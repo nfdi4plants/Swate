@@ -8,7 +8,7 @@ open Feliz
 open ARCtrl
 
 open Swate.Components
-open Swate.Components.Metadata.JsBindings
+open Swate.Components.JsBindings
 
 [<RequireQualifiedAccess>]
 type AsyncState<'T> =
@@ -88,7 +88,8 @@ type FormComponents =
                     ResizeArray [
                         for _ in inputs do
                             Guid.NewGuid()
-                    ]),
+                    ]
+                ),
                 [| box inputs.Count |]
             )
 
@@ -155,10 +156,12 @@ type FormComponents =
                                                     item,
                                                     (fun updated ->
                                                         inputs.[index] <- updated
-                                                        validateSetter inputs),
+                                                        validateSetter inputs
+                                                    ),
                                                     (fun _ ->
                                                         inputs.RemoveAt index
-                                                        validateSetter inputs)
+                                                        validateSetter inputs
+                                                    )
                                                 )
                                             )
                                     ]
@@ -170,7 +173,8 @@ type FormComponents =
                     prop.children [
                         Helper.addButton (fun _ ->
                             inputs.Add(constructor ())
-                            validateSetter inputs)
+                            validateSetter inputs
+                        )
                     ]
                 ]
             ]
@@ -218,7 +222,8 @@ type FormComponents =
         let setTermWrapper =
             React.useCallback (fun (nextTerm: Term option) ->
                 setTerm nextTerm
-                startedChange.current <- true)
+                startedChange.current <- true
+            )
 
         let debouncedTerm = React.useDebounce (term, 300)
 
@@ -227,14 +232,16 @@ type FormComponents =
                 if startedChange.current then
                     setter (debouncedTerm |> Option.map OntologyAnnotation.from)
 
-                startedChange.current <- false),
+                startedChange.current <- false
+            ),
             [| box debouncedTerm |]
         )
 
         React.useEffect (
             (fun () ->
                 setTerm (input |> Option.map _.ToTerm())
-                startedChange.current <- false),
+                startedChange.current <- false
+            ),
             [| box input |]
         )
 
@@ -261,8 +268,12 @@ type FormComponents =
 
     [<ReactComponent>]
     static member OntologyAnnotationsInput
-        (input: ResizeArray<OntologyAnnotation>, setter: ResizeArray<OntologyAnnotation> -> unit, ?label: string, ?parent)
-        =
+        (
+            input: ResizeArray<OntologyAnnotation>,
+            setter: ResizeArray<OntologyAnnotation> -> unit,
+            ?label: string,
+            ?parent
+        ) =
         FormComponents.InputSequence(
             input,
             OntologyAnnotation.empty,
@@ -273,7 +284,8 @@ type FormComponents =
                     (fun next -> next |> Option.defaultValue (OntologyAnnotation.empty ()) |> setValue),
                     ?parent = parent,
                     rmv = remove
-                )),
+                )
+            ),
             ?label = label
         )
 
@@ -293,7 +305,9 @@ type FormComponents =
             personSetter input value
             setter input
 
-        let createPersonFieldTextInput (field: string option, label: string, personSetter: Person -> string option -> unit) =
+        let createPersonFieldTextInput
+            (field: string option, label: string, personSetter: Person -> string option -> unit)
+            =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
                 (fun value -> updatePersonField value personSetter),
@@ -318,37 +332,50 @@ type FormComponents =
             let filled = fields |> List.choose id |> List.length
             $"{filled}/{total}"
 
-        Generic.Collapse
-            [ Generic.CollapseTitle(nameText, orcid, countFilledFieldsString input) ]
-            [
-                Helper.cardFormGroup [
-                    createPersonFieldTextInput (input.FirstName, "First Name", fun person value -> person.FirstName <- value)
-                    createPersonFieldTextInput (input.LastName, "Last Name", fun person value -> person.LastName <- value)
-                ]
-                Helper.cardFormGroup [
-                    createPersonFieldTextInput (input.MidInitials, "Mid Initials", fun person value -> person.MidInitials <- value)
-                    createPersonFieldTextInput (input.ORCID, "ORCID", fun person value -> person.ORCID <- value)
-                ]
-                Helper.cardFormGroup [
-                    createPersonFieldTextInput (input.Affiliation, "Affiliation", fun person value -> person.Affiliation <- value)
-                    createPersonFieldTextInput (input.Address, "Address", fun person value -> person.Address <- value)
-                ]
-                createPersonFieldTextInput (input.EMail, "Email", fun person value -> person.EMail <- value)
-                Helper.cardFormGroup [
-                    createPersonFieldTextInput (input.Phone, "Phone", fun person value -> person.Phone <- value)
-                    createPersonFieldTextInput (input.Fax, "Fax", fun person value -> person.Fax <- value)
-                ]
-                FormComponents.OntologyAnnotationsInput(
-                    input.Roles,
-                    (fun roles ->
-                        input.Roles <- roles
-                        setter input),
-                    "Roles",
-                    parent = TermCollection.PersonRoleWithinExperiment
+        Generic.Collapse [
+            Generic.CollapseTitle(nameText, orcid, countFilledFieldsString input)
+        ] [
+            Helper.cardFormGroup [
+                createPersonFieldTextInput (
+                    input.FirstName,
+                    "First Name",
+                    fun person value -> person.FirstName <- value
                 )
-                if rmv.IsSome then
-                    Helper.deleteButton rmv.Value
+                createPersonFieldTextInput (input.LastName, "Last Name", fun person value -> person.LastName <- value)
             ]
+            Helper.cardFormGroup [
+                createPersonFieldTextInput (
+                    input.MidInitials,
+                    "Mid Initials",
+                    fun person value -> person.MidInitials <- value
+                )
+                createPersonFieldTextInput (input.ORCID, "ORCID", fun person value -> person.ORCID <- value)
+            ]
+            Helper.cardFormGroup [
+                createPersonFieldTextInput (
+                    input.Affiliation,
+                    "Affiliation",
+                    fun person value -> person.Affiliation <- value
+                )
+                createPersonFieldTextInput (input.Address, "Address", fun person value -> person.Address <- value)
+            ]
+            createPersonFieldTextInput (input.EMail, "Email", fun person value -> person.EMail <- value)
+            Helper.cardFormGroup [
+                createPersonFieldTextInput (input.Phone, "Phone", fun person value -> person.Phone <- value)
+                createPersonFieldTextInput (input.Fax, "Fax", fun person value -> person.Fax <- value)
+            ]
+            FormComponents.OntologyAnnotationsInput(
+                input.Roles,
+                (fun roles ->
+                    input.Roles <- roles
+                    setter input
+                ),
+                "Roles",
+                parent = TermCollection.PersonRoleWithinExperiment
+            )
+            if rmv.IsSome then
+                Helper.deleteButton rmv.Value
+        ]
 
     [<ReactComponent>]
     static member PersonsInput
@@ -364,7 +391,7 @@ type FormComponents =
 
         let importPersons () =
             match onImportPersons with
-            | None -> setImportState (AsyncState.Error (exn "No import callback configured."))
+            | None -> setImportState (AsyncState.Error(exn "No import callback configured."))
             | Some load ->
                 promise {
                     setImportState AsyncState.Loading
@@ -391,9 +418,14 @@ type FormComponents =
                             ]
                             match importState with
                             | AsyncState.Loading ->
-                                Html.span [ prop.className "swt:loading swt:loading-spinner swt:loading-sm" ]
+                                Html.span [
+                                    prop.className "swt:loading swt:loading-spinner swt:loading-sm"
+                                ]
                             | AsyncState.Error err ->
-                                Html.span [ prop.className "swt:text-error swt:text-sm"; prop.text err.Message ]
+                                Html.span [
+                                    prop.className "swt:text-error swt:text-sm"
+                                    prop.text err.Message
+                                ]
                             | AsyncState.Ok loaded ->
                                 Html.span [
                                     prop.className "swt:text-success swt:text-sm"
@@ -423,7 +455,8 @@ type FormComponents =
         React.useEffect (
             (fun () ->
                 if inputRef.current.IsSome then
-                    inputRef.current.Value.value <- inputValue),
+                    inputRef.current.Value.value <- inputValue
+            ),
             [| box inputValue |]
         )
 
@@ -437,7 +470,8 @@ type FormComponents =
                     prop.type'.dateTimeLocal
                     prop.ref inputRef
                     prop.onChange (fun (dateValue: DateTime) ->
-                        dateValue.ToString("yyyy-MM-ddTHH:mm") |> debouncedSetter)
+                        dateValue.ToString("yyyy-MM-ddTHH:mm") |> debouncedSetter
+                    )
                 ]
             ]
         ]
@@ -468,7 +502,8 @@ type FormComponents =
                             comment.Name |> Option.defaultValue "",
                             (fun value ->
                                 comment.Name <- (if value = "" then None else Some value)
-                                setter comment),
+                                setter comment
+                            ),
                             placeholder = "comment name",
                             ?validator = keyValidator
                         )
@@ -476,7 +511,8 @@ type FormComponents =
                             comment.Value |> Option.defaultValue "",
                             (fun value ->
                                 comment.Value <- (if value = "" then None else Some value)
-                                setter comment),
+                                setter comment
+                            ),
                             placeholder = "comment"
                         )
                         if rmv.IsSome then
@@ -502,7 +538,8 @@ type FormComponents =
             Comment,
             setter,
             (fun (value, setValue, remove) ->
-                FormComponents.CommentInput(value, setValue, rmv = remove, keyValidator = keyValidator)),
+                FormComponents.CommentInput(value, setValue, rmv = remove, keyValidator = keyValidator)
+            ),
             ?label = label
         )
 
@@ -520,15 +557,14 @@ type FormComponents =
         let title = Option.defaultValue "<title>" publication.Title
         let doi = Option.defaultValue "<doi>" publication.DOI
 
-        let createFieldTextInput
-            (field: string option, label: string, publicationSetter: string option -> unit)
-            =
+        let createFieldTextInput (field: string option, label: string, publicationSetter: string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
                 (fun value ->
                     let value = if value = "" then None else Some value
                     publicationSetter value
-                    setter publication),
+                    setter publication
+                ),
                 label
             )
 
@@ -545,33 +581,35 @@ type FormComponents =
             let filled = fields |> List.choose id |> List.length
             $"{filled}/{total}"
 
-        Generic.Collapse
-            [ Generic.CollapseTitle(title, doi, countFilledFieldsString ()) ]
-            [
-                createFieldTextInput (publication.Title, "Title", fun value -> publication.Title <- value)
-                Helper.cardFormGroup [
-                    createFieldTextInput (publication.PubMedID, "PubMed ID", fun value -> publication.PubMedID <- value)
-                    createFieldTextInput (publication.DOI, "DOI", fun value -> publication.DOI <- value)
-                ]
-                createFieldTextInput (publication.Authors, "Authors", fun value -> publication.Authors <- value)
-                FormComponents.OntologyAnnotationInput(
-                    publication.Status,
-                    (fun value ->
-                        publication.Status <- value
-                        setter publication),
-                    "Status",
-                    parent = TermCollection.PublicationStatus
-                )
-                FormComponents.CommentsInput(
-                    publication.Comments,
-                    (fun comments ->
-                        publication.Comments <- ResizeArray comments
-                        setter publication),
-                    "Comments"
-                )
-                if rmv.IsSome then
-                    Helper.deleteButton rmv.Value
+        Generic.Collapse [
+            Generic.CollapseTitle(title, doi, countFilledFieldsString ())
+        ] [
+            createFieldTextInput (publication.Title, "Title", fun value -> publication.Title <- value)
+            Helper.cardFormGroup [
+                createFieldTextInput (publication.PubMedID, "PubMed ID", fun value -> publication.PubMedID <- value)
+                createFieldTextInput (publication.DOI, "DOI", fun value -> publication.DOI <- value)
             ]
+            createFieldTextInput (publication.Authors, "Authors", fun value -> publication.Authors <- value)
+            FormComponents.OntologyAnnotationInput(
+                publication.Status,
+                (fun value ->
+                    publication.Status <- value
+                    setter publication
+                ),
+                "Status",
+                parent = TermCollection.PublicationStatus
+            )
+            FormComponents.CommentsInput(
+                publication.Comments,
+                (fun comments ->
+                    publication.Comments <- ResizeArray comments
+                    setter publication
+                ),
+                "Comments"
+            )
+            if rmv.IsSome then
+                Helper.deleteButton rmv.Value
+        ]
 
     static member PublicationsInput
         (publications: ResizeArray<Publication>, setter: ResizeArray<Publication> -> unit, label: string)
@@ -586,25 +624,21 @@ type FormComponents =
 
     [<ReactComponent>]
     static member OntologySourceReferenceInput
-        (
-            input: OntologySourceReference,
-            setter: OntologySourceReference -> unit,
-            ?deleteButton: MouseEvent -> unit
-        ) =
+        (input: OntologySourceReference, setter: OntologySourceReference -> unit, ?deleteButton: MouseEvent -> unit)
+        =
         let name = Option.defaultValue "<name>" input.Name
         let version = Option.defaultValue "<version>" input.Version
 
         let toOptionalString (value: string) =
             if String.IsNullOrWhiteSpace value then None else Some value
 
-        let createFieldTextInput
-            (field: string option, label: string, setField: string option -> unit)
-            =
+        let createFieldTextInput (field: string option, label: string, setField: string option -> unit) =
             FormComponents.TextInput(
                 field |> Option.defaultValue "",
                 (fun value ->
                     setField (toOptionalString value)
-                    setter input),
+                    setter input
+                ),
                 label
             )
 
@@ -621,32 +655,34 @@ type FormComponents =
             let filled = fields |> List.choose id |> List.length
             $"{filled}/{total}"
 
-        Generic.Collapse
-            [ Generic.CollapseTitle(name, version, countFilledFieldsString ()) ]
-            [
-                createFieldTextInput (input.Name, "Name", fun value -> input.Name <- value)
-                Helper.cardFormGroup [
-                    createFieldTextInput (input.Version, "Version", fun value -> input.Version <- value)
-                    createFieldTextInput (input.File, "File", fun value -> input.File <- value)
-                ]
-                FormComponents.TextInput(
-                    Option.defaultValue "" input.Description,
-                    (fun value ->
-                        input.Description <- toOptionalString value
-                        setter input),
-                    "Description",
-                    isArea = true
-                )
-                FormComponents.CommentsInput(
-                    input.Comments,
-                    (fun comments ->
-                        input.Comments <- comments
-                        setter input),
-                    "Comments"
-                )
-                if deleteButton.IsSome then
-                    Helper.deleteButton deleteButton.Value
+        Generic.Collapse [
+            Generic.CollapseTitle(name, version, countFilledFieldsString ())
+        ] [
+            createFieldTextInput (input.Name, "Name", fun value -> input.Name <- value)
+            Helper.cardFormGroup [
+                createFieldTextInput (input.Version, "Version", fun value -> input.Version <- value)
+                createFieldTextInput (input.File, "File", fun value -> input.File <- value)
             ]
+            FormComponents.TextInput(
+                Option.defaultValue "" input.Description,
+                (fun value ->
+                    input.Description <- toOptionalString value
+                    setter input
+                ),
+                "Description",
+                isArea = true
+            )
+            FormComponents.CommentsInput(
+                input.Comments,
+                (fun comments ->
+                    input.Comments <- comments
+                    setter input
+                ),
+                "Comments"
+            )
+            if deleteButton.IsSome then
+                Helper.deleteButton deleteButton.Value
+        ]
 
     static member OntologySourceReferencesInput
         (
@@ -659,6 +695,7 @@ type FormComponents =
             OntologySourceReference,
             setter,
             (fun (value, setValue, remove) ->
-                FormComponents.OntologySourceReferenceInput(value, setValue, deleteButton = remove)),
+                FormComponents.OntologySourceReferenceInput(value, setValue, deleteButton = remove)
+            ),
             label = label
         )

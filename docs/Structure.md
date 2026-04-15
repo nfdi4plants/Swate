@@ -62,8 +62,6 @@ For example: IPC base types are defined here and implemented in preload, main, a
 	- `Preload` contains bridge and IPC registration code.
 	- `Renderer` contains UI and renderer-safe integrations.
 
-
-
 ### Placement rule of thumb
 
 - If code is reusable UI without app context -> put it in `src/Components`.

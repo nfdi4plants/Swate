@@ -33,6 +33,9 @@ module DndKit =
         abstract member transform: obj
         abstract member transition: obj
 
+    type IDroppable =
+        abstract member setNodeRef: obj -> unit
+
     /// <summary>
     /// Not 100% sure that active and over are in fact HTMLElements. But currently we only use id.
     /// </summary>
@@ -58,6 +61,9 @@ module DndKit =
     [<Import("verticalListSortingStrategy", "@dnd-kit/sortable")>]
     let verticalListSortingStrategy: obj = jsNative
 
+    [<Import("horizontalListSortingStrategy", "@dnd-kit/sortable")>]
+    let horizontalListSortingStrategy: obj = jsNative
+
 
 open DndKit
 
@@ -69,6 +75,9 @@ type DndKit =
 
     [<Import("useSortable", "@dnd-kit/sortable")>]
     static member useSortable(props: obj) : ISortable = jsNative
+
+    [<Import("useDroppable", "@dnd-kit/core")>]
+    static member useDroppable(props: obj) : IDroppable = jsNative
 
     [<Import("useSensor", "@dnd-kit/core")>]
     static member useSensor(sensor, ?props) : ISensor = jsNative
