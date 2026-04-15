@@ -284,7 +284,15 @@ type ArcFileFooterTabs =
     [<ReactComponent>]
     static member DragAndDropContainer(tableIds: ResizeArray<string>, handleDragEnd, children: ReactElement) =
 
-        let sensors = DndKit.useSensors [| DndKit.useSensor DndKit.PointerSensor |]
+        let pointerSensor =
+            DndKit.useSensor (
+                DndKit.PointerSensor,
+                {|
+                    activationConstraint = {| distance = 8 |}
+                |}
+            )
+
+        let sensors = DndKit.useSensors [| pointerSensor |]
 
         DndKit.DndContext(
             sensors = sensors,
@@ -308,8 +316,6 @@ type ArcFileFooterTabs =
 
         let isEditorModeTableTab, setIsEditorModeTableTab =
             React.useState (None: int option)
-
-        let sensors = DndKit.useSensors [| DndKit.useSensor DndKit.PointerSensor |]
 
         let addNewTable _ =
             if canAddTable then
