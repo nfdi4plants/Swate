@@ -17,15 +17,6 @@ module private ArcFileFooterTabsHelper =
     [<Literal>]
     let TableDragIdPrefix = "table-"
 
-    [<Literal>]
-    let MetadataDropTargetId = "drop-metadata"
-
-    [<Literal>]
-    let DataMapDropTargetId = "drop-datamap"
-
-    [<Literal>]
-    let PlusDropTargetId = "drop-plus"
-
     let mkTableDragId (index: int) = $"{TableDragIdPrefix}{index}"
 
     let tryParseTableDragId (i: string) =
@@ -38,12 +29,7 @@ module private ArcFileFooterTabsHelper =
         else
             None
 
-    let resolveDropTargetTableIndex (targetId: string) (tableCount: int) =
-        match targetId with
-        | MetadataDropTargetId
-        | DataMapDropTargetId -> Some 0
-        | PlusDropTargetId -> Some tableCount
-        | _ -> tryParseTableDragId targetId
+    let resolveDropTargetTableIndex (targetId: string) = tryParseTableDragId targetId
 
     let tryGetDndEventId (eventNode: obj) =
         if isNull eventNode then
@@ -175,7 +161,7 @@ type ArcFileFooterTabs =
 
                 match System.String.IsNullOrWhiteSpace trimmed || trimmed = currentName with
                 | true -> ()
-                | _ -> onNameChange localInput
+                | _ -> onNameChange trimmed
 
         ArcFileFooterTabs.BaseTab(
             Html.input [
@@ -219,7 +205,6 @@ type ArcFileFooterTabs =
             "swt:iconify swt:fluent--info-20-filled",
             isActive = isActive,
             activeView = ActiveView.Metadata,
-            extraProps = [ prop.id MetadataDropTargetId ],
             key = "MetadataTab"
         )
 
@@ -232,19 +217,13 @@ type ArcFileFooterTabs =
             "swt:iconify swt:fluent--map-16-regular",
             isActive = isActive,
             activeView = ActiveView.DataMap,
-            extraProps = [ prop.id DataMapDropTargetId ],
             key = "DataMapTab"
         )
 
     [<ReactComponent>]
     static member private PlusBtn(onClick) =
 
-        ArcFileFooterTabs.BaseTab(
-            Html.none,
-            onClick,
-            "swt:iconify swt:fluent--add-12-filled",
-            extraProps = [ prop.id PlusDropTargetId ]
-        )
+        ArcFileFooterTabs.BaseTab(Html.none, onClick, "swt:iconify swt:fluent--add-12-filled")
 
     [<ReactComponent>]
     static member private ContextMenu
@@ -325,6 +304,8 @@ type ArcFileFooterTabs =
             React.useState (None: int option)
 
         let addNewTable _ =
+            setIsEditorModeTableTab None
+
             if canAddTable then
                 let nextName = Helper.createNewTableName tables
                 let nextTable = ArcTable.init nextName
@@ -334,15 +315,18 @@ type ArcFileFooterTabs =
                 setActiveView (ActiveView.Table(tables.Count - 1))
 
         let deleteTable (tableIndex: int) =
+            setIsEditorModeTableTab None
             arcFile.ArcTables().RemoveTableAt tableIndex
 
             match activeView with
             | ActiveView.Table i when i = tableIndex -> setActiveView ActiveView.Metadata
+            | ActiveView.Table i when i > tableIndex -> setActiveView (ActiveView.Table(i - 1))
             | _ -> ()
 
             setArcFile (WidgetArcFile.refreshRef arcFile)
 
         let updateTableOrder (oldIndex: int, newIndex: int) =
+            setIsEditorModeTableTab None
             arcFile.ArcTables().MoveTable(oldIndex, newIndex)
             let lastIndex = tables.Count - 1
             let nextActiveIndex = max 0 (min newIndex lastIndex)
@@ -356,7 +340,7 @@ type ArcFileFooterTabs =
             else
                 match tryGetDndEventId (box event.active), tryGetDndEventId (box event.over) with
                 | Some activeId, Some overId when activeId <> overId ->
-                    match tryParseTableDragId activeId, resolveDropTargetTableIndex overId tables.Count with
+                    match tryParseTableDragId activeId, resolveDropTargetTableIndex overId with
                     | Some oldIndex, Some newIndex when oldIndex <> newIndex -> updateTableOrder (oldIndex, newIndex)
                     | _ -> ()
                 | _ -> ()

@@ -129,13 +129,16 @@ type ContextMenu =
                     match onSpawn e with
                     | Some data ->
                         functionIsCalled.current <- false
-                        e.preventDefault ()
-                        setSpawnData (data)
                         let children = childInfo data
 
                         match children with
-                        | [] -> ()
+                        | [] ->
+                            setSpawnData null
+                            setChildren []
+                            setIsOpen false
                         | children ->
+                            e.preventDefault ()
+                            setSpawnData (data)
 
                             children |> setChildren
 

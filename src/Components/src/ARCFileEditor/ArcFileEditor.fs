@@ -388,7 +388,7 @@ type Main =
 
         let startArcFile = ArcFiles.Assay(ArcAssay.init ("Test"))
 
-        for i in 0..20 do
+        for i in 0..10 do
             startArcFile.Tables().Add(ArcTable.init (sprintf "Table %i" i))
 
         let arcFile, setArcFile = React.useState (startArcFile)
