@@ -219,7 +219,7 @@ type ContextMenu =
                             visuallyHiddenDismiss = true,
                             children =
                                 Html.div [
-                                    prop.ref (unbox floating.refs.setFloating)
+                                    prop.ref floating.refs.setFloating
                                     if debug then
                                         prop.testId "context_menu"
                                     prop.custom ("style", floating.floatingStyles)

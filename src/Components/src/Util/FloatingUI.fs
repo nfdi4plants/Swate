@@ -37,8 +37,8 @@ module FloatingUI =
         abstract reference: IRefValue<ReferenceElement option>
         abstract floating: IRefValue<HTMLElement option>
         abstract domReference: IRefValue<HTMLElement option>
-        abstract setReference: HTMLElement option -> unit
-        abstract setFloating: HTMLElement option -> unit
+        abstract setReference: Element -> unit
+        abstract setFloating: Element -> unit
         abstract setPositionReference: ReferenceElement -> unit
 
     [<AllowNullLiteral>]
