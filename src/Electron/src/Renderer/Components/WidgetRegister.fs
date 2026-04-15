@@ -4,7 +4,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.ArcFileEditor.Types
 open Swate.Components.Shared
-open Swate.Components.Widgets.Contexts
+open Swate.Components.Widgets.Context
 open ARCtrl
 open Swate.Electron.Shared.IPCTypes
 

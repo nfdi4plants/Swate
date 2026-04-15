@@ -5,7 +5,7 @@ open Fable.Core
 open Feliz
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
-open Swate.Components.Widgets.Contexts
+open Swate.Components.Widgets.Context
 
 
 module private BuildingBlockWidgetState =

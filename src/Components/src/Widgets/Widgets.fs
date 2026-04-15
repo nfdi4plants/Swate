@@ -5,7 +5,7 @@ open Browser.Types
 open WidgetsLocalStorage
 open Swate
 open Swate.Components
-open Swate.Components.Widgets.Contexts
+open Swate.Components.Widgets.Context
 
 module InitExtensions =
 

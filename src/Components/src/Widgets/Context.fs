@@ -1,4 +1,4 @@
-module Swate.Components.Widgets.Contexts
+module Swate.Components.Widgets.Context
 
 open Fable.Core
 open Feliz
@@ -26,19 +26,17 @@ type WidgetControllerContext = {
     focusWidget: WidgetType -> unit
 }
 
-module WidgetControllerContext =
-
-    let init () = {
-        activeWidgets = []
-        isActive = fun _ -> false
-        openWidget = fun _ -> ()
-        closeWidget = fun _ -> ()
-        toggleWidget = fun _ -> ()
-        focusWidget = fun _ -> ()
-    }
+let init () = {
+    activeWidgets = []
+    isActive = fun _ -> false
+    openWidget = fun _ -> ()
+    closeWidget = fun _ -> ()
+    toggleWidget = fun _ -> ()
+    focusWidget = fun _ -> ()
+}
 
 let WidgetControllerCtx =
-    React.createContext<WidgetControllerContext> (WidgetControllerContext.init ())
+    React.createContext<WidgetControllerContext> (init ())
 
 let ActiveWidgetContext = WidgetControllerCtx
 
