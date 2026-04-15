@@ -133,38 +133,39 @@ type ContextMenu =
                         setSpawnData (data)
                         let children = childInfo data
 
-                        if children.Length = 0 then
-                            failwith "Context menu must have at least one item"
+                        match children with
+                        | [] -> ()
+                        | children ->
 
-                        children |> setChildren
+                            children |> setChildren
 
-                        listContentRef.current.AddRange(
-                            children
-                            |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
-                        )
+                            listContentRef.current.AddRange(
+                                children
+                                |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
+                            )
 
-                        let rect: ClientRect =
-                            {|
-                                width = 0
-                                height = 0
-                                x = e.clientX
-                                y = e.clientY
-                                top = e.clientY
-                                left = e.clientX
-                                right = e.clientX
-                                bottom = e.clientY
-                            |}
-                            |> unbox
+                            let rect: ClientRect =
+                                {|
+                                    width = 0
+                                    height = 0
+                                    x = e.clientX
+                                    y = e.clientY
+                                    top = e.clientY
+                                    left = e.clientX
+                                    right = e.clientX
+                                    bottom = e.clientY
+                                |}
+                                |> unbox
 
-                        let vEl = FloatingUI.VirtualElement(fun () -> rect)
+                            let vEl = FloatingUI.VirtualElement(fun () -> rect)
 
-                        floating.refs.setPositionReference !^vEl
+                            floating.refs.setPositionReference !^vEl
+                            setIsOpen (true)
 
-                        setIsOpen (true)
-                        myClearTimeout ()
+                            myClearTimeout ()
 
-                        allowMouseUpCloseRef.current <- false
-                        timeout.current <- Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
+                            allowMouseUpCloseRef.current <- false
+                            timeout.current <- Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
 
                     | None -> ()
 
@@ -279,7 +280,7 @@ type ContextMenu =
                                                         if child.icon.IsSome then
                                                             Html.div [
                                                                 prop.className
-                                                                    "swt:col-start-1 swt:justify-self-start swt:self-center"
+                                                                    "swt:col-start-1 swt:justify-self-start swt:self-center swt:flex swt:items-center"
                                                                 prop.children child.icon.Value
                                                             ]
                                                         else

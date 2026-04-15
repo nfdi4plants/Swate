@@ -1,4 +1,4 @@
-namespace Swate.Components.Metadata.JsBindings
+namespace Swate.Components.JsBindings
 
 open Browser.Types
 open Fable.Core
@@ -56,7 +56,6 @@ module DndKit =
     [<Import("verticalListSortingStrategy", "@dnd-kit/sortable")>]
     let verticalListSortingStrategy: obj = jsNative
 
-
 open DndKit
 
 [<Erase>]
@@ -79,9 +78,7 @@ type DndKit =
         React.Imported()
 
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
-    static member SortableContext(items: ResizeArray<string>, strategy, children: ReactElement) =
-        React.Imported()
+    static member SortableContext(items: ResizeArray<string>, strategy, children: ReactElement) = React.Imported()
 
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
-    static member SortableContext(items: ResizeArray<System.Guid>, strategy, children: ReactElement) =
-        React.Imported()
+    static member SortableContext(items: ResizeArray<System.Guid>, strategy, children: ReactElement) = React.Imported()
