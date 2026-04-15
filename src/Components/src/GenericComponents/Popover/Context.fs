@@ -1,4 +1,4 @@
-module Swate.Components.Popover.Context
+module Swate.Components.PopoverContext
 
 open Fable.Core
 open Feliz
