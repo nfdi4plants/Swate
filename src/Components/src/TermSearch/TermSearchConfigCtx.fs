@@ -3,15 +3,6 @@ namespace Swate.Components.TermSearch
 open Feliz
 open Swate.Components.Types
 
-type TermSearchConfigLocalStorageActiveKeysCtx = {
-    disableDefault: bool
-    aktiveKeys: string[]
-} with
-
-    static member init(?defaultActive: Set<string>) = {
-        disableDefault = false
-        aktiveKeys = defaultActive |> Option.map Set.toArray |> Option.defaultValue [||]
-    }
 
 type TermSearchConfigCtx = {
     hasProvider: bool
