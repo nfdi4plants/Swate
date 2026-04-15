@@ -158,6 +158,7 @@ export const Basic: Story = {
     const dialog = await screen.findByRole("dialog", { name: /dataset actions/i });
     expect(content).toBe(dialog);
     expect(dialog).toHaveAttribute("data-state", "open");
+    await waitFor(() => expect(dialog).toHaveAttribute("data-status", "open"));
     expect(screen.getByText(/choose what should happen/i)).toBeInTheDocument();
 
     await userEvent.keyboard("{Escape}");

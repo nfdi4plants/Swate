@@ -42,7 +42,9 @@ type Popover =
             ?initialFocus: obj,
             ?returnFocus: obj,
             ?visuallyHiddenDismiss: obj,
-            ?closeOnFocusOut: bool
+            ?closeOnFocusOut: bool,
+            ?outsideElementsInert: bool,
+            ?focusManagerDisabled: bool
         ) =
         let controlledOpen = isOpen
 
@@ -81,6 +83,8 @@ type Popover =
 
         let interactions = FloatingUI.useInteractions [| click; dismiss; role |]
 
+        let transitionStatus = FloatingUI.useTransitionStatus floating.context
+
         let labelId, setLabelId = React.useStateWithUpdater<string option> None
 
         let descriptionId, setDescriptionId = React.useStateWithUpdater<string option> None
@@ -90,6 +94,8 @@ type Popover =
             setIsOpen = setIsOpen
             floating = floating
             interactions = interactions
+            isMounted = transitionStatus.isMounted
+            status = transitionStatus.status
             modal = defaultArg modal false
             labelId = labelId
             setLabelId = setLabelId
@@ -102,6 +108,8 @@ type Popover =
             returnFocus = returnFocus
             visuallyHiddenDismiss = visuallyHiddenDismiss
             closeOnFocusOut = closeOnFocusOut
+            outsideElementsInert = outsideElementsInert
+            focusManagerDisabled = focusManagerDisabled
         }
 
         PopoverCtx.Provider(Some providerValue, children)
@@ -114,20 +122,18 @@ type Popover =
 
         Html.button [
             prop.type'.button
-            prop.ref (unbox ctx.floating.refs.setReference)
+            prop.ref ctx.floating.refs.setReference
             prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
             if resolvedDebug.IsSome then
                 prop.testId ("popover_trigger_" + resolvedDebug.Value)
             prop.className [
                 "swt:btn"
-                if className.IsSome then
-                    className.Value
+                yield! Option.toList className
             ]
             yield!
                 prop.spread
                 <| ctx.interactions.getReferenceProps (PopoverHelper.resolveProps interactionProps)
-            if props.IsSome then
-                yield! props.Value
+            yield! Option.defaultValue [] props
             prop.children children
         ]
 
@@ -147,7 +153,7 @@ type Popover =
 
         render {|
             isOpen = ctx.isOpen
-            setReference = unbox ctx.floating.refs.setReference
+            setReference = box ctx.floating.refs.setReference
             referenceProps = ctx.interactions.getReferenceProps (PopoverHelper.resolveProps interactionProps)
         |}
 
@@ -172,15 +178,18 @@ type Popover =
                     FloatingUI.FloatingFocusManager(
                         context = ctx.floating.context,
                         modal = ctx.modal,
+                        ?disabled = ctx.focusManagerDisabled,
                         ?initialFocus = ctx.initialFocus,
                         ?returnFocus = ctx.returnFocus,
                         ?visuallyHiddenDismiss = ctx.visuallyHiddenDismiss,
                         ?closeOnFocusOut = ctx.closeOnFocusOut,
+                        ?outsideElementsInert = ctx.outsideElementsInert,
                         children =
                             Html.div [
-                                prop.ref (unbox ctx.floating.refs.setFloating)
+                                prop.ref ctx.floating.refs.setFloating
                                 prop.custom ("style", ctx.floating.floatingStyles)
                                 prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
+                                prop.custom ("data-status", ctx.status)
                                 match ctx.labelId with
                                 | Some lid -> prop.ariaLabelledBy lid
                                 | None ->
@@ -194,14 +203,12 @@ type Popover =
                                     "swt:z-[9999] swt:min-w-56 swt:max-w-[min(28rem,calc(100vw-2rem))]"
                                     "swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100"
                                     "swt:p-4 swt:shadow-md swt:outline-hidden"
-                                    if className.IsSome then
-                                        className.Value
+                                    yield! Option.toList className
                                 ]
                                 yield!
                                     prop.spread
                                     <| ctx.interactions.getFloatingProps (PopoverHelper.resolveProps interactionProps)
-                                if props.IsSome then
-                                    yield! props.Value
+                                yield! Option.defaultValue [] props
                                 prop.children children
                             ]
                     )
@@ -238,11 +245,9 @@ type Popover =
             prop.id headingId
             prop.className [
                 "swt:text-base swt:font-semibold swt:leading-tight"
-                if className.IsSome then
-                    className.Value
+                yield! Option.toList className
             ]
-            if props.IsSome then
-                yield! props.Value
+            yield! Option.defaultValue [] props
             prop.children children
         ]
 
@@ -275,11 +280,9 @@ type Popover =
             prop.id descriptionId
             prop.className [
                 "swt:text-sm swt:opacity-70"
-                if className.IsSome then
-                    className.Value
+                yield! Option.toList className
             ]
-            if props.IsSome then
-                yield! props.Value
+            yield! Option.defaultValue [] props
             prop.children children
         ]
 
@@ -291,11 +294,9 @@ type Popover =
             prop.type'.button
             prop.className [
                 "swt:btn swt:btn-sm"
-                if className.IsSome then
-                    className.Value
+                yield! Option.toList className
             ]
             prop.onClick (fun _ -> ctx.setIsOpen false)
-            if props.IsSome then
-                yield! props.Value
+            yield! Option.defaultValue [] props
             prop.children children
         ]
