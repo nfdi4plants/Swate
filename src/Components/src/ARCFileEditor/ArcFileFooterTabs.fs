@@ -34,6 +34,20 @@ module private ArcFileFooterTabsHelper =
             | _ -> None
         | _ -> None
 
+    module ContextMenu =
+
+        let onSpawn (elementRef: IRefValue<option<Browser.Types.HTMLElement>>) =
+            (fun (e: Browser.Types.MouseEvent) ->
+                let target = e.target :?> Browser.Types.HTMLElement
+
+                match target.closest ($"[data-{FooterTabIdDataKey}]"), elementRef.current with
+                | Some cell, Some container when container.contains (cell) ->
+                    let cell = cell :?> Browser.Types.HTMLElement
+                    let tabId: string = cell?dataset?footertabid
+                    unbox (tryParseDataFooterTabId tabId)
+                | _ -> None
+            )
+
 open ArcFileFooterTabsHelper
 
 [<Erase; Mangle(false)>]
@@ -159,17 +173,7 @@ type ArcFileFooterTabs =
             setEditorMode: int option -> unit,
             deleteTable: int -> unit
         ) =
-        let onSpawn =
-            (fun (e: Browser.Types.MouseEvent) ->
-                let target = e.target :?> Browser.Types.HTMLElement
 
-                match target.closest ($"[data-{FooterTabIdDataKey}]"), elementRef.current with
-                | Some cell, Some container when container.contains (cell) ->
-                    let cell = cell :?> Browser.Types.HTMLElement
-                    let tabId: string = cell?dataset?footertabid
-                    unbox (tryParseDataFooterTabId tabId)
-                | _ -> None
-            )
 
         let delete (tableIndex: int) = fun _ -> deleteTable tableIndex
 
@@ -202,7 +206,7 @@ type ArcFileFooterTabs =
                 | _ -> []
 
 
-        Swate.Components.ContextMenu.ContextMenu(children, ref = elementRef, onSpawn = onSpawn)
+        Swate.Components.ContextMenu.ContextMenu(children, ref = elementRef, onSpawn = ContextMenu.onSpawn elementRef)
 
     [<ReactComponent>]
     static member Main
@@ -234,6 +238,11 @@ type ArcFileFooterTabs =
             | ActiveView.Table i when i = tableIndex -> setActiveView ActiveView.Metadata
             | _ -> ()
 
+            setArcFile (WidgetArcFile.refreshRef arcFile)
+
+        let updateTableOrder (oldIndex: int, newIndex: int) =
+            arcFile.ArcTables().MoveTable(oldIndex, newIndex)
+            setActiveView (ActiveView.Table newIndex)
             setArcFile (WidgetArcFile.refreshRef arcFile)
 
         React.Fragment [
