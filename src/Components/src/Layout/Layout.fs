@@ -243,10 +243,8 @@ type Layout =
             ?leftContent: ReactElement,
             ?leftActions: ReactElement,
             ?rightContent: ReactElement,
-            ?rightActions: ReactElement,
-            ?hasNavbar: bool
+            ?rightActions: ReactElement
         ) =
-        let hasNavbar = defaultArg hasNavbar false
         let ctxLeft = React.useContext (LeftSidebarContext)
         let ctxRight = React.useContext (RightSidebarContext)
 
@@ -376,13 +374,7 @@ type Layout =
         )
 
         Html.div [
-            prop.className [
-                "swt:flex swt:flex-row swt:w-full"
-                if hasNavbar then
-                    "swt:grow-0 swt:h-[calc(100%-2.5rem)]"
-                else
-                    "swt:grow swt:h-full"
-            ]
+            prop.className "swt:flex swt:flex-row swt:w-full swt:flex-1 swt:min-h-0"
             prop.children [
                 if leftActions.IsSome then
                     Layout.SidebarActions(leftActions.Value, Sidebar.Side.Left)
@@ -486,7 +478,7 @@ type Layout =
                         if navbar.IsSome then
                             Html.div [
                                 prop.className
-                                    "swt:h-12 swt:flex swt:flex-row swt:items-center swt:grow-0 swt:border-b swt:border-base-content/50"
+                                    "swt:h-12 swt:shrink-0 swt:grow-0 swt:flex swt:flex-row swt:items-center swt:overflow-hidden swt:border-b swt:border-base-content/50"
                                 prop.testId "layout-main-navbar"
                                 prop.children navbar.Value
                             ]
@@ -495,8 +487,7 @@ type Layout =
                             ?leftContent = leftSidebar,
                             ?leftActions = leftActions,
                             ?rightContent = rightSidebar,
-                            ?rightActions = rightActions,
-                            hasNavbar = navbar.IsSome
+                            ?rightActions = rightActions
                         )
                     ]
                 ]

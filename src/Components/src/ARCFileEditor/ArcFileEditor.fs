@@ -335,7 +335,7 @@ type Main =
 
         let editorContent =
             Html.div [
-                prop.className "swt:grow swt:flex swt:flex-col swt:border swt:border-red-500 swt:overflow-hidden"
+                prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
                 prop.children [
                     navbar
                     Html.div [
