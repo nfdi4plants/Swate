@@ -34,6 +34,9 @@ module DndKit =
         abstract member transform: obj
         abstract member transition: obj
 
+    type IDroppable =
+        abstract member setNodeRef: obj -> unit
+
     type IDndKitEvent =
         abstract member active: HTMLElement
         abstract member over: HTMLElement
@@ -56,6 +59,9 @@ module DndKit =
     [<Import("verticalListSortingStrategy", "@dnd-kit/sortable")>]
     let verticalListSortingStrategy: obj = jsNative
 
+    [<Import("horizontalListSortingStrategy", "@dnd-kit/sortable")>]
+    let horizontalListSortingStrategy: obj = jsNative
+
 open DndKit
 
 [<Erase>]
@@ -66,6 +72,9 @@ type DndKit =
 
     [<Import("useSortable", "@dnd-kit/sortable")>]
     static member useSortable(props: obj) : ISortable = jsNative
+
+    [<Import("useDroppable", "@dnd-kit/core")>]
+    static member useDroppable(props: obj) : IDroppable = jsNative
 
     [<Import("useSensor", "@dnd-kit/core")>]
     static member useSensor(sensor, ?props) : ISensor = jsNative

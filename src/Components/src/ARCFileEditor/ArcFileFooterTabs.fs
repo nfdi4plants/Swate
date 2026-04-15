@@ -14,25 +14,66 @@ module private ArcFileFooterTabsHelper =
     [<Literal>]
     let FooterTabIdDataKey = "footertabid"
 
+    [<Literal>]
+    let TableDragIdPrefix = "table-"
+
+    [<Literal>]
+    let MetadataDropTargetId = "drop-metadata"
+
+    [<Literal>]
+    let DataMapDropTargetId = "drop-datamap"
+
+    [<Literal>]
+    let PlusDropTargetId = "drop-plus"
+
+    let mkTableDragId (index: int) = $"{TableDragIdPrefix}{index}"
+
+    let tryParseTableDragId (i: string) =
+        if i.StartsWith TableDragIdPrefix then
+            let indexStr = i.Substring(TableDragIdPrefix.Length)
+
+            match System.Int32.TryParse indexStr with
+            | true, index -> Some index
+            | _ -> None
+        else
+            None
+
+    let resolveDropTargetTableIndex (targetId: string) (tableCount: int) =
+        match targetId with
+        | MetadataDropTargetId
+        | DataMapDropTargetId -> Some 0
+        | PlusDropTargetId -> Some tableCount
+        | _ -> tryParseTableDragId targetId
+
+    let tryGetDndEventId (eventNode: obj) =
+        if isNull eventNode then
+            None
+        else
+            let idObj: obj = eventNode?``id``
+
+            if isNull idObj then None else Some(string idObj)
+
+    let dndObjectProps (obj: Swate.Components.JsBindings.IObject) = [
+        for key in Swate.Components.JsBindings.Object.keys obj do
+            prop.custom (key, obj.get key)
+    ]
+
     type prop with
         static member dataFooterTabId(arctiveView: ActiveView) : IReactProperty =
             match arctiveView with
             | ActiveView.DataMap -> "datamap"
             | ActiveView.Metadata -> "metadata"
-            | ActiveView.Table index -> $"table-{index}"
+            | ActiveView.Table index -> mkTableDragId index
             |> fun v -> unbox ($"data-{FooterTabIdDataKey}", v)
 
     let tryParseDataFooterTabId (i: string) =
         match i with
         | "metadata" -> Some ActiveView.Metadata
         | "datamap" -> Some ActiveView.DataMap
-        | _ when i.StartsWith "table-" ->
-            let indexStr = i.Substring(6)
-
-            match System.Int32.TryParse indexStr with
-            | true, index -> Some(ActiveView.Table index)
-            | _ -> None
-        | _ -> None
+        | _ ->
+            match tryParseTableDragId i with
+            | Some index -> Some(ActiveView.Table index)
+            | None -> None
 
     module ContextMenu =
 
@@ -60,10 +101,13 @@ type ArcFileFooterTabs =
             ?iconClass: string,
             ?isActive: bool,
             ?key,
+            ?extraProps: IReactProperty list,
             // This arg is used to get tab information for context menu
             ?activeView: ActiveView
         ) =
         Html.button [
+            if extraProps.IsSome then
+                yield! extraProps.Value
             if activeView.IsSome then
                 prop.dataFooterTabId activeView.Value
             prop.className [
@@ -83,12 +127,32 @@ type ArcFileFooterTabs =
     [<ReactComponent>]
     static member private TableTab(index: int, tableName: string, onClick, isActive: bool, ?key: int) =
 
+        let sortable = DndKit.useSortable ({| id = mkTableDragId index |})
+
+        let style = [
+            style.custom ("transform", DndKit.CSS.Transform.toString sortable.transform)
+            style.custom ("transition", sortable.transition)
+            style.cursor.grab
+        ]
+
+        let dndProps = [
+            prop.id (mkTableDragId index)
+            prop.ref sortable.setNodeRef
+            prop.style style
+        ]
+
+        let dndProps =
+            dndProps
+            @ dndObjectProps sortable.attributes
+            @ dndObjectProps sortable.listeners
+
         ArcFileFooterTabs.BaseTab(
             Html.span [ prop.text tableName ],
             onClick,
             "swt:iconify swt:fluent--table-24-regular",
             isActive = isActive,
             activeView = ActiveView.Table index,
+            extraProps = dndProps,
             ?key = key
         )
 
@@ -148,23 +212,32 @@ type ArcFileFooterTabs =
             "swt:iconify swt:fluent--info-20-filled",
             isActive = isActive,
             activeView = ActiveView.Metadata,
+            extraProps = [ prop.id MetadataDropTargetId ],
             key = "MetadataTab"
         )
 
     [<ReactComponent>]
     static member private DataMapTab(onClick, isActive: bool) =
+
         ArcFileFooterTabs.BaseTab(
             Html.span "DataMap",
             onClick,
             "swt:iconify swt:fluent--map-16-regular",
             isActive = isActive,
             activeView = ActiveView.DataMap,
+            extraProps = [ prop.id DataMapDropTargetId ],
             key = "DataMapTab"
         )
 
     [<ReactComponent>]
     static member private PlusBtn(onClick) =
-        ArcFileFooterTabs.BaseTab(Html.none, onClick, "swt:iconify swt:fluent--add-12-filled")
+
+        ArcFileFooterTabs.BaseTab(
+            Html.none,
+            onClick,
+            "swt:iconify swt:fluent--add-12-filled",
+            extraProps = [ prop.id PlusDropTargetId ]
+        )
 
     [<ReactComponent>]
     static member private ContextMenu
@@ -209,6 +282,23 @@ type ArcFileFooterTabs =
         Swate.Components.ContextMenu.ContextMenu(children, ref = elementRef, onSpawn = ContextMenu.onSpawn elementRef)
 
     [<ReactComponent>]
+    static member DragAndDropContainer(tableIds: ResizeArray<string>, handleDragEnd, children: ReactElement) =
+
+        let sensors = DndKit.useSensors [| DndKit.useSensor DndKit.PointerSensor |]
+
+        DndKit.DndContext(
+            sensors = sensors,
+            onDragEnd = handleDragEnd,
+            collisionDetection = DndKit.closestCenter,
+            children =
+                DndKit.SortableContext(
+                    items = tableIds,
+                    strategy = DndKit.horizontalListSortingStrategy,
+                    children = children
+                )
+        )
+
+    [<ReactComponent>]
     static member Main
         (arcFile: ArcFiles, activeView: ActiveView, setActiveView: ActiveView -> unit, setArcFile: ArcFiles -> unit)
         =
@@ -218,7 +308,8 @@ type ArcFileFooterTabs =
 
         let isEditorModeTableTab, setIsEditorModeTableTab =
             React.useState (None: int option)
-        // let sensors = DndKit.useSensors [| DndKit.useSensor DndKit.PointerSensor |]
+
+        let sensors = DndKit.useSensors [| DndKit.useSensor DndKit.PointerSensor |]
 
         let addNewTable _ =
             if canAddTable then
@@ -228,8 +319,6 @@ type ArcFileFooterTabs =
                 tables.Add nextTable
                 setArcFile (WidgetArcFile.refreshRef arcFile)
                 setActiveView (ActiveView.Table(tables.Count - 1))
-
-        // let handleDragEnd (event: _) = console.log event
 
         let deleteTable (tableIndex: int) =
             arcFile.ArcTables().RemoveTableAt tableIndex
@@ -242,8 +331,25 @@ type ArcFileFooterTabs =
 
         let updateTableOrder (oldIndex: int, newIndex: int) =
             arcFile.ArcTables().MoveTable(oldIndex, newIndex)
-            setActiveView (ActiveView.Table newIndex)
+            let lastIndex = tables.Count - 1
+            let nextActiveIndex = max 0 (min newIndex lastIndex)
+            setActiveView (ActiveView.Table nextActiveIndex)
             setArcFile (WidgetArcFile.refreshRef arcFile)
+
+        let handleDragEnd (event: DndKit.IDndKitEvent) =
+
+            if isEditorModeTableTab.IsSome then
+                ()
+            else
+                match tryGetDndEventId (box event.active), tryGetDndEventId (box event.over) with
+                | Some activeId, Some overId when activeId <> overId ->
+                    match tryParseTableDragId activeId, resolveDropTargetTableIndex overId tables.Count with
+                    | Some oldIndex, Some newIndex when oldIndex <> newIndex -> updateTableOrder (oldIndex, newIndex)
+                    | _ -> ()
+                | _ -> ()
+
+        let tableIds =
+            tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray
 
         React.Fragment [
             ArcFileFooterTabs.ContextMenu(tabsRef, setIsEditorModeTableTab, deleteTable)
@@ -269,65 +375,57 @@ type ArcFileFooterTabs =
                                 (fun _ -> setActiveView ActiveView.Metadata),
                                 isActive = (activeView = ActiveView.Metadata)
                             )
+
                             if arcFile.CanRenderDataMapView() then
                                 ArcFileFooterTabs.DataMapTab(
                                     (fun _ -> setActiveView ActiveView.DataMap),
                                     isActive = (activeView = ActiveView.DataMap)
                                 )
-                            // DndKit.DndContext(
-                            //     sensors = sensors,
-                            //     onDragEnd = handleDragEnd,
-                            //     collisionDetection = DndKit.closestCenter,
-                            //     children =
-                            //         DndKit.SortableContext(
-                            //             items = (tables |> Seq.map (fun t -> t.Name) |> ResizeArray),
-                            //             strategy = DndKit.verticalListSortingStrategy,
-                            //             children =
-                            //                 React.Fragment [
-                            //                     for index = 0 to tables.Count - 1 do
-                            //                         let table = tables.[index]
 
-                            //                         ArcFileFooterTabs.TableTab(
-                            //                             table.Name,
-                            //                             (fun _ -> setActiveView (ActiveView.Table index)),
-                            //                             isActive = (activeView = ActiveView.Table index),
-                            //                             key = index
-                            //                         )
-                            //                 ]
-                            //         )
-                            // )
-                            for index = 0 to tables.Count - 1 do
-                                let table = tables.[index]
+                            ArcFileFooterTabs.DragAndDropContainer(
+                                tableIds,
+                                handleDragEnd,
+                                children =
+                                    React.Fragment [
 
-                                let isEditorMode = isEditorModeTableTab = Some index
-                                let isActive = activeView = ActiveView.Table index
+                                        for index = 0 to tables.Count - 1 do
+                                            let table = tables.[index]
 
-                                match isEditorMode with
-                                | true ->
-                                    let renameTable newName =
-                                        match System.String.IsNullOrWhiteSpace newName || newName = table.Name with
-                                        | true -> ()
-                                        | false ->
-                                            arcFile.ArcTables().RenameTableAt(index, newName)
-                                            setArcFile (WidgetArcFile.refreshRef arcFile)
-                                            setIsEditorModeTableTab None
+                                            let isEditorMode = isEditorModeTableTab = Some index
+                                            let isActive = activeView = ActiveView.Table index
 
-                                    let closeEdit () = setIsEditorModeTableTab None
+                                            match isEditorMode with
+                                            | true ->
+                                                let renameTable newName =
+                                                    match
+                                                        System.String.IsNullOrWhiteSpace newName || newName = table.Name
+                                                    with
+                                                    | true -> ()
+                                                    | false ->
+                                                        arcFile.ArcTables().RenameTableAt(index, newName)
+                                                        setArcFile (WidgetArcFile.refreshRef arcFile)
+                                                        setIsEditorModeTableTab None
 
-                                    ArcFileFooterTabs.EditTableNameTab(
-                                        table.Name,
-                                        renameTable,
-                                        closeEdit,
-                                        isActive = isActive
-                                    )
-                                | false ->
-                                    ArcFileFooterTabs.TableTab(
-                                        index,
-                                        table.Name,
-                                        (fun _ -> setActiveView (ActiveView.Table index)),
-                                        isActive = isActive,
-                                        key = index
-                                    )
+                                                let closeEdit () = setIsEditorModeTableTab None
+
+                                                ArcFileFooterTabs.EditTableNameTab(
+                                                    table.Name,
+                                                    renameTable,
+                                                    closeEdit,
+                                                    isActive = isActive
+                                                )
+                                            | false ->
+                                                ArcFileFooterTabs.TableTab(
+                                                    index,
+                                                    table.Name,
+                                                    (fun _ -> setActiveView (ActiveView.Table index)),
+                                                    isActive = isActive,
+                                                    key = index
+                                                )
+
+                                    ]
+                            )
+
 
                             if canAddTable then
                                 ArcFileFooterTabs.PlusBtn addNewTable
