@@ -1,5 +1,6 @@
 module ElectronRenderer.GitWorkflowTests
 
+open System
 open Browser.Dom
 open Browser.Types
 open Elmish
@@ -11,6 +12,9 @@ open Swate.Components.Api.GitLabApi
 open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
 open Vitest
+
+[<Import("renderToStaticMarkup", "react-dom/server")>]
+let private renderToStaticMarkup (element: ReactElement) : string = jsNative
 
 let private cleanStatus = {
     Current = Some "main"
@@ -165,6 +169,43 @@ let private manyChangedFiles count =
         for index in 0 .. count - 1 do
             changedFile (sprintf "src/file-%03i.txt" index) "M" " " false
     |]
+
+let private joinLines (lines: string array) =
+    String.concat "\n" lines + "\n"
+
+let private buildAddedFileDiff (path: string) (lines: string array) =
+    [
+        "new file mode 100644"
+        "--- /dev/null"
+        $"+++ b/{path}"
+        $"@@ -0,0 +1,{lines.Length} @@"
+        yield! lines |> Array.map (fun line -> $"+{line}")
+        "~"
+        ""
+    ]
+    |> String.concat "\n"
+
+let private buildSingleConflictDocument (currentLines: string array) (incomingLines: string array) =
+    [
+        "<<<<<<< HEAD"
+        yield! currentLines
+        "======="
+        yield! incomingLines
+        ">>>>>>> origin/main"
+        ""
+    ]
+    |> String.concat "\n"
+
+let private countOccurrences (needle: string) (haystack: string) =
+    let rec loop startIndex count =
+        let nextIndex = haystack.IndexOf(needle, startIndex, StringComparison.Ordinal)
+
+        if nextIndex < 0 then
+            count
+        else
+            loop (nextIndex + needle.Length) (count + 1)
+
+    loop 0 0
 
 let private unexpectedPromise<'T> (name: string) : JS.Promise<Result<'T, string>> = promise {
     return failwith $"Unexpected call: {name}"
@@ -1237,10 +1278,40 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "GitDiffViewer virtualizes large added-file diffs instead of mounting every rendered row",
+            fun () ->
+                let lines =
+                    [| for index in 0 .. 599 -> $"Generated renderer diff line {index + 1}" |]
+
+                let markup =
+                    renderToStaticMarkup (
+                        Html.div [
+                            prop.style [
+                                style.width 960
+                                style.height 480
+                            ]
+                            prop.children [
+                                Swate.Components.GitDiffViewer.Viewer(
+                                    wordDiffText = buildAddedFileDiff "notes/renderer-large.txt" lines,
+                                    previousContent = "",
+                                    currentContent = joinLines lines,
+                                    testIdPrefix = "renderer-large-diff"
+                                )
+                            ]
+                        ]
+                    )
+
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-virtual-content\"")).toBe (true)
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-0\"")).toBe (true)
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-599\"")).toBe (false)
+                Vitest.expect(countOccurrences "data-testid=\"renderer-large-diff-comparison-scroll-row-" markup).toBeLessThan (120)
+        )
+
+        Vitest.test (
             "GitDiffViewer renders synthetic new-file diff metadata without blanking the content pane",
-            fun () -> promise {
-                let! container, cleanup =
-                    renderToBody (
+            fun () ->
+                let markup =
+                    renderToStaticMarkup (
                         Swate.Components.GitDiffViewer.Viewer(
                             wordDiffText = "new file mode 100644\n--- /dev/null\n+++ b/notes/draft.txt\n",
                             previousContent = "",
@@ -1249,11 +1320,38 @@ Vitest.describe (
                         )
                     )
 
-                Vitest.expect(container.textContent.Contains("Draft line")).toBe (true)
-                Vitest.expect(container.textContent.Contains("Changed")).toBe (true)
+                Vitest.expect(markup.Contains("Draft line")).toBe (true)
+                Vitest.expect(markup.Contains("Changed")).toBe (true)
+        )
 
-                cleanup ()
-            }
+        Vitest.test (
+            "GitMergeConflictViewer virtualizes long conflict blocks instead of mounting every rendered row",
+            fun () ->
+                let currentLines =
+                    [| for index in 0 .. 239 -> $"Current renderer conflict line {index + 1}" |]
+
+                let incomingLines =
+                    [| for index in 0 .. 239 -> $"Incoming renderer conflict line {index + 1}" |]
+
+                let markup =
+                    renderToStaticMarkup (
+                        Html.div [
+                            prop.style [
+                                style.width 960
+                                style.height 520
+                            ]
+                            prop.children [
+                                Swate.Components.GitMergeConflictViewer.Viewer(
+                                    mergeConflictContent = buildSingleConflictDocument currentLines incomingLines,
+                                    testIdPrefix = "renderer-large-merge"
+                                )
+                            ]
+                        ]
+                    )
+
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-virtual-content\"")).toBe (true)
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-row-0\"")).toBe (true)
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-row-239\"")).toBe (false)
         )
 
         Vitest.test (
@@ -1513,6 +1611,32 @@ Vitest.describe (
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")).not.toBeNull ()
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")).not.toBeNull ()
                 Vitest.expect(container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']").length).toBe(3)
+                Vitest
+                    .expect(
+                        container
+                            .querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")
+                            .getAttribute("role")
+                    )
+                    .toBe("region")
+                Vitest
+                    .expect(
+                        container
+                            .querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")
+                            .getAttribute("aria-label")
+                    )
+                    .toBe("Changed files")
+                Vitest
+                    .expect(
+                        container
+                            .querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")
+                            .getAttribute("role")
+                    )
+                    .toBe("list")
+                Vitest.expect(container.querySelectorAll("[role='listitem']").length).toBe(3)
+                Vitest
+                    .expect(container.querySelector("[role='listitem'] [data-testid='GitSidebarChangeRow-0']"))
+                    .not
+                    .toBeNull()
 
                 cleanup ()
             }
@@ -1565,6 +1689,99 @@ Vitest.describe (
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")).not.toBeNull ()
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-399']")).toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar virtualizes changed files when nested inside an outer scrollable wrapper",
+            fun () -> promise {
+                // Reproduce the production layout: fixed-height sidebar panel -> outer scroll wrapper
+                // -> Git host wrapper -> GitSidebar. The virtualizer only works when the host wrapper
+                // gives GitSidebar a bounded height, so this test keeps the working height contract visible.
+                let boundedWrapperClasses = [
+                    "swt:box-border"
+                    "swt:flex"
+                    "swt:h-full"
+                    "swt:min-h-0"
+                    "swt:min-w-0"
+                    "swt:max-w-full"
+                    "swt:flex-col"
+                    "swt:overflow-hidden"
+                    "swt:p-4"
+                ]
+
+                let! container, cleanup =
+                    renderToBody (
+                        Html.div [
+                            prop.style [
+                                style.width 340
+                                style.height 760
+                                style.overflow.hidden
+                            ]
+                            prop.children [
+                                Html.div [
+                                    prop.style [
+                                        style.width (length.percent 100)
+                                        style.height (length.percent 100)
+                                        style.overflowY.auto
+                                    ]
+                                    prop.children [
+                                        Html.div [
+                                            prop.testId "GitSidebarBoundedHost"
+                                            prop.className boundedWrapperClasses
+                                            prop.style [ style.height (length.percent 100) ]
+                                            prop.children [
+                                                Swate.Components.GitSidebar.Main(
+                                                    status = {
+                                                        CurrentBranch = Some "main"
+                                                        TrackingBranch = Some "origin/main"
+                                                        Ahead = 0
+                                                        Behind = 0
+                                                        IsClean = false
+                                                        IsMergeInProgress = false
+                                                    },
+                                                    changedFiles = manyChangedFiles 200,
+                                                    branchOptions = [| sidebarLocalBranch "main" true true |],
+                                                    callbacks = {
+                                                        OnRefresh = fun () -> ()
+                                                        OnFetch = fun () -> ()
+                                                        OnPull = fun () -> ()
+                                                        OnPush = fun () -> ()
+                                                        OnSync = fun () -> ()
+                                                        OnCommitSelection = fun _ -> ()
+                                                        OnCommitAll = fun _ -> ()
+                                                        OnSaveDownloadLargeFiles = fun _ -> ()
+                                                        OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                                        OnCreateBranch = fun _ -> ()
+                                                        OnSwitchBranch = fun _ -> ()
+                                                        OnSelectChange = fun _ -> promise { return Ok() }
+                                                    },
+                                                    downloadLargeFiles = true,
+                                                    lfsAutoTrackThresholdMb = 5
+                                                )
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    )
+
+                // With 200 items, only a subset should be rendered (visible + overscan).
+                // If virtualization is broken, all 200 items would be in the DOM.
+                let boundedHost = container.querySelector("[data-testid='GitSidebarBoundedHost']") :?> HTMLElement
+
+                for expectedClass in boundedWrapperClasses do
+                    Vitest.expect(boundedHost.classList.contains expectedClass).toBe (true)
+
+                Vitest.expect(boundedHost.classList.contains "swt:w-full").toBe (false)
+
+                let renderedRows = container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")
+                Vitest.expect(renderedRows.length).toBeLessThan(200)
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-199']")).toBeNull ()
 
                 cleanup ()
             }
