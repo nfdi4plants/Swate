@@ -319,7 +319,7 @@ type Authentication =
             )
 
         React.Fragment [
-            BaseModal.ErrorBaseModal(
+            BaseModal.ErrorModalObsolete(
                 error.IsSome,
                 (fun _ -> setError None),
                 error
