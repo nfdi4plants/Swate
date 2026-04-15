@@ -126,14 +126,11 @@ type Popover =
             prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
             if resolvedDebug.IsSome then
                 prop.testId ("popover_trigger_" + resolvedDebug.Value)
-            prop.className [
-                "swt:btn"
-                yield! Option.toList className
-            ]
+            prop.className [ "swt:btn"; yield! Option.toList className ]
+            yield! Option.defaultValue [] props
             yield!
                 prop.spread
                 <| ctx.interactions.getReferenceProps (PopoverHelper.resolveProps interactionProps)
-            yield! Option.defaultValue [] props
             prop.children children
         ]
 
@@ -205,10 +202,10 @@ type Popover =
                                     "swt:p-4 swt:shadow-md swt:outline-hidden"
                                     yield! Option.toList className
                                 ]
+                                yield! Option.defaultValue [] props
                                 yield!
                                     prop.spread
                                     <| ctx.interactions.getFloatingProps (PopoverHelper.resolveProps interactionProps)
-                                yield! Option.defaultValue [] props
                                 prop.children children
                             ]
                     )
@@ -292,10 +289,7 @@ type Popover =
 
         Html.button [
             prop.type'.button
-            prop.className [
-                "swt:btn swt:btn-sm"
-                yield! Option.toList className
-            ]
+            prop.className [ "swt:btn swt:btn-sm"; yield! Option.toList className ]
             prop.onClick (fun _ -> ctx.setIsOpen false)
             yield! Option.defaultValue [] props
             prop.children children
