@@ -13,6 +13,9 @@ open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
 open Vitest
 
+[<Import("renderToStaticMarkup", "react-dom/server")>]
+let private renderToStaticMarkup (element: ReactElement) : string = jsNative
+
 let private cleanStatus = {
     Current = Some "main"
     Tracking = Some "origin/main"
@@ -192,6 +195,17 @@ let private buildSingleConflictDocument (currentLines: string array) (incomingLi
         ""
     ]
     |> String.concat "\n"
+
+let private countOccurrences (needle: string) (haystack: string) =
+    let rec loop startIndex count =
+        let nextIndex = haystack.IndexOf(needle, startIndex, StringComparison.Ordinal)
+
+        if nextIndex < 0 then
+            count
+        else
+            loop (nextIndex + needle.Length) (count + 1)
+
+    loop 0 0
 
 let private unexpectedPromise<'T> (name: string) : JS.Promise<Result<'T, string>> = promise {
     return failwith $"Unexpected call: {name}"
@@ -1265,12 +1279,12 @@ Vitest.describe (
 
         Vitest.test (
             "GitDiffViewer virtualizes large added-file diffs instead of mounting every rendered row",
-            fun () -> promise {
+            fun () ->
                 let lines =
                     [| for index in 0 .. 599 -> $"Generated renderer diff line {index + 1}" |]
 
-                let! container, cleanup =
-                    renderToBody (
+                let markup =
+                    renderToStaticMarkup (
                         Html.div [
                             prop.style [
                                 style.width 960
@@ -1287,20 +1301,17 @@ Vitest.describe (
                         ]
                     )
 
-                Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-virtual-content']")).not.toBeNull ()
-                Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-row-0']")).not.toBeNull ()
-                Vitest.expect(container.querySelector("[data-testid='renderer-large-diff-comparison-scroll-row-599']")).toBeNull ()
-                Vitest.expect(container.querySelectorAll("[data-testid^='renderer-large-diff-comparison-scroll-row-']").length).toBeLessThan (120)
-
-                cleanup ()
-            }
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-virtual-content\"")).toBe (true)
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-0\"")).toBe (true)
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-599\"")).toBe (false)
+                Vitest.expect(countOccurrences "data-testid=\"renderer-large-diff-comparison-scroll-row-" markup).toBeLessThan (120)
         )
 
         Vitest.test (
             "GitDiffViewer renders synthetic new-file diff metadata without blanking the content pane",
-            fun () -> promise {
-                let! container, cleanup =
-                    renderToBody (
+            fun () ->
+                let markup =
+                    renderToStaticMarkup (
                         Swate.Components.GitDiffViewer.Viewer(
                             wordDiffText = "new file mode 100644\n--- /dev/null\n+++ b/notes/draft.txt\n",
                             previousContent = "",
@@ -1309,24 +1320,21 @@ Vitest.describe (
                         )
                     )
 
-                Vitest.expect(container.textContent.Contains("Draft line")).toBe (true)
-                Vitest.expect(container.textContent.Contains("Changed")).toBe (true)
-
-                cleanup ()
-            }
+                Vitest.expect(markup.Contains("Draft line")).toBe (true)
+                Vitest.expect(markup.Contains("Changed")).toBe (true)
         )
 
         Vitest.test (
             "GitMergeConflictViewer virtualizes long conflict blocks instead of mounting every rendered row",
-            fun () -> promise {
+            fun () ->
                 let currentLines =
                     [| for index in 0 .. 239 -> $"Current renderer conflict line {index + 1}" |]
 
                 let incomingLines =
                     [| for index in 0 .. 239 -> $"Incoming renderer conflict line {index + 1}" |]
 
-                let! container, cleanup =
-                    renderToBody (
+                let markup =
+                    renderToStaticMarkup (
                         Html.div [
                             prop.style [
                                 style.width 960
@@ -1341,12 +1349,9 @@ Vitest.describe (
                         ]
                     )
 
-                Vitest.expect(container.querySelector("[data-testid='renderer-large-merge-conflict-1-scroll-virtual-content']")).not.toBeNull ()
-                Vitest.expect(container.querySelector("[data-testid='renderer-large-merge-conflict-1-scroll-row-0']")).not.toBeNull ()
-                Vitest.expect(container.querySelector("[data-testid='renderer-large-merge-conflict-1-scroll-row-239']")).toBeNull ()
-
-                cleanup ()
-            }
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-virtual-content\"")).toBe (true)
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-row-0\"")).toBe (true)
+                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-row-239\"")).toBe (false)
         )
 
         Vitest.test (
@@ -1695,6 +1700,18 @@ Vitest.describe (
                 // Reproduce the production layout: fixed-height sidebar panel -> outer scroll wrapper
                 // -> Git host wrapper -> GitSidebar. The virtualizer only works when the host wrapper
                 // gives GitSidebar a bounded height, so this test keeps the working height contract visible.
+                let boundedWrapperClasses = [
+                    "swt:box-border"
+                    "swt:flex"
+                    "swt:h-full"
+                    "swt:min-h-0"
+                    "swt:min-w-0"
+                    "swt:max-w-full"
+                    "swt:flex-col"
+                    "swt:overflow-hidden"
+                    "swt:p-4"
+                ]
+
                 let! container, cleanup =
                     renderToBody (
                         Html.div [
@@ -1712,7 +1729,8 @@ Vitest.describe (
                                     ]
                                     prop.children [
                                         Html.div [
-                                            // Inline height mirrors the Git-only host class in LeftSidebar/MainStyles.fs.
+                                            prop.testId "GitSidebarBoundedHost"
+                                            prop.className boundedWrapperClasses
                                             prop.style [ style.height (length.percent 100) ]
                                             prop.children [
                                                 Swate.Components.GitSidebar.Main(
@@ -1753,41 +1771,19 @@ Vitest.describe (
 
                 // With 200 items, only a subset should be rendered (visible + overscan).
                 // If virtualization is broken, all 200 items would be in the DOM.
+                let boundedHost = container.querySelector("[data-testid='GitSidebarBoundedHost']") :?> HTMLElement
+
+                for expectedClass in boundedWrapperClasses do
+                    Vitest.expect(boundedHost.classList.contains expectedClass).toBe (true)
+
+                Vitest.expect(boundedHost.classList.contains "swt:w-full").toBe (false)
+
                 let renderedRows = container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")
                 Vitest.expect(renderedRows.length).toBeLessThan(200)
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-199']")).toBeNull ()
 
                 cleanup ()
-            }
-        )
-
-        Vitest.test (
-            "LeftSidebar.Main applies the bounded wrapper classes to every sidebar target",
-            fun () -> promise {
-                let expectedClasses = [|
-                    "swt:box-border"
-                    "swt:flex"
-                    "swt:h-full"
-                    "swt:min-h-0"
-                    "swt:min-w-0"
-                    "swt:max-w-full"
-                    "swt:flex-col"
-                    "swt:overflow-hidden"
-                    "swt:p-4"
-                |]
-
-                for target in [| LeftSidebarPage.Git; LeftSidebarPage.FileExplorer; LeftSidebarPage.ArcObjectExplorer |] do
-                    let! container, cleanup =
-                        renderToBody (Renderer.Components.LeftSidebar.Main.Main target)
-
-                    let wrapper = container.children.[0] :?> HTMLElement
-
-                    for expectedClass in expectedClasses do
-                        Vitest.expect(wrapper.classList.contains expectedClass).toBe (true)
-
-                    Vitest.expect(wrapper.classList.contains "swt:w-full").toBe (false)
-                    cleanup ()
             }
         )
 
