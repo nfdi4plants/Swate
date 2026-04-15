@@ -1,41 +1,10 @@
 namespace Swate.Components
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.PopoverContext
 
 module private PopoverHelper =
-
-    [<Import("Children", "react")>]
-    let private reactChildren: obj = jsNative
-
-    [<Import("Fragment", "react")>]
-    let private reactFragment: obj = jsNative
-
-    [<Import("cloneElement", "react")>]
-    let private cloneElement (element: obj) (props: obj) : ReactElement = jsNative
-
-    [<Emit("Heading")>]
-    let headingComponent: obj = jsNative
-
-    [<Emit("Description")>]
-    let descriptionComponent: obj = jsNative
-
-    [<Emit("$0.toArray($1)")>]
-    let private childrenToArray (childrenApi: obj) (children: obj) : obj[] = jsNative
-
-    [<Emit("$0.type === $1")>]
-    let private isElementType (element: obj) (componentType: obj) : bool = jsNative
-
-    [<Emit("$0.props.children")>]
-    let private getElementChildren (element: obj) : obj = jsNative
-
-    type ProcessedChildren = {
-        children: ReactElement
-        hasLabel: bool
-        hasDescription: bool
-    }
 
     let requireContext () =
         match usePopoverCtx () with
@@ -51,57 +20,6 @@ module private PopoverHelper =
         FloatingUI.Middleware.flip ()
         FloatingUI.Middleware.shift {| padding = 8 |}
     |]
-
-    let private asChildren (children: ReactElement list) =
-        match children with
-        | [] -> Html.none
-        | [ child ] -> child
-        | many -> React.Fragment many
-
-    let decorateSemantics headingComponent descriptionComponent labelId descriptionId (children: ReactElement) =
-        let rec processNode hasLabel hasDescription (node: obj) =
-            if isElementType node headingComponent then
-                let child =
-                    if hasLabel then
-                        unbox<ReactElement> node
-                    else
-                        cloneElement node {| id = labelId |}
-
-                child, true, hasDescription
-            elif isElementType node descriptionComponent then
-                let child =
-                    if hasDescription then
-                        unbox<ReactElement> node
-                    else
-                        cloneElement node {| id = descriptionId |}
-
-                child, hasLabel, true
-            elif isElementType node reactFragment then
-                let processed = processChildren hasLabel hasDescription (getElementChildren node)
-                cloneElement node {| children = processed.children |}, processed.hasLabel, processed.hasDescription
-            else
-                unbox<ReactElement> node, hasLabel, hasDescription
-
-        and processChildren hasLabel hasDescription (children: obj) =
-            let mutable seenLabel = hasLabel
-            let mutable seenDescription = hasDescription
-            let processedChildren = ResizeArray<ReactElement>()
-
-            for child in childrenToArray reactChildren children do
-                let nextChild, nextHasLabel, nextHasDescription =
-                    processNode seenLabel seenDescription child
-
-                processedChildren.Add nextChild
-                seenLabel <- nextHasLabel
-                seenDescription <- nextHasDescription
-
-            {
-                children = processedChildren |> Seq.toList |> asChildren
-                hasLabel = seenLabel
-                hasDescription = seenDescription
-            }
-
-        processChildren false false children
 
 [<Erase; Mangle(false)>]
 type Popover =
@@ -163,14 +81,20 @@ type Popover =
 
         let interactions = FloatingUI.useInteractions [| click; dismiss; role |]
 
+        let labelId, setLabelId = React.useStateWithUpdater<string option> None
+
+        let descriptionId, setDescriptionId = React.useStateWithUpdater<string option> None
+
         let providerValue: PopoverContext = {
             isOpen = isOpen
             setIsOpen = setIsOpen
             floating = floating
             interactions = interactions
             modal = defaultArg modal false
-            labelId = FloatingUI.useId ()
-            descriptionId = FloatingUI.useId ()
+            labelId = labelId
+            setLabelId = setLabelId
+            descriptionId = descriptionId
+            setDescriptionId = setDescriptionId
             debug = debug
             portalId = portalId
             preserveTabOrder = defaultArg preserveTabOrder true
@@ -240,14 +164,6 @@ type Popover =
         let ctx = PopoverHelper.requireContext ()
         let resolvedDebug = debug |> Option.orElse ctx.debug
 
-        let semantics =
-            PopoverHelper.decorateSemantics
-                PopoverHelper.headingComponent
-                PopoverHelper.descriptionComponent
-                ctx.labelId
-                ctx.descriptionId
-                children
-
         if ctx.isOpen then
             FloatingUI.FloatingPortal(
                 ?id = ctx.portalId,
@@ -265,12 +181,13 @@ type Popover =
                                 prop.ref (unbox ctx.floating.refs.setFloating)
                                 prop.custom ("style", ctx.floating.floatingStyles)
                                 prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
-                                if semantics.hasLabel then
-                                    prop.ariaLabelledBy ctx.labelId
-                                elif ariaLabel.IsSome then
-                                    prop.ariaLabel ariaLabel.Value
-                                if semantics.hasDescription then
-                                    prop.ariaDescribedBy ctx.descriptionId
+                                match ctx.labelId with
+                                | Some lid -> prop.ariaLabelledBy lid
+                                | None ->
+                                    if ariaLabel.IsSome then
+                                        prop.ariaLabel ariaLabel.Value
+                                if ctx.descriptionId.IsSome then
+                                    prop.ariaDescribedBy ctx.descriptionId.Value
                                 if resolvedDebug.IsSome then
                                     prop.testId ("popover_content_" + resolvedDebug.Value)
                                 prop.className [
@@ -285,7 +202,7 @@ type Popover =
                                     <| ctx.interactions.getFloatingProps (PopoverHelper.resolveProps interactionProps)
                                 if props.IsSome then
                                     yield! props.Value
-                                prop.children semantics.children
+                                prop.children children
                             ]
                     )
             )
@@ -294,11 +211,31 @@ type Popover =
 
     [<ReactComponent>]
     static member Heading(children: ReactElement, ?className: string, ?props: IReactProperty list, ?id: string) =
-        let _ = PopoverHelper.requireContext ()
+        let generatedId = FloatingUI.useId ()
+        let headingId = defaultArg id generatedId
+        let ctx = PopoverHelper.requireContext ()
+
+        React.useEffect (
+            (fun () ->
+                ctx.setLabelId (fun cur ->
+                    match cur with
+                    | None -> Some headingId
+                    | s -> s
+                )
+
+                FsReact.createDisposable (fun () ->
+                    ctx.setLabelId (fun cur ->
+                        match cur with
+                        | Some x when x = headingId -> None
+                        | s -> s
+                    )
+                )
+            ),
+            [| headingId :> obj; ctx.setLabelId :> obj |]
+        )
 
         Html.h2 [
-            if id.IsSome then
-                prop.id id.Value
+            prop.id headingId
             prop.className [
                 "swt:text-base swt:font-semibold swt:leading-tight"
                 if className.IsSome then
@@ -311,11 +248,31 @@ type Popover =
 
     [<ReactComponent>]
     static member Description(children: ReactElement, ?className: string, ?props: IReactProperty list, ?id: string) =
-        let _ = PopoverHelper.requireContext ()
+        let generatedId = FloatingUI.useId ()
+        let descriptionId = defaultArg id generatedId
+        let ctx = PopoverHelper.requireContext ()
+
+        React.useEffect (
+            (fun () ->
+                ctx.setDescriptionId (fun cur ->
+                    match cur with
+                    | None -> Some descriptionId
+                    | s -> s
+                )
+
+                FsReact.createDisposable (fun () ->
+                    ctx.setDescriptionId (fun cur ->
+                        match cur with
+                        | Some x when x = descriptionId -> None
+                        | s -> s
+                    )
+                )
+            ),
+            [| descriptionId :> obj; ctx.setDescriptionId :> obj |]
+        )
 
         Html.p [
-            if id.IsSome then
-                prop.id id.Value
+            prop.id descriptionId
             prop.className [
                 "swt:text-sm swt:opacity-70"
                 if className.IsSome then

@@ -10,8 +10,10 @@ type PopoverContext = {
     floating: FloatingUI.UseFloatingReturn
     interactions: FloatingUI.UseInteractionsReturn
     modal: bool
-    labelId: string
-    descriptionId: string
+    labelId: string option
+    setLabelId: (string option -> string option) -> unit
+    descriptionId: string option
+    setDescriptionId: (string option -> string option) -> unit
     debug: string option
     portalId: string option
     preserveTabOrder: bool
