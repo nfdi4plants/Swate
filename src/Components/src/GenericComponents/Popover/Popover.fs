@@ -3,6 +3,7 @@ namespace Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components.Popover.Context
 
 module private PopoverHelper =
 
@@ -37,7 +38,7 @@ module private PopoverHelper =
     }
 
     let requireContext () =
-        match Contexts.Popover.usePopoverCtx () with
+        match usePopoverCtx () with
         | Some ctx -> ctx
         | None -> failwith "Popover render components must be used inside Popover.Popover."
 
@@ -84,10 +85,12 @@ module private PopoverHelper =
         and processChildren hasLabel hasDescription (children: obj) =
             let mutable seenLabel = hasLabel
             let mutable seenDescription = hasDescription
-            let processedChildren = ResizeArray<ReactElement> ()
+            let processedChildren = ResizeArray<ReactElement>()
 
             for child in childrenToArray reactChildren children do
-                let nextChild, nextHasLabel, nextHasDescription = processNode seenLabel seenDescription child
+                let nextChild, nextHasLabel, nextHasDescription =
+                    processNode seenLabel seenDescription child
+
                 processedChildren.Add nextChild
                 seenLabel <- nextHasLabel
                 seenDescription <- nextHasDescription
@@ -160,7 +163,7 @@ type Popover =
 
         let interactions = FloatingUI.useInteractions [| click; dismiss; role |]
 
-        let providerValue: Contexts.Popover.PopoverContext = {
+        let providerValue: PopoverContext = {
             isOpen = isOpen
             setIsOpen = setIsOpen
             floating = floating
@@ -177,7 +180,7 @@ type Popover =
             closeOnFocusOut = closeOnFocusOut
         }
 
-        Contexts.Popover.PopoverCtx.Provider(Some providerValue, children)
+        PopoverCtx.Provider(Some providerValue, children)
 
     [<ReactComponent>]
     static member Trigger
@@ -236,6 +239,7 @@ type Popover =
         ) =
         let ctx = PopoverHelper.requireContext ()
         let resolvedDebug = debug |> Option.orElse ctx.debug
+
         let semantics =
             PopoverHelper.decorateSemantics
                 PopoverHelper.headingComponent
