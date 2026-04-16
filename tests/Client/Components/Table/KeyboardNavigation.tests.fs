@@ -2,7 +2,10 @@ module Components.Tests.Table.KeyboardNavigation
 
 open Fable.Mocha
 open Swate.Components
-open Swate.Components.GridSelect
+
+open Swate.Components.Table
+open Swate.Components.Table.GridSelect
+
 
 [<Literal>]
 let private DEFAULT_MAX = 10
