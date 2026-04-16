@@ -199,17 +199,17 @@ module ArcVaultExtensions =
         member private this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <- fileTree
 
-            let sendMsg =
+            let sendFileTree =
                 Remoting.init
                 |> Remoting.withWindow this.window
-                |> Remoting.buildClient<IMainUpdateRendererApi>
+                |> Remoting.buildClient<IFileTreeUpdateApi>
 
             let rendererFileTree =
                 match this.path with
                 | Some arcPath -> toRendererFileTree arcPath fileTree.Values
                 | None -> Dictionary<string, FileEntry>()
 
-            sendMsg.fileTreeUpdate rendererFileTree
+            sendFileTree.fileTreeUpdate rendererFileTree
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
@@ -244,15 +244,15 @@ module ArcVaultExtensions =
             match this.path with
             | Some _ -> swatefailfn this.window.id "Unable to open ARC in vault bound to ARC."
             | None ->
-                let sendMsg =
+                let sendPathChange =
                     Remoting.init
                     |> Remoting.withWindow this.window
-                    |> Remoting.buildClient<IMainUpdateRendererApi>
+                    |> Remoting.buildClient<IPathChangeApi>
 
                 swatelogfn this.window.id "path: %s" path
                 this.path <- Some path
                 do! this.Startup()
-                sendMsg.pathChange (Some path)
+                sendPathChange.pathChange (Some path)
         }
 
         member this.CreateARC(path: string, identifier: string) = promise {
@@ -260,10 +260,10 @@ module ArcVaultExtensions =
             | Some _, _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to path."
             | _, Some _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to ARC."
             | None, None ->
-                let sendMsg =
+                let sendPathChange =
                     Remoting.init
                     |> Remoting.withWindow this.window
-                    |> Remoting.buildClient<IMainUpdateRendererApi>
+                    |> Remoting.buildClient<IPathChangeApi>
 
                 let arc = ARC(identifier)
                 this.path <- Some path
@@ -276,7 +276,7 @@ module ArcVaultExtensions =
                     this.isBusyWriting <- false
 
                 do! this.Startup()
-                sendMsg.pathChange (Some path)
+                sendPathChange.pathChange (Some path)
         }
 
         member this.SyncArc newArc = this.arc <- newArc
@@ -328,7 +328,7 @@ type ArcVaults() =
                 |> Array.iter (fun vault ->
                     Remoting.init
                     |> Remoting.withWindow vault.window
-                    |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+                    |> Remoting.buildClient<IRecentARCsUpdateApi>
                     |> fun client -> client.recentARCsUpdate recentARCs
                 )
 
