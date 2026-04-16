@@ -12,7 +12,7 @@ open Feliz
 open ARCtrl
 
 
-module private FileExplorerHelper =
+module FileExplorerCreate =
 
     [<RequireQualifiedAccess>]
     type ArcCreateKind =
@@ -20,6 +20,11 @@ module private FileExplorerHelper =
         | Assay
         | Workflow
         | Run
+
+    type ArcCreateDraft = {
+        ArcFile: ArcFiles
+        Path: string
+    }
 
     let rec loopPaths (selectedTreeItemPath: string option) (parent: FileTreeNode) =
         match parent.isDirectory with
@@ -108,7 +113,33 @@ module private FileExplorerHelper =
             run.InitTable($"{identifier} Table") |> ignore
             ArcFiles.Run run
 
-open FileExplorerHelper
+    let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq) =
+        let identifier = identifier.Trim()
+        let label = arcCreateKindLabel kind
+
+        if isArcCreateIdentifierValid identifier |> not then
+            Error arcCreateIdentifierError
+        else
+            let arcFile = createArcFile kind identifier
+
+            match FileContentDTO.fromArcFile arcFile with
+            | None -> Error $"Creating {label} files is not supported in Electron yet."
+            | Some request ->
+                let requestedPath = normalizePath request.path
+
+                let alreadyExists =
+                    existingPaths
+                    |> Seq.exists (fun path -> PathHelpers.pathsEqual (normalizePath path) requestedPath)
+
+                if alreadyExists then
+                    Error $"{label} '{identifier}' already exists."
+                else
+                    Ok {
+                        ArcFile = arcFile
+                        Path = requestedPath
+                    }
+
+open FileExplorerCreate
 
 [<ReactComponent>]
 let EmptyFileTreePlaceholder () =
@@ -295,53 +326,23 @@ let FileTree () =
                 errorMessage
 
         let createArcEntry kind (identifier: string) =
-            let identifier = identifier.Trim()
+            let existingPaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
 
-            if isArcCreateIdentifierValid identifier then
-                promise {
-                    let label = arcCreateKindLabel kind
-                    let arcFile = createArcFile kind identifier
+            match tryBuildArcCreateDraft kind identifier existingPaths with
+            | Error errorMessage -> applyCreateError errorMessage
+            | Ok draft ->
+                fileStateCtx.setSelection (ArcSelection.forTreePath (Some draft.Path))
 
-                    match FileContentDTO.fromArcFile arcFile with
-                    | None -> applyCreateError $"Creating {label} files is not supported in Electron yet."
-                    | Some request ->
-                        let requestedPath = normalizePath request.path
+                draft.ArcFile
+                |> Renderer.Components.ARCHelper.viewLoadResultOfArcFile
+                |> Renderer.Components.ARCHelper.applyLoadedView
+                    pageStateCtx.setState
+                    arcObjectCtx.setArcFileState
+                    arcObjectCtx.setPreviewState
+                    arcObjectCtx.setStatusMessage
 
-                        let alreadyExists =
-                            fileStateCtx.state.FileTree
-                            |> Array.exists (fun entry ->
-                                PathHelpers.pathsEqual (normalizePath entry.path) requestedPath
-                            )
-
-                        if alreadyExists then
-                            applyCreateError $"{label} '{identifier}' already exists."
-                        else
-                            let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
-
-                            match saveResult with
-                            | Ok() ->
-                                let! openResult = Api.ipcArcVaultApi.openFile (unbox null) request.path
-
-                                match openResult with
-                                | Ok loadedFile ->
-                                    let selectedPath = normalizePath loadedFile.path
-                                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                                    loadedFile
-                                    |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                                    |> Renderer.Components.ARCHelper.applyLoadedView
-                                        pageStateCtx.setState
-                                        arcObjectCtx.setArcFileState
-                                        arcObjectCtx.setPreviewState
-                                        arcObjectCtx.setStatusMessage
-                                | Error exn ->
-                                    applyCreateError
-                                        $"Created {label} '{identifier}' but could not open it: {exn.Message}"
-                            | Error exn -> applyCreateError $"Could not create {label} '{identifier}': {exn.Message}"
-
-                        closeCreateModal ()
-                }
-                |> Promise.start
+                arcObjectCtx.setPendingArcFileSave (Some draft.ArcFile)
+                closeCreateModal ()
 
         let arcCreateContextMenuItems (item: FileItem) =
             if item.IsDirectory then
@@ -369,11 +370,11 @@ let FileTree () =
             | _ -> 1000
 
         let sortContextMenuItems (items: ContextMenuItem list) =
-            items
-            |> List.sortBy (fun item -> contextMenuSortOrder item, item.Label)
+            items |> List.sortBy (fun item -> contextMenuSortOrder item, item.Label)
 
         let contextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+            arcCreateContextMenuItems item
+            @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
             |> sortContextMenuItems
 
         match fileItem with
