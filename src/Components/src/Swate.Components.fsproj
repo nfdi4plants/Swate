@@ -105,6 +105,7 @@
     <Compile Include="GitComparison\GitMergeConflictViewer.fs" />
     <Compile Include="GitSidebar\Types.fs" />
     <Compile Include="GitSidebar\GitSidebar.fs" />
+    <Compile Include="ThemeProvider\ThemeContext.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchConfigLocalStorageActiveKeysContext.fs" />

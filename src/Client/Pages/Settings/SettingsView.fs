@@ -8,8 +8,8 @@ open Messages
 
 open Feliz
 
-open Swate.Client.Theme.Context
 open Swate.Components
+open Swate.Components.ThemeProvider.Context
 
 type Settings =
 

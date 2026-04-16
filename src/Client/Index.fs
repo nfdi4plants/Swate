@@ -3,7 +3,7 @@ module Index
 
 open Messages
 open Model
-open Swate.Client.Theme.Context
+open Swate.Components.ThemeProvider.Context
 
 
 ///<summary> This is a basic test case used in Client unit tests </summary>
@@ -20,7 +20,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
         | _ -> None
 
     // React.strictMode [
-    Swate.Components.ThemeProvider.ThemeProvider(
+    Swate.Components.ThemeProvider.ThemeProvider.ThemeProvider(
         ThemeCtx,
         Swate.Components.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
             Swate.Components.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(

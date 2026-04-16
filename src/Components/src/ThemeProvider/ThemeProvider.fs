@@ -1,9 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.ThemeProvider
 
 open Feliz
 open Fable.Core
 open Browser
 open Fable.React
+open Swate.Components
 
 [<Erase; Mangle(false)>]
 type ThemeProvider =

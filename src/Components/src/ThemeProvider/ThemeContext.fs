@@ -1,5 +1,5 @@
 
-module Swate.Client.Theme.Context
+module Swate.Components.ThemeProvider.Context
 
 open Feliz
 open Swate.Components
