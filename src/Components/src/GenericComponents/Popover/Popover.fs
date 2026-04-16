@@ -1,12 +1,16 @@
 namespace Swate.Components
 
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.PopoverContext
 
 module private PopoverHelper =
 
-    let tryContext () = usePopoverCtx ()
+    let tryContext () =
+        match usePopoverCtx () with
+        | Some ctx when not (isNullOrUndefined ctx) -> Some ctx
+        | _ -> None
 
     let missingContextError (componentName: string) =
         Html.div [
@@ -353,7 +357,7 @@ type Popover =
             ?modal = modal,
             ?debug = debug,
             children =
-                React.fragment [
+                React.Fragment [
                     Popover.Trigger(trigger, ?className = triggerClassName)
                     Popover.Content(
                         ?className = contentClassName,
