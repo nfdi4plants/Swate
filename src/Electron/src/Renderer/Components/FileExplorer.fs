@@ -69,6 +69,13 @@ module private FileExplorerHelper =
         ArcCreateKind.Run
     ]
 
+    let arcCreateKindSortOrder =
+        function
+        | ArcCreateKind.Study -> 10
+        | ArcCreateKind.Assay -> 20
+        | ArcCreateKind.Workflow -> 30
+        | ArcCreateKind.Run -> 40
+
     let arcCreateKindDefaultIdentifier =
         function
         | ArcCreateKind.Study -> "NewStudy"
@@ -339,7 +346,7 @@ let FileTree () =
         let arcCreateContextMenuItems (item: FileItem) =
             if item.IsDirectory then
                 arcCreateKinds
-                |> List.sortBy arcCreateKindLabel
+                |> List.sortBy arcCreateKindSortOrder
                 |> List.map (fun kind -> {
                     Label = $"Add {arcCreateKindLabel kind}"
                     Icon = arcCreateKindIcon kind
@@ -349,9 +356,25 @@ let FileTree () =
             else
                 []
 
+        let contextMenuSortOrder (item: ContextMenuItem) =
+            match item.Label with
+            | "Add Study" -> 10
+            | "Add Assay" -> 20
+            | "Add Workflow" -> 30
+            | "Add Run" -> 40
+            | "Mark Git LFS"
+            | "Unmark Git LFS" -> 100
+            | "Git LFS: marked"
+            | "Git LFS: not marked" -> 110
+            | _ -> 1000
+
+        let sortContextMenuItems (items: ContextMenuItem list) =
+            items
+            |> List.sortBy (fun item -> contextMenuSortOrder item, item.Label)
+
         let contextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item
-            @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+            arcCreateContextMenuItems item @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+            |> sortContextMenuItems
 
         match fileItem with
 
