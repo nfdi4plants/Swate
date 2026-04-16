@@ -314,7 +314,7 @@ type BuildingBlockWidget =
 
         let annotationCtx = AnnotationTableContext.useAnnotationTableCtx ()
 
-        let widgetCtx = useWidgetController ()
+        let widgetCtx = useWidgetControllerCtx ()
 
         match arcFile.TryGetActiveTable(activeTableIndex) with
         | None -> BuildingBlockWidget.disabledState "Switch to a table tab to add a building block."

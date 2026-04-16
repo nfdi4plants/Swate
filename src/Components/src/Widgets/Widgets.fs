@@ -349,7 +349,7 @@ type Widget =
             focusWidget = focusWidget
         }
 
-        ActiveWidgetContext.Provider(
+        WidgetControllerCtx.Provider(
             widgetContext,
             [
                 yield! children
@@ -372,7 +372,7 @@ type Widget =
     /// This component is only used for testing and development via playground
     [<ReactComponent>]
     static member private EntryControls(widgetTypes: WidgetType list) =
-        let context = useWidgetController ()
+        let context = useWidgetControllerCtx ()
 
         let controlButton (widgetType: WidgetType) =
             let isActive = context.isActive widgetType

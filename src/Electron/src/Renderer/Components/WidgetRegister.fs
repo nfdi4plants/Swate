@@ -127,7 +127,7 @@ let createWidgets
 
 [<ReactComponent>]
 let NavbarButtons (widgetTypes: WidgetType list, isEnabled: bool) =
-    let context = useWidgetController ()
+    let context = useWidgetControllerCtx ()
 
     let widgetInfo (widgetType: WidgetType) =
         match widgetType with

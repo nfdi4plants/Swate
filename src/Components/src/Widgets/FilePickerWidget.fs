@@ -125,7 +125,7 @@ type FilePickerWidget =
 
         let isPicking, setIsPicking = React.useState false
         let statusMessage, setStatusMessage = React.useState (None: string option)
-        let widgetCtx = useWidgetController ()
+        let widgetCtx = useWidgetControllerCtx ()
 
         let annotationCtx = AnnotationTableContext.useAnnotationTableCtx ()
 

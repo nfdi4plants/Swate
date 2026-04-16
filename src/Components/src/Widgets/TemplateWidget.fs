@@ -391,7 +391,7 @@ type TemplateWidget =
             React.useStateWithUpdater (Set.empty<System.Guid * int>)
 
         let showImportDialog, setShowImportDialog = React.useState false
-        let widgetCtx = useWidgetController ()
+        let widgetCtx = useWidgetControllerCtx ()
 
         let tryGetActiveTableIndex (arcFile: ArcFiles) =
             arcFile.TryGetActiveTable(activeTableIndex) |> Option.map fst

@@ -428,7 +428,7 @@ type DataAnnotatorWidget =
         let loading, setLoading = React.useState false
         let statusMessage, setStatusMessage = React.useState (None: string option)
         let errorMessage, setErrorMessage = React.useState (None: string option)
-        let widgetCtx = useWidgetController ()
+        let widgetCtx = useWidgetControllerCtx ()
 
         let disabledMessage =
             DataAnnotatorWidget.inferDisabledMessage arcFile activeView activeTableIndex

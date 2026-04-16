@@ -33,7 +33,7 @@ module private WidgetNavbar =
 
     [<ReactComponent>]
     let Buttons(isEnabled: bool) =
-        let context = useWidgetController ()
+        let context = useWidgetControllerCtx ()
 
         let controlButton (widgetType: WidgetType) =
             let isActive = context.isActive widgetType
