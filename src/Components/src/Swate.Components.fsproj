@@ -79,7 +79,7 @@
     <Compile Include="Api\TIBApi.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
-    <Compile Include="GenericComponents\Popover\Context.fs" />
+    <Compile Include="GenericComponents\Popover\PopoverContext.fs" />
     <Compile Include="GenericComponents\Popover\Popover.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />

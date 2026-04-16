@@ -3,7 +3,7 @@ namespace Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.PopoverContext
+open Swate.Components.Popover.PopoverContext
 
 module private PopoverHelper =
 
