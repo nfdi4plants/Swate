@@ -47,8 +47,8 @@ do Remoting.init |> Remoting.buildHandler { recentARCsUpdate = recentArcsStore.U
 let private authAccountsStore = IPCStore<AuthStateDto>()
 do Remoting.init |> Remoting.buildHandler { authAccountsUpdate = authAccountsStore.Update }
 
-let private fileTreeStore = IPCStore<Dictionary<string, FileEntry>>()
-do Remoting.init |> Remoting.buildHandler { fileTreeUpdate = fileTreeStore.Update }
+let private fileTreeStore = IPCStore<Map<string, FileEntry>>()
+do Remoting.init |> Remoting.buildHandler { fileTreeUpdate = fun dict -> dict |> Seq.map (fun kv -> kv.Key, kv.Value) |> Map.ofSeq |> fileTreeStore.Update }
 
 let private gitProgressStore = IPCStore<GitProgressDto>()
 do Remoting.init |> Remoting.buildHandler { gitProgressUpdate = gitProgressStore.Update }
@@ -74,6 +74,13 @@ let private gitProgressSnap      = gitProgressStore.GetSnapshot
 // Subscribe helpers — backward-compatible ('T -> unit) -> (unit -> unit)
 // Wraps the store's raw Subscribe to unwrap ValueOption so typed
 // subscribers only fire after a real IPC event.
+//
+// NOTE: These fire on every IPC message, even if the payload is identical
+// to the previous one (behavioral parity with the old pub/sub bridge).
+// The useSyncExternalStore hooks above behave differently: React
+// suppresses re-renders when Object.is(oldSnapshot, newSnapshot) is
+// true. For reference types deserialized from IPC (always new objects),
+// the hook will re-render on every message regardless.
 // ---------------------------------------------------------------------------
 
 let private makeSubscribe (store: IPCStore<'T>) (handler: 'T -> unit) : (unit -> unit) =
@@ -108,7 +115,7 @@ let useAuthAccountsUpdate () : AuthStateDto voption =
     React.useSyncExternalStore(authAccountsSub, UseSyncExternalStoreSnapshot(authAccountsSnap))
 
 [<Hook>]
-let useFileTreeUpdate () : Dictionary<string, FileEntry> voption =
+let useFileTreeUpdate () : Map<string, FileEntry> voption =
     React.useSyncExternalStore(fileTreeSub, UseSyncExternalStoreSnapshot(fileTreeSnap))
 
 [<Hook>]
