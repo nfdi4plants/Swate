@@ -81,7 +81,7 @@ type ContextMenu =
                     FloatingUI.Middleware.shift {| padding = 10 |}
                 |],
                 placement = FloatingUI.Placement.RightStart,
-                strategy = "fixed",
+                strategy = FloatingUI.FloatingStrategy.Fixed,
                 whileElementsMounted = FloatingUI.autoUpdate
             )
 
@@ -215,7 +215,7 @@ type ContextMenu =
             FloatingUI.FloatingPortal(
                 FloatingUI.FloatingOverlay(
                     lockScroll = true,
-                    className = "swt:z-[9999]",
+                    className = "swt:z-9999",
                     children =
                         FloatingUI.FloatingFocusManager(
                             context = floating.context,

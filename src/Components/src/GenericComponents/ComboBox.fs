@@ -138,7 +138,8 @@ type ComboBox =
             fun (index: int) (item: 'a) ->
                 onChange |> Option.iter (fun fn -> fn index item)
                 close ()
-                fluiContext.refs.domReference.current.focus ()
+                fluiContext.refs.domReference.current
+                |> Option.iter (fun el -> el.focus ())
 
         let filteredItems =
             items
@@ -220,7 +221,10 @@ type ComboBox =
         React.useImperativeHandle (
             unbox comboBoxRef,
             (fun () -> {|
-                focus = fun () -> fluiContext.refs.reference.current?focus ()
+                focus =
+                    fun () ->
+                        fluiContext.refs.domReference.current
+                        |> Option.iter (fun el -> el.focus ())
                 close =
                     fun () ->
                         setOpen false
