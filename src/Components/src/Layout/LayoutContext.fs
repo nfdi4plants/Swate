@@ -1,7 +1,6 @@
 module Swate.Components.LayoutContext
 
 open Feliz
-open Fable.Core
 
 type LeftSidebarContextType = StateContext<bool>
 

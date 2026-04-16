@@ -3,7 +3,6 @@ module Renderer.Context.FileStateCtx
 open Feliz
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.IPCTypes
 
 type FileState = {
     FileTree: FileEntry[]
