@@ -1,4 +1,4 @@
-module Renderer.Context.PageStateCtx
+module Renderer.Context.PageStateContext
 
 open Feliz
 open Renderer.Types

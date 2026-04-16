@@ -11,7 +11,7 @@ open Swate.Components.AnnotationTable.AnnotationTableContext
 type AnnotationTableContextProvider =
 
     [<ReactComponent(true)>]
-    static member Init(children: ReactElement) =
+    static member AnnotationTableContextProvider(children: ReactElement) =
 
         let (data: Map<string, AnnotationTableContext>), setData =
             React.useState (Map.empty)

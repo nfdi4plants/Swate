@@ -1,4 +1,4 @@
-module Renderer.Context.GitStateCtx
+module Renderer.Context.GitStateContext
 
 open Browser.Dom
 open Fable.Core
@@ -107,8 +107,8 @@ let useGitState () = React.useContext GitStateCtx
 [<ReactComponent>]
 let GitStateCtxProvider (children: ReactElement) =
 
-    let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppState ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
 
     let gitState, dispatch =
         React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])

@@ -127,7 +127,7 @@ type FilePickerWidget =
         let statusMessage, setStatusMessage = React.useState (None: string option)
         let widgetCtx = useWidgetControllerCtx ()
 
-        let annotationCtx = AnnotationTableContext.useAnnotationTableCtx ()
+        let annotationCtx = AnnotationTableContext.useAnnotationTableStateCtx ()
 
         let selectedCells =
 

@@ -20,7 +20,7 @@ open Fable.Core.JsInterop
 [<ReactComponent>]
 let private AddButton (model: Model, dispatch) =
     let ctx =
-        AnnotationTableContext.useAnnotationTableCtx ()
+        AnnotationTableContext.useAnnotationTableStateCtx ()
 
     let selectedCells =
         ctx.state

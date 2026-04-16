@@ -3,8 +3,9 @@ namespace Swate.Components.TermSearch
 open Swate.Components
 open Fable.Core
 open Feliz
-open Swate.Components.TermSearch.TermSearchConfigCtx
-open Swate.Components.TermSearch.TermSearchConfigLocalStorageActiveKeysCtx
+open Swate.Components.TermSearch.TermSearchConfigContext
+open Swate.Components.TermSearch.TermSearchAllKeysContext
+open Swate.Components.TermSearch.TermSearchConfigLocalStorageActiveKeysContext
 
 
 module private TermSearchConfigProviderHelper =
@@ -111,10 +112,10 @@ type TermSearchConfigProvider =
         ) =
         let localStorageKey = defaultArg localStorageKey "swate-termsearchconfig-ctx"
 
-        let (activeKeys: TermSearchConfigLocalStorageActiveKeysCtx), setActiveKeys =
+        let (activeKeys: TermSearchConfigLocalStorageActiveKeysContext), setActiveKeys =
             React.useLocalStorage (
                 localStorageKey,
-                TermSearchConfigLocalStorageActiveKeysCtx.init (?defaultActive = defaultActive)
+                TermSearchConfigLocalStorageActiveKeysContext.init (?defaultActive = defaultActive)
             )
 
         let allKeys =
@@ -139,7 +140,7 @@ type TermSearchConfigProvider =
             )
 
         /// This is used for memoization
-        let activeKeysString = activeKeys.aktiveKeys |> Array.sort |> String.concat "; "
+        let activeKeysString = activeKeys.activeKeys |> Array.sort |> String.concat "; "
 
         let queries =
             React.useMemo (
@@ -148,7 +149,7 @@ type TermSearchConfigProvider =
                     let termSearchQueries =
                         allTermSearchQueries
                         |> Seq.filter (fun (key, _) ->
-                            let isActive = activeKeys.aktiveKeys |> Set.ofSeq |> Set.contains key
+                            let isActive = activeKeys.activeKeys |> Set.ofSeq |> Set.contains key
 
                             isActive
                         )
@@ -156,12 +157,12 @@ type TermSearchConfigProvider =
 
                     let parentSearchQueries =
                         allParentSearchQueries
-                        |> Seq.filter (fun (key, _) -> activeKeys.aktiveKeys |> Set.ofSeq |> Set.contains key)
+                        |> Seq.filter (fun (key, _) -> activeKeys.activeKeys |> Set.ofSeq |> Set.contains key)
                         |> ResizeArray
 
                     let allChildrenSearchQueries =
                         allAllChildrenSearchQueries
-                        |> Seq.filter (fun (key, _) -> activeKeys.aktiveKeys |> Set.ofSeq |> Set.contains key)
+                        |> Seq.filter (fun (key, _) -> activeKeys.activeKeys |> Set.ofSeq |> Set.contains key)
                         |> ResizeArray
 
                     {
@@ -181,13 +182,13 @@ type TermSearchConfigProvider =
                 |]
             )
 
-        TermSearchConfigCtx.termSearchActiveKeysCtx.Provider(
+        TermSearchConfigLocalStorageActiveKeysContext.TermSearchActiveKeysCtx.Provider(
             {
                 state = activeKeys
                 setState = setActiveKeys
             },
-            TermSearchConfigCtx.termSearchConfigCtx.Provider(
+            TermSearchConfigCtx.Provider(
                 queries,
-                TermSearchConfigCtx.termSearchAllKeysCtx.Provider(allKeys, children)
+                TermSearchAllKeysCtx.Provider(allKeys, children)
             )
         )

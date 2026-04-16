@@ -8,9 +8,9 @@ open Swate.Electron.Shared.FileIOHelper
 [<ReactComponent>]
 let NotesSearchTarget () =
 
-    let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let pageCtx = Renderer.Context.PageStateContext.usePageState ()
+    let fileTreeCtx = Renderer.Context.FileStateContext.useFileState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorer ()
     let notes, setNotes = React.useState ([]: NoteSearch list)
     let isLoading, setIsLoading = React.useState true
     let error, setError = React.useState (None: string option)

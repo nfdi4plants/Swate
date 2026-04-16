@@ -54,7 +54,7 @@ type private Selector =
 
     [<ReactComponent>]
     static member private Actionbar(setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit) =
-        let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
 
         let onCreateARC =
             fun _ ->
@@ -142,7 +142,7 @@ module private Authentication =
     [<ReactComponent>]
     let UserAvatar () =
         let isLoading, setIsLoading = React.useState false
-        let authStateCtx = Renderer.Context.AuthStateCtx.useAuthState ()
+        let authStateCtx = Renderer.Context.AuthStateContext.useAuthState ()
 
         let onSignIn (signInInfo: SignInInformation) =
             promise {

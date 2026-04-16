@@ -196,7 +196,7 @@ type SearchComponent =
         let state_bb, setState_bb = React.useState (BuildingBlockUIState.init)
 
         let ctx =
-            AnnotationTableContext.useAnnotationTableCtx ()
+            AnnotationTableContext.useAnnotationTableStateCtx ()
 
         let xIndex =
             ctx.state

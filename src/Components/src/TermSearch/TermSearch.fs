@@ -4,7 +4,7 @@ open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
 open Feliz
-open Swate.Components.TermSearch.TermSearchConfigCtx
+open Swate.Components.TermSearch.TermSearchConfigContext
 
 
 module private APIExtentions =

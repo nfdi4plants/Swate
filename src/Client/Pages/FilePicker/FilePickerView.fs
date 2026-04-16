@@ -91,7 +91,7 @@ type FilePicker =
     static member ActionButtons (model: Model) dispatch =
 
         let ctx =
-            AnnotationTableContext.useAnnotationTableCtx ()
+            AnnotationTableContext.useAnnotationTableStateCtx ()
 
         let selectedCells =
             ctx.state

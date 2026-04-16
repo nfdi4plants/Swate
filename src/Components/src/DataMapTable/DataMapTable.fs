@@ -314,7 +314,7 @@ type DataMapTable =
         let tableRef = React.useRef<TableHandle> (unbox null)
         let containerRef = React.useElementRef ()
         let defaultDebug = defaultArg debug false
-        let annotationTableCtx = AnnotationTableContext.useAnnotationTableCtx ()
+        let annotationTableCtx = AnnotationTableContext.useAnnotationTableStateCtx ()
         let hasAnnotationCtx = isNullOrUndefined annotationTableCtx |> not
 
         let onSelect: GridSelect.OnSelect =

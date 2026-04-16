@@ -520,7 +520,7 @@ type AnnotationTable =
         let containerRef = React.useElementRef ()
         let tableRefInner = React.useRef<TableHandle> (null)
         let (modal: ModalTypes option), setModal = React.useState None
-        let ctx = AnnotationTableContext.useAnnotationTableCtx ()
+        let ctx = AnnotationTableContext.useAnnotationTableStateCtx ()
 
         let hasCtx = isNullOrUndefined ctx |> not
 
@@ -731,7 +731,7 @@ type AnnotationTable =
     static member Entry() =
         let arcTable = ARCtrl.ArcTable("TestTable", ResizeArray())
 
-        let ctx = AnnotationTableContext.useAnnotationTableCtx ()
+        let ctx = AnnotationTableContext.useAnnotationTableStateCtx ()
 
         arcTable.AddColumn(
             CompositeHeader.Input IOType.Source,

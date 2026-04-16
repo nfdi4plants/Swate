@@ -105,8 +105,9 @@
     <Compile Include="GitSidebar\GitSidebar.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
-    <Compile Include="TermSearch\TermSearchConfigLocalStorageActiveKeysCtx.fs" />
-    <Compile Include="TermSearch\TermSearchConfigCtx.fs" />
+    <Compile Include="TermSearch\TermSearchConfigLocalStorageActiveKeysContext.fs" />
+    <Compile Include="TermSearch\TermSearchConfigContext.fs" />
+    <Compile Include="TermSearch\TermSearchAllKeysContext.fs" />
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
     <Compile Include="TermSearch\TermSearchConfigSetter.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />

@@ -312,7 +312,7 @@ type BuildingBlockWidget =
 
         let state, setState = React.useState (BuildingBlockWidgetState.Model.init ())
 
-        let annotationCtx = AnnotationTableContext.useAnnotationTableCtx ()
+        let annotationCtx = AnnotationTableContext.useAnnotationTableStateCtx ()
 
         let widgetCtx = useWidgetControllerCtx ()
 

@@ -52,10 +52,10 @@ let EmptyFileTreePlaceholder () =
 [<ReactComponent>]
 let FileTree () =
 
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
-    let errorModal = ErrorModal.Context.useErrorModal ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorer ()
+    let errorModal = ErrorModal.Context.useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 
     match fileStateCtx.state.FileTree with

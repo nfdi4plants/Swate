@@ -23,7 +23,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
     Swate.Components.ThemeProvider.ThemeProvider(
         ThemeCtx,
         Swate.Components.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
-            Swate.Components.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.Init(
+            Swate.Components.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
 
                 Html.div [
                     prop.id "ClientView"

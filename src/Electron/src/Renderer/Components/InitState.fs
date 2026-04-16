@@ -88,7 +88,7 @@ let CreateNewArcModalContent (close: unit -> unit) =
 let InitState () =
 
     let modalIsOpen, setModalIsOpen = React.useState (false)
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
 
     React.Fragment [
         BaseModal.BaseModal(modalIsOpen, setModalIsOpen, CreateNewArcModalContent(fun () -> setModalIsOpen false))

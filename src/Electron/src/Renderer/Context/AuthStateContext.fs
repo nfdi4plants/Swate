@@ -1,4 +1,4 @@
-module Renderer.Context.AuthStateCtx
+module Renderer.Context.AuthStateContext
 
 open Feliz
 open Swate.Electron.Shared.AuthTypes

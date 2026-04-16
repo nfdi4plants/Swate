@@ -293,7 +293,7 @@ type ErrorModalProvider =
             showQueued: bool,
             showBatch: bool
         ) =
-        let errorModal = useErrorModal ()
+        let errorModal = useErrorModalCtx ()
 
         let enqueueSingle () =
             errorModal.enqueue (
@@ -362,7 +362,7 @@ type ErrorModalProvider =
 
     [<ReactComponent>]
     static member private ScopedEntryContent() =
-        let errorModal = useErrorModal ()
+        let errorModal = useErrorModalCtx ()
 
         let enqueueScopedQueue () =
             errorModal.enqueue (

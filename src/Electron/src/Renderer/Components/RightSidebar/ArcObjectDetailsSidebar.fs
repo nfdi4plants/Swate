@@ -6,8 +6,8 @@ open Swate.Components.Shared
 
 [<ReactComponent>]
 let Main () =
-    let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileState ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorer ()
 
     let viewModel =
         ArcObjectExplorerView.create

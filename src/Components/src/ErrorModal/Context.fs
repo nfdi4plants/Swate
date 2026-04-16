@@ -33,4 +33,4 @@ type ErrorModalContext = {
 let ErrorModalCtx = React.createContext<ErrorModalContext> (ErrorModalContext.Empty)
 
 [<Hook>]
-let useErrorModal () = React.useContext ErrorModalCtx
+let useErrorModalCtx () = React.useContext ErrorModalCtx

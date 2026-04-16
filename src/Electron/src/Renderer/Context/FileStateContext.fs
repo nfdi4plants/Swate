@@ -1,4 +1,4 @@
-module Renderer.Context.FileStateCtx
+module Renderer.Context.FileStateContext
 
 open Feliz
 open Swate.Components.Shared

@@ -162,16 +162,16 @@ let Main () =
     let showDetailsSidebarToggle =
         model.AppState.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectExplorer
 
-    Context.AppStateCtx.AppStateCtx.Provider(
+    Context.AppStateContext.AppStateCtx.Provider(
         appCtx,
-        Renderer.Context.FileStateCtx.FileStateCtxProvider(
-            Renderer.Context.ArcObjectExplorerCtx.ArcObjectExplorerCtxProvider(
-                Renderer.Context.PageStateCtx.PageStateCtx.Provider(
+        Renderer.Context.FileStateContext.FileStateCtxProvider(
+            Renderer.Context.ArcObjectExplorerContext.ArcObjectExplorerCtxProvider(
+                Renderer.Context.PageStateContext.PageStateCtx.Provider(
                     pageCtx,
                     ErrorModalProvider.ErrorModalProvider(
-                        Renderer.Context.AuthStateCtx.Provider(
-                            Renderer.Context.GitStateCtx.GitStateCtxProvider(
-                                AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.Init(
+                        Renderer.Context.AuthStateContext.Provider(
+                            Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
                                     Layout.Main(
                                         children =
                                             React.Fragment [|

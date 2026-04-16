@@ -19,8 +19,8 @@ type CloseWindowController =
         ) =
 
         let modalIsOpen, setModalIsOpen = React.useState false
-        let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
-        let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+        let pageCtx = Renderer.Context.PageStateContext.usePageState ()
+        let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorer ()
 
         let saveBeforeClose () : JS.Promise<Result<unit, exn>> = promise {
             let saveTarget =
