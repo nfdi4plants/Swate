@@ -11,6 +11,10 @@ open Fable.Core
 open Feliz
 open System.ComponentModel
 
+type UseMeasureRect =
+    abstract width: float option
+    abstract height: float option
+
 [<EditorBrowsable(EditorBrowsableState.Never)>]
 module Impl =
     [<Emit("typeof window !== 'undefined'")>]
@@ -127,6 +131,9 @@ type React =
 
     [<ImportMember("@uidotdev/usehooks")>]
     static member useThrottle<'A>(value: 'A, delay: int) : 'A = jsNative
+
+    [<ImportMember("@uidotdev/usehooks")>]
+    static member useMeasure<'T when 'T :> Element>() : (('T option -> unit) * UseMeasureRect) = jsNative
 
 [<Erase; RequireQualifiedAccess>]
 module React =

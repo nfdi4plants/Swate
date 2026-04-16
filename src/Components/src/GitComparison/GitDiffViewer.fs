@@ -30,6 +30,7 @@ type GitDiffViewer =
 
                     let rows =
                         GitTextComparisonCore.WordDiff.buildRowsFromWordDiff wordDiffText previousContent currentContent
+                        |> List.toArray
 
                     let previousLineCount = (GitTextComparisonCore.Text.splitContentToLines previousContent).Length
                     let currentLineCount = (GitTextComparisonCore.Text.splitContentToLines currentContent).Length

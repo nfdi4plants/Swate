@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { within, expect, waitFor } from "storybook/test";
+import { within, expect, waitFor, fireEvent } from "storybook/test";
 import { Viewer as GitDiffViewerComponent } from "./GitDiffViewer.fs.js";
 
 const introLines = Array.from({ length: 14 }, (_, index) => `Context line ${index + 1}`);
@@ -68,6 +68,29 @@ index 1111111..3333333 100644
 ~
 `;
 
+function buildAddedFileWordDiffText(path: string, lines: string[]) {
+  return [
+    "new file mode 100644",
+    "--- /dev/null",
+    `+++ b/${path}`,
+    `@@ -0,0 +1,${lines.length} @@`,
+    ...lines.map((line) => `+${line}`),
+    "~",
+    "",
+  ].join("\n");
+}
+
+const largeDiffLines = Array.from(
+  { length: 600 },
+  (_, index) => `Generated large diff line ${index + 1}`,
+);
+const largeDiffPath = "notes/large-diff.txt";
+const largeDiffContent = `${largeDiffLines.join("\n")}\n`;
+const largeDiffWordDiffText = buildAddedFileWordDiffText(
+  largeDiffPath,
+  largeDiffLines,
+);
+
 const meta = {
   title: "Components/GitComparison/GitDiffViewer",
   component: GitDiffViewerComponent,
@@ -83,7 +106,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div className="swt:p-6 swt:bg-base-200">
+      <div className="swt:h-[80vh] swt:min-h-[48rem] swt:bg-base-200 swt:p-6">
         <Story />
       </div>
     ),
@@ -102,22 +125,180 @@ export const Default: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const hasExactText = (value: string) => (_content: string, element: Element | null) =>
+      element?.textContent === value;
     const root = canvas.getByTestId("git-diff-story-root");
-    const comparisonScroll = canvas.getByTestId("git-diff-story-comparison-scroll");
+    const previousHeader = canvas.getByTestId("git-diff-story-previous-header");
+    const currentHeader = canvas.getByTestId("git-diff-story-current-header");
+    const virtualContent = canvas.getByTestId(
+      "git-diff-story-comparison-scroll-virtual-content",
+    );
+    const comparisonScroll = canvas.getByTestId("git-diff-story-comparison-scroll") as HTMLElement;
 
-    await expect(canvas.getByTestId("git-diff-story-previous-header")).toHaveTextContent("notes/protocol.md");
-    await expect(canvas.getByTestId("git-diff-story-current-header")).toHaveTextContent("notes/protocol.md");
+    await expect(previousHeader).toHaveTextContent("notes/protocol.md");
+    await expect(currentHeader).toHaveTextContent("notes/protocol.md");
+    await expect(
+      virtualContent,
+    ).toBeInTheDocument();
+    await waitFor(() => {
+      const headerWidth =
+        previousHeader.getBoundingClientRect().width +
+        currentHeader.getBoundingClientRect().width;
+      const bodyWidth = virtualContent.getBoundingClientRect().width;
+
+      expect(Math.abs(headerWidth - bodyWidth)).toBeLessThanOrEqual(1);
+    });
     await expect(root).toHaveTextContent("Protocol Overview");
     await expect(root).toHaveTextContent("Context line 14");
-    await expect(root).toHaveTextContent("Checkpoint item 16");
-    await expect(root).toHaveTextContent("Temperature 24 C");
     await expect(root).toHaveTextContent("Step A updated");
     await expect(root).toHaveTextContent("Remove me");
-    await expect(root).toHaveTextContent("Added after shared");
-    await expect(root).toHaveTextContent("Tail note refined");
 
     await waitFor(() => {
       expect(comparisonScroll.clientHeight).toBeGreaterThan(0);
+      expect(comparisonScroll.scrollHeight).toBeGreaterThan(comparisonScroll.clientHeight);
+    });
+
+    const middleScrollTop = Math.floor(
+      (comparisonScroll.scrollHeight - comparisonScroll.clientHeight) * 0.7,
+    );
+    comparisonScroll.scrollTop = middleScrollTop;
+    await fireEvent.scroll(comparisonScroll, {
+      target: { scrollTop: middleScrollTop },
+    });
+
+    await expect(
+      await canvas.findByTestId("git-diff-story-comparison-scroll-row-35"),
+    ).toBeInTheDocument();
+    await expect(await canvas.findAllByText("Checkpoint item 16")).toHaveLength(2);
+    await expect(await canvas.findByText(hasExactText("Temperature 24 C"))).toBeInTheDocument();
+    await expect(await canvas.findByText("Added after shared")).toBeInTheDocument();
+
+    const maxScrollTop = comparisonScroll.scrollHeight - comparisonScroll.clientHeight;
+    comparisonScroll.scrollTop = maxScrollTop;
+    await fireEvent.scroll(comparisonScroll, {
+      target: { scrollTop: maxScrollTop },
+    });
+
+    await expect(await canvas.findByText(hasExactText("Tail note refined"))).toBeInTheDocument();
+  },
+};
+
+export const LargeAddedFileVirtualized: Story = {
+  args: {
+    wordDiffText: largeDiffWordDiffText,
+    previousContent: "",
+    currentContent: largeDiffContent,
+    testIdPrefix: "git-diff-large-story",
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const comparisonScroll = canvas.getByTestId(
+      "git-diff-large-story-comparison-scroll",
+    ) as HTMLElement;
+
+    await expect(
+      canvas.getByTestId("git-diff-large-story-comparison-scroll-virtual-content"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.getByTestId("git-diff-large-story-comparison-scroll-row-0"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByTestId("git-diff-large-story-comparison-scroll-row-599"),
+    ).toBeNull();
+    await expect(
+      canvasElement.querySelectorAll(
+        "[data-testid^='git-diff-large-story-comparison-scroll-row-']",
+      ).length,
+    ).toBeLessThan(100);
+
+    await waitFor(() => {
+      expect(comparisonScroll.clientHeight).toBeGreaterThan(0);
+      expect(comparisonScroll.scrollHeight).toBeGreaterThan(comparisonScroll.clientHeight);
+    });
+
+    const maxScrollTop = comparisonScroll.scrollHeight - comparisonScroll.clientHeight;
+    comparisonScroll.scrollTop = maxScrollTop;
+    await fireEvent.scroll(comparisonScroll, {
+      target: { scrollTop: maxScrollTop },
+    });
+
+    await expect(
+      await canvas.findByTestId("git-diff-large-story-comparison-scroll-row-599"),
+    ).toBeInTheDocument();
+    await expect(
+      await canvas.findByText("Generated large diff line 600"),
+    ).toBeInTheDocument();
+  },
+};
+
+export const ClientHostVirtualized: Story = {
+  args: {
+    wordDiffText: largeDiffWordDiffText,
+    previousContent: "",
+    currentContent: largeDiffContent,
+    testIdPrefix: "git-diff-client-host-story",
+  },
+  render: (args) => (
+    <div className="swt:flex swt:w-full swt:overflow-auto swt:h-screen">
+      <GitDiffViewerComponent {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(
+      canvas.getByTestId("git-diff-client-host-story-comparison-scroll-row-0"),
+    ).toBeInTheDocument();
+    await expect(
+      canvas.queryByTestId("git-diff-client-host-story-comparison-scroll-row-599"),
+    ).toBeNull();
+    await expect(
+      canvasElement.querySelectorAll(
+        "[data-testid^='git-diff-client-host-story-comparison-scroll-row-']",
+      ).length,
+    ).toBeLessThan(100);
+  },
+};
+
+export const ResizableViewportWidth: Story = {
+  args: {
+    wordDiffText: largeDiffWordDiffText,
+    previousContent: "",
+    currentContent: largeDiffContent,
+    testIdPrefix: "git-diff-resize-story",
+  },
+  render: (args) => (
+    <div
+      data-testid="git-diff-resize-shell"
+      style={{ width: "1120px", height: "34rem" }}
+    >
+      <GitDiffViewerComponent {...args} />
+    </div>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const shell = canvas.getByTestId("git-diff-resize-shell") as HTMLElement;
+    const comparisonScroll = canvas.getByTestId(
+      "git-diff-resize-story-comparison-scroll",
+    ) as HTMLElement;
+    const virtualContent = canvas.getByTestId(
+      "git-diff-resize-story-comparison-scroll-virtual-content",
+    ) as HTMLElement;
+
+    const scrollWidth = () => Math.round(comparisonScroll.getBoundingClientRect().width);
+    const contentWidth = () => Math.round(virtualContent.getBoundingClientRect().width);
+
+    await waitFor(() => {
+      expect(comparisonScroll.clientHeight).toBeGreaterThan(0);
+      expect(scrollWidth()).toBeGreaterThan(1000);
+      expect(Math.abs(contentWidth() - scrollWidth())).toBeLessThanOrEqual(1);
+    });
+
+    shell.style.width = "1040px";
+
+    await waitFor(() => {
+      expect(scrollWidth()).toBeLessThanOrEqual(1041);
+      expect(Math.abs(contentWidth() - scrollWidth())).toBeLessThanOrEqual(1);
     });
   },
 };

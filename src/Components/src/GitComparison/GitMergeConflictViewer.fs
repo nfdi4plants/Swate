@@ -460,7 +460,10 @@ module private GitMergeConflictViewerInternal =
                     let currentHeaderLabel =
                         GitTextComparisonCore.Metadata.resolveHeaderLabel "Current" currentTitle block.CurrentLabel
 
-                    let rows = GitTextComparisonCore.Rows.buildRows block.IncomingContent block.CurrentContent
+                    let rows =
+                        GitTextComparisonCore.Rows.buildRows block.IncomingContent block.CurrentContent
+                        |> List.toArray
+
                     let incomingLineCount = (GitTextComparisonCore.Text.splitContentToLines block.IncomingContent).Length
                     let currentLineCount = (GitTextComparisonCore.Text.splitContentToLines block.CurrentContent).Length
 
