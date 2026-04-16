@@ -58,7 +58,7 @@ let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgress
     let rendererApi =
         Remoting.init
         |> Remoting.withWindow vault.window
-        |> Remoting.buildClient<IMainUpdateRendererApi>
+        |> Remoting.buildClient<IGitProgressUpdateApi>
 
     fun progressEvent ->
         rendererApi.gitProgressUpdate {

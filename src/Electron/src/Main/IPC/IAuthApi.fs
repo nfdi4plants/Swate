@@ -15,7 +15,7 @@ let private broadcastAccountsUpdate () =
     |> Array.iter (fun window ->
         Remoting.init
         |> Remoting.withWindow window.window
-        |> Remoting.buildClient<IMainUpdateRendererApi>
+        |> Remoting.buildClient<IAuthAccountsUpdateApi>
         |> fun client -> client.authAccountsUpdate authState
     )
 
