@@ -94,22 +94,12 @@ type IGitLabApi = {
     createProject: IpcMainEvent -> string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
 }
 
-/// One Way Bridge: Main -> Renderer
-type IMainUpdateRendererApi = {
-    pathChange: string option -> unit
-    recentARCsUpdate: ARCPointer[] -> unit
-    authAccountsUpdate: AuthStateDto -> unit
-    fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
-    gitProgressUpdate: GitProgressDto -> unit
-}
-with
-    static member empty = {
-        pathChange = ignore
-        recentARCsUpdate = ignore
-        authAccountsUpdate = ignore
-        fileTreeUpdate = ignore
-        gitProgressUpdate = ignore
-    }
+/// One Way Bridge: Main -> Renderer (per-channel)
+type IPathChangeApi = { pathChange: string option -> unit }
+type IRecentARCsUpdateApi = { recentARCsUpdate: ARCPointer[] -> unit }
+type IAuthAccountsUpdateApi = { authAccountsUpdate: AuthStateDto -> unit }
+type IFileTreeUpdateApi = { fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit }
+type IGitProgressUpdateApi = { gitProgressUpdate: GitProgressDto -> unit }
 
 // TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer
