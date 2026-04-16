@@ -35,7 +35,10 @@ Components in `src/Components` are expected to be reusable and application-agnos
 - **PascalCase**: MUST use PascalCase for component and object names.
 - **CamelCase**: MUST use camelCase for props and functions.
 - **`[<ReactComponent>]`**: If a component returns a `ReactElement`, it MUST be decorated with `[<ReactComponent>]`.
-- **Components as static members**: Any components SHOULD be defined as static members of a class. They MUST use tupled args. This allows us to use optional params with `?optionalParam` syntax, as well as named params with `namedParam = namedParamValue` syntax. These Classes MUST have the `[<Erase; Mangle(false)>]` attribute to improve interop with native TypeScript.
+- **Components as static members**: Any components MUST be defined as static members of a class.
+    - They MUST use tupled args. This allows us to use optional params with `?optionalParam` syntax, as well as named params with `namedParam = namedParamValue` syntax.
+    - These Classes MUST have the `[<Erase; Mangle(false)>]` attribute to improve interop with native TypeScript.
+    - Public component names MUST be Standalone descriptive if they are intended for TypeScript interop. The main component name MUST be equal to the file name. Subcomponent names MUST be descriptive of their purpose and not include the main component name as a prefix. For example, if the main component is `MyComponent`, a subcomponent should be named `Header` instead of `MyComponentHeader`. In addition, subcomponents SHOULD be private.
 
     ```fsharp
     [<Erase; Mangle(false)>]
@@ -48,11 +51,12 @@ Components in `src/Components` are expected to be reusable and application-agnos
 - **Types**: `private` types that are only used within a single component file MUST be defined in the same file. Public types that are shared across multiple files MUST be defined in a separate `Types.fs` file.
 - **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MUST be defined in a separate file if they are used by multiple files. Otherwise they MUST be defined in a **private** module `module <FileName>Helper` within the component file.
 - **React context**: If a component needs to share state or configuration with a React context. It MUST define the base context in a separate file `**/<ComponentName>/Context.fs` or `**/<ComponentName>/Contexts/<ContextName>.fs` or `**/<ComponentName>/<ContextName>.fs` if there are multiple contexts associated with the component, with the following properties.
-    - File namespace MUST follow folder structure and be named `Swate.Components.<Path>.<ContextName>`.
+    - File namespace MUST follow folder structure and be named `module Swate.Components.<Path>.<ContextName>` or if there is a single context `module Swate.Components.<Path>.Context`.
     - MAY contain the relevant public types.
     - MAY contain helper functions inside a MAYBE public module. This module should be named `<ContextName>Helper`.
     - It MUST NOT contain any React components.
     - It MUST contain the `React.createContext` implementation in PascalCase with the suffix `Ctx`. For example, `ExampleCtx`.
+        - It must be a root level `let` binding.
     - It MUST contain a hook to easily bind to the context. This hook MUST be named `use<ContextName>Ctx`. For example, `useExampleCtx`.
     - Example for an context "Example" for a component "ExampleComponent":
 

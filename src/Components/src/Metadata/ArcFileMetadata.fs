@@ -17,12 +17,7 @@ type ArcFileMetadata =
             Generic.BoxedField(
                 "Assay Metadata",
                 content = [
-                    FormComponents.TextInput(
-                        assay.Identifier,
-                        (fun _ -> ()),
-                        label = "Identifier",
-                        disabled = true
-                    )
+                    FormComponents.TextInput(assay.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
                     FormComponents.TextInput(
                         defaultArg assay.Title "",
                         (fun value ->
@@ -90,12 +85,7 @@ type ArcFileMetadata =
             Generic.BoxedField(
                 "Study Metadata",
                 content = [
-                    FormComponents.TextInput(
-                        study.Identifier,
-                        (fun _ -> ()),
-                        label = "Identifier",
-                        disabled = true
-                    )
+                    FormComponents.TextInput(study.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
                     FormComponents.TextInput(
                         defaultArg study.Title "",
                         (fun value ->
@@ -166,9 +156,7 @@ type ArcFileMetadata =
         ]
 
     [<ReactComponent>]
-    static member InvestigationMetadata
-        (investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit)
-        =
+    static member InvestigationMetadata(investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit) =
         Generic.Section [
             Generic.BoxedField(
                 "Investigation Metadata",
@@ -215,7 +203,9 @@ type ArcFileMetadata =
                     FormComponents.DateTimeInput(
                         defaultArg investigation.SubmissionDate "",
                         (fun value ->
-                            investigation.SubmissionDate <- if String.IsNullOrWhiteSpace value then None else Some value
+                            investigation.SubmissionDate <-
+                                if String.IsNullOrWhiteSpace value then None else Some value
+
                             setInvestigation investigation
                         ),
                         label = "Submission Date"
@@ -223,7 +213,9 @@ type ArcFileMetadata =
                     FormComponents.DateTimeInput(
                         defaultArg investigation.PublicReleaseDate "",
                         (fun value ->
-                            investigation.PublicReleaseDate <- if String.IsNullOrWhiteSpace value then None else Some value
+                            investigation.PublicReleaseDate <-
+                                if String.IsNullOrWhiteSpace value then None else Some value
+
                             setInvestigation investigation
                         ),
                         label = "Public Release Date"
@@ -254,12 +246,7 @@ type ArcFileMetadata =
             Generic.BoxedField(
                 "Run Metadata",
                 content = [
-                    FormComponents.TextInput(
-                        run.Identifier,
-                        (fun _ -> ()),
-                        label = "Identifier",
-                        disabled = true
-                    )
+                    FormComponents.TextInput(run.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
                     FormComponents.TextInput(
                         defaultArg run.Title "",
                         (fun value ->
@@ -335,12 +322,7 @@ type ArcFileMetadata =
             Generic.BoxedField(
                 "Workflow Metadata",
                 content = [
-                    FormComponents.TextInput(
-                        workflow.Identifier,
-                        (fun _ -> ()),
-                        label = "Identifier",
-                        disabled = true
-                    )
+                    FormComponents.TextInput(workflow.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
                     FormComponents.TextInput(
                         defaultArg workflow.Title "",
                         (fun value ->
@@ -491,31 +473,19 @@ type ArcFileMetadata =
 
     [<ReactComponent>]
     static member View(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
-        Html.div [
-            prop.className "swt:p-4 swt:h-full"
-            prop.children [
-                match arcFile with
-                | ArcFiles.Investigation investigation ->
-                    ArcFileMetadata.InvestigationMetadata(
-                        investigation,
-                        fun updated -> setArcFile (ArcFiles.Investigation updated)
-                    )
-                | ArcFiles.Study(study, assays) ->
-                    ArcFileMetadata.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
-                | ArcFiles.Assay assay ->
-                    ArcFileMetadata.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
-                | ArcFiles.Run run ->
-                    ArcFileMetadata.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
-                | ArcFiles.Workflow workflow ->
-                    ArcFileMetadata.WorkflowMetadata(
-                        workflow,
-                        fun updated -> setArcFile (ArcFiles.Workflow updated)
-                    )
-                | ArcFiles.DataMap(_, datamap) -> ArcFileMetadata.DataMapMetadata(datamap)
-                | ArcFiles.Template template ->
-                    ArcFileMetadata.TemplateMetadata(
-                        template,
-                        fun updated -> setArcFile (ArcFiles.Template updated)
-                    )
-            ]
-        ]
+        match arcFile with
+        | ArcFiles.Investigation investigation ->
+            ArcFileMetadata.InvestigationMetadata(
+                investigation,
+                fun updated -> setArcFile (ArcFiles.Investigation updated)
+            )
+        | ArcFiles.Study(study, assays) ->
+            ArcFileMetadata.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
+        | ArcFiles.Assay assay ->
+            ArcFileMetadata.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
+        | ArcFiles.Run run -> ArcFileMetadata.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
+        | ArcFiles.Workflow workflow ->
+            ArcFileMetadata.WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
+        | ArcFiles.DataMap(_, datamap) -> ArcFileMetadata.DataMapMetadata(datamap)
+        | ArcFiles.Template template ->
+            ArcFileMetadata.TemplateMetadata(template, fun updated -> setArcFile (ArcFiles.Template updated))
