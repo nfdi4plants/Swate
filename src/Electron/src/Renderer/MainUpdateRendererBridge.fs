@@ -30,7 +30,9 @@ type IPCStore<'T>() =
 
     member _.Update(value: 'T) =
         snapshot <- ValueSome value
-        for kv in listeners do kv.Value()
+        // Snapshot listeners before iterating so that subscribe/dispose
+        // calls from within a listener do not mutate the collection mid-loop.
+        for listener in listeners.Values |> Seq.toArray do listener()
 
 // ---------------------------------------------------------------------------
 // Per-channel stores + IPC handler registration

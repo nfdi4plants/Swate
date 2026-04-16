@@ -3,6 +3,7 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="IPCStore.test.fs" />
     <Compile Include="GitWorkflow.test.fs" />
   </ItemGroup>
   <ItemGroup>
