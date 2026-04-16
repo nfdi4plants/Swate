@@ -6,10 +6,13 @@ open Swate.Components.PopoverContext
 
 module private PopoverHelper =
 
-    let requireContext () =
-        match usePopoverCtx () with
-        | Some ctx -> ctx
-        | None -> failwith "Popover render components must be used inside Popover.Popover."
+    let tryContext () = usePopoverCtx ()
+
+    let missingContextError (componentName: string) =
+        Html.div [
+            prop.className "swt:text-error swt:text-xs swt:p-1 swt:border swt:border-error swt:rounded"
+            prop.text $"⚠ Popover.{componentName} must be used inside Popover.Popover."
+        ]
 
     let dataState isOpen = if isOpen then "open" else "closed"
 
@@ -117,22 +120,24 @@ type Popover =
     [<ReactComponent>]
     static member Trigger
         (children: ReactElement, ?className: string, ?interactionProps: obj, ?props: IReactProperty list, ?debug: string) =
-        let ctx = PopoverHelper.requireContext ()
-        let resolvedDebug = debug |> Option.orElse ctx.debug
+        match PopoverHelper.tryContext () with
+        | None -> PopoverHelper.missingContextError "Trigger"
+        | Some ctx ->
+            let resolvedDebug = debug |> Option.orElse ctx.debug
 
-        Html.button [
-            prop.type'.button
-            prop.ref ctx.floating.refs.setReference
-            prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
-            if resolvedDebug.IsSome then
-                prop.testId ("popover_trigger_" + resolvedDebug.Value)
-            prop.className [ "swt:btn"; yield! Option.toList className ]
-            yield! Option.defaultValue [] props
-            yield!
-                prop.spread
-                <| ctx.interactions.getReferenceProps (PopoverHelper.resolveProps interactionProps)
-            prop.children children
-        ]
+            Html.button [
+                prop.type'.button
+                prop.ref ctx.floating.refs.setReference
+                prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
+                if resolvedDebug.IsSome then
+                    prop.testId ("popover_trigger_" + resolvedDebug.Value)
+                prop.className [ "swt:btn"; yield! Option.toList className ]
+                yield! Option.defaultValue [] props
+                yield!
+                    prop.spread
+                    <| ctx.interactions.getReferenceProps (PopoverHelper.resolveProps interactionProps)
+                prop.children children
+            ]
 
     [<ReactComponent>]
     static member TriggerRender
@@ -146,13 +151,14 @@ type Popover =
                     -> ReactElement,
             ?interactionProps: obj
         ) =
-        let ctx = PopoverHelper.requireContext ()
-
-        render {|
-            isOpen = ctx.isOpen
-            setReference = box ctx.floating.refs.setReference
-            referenceProps = ctx.interactions.getReferenceProps (PopoverHelper.resolveProps interactionProps)
-        |}
+        match PopoverHelper.tryContext () with
+        | None -> PopoverHelper.missingContextError "TriggerRender"
+        | Some ctx ->
+            render {|
+                isOpen = ctx.isOpen
+                setReference = box ctx.floating.refs.setReference
+                referenceProps = ctx.interactions.getReferenceProps (PopoverHelper.resolveProps interactionProps)
+            |}
 
     [<ReactComponent>]
     static member Content
@@ -164,133 +170,206 @@ type Popover =
             ?debug: string,
             ?ariaLabel: string
         ) =
-        let ctx = PopoverHelper.requireContext ()
-        let resolvedDebug = debug |> Option.orElse ctx.debug
+        match PopoverHelper.tryContext () with
+        | None -> PopoverHelper.missingContextError "Content"
+        | Some ctx ->
+            let resolvedDebug = debug |> Option.orElse ctx.debug
 
-        if ctx.isOpen then
-            FloatingUI.FloatingPortal(
-                ?id = ctx.portalId,
-                preserveTabOrder = ctx.preserveTabOrder,
-                children =
-                    FloatingUI.FloatingFocusManager(
-                        context = ctx.floating.context,
-                        modal = ctx.modal,
-                        ?disabled = ctx.focusManagerDisabled,
-                        ?initialFocus = ctx.initialFocus,
-                        ?returnFocus = ctx.returnFocus,
-                        ?visuallyHiddenDismiss = ctx.visuallyHiddenDismiss,
-                        ?closeOnFocusOut = ctx.closeOnFocusOut,
-                        ?outsideElementsInert = ctx.outsideElementsInert,
-                        children =
-                            Html.div [
-                                prop.ref ctx.floating.refs.setFloating
-                                prop.custom ("style", ctx.floating.floatingStyles)
-                                prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
-                                prop.custom ("data-status", ctx.status)
-                                match ctx.labelId with
-                                | Some lid -> prop.ariaLabelledBy lid
-                                | None ->
-                                    if ariaLabel.IsSome then
-                                        prop.ariaLabel ariaLabel.Value
-                                if ctx.descriptionId.IsSome then
-                                    prop.ariaDescribedBy ctx.descriptionId.Value
-                                if resolvedDebug.IsSome then
-                                    prop.testId ("popover_content_" + resolvedDebug.Value)
-                                prop.className [
-                                    "swt:z-[9999] swt:min-w-56 swt:max-w-[min(28rem,calc(100vw-2rem))]"
-                                    "swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100"
-                                    "swt:p-4 swt:shadow-md swt:outline-hidden"
-                                    yield! Option.toList className
+            if ctx.isOpen then
+                FloatingUI.FloatingPortal(
+                    ?id = ctx.portalId,
+                    preserveTabOrder = ctx.preserveTabOrder,
+                    children =
+                        FloatingUI.FloatingFocusManager(
+                            context = ctx.floating.context,
+                            modal = ctx.modal,
+                            ?disabled = ctx.focusManagerDisabled,
+                            ?initialFocus = ctx.initialFocus,
+                            ?returnFocus = ctx.returnFocus,
+                            ?visuallyHiddenDismiss = ctx.visuallyHiddenDismiss,
+                            ?closeOnFocusOut = ctx.closeOnFocusOut,
+                            ?outsideElementsInert = ctx.outsideElementsInert,
+                            children =
+                                Html.div [
+                                    prop.ref ctx.floating.refs.setFloating
+                                    prop.custom ("style", ctx.floating.floatingStyles)
+                                    prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
+                                    prop.custom ("data-status", ctx.status)
+                                    match ctx.labelId with
+                                    | Some lid -> prop.ariaLabelledBy lid
+                                    | None ->
+                                        if ariaLabel.IsSome then
+                                            prop.ariaLabel ariaLabel.Value
+                                    if ctx.descriptionId.IsSome then
+                                        prop.ariaDescribedBy ctx.descriptionId.Value
+                                    if resolvedDebug.IsSome then
+                                        prop.testId ("popover_content_" + resolvedDebug.Value)
+                                    prop.className [
+                                        "swt:z-[9999] swt:min-w-56 swt:max-w-[min(28rem,calc(100vw-2rem))]"
+                                        "swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100"
+                                        "swt:p-4 swt:shadow-md swt:outline-hidden"
+                                        yield! Option.toList className
+                                    ]
+                                    yield! Option.defaultValue [] props
+                                    yield!
+                                        prop.spread
+                                        <| ctx.interactions.getFloatingProps (
+                                            PopoverHelper.resolveProps interactionProps
+                                        )
+                                    prop.children children
                                 ]
-                                yield! Option.defaultValue [] props
-                                yield!
-                                    prop.spread
-                                    <| ctx.interactions.getFloatingProps (PopoverHelper.resolveProps interactionProps)
-                                prop.children children
-                            ]
-                    )
-            )
-        else
-            Html.none
+                        )
+                )
+            else
+                Html.none
 
     [<ReactComponent>]
     static member Heading(children: ReactElement, ?className: string, ?props: IReactProperty list, ?id: string) =
         let generatedId = FloatingUI.useId ()
         let headingId = defaultArg id generatedId
-        let ctx = PopoverHelper.requireContext ()
+        let ctxOpt = PopoverHelper.tryContext ()
 
         React.useEffect (
             (fun () ->
-                ctx.setLabelId (fun cur ->
-                    match cur with
-                    | None -> Some headingId
-                    | s -> s
-                )
-
-                FsReact.createDisposable (fun () ->
+                match ctxOpt with
+                | Some ctx ->
                     ctx.setLabelId (fun cur ->
                         match cur with
-                        | Some x when x = headingId -> None
+                        | None -> Some headingId
                         | s -> s
                     )
-                )
+
+                    FsReact.createDisposable (fun () ->
+                        ctx.setLabelId (fun cur ->
+                            match cur with
+                            | Some x when x = headingId -> None
+                            | s -> s
+                        )
+                    )
+                | None -> FsReact.createDisposable (fun () -> ())
             ),
-            [| headingId :> obj; ctx.setLabelId :> obj |]
+            [|
+                headingId :> obj
+                (ctxOpt |> Option.map (fun c -> c.setLabelId :> obj) |> Option.defaultValue null)
+            |]
         )
 
-        Html.h2 [
-            prop.id headingId
-            prop.className [
-                "swt:text-base swt:font-semibold swt:leading-tight"
-                yield! Option.toList className
+        match ctxOpt with
+        | None -> PopoverHelper.missingContextError "Heading"
+        | Some _ ->
+            Html.h2 [
+                prop.id headingId
+                prop.className [
+                    "swt:text-base swt:font-semibold swt:leading-tight"
+                    yield! Option.toList className
+                ]
+                yield! Option.defaultValue [] props
+                prop.children children
             ]
-            yield! Option.defaultValue [] props
-            prop.children children
-        ]
 
     [<ReactComponent>]
     static member Description(children: ReactElement, ?className: string, ?props: IReactProperty list, ?id: string) =
         let generatedId = FloatingUI.useId ()
         let descriptionId = defaultArg id generatedId
-        let ctx = PopoverHelper.requireContext ()
+        let ctxOpt = PopoverHelper.tryContext ()
 
         React.useEffect (
             (fun () ->
-                ctx.setDescriptionId (fun cur ->
-                    match cur with
-                    | None -> Some descriptionId
-                    | s -> s
-                )
-
-                FsReact.createDisposable (fun () ->
+                match ctxOpt with
+                | Some ctx ->
                     ctx.setDescriptionId (fun cur ->
                         match cur with
-                        | Some x when x = descriptionId -> None
+                        | None -> Some descriptionId
                         | s -> s
                     )
-                )
+
+                    FsReact.createDisposable (fun () ->
+                        ctx.setDescriptionId (fun cur ->
+                            match cur with
+                            | Some x when x = descriptionId -> None
+                            | s -> s
+                        )
+                    )
+                | None -> FsReact.createDisposable (fun () -> ())
             ),
-            [| descriptionId :> obj; ctx.setDescriptionId :> obj |]
+            [|
+                descriptionId :> obj
+                (ctxOpt
+                 |> Option.map (fun c -> c.setDescriptionId :> obj)
+                 |> Option.defaultValue null)
+            |]
         )
 
-        Html.p [
-            prop.id descriptionId
-            prop.className [
-                "swt:text-sm swt:opacity-70"
-                yield! Option.toList className
+        match ctxOpt with
+        | None -> PopoverHelper.missingContextError "Description"
+        | Some _ ->
+            Html.p [
+                prop.id descriptionId
+                prop.className [
+                    "swt:text-sm swt:opacity-70"
+                    yield! Option.toList className
+                ]
+                yield! Option.defaultValue [] props
+                prop.children children
             ]
-            yield! Option.defaultValue [] props
-            prop.children children
-        ]
 
     [<ReactComponent>]
-    static member Close(children: ReactElement, ?className: string, ?props: IReactProperty list) =
-        let ctx = PopoverHelper.requireContext ()
+    static member Close(?children: ReactElement, ?className: string, ?props: IReactProperty list) =
+        match PopoverHelper.tryContext () with
+        | None -> PopoverHelper.missingContextError "Close"
+        | Some ctx ->
+            match children with
+            | Some c ->
+                Html.button [
+                    prop.type'.button
+                    prop.className [ "swt:btn swt:btn-sm"; yield! Option.toList className ]
+                    prop.onClick (fun _ -> ctx.setIsOpen false)
+                    yield! Option.defaultValue [] props
+                    prop.children c
+                ]
+            | None ->
+                Components.CircularExitButton(
+                    className = (defaultArg className "swt:btn-sm"),
+                    props = [
+                        prop.type'.button
+                        prop.onClick (fun _ -> ctx.setIsOpen false)
+                        yield! Option.defaultValue [] props
+                    ]
+                )
 
-        Html.button [
-            prop.type'.button
-            prop.className [ "swt:btn swt:btn-sm"; yield! Option.toList className ]
-            prop.onClick (fun _ -> ctx.setIsOpen false)
-            yield! Option.defaultValue [] props
-            prop.children children
-        ]
+    [<ReactComponent>]
+    static member Simple
+        (
+            trigger: ReactElement,
+            content: ReactElement,
+            ?placement: FloatingUI.Placement,
+            ?modal: bool,
+            ?debug: string,
+            ?contentClassName: string,
+            ?triggerClassName: string
+        ) =
+        Popover.Popover(
+            ?placement = placement,
+            ?modal = modal,
+            ?debug = debug,
+            children =
+                React.fragment [
+                    Popover.Trigger(trigger, ?className = triggerClassName)
+                    Popover.Content(
+                        ?className = contentClassName,
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:flex swt:items-start swt:justify-between swt:gap-2"
+                                        prop.children [
+                                            Html.div [ prop.className "swt:flex-1"; prop.children content ]
+                                            Popover.Close()
+                                        ]
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
+        )

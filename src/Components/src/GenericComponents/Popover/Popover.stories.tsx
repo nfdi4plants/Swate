@@ -9,6 +9,7 @@ import {
   Heading,
   Description,
   Close,
+  Simple,
 } from "./Popover.fs.js";
 // NOTE: Fable dev mode (--lang ts) generates `.fs.ts` files colocated with
 // source. The `.fs.js` extension in the import is resolved by Vite's
@@ -275,5 +276,48 @@ export const BareContent: Story = {
     expect(dialog).toHaveAttribute("aria-label", "Plain actions");
     expect(dialog).not.toHaveAttribute("aria-labelledby");
     expect(screen.getByRole("button", { name: /only action/i })).toBeInTheDocument();
+  },
+};
+
+const SimplePopoverExample = () => (
+  <Simple
+    trigger={<>Show info</>}
+    debug="simple"
+    content={
+      <>
+        <p className="swt:text-sm">This is the easy-entry popover with a built-in close button.</p>
+        <button className="swt:btn swt:btn-sm swt:btn-primary">Action</button>
+      </>
+    }
+  />
+);
+
+export const SimpleEntry: Story = {
+  render: () => <SimplePopoverExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId("popover_trigger_simple"));
+
+    const content = await screen.findByTestId("popover_content_simple");
+    expect(content).toBeInTheDocument();
+    expect(screen.getByText(/easy-entry popover/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /action/i })).toBeInTheDocument();
+  },
+};
+
+const MissingContextExample = () => (
+  <div className="swt:flex swt:gap-4">
+    <Trigger>Orphan trigger</Trigger>
+    <Content>Orphan content</Content>
+    <Close>Orphan close</Close>
+  </div>
+);
+
+export const MissingContext: Story = {
+  render: () => <MissingContextExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const errors = canvas.getAllByText(/must be used inside/i);
+    expect(errors.length).toBeGreaterThanOrEqual(3);
   },
 };
