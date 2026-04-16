@@ -68,6 +68,7 @@
     <Compile Include="Util\DateTimeExtensions.fs" />
     <Compile Include="Util\Virtual.fs" />
     <Compile Include="Util\FloatingUI.fs" />
+    <Compile Include="Util\DndKit.fs" />
     <Compile Include="Util\Constants.fs" />
     <Compile Include="Util\Extensions.fs" />
     <Compile Include="Util\React.useListener.fs" />
@@ -111,7 +112,6 @@
     <Compile Include="TermSearch\TermSearch.fs" />
     <Compile Include="Metadata\Generic.fs" />
     <Compile Include="Metadata\TextInput.fs" />
-    <Compile Include="Metadata\JsBindings\DndKit.fs" />
     <Compile Include="Metadata\Forms.fs" />
     <Compile Include="Metadata\ArcFileMetadata.fs" />
     <Compile Include="MarkdownText\Types.fs" />

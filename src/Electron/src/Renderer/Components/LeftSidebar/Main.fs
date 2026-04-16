@@ -7,7 +7,17 @@ open Renderer.Types
 [<ReactComponent>]
 let Main (leftSidebarTarget: LeftSidebarPage) =
     Html.div [
-        prop.className "swt:p-4"
+        prop.className [
+            "swt:box-border"
+            "swt:flex"
+            "swt:h-full"
+            "swt:min-h-0"
+            "swt:min-w-0"
+            "swt:max-w-full"
+            "swt:flex-col"
+            "swt:overflow-hidden"
+            "swt:p-4"
+        ]
         prop.children [|
             match leftSidebarTarget with
             | LeftSidebarPage.FileExplorer -> FileExplorerSidebar.Main()

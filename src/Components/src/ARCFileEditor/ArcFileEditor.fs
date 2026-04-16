@@ -293,7 +293,9 @@ type Main =
             ?widgetServices: ArcFileEditorWidgetServices
         ) =
         let activeView, setActiveView = React.useState ActiveView.Metadata
-        let templateImportType, setTemplateImportType = React.useState TableJoinOptions.Headers
+
+        let templateImportType, setTemplateImportType =
+            React.useState TableJoinOptions.Headers
 
         React.useEffect (
             (fun () ->
@@ -316,8 +318,7 @@ type Main =
         let activeTableIndex = activeView.TryTableIndex
         let widgetHostView = activeView.ToWidgetHostView()
 
-        let hasSelectedTable =
-            arcFile.TryGetActiveTable(activeTableIndex) |> Option.isSome
+        let hasSelectedTable = arcFile.TryGetActiveTable(activeTableIndex) |> Option.isSome
 
         let navbar =
             match widgetServices, header with
@@ -387,6 +388,9 @@ type Main =
     static member Entry() =
 
         let startArcFile = ArcFiles.Assay(ArcAssay.init ("Test"))
+
+        for i in 0..10 do
+            startArcFile.Tables().Add(ArcTable.init (sprintf "Table %i" i))
 
         let arcFile, setArcFile = React.useState (startArcFile)
         Main.ArcFileEditor(arcFile, setArcFile, EntryHelpers.templateServices)

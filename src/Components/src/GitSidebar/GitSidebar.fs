@@ -788,67 +788,74 @@ type GitSidebar =
     static member private ChangedFileRow(props: ChangedFileRowProps) =
         let change = props.Change
 
-        Html.button [
-            prop.testId $"GitSidebarChangeRow-{props.Index}"
+        Html.div [
+            prop.role "listitem"
             prop.custom ("data-index", props.Index)
             prop.ref (fun element -> props.MeasureElementRef (Option.ofObj element))
-            prop.disabled props.IsBusy
-            prop.className [
-                "swt:absolute swt:left-0 swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors"
-                if change.IsConflicted then
-                    "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
-                elif props.IsSelected then
-                    "swt:border-primary/40 swt:bg-primary/5 hover:swt:bg-primary/10"
-                else
-                    "swt:border-base-content/10 swt:bg-base-100 hover:swt:bg-base-200/80"
-            ]
+            prop.className "swt:absolute swt:left-0 swt:w-full"
             prop.style [
                 style.top 0
                 style.left 0
                 style.width (length.percent 100)
                 style.custom ("transform", $"translateY({props.VirtualStart}px)")
             ]
-            prop.onClick (fun _ -> props.OpenChange change)
             prop.children [
-                Html.input [
-                    prop.testId ("GitSidebarCommitSelectionCheckbox-" + change.Path)
-                    prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
-                    prop.type'.checkbox
-                    prop.disabled (not props.CanEditCommit || change.IsConflicted)
-                    prop.isChecked props.IsSelectedForCommit
-                    prop.onClick (fun event -> event.stopPropagation ())
-                    prop.onChange (fun (_: bool) -> props.ToggleCommitSelection change.Path)
-                ]
-                Html.span [
+                Html.button [
+                    prop.testId $"GitSidebarChangeRow-{props.Index}"
+                    prop.custom ("data-index", props.Index)
+                    prop.disabled props.IsBusy
                     prop.className [
-                        "swt:mt-0.5 swt:font-mono swt:text-[0.7rem]"
+                        "swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors"
                         if change.IsConflicted then
-                            "swt:text-error"
+                            "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
+                        elif props.IsSelected then
+                            "swt:border-primary/40 swt:bg-primary/5 hover:swt:bg-primary/10"
                         else
-                            "swt:text-base-content/60"
+                            "swt:border-base-content/10 swt:bg-base-100 hover:swt:bg-base-200/80"
                     ]
-                    prop.text (GitSidebarInternal.describeChange change)
-                ]
-                Html.div [
-                    prop.className "swt:min-w-0 swt:flex-1"
+                    prop.onClick (fun _ -> props.OpenChange change)
                     prop.children [
+                        Html.input [
+                            prop.testId ("GitSidebarCommitSelectionCheckbox-" + change.Path)
+                            prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
+                            prop.type'.checkbox
+                            prop.disabled (not props.CanEditCommit || change.IsConflicted)
+                            prop.isChecked props.IsSelectedForCommit
+                            prop.onClick (fun event -> event.stopPropagation ())
+                            prop.onChange (fun (_: bool) -> props.ToggleCommitSelection change.Path)
+                        ]
+                        Html.span [
+                            prop.className [
+                                "swt:mt-0.5 swt:font-mono swt:text-[0.7rem]"
+                                if change.IsConflicted then
+                                    "swt:text-error"
+                                else
+                                    "swt:text-base-content/60"
+                            ]
+                            prop.text (GitSidebarInternal.describeChange change)
+                        ]
                         Html.div [
-                            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1.5"
+                            prop.className "swt:min-w-0 swt:flex-1"
                             prop.children [
-                                Html.span [
-                                    prop.className "swt:truncate swt:text-sm swt:font-medium"
-                                    prop.text change.Path
+                                Html.div [
+                                    prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1.5"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:truncate swt:text-sm swt:font-medium"
+                                            prop.text change.Path
+                                        ]
+                                        GitSidebar.ChangeStatusBadge({ Change = change })
+                                    ]
                                 ]
-                                GitSidebar.ChangeStatusBadge({ Change = change })
+                                match change.OriginalPath with
+                                | Some originalPath ->
+                                    Html.div [
+                                        prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
+                                        prop.text $"Renamed from {originalPath}"
+                                    ]
+                                | None -> Html.none
                             ]
                         ]
-                        match change.OriginalPath with
-                        | Some originalPath ->
-                            Html.div [
-                                prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
-                                prop.text $"Renamed from {originalPath}"
-                            ]
-                        | None -> Html.none
                     ]
                 ]
             ]
@@ -907,6 +914,8 @@ type GitSidebar =
 
             Html.div [
                 prop.testId "GitSidebarChangedFilesScrollContainer"
+                prop.role "region"
+                prop.ariaLabel "Changed files"
                 prop.ref scrollContainerRef
                 prop.className "swt:min-h-0 swt:flex-1 swt:overflow-y-auto swt:px-2 swt:pb-2"
                 prop.children [
@@ -919,6 +928,7 @@ type GitSidebar =
                     else
                         Html.div [
                             prop.testId "GitSidebarChangedFilesVirtualContent"
+                            prop.role "list"
                             prop.className "swt:relative swt:mt-1"
                             prop.style [ style.height (changedFileListVirtualizer.getTotalSize ()) ]
                             prop.children [

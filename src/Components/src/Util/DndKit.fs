@@ -1,4 +1,4 @@
-namespace Swate.Components.Metadata.JsBindings
+namespace Swate.Components.JsBindings
 
 open Browser.Types
 open Fable.Core
@@ -34,6 +34,9 @@ module DndKit =
         abstract member transform: obj
         abstract member transition: obj
 
+    type IDroppable =
+        abstract member setNodeRef: obj -> unit
+
     type IDndKitEvent =
         abstract member active: HTMLElement
         abstract member over: HTMLElement
@@ -56,6 +59,8 @@ module DndKit =
     [<Import("verticalListSortingStrategy", "@dnd-kit/sortable")>]
     let verticalListSortingStrategy: obj = jsNative
 
+    [<Import("horizontalListSortingStrategy", "@dnd-kit/sortable")>]
+    let horizontalListSortingStrategy: obj = jsNative
 
 open DndKit
 
@@ -68,6 +73,9 @@ type DndKit =
     [<Import("useSortable", "@dnd-kit/sortable")>]
     static member useSortable(props: obj) : ISortable = jsNative
 
+    [<Import("useDroppable", "@dnd-kit/core")>]
+    static member useDroppable(props: obj) : IDroppable = jsNative
+
     [<Import("useSensor", "@dnd-kit/core")>]
     static member useSensor(sensor, ?props) : ISensor = jsNative
 
@@ -79,9 +87,7 @@ type DndKit =
         React.Imported()
 
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
-    static member SortableContext(items: ResizeArray<string>, strategy, children: ReactElement) =
-        React.Imported()
+    static member SortableContext(items: ResizeArray<string>, strategy, children: ReactElement) = React.Imported()
 
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
-    static member SortableContext(items: ResizeArray<System.Guid>, strategy, children: ReactElement) =
-        React.Imported()
+    static member SortableContext(items: ResizeArray<System.Guid>, strategy, children: ReactElement) = React.Imported()
