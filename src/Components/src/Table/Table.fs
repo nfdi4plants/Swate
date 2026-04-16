@@ -1,12 +1,12 @@
-namespace Swate.Components
+namespace Swate.Components.Table
 
 open System
-open Swate.Components.Shared
 open Swate.Components
-open Swate.Components.Context
+open Swate.Components.Table
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+
 
 module private TableHelper =
 
@@ -279,7 +279,7 @@ swt:p-0"""
                 onClick = onClick
             )
 
-        TableStateCtx.Provider(
+        TableState.TableStateCtx.Provider(
             ctx,
             React.Fragment [
                 Html.div [
@@ -526,7 +526,7 @@ swt:p-0"""
 
     [<ReactComponent>]
     static member private EntryInactiveCell(index: CellCoordinate, data: string) =
-        let ctx = useTableStateCtx ()
+        let ctx = TableState.useTableStateCtx ()
 
         TableCell.InactiveCell(index, data |> Html.text)
 

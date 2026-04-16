@@ -2,7 +2,7 @@ namespace Swate.Components
 
 open Fable.Core
 open Feliz
-open Swate.Components.GenericComponents.Context
+open Swate.Components.GenericComponents.SelectContextValue
 
 [<Erase; Mangle(false)>]
 type Select =

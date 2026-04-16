@@ -12,4 +12,4 @@ let Main (model: Model, dispatch) =
     let setTable =
         fun (table: ARCtrl.ArcTable) -> Spreadsheet.UpdateTable table |> SpreadsheetMsg |> dispatch
 
-    AnnotationTable.Create(model.SpreadsheetModel.ActiveTable, setTable)
+    AnnotationTable.AnnotationTable(model.SpreadsheetModel.ActiveTable, setTable)

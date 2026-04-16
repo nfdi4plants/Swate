@@ -471,7 +471,7 @@ type Widget =
                             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-80"
                             prop.children [
                                 Html.h3 [ prop.className "swt:font-bold"; prop.text "Template POC" ]
-                                TermSearch.TermSearch.Init(term, setTerm)
+                                TermSearch.TermSearch.TermSearch(term, setTerm)
                                 Html.span [
                                     prop.className "swt:text-xs swt:opacity-70"
                                     prop.textf

@@ -4,8 +4,11 @@ open Feliz
 open Fable.Core
 open ARCtrl
 open Fable.Core.JsInterop
+open Swate.Components.Table
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.AnnotationTableContext
+
 
 module private DataMapTableHelper =
     [<RequireQualifiedAccess>]

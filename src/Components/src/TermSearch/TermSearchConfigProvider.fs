@@ -1,9 +1,11 @@
 namespace Swate.Components.TermSearch
 
-open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
 open Feliz
+open Swate.Components.TermSearch.TermSearchConfigCtx
+open Swate.Components.TermSearch.TermSearchConfigLocalStorageActiveKeysCtx
+
 
 module private TermSearchConfigProviderHelper =
 
@@ -71,22 +73,17 @@ type TermSearchConfigProvider =
 
                     let! collections =
                         Api.TIBApi.TIBApi.getCollections ()
-                        |> Promise.map Some
-                        |> Promise.catch (fun ex ->
-                            console.error "Error fetching TIB collections:" ex
-                            None
-                        )
+                        |> Promise.catch (fun ex -> console.error "Error fetching TIB collections:" ex)
 
-                    let collectionSet =
-                        collections
-                        |> Option.map _.content
-                        |> Option.defaultValue [||]
-                        |> Set.ofArray
-
+                    let collectionSet = Set.ofArray collections.content
                     let tibQueries = TermSearchConfigProviderHelper.mkTIBQueries collectionSet
-                    setAllTermSearchQueries tibQueries.TermSearch
-                    setAllParentSearchQueries tibQueries.ParentSearch
-                    setAllAllChildrenSearchQueries tibQueries.AllChildrenSearch
+                    setAllTermSearchQueries (ResizeArray(Seq.append allTermSearchQueries tibQueries.TermSearch))
+
+                    setAllParentSearchQueries (ResizeArray(Seq.append allParentSearchQueries tibQueries.ParentSearch))
+
+                    setAllAllChildrenSearchQueries (
+                        ResizeArray(Seq.append allAllChildrenSearchQueries tibQueries.AllChildrenSearch)
+                    )
                 }
                 |> Promise.start
             ),
@@ -184,13 +181,13 @@ type TermSearchConfigProvider =
                 |]
             )
 
-        TermSearchConfigCtx.TermSearchActiveKeysCtx.Provider(
+        TermSearchConfigCtx.termSearchActiveKeysCtx.Provider(
             {
                 state = activeKeys
                 setState = setActiveKeys
             },
-            TermSearchConfigCtx.TermSearchConfigCtx.Provider(
+            TermSearchConfigCtx.termSearchConfigCtx.Provider(
                 queries,
-                TermSearchConfigCtx.TermSearchAllKeysCtx.Provider(allKeys, children)
+                TermSearchConfigCtx.termSearchAllKeysCtx.Provider(allKeys, children)
             )
         )

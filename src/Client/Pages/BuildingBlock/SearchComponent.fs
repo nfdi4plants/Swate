@@ -98,7 +98,7 @@ type SearchComponent =
                         let parent = model.AddBuildingBlockState.TryHeaderOA()
                         let input = model.AddBuildingBlockState.TryBodyOA()
 
-                        TermSearch.TermSearch.Init(
+                        TermSearch.TermSearch.TermSearch(
                             (input |> Option.map _.ToTerm()),
                             setter,
                             classNames =
@@ -142,7 +142,7 @@ type SearchComponent =
                                 BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
                             let input = model.AddBuildingBlockState.TryHeaderOA()
 
-                            TermSearch.TermSearch.Init(
+                            TermSearch.TermSearch.TermSearch(
                                 (input |> Option.map _.ToTerm()),
                                 setter,
                                 classNames =

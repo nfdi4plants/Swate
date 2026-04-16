@@ -1,4 +1,4 @@
-module Swate.Components.Context
+namespace Swate.Components.Table
 
 open Browser.Dom
 open Browser.Types
@@ -42,7 +42,7 @@ module TableState =
             (fun _ _ -> console.warn "TableCtx default onClick")
         )
 
-let TableStateCtx = React.createContext<TableState> (TableState.init ())
-
-[<Hook>]
-let useTableStateCtx () = React.useContext TableStateCtx
+    let TableStateCtx = React.createContext<TableState>(init ())
+     
+    [<Hook>]
+    let useTableStateCtx () = React.useContext TableStateCtx

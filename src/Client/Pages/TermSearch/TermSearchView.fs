@@ -87,7 +87,7 @@ let Main (model: Model, dispatch) =
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
         SidebarComponents.SidebarLayout.LogicContainer [
-            Swate.Components.TermSearch.TermSearch.Init(
+            Swate.Components.TermSearch.TermSearch.TermSearch(
                 (model.TermSearchState.SelectedTerm |> Option.map _.ToTerm()),
                 setTerm,
                 autoFocus = true,

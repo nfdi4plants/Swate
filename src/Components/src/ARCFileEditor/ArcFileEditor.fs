@@ -161,7 +161,7 @@ type Main =
         Html.div [
             prop.className "swt:w-full swt:min-w-0 swt:pb-4"
             prop.children [
-                Swate.Components.AnnotationTable.AnnotationTable.Create(table, setTableInArcFile)
+                Swate.Components.AnnotationTable.AnnotationTable.AnnotationTable(table, setTableInArcFile)
             ]
         ]
 

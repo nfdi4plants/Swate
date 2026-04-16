@@ -2,7 +2,7 @@ namespace Swate.Components
 
 open Feliz
 open Fable.Core
-open Swate.Components.GenericComponents.Context
+open Swate.Components.GenericComponents.BaseModalContext
 
 [<Mangle(false); Erase>]
 type BaseModal =

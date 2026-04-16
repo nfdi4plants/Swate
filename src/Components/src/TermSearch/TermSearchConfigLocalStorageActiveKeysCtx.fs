@@ -1,4 +1,4 @@
-namespace Swate.Components.TermSearch
+module Swate.Components.TermSearch.TermSearchConfigLocalStorageActiveKeysCtx
 
 
 type TermSearchConfigLocalStorageActiveKeysCtx = {

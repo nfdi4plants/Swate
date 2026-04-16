@@ -79,7 +79,8 @@
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
-    <Compile Include="GenericComponents\Context.fs" />
+    <Compile Include="GenericComponents\BaseModalContext.fs" />
+    <Compile Include="GenericComponents\SelectContextValue.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
     <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />
@@ -142,11 +143,11 @@
     <Compile Include="Landing\Landing.fs" />
     <Compile Include="Template\Context.fs" />
     <Compile Include="Template\TemplateFilter.fs" />
-    <Compile Include="Table\Context.fs" />
+    <Compile Include="Table\TableState.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
-    <Compile Include="AnnotationTable\Context.fs" />
+    <Compile Include="AnnotationTable\AnnotationTableContext.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs" />
     <Compile Include="AnnotationTable\AnnotationTableModals.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />

@@ -1,7 +1,9 @@
 namespace Swate.Components.AnnotationTable
 
 open Swate.Components
+open Swate.Components.Table
 open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.AnnotationTableContext
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -505,7 +507,7 @@ type AnnotationTable =
 
 
     [<ReactComponent(true)>]
-    static member Create
+    static member AnnotationTable
         (
             arcTable: ArcTable,
             setArcTable: ArcTable -> unit,
@@ -780,7 +782,7 @@ type AnnotationTable =
         let table, setTable = React.useState (arcTable)
 
         React.Fragment [
-            AnnotationTable.Create(table, setTable, height = 600)
+            AnnotationTable.AnnotationTable(table, setTable, height = 600)
             Html.div [
                 prop.textf
                     "%A"

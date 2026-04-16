@@ -4,6 +4,8 @@ open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
 open Feliz
+open Swate.Components.TermSearch.TermSearchConfigCtx
+
 
 module private APIExtentions =
 
@@ -762,7 +764,7 @@ type TermSearch =
     // [<ExportDefaultAttribute; NamedParams>]
     // #endif
     [<ReactComponent(true)>]
-    static member Init
+    static member TermSearch
         (
             term: Term option,
             onTermChange: Term option -> unit,
@@ -798,7 +800,7 @@ type TermSearch =
         let inputText = term |> Option.bind _.name |> Option.defaultValue ""
         let input, setInput = React.useState (inputText)
 
-        let termSearchConfigCtx = TermSearchConfigCtx.useTermSearchConfigCtx ()
+        let termSearchConfigCtx = useTermSearchConfigCtx ()
 
         React.useLayoutEffect (
             (fun () -> term |> Option.bind _.name |> Option.defaultValue "" |> setInput),

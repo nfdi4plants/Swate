@@ -1,8 +1,8 @@
-namespace Swate.Components.TermSearch
+module Swate.Components.TermSearch.TermSearchConfigCtx
 
 open Feliz
 open Swate.Components.Types
-
+open Swate.Components.TermSearch.TermSearchConfigLocalStorageActiveKeysCtx
 
 type TermSearchConfigCtx = {
     hasProvider: bool
@@ -20,36 +20,26 @@ type TermSearchConfigCtx = {
         allChildrenSearchQueries = ResizeArray()
     }
 
-module private StableContexts =
+let termSearchConfigCtx =
+    React.createContext<TermSearchConfigCtx> (TermSearchConfigCtx.init ())
 
-    let TermSearchConfigCtx =
-        React.createContext<TermSearchConfigCtx> (TermSearchConfigCtx.init ())
+let termSearchActiveKeysCtx =
+    React.createContext<StateContext<TermSearchConfigLocalStorageActiveKeysCtx>> (
+        {
+            state = TermSearchConfigLocalStorageActiveKeysCtx.init ()
+            setState = fun keys -> printfn "Setting active keys not given: %A" keys
+        }
+    )
 
-    let TermSearchActiveKeysCtx =
-        React.createContext<StateContext<TermSearchConfigLocalStorageActiveKeysCtx>> (
-            {
-                state = TermSearchConfigLocalStorageActiveKeysCtx.init ()
-                setState = fun keys -> printfn "Setting active keys not given: %A" keys
-            }
-        )
+let TermSearchAllKeysCtx = React.createContext<Set<string>>(Set.empty)
 
-    let TermSearchAllKeysCtx = React.createContext<Set<string>> (Set.empty)
+[<Hook>]
+let useTermSearchConfigCtx () = React.useContext termSearchConfigCtx
 
-type TermSearchConfigCtx with
+[<Hook>]
+let useTermSearchActiveKeysCtx () = React.useContext termSearchActiveKeysCtx
 
-    static member TermSearchConfigCtx =
-        StableContexts.TermSearchConfigCtx
+let termSearchAllKeysCtx = TermSearchAllKeysCtx
 
-    [<Hook>]
-    static member useTermSearchConfigCtx () = React.useContext TermSearchConfigCtx.TermSearchConfigCtx
-
-    static member TermSearchActiveKeysCtx =
-        StableContexts.TermSearchActiveKeysCtx
-
-    [<Hook>]
-    static member useTermSearchActiveKeysCtx () = React.useContext TermSearchConfigCtx.TermSearchActiveKeysCtx
-
-    static member TermSearchAllKeysCtx = StableContexts.TermSearchAllKeysCtx
-
-    [<Hook>]
-    static member useTermSearchAllKeysCtx () = React.useContext TermSearchConfigCtx.TermSearchAllKeysCtx
+[<Hook>]
+let useTermSearchAllKeysCtx () = React.useContext TermSearchAllKeysCtx

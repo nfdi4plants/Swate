@@ -1,4 +1,4 @@
-module Swate.Components.TemplateContext
+module Swate.Components.Template.Context
 
 open ARCtrl
 open Feliz

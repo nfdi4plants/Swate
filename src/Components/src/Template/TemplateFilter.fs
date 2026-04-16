@@ -3,7 +3,7 @@ namespace Swate.Components
 open Fable.Core
 open Feliz
 open ARCtrl
-open Swate.Components.TemplateContext
+open Swate.Components.Template.Context
 
 module TemplateMocks =
 

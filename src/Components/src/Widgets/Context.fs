@@ -38,10 +38,6 @@ let init () = {
 let WidgetControllerCtx =
     React.createContext<WidgetControllerContext> (init ())
 
-let ActiveWidgetContext = WidgetControllerCtx
-
 [<Hook>]
 let useWidgetControllerCtx () = React.useContext WidgetControllerCtx
 
-[<Hook>]
-let useWidgetController () = useWidgetControllerCtx ()

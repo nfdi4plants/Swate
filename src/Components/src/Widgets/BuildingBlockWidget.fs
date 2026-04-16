@@ -210,7 +210,7 @@ type BuildingBlockWidget =
                     prop.onChange (fun (value: string) -> setState { state with CommentHeader = value })
                 ]
             elif state.HeaderCellType.HasOA() then
-                TermSearch.TermSearch.Init(
+                TermSearch.TermSearch.TermSearch(
                     (state.TryHeaderOA() |> Option.map (fun oa -> oa.ToTerm())),
                     setHeaderTerm,
                     classNames = TermSearchStyle(U2.Case1 "swt:border-current swt:join-item swt:w-full")
@@ -292,7 +292,7 @@ type BuildingBlockWidget =
                                     }
                                 )
                             ]
-                            TermSearch.TermSearch.Init(
+                            TermSearch.TermSearch.TermSearch(
                                 (state.TryBodyOA() |> Option.map (fun oa -> oa.ToTerm())),
                                 setBodyTerm,
                                 classNames = TermSearchStyle(U2.Case1 "swt:border-current swt:w-full"),

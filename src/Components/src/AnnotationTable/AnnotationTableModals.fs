@@ -224,7 +224,7 @@ type InputField =
             prop.className "swt:flex swt:flex-col swt:gap-2"
             prop.children [
                 Html.label [ prop.className "swt:label"; prop.text label ]
-                TermSearch.TermSearch.Init(
+                TermSearch.TermSearch.TermSearch(
                     v,
                     setter,
                     classNames = TermSearchStyle(U2.Case1 "swt:border-current swt:w-full"),

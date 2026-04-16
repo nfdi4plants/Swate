@@ -246,7 +246,7 @@ type FormComponents =
                 Html.div [
                     prop.className "swt:w-full swt:flex swt:gap-2 swt:relative"
                     prop.children [
-                        TermSearch.TermSearch.Init(
+                        TermSearch.TermSearch.TermSearch(
                             term,
                             setTermWrapper,
                             ?parentId = (parent |> Option.map _.TermAccessionShort),
