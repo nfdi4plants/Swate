@@ -81,7 +81,7 @@ type ContextMenu =
                     FloatingUI.Middleware.shift {| padding = 10 |}
                 |],
                 placement = FloatingUI.Placement.RightStart,
-                strategy = "fixed",
+                strategy = FloatingUI.FloatingStrategy.Fixed,
                 whileElementsMounted = FloatingUI.autoUpdate
             )
 
