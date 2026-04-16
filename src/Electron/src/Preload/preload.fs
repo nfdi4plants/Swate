@@ -8,7 +8,11 @@ Remoting.init |> Remoting.buildTwoWayBridge<IGitApi>
 Remoting.init |> Remoting.buildTwoWayBridge<IGitLabApi>
 Remoting.init |> Remoting.buildTwoWayBridge<IAuthApi>
 
-Remoting.init |> Remoting.buildBridge<IMainUpdateRendererApi>
+Remoting.init |> Remoting.buildBridge<IPathChangeApi>
+Remoting.init |> Remoting.buildBridge<IRecentARCsUpdateApi>
+Remoting.init |> Remoting.buildBridge<IAuthAccountsUpdateApi>
+Remoting.init |> Remoting.buildBridge<IFileTreeUpdateApi>
+Remoting.init |> Remoting.buildBridge<IGitProgressUpdateApi>
 
 Remoting.init |> Remoting.buildBridge<IArcFileWatcherApi>
 Remoting.init |> Remoting.buildBridge<IMainSaveBeforeQuitApi>
