@@ -21,13 +21,13 @@ open Renderer.Components.MainContent.UnknownPreviewTarget
 [<ReactComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option, leftSidebarTarget: LeftSidebarPage) =
     Html.div [
-        prop.className "swt:w-full swt:h-full swt:flex swt:justify-center swt:overflow-hidden"
+        prop.className "swt:size-full swt:min-w-0 swt:min-h-0 swt:flex swt:justify-center swt:overflow-hidden"
         prop.children [
             match appRootPath, pageState with
             | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
             | None, _ ->
                 Html.div [
-                    prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
+                    prop.className "swt:flex-1 swt:min-w-0 swt:min-h-0 swt:flex swt:justify-center swt:items-center"
                     prop.children [ Renderer.Components.InitState.InitState() ]
                 ]
             | Some _, _ when leftSidebarTarget = LeftSidebarPage.ArcObjectExplorer -> ArcObjectExplorerTarget.Main()
