@@ -53,7 +53,7 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select template(s)",
             children =
-                Swate.Components.TemplateWidgetMain.Main(
+                Swate.Components.Widgets.TemplateWidget.Main(
                     arcFile,
                     activeTableIndex,
                     setArcFileAndClose,
