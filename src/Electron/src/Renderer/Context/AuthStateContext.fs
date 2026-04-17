@@ -7,6 +7,15 @@ open Swate.Components.Authentication.Types
 
 module private AuthStateHelper =
 
+    let private isEmptyAuthState (state: AuthStateDto) =
+        state.ActiveAccount.IsNone && state.StoredAccounts.Length = 0
+
+    let shouldLogRevalidationFailure (response: AuthResult) =
+        match response.Success, response.FailureKind, response.User with
+        | false, Some AuthFailureKind.Unauthorized, Some state when isEmptyAuthState state -> false
+        | false, _, _ -> true
+        | true, _, _ -> false
+
     let refreshState (setAuthState) (onError) = promise {
         let! stateResult = Api.ipcAuthApi.getAuthState ()
 
@@ -41,7 +50,7 @@ let Provider (children: ReactElement) =
             | Ok response ->
                 do! refreshState setAuthState ignore
 
-                if not response.Success then
+                if shouldLogRevalidationFailure response then
                     console.error (response.FailureKind, Fable.Core.JS.JSON.stringify response.Message)
             | Error ex -> console.error (Fable.Core.JS.JSON.stringify ex.Message)
 

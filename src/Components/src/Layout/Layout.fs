@@ -458,7 +458,7 @@ type Layout =
             React.useMemo (
                 (fun () ->
                     Html.div [
-                        prop.className "swt:grow swt:overflow-hidden"
+                        prop.className "swt:grow swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
                         prop.testId "layout-main-content"
                         prop.children children
                     ]
