@@ -8,7 +8,8 @@ open Swate.Components.NoteTypes
 
 module InputField =
 
-    let searchInput
+    [<ReactComponent>]
+    let SearchInput
         (
             setSearchTerm,
             setStartSearch,
@@ -40,19 +41,25 @@ module InputField =
                         ]
                     ]
                 ]
-                FilterComponents.filterDropdown filterOptions selectedOptIndices setSelectedOptIndices
+                NoteSearch.FilterComponent.Main.FilterDropdown(filterOptions, selectedOptIndices, setSelectedOptIndices)
             ]
         ]
 
-module suggestionSnippet =
+module helperFnctions =
 
-    let private createContentPreview (note: Note) =
+    let createContentPreview (note: Note) =
         if note.Content.Length > 45 then
             note.Content.Substring(0, 45) + "..."
         else
             note.Content
 
-    let searchSuggestion (note: Note, onOpen: string -> unit) =
+
+
+[<Erase; Mangle(false)>]
+type SearchComponent =
+
+    [<ReactComponent>]
+    static member SearchSuggestion(note: Note, onOpen: string -> unit) =
         Html.div [
             prop.className "swt:p-3"
             prop.children [
@@ -87,13 +94,10 @@ module suggestionSnippet =
                 ]
                 Html.p [
                     prop.className "swt:mt-2"
-                    prop.text (createContentPreview note)
+                    prop.text (helperFnctions.createContentPreview note)
                 ]
             ]
         ]
-
-[<Erase; Mangle(false)>]
-type SearchComponent =
 
     [<ReactComponent>]
     static member Main(notes: Note list, isLoading: bool, error: string option, onOpen: string -> unit) =
@@ -104,10 +108,10 @@ type SearchComponent =
         let filterOptions = [ "Title"; "Content"; "Tags" ]
 
         let searchResults =
-            if startSearch then
-                FilterComponents.noteSuggestions (searchTerm, selectedOptIndices, notes)
-            else
-                []
+            match notes with
+            | [] -> []
+            | _ -> NoteSearch.FilterComponent.Main.noteSuggestions (searchTerm, selectedOptIndices, notes)
+
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:items-center swt:pt-8 swt:min-h-screen"
@@ -117,7 +121,7 @@ type SearchComponent =
                     prop.className "swt:w-full swt:max-w-md"
                     prop.onClick (fun e -> e.stopPropagation ())
                     prop.children [
-                        InputField.searchInput (
+                        InputField.SearchInput (
                             setSearchTerm,
                             setStartSearch,
                             filterOptions,
@@ -141,7 +145,8 @@ type SearchComponent =
                                         "swt:border-2 swt:border-current swt:rounded-md swt:mt-2 swt:bg-base-100 swt:shadow-md swt:divide-y swt:divide-current"
                                     prop.children [
                                         for note in searchResults do
-                                            suggestionSnippet.searchSuggestion (note, onOpen)
+                                            SearchComponent.SearchSuggestion(note, onOpen)
+                                            
                                     ]
                                 ]
                             else
