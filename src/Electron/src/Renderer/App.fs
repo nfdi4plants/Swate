@@ -1,12 +1,13 @@
 module Renderer.App
 
-open Browser.Dom
+
 open Elmish
 open Feliz
 open Feliz.UseElmish
 open Renderer.Components
 open Renderer.Types
 open Swate.Components
+open Swate.Components.Layout
 open Swate.Components.ErrorModal
 open Swate.Electron.Shared
 

@@ -1,7 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.Layout
 
 open Feliz
 open Fable.Core
+open Swate.Components
 
 module private Mocks =
 
