@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Components.NoteTypes
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"

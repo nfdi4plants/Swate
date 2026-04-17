@@ -10,6 +10,7 @@ open Swate.Components.Shared
 open AuthTypes
 open FileIOTypes
 open GitTypes
+open Swate.Components.NoteTypes
 
 module IPCTypesHelper =
 
@@ -101,8 +102,8 @@ type IMainUpdateRendererApi = {
     authAccountsUpdate: AuthStateDto -> unit
     fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
     gitProgressUpdate: GitProgressDto -> unit
-}
-with
+} with
+
     static member empty = {
         pathChange = ignore
         recentARCsUpdate = ignore
