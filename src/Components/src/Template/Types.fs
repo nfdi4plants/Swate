@@ -34,3 +34,21 @@ type TemplatePreviewCallbacks = {
     SelectAllTemplateColumns: System.Guid -> unit
     UnselectAllTemplateColumns: Template -> unit
 }
+
+type ImportTable = { Index: int; FullImport: bool }
+
+type SelectiveImportConfig = {
+    ImportType: ARCtrl.TableJoinOptions
+    ImportMetadata: bool
+    ImportTables: ImportTable list
+    DeselectedColumns: Set<int * int>
+    TemplateName: string option
+} with
+
+    static member init() = {
+        ImportType = ARCtrl.TableJoinOptions.Headers
+        ImportMetadata = false
+        ImportTables = []
+        DeselectedColumns = Set.empty
+        TemplateName = None
+    }

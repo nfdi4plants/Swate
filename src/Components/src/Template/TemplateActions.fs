@@ -159,17 +159,17 @@ let importTablesConfig (selectedTemplatesForImport: (Template * TemplateImportAc
             Index = tableIndex
             FullImport = (action = TemplateImportAction.ImportAsNewTable)
         }
-        : Swate.Components.WidgetTemplateImport.ImportTable)
+        : ImportTable)
     )
     |> Array.toList
 
 let buildSelectiveImportConfig
     (importType: TableJoinOptions)
-    (importTablesConfig: Swate.Components.WidgetTemplateImport.ImportTable list)
+    (importTablesConfig: ImportTable list)
     (deselectedColumns: Set<int * int>)
     =
     {
-        Swate.Components.WidgetTemplateImport.SelectiveImportConfig.init () with
+        SelectiveImportConfig.init () with
             ImportType = importType
             ImportMetadata = false
             ImportTables = importTablesConfig
