@@ -7,112 +7,23 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types
 
-module private EntryHelpers =
+module private ArcFileEditorHelpers =
 
-    let templateServices: TemplateWidgetServices = {
-        loadTemplates = fun () -> async { return Ok [||] }
+    open ARCtrl.Json
+
+    let TemplateServices = {
+        loadTemplates =
+            fun () -> async {
+                try
+                    let! templatesJson = Api.SwateApi.SwateTemplateApi.getTemplates ()
+
+                    let templates = templatesJson |> ARCtrl.Json.Templates.fromJsonString |> Array.ofSeq
+
+                    return Ok templates
+                with error ->
+                    return Error error.Message
+            }
     }
-
-module private WidgetNavbar =
-
-    let widgetTypes = [
-        WidgetType.BuildingBlock
-        WidgetType.Template
-        WidgetType.FilePicker
-        WidgetType.DataAnnotator
-    ]
-
-    let private widgetInfo (widgetType: WidgetType) =
-        match widgetType with
-        | WidgetType.BuildingBlock -> "Add Building Block", Icons.BuildingBlock()
-        | WidgetType.Template -> "Add Template", Icons.Templates()
-        | WidgetType.FilePicker -> "File Picker", Icons.FilePicker()
-        | WidgetType.DataAnnotator -> "Data Annotator", Icons.DataAnnotator()
-        | WidgetType.Playground -> "Playground", Icons.Templates()
-
-    [<ReactComponent>]
-    let Buttons (isEnabled: bool) =
-        let context = WidgetContext.useWidgetController ()
-
-        let controlButton (widgetType: WidgetType) =
-            let isActive = context.isActive widgetType
-            let label, icon = widgetInfo widgetType
-
-            let tooltip =
-                if not isEnabled then "Select a table to open widgets"
-                elif isActive then $"Close {label}"
-                else $"Open {label}"
-
-            QuickAccessButton.QuickAccessButton(
-                tooltip,
-                icon,
-                (fun _ -> context.toggleWidget widgetType),
-                isDisabled = (not isEnabled),
-                classes = (if isActive then "swt:!text-primary" else "")
-            )
-
-        Html.div [
-            prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:justify-center"
-            prop.children [
-                for widgetType in widgetTypes do
-                    controlButton widgetType
-            ]
-        ]
-
-    let createWidgets
-        (arcFileState: ArcFiles)
-        (activeView: WidgetHostView)
-        (activeTableIndex: int option)
-        (setArcFileState: ArcFiles -> unit)
-        (templateImportType: TableJoinOptions)
-        (setTemplateImportType: TableJoinOptions -> unit)
-        (templateServices: TemplateWidgetServices)
-        (widgetServices: ArcFileEditorWidgetServices)
-        : Map<WidgetType, WidgetDefinition> =
-        [
-            WidgetType.BuildingBlock,
-            {|
-                prefix = "ADD_BUILDINGBLOCK"
-                content = BuildingBlockWidget.Main(arcFileState, activeTableIndex, setArcFileState)
-            |}
-            WidgetType.Template,
-            {|
-                prefix = "ADD_TEMPLATE"
-                content =
-                    TemplateWidget.Main(
-                        arcFileState,
-                        activeTableIndex,
-                        setArcFileState,
-                        templateImportType,
-                        setTemplateImportType,
-                        templateServices
-                    )
-            |}
-            WidgetType.FilePicker,
-            {|
-                prefix = "FILEPICKER"
-                content =
-                    FilePickerWidget.Main(
-                        arcFileState,
-                        activeTableIndex,
-                        setArcFileState,
-                        widgetServices.filePickerServices
-                    )
-            |}
-            WidgetType.DataAnnotator,
-            {|
-                prefix = "DATAANNOTATOR"
-                content =
-                    DataAnnotatorWidget.Main(
-                        arcFileState,
-                        activeView,
-                        activeTableIndex,
-                        setArcFileState,
-                        widgetServices.dataAnnotatorServices
-                    )
-            |}
-        ]
-        |> Map.ofList
 
 type private AddRowsFooterViewProps = {
     rowsToAdd: int
@@ -278,15 +189,11 @@ type Main =
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
             templateServices: TemplateWidgetServices,
-            ?header: (ArcFileEditorHeaderProps -> ReactElement),
-            ?widgetServices: ArcFileEditorWidgetServices,
+            ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView
         ) =
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
-
-        let templateImportType, setTemplateImportType =
-            React.useState TableJoinOptions.Headers
 
         React.useEffect (
             (fun () ->
@@ -307,63 +214,51 @@ type Main =
         }
 
         let activeTableIndex = activeView.TryTableIndex
-        let widgetHostView = activeView.ToWidgetHostView()
 
         let hasSelectedTable = arcFile.TryGetActiveTable(activeTableIndex) |> Option.isSome
 
         let navbar =
-            match widgetServices, header with
-            | Some _, _ ->
-                Html.div [
-                    prop.className "swt:flex-none"
-                    prop.children [
-                        Navbar.Main(
-                            left = WidgetNavbar.Buttons(hasSelectedTable),
-                            right =
-                                match header with
-                                | Some renderHeader -> renderHeader headerProps
-                                | None -> Html.none
-                        )
-                    ]
-                ]
-            | None, Some renderHeader ->
-                Html.div [
-                    prop.className "swt:flex-none"
-                    prop.children [ renderHeader headerProps ]
-                ]
-            | None, None -> Html.none
-
-        let editorContent =
             Html.div [
-                prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
+                prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
                 prop.children [
-                    navbar
-                    Html.div [
-                        prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                        prop.children [
-                            Main.ArcFileContentView(activeView, arcFile, setArcFile, templateServices)
-                        ]
-                    ]
-                    Main.AddRowsFooter(activeView, arcFile, setArcFile)
-                    ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
+                    Navbar.Main(
+                        left = Swate.Components.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
+                        right =
+                            match trailingNavbarElements with
+                            | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
+                            | None -> Html.none
+                    )
                 ]
             ]
 
-        match widgetServices with
-        | Some widgetServices ->
-            let widgets =
-                WidgetNavbar.createWidgets
-                    arcFile
-                    widgetHostView
-                    activeTableIndex
-                    setArcFile
-                    templateImportType
-                    setTemplateImportType
-                    templateServices
-                    widgetServices
 
-            Widget.WidgetController(widgets, closeAllWhen = not hasSelectedTable, children = [ editorContent ])
-        | None -> editorContent
+        let buildingBlockWidget =
+            BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFile)
+
+        let templateWidget =
+            TemplateWidget.Main(arcFile, activeTableIndex, setArcFile, templateServices)
+
+
+        AnnotationTableContextProvider.AnnotationTableContextProvider(
+            Swate.Components.ArcFileEditor.Widgets.Main.Widgets(
+                Html.div [
+                    prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
+                    prop.children [
+                        navbar
+                        Html.div [
+                            prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
+                            prop.children [
+                                Main.ArcFileContentView(activeView, arcFile, setArcFile, templateServices)
+                            ]
+                        ]
+                        Main.AddRowsFooter(activeView, arcFile, setArcFile)
+                        ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
+                    ]
+                ],
+                buildingBlockWidget,
+                templateWidget
+            )
+        )
 
     [<ReactComponent>]
     static member Entry() =
@@ -393,4 +288,10 @@ type Main =
                 startArcFile.Tables().Add(ArcTable.init (sprintf "Table %i" i))
 
         let arcFile, setArcFile = React.useState (startArcFile)
-        Main.ArcFileEditor(arcFile, setArcFile, EntryHelpers.templateServices, startingActiveView = ActiveView.Table 0)
+
+        Main.ArcFileEditor(
+            arcFile,
+            setArcFile,
+            ArcFileEditorHelpers.TemplateServices,
+            startingActiveView = ActiveView.Table 0
+        )

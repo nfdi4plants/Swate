@@ -369,16 +369,10 @@ type TemplateWidget =
 
     [<ReactComponent>]
     static member Main
-        (
-            arcFile: ArcFiles,
-            activeTableIndex: int option,
-            setArcFile: ArcFiles -> unit,
-            importType: TableJoinOptions,
-            setImportType: TableJoinOptions -> unit,
-            services: TemplateWidgetServices
-        ) =
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, services: TemplateWidgetServices) =
 
         let templateState, setTemplateState = React.useState (fun _ -> TemplateLoading)
+        let importType, setImportType = React.useState TableJoinOptions.Headers
 
         let selectedTemplateIds, setSelectedTemplateIds =
             React.useStateWithUpdater (Set.empty<System.Guid>)

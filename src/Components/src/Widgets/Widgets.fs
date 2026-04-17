@@ -127,14 +127,12 @@ type WidgetType =
     | DataAnnotator
     | Playground
 
-type WidgetBlock =
-    {
-        prefix: string
-        content: ReactElement
-    }
+type WidgetBlock = {
+    prefix: string
+    content: ReactElement
+} with
 
-    static member CreateWidgetBlock prefix content : WidgetBlock =
-        { prefix = prefix; content = content }
+    static member CreateWidgetBlock prefix content : WidgetBlock = { prefix = prefix; content = content }
 
 module WidgetContext =
 
@@ -330,16 +328,12 @@ type Widget =
 
     [<ReactComponent>]
     static member WidgetController
-        (
-            widgets: Map<WidgetType, WidgetDefinition>,
-            ?children: ReactElement list,
-            ?closeAllWhen: bool
-        ) =
+        (widgets: Map<WidgetType, WidgetDefinition>, children: ReactElement, ?closeAllWhen: bool)
+        =
 
         let activeWidgets, setActiveWidgets =
             React.useStateWithUpdater<WidgetType list> ([])
 
-        let children = defaultArg children []
         let closeAllWhen = defaultArg closeAllWhen false
 
         React.useEffect (
@@ -393,7 +387,7 @@ type Widget =
         WidgetContext.ActiveWidgetContext.Provider(
             widgetContext,
             [
-                yield! children
+                children
 
                 for index, widgetType in activeWidgets |> List.indexed do
                     match widgets.TryFind widgetType with
@@ -610,4 +604,4 @@ type Widget =
             ]
             |> Map.ofList
 
-        Widget.WidgetController(widgets, children = [ Widget.EntryControls(widgetTypes) ])
+        Widget.WidgetController(widgets, children = Widget.EntryControls(widgetTypes))

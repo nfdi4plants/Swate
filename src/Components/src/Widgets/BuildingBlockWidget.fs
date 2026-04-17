@@ -304,9 +304,7 @@ type BuildingBlockWidget =
             Html.none
 
     [<ReactComponent>]
-    static member Main
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
-        =
+    static member Main(arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
 
         let state, setState = React.useState (BuildingBlockWidgetState.Model.init ())
 
@@ -402,7 +400,6 @@ type BuildingBlockWidget =
 
                 table.AddColumn(header, cells, insertionIndex, true)
                 setArcFile (WidgetArcFile.refreshRef arcFile)
-                widgetCtx.closeWidget WidgetType.BuildingBlock
 
             let header = BuildingBlockWidgetState.createCompositeHeaderFromState state
             let isValid = BuildingBlockWidgetState.isValidColumn header

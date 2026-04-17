@@ -44,8 +44,6 @@ type Modals =
             setIsOpen: bool -> unit
         ) =
 
-        let importType, setImportType = React.useState TableJoinOptions.Headers
-
         let setArcFileAndClose nextArcFile =
             setArcFile nextArcFile
             setIsOpen false
@@ -54,15 +52,7 @@ type Modals =
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text "Select template(s)",
-            children =
-                TemplateWidget.Main(
-                    arcFile,
-                    activeTableIndex,
-                    setArcFileAndClose,
-                    importType,
-                    setImportType,
-                    templateServices
-                ),
+            children = TemplateWidget.Main(arcFile, activeTableIndex, setArcFileAndClose, templateServices),
             className = "swt:flex swt:min-w-fit"
         )
 

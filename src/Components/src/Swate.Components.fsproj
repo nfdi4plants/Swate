@@ -161,6 +161,7 @@
     <Compile Include="ARCFileEditor\EmptyTableView\Helper.fs" />
     <Compile Include="ARCFileEditor\EmptyTableView\Modals.fs" />
     <Compile Include="ARCFileEditor\EmptyTableView\Main.fs" />
+    <Compile Include="ARCFileEditor\Widgets\Main.fs" />
     <Compile Include="ARCFileEditor\ArcFileFooterTabs.fs" />
     <Compile Include="ARCFileEditor\ArcFileEditor.fs" />
     <Compile Include="ARCObjectExplorer\ARCExplorer.fs" />

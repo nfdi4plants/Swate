@@ -1,0 +1,131 @@
+namespace Swate.Components.ArcFileEditor.Widgets
+
+open Feliz
+open Fable.Core
+open ARCtrl
+open Swate.Components
+
+module private MainHelper =
+
+    let widgetTypes = [
+        WidgetType.BuildingBlock
+        WidgetType.Template
+        WidgetType.FilePicker
+        WidgetType.DataAnnotator
+    ]
+
+    let widgetInfo (widgetType: WidgetType) =
+        match widgetType with
+        | WidgetType.BuildingBlock -> "Add Building Block", Icons.BuildingBlock()
+        | WidgetType.Template -> "Add Template", Icons.Templates()
+        | WidgetType.FilePicker -> "File Picker", Icons.FilePicker()
+        | WidgetType.DataAnnotator -> "Data Annotator", Icons.DataAnnotator()
+        | WidgetType.Playground -> "Playground", Icons.Templates()
+
+// let createWidgets
+//     (arcFileState: ArcFiles)
+//     (activeView: WidgetHostView)
+//     (activeTableIndex: int option)
+//     (setArcFileState: ArcFiles -> unit)
+//     (templateImportType: TableJoinOptions)
+//     (setTemplateImportType: TableJoinOptions -> unit)
+//     (templateServices: TemplateWidgetServices)
+//     (widgetServices: ArcFileEditorWidgetServices)
+//     : Map<WidgetType, WidgetDefinition> =
+//     [
+//         WidgetType.BuildingBlock,
+//         {|
+//             prefix = "ADD_BUILDINGBLOCK"
+//             content = BuildingBlockWidget.Main(arcFileState, activeTableIndex, setArcFileState)
+//         |}
+//         WidgetType.Template,
+//         {|
+//             prefix = "ADD_TEMPLATE"
+//             content =
+//                 TemplateWidget.Main(
+//                     arcFileState,
+//                     activeTableIndex,
+//                     setArcFileState,
+//                     templateImportType,
+//                     setTemplateImportType,
+//                     templateServices
+//                 )
+//         |}
+//         WidgetType.FilePicker,
+//         {|
+//             prefix = "FILEPICKER"
+//             content =
+//                 FilePickerWidget.Main(
+//                     arcFileState,
+//                     activeTableIndex,
+//                     setArcFileState,
+//                     widgetServices.filePickerServices
+//                 )
+//         |}
+//         WidgetType.DataAnnotator,
+//         {|
+//             prefix = "DATAANNOTATOR"
+//             content =
+//                 DataAnnotatorWidget.Main(
+//                     arcFileState,
+//                     activeView,
+//                     activeTableIndex,
+//                     setArcFileState,
+//                     widgetServices.dataAnnotatorServices
+//                 )
+//         |}
+//     ]
+//     |> Map.ofList
+
+open MainHelper
+open Swate.Components.WidgetContext
+
+[<Erase; Mangle(false)>]
+type Main =
+
+    [<ReactComponent>]
+    static member private WidgetToggleBtn(widgetType: WidgetType, isOpen: bool, toggle: unit -> unit) =
+
+        let label, icon = widgetInfo widgetType
+
+        let tooltip = if isOpen then $"Close {label}" else $"Open {label}"
+
+        QuickAccessButton.QuickAccessButton(
+            tooltip,
+            icon,
+            (fun _ -> toggle ()),
+            classes = (if isOpen then "swt:!text-primary" else "")
+        )
+
+    [<ReactComponent>]
+    static member WidgetToggleBtns() =
+
+        let context = WidgetContext.useWidgetController ()
+
+        Html.div [
+            prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:justify-center"
+            prop.children [
+                for widgetType in widgetTypes do
+                    let isOpen = context.isActive widgetType
+                    let toggle = fun _ -> context.toggleWidget widgetType
+                    Main.WidgetToggleBtn(widgetType, isOpen, toggle)
+            ]
+        ]
+
+    static member Widgets(children: ReactElement, buildingBlockWidget: ReactElement, templateWidget: ReactElement) =
+        let widgets: Map<WidgetType, WidgetDefinition> =
+            [
+                WidgetType.BuildingBlock,
+                {|
+                    prefix = "ADD_BUILDINGBLOCK"
+                    content = buildingBlockWidget
+                |}
+                WidgetType.Template,
+                {|
+                    prefix = "ADD_TEMPLATE"
+                    content = templateWidget
+                |}
+            ]
+            |> Map.ofList
+
+        Widget.WidgetController(widgets, children = children)
