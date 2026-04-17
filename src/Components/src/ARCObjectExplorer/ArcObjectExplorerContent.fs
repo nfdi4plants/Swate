@@ -1,8 +1,9 @@
-namespace Swate.Components
+namespace Swate.Components.ARCObjectExplorer
 
 open System
 open Feliz
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 
 type private ArcObjectPropertyValue =

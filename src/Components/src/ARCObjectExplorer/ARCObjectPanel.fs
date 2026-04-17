@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.ARCObjectExplorer
 
 open Fable.Core
 open Feliz

@@ -1,7 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.ARCObjectExplorer
 
 open Fable.Core
 open Feliz
+open Swate.Components
 open Swate.Components.FileExplorerTypes
 
 type ARCObjectExplorerVisibleItem = {

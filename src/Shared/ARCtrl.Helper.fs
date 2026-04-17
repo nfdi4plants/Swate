@@ -176,7 +176,6 @@ module ARCtrlHelper =
         member this.CanRenderDataMapView() =
             this.TryGetDataMap() |> Option.isSome
 
-    [<RequireQualifiedAccess>]
     type JsonExportFormat =
         | ARCtrl
         | ARCtrlCompressed
