@@ -20,27 +20,27 @@ type TableState
     member val onBlur = onBlur with get, set
     member val onKeyDown = onKeyDown with get, set
     member val onClick = onClick with get, set
+    with
+        static member init () =
+            TableState(
+                (fun _ ->
+                    console.warn "TableCtx default isActive"
+                    false
+                ),
+                (fun _ ->
+                    console.warn "TableCtx default isOrigin"
+                    false
+                ),
+                (fun _ ->
+                    console.warn "TableCtx default isSelected"
+                    false
+                ),
+                (fun _ _ -> console.warn "TableCtx default onBlur"),
+                (fun _ _ -> console.warn "TableCtx default onKeyDown"),
+                (fun _ _ -> console.warn "TableCtx default onClick")
+            )
 
-let private init () =
-    TableState(
-        (fun _ ->
-            console.warn "TableCtx default isActive"
-            false
-        ),
-        (fun _ ->
-            console.warn "TableCtx default isOrigin"
-            false
-        ),
-        (fun _ ->
-            console.warn "TableCtx default isSelected"
-            false
-        ),
-        (fun _ _ -> console.warn "TableCtx default onBlur"),
-        (fun _ _ -> console.warn "TableCtx default onKeyDown"),
-        (fun _ _ -> console.warn "TableCtx default onClick")
-    )
-
-let TableStateCtx = React.createContext<TableState> (init ())
+let TableStateCtx = React.createContext<TableState> (TableState.init ())
 
 [<Hook>]
 let useTableStateCtx () = React.useContext TableStateCtx

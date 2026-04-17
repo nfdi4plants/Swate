@@ -24,19 +24,18 @@ type WidgetControllerContext = {
     closeWidget: WidgetType -> unit
     toggleWidget: WidgetType -> unit
     focusWidget: WidgetType -> unit
-}
-
-let init () = {
-    activeWidgets = []
-    isActive = fun _ -> false
-    openWidget = fun _ -> ()
-    closeWidget = fun _ -> ()
-    toggleWidget = fun _ -> ()
-    focusWidget = fun _ -> ()
+} with
+    static member init () : WidgetControllerContext = {
+        activeWidgets = []
+        isActive = fun _ -> false
+        openWidget = fun _ -> ()
+        closeWidget = fun _ -> ()
+        toggleWidget = fun _ -> ()
+        focusWidget = fun _ -> ()
 }
 
 let WidgetControllerCtx =
-    React.createContext<WidgetControllerContext> (init ())
+    React.createContext<WidgetControllerContext> (WidgetControllerContext.init ())
 
 [<Hook>]
 let useWidgetControllerCtx () = React.useContext WidgetControllerCtx

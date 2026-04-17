@@ -22,17 +22,13 @@ type RightSidebarCtxState = {
     setIsOpen: bool -> unit
     sidebarType: obj
     setSidebarType: obj -> unit
-}
-
-let Empty: RightSidebarCtxState = {
-    isOpen = false
-    setIsOpen = ignore
-    sidebarType = null
-    setSidebarType = ignore
-}
-
-let RightSidebarCtx =
-    React.createContext<RightSidebarCtxState> (Empty)
+} with
+     static member Empty : RightSidebarCtxState = {
+        isOpen = false
+        setIsOpen = ignore
+        sidebarType = null
+        setSidebarType = ignore
+    }
 
 let toRightSidebarCtxState (state: RightSidebarState<'A>) : RightSidebarCtxState = {
     isOpen = state.isOpen
@@ -41,11 +37,14 @@ let toRightSidebarCtxState (state: RightSidebarState<'A>) : RightSidebarCtxState
     setSidebarType = fun nextSidebarType -> state.setSidebarType (unbox<'A> nextSidebarType)
 }
 
-let private unboxOrDefault<'A> (value: obj) : 'A =
+let unboxOrDefault<'A> (value: obj) : 'A =
     if obj.ReferenceEquals(value, null) then
         Unchecked.defaultof<'A>
     else
         unbox<'A> value
+
+let RightSidebarCtx =
+    React.createContext<RightSidebarCtxState> (RightSidebarCtxState.Empty)
 
 [<Hook>]
 let useRightSidebarCtx<'A> () : RightSidebarState<'A> =

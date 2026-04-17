@@ -83,7 +83,7 @@
     <Compile Include="GenericComponents\Popover\Popover.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModalContext.fs" />
-    <Compile Include="GenericComponents\SelectContextValue.fs" />
+    <Compile Include="GenericComponents\SelectContext.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
     <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />

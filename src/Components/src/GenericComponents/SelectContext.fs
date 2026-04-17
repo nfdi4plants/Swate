@@ -1,25 +1,22 @@
-module Swate.Components.GenericComponents.SelectContextValue
+module Swate.Components.GenericComponents.SelectContext
 
 open Feliz
 
 
-type SelectContextValue = {|
+type SelectContextValue = {
     activeIndex: int option
     selectedIndices: Set<int>
     optionCount: int
     getItemProps: obj -> obj
     handleSelect: int option -> unit
-|}
-
-module SelectContextValue =
-
-    let init () : SelectContextValue = {|
+} with
+    static member init () : SelectContextValue = {
         activeIndex = None
         selectedIndices = Set.empty
         optionCount = 0
         getItemProps = fun _ -> null
         handleSelect = fun _ -> ()
-    |}
+    }
 
 let SelectCtx = React.createContext<SelectContextValue> (SelectContextValue.init ())
 

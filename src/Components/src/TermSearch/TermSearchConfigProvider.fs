@@ -5,7 +5,7 @@ open Fable.Core
 open Feliz
 open Swate.Components.TermSearch.TermSearchConfigContext
 open Swate.Components.TermSearch.TermSearchAllKeysContext
-open Swate.Components.TermSearch.TermSearchConfigLocalStorageActiveKeysContext
+open Swate.Components.TermSearch.TermSearchActiveKeysContext
 
 
 module private TermSearchConfigProviderHelper =
@@ -182,7 +182,7 @@ type TermSearchConfigProvider =
                 |]
             )
 
-        TermSearchConfigLocalStorageActiveKeysContext.TermSearchActiveKeysCtx.Provider(
+        TermSearchActiveKeysContext.TermSearchActiveKeysCtx.Provider(
             {
                 state = activeKeys
                 setState = setActiveKeys

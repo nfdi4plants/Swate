@@ -5,12 +5,14 @@ open Swate.Components.Types
 
 type LeftSidebarCtxState = StateContext<bool>
 
-module LeftSidebarCtxState =
+module private Helper =
 
     let Empty: LeftSidebarCtxState = { state = false; setState = ignore }
 
+open Helper
+
 let LeftSidebarCtx =
-    React.createContext<LeftSidebarCtxState> (LeftSidebarCtxState.Empty)
+    React.createContext<LeftSidebarCtxState>(Empty)
 
 [<Hook>]
 let useLeftSidebarCtx () = React.useContext LeftSidebarCtx

@@ -31,53 +31,55 @@ type GitStateController = {
     confirmMergeResolution: GitConfirmMergeResolutionRequest -> unit
 }
 
-let private mapDiffPageResult (_requestedPath: string) =
-    function
-    | Ok(GitPageLoadResultDto.Loaded diffData) -> Ok(PageState.GitDiffPage diffData)
-    | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
-    | Error message -> Error message
+module private Helper =
 
-let private mapMergeConflictPageResult (_requestedPath: string) =
-    function
-    | Ok(GitPageLoadResultDto.Loaded mergeData) -> Ok(PageState.GitMergeConflictPage mergeData)
-    | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
-    | Error message -> Error message
+    let mapDiffPageResult (_requestedPath: string) =
+        function
+        | Ok(GitPageLoadResultDto.Loaded diffData) -> Ok(PageState.GitDiffPage diffData)
+        | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
+        | Error message -> Error message
 
-let private dependencies: GitDependencies = {
-    getGitStatus = Renderer.GitApiClient.getGitStatus
-    getGitBranches = Renderer.GitApiClient.getGitBranches
-    getGitLfsSettings = Renderer.GitApiClient.getGitLfsSettings
-    loadDiffPage =
-        fun requestedPath -> promise {
-            let! result = Renderer.GitApiClient.getGitDiffViewData requestedPath
-            return mapDiffPageResult requestedPath result
-        }
-    loadMergeConflictPage =
-        fun requestedPath -> promise {
-            let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
-            return mapMergeConflictPageResult requestedPath result
-        }
-    initGitRepository = Renderer.GitApiClient.gitInitRepository
-    createDataHubProject =
-        fun projectName -> promise {
-            let! result = Api.ipcGitLabApi.createProject (unbox null) projectName
-            return result |> Result.mapError _.GitLabErrorToString
-        }
-    installGitLfs = Renderer.GitApiClient.installGitLfs
-    gitFetch = Renderer.GitApiClient.gitFetch
-    gitPull = Renderer.GitApiClient.gitPull
-    gitPush = Renderer.GitApiClient.gitPush
-    gitAddRemote = Renderer.GitApiClient.gitAddRemote
-    gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
-    createBranch = Renderer.GitApiClient.createBranch
-    checkoutBranch = Renderer.GitApiClient.checkoutBranch
-    gitStagePaths = Renderer.GitApiClient.gitStagePaths
-    gitUnstagePaths = Renderer.GitApiClient.gitUnstagePaths
-    gitCommit = Renderer.GitApiClient.gitCommit
-    setGitLfsSettings = Renderer.GitApiClient.setGitLfsSettings
-    confirmGitMergeResolution = Renderer.GitApiClient.confirmGitMergeResolution
-    confirmInstall = fun message -> window.confirm message
-}
+    let mapMergeConflictPageResult (_requestedPath: string) =
+        function
+        | Ok(GitPageLoadResultDto.Loaded mergeData) -> Ok(PageState.GitMergeConflictPage mergeData)
+        | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
+        | Error message -> Error message
+
+    let dependencies: GitDependencies = {
+        getGitStatus = Renderer.GitApiClient.getGitStatus
+        getGitBranches = Renderer.GitApiClient.getGitBranches
+        getGitLfsSettings = Renderer.GitApiClient.getGitLfsSettings
+        loadDiffPage =
+            fun requestedPath -> promise {
+                let! result = Renderer.GitApiClient.getGitDiffViewData requestedPath
+                return mapDiffPageResult requestedPath result
+            }
+        loadMergeConflictPage =
+            fun requestedPath -> promise {
+                let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
+                return mapMergeConflictPageResult requestedPath result
+            }
+        initGitRepository = Renderer.GitApiClient.gitInitRepository
+        createDataHubProject =
+            fun projectName -> promise {
+                let! result = Api.ipcGitLabApi.createProject (unbox null) projectName
+                return result |> Result.mapError _.GitLabErrorToString
+            }
+        installGitLfs = Renderer.GitApiClient.installGitLfs
+        gitFetch = Renderer.GitApiClient.gitFetch
+        gitPull = Renderer.GitApiClient.gitPull
+        gitPush = Renderer.GitApiClient.gitPush
+        gitAddRemote = Renderer.GitApiClient.gitAddRemote
+        gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
+        createBranch = Renderer.GitApiClient.createBranch
+        checkoutBranch = Renderer.GitApiClient.checkoutBranch
+        gitStagePaths = Renderer.GitApiClient.gitStagePaths
+        gitUnstagePaths = Renderer.GitApiClient.gitUnstagePaths
+        gitCommit = Renderer.GitApiClient.gitCommit
+        setGitLfsSettings = Renderer.GitApiClient.setGitLfsSettings
+        confirmGitMergeResolution = Renderer.GitApiClient.confirmGitMergeResolution
+        confirmInstall = fun message -> window.confirm message
+    }
 
 let GitStateCtx =
     React.createContext<GitStateController> (
@@ -111,7 +113,7 @@ let GitStateCtxProvider (children: ReactElement) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
     let gitState, dispatch =
-        React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
+        React.useElmish ((fun () -> init ()), update Helper.dependencies pageStateCtx.setState, subscribe, [||])
 
     let refresh () = dispatch RefreshRequested
 
