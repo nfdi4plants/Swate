@@ -11,8 +11,8 @@ module private Mocks =
         | Settings
         | Info
 
-open Swate.Components.LayoutContexts.LeftSidebarContext
-open Swate.Components.LayoutContexts.RightSidebarContext
+open Swate.Components.Layout.LeftSidebarContext
+open Swate.Components.Layout.RightSidebarContext
 
 module private LayoutHelper =
 
