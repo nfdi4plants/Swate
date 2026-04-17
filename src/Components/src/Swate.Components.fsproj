@@ -79,7 +79,7 @@
     <Compile Include="Api\TIBApi.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
-    <Compile Include="GenericComponents\Popover\PopoverContext.fs" />
+    <Compile Include="GenericComponents\Popover\Context.fs" />
     <Compile Include="GenericComponents\Popover\Popover.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModalContext.fs" />
@@ -92,7 +92,8 @@
     <Compile Include="GenericComponents\Actionbar.fs" />
     <Compile Include="GenericComponents\Navbar.fs" />
     <Compile Include="ARCSelector\Selector.fs" />
-    <Compile Include="Layout\LayoutContext.fs" />
+    <Compile Include="Layout\LeftSidebarContext.fs" />
+    <Compile Include="Layout\RightSidebarContext.fs" />
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
     <Compile Include="FileExplorer\FileExplorerGitLfsHelper.fs" />
@@ -105,7 +106,7 @@
     <Compile Include="GitComparison\GitMergeConflictViewer.fs" />
     <Compile Include="GitSidebar\Types.fs" />
     <Compile Include="GitSidebar\GitSidebar.fs" />
-    <Compile Include="ThemeProvider\ThemeContext.fs" />
+    <Compile Include="ThemeProvider\Context.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchConfigLocalStorageActiveKeysContext.fs" />
@@ -147,11 +148,11 @@
     <Compile Include="Landing\Landing.fs" />
     <Compile Include="Template\Context.fs" />
     <Compile Include="Template\TemplateFilter.fs" />
-    <Compile Include="Table\TableState.fs" />
+    <Compile Include="Table\Context.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
-    <Compile Include="AnnotationTable\AnnotationTableContext.fs" />
+    <Compile Include="AnnotationTable\Context.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextMenu.fs" />
     <Compile Include="AnnotationTable\AnnotationTableModals.fs" />
     <Compile Include="AnnotationTable\AnnotationTableContextProvider.fs" />

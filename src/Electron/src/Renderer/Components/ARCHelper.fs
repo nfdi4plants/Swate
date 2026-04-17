@@ -11,7 +11,7 @@ open Swate.Electron.Shared.GitTypes
 
 [<Hook>]
 let useCurrentArcScopeId () =
-    let appStateCtx = Renderer.Context.AppStateContext.useAppState ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
     appStateCtx.state
     |> Option.map normalizePath

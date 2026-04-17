@@ -32,7 +32,7 @@ let FileStateCtx =
     )
 
 [<Hook>]
-let useFileState () = React.useContext FileStateCtx
+let useFileStateCtx() = React.useContext FileStateCtx
 
 [<ReactComponent>]
 let FileStateCtxProvider (children: ReactElement) =

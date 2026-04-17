@@ -15,9 +15,9 @@ let NotesDraftTarget () =
 
     let notesDraft, setNotesDraft = React.useState NotesDraft.init
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
-    let fileStateCtx = Renderer.Context.FileStateContext.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorer ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let availableNotesTargets =
         React.useMemo (

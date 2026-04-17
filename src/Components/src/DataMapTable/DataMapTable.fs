@@ -7,7 +7,7 @@ open Fable.Core.JsInterop
 open Swate.Components.Table
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
-open Swate.Components.AnnotationTable.AnnotationTableContext
+open Swate.Components.AnnotationTable.Context
 
 
 module private DataMapTableHelper =
@@ -314,7 +314,7 @@ type DataMapTable =
         let tableRef = React.useRef<TableHandle> (unbox null)
         let containerRef = React.useElementRef ()
         let defaultDebug = defaultArg debug false
-        let annotationTableCtx = AnnotationTableContext.useAnnotationTableStateCtx ()
+        let annotationTableCtx = useAnnotationTableStateCtx ()
         let hasAnnotationCtx = isNullOrUndefined annotationTableCtx |> not
 
         let onSelect: GridSelect.OnSelect =

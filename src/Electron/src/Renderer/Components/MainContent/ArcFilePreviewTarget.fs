@@ -11,8 +11,8 @@ open Swate.Components.ErrorModal
 
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorer ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
     let errorModal = ErrorModal.Context.useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 

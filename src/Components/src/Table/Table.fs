@@ -3,6 +3,7 @@ namespace Swate.Components.Table
 open System
 open Swate.Components
 open Swate.Components.Table
+open Swate.Components.Table.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -250,7 +251,7 @@ swt:p-0"""
                 onClick = onClick
             )
 
-        TableState.TableStateCtx.Provider(
+        TableStateCtx.Provider(
             ctx,
             React.Fragment [
                 Html.div [

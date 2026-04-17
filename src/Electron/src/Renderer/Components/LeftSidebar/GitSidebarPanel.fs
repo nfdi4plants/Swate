@@ -5,9 +5,9 @@ open Feliz
 [<ReactComponent>]
 let Main () =
 
-    let gitStateCtx = Renderer.Context.GitStateContext.useGitState ()
-    let authState = Renderer.Context.AuthStateContext.useAuthState ()
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
+    let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
+    let authState = Renderer.Context.AuthStateContext.useAuthStateCtx ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
 

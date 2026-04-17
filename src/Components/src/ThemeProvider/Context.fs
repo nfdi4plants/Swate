@@ -1,4 +1,3 @@
-
 module Swate.Components.ThemeProvider.Context
 
 open Feliz

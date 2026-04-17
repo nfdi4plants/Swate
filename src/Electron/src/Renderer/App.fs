@@ -87,7 +87,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
 [<ReactComponent>]
 let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget) =
-    let leftSidebarCtx = React.useContext Swate.Components.LayoutContext.LeftSidebarContext
+    let leftSidebarCtx = Swate.Components.LayoutContexts.LeftSidebarContext.useLeftSidebarCtx ()
 
     let toggleTarget target =
         if leftSidebarTarget = target then

@@ -10,9 +10,9 @@ open ARCtrl.Contract
 [<ReactComponent>]
 let LandingDraftTarget () =
 
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
-    let fileStateCtx = Renderer.Context.FileStateContext.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorer ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
 

@@ -7,7 +7,7 @@ open Swate.Electron.Shared.GitTypes
 [<ReactComponent>]
 let Main (mergeData: GitMergeConflictViewDataDto) =
 
-    let gitStateCtx = Renderer.Context.GitStateContext.useGitState ()
+    let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
 
     let isConfirmingCurrentPath =
         gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path

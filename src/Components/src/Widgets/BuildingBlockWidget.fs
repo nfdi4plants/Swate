@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.Context
 open Swate.Components.Widgets.Context
 
 
@@ -312,7 +313,7 @@ type BuildingBlockWidget =
 
         let state, setState = React.useState (BuildingBlockWidgetState.Model.init ())
 
-        let annotationCtx = AnnotationTableContext.useAnnotationTableStateCtx ()
+        let annotationCtx = useAnnotationTableStateCtx ()
 
         let widgetCtx = useWidgetControllerCtx ()
 

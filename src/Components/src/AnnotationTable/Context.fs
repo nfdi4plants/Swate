@@ -1,4 +1,4 @@
-module Swate.Components.AnnotationTable.AnnotationTableContext
+module Swate.Components.AnnotationTable.Context
 
 open Feliz
 open Swate.Components.Types

@@ -48,7 +48,7 @@ let ArcObjectExplorerCtx =
     )
 
 [<Hook>]
-let useArcObjectExplorer () = React.useContext ArcObjectExplorerCtx
+let useArcObjectExplorerCtx () = React.useContext ArcObjectExplorerCtx
 
 let rec private containsNodeId (nodeId: string) (nodes: ArcExplorerNode list) =
     nodes
@@ -56,8 +56,8 @@ let rec private containsNodeId (nodeId: string) (nodes: ArcExplorerNode list) =
 
 [<ReactComponent>]
 let ArcObjectExplorerCtxProvider (children: ReactElement) =
-    let appStateCtx = Renderer.Context.AppStateContext.useAppState ()
-    let fileStateCtx = Renderer.Context.FileStateContext.useFileState ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
     let state, setState = React.useStateWithUpdater (ArcObjectExplorerState.init ())
 
     React.useEffect (

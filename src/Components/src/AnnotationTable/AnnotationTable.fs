@@ -3,7 +3,7 @@ namespace Swate.Components.AnnotationTable
 open Swate.Components
 open Swate.Components.Table
 open Swate.Components.AnnotationTable
-open Swate.Components.AnnotationTable.AnnotationTableContext
+open Swate.Components.AnnotationTable.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -520,7 +520,7 @@ type AnnotationTable =
         let containerRef = React.useElementRef ()
         let tableRefInner = React.useRef<TableHandle> (null)
         let (modal: ModalTypes option), setModal = React.useState None
-        let ctx = AnnotationTableContext.useAnnotationTableStateCtx ()
+        let ctx = useAnnotationTableStateCtx ()
 
         let hasCtx = isNullOrUndefined ctx |> not
 
@@ -731,7 +731,7 @@ type AnnotationTable =
     static member Entry() =
         let arcTable = ARCtrl.ArcTable("TestTable", ResizeArray())
 
-        let ctx = AnnotationTableContext.useAnnotationTableStateCtx ()
+        let ctx = useAnnotationTableStateCtx ()
 
         arcTable.AddColumn(
             CompositeHeader.Input IOType.Source,

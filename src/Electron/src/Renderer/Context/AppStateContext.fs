@@ -9,4 +9,4 @@ let AppStateCtx =
     React.createContext<StateContext<ArcRootPath>> ({ state = None; setState = ignore })
 
 [<Hook>]
-let useAppState () = React.useContext AppStateCtx
+let useAppStateCtx () = React.useContext AppStateCtx

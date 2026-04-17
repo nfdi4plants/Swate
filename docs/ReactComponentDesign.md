@@ -50,8 +50,8 @@ Components in `src/Components` are expected to be reusable and application-agnos
 - **Subcomponents**: Larger components MUST be split into smaller logical subcomponents. These subcomponents MAY be defined as static members of the main component class, or as separate component-files in the same folder.
 - **Types**: `private` types that are only used within a single component file MUST be defined in the same file. Public types that are shared across multiple files MUST be defined in a separate `Types.fs` file.
 - **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MUST be defined in a separate file if they are used by multiple files. Otherwise they MUST be defined in a **private** module `module <FileName>Helper` within the component file.
-- **React context**: If a component needs to share state or configuration with a React context. It MUST define the base context in a separate file `**/<ComponentName>/Context.fs` or `**/<ComponentName>/Contexts/<ContextName>.fs` or `**/<ComponentName>/<ContextName>.fs` if there are multiple contexts associated with the component, with the following properties.
-    - File namespace MUST follow folder structure and be named `module Swate.Components.<Path>.<ContextName>` or if there is a single context `module Swate.Components.<Path>.Context`.
+- **React context**: If a component needs to share state or configuration with a React context. It MUST define the base context in a separate file `**/<ComponentName>/Context.fs` or `**/<ComponentName>/Contexts/<ContextName>Context.fs` or `**/<ComponentName>/<ContextName>Context.fs` if there are multiple contexts associated with the component, with the following properties.
+    - File namespace MUST follow folder structure and be named `module Swate.Components.<Path>.<ContextName>Context` or if there is a single context `module Swate.Components.<Path>.Context`.
     - MAY contain the relevant public types.
     - MAY contain helper functions inside a MAYBE public module. This module should be named `<ContextName>Helper`.
     - It MUST NOT contain any React components.

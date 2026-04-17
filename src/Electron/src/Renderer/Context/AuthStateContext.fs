@@ -21,7 +21,7 @@ module private AuthStateHelper =
     let AuthStateCtx = React.createContext<AuthStateDto> AuthStateDto.Empty
 
 [<Hook>]
-let useAuthState () =
+let useAuthStateCtx () =
     React.useContext AuthStateHelper.AuthStateCtx
 
 open AuthStateHelper

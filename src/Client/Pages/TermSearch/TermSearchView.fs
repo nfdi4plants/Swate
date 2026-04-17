@@ -15,12 +15,13 @@ let update (termSearchMsg: TermSearch.Msg) (currentState: TermSearch.Model) : Te
 open Feliz
 open ARCtrl
 open Fable.Core.JsInterop
+open Swate.Components.AnnotationTable.Context
 
 /// "Fill selected cells with this term" - button //
 [<ReactComponent>]
 let private AddButton (model: Model, dispatch) =
     let ctx =
-        AnnotationTableContext.useAnnotationTableStateCtx ()
+        useAnnotationTableStateCtx ()
 
     let selectedCells =
         ctx.state

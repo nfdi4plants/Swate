@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.Context
 open Swate.Components.Widgets.Context
 
 
@@ -127,7 +128,7 @@ type FilePickerWidget =
         let statusMessage, setStatusMessage = React.useState (None: string option)
         let widgetCtx = useWidgetControllerCtx ()
 
-        let annotationCtx = AnnotationTableContext.useAnnotationTableStateCtx ()
+        let annotationCtx = useAnnotationTableStateCtx ()
 
         let selectedCells =
 

@@ -102,13 +102,13 @@ let GitStateCtx =
     )
 
 [<Hook>]
-let useGitState () = React.useContext GitStateCtx
+let useGitStateCtx () = React.useContext GitStateCtx
 
 [<ReactComponent>]
 let GitStateCtxProvider (children: ReactElement) =
 
-    let appStateCtx = Renderer.Context.AppStateContext.useAppState ()
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageState ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
     let gitState, dispatch =
         React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])

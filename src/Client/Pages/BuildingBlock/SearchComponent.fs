@@ -10,6 +10,7 @@ open Fable.Core
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.Context
 
 
 module SearchComponentHelper =
@@ -196,7 +197,7 @@ type SearchComponent =
         let state_bb, setState_bb = React.useState (BuildingBlockUIState.init)
 
         let ctx =
-            AnnotationTableContext.useAnnotationTableStateCtx ()
+            useAnnotationTableStateCtx ()
 
         let xIndex =
             ctx.state
