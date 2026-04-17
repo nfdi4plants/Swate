@@ -169,6 +169,9 @@
     <Compile Include="ARCObjectExplorer\Model.fs" />
     <Compile Include="ARCObjectExplorer\ArcObjectExplorerContent.fs" />
     <Compile Include="ARCObjectExplorer\ARCObjectFixture.fs" />
+    <Compile Include="Notes\Types.fs" />
+    <Compile Include="Notes\NoteSearch\ExampleNotes.fs" />
+    <Compile Include="Notes\NoteSearch\Filter.fs" />
     <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs" />
     <Compile Include="Notes\Editor\Types.fs" />
     <Compile Include="Notes\Editor\State.fs" />
