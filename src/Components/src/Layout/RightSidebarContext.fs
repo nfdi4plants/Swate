@@ -1,4 +1,4 @@
-module Swate.Components.LayoutContexts.RightSidebarContext
+module Swate.Components.Layout.RightSidebarContext
 
 open Feliz
 
@@ -30,18 +30,22 @@ type RightSidebarCtxState = {
         setSidebarType = ignore
     }
 
-let toRightSidebarCtxState (state: RightSidebarState<'A>) : RightSidebarCtxState = {
-    isOpen = state.isOpen
-    setIsOpen = state.setIsOpen
-    sidebarType = box state.sidebarType
-    setSidebarType = fun nextSidebarType -> state.setSidebarType (unbox<'A> nextSidebarType)
-}
+module RightSidebarHelper =
 
-let unboxOrDefault<'A> (value: obj) : 'A =
-    if obj.ReferenceEquals(value, null) then
-        Unchecked.defaultof<'A>
-    else
-        unbox<'A> value
+    let toRightSidebarCtxState (state: RightSidebarState<'A>) : RightSidebarCtxState = {
+        isOpen = state.isOpen
+        setIsOpen = state.setIsOpen
+        sidebarType = box state.sidebarType
+        setSidebarType = fun nextSidebarType -> state.setSidebarType (unbox<'A> nextSidebarType)
+    }
+
+    let unboxOrDefault<'A> (value: obj) : 'A =
+        if obj.ReferenceEquals(value, null) then
+            Unchecked.defaultof<'A>
+        else
+            unbox<'A> value
+
+open RightSidebarHelper
 
 let RightSidebarCtx =
     React.createContext<RightSidebarCtxState> (RightSidebarCtxState.Empty)

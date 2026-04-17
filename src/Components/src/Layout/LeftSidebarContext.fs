@@ -1,4 +1,4 @@
-module Swate.Components.LayoutContexts.LeftSidebarContext
+module Swate.Components.Layout.LeftSidebarContext
 
 open Feliz
 open Swate.Components.Types

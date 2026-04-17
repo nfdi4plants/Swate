@@ -472,7 +472,7 @@ type Layout =
                 setState = setLeftSidebarIsOpen
             },
             RightSidebarCtx.Provider(
-                toRightSidebarCtxState rightSidebarState,
+                RightSidebarHelper.toRightSidebarCtxState rightSidebarState,
                 Html.div [
                     prop.className "swt:flex-1 swt:flex swt:flex-col swt:h-screen swt:overflow-hidden"
                     prop.children [

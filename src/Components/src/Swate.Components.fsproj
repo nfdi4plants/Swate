@@ -109,7 +109,7 @@
     <Compile Include="ThemeProvider\Context.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
-    <Compile Include="TermSearch\TermSearchConfigLocalStorageActiveKeysContext.fs" />
+    <Compile Include="TermSearch\TermSearchActiveKeysContext.fs" />
     <Compile Include="TermSearch\TermSearchConfigContext.fs" />
     <Compile Include="TermSearch\TermSearchAllKeysContext.fs" />
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />

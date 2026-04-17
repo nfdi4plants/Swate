@@ -50,9 +50,13 @@ let ArcObjectExplorerCtx =
 [<Hook>]
 let useArcObjectExplorerCtx () = React.useContext ArcObjectExplorerCtx
 
-let rec private containsNodeId (nodeId: string) (nodes: ArcExplorerNode list) =
-    nodes
-    |> List.exists (fun node -> node.id = nodeId || containsNodeId nodeId node.children)
+module private Helper =
+
+    let rec containsNodeId (nodeId: string) (nodes: ArcExplorerNode list) =
+        nodes
+        |> List.exists (fun node -> node.id = nodeId || containsNodeId nodeId node.children)
+
+open Helper
 
 [<ReactComponent>]
 let ArcObjectExplorerCtxProvider (children: ReactElement) =
