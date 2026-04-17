@@ -52,7 +52,13 @@ type Modals =
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text "Select template(s)",
-            children = TemplateWidget.Main(arcFile, activeTableIndex, setArcFileAndClose, templateServices),
+            children =
+                Swate.Components.TemplateWidgetMain.Main(
+                    arcFile,
+                    activeTableIndex,
+                    setArcFileAndClose,
+                    templateServices
+                ),
             className = "swt:flex swt:min-w-fit"
         )
 

@@ -66,14 +66,7 @@ let TemplateWidget
     {|
         prefix = "ADD_TEMPLATE"
         content =
-            Swate.Components.TemplateWidget.Main(
-                arcFileState,
-                activeTableIndex,
-                setArcFileState,
-                importType,
-                setImportType,
-                templateServices
-            )
+            Swate.Components.TemplateWidgetMain.Main(arcFileState, activeTableIndex, setArcFileState, templateServices)
     |}
 
 let FilePickerWidget

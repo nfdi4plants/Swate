@@ -140,7 +140,12 @@
     <Compile Include="Landing\TargetSelector.fs" />
     <Compile Include="Landing\Actions.fs" />
     <Compile Include="Landing\Landing.fs" />
+    <Compile Include="Template\Types.fs" />
+    <Compile Include="Template\Helper.fs" />
     <Compile Include="Template\TemplateFilter.fs" />
+    <Compile Include="Template\TemplateRows.fs" />
+    <Compile Include="Template\TemplatePreview.fs" />
+    <Compile Include="Template\TemplateToolbar.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />
@@ -152,9 +157,11 @@
     <Compile Include="Widgets\LocalStorage.fs" />
     <Compile Include="Widgets\Widgets.fs" />
     <Compile Include="Widgets\WidgetSupport.fs" />
+    <Compile Include="Template\TemplateActions.fs" />
     <Compile Include="Widgets\BuildingBlockWidget.fs" />
     <Compile Include="Widgets\FilePickerWidget.fs" />
     <Compile Include="Widgets\DataAnnotatorWidget.fs" />
+    <Compile Include="Template\TemplateWidget.fs" />
     <Compile Include="Widgets\TemplateWidget.fs" />
     <Compile Include="ARCFileEditor\Types.fs" />
     <Compile Include="ARCFileEditor\Helper.fs" />

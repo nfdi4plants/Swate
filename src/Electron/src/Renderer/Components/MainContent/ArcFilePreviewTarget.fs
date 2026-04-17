@@ -49,10 +49,4 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let renderTrailingNavbarElements _ =
         QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveArcFile)
 
-    Main.ArcFileEditor(
-        arcFile,
-        setArcFile,
-        templateServices,
-        trailingNavbarElements = renderTrailingNavbarElements,
-        widgetServices = arcFileEditorWidgetServices
-    )
+    Main.ArcFileEditor(arcFile, setArcFile, templateServices, trailingNavbarElements = renderTrailingNavbarElements)

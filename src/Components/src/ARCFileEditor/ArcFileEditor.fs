@@ -236,7 +236,7 @@ type Main =
             BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFile)
 
         let templateWidget =
-            TemplateWidget.Main(arcFile, activeTableIndex, setArcFile, templateServices)
+            Swate.Components.TemplateWidgetMain.Main(arcFile, activeTableIndex, setArcFile, templateServices)
 
 
         AnnotationTableContextProvider.AnnotationTableContextProvider(
