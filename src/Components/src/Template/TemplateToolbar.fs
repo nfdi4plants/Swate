@@ -9,7 +9,7 @@ type TemplateToolbar =
 
     [<ReactComponent>]
     static member TemplateToolbar
-        (selectedCount: int, canImport: bool, onRefresh: unit -> unit, onImport: unit -> unit)
+        (selectedCount: int, canImport: bool, isRefreshing: bool, onRefresh: unit -> unit, onImport: unit -> unit)
         =
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:items-end"
@@ -25,8 +25,16 @@ type TemplateToolbar =
                 Html.button [
                     prop.className "swt:btn swt:btn-sm swt:btn-square"
                     prop.title "Refresh templates"
+                    prop.disabled isRefreshing
                     prop.onClick (fun _ -> onRefresh ())
-                    prop.children [ Icons.ArrowsRotate() ]
+                    prop.children [
+                        if isRefreshing then
+                            Html.span [
+                                prop.className "swt:loading swt:loading-spinner swt:loading-xs"
+                            ]
+                        else
+                            Icons.ArrowsRotate()
+                    ]
                 ]
                 Html.button [
                     prop.className [

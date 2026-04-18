@@ -3,18 +3,14 @@ namespace Swate.Components.Widgets
 open ARCtrl
 open Fable.Core
 open Feliz
-open Swate.Components.Shared
-open ARCtrl
-open Fable.Core
-open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Template
 
 
-module TemplateHelper = Swate.Components.Template.Helper
 module TemplateTypes = Swate.Components.Template.Types
 module TemplateActions = Swate.Components.Template.TemplateActions
+module TemplateCacheContext = Swate.Components.Template.TemplateCacheContext
 
 
 [<Erase; Mangle(false)>]
@@ -27,21 +23,20 @@ type TemplateWidget =
     static member Main
         (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit, services: TemplateWidgetServices) =
 
-        let cacheState, setCacheState =
-            React.useLocalStorage (TemplateHelper.CacheStorageKey, TemplateTypes.TemplateCacheState.Empty)
+        TemplateCacheProvider.TemplateCacheProvider(
+            services.loadTemplates,
+            TemplateWidget.Content(arcFile, activeTableIndex, setArcFile)
+        )
 
-        let templateState, setTemplateState =
-            React.useState (fun _ ->
-                match TemplateHelper.tryReadTemplatesFromCache cacheState with
-                | Ok(Some templates) ->
-                    templates
-                    |> Array.sortBy (fun template -> template.Name)
-                    |> TemplateTypes.TemplateLoadState.Loaded
-                | _ -> TemplateTypes.TemplateLoadState.Loading
-            )
+    [<ReactComponent>]
+    static member private Content(arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
+
+        let templateCacheCtx = TemplateCacheContext.useTemplateCacheCtx ()
+        let templateState = templateCacheCtx.LoadState
+        let isRefreshing = templateCacheCtx.IsRefreshing
+        let refreshError = templateCacheCtx.RefreshError
 
         let importType, setImportType = React.useState TableJoinOptions.Headers
-        let latestFetchId = React.useRef (None: System.Guid option)
 
         let selectedTemplateIds, setSelectedTemplateIds =
             React.useStateWithUpdater (Set.empty<System.Guid>)
@@ -72,53 +67,7 @@ type TemplateWidget =
                 setTemplateImportDecisions
                 setDeselectedTemplateColumns
 
-        let loadTemplates (forceRefresh: bool) = async {
-            let cachedTemplatesResult = TemplateHelper.tryReadTemplatesFromCache cacheState
-
-            let shouldFetchFresh =
-                forceRefresh
-                || Result.isError cachedTemplatesResult
-                || TemplateHelper.shouldFetchFresh false cacheState System.DateTime.UtcNow
-
-            if shouldFetchFresh then
-                let hasVisibleTemplates =
-                    match templateState with
-                    | TemplateTypes.TemplateLoadState.Loaded templates -> templates.Length > 0
-                    | _ -> false
-
-                if not hasVisibleTemplates then
-                    setTemplateState TemplateTypes.TemplateLoadState.Loading
-
-                let requestId = System.Guid.NewGuid()
-                latestFetchId.current <- Some requestId
-
-                let! result = services.loadTemplates ()
-
-                if latestFetchId.current = Some requestId then
-                    match result with
-                    | Ok templates ->
-                        let sortedTemplates = templates |> Array.sortBy (fun template -> template.Name)
-
-                        setCacheState (TemplateHelper.toCacheState sortedTemplates System.DateTime.UtcNow)
-                        setTemplateState (TemplateTypes.TemplateLoadState.Loaded sortedTemplates)
-                    | Error message -> setTemplateState (TemplateTypes.TemplateLoadState.LoadError message)
-            else
-                match cachedTemplatesResult with
-                | Ok(Some templates) ->
-                    templates
-                    |> Array.sortBy (fun template -> template.Name)
-                    |> TemplateTypes.TemplateLoadState.Loaded
-                    |> setTemplateState
-                | Ok None -> setTemplateState TemplateTypes.TemplateLoadState.Loading
-                | Error message ->
-                    setCacheState TemplateTypes.TemplateCacheState.Empty
-                    setTemplateState (TemplateTypes.TemplateLoadState.LoadError message)
-        }
-
-        React.useEffectOnce (fun _ -> loadTemplates false |> Async.StartImmediate)
-
-        let refreshTemplates () =
-            loadTemplates true |> Async.StartImmediate
+        let refreshTemplates () = templateCacheCtx.RefreshTemplates()
 
         React.useEffect (
             (fun () ->
@@ -303,9 +252,19 @@ type TemplateWidget =
                             TemplateToolbar.TemplateToolbar(
                                 selectedTemplates.Length,
                                 canImport,
+                                isRefreshing,
                                 refreshTemplates,
                                 openImportDialog
                             )
+                            match refreshError with
+                            | Some message ->
+                                Html.div [
+                                    prop.className "swt:alert swt:alert-error swt:text-xs"
+                                    prop.children [
+                                        Html.span [ prop.text $"Failed to refresh templates: {message}" ]
+                                    ]
+                                ]
+                            | None -> Html.none
                             BaseModal.Modal(
                                 isOpen = showImportDialog,
                                 setIsOpen = setShowImportDialog,

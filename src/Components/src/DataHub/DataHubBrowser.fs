@@ -9,7 +9,7 @@ open Swate.Components.Types.Actionbar
 open DataHubTypes
 open Swate.Components.Api.GitLabApi
 
-module DatahubBrowserModel =
+module private DatahubBrowserModel =
 
     type Msg =
         | SetTab of ExploreTab

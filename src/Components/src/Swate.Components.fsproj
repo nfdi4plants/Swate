@@ -142,6 +142,8 @@
     <Compile Include="Landing\Landing.fs" />
     <Compile Include="Template\Types.fs" />
     <Compile Include="Template\Helper.fs" />
+    <Compile Include="Template\TemplateCacheContext.fs" />
+    <Compile Include="Template\TemplateCacheProvider.fs" />
     <Compile Include="Template\TemplateActions.fs" />
     <Compile Include="Template\TemplateFilter.fs" />
     <Compile Include="Template\TemplateRows.fs" />
