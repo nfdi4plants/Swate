@@ -1,6 +1,6 @@
 module ElectronRenderer.IPCStoreTests
 
-open Renderer.MainUpdateRendererBridge
+open Renderer.IPCStore
 open Vitest
 
 Vitest.describe (
