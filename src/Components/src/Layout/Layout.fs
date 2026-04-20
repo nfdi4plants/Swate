@@ -1,7 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.Layout
 
 open Feliz
 open Fable.Core
+open Swate.Components
 
 module private Mocks =
 
@@ -11,7 +12,8 @@ module private Mocks =
         | Settings
         | Info
 
-open LayoutContext
+open Swate.Components.Layout.LeftSidebarContext
+open Swate.Components.Layout.RightSidebarContext
 
 module private LayoutHelper =
 
@@ -107,7 +109,7 @@ type Layout =
 
     [<ReactComponent>]
     static member LeftSidebarToggleBtn(?activeBorderStyle: bool) =
-        let ctx = React.useContext LeftSidebarContext
+        let ctx = useLeftSidebarCtx ()
         let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.state)
 
         Layout.LayoutBtn(
@@ -123,7 +125,7 @@ type Layout =
 
     [<ReactComponent>]
     static member RightSidebarToggleBtn(?activeBorderStyle: bool) =
-        let ctx = React.useContext RightSidebarContext
+        let ctx = useRightSidebarCtx ()
         let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.isOpen)
 
         Layout.LayoutBtn(
@@ -245,8 +247,8 @@ type Layout =
             ?rightContent: ReactElement,
             ?rightActions: ReactElement
         ) =
-        let ctxLeft = React.useContext (LeftSidebarContext)
-        let ctxRight = React.useContext (RightSidebarContext)
+        let ctxLeft = useLeftSidebarCtx ()
+        let ctxRight = useRightSidebarCtx ()
 
         let widthLeft, setWidthLeft =
             React.useLocalStorage (
@@ -465,13 +467,13 @@ type Layout =
                 [| box children |]
             )
 
-        LeftSidebarContext.Provider(
+        LeftSidebarCtx.Provider(
             {
                 state = leftSidebarIsOpen
                 setState = setLeftSidebarIsOpen
             },
-            RightSidebarContext.Provider(
-                rightSidebarState,
+            RightSidebarCtx.Provider(
+                RightSidebarHelper.toRightSidebarCtxState rightSidebarState,
                 Html.div [
                     prop.className "swt:flex-1 swt:flex swt:flex-col swt:h-screen swt:overflow-hidden"
                     prop.children [

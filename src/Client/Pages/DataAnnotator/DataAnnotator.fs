@@ -7,6 +7,7 @@ open Model
 open Messages
 open Feliz
 open Swate.Components
+open Swate.Components.Table
 
 module private DataAnnotatorHelper =
 

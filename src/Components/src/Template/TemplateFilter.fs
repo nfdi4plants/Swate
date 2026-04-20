@@ -3,6 +3,7 @@ namespace Swate.Components
 open Fable.Core
 open Feliz
 open ARCtrl
+open Swate.Components.Template.Context
 
 module TemplateMocks =
 
@@ -190,9 +191,6 @@ module TemplateMocks =
     |]
 
 module TemplateFilterAux =
-
-    let FilteredTemplateContext =
-        React.createContext<StateContext<Template[]>> ({ state = [||]; setState = fun _ -> () })
 
     open System
 
@@ -548,7 +546,7 @@ type TemplateFilter =
 
         /// This context is used to provide the filtered templates to the rest of the application
         let filteredTemplatesCtx =
-            React.useContext TemplateFilterAux.FilteredTemplateContext
+            useFilteredTemplateCtx ()
 
         /// This constant is used to display available tags in the combo box
         let availableCommunities: Organisation[] =
@@ -650,7 +648,7 @@ type TemplateFilter =
     static member TemplateFilterProvider(children: ReactElement) =
         let filteredTemplates, setFilteredTemplatesFn = React.useState ([||])
 
-        TemplateFilterAux.FilteredTemplateContext.Provider(
+        FilteredTemplateCtx.Provider(
             {
                 state = filteredTemplates
                 setState = setFilteredTemplatesFn
@@ -660,8 +658,7 @@ type TemplateFilter =
 
     [<ReactComponent>]
     static member FilteredTemplateRenderer(children: Template[] -> ReactElement) =
-        let filteredTemplatesCtx =
-            React.useContext<StateContext<Template[]>> TemplateFilterAux.FilteredTemplateContext
+        let filteredTemplatesCtx = useFilteredTemplateCtx ()
 
         let templates = filteredTemplatesCtx.state
 

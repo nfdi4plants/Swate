@@ -29,9 +29,9 @@ module DataHubBrowserHelper =
 
 [<ReactComponent>]
 let DataHubBrowserTarget () =
-    let authCtx = Renderer.Context.AuthStateCtx.useAuthState ()
-    let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let gitStateCtx = Renderer.Context.GitStateCtx.useGitState ()
+    let authCtx = Renderer.Context.AuthStateContext.useAuthStateCtx ()
+    let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
 
     let loadAllRepos (query: ExploreRepoQuery) =
         Api.ipcGitLabApi.loadAllRepos (unbox null) query

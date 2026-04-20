@@ -1,11 +1,11 @@
-module Renderer.Context.AuthStateCtx
+module Renderer.Context.AuthStateContext
 
 open Feliz
 open Swate.Electron.Shared.AuthTypes
 open Swate.Components.Authentication.Types
 
 
-module private AuthStateHelper =
+module private Helper =
 
     let private isEmptyAuthState (state: AuthStateDto) =
         state.ActiveAccount.IsNone && state.StoredAccounts.Length = 0
@@ -27,13 +27,12 @@ module private AuthStateHelper =
             onError ()
     }
 
-    let AuthStateCtx = React.createContext<AuthStateDto> AuthStateDto.Empty
+let AuthStateCtx = React.createContext<AuthStateDto> AuthStateDto.Empty
 
 [<Hook>]
-let useAuthState () =
-    React.useContext AuthStateHelper.AuthStateCtx
+let useAuthStateCtx () = React.useContext AuthStateCtx
 
-open AuthStateHelper
+open Helper
 
 /// This component stores the current account information. If you want to log out, switch account, login, etc.
 /// - you simply can use the IAuthApi via IPC. Any changes will be broadcasted to all open windows via: `authAccountsUpdate`

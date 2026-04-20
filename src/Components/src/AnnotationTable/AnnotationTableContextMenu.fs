@@ -1,9 +1,8 @@
-namespace Swate.Components.AnnotationTableContextMenu
+namespace Swate.Components.AnnotationTable
 
 open System
 open System.Text.RegularExpressions
 open Fable.Core
-open Fable.Core.JsInterop
 open ARCtrl
 open Feliz
 
