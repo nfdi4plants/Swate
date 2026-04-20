@@ -32,9 +32,14 @@ open AuthStateHelper
 let Provider (children: ReactElement) =
     let authState, setAuthState = React.useState AuthStateDto.Empty
 
-    React.useEffectOnce (fun () ->
-        let disposeAuthSubscription = Renderer.MainUpdateRendererBridge.subscribeAuthAccountsUpdate setAuthState
+    let authAccountsUpdate = Renderer.MainUpdateRendererBridge.useAuthAccountsUpdate ()
 
+    let providedAuthState =
+        match authAccountsUpdate with
+        | ValueSome state -> state
+        | ValueNone -> authState
+
+    React.useEffectOnce (fun () ->
         // TODO: Add error handling.
         promise {
             match! Api.ipcAuthApi.revalidate () with
@@ -47,9 +52,7 @@ let Provider (children: ReactElement) =
 
         }
         |> Promise.start
-
-        disposeAuthSubscription
     )
 
 
-    AuthStateCtx.Provider(authState, children)
+    AuthStateCtx.Provider(providedAuthState, children)
