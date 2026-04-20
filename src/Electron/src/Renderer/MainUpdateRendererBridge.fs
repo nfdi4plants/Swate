@@ -91,16 +91,9 @@ let private gitProgressSub       = subscribeStore gitProgressStore
 let private gitProgressSnap      = gitProgressStore.GetSnapshot
 
 // ---------------------------------------------------------------------------
-// Subscribe helpers — backward-compatible ('T -> unit) -> (unit -> unit)
-// Wraps the store's raw Subscribe to unwrap ValueOption so typed
-// subscribers only fire after a real IPC event.
-//
-// NOTE: These fire on every IPC message, even if the payload is identical
-// to the previous one (behavioral parity with the old pub/sub bridge).
-// The useSyncExternalStore hooks above behave differently: React
-// suppresses re-renders when Object.is(oldSnapshot, newSnapshot) is
-// true. For reference types deserialized from IPC (always new objects),
-// the hook will re-render on every message regardless.
+// Event subscribe helpers for Elmish dispatch bridges.
+// These intentionally preserve "new IPC event only" semantics.
+// Do not replace them with hook snapshots unless replay-on-mount is desired.
 // ---------------------------------------------------------------------------
 
 let private makeSubscribe (store: IPCStore<'T>) (handler: 'T -> unit) : (unit -> unit) =
@@ -111,13 +104,10 @@ let private makeSubscribe (store: IPCStore<'T>) (handler: 'T -> unit) : (unit ->
     )
 
 let subscribePathChange = makeSubscribe pathChangeStore
-let subscribeRecentArcsUpdate = makeSubscribe recentArcsStore
-let subscribeAuthAccountsUpdate = makeSubscribe authAccountsStore
-let subscribeFileTreeUpdate = makeSubscribe fileTreeStore
 let subscribeGitProgressUpdate = makeSubscribe gitProgressStore
 
 // ---------------------------------------------------------------------------
-// Per-channel React hooks (for future consumer migration)
+// Per-channel React hooks.
 // Return ValueOption<'T> — consumers must handle ValueNone.
 // Uses the hoisted stable references above to avoid re-subscription.
 // ---------------------------------------------------------------------------

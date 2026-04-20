@@ -76,4 +76,19 @@ Vitest.describe (
                 store.Update(1)
                 Vitest.expect(callCount).toBe (0)
         )
+
+        Vitest.test (
+            "Subscribe does not replay current snapshot to late subscribers",
+            fun () ->
+                let store = IPCStore<int>()
+                store.Update(1)
+
+                let mutable callCount = 0
+                store.Subscribe(fun () -> callCount <- callCount + 1) |> ignore
+
+                Vitest.expect(callCount).toBe (0)
+
+                store.Update(2)
+                Vitest.expect(callCount).toBe (1)
+        )
 )
