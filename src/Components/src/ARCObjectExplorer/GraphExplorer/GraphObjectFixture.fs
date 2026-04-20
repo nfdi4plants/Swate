@@ -557,12 +557,13 @@ type GraphObjectFixture =
         let selection, setSelection = React.useState ArcSelection.empty
 
         let selectedKindIndices, setSelectedKindIndices =
-            React.useState (ARCObjectWidget.DefaultKindFilterIndices())
+            React.useState (KindFilter.defaultSelectedIndices KindFilter.GraphObjectExplorerOptions)
 
         let viewModel =
             ArcObjectExplorerView.create
                 nodes
                 selection
+                KindFilter.GraphObjectExplorerOptions
                 selectedKindIndices
 
         let collapsedExplorerItems =
@@ -623,6 +624,7 @@ type GraphObjectFixture =
                 ARCObjectWidget.Navbar(
                     ArcObjectExplorerView.selectedTitle viewModel,
                     ArcObjectExplorerView.selectedSubtitle viewModel,
+                    KindFilter.GraphObjectExplorerOptions,
                     selectedKindIndices,
                     setSelectedKindIndices,
                     rightActions = searchAction

@@ -1,6 +1,7 @@
 module ElectronCore.ArcObjectWidgetTests
 
 open Swate.Components
+open Swate.Components.ARCObjectExplorer
 open Swate.Components.FileExplorerTypes
 open Vitest
 

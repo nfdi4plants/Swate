@@ -2,6 +2,7 @@ module Renderer.Components.LeftSidebar.ArcObjectTreeSidebar
 
 open Feliz
 open Swate.Components
+open Swate.Components.ARCObjectExplorer
 
 [<ReactComponent>]
 let Main () =
@@ -14,6 +15,7 @@ let Main () =
         ArcObjectExplorerView.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
+            KindFilter.ArcObjectExplorerOptions
             arcObjectCtx.state.SelectedKindIndices
 
     let services =
@@ -31,7 +33,7 @@ let Main () =
             prop.text "No ARC objects found."
         ]
     | Some rootRepoPath, _ ->
-        Swate.Components.ARCExplorer.CreateArcExplorer
+        ARCExplorer.CreateArcExplorer
             rootRepoPath
             viewModel.FilteredTree
             fileStateCtx.state.Selection

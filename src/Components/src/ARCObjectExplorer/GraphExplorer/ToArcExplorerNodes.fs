@@ -2,6 +2,7 @@ namespace Swate.Components.ARCObjectExplorer.GraphExplorer
 
 open System
 open Swate.Components.Shared
+open Fable.Core
 
 type GraphNodeMeta = {
     KindLabel: string
@@ -36,20 +37,6 @@ module ToArcExplorerNodes =
             .Replace("/", "-")
             .Replace("\\", "-")
             .Replace(":", "-")
-
-    let private datasetKindLabel =
-        function
-        | ARCDatasets.Assay -> "Assay"
-        | ARCDatasets.Study -> "Study"
-        | ARCDatasets.Workflow -> "Workflow"
-        | ARCDatasets.Run -> "Run"
-
-    let private datasetGroupLabel =
-        function
-        | ARCDatasets.Assay -> "Assays"
-        | ARCDatasets.Study -> "Studies"
-        | ARCDatasets.Workflow -> "Workflows"
-        | ARCDatasets.Run -> "Runs"
 
     let private datasetKindSortOrder =
         function
@@ -623,7 +610,7 @@ module ToArcExplorerNodes =
         (dataset: Dataset)
         (metaById: Map<string, GraphNodeMeta>)
         =
-        let kindLabel = datasetKindLabel dataset.type'
+        let kindLabel = dataset.type'.ToString()
         let datasetKind = nodeKindForDataset dataset.type'
         let datasetName = dataset.name |> asOptionalText |> Option.defaultValue dataset.identifier
         let datasetTitle = datasetName
@@ -709,8 +696,8 @@ module ToArcExplorerNodes =
 
             let groupNode =
                 ArcExplorerNode.create (
-                    $"graph:group:{(datasetKindLabel datasetKind).ToLowerInvariant()}",
-                    datasetGroupLabel datasetKind,
+                    $"graph:group:{(datasetKind.ToString()).ToLowerInvariant()}",
+                    datasetKind.ToString(),
                     ArcExplorerNodeKind.Group,
                     isSelectable = false,
                     children = datasetNodes

@@ -24,7 +24,7 @@ module ArcObjectExplorerView =
         ArcExplorerNodeKind.label
 
     let private inferredProcessRoleLabel (node: ArcExplorerNode) =
-        let hasIdMarker marker =
+        let hasIdMarker (marker: string) =
             node.id.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0
 
         if hasIdMarker ":process:input:" then
@@ -161,9 +161,10 @@ module ArcObjectExplorerView =
     let create
         (nodes: ArcExplorerNode list)
         (selection: ArcSelection)
+        (kindFilterOptions)
         (selectedKindIndices: Set<int>)
         : Model =
-        let visibleKinds = ARCObjectWidget.selectedKindLabels selectedKindIndices
+        let visibleKinds = KindFilter.selectedLabels kindFilterOptions selectedKindIndices
         let filteredTree = filterTreeByKinds visibleKinds nodes
         let explorerItems = ARCExplorer.toFileItems filteredTree
         let searchItems = searchableItems filteredTree explorerItems

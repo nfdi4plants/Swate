@@ -168,38 +168,19 @@ type ARCObjectWidget =
             yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
         ]
 
-    static member private KindFilterOptions: SelectItem<string>[] = [|
-        {| label = "Study"; item = "Study" |}
-        {| label = "Assay"; item = "Assay" |}
-        {| label = "Workflow"; item = "Workflow" |}
-        {| label = "Run"; item = "Run" |}
-        {| label = "Table"; item = "Table" |}
-        {| label = "DataMap"; item = "DataMap" |}
-        {| label = "Note"; item = "Note" |}
-        {| label = "Sample"; item = "Sample" |}
-    |]
+    static member DefaultKindFilterIndices(kindFilterOptions: SelectItem<string>[]) =
+        KindFilter.defaultSelectedIndices kindFilterOptions
 
-    static member DefaultKindFilterIndices() =
-        ARCObjectWidget.KindFilterOptions
-        |> Array.mapi (fun index _ -> index)
-        |> Set.ofArray
-
-    static member selectedKindLabels(selectedKindIndices: Set<int>) =
-        selectedKindIndices
-        |> Seq.sort
-        |> Seq.choose (fun index ->
-            ARCObjectWidget.KindFilterOptions
-            |> Array.tryItem index
-            |> Option.map (fun option -> option.item))
-        |> Set.ofSeq
+    static member selectedKindLabels(kindFilterOptions: SelectItem<string>[]) (selectedKindIndices: Set<int>) =
+        KindFilter.selectedLabels kindFilterOptions selectedKindIndices
 
     [<ReactComponent>]
-    static member private KindFilterTrigger(selectedKindIndices: Set<int>) =
+    static member private KindFilterTrigger(kindFilterOptions: SelectItem<string>[], selectedKindIndices: Set<int>) =
         let selectedLabels =
             selectedKindIndices
             |> Seq.sort
             |> Seq.choose (fun index ->
-                ARCObjectWidget.KindFilterOptions
+                kindFilterOptions
                 |> Array.tryItem index
                 |> Option.map (fun option -> option.label))
             |> Array.ofSeq
@@ -207,7 +188,7 @@ type ARCObjectWidget =
         let summary =
             if selectedLabels.Length = 0 then
                 "No kinds"
-            elif selectedLabels.Length = ARCObjectWidget.KindFilterOptions.Length then
+            elif selectedLabels.Length = kindFilterOptions.Length then
                 "All kinds"
             else
                 let truncated =
@@ -334,6 +315,7 @@ type ARCObjectWidget =
         (
             selectedTitle: string,
             selectedSubtitle: string,
+            kindFilterOptions: SelectItem<string>[],
             selectedKindIndices: Set<int>,
             setSelectedKindIndices: Set<int> -> unit,
             ?rightActions: ReactElement
@@ -362,10 +344,10 @@ type ARCObjectWidget =
                             prop.className "swt:flex swt:flex-wrap swt:items-center swt:justify-end swt:gap-2"
                             prop.children [
                                 Select.Select(
-                                    ARCObjectWidget.KindFilterOptions,
+                                    kindFilterOptions,
                                     selectedKindIndices,
                                     setSelectedKindIndices,
-                                    triggerRenderFn = (fun _ -> ARCObjectWidget.KindFilterTrigger(selectedKindIndices)),
+                                    triggerRenderFn = (fun _ -> ARCObjectWidget.KindFilterTrigger(kindFilterOptions, selectedKindIndices)),
                                     middleware = [|
                                         FloatingUI.Middleware.flip ()
                                         FloatingUI.Middleware.shift ()

@@ -1,5 +1,6 @@
 namespace Swate.Components.ARCObjectExplorer.GraphExplorer
 
+open Fable.Core
 
 type Data ={
     id: string option
@@ -74,6 +75,7 @@ type Protocol ={
     formalParameters: FormalParameter list
 }
 
+[<StringEnum>]
 type ARCDatasets =
     | Assay
     | Study

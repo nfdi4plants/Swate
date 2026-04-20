@@ -178,6 +178,7 @@
     <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectDetails.fs" />
     <Compile Include="ARCObjectExplorer\ARCExplorer.fs" />
     <Compile Include="ARCObjectExplorer\ARCObjectPanel.fs" />
+    <Compile Include="ARCObjectExplorer\KindFilter.fs" />
     <Compile Include="ARCObjectExplorer\ARCObjectWidget.fs" />
     <Compile Include="ARCObjectExplorer\Model.fs" />
     <Compile Include="ARCObjectExplorer\ArcObjectExplorerContent.fs" />

@@ -790,12 +790,12 @@ type ARCObjectFixture =
         let selectedId, setSelectedId = React.useState ARCObjectFixture.StoryItemIdStudy
 
         let selectedKindIndices, setSelectedKindIndices =
-            React.useState (ARCObjectWidget.DefaultKindFilterIndices())
+            React.useState (KindFilter.defaultSelectedIndices KindFilter.ArcObjectExplorerOptions)
 
         let items =
             React.useMemo ((fun () -> ARCObjectFixture.StoryItems()), [||])
 
-        let visibleKinds = ARCObjectWidget.selectedKindLabels(selectedKindIndices)
+        let visibleKinds = KindFilter.selectedLabels KindFilter.ArcObjectExplorerOptions selectedKindIndices
 
         let filteredItems = ARCObjectFixture.filterStoryItemsByKinds(visibleKinds, items)
 
@@ -835,6 +835,7 @@ type ARCObjectFixture =
             ARCObjectWidget.Navbar(
                 selectedTitle,
                 selectedSubtitle,
+                KindFilter.ArcObjectExplorerOptions,
                 selectedKindIndices,
                 setSelectedKindIndices,
                 rightActions = searchAction

@@ -2,6 +2,7 @@ module Renderer.Components.MainContent.ArcObjectExplorerTarget
 
 open Feliz
 open Swate.Components
+open Swate.Components.ARCObjectExplorer
 
 [<ReactComponent>]
 let Main () =
@@ -13,6 +14,7 @@ let Main () =
         ArcObjectExplorerView.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
+            KindFilter.ArcObjectExplorerOptions
             arcObjectCtx.state.SelectedKindIndices
 
     let services =
@@ -23,12 +25,12 @@ let Main () =
             arcObjectCtx.setStatusMessage
 
     let handleExplorerSelection =
-        Swate.Components.ARCExplorer.createOpenPreviewHandler
+        ARCExplorer.createOpenPreviewHandler
             fileStateCtx.setSelection
             services
 
     let searchAction =
-        Swate.Components.ARCObjectWidget.SearchAction(
+        ARCObjectWidget.SearchAction(
             viewModel.SearchItems,
             (fun (name, _, _) -> name),
             (fun (_, _, item) -> promise { do! handleExplorerSelection item } |> Promise.start),
@@ -40,9 +42,10 @@ let Main () =
         prop.className
             "swt:size-full swt:min-w-0 swt:min-h-0 swt:flex swt:flex-col swt:gap-3 swt:overflow-hidden swt:p-4"
         prop.children [
-            Swate.Components.ARCObjectWidget.Navbar(
+            ARCObjectWidget.Navbar(
                 ArcObjectExplorerView.selectedTitle viewModel,
                 ArcObjectExplorerView.selectedSubtitle viewModel,
+                KindFilter.ArcObjectExplorerOptions,
                 arcObjectCtx.state.SelectedKindIndices,
                 arcObjectCtx.setSelectedKindIndices,
                 rightActions = searchAction
@@ -55,10 +58,10 @@ let Main () =
                     prop.text statusMessage
                 ]
             | None -> Html.none
-            Swate.Components.ARCObjectPanel.Main(
+            ARCObjectPanel.Main(
                 "ARC Object Explorer",
                 content =
-                    Swate.Components.ARCObjectWidget.ExplorerContent(
+                    ARCObjectWidget.ExplorerContent(
                         viewModel.ExplorerItems,
                         ?selectedItemId = ArcObjectExplorerView.selectedItemId viewModel,
                         onItemClick =

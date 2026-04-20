@@ -1,7 +1,6 @@
 namespace Swate.Components.Shared.DTOs
 
-
-open Fable.Core  
+ 
 open Swate.Components.Shared
 
 
