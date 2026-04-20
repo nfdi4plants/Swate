@@ -1,6 +1,6 @@
 module ElectronRenderer.FileStateCtxTests
 
-open Renderer.Context.FileStateCtx
+open Renderer.Context.FileStateTypes
 open Swate.Components.Shared
 open Vitest
 

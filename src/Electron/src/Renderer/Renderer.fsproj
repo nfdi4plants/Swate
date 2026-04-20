@@ -12,6 +12,7 @@
     <Compile Include="GitApiClient.fs" />
     <Compile Include="Context\AppStateCtx.fs" />
     <Compile Include="Context\PageStateCtx.fs" />
+    <Compile Include="Context\FileStateTypes.fs" />
     <Compile Include="Context\FileStateCtx.fs" />
     <Compile Include="Context\ArcObjectExplorerCtx.fs" />
     <Compile Include="Context\AuthStateCtx.fs" />
