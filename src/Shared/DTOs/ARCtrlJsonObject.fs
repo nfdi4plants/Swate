@@ -4,34 +4,29 @@ namespace Swate.Components.Shared.DTOs
 open Fable.Core  
 open Swate.Components.Shared
 
-[<StringEnum>]
+
 type ARCDatasets =
     | Assay
     | Study
     | Workflow
     | Run
 
-[<StringEnum>]
 type ARCMaterial =
     | Sources
     | Samples
 
-[<StringEnum>]
 type ARCData =
     | Files
     | FragmentSelector
 
-[<StringEnum>]
 type ProcessType =
     | Material of ARCMaterial
     | Data of ARCData
 
-[<StringEnum>]
 type CurrentProcess =
     | Input of ProcessType
     | Output of ProcessType
 
-[<StringEnum>]
 type ARCObjects =
     | Arc
     | Datasets of ARCDatasets
@@ -51,7 +46,6 @@ type ARCtrlJsonObject = {
         JsonType = jsonType
     }
 
-[<StringEnum>]
 type JsonDTOs =
     | ARCtrlJsonObject of ARCtrlJsonObject
     | ARCtrlContract

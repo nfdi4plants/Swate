@@ -1,5 +1,6 @@
 namespace Swate.Components.ARCObjectExplorer
 
+open System
 open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
 
@@ -22,6 +23,25 @@ module ArcObjectExplorerView =
     let nodeKindLabel =
         ArcExplorerNodeKind.label
 
+    let private inferredProcessRoleLabel (node: ArcExplorerNode) =
+        let hasIdMarker marker =
+            node.id.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0
+
+        if hasIdMarker ":process:input:" then
+            Some "Input"
+        elif hasIdMarker ":process:output:" then
+            Some "Output"
+        elif node.name.StartsWith("About: Input", StringComparison.OrdinalIgnoreCase) then
+            Some "Input"
+        elif node.name.StartsWith("About: Output", StringComparison.OrdinalIgnoreCase) then
+            Some "Output"
+        else
+            None
+
+    let private nodeRoleLabel (node: ArcExplorerNode) =
+        inferredProcessRoleLabel node
+        |> Option.defaultValue (if node.isReference then "Reference" else "Canonical")
+
     let selectedItemId (model: Model) : string option =
         model.Selection |> Option.map _.ItemId
 
@@ -41,7 +61,7 @@ module ArcObjectExplorerView =
     let selectedSubtitle (model: Model) : string =
         model.Selection
         |> Option.map (fun selection ->
-            let role = if selection.Node.isReference then "Reference" else "Canonical"
+            let role = nodeRoleLabel selection.Node
             $"{nodeKindLabel selection.Node.kind} | {role}")
         |> Option.defaultValue "Selection"
 
@@ -118,7 +138,7 @@ module ArcObjectExplorerView =
 
                     let subtitleParts = [
                         nodeKindLabel node.kind
-                        if node.isReference then "Reference" else "Canonical"
+                        nodeRoleLabel node
                         yield! lineagePart
                         yield! node.path |> Option.toList
                     ]
