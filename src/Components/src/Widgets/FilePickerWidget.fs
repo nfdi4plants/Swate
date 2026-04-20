@@ -4,6 +4,9 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components.Shared
+open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.Context
+open Swate.Components.Widgets.Context
 
 
 [<Erase; Mangle(false)>]
@@ -87,7 +90,7 @@ type FilePickerWidget =
             clearPaths: unit -> unit,
             insertPaths: unit -> unit,
             canInsert: bool,
-            widgetCtx: WidgetContext.WidgetControllerContext
+            widgetCtx: WidgetControllerContext
         ) =
         Html.div [
             prop.className "swt:flex swt:gap-2"
@@ -123,10 +126,9 @@ type FilePickerWidget =
 
         let isPicking, setIsPicking = React.useState false
         let statusMessage, setStatusMessage = React.useState (None: string option)
-        let widgetCtx = WidgetContext.useWidgetController ()
+        let widgetCtx = useWidgetControllerCtx ()
 
-        let annotationCtx =
-            React.useContext Contexts.AnnotationTable.AnnotationTableStateCtx
+        let annotationCtx = useAnnotationTableStateCtx ()
 
         let selectedCells =
 

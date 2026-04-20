@@ -1,4 +1,4 @@
-module Renderer.Context.ArcObjectExplorerCtx
+module Renderer.Context.ArcObjectExplorerContext
 
 open Feliz
 open Swate.Components
@@ -48,16 +48,20 @@ let ArcObjectExplorerCtx =
     )
 
 [<Hook>]
-let useArcObjectExplorer () = React.useContext ArcObjectExplorerCtx
+let useArcObjectExplorerCtx () = React.useContext ArcObjectExplorerCtx
 
-let rec private containsNodeId (nodeId: string) (nodes: ArcExplorerNode list) =
-    nodes
-    |> List.exists (fun node -> node.id = nodeId || containsNodeId nodeId node.children)
+module private Helper =
+
+    let rec containsNodeId (nodeId: string) (nodes: ArcExplorerNode list) =
+        nodes
+        |> List.exists (fun node -> node.id = nodeId || containsNodeId nodeId node.children)
+
+open Helper
 
 [<ReactComponent>]
 let ArcObjectExplorerCtxProvider (children: ReactElement) =
-    let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
-    let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
     let state, setState = React.useStateWithUpdater (ArcObjectExplorerState.init ())
 
     React.useEffect (

@@ -408,7 +408,7 @@ type ARCObjectWidget =
             Html.button [
                 prop.type'.button
                 prop.className [
-                    "swt:flex swt:min-w-[15rem] swt:max-w-[18rem] swt:flex-none swt:flex-col swt:items-center swt:justify-center swt:gap-3 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:min-h-28 swt:text-center swt:transition-colors hover:swt:border-primary/60 hover:swt:bg-base-200/60"
+                    "swt:flex swt:w-full swt:min-w-0 swt:flex-col swt:items-center swt:justify-center swt:gap-3 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:min-h-28 swt:text-center swt:transition-colors hover:swt:border-primary/60 hover:swt:bg-base-200/60"
                     if isCurrentTarget then "swt:border-primary swt:bg-primary/10"
                 ]
                 prop.onClick (fun _ -> onItemClick item)
@@ -417,11 +417,14 @@ type ARCObjectWidget =
                         prop.className (ARCObjectWidget.IconClassName([ "swt:iconify"; "swt:text-4xl" ], item))
                     ]
                     Html.div [
-                        prop.className "swt:flex swt:flex-col swt:gap-1"
+                        prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-1 swt:w-full"
                         prop.children [
-                            Html.span [ prop.className "swt:text-sm swt:font-medium"; prop.text item.Name ]
                             Html.span [
-                                prop.className "swt:text-xs swt:opacity-60"
+                                prop.className "swt:text-sm swt:font-medium swt:truncate"
+                                prop.text item.Name
+                            ]
+                            Html.span [
+                                prop.className "swt:text-xs swt:opacity-60 swt:truncate"
                                 prop.text (tileSubtitle sourceName entry)
                             ]
                         ]
@@ -497,7 +500,8 @@ type ARCObjectWidget =
                         ]
                     ]
                     Html.div [
-                        prop.className "swt:flex swt:gap-3 swt:overflow-x-auto swt:pb-2"
+                        prop.className
+                            "swt:grid swt:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] swt:gap-3 swt:overflow-x-hidden swt:pb-2"
                         prop.children [
                             for visibleItem in section.Items do
                                 iconTile
@@ -510,7 +514,8 @@ type ARCObjectWidget =
             ]
 
         Html.div [
-            prop.className "swt:flex swt:flex-col swt:gap-4 swt:h-full swt:overflow-auto"
+            prop.className
+                "swt:flex swt:flex-col swt:gap-4 swt:h-full swt:min-h-0 swt:min-w-0 swt:overflow-y-auto swt:overflow-x-hidden"
             prop.children [
                 match explorerItems with
                 | Some explorerItems ->

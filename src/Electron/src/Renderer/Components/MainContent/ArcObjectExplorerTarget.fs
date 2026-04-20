@@ -5,9 +5,9 @@ open Swate.Components
 
 [<ReactComponent>]
 let Main () =
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let viewModel =
         ArcObjectExplorerView.create
@@ -37,7 +37,8 @@ let Main () =
 
     Html.div [
         prop.id "arc-object-target"
-        prop.className "swt:size-full swt:flex swt:flex-col swt:gap-3 swt:p-4"
+        prop.className
+            "swt:size-full swt:min-w-0 swt:min-h-0 swt:flex swt:flex-col swt:gap-3 swt:overflow-hidden swt:p-4"
         prop.children [
             Swate.Components.ARCObjectWidget.Navbar(
                 ArcObjectExplorerView.selectedTitle viewModel,

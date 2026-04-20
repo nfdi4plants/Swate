@@ -2,6 +2,7 @@ namespace Renderer.Components
 
 open Feliz
 open Swate.Components
+open Swate.Components.Layout
 open Swate.Components.Shared
 
 module NavbarHelper =
@@ -54,7 +55,7 @@ type private Selector =
 
     [<ReactComponent>]
     static member private Actionbar(setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit) =
-        let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
         let onCreateARC =
             fun _ ->
@@ -142,7 +143,7 @@ module private Authentication =
     [<ReactComponent>]
     let UserAvatar () =
         let isLoading, setIsLoading = React.useState false
-        let authStateCtx = Renderer.Context.AuthStateCtx.useAuthState ()
+        let authStateCtx = Renderer.Context.AuthStateContext.useAuthStateCtx ()
 
         let onSignIn (signInInfo: SignInInformation) =
             promise {

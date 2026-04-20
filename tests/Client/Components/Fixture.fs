@@ -1,23 +1,9 @@
 module Fixture
 
 open ARCtrl
-open ARCtrl.Spreadsheet
-open Browser.Types
-open Swate.Components
-open Fable.Mocha
-open Fable.React
-open Fable.React.Props
-open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.Shared
 open Swate.Components
-open Fable.Core
-open Fable.Core.JsInterop
-open Feliz
-open ARCtrl
-open ARCtrl.Spreadsheet
-open Types.AnnotationTableContextMenu
-open Types.AnnotationTable
+open Swate.Components.Table
 
 /// <summary>
 /// Creates a mock table with some sample data.

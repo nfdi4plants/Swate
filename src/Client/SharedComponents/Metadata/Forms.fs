@@ -760,7 +760,7 @@ type FormComponents =
                 Html.div [
                     prop.className "swt:w-full swt:flex swt:gap-2 swt:relative"
                     prop.children [
-                        TermSearch.TermSearch(
+                        TermSearch.TermSearch.TermSearch(
                             tempValue,
                             setTempValueWrapper,
                             ?parentId = (parent |> Option.map _.TermAccessionShort),

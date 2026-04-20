@@ -1,4 +1,4 @@
-module Renderer.Context.FileStateCtx
+module Renderer.Context.FileStateContext
 
 open Feliz
 open Renderer.Context.FileStateTypes
@@ -33,7 +33,7 @@ let private useFileSelection () =
     React.useContext FileStateHelper.FileSelectionCtx
 
 [<Hook>]
-let useFileState () =
+let useFileStateCtx () =
     let fileTree = useFileTree ()
     let selectionCtx = useFileSelection ()
 

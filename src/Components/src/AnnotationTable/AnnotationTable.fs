@@ -1,12 +1,14 @@
-namespace Swate.Components
+namespace Swate.Components.AnnotationTable
 
-open Swate.Components.Shared
 open Swate.Components
+open Swate.Components.Table
+open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open ARCtrl
-open ARCtrl.Spreadsheet
+
 
 open Types.AnnotationTableContextMenu
 open Types.AnnotationTable
@@ -323,14 +325,14 @@ type AnnotationTable =
                 let index = data |> unbox<CellCoordinate>
 
                 if index.x = 0 && index.y > 0 then // index col
-                    AnnotationTableContextMenu.AnnotationTableContextMenu.IndexColumnContent(
+                    AnnotationTableContextMenu.IndexColumnContent(
                         index.y,
                         arcTable,
                         setArcTable,
                         tableRef.current.SelectHandle
                     )
                 elif index.y = 0 then // header Row
-                    AnnotationTableContextMenu.AnnotationTableContextMenu.CompositeHeaderContent(
+                    AnnotationTableContextMenu.CompositeHeaderContent(
                         index.x,
                         arcTable,
                         setArcTable,
@@ -338,7 +340,7 @@ type AnnotationTable =
                         setModal
                     )
                 else // standard cell
-                    AnnotationTableContextMenu.AnnotationTableContextMenu.CompositeCellContent(
+                    AnnotationTableContextMenu.CompositeCellContent(
                         {| x = index.x; y = index.y |},
                         arcTable,
                         setArcTable,
@@ -407,7 +409,7 @@ type AnnotationTable =
                                 setModal (Some(ModalTypes.Error exnMessage))
                                 failwith exn.Message
 
-                    AnnotationTableModals.CompositeCellModal.CompositeHeaderModal(header, setHeader, rmv)
+                    CompositeCellModal.CompositeHeaderModal(header, setHeader, rmv)
 
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
@@ -419,7 +421,7 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    AnnotationTableModals.CompositeCellModal.CompositeCellModal(
+                    CompositeCellModal.CompositeCellModal(
                         cell,
                         setCell,
                         rmv,
@@ -439,7 +441,7 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    AnnotationTableModals.CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
+                    CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
                 else
                     let cell = arcTable.GetCellAt(cc.x - 1, cc.y - 1)
 
@@ -450,12 +452,12 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    AnnotationTableModals.CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
+                    CompositeCellEditModal.CompositeCellTransformModal(cell, header, setCell, rmv)
             | Some(ModalTypes.Edit cc) ->
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
-                    AnnotationTableModals.EditConfig.CompositeCellEditModal(
+                    EditConfig.CompositeCellEditModal(
                         cc.x - 1,
                         arcTable,
                         setArcTable,
@@ -463,7 +465,7 @@ type AnnotationTable =
                         ?debug = debug
                     )
                 else
-                    AnnotationTableModals.EditConfig.CompositeCellEditModal(
+                    EditConfig.CompositeCellEditModal(
                         cc.x - 1,
                         arcTable,
                         setArcTable,
@@ -471,7 +473,7 @@ type AnnotationTable =
                         ?debug = debug
                     )
             | Some(ModalTypes.MoveColumn(uiTableIndex, arcTableIndex)) ->
-                AnnotationTableModals.ContextMenuModals.MoveColumnModal(
+                ContextMenuModals.MoveColumnModal(
                     arcTable,
                     setArcTable,
                     arcTableIndex,
@@ -482,7 +484,7 @@ type AnnotationTable =
                 )
 
             | Some(ModalTypes.PasteCaseUserInput(PasteCases.AddColumns addColumns, selectHandle: SelectHandle)) ->
-                AnnotationTableModals.ContextMenuModals.PasteFullColumnsModal(
+                ContextMenuModals.PasteFullColumnsModal(
                     arcTable,
                     setArcTable,
                     addColumns,
@@ -490,9 +492,9 @@ type AnnotationTable =
                     setModal,
                     tableRef
                 )
-            | Some(ModalTypes.Error(exn)) -> AnnotationTableModals.ContextMenuModals.ErrorModal(exn, setModal, tableRef)
+            | Some(ModalTypes.Error(exn)) -> ContextMenuModals.ErrorModal(exn, setModal, tableRef)
             | Some(ModalTypes.UnknownPasteCase(PasteCases.Unknown unknownPasteCase)) ->
-                AnnotationTableModals.ContextMenuModals.UnknownPasteCase(
+                ContextMenuModals.UnknownPasteCase(
                     unknownPasteCase.data,
                     unknownPasteCase.headers,
                     setModal,
@@ -518,7 +520,7 @@ type AnnotationTable =
         let containerRef = React.useElementRef ()
         let tableRefInner = React.useRef<TableHandle> (null)
         let (modal: ModalTypes option), setModal = React.useState None
-        let ctx = React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
+        let ctx = useAnnotationTableStateCtx ()
 
         let hasCtx = isNullOrUndefined ctx |> not
 
@@ -538,7 +540,7 @@ type AnnotationTable =
             fun latest range ->
 
                 if hasCtx then
-                    let nextTable: Contexts.AnnotationTable.AnnotationTableContext = { SelectedCells = range }
+                    let nextTable: AnnotationTableContext = { SelectedCells = range }
                     let nextData = ctx.state.Add(arcTable.Name, nextTable)
                     ctx.setState nextData
 
@@ -694,7 +696,7 @@ type AnnotationTable =
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlV ->
-                                AnnotationTableContextMenu.AnnotationTableContextMenuUtil.tryPasteCopiedCells (
+                                AnnotationTableContextMenuUtil.tryPasteCopiedCells (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
                                     tableRef.current.SelectHandle,
@@ -703,14 +705,14 @@ type AnnotationTable =
                                 )
                                 |> Promise.start
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlC ->
-                                AnnotationTableContextMenu.AnnotationTableContextMenuUtil.copy (
+                                AnnotationTableContextMenuUtil.copy (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
                                     tableRef.current.SelectHandle
                                 )
                                 |> Promise.start
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlX ->
-                                AnnotationTableContextMenu.AnnotationTableContextMenuUtil.cut (
+                                AnnotationTableContextMenuUtil.cut (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
                                     setArcTable,
@@ -729,7 +731,7 @@ type AnnotationTable =
     static member Entry() =
         let arcTable = ARCtrl.ArcTable("TestTable", ResizeArray())
 
-        let ctx = React.useContext (Contexts.AnnotationTable.AnnotationTableStateCtx)
+        let ctx = useAnnotationTableStateCtx ()
 
         arcTable.AddColumn(
             CompositeHeader.Input IOType.Source,
