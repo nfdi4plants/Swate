@@ -32,6 +32,8 @@ module InputField =
                                 let value: string = ev.target?value
                                 setSearchTerm value
                                 setStartSearch true
+                                
+
                             )
                         ]
                         Html.div [
@@ -110,7 +112,8 @@ type SearchComponent =
         let searchResults =
             match notes with
             | [] -> []
-            | _ -> NoteSearch.FilterComponent.Main.noteSuggestions (searchTerm, selectedOptIndices, notes)
+            | _ when searchTerm.Trim() = "" -> notes
+            | _ -> NoteSearch.FilterComponent.Main.noteSuggestionsList (searchTerm, selectedOptIndices, notes)
 
 
         Html.div [
@@ -121,7 +124,7 @@ type SearchComponent =
                     prop.className "swt:w-full swt:max-w-md"
                     prop.onClick (fun e -> e.stopPropagation ())
                     prop.children [
-                        InputField.SearchInput (
+                        InputField.SearchInput(
                             setSearchTerm,
                             setStartSearch,
                             filterOptions,
@@ -146,10 +149,10 @@ type SearchComponent =
                                     prop.children [
                                         for note in searchResults do
                                             SearchComponent.SearchSuggestion(note, onOpen)
-                                            
+
                                     ]
                                 ]
-                            else
+                            elif searchResults.IsEmpty && searchTerm.Trim() <> "" then
                                 Html.div [
                                     prop.className "swt:mt-2 swt:text-center"
                                     prop.text "No results found."

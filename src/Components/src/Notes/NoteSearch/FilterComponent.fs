@@ -6,7 +6,7 @@ open Swate.Components
 
 
 module Main =
-    let noteSuggestions (searchTerm: string, selectedIndices: Set<int>, notes: Swate.Components.NoteTypes.Note list) =
+    let noteSuggestionsList (searchTerm: string, selectedIndices: Set<int>, notes: Swate.Components.NoteTypes.Note list) =
         let notesFilteredAfterTitle =
             if Set.contains 0 selectedIndices || Set.isEmpty selectedIndices then
                 Swate.Components.NoteSearch.FilterLogic.FuzzySearch.search (searchTerm, "Title", notes)
@@ -49,7 +49,7 @@ module Main =
             selectedIndices,
             setSelectedIndices,
             triggerRenderFn = TriggerRenderFn,
-            dropdownPlacement = FloatingUI.Placement.BottomEnd,
+            dropdownPlacement = FloatingUI.Placement.BottomStart,
             middleware = [|
                 FloatingUI.Middleware.flip ()
                 FloatingUI.Middleware.offset (10)

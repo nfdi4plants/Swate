@@ -5,7 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.NoteTypes
-
+open System
 
 //filters the note list based on the search term and the selected filter options.
 [<ImportDefault("fuse.js")>]
@@ -28,9 +28,12 @@ type FuzzySearch =
         |> Array.toList
 
 type ExactMatchSearch =
-    static member private containsIgnoreCase(needle: string, haystack: string) = //
-        if needle.Trim() = "" then
+    static member private containsIgnoreCase(needle: string, haystack: string) =
+        if String.IsNullOrEmpty(needle) || String.IsNullOrEmpty(haystack) then
             false
+        elif needle.Trim() = "" then
+            false
+
         else
             haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
 
