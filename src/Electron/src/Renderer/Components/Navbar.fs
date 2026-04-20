@@ -88,9 +88,22 @@ type private Selector =
         let currentlyOpenArcPath, setCurrentlyOpenArcPath =
             React.useState (None: string option)
 
+        let pathChangeSnapshot = Renderer.MainUpdateRendererBridge.usePathChange ()
+        let recentArcsSnapshot = Renderer.MainUpdateRendererBridge.useRecentArcs ()
+
+        let displayedOpenArcPath =
+            match pathChangeSnapshot with
+            | ValueSome path -> path
+            | ValueNone -> currentlyOpenArcPath
+
+        let displayedRecentArcs =
+            match recentArcsSnapshot with
+            | ValueSome arcs -> arcs
+            | ValueNone -> recentArc
+
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
 
-        React.useLayoutEffectOnce (fun () ->
+        React.useEffectOnce (fun () ->
             promise {
                 let! arcs = Api.ipcArcVaultApi.getRecentARCs ()
                 let! currentlyOpenArcPath = Api.ipcArcVaultApi.getOpenPath (unbox null)
@@ -99,22 +112,10 @@ type private Selector =
                 setIsLoading false
             }
             |> Promise.start
-
-            let disposePathChange = Renderer.MainUpdateRendererBridge.subscribePathChange setCurrentlyOpenArcPath
-            let disposeRecentArcs = Renderer.MainUpdateRendererBridge.subscribeRecentArcsUpdate setRecentArc
-
-            fun () ->
-                disposePathChange ()
-                disposeRecentArcs ()
         )
 
         let selectorControlRef =
             React.useRef ({ toggle = ignore }: SelectorRef)
-
-        let onOpen =
-            fun (isOpen: bool) ->
-                if isOpen then
-                    Api.ipcArcVaultApi.getRecentARCs () |> Promise.map setRecentArc |> Promise.start
 
         React.Fragment [
             BaseModal.BaseModal(
@@ -123,14 +124,13 @@ type private Selector =
                 Renderer.Components.InitState.CreateNewArcModalContent(fun () -> setNewArcModalIsOpen false)
             )
             Swate.Components.Selector.Main(
-                recentArc,
+                displayedRecentArcs,
                 NavbarHelper.Selector.openArcByPath,
                 rmvRecentArc = NavbarHelper.Selector.rmvRecentArc,
-                onOpenChange = onOpen,
                 actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle),
                 isLoading = isLoading,
                 controlRef = selectorControlRef,
-                ?currentlyOpenArcPath = currentlyOpenArcPath
+                ?currentlyOpenArcPath = displayedOpenArcPath
             )
         ]
 
