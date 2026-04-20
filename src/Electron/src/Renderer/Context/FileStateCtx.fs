@@ -17,61 +17,97 @@ with
 
 type FileStateController = {
     state: FileState
-    setState: (FileState -> FileState) -> unit
-    setFileTree: FileEntry[] -> unit
     setSelection: ArcSelection -> unit
+    updateSelection: (ArcSelection -> ArcSelection) -> unit
 }
 
-let FileStateCtx =
-    React.createContext<FileStateController> (
-        {
-            state = FileState.init ()
-            setState = ignore
-            setFileTree = ignore
-            setSelection = ignore
-        }
-    )
+type private FileSelectionController = {
+    selection: ArcSelection
+    setSelection: ArcSelection -> unit
+    updateSelection: (ArcSelection -> ArcSelection) -> unit
+}
+
+module private FileStateHelper =
+
+    let FileTreeCtx = React.createContext<FileEntry[]> [||]
+
+    let FileSelectionCtx =
+        React.createContext<FileSelectionController> (
+            {
+                selection = ArcSelection.empty
+                setSelection = ignore
+                updateSelection = ignore
+            }
+        )
 
 [<Hook>]
-let useFileState () = React.useContext FileStateCtx
+let useFileTree () =
+    React.useContext FileStateHelper.FileTreeCtx
+
+[<Hook>]
+let private useFileSelection () =
+    React.useContext FileStateHelper.FileSelectionCtx
+
+[<Hook>]
+let useFileState () =
+    let fileTree = useFileTree ()
+    let selectionCtx = useFileSelection ()
+
+    React.useMemo (
+        (fun _ -> {
+            state = {
+                FileTree = fileTree
+                Selection = selectionCtx.selection
+            }
+            setSelection = selectionCtx.setSelection
+            updateSelection = selectionCtx.updateSelection
+        }),
+        [| box fileTree; box selectionCtx.selection |]
+    )
 
 [<ReactComponent>]
 let FileStateCtxProvider (children: ReactElement) =
-    let fileState, setFileState = React.useStateWithUpdater (FileState.init ())
+    let selection, setSelectionState = React.useStateWithUpdater ArcSelection.empty
 
     let fileTreeUpdate = Renderer.MainUpdateRendererBridge.useFileTreeUpdate ()
 
-    let currentFileTree =
+    let fileTree =
         React.useMemo (
             (fun _ ->
                 match fileTreeUpdate with
                 | ValueSome fileTreeMap -> fileTreeMap.Values |> Seq.toArray
-                | ValueNone -> fileState.FileTree),
-            [| box fileTreeUpdate; box fileState.FileTree |]
+                | ValueNone -> [||]),
+            [| box fileTreeUpdate |]
         )
 
-    let fileStateCtx: FileStateController =
+    let setSelection =
+        React.useCallback (
+            (fun (nextSelection: ArcSelection) ->
+                setSelectionState (fun _ -> ArcSelection.normalize nextSelection)),
+            [||]
+        )
+
+    let updateSelection =
+        React.useCallback (
+            (fun (update: ArcSelection -> ArcSelection) ->
+                setSelectionState (fun currentSelection ->
+                    currentSelection
+                    |> update
+                    |> ArcSelection.normalize)),
+            [||]
+        )
+
+    let selectionCtx =
         React.useMemo (
             (fun _ -> {
-                state = {
-                    FileTree = currentFileTree
-                    Selection = fileState.Selection
-                }
-                setState = setFileState
-                // Retained for the existing context shape. After the first IPC
-                // file-tree snapshot, useFileTreeUpdate is authoritative and this
-                // only updates the pre-broadcast fallback state.
-                setFileTree =
-                    fun fileTree ->
-                        setFileState (fun fs -> { fs with FileTree = fileTree })
-                setSelection =
-                    fun selection ->
-                        setFileState (fun fs -> {
-                            fs with
-                                Selection = ArcSelection.normalize selection
-                        })
+                selection = selection
+                setSelection = setSelection
+                updateSelection = updateSelection
             }),
-            [| box currentFileTree; box fileState.Selection |]
+            [| box selection |]
         )
 
-    FileStateCtx.Provider(fileStateCtx, children)
+    FileStateHelper.FileTreeCtx.Provider(
+        fileTree,
+        FileStateHelper.FileSelectionCtx.Provider(selectionCtx, children)
+    )

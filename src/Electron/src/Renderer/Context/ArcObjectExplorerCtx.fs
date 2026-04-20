@@ -73,20 +73,12 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                     if isCurrent then
                         match result with
                         | Ok nodes ->
-                            fileStateCtx.setState (fun currentFileState ->
-                                let nextSelection =
-                                    match currentFileState.Selection.ExplorerNodeId with
-                                    | Some nodeId when containsNodeId nodeId nodes -> currentFileState.Selection
-                                    | Some _ -> ArcSelection.clearExplorerNode currentFileState.Selection
-                                    | None -> currentFileState.Selection
-
-                                if nextSelection = currentFileState.Selection then
-                                    currentFileState
-                                else
-                                    {
-                                        currentFileState with
-                                            Selection = nextSelection
-                                    })
+                            fileStateCtx.updateSelection (fun currentSelection ->
+                                match currentSelection.ExplorerNodeId with
+                                | Some nodeId when containsNodeId nodeId nodes -> currentSelection
+                                | Some _ -> ArcSelection.clearExplorerNode currentSelection
+                                | None -> currentSelection
+                            )
 
                             setState (fun currentState ->
                                 {
@@ -95,17 +87,7 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                                         StatusMessage = None
                                 })
                         | Error exn ->
-                            fileStateCtx.setState (fun currentFileState ->
-                                let nextSelection =
-                                    ArcSelection.clearExplorerNode currentFileState.Selection
-
-                                if nextSelection = currentFileState.Selection then
-                                    currentFileState
-                                else
-                                    {
-                                        currentFileState with
-                                            Selection = nextSelection
-                                    })
+                            fileStateCtx.updateSelection ArcSelection.clearExplorerNode
 
                             setState (fun currentState -> {
                                 currentState with
