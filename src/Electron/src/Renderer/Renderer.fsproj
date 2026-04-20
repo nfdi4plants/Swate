@@ -17,6 +17,7 @@
     <Compile Include="Context\ArcObjectExplorerCtx.fs" />
     <Compile Include="Context\AuthStateCtx.fs" />
     <Compile Include="Context\GitWorkflow.fs" />
+    <Compile Include="Context\GitProgressSubscription.fs" />
     <Compile Include="Context\GitStateCtx.fs" />
     <Compile Include="Components\ARCHelper.fs" />
     <Compile Include="Components\InitState.fs" />

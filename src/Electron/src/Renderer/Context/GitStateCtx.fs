@@ -112,7 +112,12 @@ let GitStateCtxProvider (children: ReactElement) =
     let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
 
     let gitState, dispatch =
-        React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
+        React.useElmish (
+            (fun () -> init ()),
+            update dependencies pageStateCtx.setState,
+            Renderer.Context.GitProgressSubscription.subscribe,
+            [||]
+        )
 
     let refresh () = dispatch RefreshRequested
 
