@@ -1,38 +1,13 @@
 module Renderer.MainUpdateRendererBridge
 
-open System.Collections.Generic
 open Fable.Electron.Remoting.Renderer
 open Feliz
+open Renderer.IPCStore
 open Swate.Components.Authentication.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
-
-/// Minimal external-store adapter for React.useSyncExternalStore.
-/// Snapshots are ValueOption<'T> so "no IPC event yet" (ValueNone)
-/// is distinguishable from a valid domain value.
-///
-/// Subscribe uses integer IDs (not ReferenceEquals) so disposal is
-/// deterministic — mirrors the pattern used by the old bridge code.
-type IPCStore<'T>() =
-    let mutable snapshot: 'T voption = ValueNone
-    let mutable nextId = 0
-    let listeners = Dictionary<int, unit -> unit>()
-
-    member _.GetSnapshot() = snapshot
-
-    member _.Subscribe(listener: unit -> unit) : (unit -> unit) =
-        let id = nextId
-        nextId <- nextId + 1
-        listeners.[id] <- listener
-        fun () -> listeners.Remove(id) |> ignore
-
-    member _.Update(value: 'T) =
-        snapshot <- ValueSome value
-        // Snapshot listeners before iterating so that subscribe/dispose
-        // calls from within a listener do not mutate the collection mid-loop.
-        for listener in listeners.Values |> Seq.toArray do listener()
 
 // ---------------------------------------------------------------------------
 // Per-channel stores + IPC handler registration
