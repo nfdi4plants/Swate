@@ -14,35 +14,28 @@ open Swate.Electron.Shared.IPCTypes
 // ---------------------------------------------------------------------------
 
 let private pathChangeStore = IPCStore<string option>()
+do Remoting.init |> Remoting.buildHandler { pathChange = pathChangeStore.Update }
 
 let private recentArcsStore = IPCStore<ARCPointer[]>()
+do Remoting.init |> Remoting.buildHandler { recentARCsUpdate = recentArcsStore.Update }
 
 let private authAccountsStore = IPCStore<AuthStateDto>()
+do Remoting.init |> Remoting.buildHandler { authAccountsUpdate = authAccountsStore.Update }
 
 let private fileTreeStore = IPCStore<Map<string, FileEntry>>()
+do
+    Remoting.init
+    |> Remoting.buildHandler {
+        fileTreeUpdate =
+            fun dict ->
+                dict
+                |> Seq.map (fun kv -> kv.Key, kv.Value)
+                |> Map.ofSeq
+                |> fileTreeStore.Update
+    }
 
 let private gitProgressStore = IPCStore<GitProgressDto>()
-
-let mutable private handlersRegistered = false
-
-let private registerHandlersOnce () =
-    if not handlersRegistered then
-        Remoting.init |> Remoting.buildHandler { pathChange = pathChangeStore.Update }
-        Remoting.init |> Remoting.buildHandler { recentARCsUpdate = recentArcsStore.Update }
-        Remoting.init |> Remoting.buildHandler { authAccountsUpdate = authAccountsStore.Update }
-
-        Remoting.init
-        |> Remoting.buildHandler {
-            fileTreeUpdate =
-                fun dict ->
-                    dict
-                    |> Seq.map (fun kv -> kv.Key, kv.Value)
-                    |> Map.ofSeq
-                    |> fileTreeStore.Update
-        }
-
-        Remoting.init |> Remoting.buildHandler { gitProgressUpdate = gitProgressStore.Update }
-        handlersRegistered <- true
+do Remoting.init |> Remoting.buildHandler { gitProgressUpdate = gitProgressStore.Update }
 
 // ---------------------------------------------------------------------------
 // Stable subscribe/getSnapshot references for useSyncExternalStore.
@@ -50,19 +43,15 @@ let private registerHandlersOnce () =
 // identity across re-renders and does not re-subscribe every render.
 // ---------------------------------------------------------------------------
 
-let private subscribeStore (store: IPCStore<'T>) (listener: unit -> unit) : (unit -> unit) =
-    registerHandlersOnce ()
-    store.Subscribe listener
-
-let private pathChangeSub        = subscribeStore pathChangeStore
+let private pathChangeSub        = pathChangeStore.Subscribe
 let private pathChangeSnap       = pathChangeStore.GetSnapshot
-let private recentArcsSub        = subscribeStore recentArcsStore
+let private recentArcsSub        = recentArcsStore.Subscribe
 let private recentArcsSnap       = recentArcsStore.GetSnapshot
-let private authAccountsSub      = subscribeStore authAccountsStore
+let private authAccountsSub      = authAccountsStore.Subscribe
 let private authAccountsSnap     = authAccountsStore.GetSnapshot
-let private fileTreeSub          = subscribeStore fileTreeStore
+let private fileTreeSub          = fileTreeStore.Subscribe
 let private fileTreeSnap         = fileTreeStore.GetSnapshot
-let private gitProgressSub       = subscribeStore gitProgressStore
+let private gitProgressSub       = gitProgressStore.Subscribe
 let private gitProgressSnap      = gitProgressStore.GetSnapshot
 
 // ---------------------------------------------------------------------------
@@ -72,7 +61,7 @@ let private gitProgressSnap      = gitProgressStore.GetSnapshot
 // ---------------------------------------------------------------------------
 
 let private makeSubscribe (store: IPCStore<'T>) (handler: 'T -> unit) : (unit -> unit) =
-    subscribeStore store (fun () ->
+    store.Subscribe(fun () ->
         match store.GetSnapshot() with
         | ValueSome v -> handler v
         | ValueNone -> ()
