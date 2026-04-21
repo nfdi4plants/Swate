@@ -12,73 +12,68 @@ open Swate.Components.Template.Types
 module TemplateHelper = Swate.Components.Template.Helper
 module TemplateCacheCtx = Swate.Components.Template.TemplateCacheContext
 
-module private TemplateCacheProviderModel =
+module private TemplateCacheProviderHelper =
+
+
+    [<Literal>]
+    let CacheStorageKey = "swate.components.template.cache.v1"
+
+    let DefaultFetchInterval = TimeSpan.FromHours 1.0
 
     type Msg =
         | LoadTemplatesRequest of forceRefresh: bool
         | LoadTemplatesResponse of requestId: Guid * result: Result<Template[], string>
 
     type State = {
-        CacheState: TemplateCacheState
-        LoadState: TemplateLoadState
+        LastFetchedUtcTicks: int64 option
         LatestFetchId: Guid option
-        IsRefreshing: bool
-        RefreshError: string option
+        IsLoading: bool
+        Templates: Template[]
     }
 
     let private sortTemplates (templates: Template[]) =
         templates |> Array.sortBy (fun template -> template.Name)
 
-    let private hasVisibleTemplates (loadState: TemplateLoadState) =
-        match loadState with
-        | TemplateLoadState.Loaded templates -> templates.Length > 0
-        | _ -> false
+    let private getLastFetchedUtc (state: State) =
+        state.LastFetchedUtcTicks
+        |> Option.map (fun ticks -> DateTime(ticks, DateTimeKind.Utc))
 
-    let init (cacheState: TemplateCacheState) =
-        let loadState =
-            match TemplateHelper.tryReadTemplatesFromCache cacheState with
-            | Ok(Some templates) -> templates |> sortTemplates |> TemplateLoadState.Loaded
-            | _ -> TemplateLoadState.Loading
+    let private shouldFetchFresh (forceRefresh: bool) (state: State) (nowUtc: DateTime) =
+        if forceRefresh then
+            true
+        else
+            state
+            |> getLastFetchedUtc
+            |> Option.map (fun lastFetchedUtc -> nowUtc - lastFetchedUtc > DefaultFetchInterval)
+            |> Option.defaultValue true
 
+
+    let init () =
         {
-            CacheState = cacheState
-            LoadState = loadState
+            LastFetchedUtcTicks = None
             LatestFetchId = None
-            IsRefreshing = false
-            RefreshError = None
+            IsLoading = false
+            Templates = [||]
         },
         Cmd.ofMsg (LoadTemplatesRequest false)
 
-    let update (loadTemplates: unit -> Async<Result<Template[], string>>) msg state =
+    let update (loadTemplates: unit -> JS.Promise<Result<Template[], string>>) msg state =
         match msg with
         | LoadTemplatesRequest forceRefresh ->
-            let cachedTemplatesResult =
-                TemplateHelper.tryReadTemplatesFromCache state.CacheState
 
-            let shouldFetchFresh =
-                forceRefresh
-                || Result.isError cachedTemplatesResult
-                || TemplateHelper.shouldFetchFresh false state.CacheState DateTime.UtcNow
+            let shouldFetchFresh = forceRefresh || shouldFetchFresh false state DateTime.UtcNow
 
             if shouldFetchFresh then
                 let requestId = Guid.NewGuid()
 
-                let nextLoadState =
-                    if hasVisibleTemplates state.LoadState then
-                        state.LoadState
-                    else
-                        TemplateLoadState.Loading
-
                 let nextState = {
                     state with
                         LatestFetchId = Some requestId
-                        LoadState = nextLoadState
-                        IsRefreshing = true
-                        RefreshError = None
+                        IsLoading = true
                 }
 
                 let cmd =
-                    Cmd.OfAsync.either
+                    Cmd.OfPromise.either
                         loadTemplates
                         ()
                         (fun result -> LoadTemplatesResponse(requestId, result))
@@ -86,32 +81,8 @@ module private TemplateCacheProviderModel =
 
                 nextState, cmd
             else
-                match cachedTemplatesResult with
-                | Ok(Some templates) ->
-                    {
-                        state with
-                            LoadState = templates |> sortTemplates |> TemplateLoadState.Loaded
-                            IsRefreshing = false
-                            RefreshError = None
-                    },
-                    Cmd.none
-                | Ok None ->
-                    {
-                        state with
-                            LoadState = TemplateLoadState.Loading
-                            IsRefreshing = false
-                            RefreshError = None
-                    },
-                    Cmd.none
-                | Error message ->
-                    {
-                        state with
-                            CacheState = TemplateCacheState.Empty
-                            LoadState = TemplateLoadState.LoadError message
-                            IsRefreshing = false
-                            RefreshError = None
-                    },
-                    Cmd.none
+                state, Cmd.none
+        // Skip if stale request
         | LoadTemplatesResponse(requestId, result) when state.LatestFetchId <> Some requestId -> state, Cmd.none
         | LoadTemplatesResponse(_, result) ->
             match result with
@@ -119,64 +90,40 @@ module private TemplateCacheProviderModel =
                 let sortedTemplates = templates |> sortTemplates
 
                 {
-                    state with
-                        CacheState = TemplateHelper.toCacheState sortedTemplates DateTime.UtcNow
-                        LoadState = TemplateLoadState.Loaded sortedTemplates
-                        LatestFetchId = None
-                        IsRefreshing = false
-                        RefreshError = None
+                    LastFetchedUtcTicks = Some(DateTime.UtcNow.Ticks)
+                    IsLoading = false
+                    LatestFetchId = None
+                    Templates = sortedTemplates
                 },
                 Cmd.none
             | Error message ->
-                if hasVisibleTemplates state.LoadState then
-                    {
-                        state with
-                            LatestFetchId = None
-                            IsRefreshing = false
-                            RefreshError = Some message
-                    },
-                    Cmd.none
-                else
-                    {
-                        state with
-                            LoadState = TemplateLoadState.LoadError message
-                            LatestFetchId = None
-                            IsRefreshing = false
-                            RefreshError = None
-                    },
-                    Cmd.none
+                // here bind error callbacks if needed, for now we just log to console and update state
+                Browser.Dom.console.error ("Failed to load templates:", message)
+
+                {
+                    state with
+                        IsLoading = false
+                        LatestFetchId = None
+                },
+                Cmd.none
+
+open TemplateCacheProviderHelper
 
 [<Erase; Mangle(false)>]
 type TemplateCacheProvider =
 
     [<ReactComponent>]
     static member TemplateCacheProvider
-        (loadTemplates: unit -> Async<Result<Template[], string>>, children: ReactElement)
+        (loadTemplates: unit -> JS.Promise<Result<Template[], string>>, children: ReactElement)
         =
 
-        let cacheState, setCacheState =
-            React.useLocalStorage (TemplateHelper.CacheStorageKey, TemplateCacheState.Empty)
-
         let model, dispatch =
-            React.useElmish (
-                (fun () -> TemplateCacheProviderModel.init cacheState),
-                TemplateCacheProviderModel.update loadTemplates,
-                [||]
-            )
-
-        React.useEffect (
-            (fun () ->
-                if cacheState <> model.CacheState then
-                    setCacheState model.CacheState
-            ),
-            [| box cacheState; box model.CacheState |]
-        )
+            React.useElmish ((fun () -> init ()), update loadTemplates, [||])
 
         let contextValue: TemplateCacheCtx.TemplateCacheContext = {
-            LoadState = model.LoadState
-            IsRefreshing = model.IsRefreshing
-            RefreshError = model.RefreshError
-            RefreshTemplates = fun () -> dispatch (TemplateCacheProviderModel.LoadTemplatesRequest true)
+            IsLoading = model.IsLoading
+            Templates = model.Templates
+            RefreshTemplates = fun () -> dispatch (LoadTemplatesRequest true)
         }
 
         TemplateCacheCtx.TemplateCacheCtx.Provider(contextValue, children)

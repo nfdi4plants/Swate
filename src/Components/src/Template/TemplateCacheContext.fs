@@ -1,20 +1,19 @@
 module Swate.Components.Template.TemplateCacheContext
 
 open Feliz
+open ARCtrl
 open Swate.Components.Template.Types
 
 type TemplateCacheContext = {
-    LoadState: TemplateLoadState
-    IsRefreshing: bool
-    RefreshError: string option
+    Templates: Template[]
+    IsLoading: bool
     RefreshTemplates: unit -> unit
 } with
 
     static member Empty = {
-        LoadState = TemplateLoadState.Loading
-        IsRefreshing = false
-        RefreshError = None
-        RefreshTemplates = fun () -> ()
+        Templates = [||]
+        IsLoading = false
+        RefreshTemplates = ignore
     }
 
 let TemplateCacheCtx =

@@ -238,7 +238,6 @@ type Main =
         let templateWidget =
             Swate.Components.Widgets.TemplateWidget.Main(arcFile, activeTableIndex, setArcFile, templateServices)
 
-
         AnnotationTableContextProvider.AnnotationTableContextProvider(
             Swate.Components.ArcFileEditor.Widgets.Main.Widgets(
                 Html.div [
@@ -289,9 +288,23 @@ type Main =
 
         let arcFile, setArcFile = React.useState (startArcFile)
 
-        Main.ArcFileEditor(
-            arcFile,
-            setArcFile,
-            ArcFileEditorHelpers.TemplateServices,
-            startingActiveView = ActiveView.Table 0
+        let loadTemplates =
+            fun () ->
+                promise {
+                    let! json = Api.SwateApi.SwateTemplateApi.getTemplates () |> Async.StartAsPromise
+                    return Ok(ARCtrl.Json.Templates.fromJsonString json)
+                }
+                |> Promise.catch (fun error ->
+                    // Handle error, e.g., log it or show a notification
+                    Error(sprintf "Error loading templates: %s" error.Message)
+                )
+
+        Template.TemplateCacheProvider.TemplateCacheProvider(
+            loadTemplates,
+            Main.ArcFileEditor(
+                arcFile,
+                setArcFile,
+                ArcFileEditorHelpers.TemplateServices,
+                startingActiveView = ActiveView.Table 0
+            )
         )
