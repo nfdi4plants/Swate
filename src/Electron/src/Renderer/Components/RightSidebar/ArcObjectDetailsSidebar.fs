@@ -4,6 +4,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer
+open Swate.Components.ARCObjectExplorer.Model
 
 [<ReactComponent>]
 let Main () =
@@ -14,7 +15,7 @@ let Main () =
         ArcObjectExplorerView.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
-            KindFilter.ArcObjectExplorerOptions
+            KindFilter.arcObjectExplorerOptions
             arcObjectCtx.state.SelectedKindIndices
 
     Html.div [
@@ -45,3 +46,4 @@ let Main () =
             )
         ]
     ]
+

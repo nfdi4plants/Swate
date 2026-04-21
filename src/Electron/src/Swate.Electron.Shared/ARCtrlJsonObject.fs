@@ -1,6 +1,5 @@
-namespace Swate.Components.Shared.DTOs
+module Swate.Electron.Shared.ARCtrlJsonObject
 
- 
 open Swate.Components.Shared
 
 
@@ -52,7 +51,12 @@ type JsonDTOs =
 
 type JsonDTOUnwrapper =
 
-    static member unwrap(jsonDTO: JsonDTOs) =
+    static member tryUnwrap(jsonDTO: JsonDTOs) =
         match jsonDTO with
-        | JsonDTOs.ARCtrlJsonObject dto -> dto
-        | JsonDTOs.ARCtrlContract -> failwith "Not implemented yet"
+        | JsonDTOs.ARCtrlJsonObject dto -> Some dto
+        | JsonDTOs.ARCtrlContract -> None //ToDo
+
+    static member unwrap(jsonDTO: JsonDTOs) =
+        match JsonDTOUnwrapper.tryUnwrap jsonDTO with
+        | Some dto -> Ok dto
+        | None -> Error "ARCtrlContract is not supported by JsonDTOUnwrapper.unwrap yet."

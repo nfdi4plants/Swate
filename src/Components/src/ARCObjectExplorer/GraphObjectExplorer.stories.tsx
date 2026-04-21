@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { Entry as GraphObjectExplorerEntry } from './GraphExplorer/GraphObjectFixture.fs.js';
+import { Entry as GraphObjectExplorerEntry } from './GraphExplorer/GraphObjectExplorer.fs.js';
 
 const meta = {
   title: 'Components/ARCObjectExplorer/GraphModel',

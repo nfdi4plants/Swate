@@ -24,7 +24,6 @@
     <Compile Include="DTOs\AdvancedSearch.fs" />
     <Compile Include="DTOs\ParentTermQuery.fs" />
     <Compile Include="DTOs\TermQuery.fs" />
-    <Compile Include="DTOs\ARCtrlJsonObject.fs" />
     <Compile Include="Extensions.fs" />
     <Compile Include="URLs.fs" />
     <Compile Include="Types.fs" />

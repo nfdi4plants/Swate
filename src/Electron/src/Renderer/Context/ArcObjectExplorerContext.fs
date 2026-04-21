@@ -17,7 +17,7 @@ type ArcObjectExplorerState = {
     static member init() = {
         Nodes = []
         SelectedKindIndices =
-            ARCObjectWidget.DefaultKindFilterIndices(KindFilter.ArcObjectExplorerOptions)
+            KindFilter.defaultSelectedIndices(KindFilter.arcObjectExplorerOptions)
         ArcFileState = None
         PageState = None
         PendingArcFileSave = None
@@ -162,3 +162,4 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
         )
 
     ArcObjectExplorerCtx.Provider(ctx, children)
+

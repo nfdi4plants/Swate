@@ -1,4 +1,4 @@
-namespace Swate.Components.ARCObjectExplorer.GraphExplorer
+module Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 
 open Fable.Core
 
@@ -94,14 +94,34 @@ type Dataset ={
     about: Protocol list
 }
 
-type ARC = {
+type ARCGraph = {
     path: string
     Datasets: Dataset list
 }
 
 type ARCObjects =
-    | Arc of ARC list
+    | Arc of ARCGraph list
     | Datasets of Dataset list
     | Protocols of Protocol list
     | FormalParameters of FormalParameter list
     | Processes of CurrentProcess list
+
+type GraphProcessEndpointValueType =
+    | Material
+    | Data
+
+type GraphNodeTag =
+    | Dataset
+    | Protocol
+    | FormalParameter
+    | Process
+    | ProcessEndpoint of GraphProcessEndpointValueType
+
+type GraphNodeMeta = {
+    Tag: GraphNodeTag option
+    KindLabel: string
+    RoleLabel: string
+    Description: string option
+    Rows: (string * string) list
+    CaseExamples: (string * string) list
+}

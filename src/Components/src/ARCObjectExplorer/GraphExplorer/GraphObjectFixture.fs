@@ -1,11 +1,7 @@
-namespace Swate.Components.ARCObjectExplorer.GraphExplorer
+module Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
 
-open Fable.Core
-open Feliz
-open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.ARCObjectExplorer
 open Swate.Components.FileExplorerTypes
+open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 
 module private GraphObjectFixtureHelper =
 
@@ -165,7 +161,7 @@ module private GraphObjectFixtureHelper =
 
         items |> List.map collapseItem
 
-    let fakeGraphModel() : ARC =
+    let fakeGraphModel() : ARCGraph =
         let sourceLeaf = makeMaterial("source:leaf-a", "Leaf-A", "Source", true)
         let sampleLeaf = makeMaterial("sample:leaf-a", "Leaf-A", "Sample", false)
         let extractMaterial = makeMaterial("material:extract-a", "Leaf-Extract-A", "Extract", false)
@@ -546,7 +542,7 @@ module private GraphObjectFixtureHelper =
             Datasets = [ studyDataset; assayDataset; workflowDataset; runDataset ]
         }
 
-    let fakeGraphModels() : ARC list =
+    let fakeGraphModels() : ARCGraph list =
         let primaryArc = fakeGraphModel ()
 
         let secondaryArc = {
@@ -564,97 +560,9 @@ module private GraphObjectFixtureHelper =
 
         [ primaryArc; secondaryArc ]
 
-[<Erase; Mangle(false)>]
-type GraphObjectFixture =
+let collapseExplorerItems(items: FileItem list) =
+    GraphObjectFixtureHelper.collapseExplorerItems items
 
-    [<ReactComponent>]
-    static member private StoryExample() =
-        let graphModels = React.useMemo ((fun () -> GraphObjectFixtureHelper.fakeGraphModels ()), [||])
+let fakeGraphModels() =
+    GraphObjectFixtureHelper.fakeGraphModels ()
 
-        let nodes, nodeMetaById =
-            React.useMemo ((fun () -> ToArcExplorerNodes.toArcExplorerNodesWithMetaFromArcs graphModels), [| box graphModels |])
-
-        let selection, setSelection = React.useState ArcSelection.empty
-
-        let selectedKindIndices, setSelectedKindIndices =
-            React.useState (KindFilter.defaultSelectedIndices KindFilter.GraphObjectExplorerOptions)
-
-        let viewModel =
-            ArcObjectExplorerView.create
-                nodes
-                selection
-                KindFilter.GraphObjectExplorerOptions
-                selectedKindIndices
-
-        let collapsedExplorerItems =
-            React.useMemo (
-                (fun () -> GraphObjectFixtureHelper.collapseExplorerItems viewModel.ExplorerItems),
-                [| box viewModel.ExplorerItems |]
-            )
-
-        let setExplorerSelection (nodeId: string) (path: string option) =
-            setSelection (ArcSelection.forExplorerNode nodeId path)
-
-        let searchAction =
-            ARCObjectWidget.SearchActionForExplorerItems(
-                viewModel.SearchItems,
-                (fun item ->
-                    if item.Selectable then
-                        setExplorerSelection item.Id item.Path),
-                placeholder = "Search graph objects..."
-            )
-
-        let treePane =
-            Swate.Components.FileExplorer.FileExplorer(
-                initialItems = collapsedExplorerItems,
-                ?selectedItemId = Some(ArcObjectExplorerView.selectedItemId viewModel),
-                onItemClick =
-                    (fun item ->
-                        if item.Selectable then
-                            setExplorerSelection item.Id item.Path),
-                showBreadcrumbs = false,
-                useDirectoryChevronToggle = true
-            )
-
-        let explorerPane =
-            ARCObjectWidget.ExplorerContent(
-                collapsedExplorerItems,
-                ?selectedItemId = ArcObjectExplorerView.selectedItemId viewModel,
-                onItemClick =
-                    (fun item ->
-                        if item.Selectable then
-                            setExplorerSelection item.Id item.Path)
-            )
-
-        let detailsPane =
-            GraphObjectDetails.Main(
-                ArcObjectExplorerView.selectedNode viewModel,
-                ArcObjectExplorerView.selectedAncestors viewModel,
-                nodeMetaById,
-                (fun nodeId ->
-                    match ARCExplorer.tryFindNodeById nodeId nodes with
-                    | Some node -> setExplorerSelection node.id node.path
-                    | None -> setSelection (ArcSelection.forExplorerNode nodeId None))
-            )
-
-        ARCObjectWidget.Main(
-            navbar =
-                ARCObjectWidget.Navbar(
-                    ArcObjectExplorerView.selectedTitle viewModel,
-                    ArcObjectExplorerView.selectedSubtitle viewModel,
-                    KindFilter.GraphObjectExplorerOptions,
-                    selectedKindIndices,
-                    setSelectedKindIndices,
-                    rightActions = searchAction
-                ),
-            treePane = treePane,
-            explorerPane = explorerPane,
-            detailsPane = detailsPane
-        )
-
-    [<ReactComponent>]
-    static member Entry() =
-        Html.div [
-            prop.className "swt:min-h-screen swt:bg-base-200 swt:p-6"
-            prop.children [ GraphObjectFixture.StoryExample() ]
-        ]

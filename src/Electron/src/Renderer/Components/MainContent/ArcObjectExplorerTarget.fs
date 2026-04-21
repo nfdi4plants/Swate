@@ -3,6 +3,7 @@ module Renderer.Components.MainContent.ArcObjectExplorerTarget
 open Feliz
 open Swate.Components
 open Swate.Components.ARCObjectExplorer
+open Swate.Components.ARCObjectExplorer.Model
 
 [<ReactComponent>]
 let Main () =
@@ -14,7 +15,7 @@ let Main () =
         ArcObjectExplorerView.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
-            KindFilter.ArcObjectExplorerOptions
+            KindFilter.arcObjectExplorerOptions
             arcObjectCtx.state.SelectedKindIndices
 
     let services =
@@ -43,7 +44,7 @@ let Main () =
             ARCObjectWidget.Navbar(
                 ArcObjectExplorerView.selectedTitle viewModel,
                 ArcObjectExplorerView.selectedSubtitle viewModel,
-                KindFilter.ArcObjectExplorerOptions,
+                KindFilter.arcObjectExplorerOptions,
                 arcObjectCtx.state.SelectedKindIndices,
                 arcObjectCtx.setSelectedKindIndices,
                 rightActions = searchAction
@@ -70,3 +71,4 @@ let Main () =
             )
         ]
     ]
+

@@ -1,8 +1,9 @@
 namespace Swate.Components.ARCObjectExplorer
 
+open Fable.Core
 open Feliz
 
-[<RequireQualifiedAccess>]
+[<Erase; Mangle(false)>]
 type ArcObjectDetailsLayout =
 
     [<ReactComponent>]

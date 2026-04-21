@@ -4,36 +4,23 @@ open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.FileExplorerTypes
+open Swate.Components.ARCObjectExplorer.Types
 
-type ARCObjectExplorerVisibleItem = {
-    Item: FileItem
-    Depth: int
-    Lineage: string list
-}
+module private ARCObjectWidgetHelper =
 
-type ARCObjectExplorerContextItem = {
-    Item: FileItem
-    IsCurrent: bool
-}
+    let widgetContainerClass =
+        "swt:flex swt:flex-col swt:gap-3 swt:p-2 swt:w-[72rem] swt:max-w-[95vw] swt:h-[70vh] swt:max-h-[80vh]"
 
-type ARCObjectExplorerSection = {
-    Label: string
-    Description: string
-    Items: ARCObjectExplorerVisibleItem list
-}
+    let iconClassName(baseClasses: string list, item: FileItem) =
+        [
+            yield! baseClasses
+            yield item.Icon |> FileItemIcon.className
+            yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
+        ]
 
-type ARCObjectExplorerItems = {
-    SourceName: string
-    SourceId: string
-    ContextItems: ARCObjectExplorerContextItem list
-    Sections: ARCObjectExplorerSection list
-}
-
-type ARCObjectWidgetHelper =
-
-    static member private TryFindItemWithAncestors(itemId: string, items: FileItem list) =
-        let rec loop (ancestorsRev: FileItem list) (items: FileItem list) =
-            items
+    let rec private tryFindItemWithAncestors(itemId: string, items: FileItem list) =
+        let rec loop (ancestorsRev: FileItem list) (currentItems: FileItem list) =
+            currentItems
             |> List.tryPick (fun item ->
                 if item.Id = itemId then
                     Some(item, List.rev ancestorsRev)
@@ -42,14 +29,14 @@ type ARCObjectWidgetHelper =
 
         loop [] items
 
-    static member private ShouldShowInExplorer(item: FileItem) =
+    let private shouldShowInExplorer(item: FileItem) =
         item.Selectable && item.ItemType <> "empty"
 
-    static member private CollectVisibleDescendants(selectedItem: FileItem) =
-        let rec loop (visibleAncestorsRev: string list) (items: FileItem list) =
-            items
+    let private collectVisibleDescendants(selectedItem: FileItem) =
+        let rec loop (visibleAncestorsRev: string list) (currentItems: FileItem list) =
+            currentItems
             |> List.collect (fun item ->
-                let shouldShow = ARCObjectWidgetHelper.ShouldShowInExplorer item
+                let shouldShow = shouldShowInExplorer item
 
                 let current =
                     if shouldShow then
@@ -75,21 +62,21 @@ type ARCObjectWidgetHelper =
         |> Option.defaultValue []
         |> loop []
 
-    static member private ContextItems(ancestors: FileItem list, selectedItem: FileItem) =
+    let private contextItems(ancestors: FileItem list, selectedItem: FileItem) =
         (ancestors @ [ selectedItem ])
         |> List.map (fun item -> {
             Item = item
             IsCurrent = item.Id = selectedItem.Id
         })
 
-    static member private FallbackSectionLabel(depth: int) =
+    let private fallbackSectionLabel(depth: int) =
         match depth with
         | 0 -> "Current"
         | 1 -> "Children"
         | 2 -> "Grandchildren"
         | depth -> $"Level {depth}"
 
-    static member private SectionObjectLabel(depth: int, items: ARCObjectExplorerVisibleItem list) =
+    let private sectionObjectLabel(depth: int, items: ARCObjectExplorerVisibleItem list) =
         let labels =
             items
             |> List.map (fun item -> item.Item.ItemType)
@@ -97,29 +84,33 @@ type ARCObjectWidgetHelper =
             |> List.distinct
 
         match labels with
-        | [] -> ARCObjectWidgetHelper.FallbackSectionLabel depth
+        | [] -> fallbackSectionLabel depth
         | labels -> String.concat " / " labels
 
-    static member private SectionDescription(depth: int, objectLabel: string) =
+    let private sectionDescription(depth: int, objectLabel: string) =
         match depth with
         | 0 -> $"Selected {objectLabel} object."
         | 1 -> $"Visible {objectLabel} objects directly under the selected ARC object."
         | _ -> $"Visible {objectLabel} objects at this hierarchy level."
 
-    static member private Sections(selectedItem: FileItem, descendants: ARCObjectExplorerVisibleItem list) =
+    let private sections(selectedItem: FileItem, descendants: ARCObjectExplorerVisibleItem list) =
         if List.isEmpty descendants then
-            let label = ARCObjectWidgetHelper.SectionObjectLabel(0, [
-                {
-                    Item = selectedItem
-                    Depth = 0
-                    Lineage = []
-                }
-            ])
+            let label =
+                sectionObjectLabel(
+                    0,
+                    [
+                        {
+                            Item = selectedItem
+                            Depth = 0
+                            Lineage = []
+                        }
+                    ]
+                )
 
             [
                 {
                     Label = label
-                    Description = ARCObjectWidgetHelper.SectionDescription(0, label)
+                    Description = sectionDescription(0, label)
                     Items = [
                         {
                             Item = selectedItem
@@ -134,45 +125,34 @@ type ARCObjectWidgetHelper =
             |> List.groupBy (fun item -> item.Depth)
             |> List.sortBy fst
             |> List.map (fun (depth, items) ->
-                let label = ARCObjectWidgetHelper.SectionObjectLabel(depth, items)
+                let label = sectionObjectLabel(depth, items)
 
                 {
                     Label = label
-                    Description = ARCObjectWidgetHelper.SectionDescription(depth, label)
+                    Description = sectionDescription(depth, label)
                     Items = items
                 })
 
-    static member GetExplorerItems(selectedId: string option, items: FileItem list) =
+    let getExplorerItems(selectedId: string option, items: FileItem list) =
         selectedId
-        |> Option.bind (fun itemId -> ARCObjectWidgetHelper.TryFindItemWithAncestors(itemId, items))
+        |> Option.bind (fun itemId -> tryFindItemWithAncestors(itemId, items))
         |> Option.map (fun (selectedItem, ancestors) ->
-            let descendants = ARCObjectWidgetHelper.CollectVisibleDescendants selectedItem
+            let descendants = collectVisibleDescendants selectedItem
 
             {
                 SourceName = selectedItem.Name
                 SourceId = selectedItem.Id
-                ContextItems = ARCObjectWidgetHelper.ContextItems(ancestors, selectedItem)
-                Sections = ARCObjectWidgetHelper.Sections(selectedItem, descendants)
+                ContextItems = contextItems(ancestors, selectedItem)
+                Sections = sections(selectedItem, descendants)
             })
+
+module ARCObjectWidgetData =
+
+    let getExplorerItems(selectedId: string option, items: FileItem list) =
+        ARCObjectWidgetHelper.getExplorerItems(selectedId, items)
 
 [<Erase; Mangle(false)>]
 type ARCObjectWidget =
-
-    static member private WidgetContainerClass =
-        "swt:flex swt:flex-col swt:gap-3 swt:p-2 swt:w-[72rem] swt:max-w-[95vw] swt:h-[70vh] swt:max-h-[80vh]"
-
-    static member private IconClassName(baseClasses: string list, item: FileItem) =
-        [
-            yield! baseClasses
-            yield item.Icon |> FileItemIcon.className
-            yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
-        ]
-
-    static member DefaultKindFilterIndices(kindFilterOptions: SelectItem<string>[]) =
-        KindFilter.defaultSelectedIndices kindFilterOptions
-
-    static member selectedKindLabels(kindFilterOptions: SelectItem<string>[]) (selectedKindIndices: Set<int>) =
-        KindFilter.selectedLabels kindFilterOptions selectedKindIndices
 
     [<ReactComponent>]
     static member private KindFilterTrigger(kindFilterOptions: SelectItem<string>[], selectedKindIndices: Set<int>) =
@@ -383,7 +363,7 @@ type ARCObjectWidget =
     [<ReactComponent>]
     static member ExplorerContent(items: FileItem list, ?selectedItemId: string, ?onItemClick: FileItem -> unit) =
         let onItemClick = defaultArg onItemClick ignore
-        let explorerItems = ARCObjectWidgetHelper.GetExplorerItems(selectedItemId, items)
+        let explorerItems = ARCObjectWidgetHelper.getExplorerItems(selectedItemId, items)
 
         let tileSubtitle sourceName (entry: ARCObjectExplorerVisibleItem) =
             match entry.Depth with
@@ -412,7 +392,7 @@ type ARCObjectWidget =
                 prop.onClick (fun _ -> onItemClick item)
                 prop.children [
                     Html.i [
-                        prop.className (ARCObjectWidget.IconClassName([ "swt:iconify"; "swt:text-2xl" ], item))
+                        prop.className (ARCObjectWidgetHelper.iconClassName([ "swt:iconify"; "swt:text-2xl" ], item))
                     ]
                     Html.div [
                         prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-1 swt:w-full"
@@ -433,7 +413,7 @@ type ARCObjectWidget =
         let contextItem (entry: ARCObjectExplorerContextItem) =
             let sharedChildren = [
                 Html.i [
-                    prop.className (ARCObjectWidget.IconClassName([ "swt:iconify"; "swt:text-base" ], entry.Item))
+                    prop.className (ARCObjectWidgetHelper.iconClassName([ "swt:iconify"; "swt:text-base" ], entry.Item))
                 ]
                 Html.span [
                     prop.className "swt:truncate"
@@ -585,7 +565,7 @@ type ARCObjectWidget =
     [<ReactComponent>]
     static member Main(?navbar: ReactElement, ?treePane: ReactElement, ?explorerPane: ReactElement, ?detailsPane: ReactElement) =
         Html.div [
-            prop.className ARCObjectWidget.WidgetContainerClass
+            prop.className ARCObjectWidgetHelper.widgetContainerClass
             prop.children [
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
