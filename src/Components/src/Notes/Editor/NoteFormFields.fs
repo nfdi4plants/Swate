@@ -126,7 +126,7 @@ module NoteFormFields =
                     Html.div [
                         prop.className "swt:w-full swt:relative"
                         prop.children [
-                            TermSearch.TermSearch(
+                            TermSearch.TermSearch.TermSearch(
                                 currentTagTerm,
                                 setCurrentTagTermAndRef,
                                 onTermSelect = (fun selectedTerm -> addTagFromTerm (Some selectedTerm)),

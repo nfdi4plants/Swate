@@ -11,9 +11,9 @@ open Swate.Components.ErrorModal
 
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
-    let errorModal = ErrorModal.Context.useErrorModal ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
+    let errorModal = ErrorModal.Context.useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 
     let isPendingSaveForCurrentArcFile =
@@ -41,7 +41,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 | Ok() -> ()
                 | Error exn ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create(exn.Message, title = "Could not save ARC file", ?scopeId = arcScopeId)
+                        ErrorModalRequest.create (exn.Message, title = "Could not save ARC file", ?scopeId = arcScopeId)
                     )
             }
             |> Promise.start
@@ -53,6 +53,6 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
         arcFile,
         setArcFile,
         templateServices,
-        ?header = Some renderHeader,
-        ?widgetServices = Some arcFileEditorWidgetServices
+        header = renderHeader,
+        widgetServices = arcFileEditorWidgetServices
     )

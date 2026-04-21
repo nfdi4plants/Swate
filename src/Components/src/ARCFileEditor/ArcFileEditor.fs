@@ -4,6 +4,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
+open Swate.Components.Widgets.Context
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types
 
@@ -31,8 +32,8 @@ module private WidgetNavbar =
         | WidgetType.Playground -> "Playground", Icons.Templates()
 
     [<ReactComponent>]
-    let Buttons (isEnabled: bool) =
-        let context = WidgetContext.useWidgetController ()
+    let Buttons(isEnabled: bool) =
+        let context = useWidgetControllerCtx ()
 
         let controlButton (widgetType: WidgetType) =
             let isActive = context.isActive widgetType
@@ -160,7 +161,7 @@ type Main =
         Html.div [
             prop.className "swt:w-full swt:min-w-0 swt:pb-4"
             prop.children [
-                AnnotationTable.AnnotationTable(table, setTableInArcFile)
+                Swate.Components.AnnotationTable.AnnotationTable.AnnotationTable(table, setTableInArcFile)
             ]
         ]
 
@@ -191,7 +192,7 @@ type Main =
 
                 match table.ColumnCount with
                 | 0 -> EmptyTableView.Main.EmptyTableView(arcFileState, setArcFileState, Some index, templateServices)
-                | _ -> Main.TableView(table, setTable)
+                | _ -> AnnotationTable.AnnotationTable.AnnotationTable(table, setTable)
             | None ->
                 Html.div [
                     prop.className "swt:p-4 swt:text-error"
@@ -289,9 +290,11 @@ type Main =
             setArcFile: ArcFiles -> unit,
             templateServices: TemplateWidgetServices,
             ?header: (ArcFileEditorHeaderProps -> ReactElement),
-            ?widgetServices: ArcFileEditorWidgetServices
+            ?widgetServices: ArcFileEditorWidgetServices,
+            ?startingActiveView: ActiveView
         ) =
-        let activeView, setActiveView = React.useState ActiveView.Metadata
+        let activeView, setActiveView =
+            React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
         let templateImportType, setTemplateImportType =
             React.useState TableJoinOptions.Headers
@@ -343,27 +346,17 @@ type Main =
 
         let editorContent =
             Html.div [
-                prop.className "swt:size-full swt:flex swt:flex-col swt:drawer-content"
+                prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
                 prop.children [
                     navbar
                     Html.div [
-                        prop.className "swt:flex-1 swt:overflow-y-auto swt:flex swt:flex-col swt:min-w-0"
+                        prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
                         prop.children [
-                            Html.div [
-                                prop.className "swt:flex swt:flex-col swt:h-full"
-                                prop.children [
-                                    Html.div [
-                                        prop.className "swt:flex-1 swt:overflow-x-hidden swt:overflow-y-auto"
-                                        prop.children [
-                                            Main.ArcFileContentView(activeView, arcFile, setArcFile, templateServices)
-                                        ]
-                                    ]
-                                    Main.AddRowsFooter(activeView, arcFile, setArcFile)
-                                    ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
-                                ]
-                            ]
+                            Main.ArcFileContentView(activeView, arcFile, setArcFile, templateServices)
                         ]
                     ]
+                    Main.AddRowsFooter(activeView, arcFile, setArcFile)
+                    ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
                 ]
             ]
 
@@ -388,8 +381,27 @@ type Main =
 
         let startArcFile = ArcFiles.Assay(ArcAssay.init ("Test"))
 
+        let fullerTable = ArcTable("Fuller Table")
+
+        fullerTable.AddColumn(CompositeHeader.Input IOType.Source)
+        fullerTable.AddColumn(CompositeHeader.Output IOType.Sample)
+        fullerTable.AddColumn(CompositeHeader.ProtocolREF)
+        fullerTable.AddColumn(CompositeHeader.ProtocolDescription)
+        fullerTable.AddColumn(CompositeHeader.ProtocolType)
+        fullerTable.AddColumn(CompositeHeader.ProtocolUri)
+        fullerTable.AddColumn(CompositeHeader.ProtocolVersion)
+
+        fullerTable.AddColumn(
+            CompositeHeader.Component(OntologyAnnotation("Component Name", "Component Accession", "Component Source"))
+        )
+
+        fullerTable.AddRowsEmpty 5
+
         for i in 0..10 do
-            startArcFile.Tables().Add(ArcTable.init (sprintf "Table %i" i))
+            if i = 0 then
+                startArcFile.Tables().Add(fullerTable)
+            else
+                startArcFile.Tables().Add(ArcTable.init (sprintf "Table %i" i))
 
         let arcFile, setArcFile = React.useState (startArcFile)
-        Main.ArcFileEditor(arcFile, setArcFile, EntryHelpers.templateServices)
+        Main.ArcFileEditor(arcFile, setArcFile, EntryHelpers.templateServices, startingActiveView = ActiveView.Table 0)

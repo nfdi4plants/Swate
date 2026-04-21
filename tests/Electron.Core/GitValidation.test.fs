@@ -85,7 +85,7 @@ let private gitStateCtxSourcePath =
         "src"
         "Renderer"
         "Context"
-        "GitStateCtx.fs"
+        "GitStateContext.fs"
     |]
 
 let private gitProvisioningServiceSourcePath =

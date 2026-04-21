@@ -1,6 +1,7 @@
-namespace Swate.Components
+namespace Swate.Components.Table
 
 open Fable.Core
+open Swate.Components
 
 module GridSelect =
 

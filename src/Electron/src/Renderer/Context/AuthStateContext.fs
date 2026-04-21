@@ -1,11 +1,20 @@
-module Renderer.Context.AuthStateCtx
+module Renderer.Context.AuthStateContext
 
 open Feliz
 open Swate.Electron.Shared.AuthTypes
 open Swate.Components.Authentication.Types
 
 
-module private AuthStateHelper =
+module private Helper =
+
+    let private isEmptyAuthState (state: AuthStateDto) =
+        state.ActiveAccount.IsNone && state.StoredAccounts.Length = 0
+
+    let shouldLogRevalidationFailure (response: AuthResult) =
+        match response.Success, response.FailureKind, response.User with
+        | false, Some AuthFailureKind.Unauthorized, Some state when isEmptyAuthState state -> false
+        | false, _, _ -> true
+        | true, _, _ -> false
 
     let refreshState (setAuthState) (onError) = promise {
         let! stateResult = Api.ipcAuthApi.getAuthState ()
@@ -18,13 +27,12 @@ module private AuthStateHelper =
             onError ()
     }
 
-    let AuthStateCtx = React.createContext<AuthStateDto> AuthStateDto.Empty
+let AuthStateCtx = React.createContext<AuthStateDto> AuthStateDto.Empty
 
 [<Hook>]
-let useAuthState () =
-    React.useContext AuthStateHelper.AuthStateCtx
+let useAuthStateCtx () = React.useContext AuthStateCtx
 
-open AuthStateHelper
+open Helper
 
 /// This component stores the current account information. If you want to log out, switch account, login, etc.
 /// - you simply can use the IAuthApi via IPC. Any changes will be broadcasted to all open windows via: `authAccountsUpdate`
@@ -41,7 +49,7 @@ let Provider (children: ReactElement) =
             | Ok response ->
                 do! refreshState setAuthState ignore
 
-                if not response.Success then
+                if shouldLogRevalidationFailure response then
                     console.error (response.FailureKind, Fable.Core.JS.JSON.stringify response.Message)
             | Error ex -> console.error (Fable.Core.JS.JSON.stringify ex.Message)
 

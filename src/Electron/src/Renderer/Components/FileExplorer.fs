@@ -21,10 +21,7 @@ module FileExplorerCreate =
         | Workflow
         | Run
 
-    type ArcCreateDraft = {
-        ArcFile: ArcFiles
-        Path: string
-    }
+    type ArcCreateDraft = { ArcFile: ArcFiles; Path: string }
 
     let rec loopPaths (selectedTreeItemPath: string option) (parent: FileTreeNode) =
         match parent.isDirectory with
@@ -326,7 +323,8 @@ let FileTree () =
                 errorMessage
 
         let createArcEntry kind (identifier: string) =
-            let existingPaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
+            let existingPaths =
+                fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
 
             match tryBuildArcCreateDraft kind identifier existingPaths with
             | Error errorMessage -> applyCreateError errorMessage

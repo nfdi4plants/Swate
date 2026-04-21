@@ -1,11 +1,9 @@
 module TermSearch
 
-open Fable.React
-open Fable.React.Props
+
 open Messages
-open Swate.Components.Shared
+open Swate.Components.AnnotationTable
 open Elmish
-open TermSearch
 open Model
 
 let update (termSearchMsg: TermSearch.Msg) (currentState: TermSearch.Model) : TermSearch.Model * Cmd<Messages.Msg> =
@@ -17,12 +15,13 @@ let update (termSearchMsg: TermSearch.Msg) (currentState: TermSearch.Model) : Te
 open Feliz
 open ARCtrl
 open Fable.Core.JsInterop
+open Swate.Components.AnnotationTable.Context
 
 /// "Fill selected cells with this term" - button //
 [<ReactComponent>]
 let private AddButton (model: Model, dispatch) =
     let ctx =
-        React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
+        useAnnotationTableStateCtx ()
 
     let selectedCells =
         ctx.state
@@ -89,7 +88,7 @@ let Main (model: Model, dispatch) =
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
         SidebarComponents.SidebarLayout.LogicContainer [
-            Swate.Components.TermSearch.TermSearch(
+            Swate.Components.TermSearch.TermSearch.TermSearch(
                 (model.TermSearchState.SelectedTerm |> Option.map _.ToTerm()),
                 setTerm,
                 autoFocus = true,

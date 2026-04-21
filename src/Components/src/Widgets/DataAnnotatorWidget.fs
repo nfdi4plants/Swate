@@ -5,6 +5,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components.Shared
+open Swate.Components.Widgets.Context
 
 module private DataAnnotatorWidgetModel =
 
@@ -427,7 +428,7 @@ type DataAnnotatorWidget =
         let loading, setLoading = React.useState false
         let statusMessage, setStatusMessage = React.useState (None: string option)
         let errorMessage, setErrorMessage = React.useState (None: string option)
-        let widgetCtx = WidgetContext.useWidgetController ()
+        let widgetCtx = useWidgetControllerCtx ()
 
         let disabledMessage =
             DataAnnotatorWidget.inferDisabledMessage arcFile activeView activeTableIndex

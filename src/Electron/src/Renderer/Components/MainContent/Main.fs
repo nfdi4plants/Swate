@@ -21,39 +21,26 @@ open Renderer.Components.MainContent.UnknownPreviewTarget
 [<ReactComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option, leftSidebarTarget: LeftSidebarPage) =
     Html.div [
-        prop.className "swt:size-full swt:flex swt:justify-center"
+        prop.className "swt:size-full swt:min-w-0 swt:min-h-0 swt:flex swt:justify-center swt:overflow-hidden"
         prop.children [
             match appRootPath, pageState with
-            | _, Some PageState.DataHubBrowser ->
-                DataHubBrowserTarget()
+            | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
             | None, _ ->
                 Html.div [
-                    prop.className "swt:flex-1 swt:flex swt:justify-center swt:items-center"
+                    prop.className "swt:flex-1 swt:min-w-0 swt:min-h-0 swt:flex swt:justify-center swt:items-center"
                     prop.children [ Renderer.Components.InitState.InitState() ]
                 ]
-            | Some _, _ when leftSidebarTarget = LeftSidebarPage.ArcObjectExplorer ->
-                ArcObjectExplorerTarget.Main()
-            | Some _, Some(PageState.ArcFilePage arcFile) ->
-                ArcFilePreviewTarget arcFile
-            | Some _, Some(PageState.TextPage content) ->
-                TextPreviewTarget content
-            | Some _, Some PageState.UnknownPage ->
-                UnknownPreviewTarget()
-            | Some _, Some(PageState.ErrorPage errMsg) ->
-                ErrorViewTarget errMsg
-            | Some _, Some PageState.LandingDraftPage ->
-                LandingDraftTarget()
-            | Some _, Some PageState.NotesDraftPage ->
-                NotesDraftTarget()
-            | Some _, Some PageState.NotesSearchPage ->
-                NotesSearchTarget()
-            | Some _, Some(PageState.GitDiffPage diffData) ->
-                GitDiffTarget.Main diffData
-            | Some _, Some(PageState.GitMergeConflictPage mergeData) ->
-                GitMergeConflictTarget.Main mergeData
-            | Some _, Some(PageState.GitUnsupportedPage unsupportedPage) ->
-                GitUnsupportedTarget.Main unsupportedPage
-            | Some _, None ->
-                EmptySelectionTarget()
+            | Some _, _ when leftSidebarTarget = LeftSidebarPage.ArcObjectExplorer -> ArcObjectExplorerTarget.Main()
+            | Some _, Some(PageState.ArcFilePage arcFile) -> ArcFilePreviewTarget arcFile
+            | Some _, Some(PageState.TextPage content) -> TextPreviewTarget content
+            | Some _, Some PageState.UnknownPage -> UnknownPreviewTarget()
+            | Some _, Some(PageState.ErrorPage errMsg) -> ErrorViewTarget errMsg
+            | Some _, Some PageState.LandingDraftPage -> LandingDraftTarget()
+            | Some _, Some PageState.NotesDraftPage -> NotesDraftTarget()
+            | Some _, Some PageState.NotesSearchPage -> NotesSearchTarget()
+            | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData
+            | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
+            | Some _, Some(PageState.GitUnsupportedPage unsupportedPage) -> GitUnsupportedTarget.Main unsupportedPage
+            | Some _, None -> EmptySelectionTarget()
         ]
     ]

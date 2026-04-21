@@ -6,8 +6,11 @@ open Model.BuildingBlock
 open Model
 open Messages
 open ARCtrl
-open Swate.Components.Shared
 open Fable.Core
+open Swate.Components
+open Swate.Components.Shared
+open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.Context
 
 
 module SearchComponentHelper =
@@ -96,7 +99,7 @@ type SearchComponent =
                         let parent = model.AddBuildingBlockState.TryHeaderOA()
                         let input = model.AddBuildingBlockState.TryBodyOA()
 
-                        Swate.Components.TermSearch.TermSearch(
+                        TermSearch.TermSearch.TermSearch(
                             (input |> Option.map _.ToTerm()),
                             setter,
                             classNames =
@@ -140,7 +143,7 @@ type SearchComponent =
                                 BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
                             let input = model.AddBuildingBlockState.TryHeaderOA()
 
-                            Swate.Components.TermSearch.TermSearch(
+                            TermSearch.TermSearch.TermSearch(
                                 (input |> Option.map _.ToTerm()),
                                 setter,
                                 classNames =
@@ -194,7 +197,7 @@ type SearchComponent =
         let state_bb, setState_bb = React.useState (BuildingBlockUIState.init)
 
         let ctx =
-            React.useContext (Swate.Components.Contexts.AnnotationTable.AnnotationTableStateCtx)
+            useAnnotationTableStateCtx ()
 
         let xIndex =
             ctx.state

@@ -1,7 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.Layout
 
 open Feliz
 open Fable.Core
+open Swate.Components
 
 module private Mocks =
 
@@ -11,7 +12,8 @@ module private Mocks =
         | Settings
         | Info
 
-open LayoutContext
+open Swate.Components.Layout.LeftSidebarContext
+open Swate.Components.Layout.RightSidebarContext
 
 module private LayoutHelper =
 
@@ -107,7 +109,7 @@ type Layout =
 
     [<ReactComponent>]
     static member LeftSidebarToggleBtn(?activeBorderStyle: bool) =
-        let ctx = React.useContext LeftSidebarContext
+        let ctx = useLeftSidebarCtx ()
         let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.state)
 
         Layout.LayoutBtn(
@@ -123,7 +125,7 @@ type Layout =
 
     [<ReactComponent>]
     static member RightSidebarToggleBtn(?activeBorderStyle: bool) =
-        let ctx = React.useContext RightSidebarContext
+        let ctx = useRightSidebarCtx ()
         let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.isOpen)
 
         Layout.LayoutBtn(
@@ -243,12 +245,10 @@ type Layout =
             ?leftContent: ReactElement,
             ?leftActions: ReactElement,
             ?rightContent: ReactElement,
-            ?rightActions: ReactElement,
-            ?hasNavbar: bool
+            ?rightActions: ReactElement
         ) =
-        let hasNavbar = defaultArg hasNavbar false
-        let ctxLeft = React.useContext (LeftSidebarContext)
-        let ctxRight = React.useContext (RightSidebarContext)
+        let ctxLeft = useLeftSidebarCtx ()
+        let ctxRight = useRightSidebarCtx ()
 
         let widthLeft, setWidthLeft =
             React.useLocalStorage (
@@ -376,13 +376,7 @@ type Layout =
         )
 
         Html.div [
-            prop.className [
-                "swt:flex swt:flex-row swt:w-full"
-                if hasNavbar then
-                    "swt:grow-0 swt:h-[calc(100%-2.5rem)]"
-                else
-                    "swt:grow swt:h-full"
-            ]
+            prop.className "swt:flex swt:flex-row swt:w-full swt:flex-1 swt:min-h-0"
             prop.children [
                 if leftActions.IsSome then
                     Layout.SidebarActions(leftActions.Value, Sidebar.Side.Left)
@@ -437,10 +431,7 @@ type Layout =
 
         // Keep the legacy storage key so existing left-sidebar visibility preferences survive the naming fix.
         let leftSidebarIsOpen, setLeftSidebarIsOpen =
-            React.useLocalStorage (
-                Keys.mkLocalStorageKey "layout" "main" "rightSidebarOpen",
-                leftSidebarDefaultOpen
-            )
+            React.useLocalStorage (Keys.mkLocalStorageKey "layout" "main" "rightSidebarOpen", leftSidebarDefaultOpen)
 
         let unmanagedRightSidebarIsOpen, setUnmanagedRightSidebarIsOpen =
             React.useState rightSidebarDefaultOpen
@@ -449,14 +440,12 @@ type Layout =
             React.useState (Unchecked.defaultof<'A>)
 
         let rightSidebarState =
-            defaultArg
-                rightSidebarState
-                {
-                    isOpen = unmanagedRightSidebarIsOpen
-                    setIsOpen = setUnmanagedRightSidebarIsOpen
-                    sidebarType = unmanagedRightSidebarType
-                    setSidebarType = setUnmanagedRightSidebarType
-                }
+            defaultArg rightSidebarState {
+                isOpen = unmanagedRightSidebarIsOpen
+                setIsOpen = setUnmanagedRightSidebarIsOpen
+                sidebarType = unmanagedRightSidebarType
+                setSidebarType = setUnmanagedRightSidebarType
+            }
 
         let navbar = React.useMemo ((fun () -> navbar), [| box navbar |])
 
@@ -470,7 +459,7 @@ type Layout =
             React.useMemo (
                 (fun () ->
                     Html.div [
-                        prop.className "swt:grow"
+                        prop.className "swt:grow swt:min-w-0 swt:min-h-0 swt:overflow-hidden"
                         prop.testId "layout-main-content"
                         prop.children children
                     ]
@@ -478,20 +467,20 @@ type Layout =
                 [| box children |]
             )
 
-        LeftSidebarContext.Provider(
+        LeftSidebarCtx.Provider(
             {
                 state = leftSidebarIsOpen
                 setState = setLeftSidebarIsOpen
             },
-            RightSidebarContext.Provider(
-                rightSidebarState,
+            RightSidebarCtx.Provider(
+                RightSidebarHelper.toRightSidebarCtxState rightSidebarState,
                 Html.div [
                     prop.className "swt:flex-1 swt:flex swt:flex-col swt:h-screen swt:overflow-hidden"
                     prop.children [
                         if navbar.IsSome then
                             Html.div [
                                 prop.className
-                                    "swt:h-12 swt:flex swt:flex-row swt:items-center swt:grow-0 swt:border-b swt:border-base-content/50"
+                                    "swt:h-12 swt:shrink-0 swt:grow-0 swt:flex swt:flex-row swt:items-center swt:border-b swt:border-base-content/50"
                                 prop.testId "layout-main-navbar"
                                 prop.children navbar.Value
                             ]
@@ -500,8 +489,7 @@ type Layout =
                             ?leftContent = leftSidebar,
                             ?leftActions = leftActions,
                             ?rightContent = rightSidebar,
-                            ?rightActions = rightActions,
-                            hasNavbar = navbar.IsSome
+                            ?rightActions = rightActions
                         )
                     ]
                 ]
@@ -580,24 +568,24 @@ type Layout =
                 ],
             leftActions =
                 React.Fragment [
-                        Layout.LayoutBtn(
-                            iconClassName = "swt:fluent--home-24-regular",
-                            tooltip = "Home",
-                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Home),
-                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Home
-                        )
-                        Layout.LayoutBtn(
-                            iconClassName = "swt:fluent--settings-24-regular",
-                            tooltip = "Settings",
-                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Settings),
-                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Settings
-                        )
-                        Layout.LayoutBtn(
-                            iconClassName = "swt:fluent--info-24-regular",
-                            tooltip = "Info",
-                            isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Info),
-                            onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Info
-                        )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--home-24-regular",
+                        tooltip = "Home",
+                        isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Home),
+                        onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Home
+                    )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--settings-24-regular",
+                        tooltip = "Settings",
+                        isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Settings),
+                        onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Settings
+                    )
+                    Layout.LayoutBtn(
+                        iconClassName = "swt:fluent--info-24-regular",
+                        tooltip = "Info",
+                        isActive = (rightSidebarTarget = Mocks.RightSidebarTargetMock.Info),
+                        onClick = fun () -> toggleRightSidebarTarget Mocks.RightSidebarTargetMock.Info
+                    )
                 ],
             rightSidebarState = {
                 isOpen = rightSidebarIsOpen
