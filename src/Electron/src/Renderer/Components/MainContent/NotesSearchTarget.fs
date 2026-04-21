@@ -9,9 +9,9 @@ open Swate.Components.NoteTypes
 [<ReactComponent>]
 let NotesSearchTarget () =
 
-    let pageCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let fileTreeCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx()
+    let fileTreeCtx = Renderer.Context.FileStateContext.useFileStateCtx()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx()
     let notes, setNotes = React.useState ([]: Note list)
 
     let isLoading, setIsLoading = React.useState true
