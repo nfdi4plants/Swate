@@ -30,11 +30,9 @@ let Main () =
             services
 
     let searchAction =
-        ARCObjectWidget.SearchAction(
+        ARCObjectWidget.SearchActionForExplorerItems(
             viewModel.SearchItems,
-            (fun (name, _, _) -> name),
-            (fun (_, _, item) -> promise { do! handleExplorerSelection item } |> Promise.start),
-            itemSubtitle = (fun (_, subtitle, _) -> subtitle)
+            (fun item -> promise { do! handleExplorerSelection item } |> Promise.start)
         )
 
     Html.div [

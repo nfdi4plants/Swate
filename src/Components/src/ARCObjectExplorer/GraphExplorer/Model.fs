@@ -77,8 +77,8 @@ type Protocol ={
 
 [<StringEnum>]
 type ARCDatasets =
-    | Assay
     | Study
+    | Assay
     | Workflow
     | Run
 

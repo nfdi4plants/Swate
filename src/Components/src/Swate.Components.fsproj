@@ -175,6 +175,7 @@
     <Compile Include="ARCFileEditor\ArcFileEditor.fs" />
     <Compile Include="ARCObjectExplorer\GraphExplorer\Model.fs" />
     <Compile Include="ARCObjectExplorer\GraphExplorer\ToArcExplorerNodes.fs" />
+    <Compile Include="ARCObjectExplorer\ArcObjectDetailsLayout.fs" />
     <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectDetails.fs" />
     <Compile Include="ARCObjectExplorer\ARCExplorer.fs" />
     <Compile Include="ARCObjectExplorer\ARCObjectPanel.fs" />

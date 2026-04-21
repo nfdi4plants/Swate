@@ -311,6 +311,21 @@ type ARCObjectWidget =
         )
 
     [<ReactComponent>]
+    static member SearchActionForExplorerItems
+        (
+            items: (string * string option * FileItem)[],
+            onSelectItem: FileItem -> unit,
+            ?placeholder: string
+        ) =
+        ARCObjectWidget.SearchAction(
+            items,
+            (fun (name, _, _) -> name),
+            (fun (_, _, item) -> onSelectItem item),
+            itemSubtitle = (fun (_, subtitle, _) -> subtitle),
+            ?placeholder = placeholder
+        )
+
+    [<ReactComponent>]
     static member Navbar
         (
             selectedTitle: string,
@@ -391,13 +406,13 @@ type ARCObjectWidget =
             Html.button [
                 prop.type'.button
                 prop.className [
-                    "swt:flex swt:w-full swt:min-w-0 swt:flex-col swt:items-center swt:justify-center swt:gap-3 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:min-h-28 swt:text-center swt:transition-colors hover:swt:border-primary/60 hover:swt:bg-base-200/60"
+                    "swt:flex swt:w-full swt:min-w-0 swt:flex-col swt:items-center swt:justify-center swt:gap-2 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:min-h-20 swt:text-center swt:transition-colors hover:swt:border-primary/60 hover:swt:bg-base-200/60"
                     if isCurrentTarget then "swt:border-primary swt:bg-primary/10"
                 ]
                 prop.onClick (fun _ -> onItemClick item)
                 prop.children [
                     Html.i [
-                        prop.className (ARCObjectWidget.IconClassName([ "swt:iconify"; "swt:text-4xl" ], item))
+                        prop.className (ARCObjectWidget.IconClassName([ "swt:iconify"; "swt:text-2xl" ], item))
                     ]
                     Html.div [
                         prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-1 swt:w-full"
@@ -484,7 +499,7 @@ type ARCObjectWidget =
                     ]
                     Html.div [
                         prop.className
-                            "swt:grid swt:grid-cols-[repeat(auto-fill,minmax(15rem,1fr))] swt:gap-3 swt:overflow-x-hidden swt:pb-2"
+                            "swt:grid swt:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] swt:gap-2 swt:overflow-x-hidden swt:pb-2"
                         prop.children [
                             for visibleItem in section.Items do
                                 iconTile

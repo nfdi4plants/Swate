@@ -547,12 +547,30 @@ type GraphObjectFixture =
             Datasets = [ studyDataset; assayDataset; workflowDataset; runDataset ]
         }
 
+    static member private fakeGraphModels() : ARC list =
+        let primaryArc = GraphObjectFixture.fakeGraphModel ()
+
+        let secondaryArc = {
+            primaryArc with
+                path = "C:/example/arc-graph-secondary"
+                Datasets =
+                    primaryArc.Datasets
+                    |> List.map (fun dataset -> {
+                        dataset with
+                            id = $"{dataset.id}-secondary"
+                            identifier = $"{dataset.identifier}-secondary"
+                            name = $"{dataset.name} (Secondary ARC)"
+                    })
+        }
+
+        [ primaryArc; secondaryArc ]
+
     [<ReactComponent>]
     static member private StoryExample() =
-        let graphModel = React.useMemo ((fun () -> GraphObjectFixture.fakeGraphModel ()), [||])
+        let graphModels = React.useMemo ((fun () -> GraphObjectFixture.fakeGraphModels ()), [||])
 
         let nodes, nodeMetaById =
-            React.useMemo ((fun () -> ToArcExplorerNodes.toArcExplorerNodesWithMeta graphModel), [| box graphModel |])
+            React.useMemo ((fun () -> ToArcExplorerNodes.toArcExplorerNodesWithMetaFromArcs graphModels), [| box graphModels |])
 
         let selection, setSelection = React.useState ArcSelection.empty
 
@@ -576,13 +594,11 @@ type GraphObjectFixture =
             setSelection (ArcSelection.forExplorerNode nodeId path)
 
         let searchAction =
-            ARCObjectWidget.SearchAction(
+            ARCObjectWidget.SearchActionForExplorerItems(
                 viewModel.SearchItems,
-                (fun (name, _, _) -> name),
-                (fun (_, _, item) ->
+                (fun item ->
                     if item.Selectable then
                         setExplorerSelection item.Id item.Path),
-                itemSubtitle = (fun (_, subtitle, _) -> subtitle),
                 placeholder = "Search graph objects..."
             )
 

@@ -38,13 +38,6 @@ module ToArcExplorerNodes =
             .Replace("\\", "-")
             .Replace(":", "-")
 
-    let private datasetKindSortOrder =
-        function
-        | ARCDatasets.Study -> 0
-        | ARCDatasets.Assay -> 1
-        | ARCDatasets.Workflow -> 2
-        | ARCDatasets.Run -> 3
-
     let private nodeKindForDataset =
         function
         | ARCDatasets.Assay -> ArcExplorerNodeKind.Assay
@@ -606,6 +599,7 @@ module ToArcExplorerNodes =
         node, addMeta nodeId meta metaAfterProcesses
 
     let private datasetNode
+        (arcScopeId: string)
         (index: int)
         (dataset: Dataset)
         (metaById: Map<string, GraphNodeMeta>)
@@ -614,7 +608,7 @@ module ToArcExplorerNodes =
         let datasetKind = nodeKindForDataset dataset.type'
         let datasetName = dataset.name |> asOptionalText |> Option.defaultValue dataset.identifier
         let datasetTitle = datasetName
-        let nodeId = $"graph:{kindLabel.ToLowerInvariant()}:{sanitizeIdSegment dataset.identifier}:{index}"
+        let nodeId = $"{arcScopeId}:{kindLabel.ToLowerInvariant()}:{sanitizeIdSegment dataset.identifier}:{index}"
         let aboutProtocols = dataset.about
         let aboutProtocolNames =
             aboutProtocols
@@ -675,12 +669,13 @@ module ToArcExplorerNodes =
         node, addMeta nodeId meta metaAfterProtocols
 
     let private groupedDatasetNodes
+        (arcScopeId: string)
         (datasets: Dataset list)
         (metaById: Map<string, GraphNodeMeta>)
         =
         datasets
         |> List.groupBy (fun dataset -> dataset.type')
-        |> List.sortBy (fun (kind, _) -> datasetKindSortOrder kind)
+        |> List.sortBy (fun (kind, _) -> kind)
         |> List.fold (fun (groupsRev, state) (datasetKind, groupedDatasets) ->
             let sortedDatasets =
                 groupedDatasets
@@ -690,13 +685,13 @@ module ToArcExplorerNodes =
                 sortedDatasets
                 |> List.mapi (fun datasetIndex dataset -> datasetIndex, dataset)
                 |> List.fold (fun (nodesRev, state') (datasetIndex, dataset) ->
-                    let node, updatedState = datasetNode datasetIndex dataset state'
+                    let node, updatedState = datasetNode arcScopeId datasetIndex dataset state'
                     node :: nodesRev, updatedState) ([], state)
                 |> fun (nodesRev, updatedState) -> List.rev nodesRev, updatedState
 
             let groupNode =
                 ArcExplorerNode.create (
-                    $"graph:group:{(datasetKind.ToString()).ToLowerInvariant()}",
+                    $"{arcScopeId}:group:{(datasetKind.ToString()).ToLowerInvariant()}",
                     datasetKind.ToString(),
                     ArcExplorerNodeKind.Group,
                     isSelectable = false,
@@ -706,43 +701,55 @@ module ToArcExplorerNodes =
             groupNode :: groupsRev, nextState) ([], metaById)
         |> fun (groupsRev, state) -> List.rev groupsRev, state
 
-    let toArcExplorerNodesWithMeta (model: ARC) =
-        let rootName =
-            if String.IsNullOrWhiteSpace model.path then
-                "ARC Graph"
-            else
-                PathHelpers.getNameFromPath model.path
+    let toArcExplorerNodesWithMetaFromArcs (models: ARC list) =
+        let arcNodes, metaAfterArcs =
+            models
+            |> List.mapi (fun arcIndex model -> arcIndex, model)
+            |> List.fold (fun (arcNodesRev, state) (arcIndex, model) ->
+                let rootName =
+                    if String.IsNullOrWhiteSpace model.path then
+                        $"ARC Graph {arcIndex + 1}"
+                    else
+                        PathHelpers.getNameFromPath model.path
 
-        let rootPath =
-            model.path
-            |> asOptionalText
-            |> Option.map PathHelpers.normalizePath
+                let rootPath =
+                    model.path
+                    |> asOptionalText
+                    |> Option.map PathHelpers.normalizePath
 
-        let groupNodes, metaAfterGroups =
-            groupedDatasetNodes model.Datasets Map.empty
+                let arcNodeId = $"graph:arc:{arcIndex}"
 
-        let arcNodeId = "graph:arc"
-        let arcNode =
-            ArcExplorerNode.create (
-                arcNodeId,
-                rootName,
-                ArcExplorerNodeKind.Arc,
-                path = rootPath,
-                children = groupNodes
-            )
+                let groupNodes, metaAfterGroups =
+                    groupedDatasetNodes arcNodeId model.Datasets state
 
-        let arcRows = [
-            yield! optionalRow "Path" model.path
-            yield! row "Datasets" (string model.Datasets.Length)
-        ]
+                let arcNode =
+                    ArcExplorerNode.create (
+                        arcNodeId,
+                        rootName,
+                        ArcExplorerNodeKind.Arc,
+                        path = rootPath,
+                        children = groupNodes
+                    )
 
-        let arcMeta = {
-            KindLabel = ArcExplorerNodeKind.label ArcExplorerNodeKind.Arc
-            RoleLabel = "Canonical"
-            Description = Some "ARC node in the Storybook graph explorer."
-            Rows = arcRows
-            CaseExamples = arcObjectCaseExamples @ datasetCaseExamples
-        }
+                let arcRows = [
+                    yield! optionalRow "Path" model.path
+                    yield! row "Datasets" (string model.Datasets.Length)
+                ]
+
+                let arcMeta = {
+                    KindLabel = ArcExplorerNodeKind.label ArcExplorerNodeKind.Arc
+                    RoleLabel = "Canonical"
+                    Description = Some "ARC node in the Storybook graph explorer."
+                    Rows = arcRows
+                    CaseExamples = arcObjectCaseExamples @ datasetCaseExamples
+                }
+
+                let nextState = addMeta arcNodeId arcMeta metaAfterGroups
+
+                arcNode :: arcNodesRev, nextState) ([], Map.empty)
+            |> fun (arcNodesRev, state) -> List.rev arcNodesRev, state
+
+        let totalArcs = arcNodes.Length
 
         let allNodeId = "graph:all"
         let allNode =
@@ -750,7 +757,7 @@ module ToArcExplorerNodes =
                 allNodeId,
                 "ARCs",
                 ArcExplorerNodeKind.Arc,
-                children = [ arcNode ]
+                children = arcNodes
             )
 
         let allMeta = {
@@ -758,7 +765,7 @@ module ToArcExplorerNodes =
             RoleLabel = "Canonical"
             Description = Some "Top layer containing all ARC roots."
             Rows = [
-                yield! row "ARCs" "1"
+                yield! row "ARCs" (string totalArcs)
             ]
             CaseExamples = [
                 "ARCs", "ARCs -> [Arc(...)]"
@@ -766,7 +773,7 @@ module ToArcExplorerNodes =
         }
 
         let canonicalNodes =
-            flattenNodes [ arcNode ]
+            flattenNodes arcNodes
 
         let datasetCandidates =
             canonicalNodes |> List.filter isDatasetNode
@@ -783,16 +790,15 @@ module ToArcExplorerNodes =
         let materialCandidates =
             canonicalNodes
             |> List.filter isProcessEndpointNode
-            |> List.filter (fun node -> hasMetaValueType "Material" node metaAfterGroups)
+            |> List.filter (fun node -> hasMetaValueType "Material" node metaAfterArcs)
 
         let dataCandidates =
             canonicalNodes
             |> List.filter isProcessEndpointNode
-            |> List.filter (fun node -> hasMetaValueType "Data" node metaAfterGroups)
+            |> List.filter (fun node -> hasMetaValueType "Data" node metaAfterArcs)
 
         let allWithMetaById =
-            metaAfterGroups
-            |> addMeta arcNodeId arcMeta
+            metaAfterArcs
             |> addMeta allNodeId allMeta
 
         let datasetsLayer, afterDatasets =
@@ -864,6 +870,9 @@ module ToArcExplorerNodes =
             materialsLayer
             datasLayer
         ], metaById
+
+    let toArcExplorerNodesWithMeta (model: ARC) =
+        toArcExplorerNodesWithMetaFromArcs [ model ]
 
     let toArcExplorerNodes (model: ARC) =
         toArcExplorerNodesWithMeta model |> fst

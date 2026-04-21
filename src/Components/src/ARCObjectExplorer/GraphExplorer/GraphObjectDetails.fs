@@ -1,23 +1,11 @@
 namespace Swate.Components.ARCObjectExplorer.GraphExplorer
 
 open Feliz
+open Swate.Components.ARCObjectExplorer
 open Swate.Components.Shared
 
 [<RequireQualifiedAccess>]
 type GraphObjectDetails =
-
-    [<ReactComponent>]
-    static member private Section(title: string, children: ReactElement list) =
-        Html.div [
-            prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
-            prop.children [
-                Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-3"; prop.text title ]
-                Html.div [
-                    prop.className "swt:flex swt:flex-col swt:gap-3"
-                    prop.children children
-                ]
-            ]
-        ]
 
     [<ReactComponent>]
     static member private PropertyTable(rows: (string * string) list) =
@@ -74,16 +62,7 @@ type GraphObjectDetails =
     ) =
         match selectedNode with
         | None ->
-            Html.div [
-                prop.className
-                    "swt:flex swt:flex-1 swt:items-center swt:justify-center swt:rounded-lg swt:border swt:border-dashed swt:border-base-300 swt:bg-base-200/40 swt:p-6"
-                prop.children [
-                    Html.p [
-                        prop.className "swt:text-sm swt:text-center swt:opacity-70"
-                        prop.text "Select a graph object to inspect details."
-                    ]
-                ]
-            ]
+            ArcObjectDetailsLayout.EmptyState("Select a graph object to inspect details.")
         | Some selectedNode ->
             let selectedMeta = nodeMetaById |> Map.tryFind selectedNode.id
             let selectionKind =
@@ -113,7 +92,7 @@ type GraphObjectDetails =
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:gap-3 swt:h-full"
                 prop.children [
-                    GraphObjectDetails.Section(
+                    ArcObjectDetailsLayout.Section(
                         "Selection",
                         [
                             Html.h4 [
@@ -126,7 +105,7 @@ type GraphObjectDetails =
                     match ancestorItems with
                     | [] -> Html.none
                     | items ->
-                        GraphObjectDetails.Section(
+                        ArcObjectDetailsLayout.Section(
                             "Ancestors",
                             [
                                 Html.div [
@@ -149,7 +128,7 @@ type GraphObjectDetails =
                     match childItems with
                     | [] -> Html.none
                     | items ->
-                        GraphObjectDetails.Section(
+                        ArcObjectDetailsLayout.Section(
                             "Children",
                             [
                                 Html.div [
@@ -171,7 +150,7 @@ type GraphObjectDetails =
                         )
                     match selectedMeta with
                     | Some meta ->
-                        GraphObjectDetails.Section(
+                        ArcObjectDetailsLayout.Section(
                             "Metadata",
                             [
                                 GraphObjectDetails.PropertyTable(
@@ -191,7 +170,7 @@ type GraphObjectDetails =
                             ]
                         )
                     | None ->
-                        GraphObjectDetails.Section(
+                        ArcObjectDetailsLayout.Section(
                             "Metadata",
                             [
                                 Html.p [
@@ -202,7 +181,7 @@ type GraphObjectDetails =
                         )
                     match selectedMeta with
                     | Some meta when List.isEmpty meta.CaseExamples |> not ->
-                        GraphObjectDetails.Section(
+                        ArcObjectDetailsLayout.Section(
                             "Case Examples",
                             [
                                 GraphObjectDetails.CaseExampleTable(meta.CaseExamples)

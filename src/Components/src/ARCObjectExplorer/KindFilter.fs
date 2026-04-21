@@ -5,26 +5,27 @@ open Swate.Components
 [<RequireQualifiedAccess>]
 module KindFilter =
 
-    let ArcObjectExplorerOptions: SelectItem<string>[] = [|
-        {| label = "Study"; item = "Study" |}
-        {| label = "Assay"; item = "Assay" |}
-        {| label = "Workflow"; item = "Workflow" |}
-        {| label = "Run"; item = "Run" |}
-        {| label = "Table"; item = "Table" |}
-        {| label = "DataMap"; item = "DataMap" |}
-        {| label = "Note"; item = "Note" |}
-        {| label = "Sample"; item = "Sample" |}
-    |]
+    let private createOption(label: string) : SelectItem<string> = {|
+        label = label
+        item = label
+    |}
 
-    let GraphObjectExplorerOptions: SelectItem<string>[] = [|
-        {| label = "Study"; item = "Study" |}
-        {| label = "Assay"; item = "Assay" |}
-        {| label = "Workflow"; item = "Workflow" |}
-        {| label = "Run"; item = "Run" |}
-        {| label = "Table"; item = "Table" |}
-        {| label = "DataMap"; item = "DataMap" |}
-        {| label = "Sample"; item = "Sample" |}
-    |]
+    let ArcObjectExplorerOptions: SelectItem<string>[] =
+        [|
+            "Study"
+            "Assay"
+            "Workflow"
+            "Run"
+            "Table"
+            "DataMap"
+            "Note"
+            "Sample"
+        |]
+        |> Array.map createOption
+
+    let GraphObjectExplorerOptions: SelectItem<string>[] =
+        ArcObjectExplorerOptions
+        |> Array.filter (fun option -> option.item <> "Note")
 
     let defaultSelectedIndices (options: SelectItem<string>[]) =
         options
