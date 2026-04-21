@@ -14,13 +14,6 @@ open ARCtrl
 
 module FileExplorerCreate =
 
-    [<RequireQualifiedAccess>]
-    type ArcCreateKind =
-        | Study
-        | Assay
-        | Workflow
-        | Run
-
     type ArcCreateDraft = { ArcFile: ArcFiles; Path: string }
 
     let rec loopPaths (selectedTreeItemPath: string option) (parent: FileTreeNode) =
@@ -50,40 +43,38 @@ module FileExplorerCreate =
                     IsLFS = parent.isLfs
             }
 
-    let arcCreateKindLabel =
-        function
-        | ArcCreateKind.Study -> "Study"
-        | ArcCreateKind.Assay -> "Assay"
-        | ArcCreateKind.Workflow -> "Workflow"
-        | ArcCreateKind.Run -> "Run"
+    let arcCreateKindLabel = ArcExplorerNodeKind.label
 
     let arcCreateKindIcon =
         function
-        | ArcCreateKind.Study -> "swt:fluent--document-table-24-regular"
-        | ArcCreateKind.Assay -> "swt:fluent--beaker-24-regular"
-        | ArcCreateKind.Workflow -> "swt:fluent--flowchart-24-regular"
-        | ArcCreateKind.Run -> "swt:fluent--play-24-regular"
+        | ArcExplorerNodeKind.Study -> "swt:fluent--document-table-24-regular"
+        | ArcExplorerNodeKind.Assay -> "swt:fluent--beaker-24-regular"
+        | ArcExplorerNodeKind.Workflow -> "swt:fluent--flowchart-24-regular"
+        | ArcExplorerNodeKind.Run -> "swt:fluent--play-24-regular"
+        | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
 
     let arcCreateKinds = [
-        ArcCreateKind.Study
-        ArcCreateKind.Assay
-        ArcCreateKind.Workflow
-        ArcCreateKind.Run
+        ArcExplorerNodeKind.Study
+        ArcExplorerNodeKind.Assay
+        ArcExplorerNodeKind.Workflow
+        ArcExplorerNodeKind.Run
     ]
 
     let arcCreateKindSortOrder =
         function
-        | ArcCreateKind.Study -> 10
-        | ArcCreateKind.Assay -> 20
-        | ArcCreateKind.Workflow -> 30
-        | ArcCreateKind.Run -> 40
+        | ArcExplorerNodeKind.Study -> 10
+        | ArcExplorerNodeKind.Assay -> 20
+        | ArcExplorerNodeKind.Workflow -> 30
+        | ArcExplorerNodeKind.Run -> 40
+        | _ -> 1000
 
     let arcCreateKindDefaultIdentifier =
         function
-        | ArcCreateKind.Study -> "NewStudy"
-        | ArcCreateKind.Assay -> "NewAssay"
-        | ArcCreateKind.Workflow -> "NewWorkflow"
-        | ArcCreateKind.Run -> "NewRun"
+        | ArcExplorerNodeKind.Study -> "New Study"
+        | ArcExplorerNodeKind.Assay -> "New Assay"
+        | ArcExplorerNodeKind.Workflow -> "New Workflow"
+        | ArcExplorerNodeKind.Run -> "New Run"
+        | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
 
     let isArcCreateIdentifierValid (identifier: string) =
         let identifier = identifier.Trim()
@@ -94,21 +85,22 @@ module FileExplorerCreate =
     let arcCreateIdentifierError =
         "Identifier is required and may only contain letters, digits, spaces, underscores, or dashes."
 
-    let createArcFile kind identifier =
+    let tryCreateArcFile kind identifier =
         match kind with
-        | ArcCreateKind.Study ->
+        | ArcExplorerNodeKind.Study ->
             let study = ArcStudy.init identifier
             study.InitTable($"{identifier} Table") |> ignore
-            ArcFiles.Study(study, [])
-        | ArcCreateKind.Assay ->
+            Ok(ArcFiles.Study(study, []))
+        | ArcExplorerNodeKind.Assay ->
             let assay = ArcAssay.init identifier
             assay.InitTable($"{identifier} Table") |> ignore
-            ArcFiles.Assay assay
-        | ArcCreateKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow
-        | ArcCreateKind.Run ->
+            Ok(ArcFiles.Assay assay)
+        | ArcExplorerNodeKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow |> Ok
+        | ArcExplorerNodeKind.Run ->
             let run = ArcRun.init identifier
             run.InitTable($"{identifier} Table") |> ignore
-            ArcFiles.Run run
+            Ok(ArcFiles.Run run)
+        | kind -> Error $"Creating {ArcExplorerNodeKind.label kind} files is not supported from the file explorer."
 
     let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq) =
         let identifier = identifier.Trim()
@@ -117,24 +109,25 @@ module FileExplorerCreate =
         if isArcCreateIdentifierValid identifier |> not then
             Error arcCreateIdentifierError
         else
-            let arcFile = createArcFile kind identifier
+            match tryCreateArcFile kind identifier with
+            | Error errorMessage -> Error errorMessage
+            | Ok arcFile ->
+                match FileContentDTO.fromArcFile arcFile with
+                | None -> Error $"Creating {label} files is not supported in Electron yet."
+                | Some request ->
+                    let requestedPath = normalizePath request.path
 
-            match FileContentDTO.fromArcFile arcFile with
-            | None -> Error $"Creating {label} files is not supported in Electron yet."
-            | Some request ->
-                let requestedPath = normalizePath request.path
+                    let alreadyExists =
+                        existingPaths
+                        |> Seq.exists (fun path -> PathHelpers.pathsEqual (normalizePath path) requestedPath)
 
-                let alreadyExists =
-                    existingPaths
-                    |> Seq.exists (fun path -> PathHelpers.pathsEqual (normalizePath path) requestedPath)
-
-                if alreadyExists then
-                    Error $"{label} '{identifier}' already exists."
-                else
-                    Ok {
-                        ArcFile = arcFile
-                        Path = requestedPath
-                    }
+                    if alreadyExists then
+                        Error $"{label} '{identifier}' already exists."
+                    else
+                        Ok {
+                            ArcFile = arcFile
+                            Path = requestedPath
+                        }
 
 open FileExplorerCreate
 
@@ -147,11 +140,11 @@ let EmptyFileTreePlaceholder () =
 
 [<ReactComponent>]
 let private ArcCreateModal
-    (kind: ArcCreateKind option)
+    (kind: ArcExplorerNodeKind option)
     (identifier: string)
     (setIdentifier: string -> unit)
     (close: unit -> unit)
-    (submit: ArcCreateKind -> string -> unit)
+    (submit: ArcExplorerNodeKind -> string -> unit)
     =
 
     let setIsOpen isOpen =
@@ -226,15 +219,15 @@ let private ArcCreateModal
 [<ReactComponent>]
 let FileTree () =
 
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let pendingCreateKind, setPendingCreateKind =
-        React.useState<ArcCreateKind option> None
+        React.useState<ArcExplorerNodeKind option> None
 
     let createIdentifier, setCreateIdentifier = React.useState ""
-    let errorModal = ErrorModal.Context.useErrorModal ()
+    let errorModal = ErrorModal.Context.useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 
     match fileStateCtx.state.FileTree with
