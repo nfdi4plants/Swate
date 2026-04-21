@@ -13,7 +13,7 @@ let Main () =
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let viewModel =
-        ArcObjectExplorerView.create
+        Swate.Components.ARCObjectExplorer.Model.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
             KindFilter.arcObjectExplorerOptions

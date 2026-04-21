@@ -12,7 +12,7 @@ let Main () =
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let viewModel =
-        ArcObjectExplorerView.create
+        Swate.Components.ARCObjectExplorer.Model.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
             KindFilter.arcObjectExplorerOptions
@@ -42,8 +42,8 @@ let Main () =
             "swt:size-full swt:min-w-0 swt:min-h-0 swt:flex swt:flex-col swt:gap-3 swt:overflow-hidden swt:p-4"
         prop.children [
             ARCObjectWidget.Navbar(
-                ArcObjectExplorerView.selectedTitle viewModel,
-                ArcObjectExplorerView.selectedSubtitle viewModel,
+                Swate.Components.ARCObjectExplorer.Model.selectedTitle viewModel,
+                Swate.Components.ARCObjectExplorer.Model.selectedSubtitle viewModel,
                 KindFilter.arcObjectExplorerOptions,
                 arcObjectCtx.state.SelectedKindIndices,
                 arcObjectCtx.setSelectedKindIndices,
@@ -62,7 +62,7 @@ let Main () =
                 content =
                     ARCObjectWidget.ExplorerContent(
                         viewModel.ExplorerItems,
-                        ?selectedItemId = ArcObjectExplorerView.selectedItemId viewModel,
+                        ?selectedItemId = Swate.Components.ARCObjectExplorer.Model.selectedItemId viewModel,
                         onItemClick =
                             (fun item ->
                                 if item.Selectable then

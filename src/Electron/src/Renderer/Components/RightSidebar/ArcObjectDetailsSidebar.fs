@@ -12,7 +12,7 @@ let Main () =
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let viewModel =
-        ArcObjectExplorerView.create
+        Swate.Components.ARCObjectExplorer.Model.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
             KindFilter.arcObjectExplorerOptions
@@ -25,8 +25,8 @@ let Main () =
                 "ARC Object Details",
                 content =
                     ArcObjectExplorerContent.ARCObjectDetailsContent(
-                        ArcObjectExplorerView.selectedNode viewModel,
-                        ArcObjectExplorerView.selectedAncestors viewModel,
+                        Swate.Components.ARCObjectExplorer.Model.selectedNode viewModel,
+                        Swate.Components.ARCObjectExplorer.Model.selectedAncestors viewModel,
                         arcObjectCtx.state.PageState,
                         arcObjectCtx.state.ArcFileState,
                         arcObjectCtx.setArcFileState,
