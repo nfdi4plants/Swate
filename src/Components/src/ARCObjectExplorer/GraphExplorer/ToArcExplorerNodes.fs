@@ -851,8 +851,8 @@ module ToArcExplorerNodes =
 
         let datasLayer, metaById =
             createCategoryLayer
-                "datas"
-                "Datas"
+                "Data"
+                "Data"
                 "Top-level index of all data endpoint nodes."
                 [
                     "Data(Files)", "Data(Files({ path = \"assays/metabolomics/feature-table.tsv\"; ... }))"

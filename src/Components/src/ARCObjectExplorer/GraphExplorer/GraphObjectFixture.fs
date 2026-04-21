@@ -7,17 +7,16 @@ open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer
 open Swate.Components.FileExplorerTypes
 
-[<Erase; Mangle(false)>]
-type GraphObjectFixture =
+module private GraphObjectFixtureHelper =
 
-    static member private kindLabel =
+    let kindLabel =
         function
         | ARCDatasets.Assay -> "Assay"
         | ARCDatasets.Study -> "Study"
         | ARCDatasets.Workflow -> "Workflow"
         | ARCDatasets.Run -> "Run"
 
-    static member private makeMaterial(id: string, name: string, materialType: string, isSource: bool) =
+    let makeMaterial(id: string, name: string, materialType: string, isSource: bool) =
         let material = {
             id = id
             type' = materialType
@@ -30,7 +29,7 @@ type GraphObjectFixture =
         else
             ProcessType.Material(ARCMaterial.Samples material)
 
-    static member private makeFilesData(id: string, name: string, path: string, dataType: string) =
+    let makeFilesData(id: string, name: string, path: string, dataType: string) =
         ARCData.Files {
             id = Some id
             type' = dataType
@@ -44,7 +43,7 @@ type GraphObjectFixture =
         }
         |> ProcessType.Data
 
-    static member private makeFragmentSelectorData
+    let makeFragmentSelectorData
         (
             id: string,
             name: string,
@@ -66,7 +65,7 @@ type GraphObjectFixture =
         }
         |> ProcessType.Data
 
-    static member private makeProcess
+    let makeProcess
         (
             name: string,
             executesProtocol: string,
@@ -85,7 +84,7 @@ type GraphObjectFixture =
             parameterValue = None
         }
 
-    static member private makeFormalParameter
+    let makeFormalParameter
         (
             id: string,
             name: string,
@@ -107,7 +106,7 @@ type GraphObjectFixture =
             processes = processes
         }
 
-    static member private makeProtocol
+    let makeProtocol
         (
             id: string,
             name: string,
@@ -131,7 +130,7 @@ type GraphObjectFixture =
             formalParameters = formalParameters
         }
 
-    static member private makeDataset
+    let makeDataset
         (
             kind: ARCDatasets,
             identifier: string,
@@ -141,9 +140,9 @@ type GraphObjectFixture =
         )
         : Dataset =
         {
-            id = $"{(GraphObjectFixture.kindLabel kind).ToLowerInvariant()}:{identifier}"
+            id = $"{(kindLabel kind).ToLowerInvariant()}:{identifier}"
             type' = kind
-            additionalType = GraphObjectFixture.kindLabel kind
+            additionalType = kindLabel kind
             identifier = identifier
             name = name
             description = description
@@ -152,7 +151,7 @@ type GraphObjectFixture =
             about = aboutProtocols
         }
 
-    static member private collapseExplorerItems (items: FileItem list) =
+    let collapseExplorerItems (items: FileItem list) =
         let rec collapseItem (item: FileItem) =
             let collapsedChildren =
                 item.Children
@@ -166,20 +165,20 @@ type GraphObjectFixture =
 
         items |> List.map collapseItem
 
-    static member private fakeGraphModel() : ARC =
-        let sourceLeaf = GraphObjectFixture.makeMaterial("source:leaf-a", "Leaf-A", "Source", true)
-        let sampleLeaf = GraphObjectFixture.makeMaterial("sample:leaf-a", "Leaf-A", "Sample", false)
-        let extractMaterial = GraphObjectFixture.makeMaterial("material:extract-a", "Leaf-Extract-A", "Extract", false)
+    let fakeGraphModel() : ARC =
+        let sourceLeaf = makeMaterial("source:leaf-a", "Leaf-A", "Source", true)
+        let sampleLeaf = makeMaterial("sample:leaf-a", "Leaf-A", "Sample", false)
+        let extractMaterial = makeMaterial("material:extract-a", "Leaf-Extract-A", "Extract", false)
         let replicateMaterial =
-            GraphObjectFixture.makeMaterial("sample:leaf-a-replicate", "Leaf-A Replicate", "Sample", false)
+            makeMaterial("sample:leaf-a-replicate", "Leaf-A Replicate", "Sample", false)
         let cultivationLogData =
-            GraphObjectFixture.makeFilesData("data:cultivation-log", "Cultivation Log", "studies/drought-response/cultivation-log.tsv", "Data")
+            makeFilesData("data:cultivation-log", "Cultivation Log", "studies/drought-response/cultivation-log.tsv", "Data")
         let extractionManifestData =
-            GraphObjectFixture.makeFilesData("data:extraction-manifest", "Extraction Manifest", "workflows/extraction/extraction-manifest.tsv", "Data")
-        let metadataData = GraphObjectFixture.makeFilesData("data:sample-sheet", "Sample Sheet", "assays/metabolomics/sample-sheet.tsv", "Data")
-        let quantData = GraphObjectFixture.makeFilesData("data:feature-table", "Feature Table", "assays/metabolomics/feature-table.tsv", "Data")
+            makeFilesData("data:extraction-manifest", "Extraction Manifest", "workflows/extraction/extraction-manifest.tsv", "Data")
+        let metadataData = makeFilesData("data:sample-sheet", "Sample Sheet", "assays/metabolomics/sample-sheet.tsv", "Data")
+        let quantData = makeFilesData("data:feature-table", "Feature Table", "assays/metabolomics/feature-table.tsv", "Data")
         let fragmentData =
-            GraphObjectFixture.makeFragmentSelectorData(
+            makeFragmentSelectorData(
                 "data:feature-window",
                 "Feature Window",
                 "assays/metabolomics/feature-table.tsv",
@@ -188,7 +187,7 @@ type GraphObjectFixture =
                 "MS:1000515"
             )
         let fragmentReviewData =
-            GraphObjectFixture.makeFragmentSelectorData(
+            makeFragmentSelectorData(
                 "data:feature-window-reviewed",
                 "Feature Window (Reviewed)",
                 "assays/metabolomics/feature-table.tsv",
@@ -197,7 +196,7 @@ type GraphObjectFixture =
                 "MS:1000515"
             )
         let cultivationFragmentData =
-            GraphObjectFixture.makeFragmentSelectorData(
+            makeFragmentSelectorData(
                 "data:cultivation-window",
                 "Cultivation Window",
                 "studies/drought-response/cultivation-log.tsv",
@@ -206,9 +205,9 @@ type GraphObjectFixture =
                 "SWATE:FRAGMENT:CULTIVATION"
             )
         let extractionSourceMaterial =
-            GraphObjectFixture.makeMaterial("source:extraction-reference", "Extraction Reference Leaf", "Source", true)
+            makeMaterial("source:extraction-reference", "Extraction Reference Leaf", "Source", true)
         let extractionFragmentData =
-            GraphObjectFixture.makeFragmentSelectorData(
+            makeFragmentSelectorData(
                 "data:extraction-window",
                 "Extraction Window",
                 "workflows/extraction/extraction-manifest.tsv",
@@ -217,11 +216,11 @@ type GraphObjectFixture =
                 "SWATE:FRAGMENT:EXTRACTION"
             )
         let measurementSourceMaterial =
-            GraphObjectFixture.makeMaterial("source:measurement-reference", "Measurement Reference Extract", "Source", true)
+            makeMaterial("source:measurement-reference", "Measurement Reference Extract", "Source", true)
         let measurementSampleMaterial =
-            GraphObjectFixture.makeMaterial("sample:measurement-qc", "Measurement QC Sample", "Sample", false)
+            makeMaterial("sample:measurement-qc", "Measurement QC Sample", "Sample", false)
         let measurementFragmentData =
-            GraphObjectFixture.makeFragmentSelectorData(
+            makeFragmentSelectorData(
                 "data:measurement-window",
                 "Measurement Window",
                 "assays/metabolomics/feature-table.tsv",
@@ -230,9 +229,9 @@ type GraphObjectFixture =
                 "MS:1000515"
             )
         let runSourceMaterial =
-            GraphObjectFixture.makeMaterial("source:run-reference", "Run Reference Extract", "Source", true)
+            makeMaterial("source:run-reference", "Run Reference Extract", "Source", true)
         let runLogData =
-            GraphObjectFixture.makeFilesData("data:run-source-log", "Run Source Log", "runs/week-01/source-log.tsv", "Data")
+            makeFilesData("data:run-source-log", "Run Source Log", "runs/week-01/source-log.tsv", "Data")
 
         let cultivationProtocolId = "study:protocol:cultivation"
         let extractionProtocolId = "workflow:protocol:extraction"
@@ -248,7 +247,7 @@ type GraphObjectFixture =
             [ sourceMaterial; sampleMaterial; filesData; fragmentSelectorData ]
 
         let cultivationProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Grow plants",
                 cultivationProtocolId,
                 completeEndpointSet sourceLeaf sampleLeaf cultivationLogData cultivationFragmentData,
@@ -256,7 +255,7 @@ type GraphObjectFixture =
             )
 
         let cultivationInputProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Register source material",
                 cultivationProtocolId,
                 completeEndpointSet sourceLeaf sampleLeaf cultivationLogData cultivationFragmentData,
@@ -264,7 +263,7 @@ type GraphObjectFixture =
             )
 
         let sourceSnapshotProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Snapshot source inventory",
                 cultivationProtocolId,
                 completeEndpointSet sourceLeaf sampleLeaf cultivationLogData cultivationFragmentData,
@@ -272,7 +271,7 @@ type GraphObjectFixture =
             )
 
         let replicatePreparationProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Prepare sample replicate",
                 cultivationProtocolId,
                 completeEndpointSet sourceLeaf sampleLeaf cultivationLogData cultivationFragmentData,
@@ -280,7 +279,7 @@ type GraphObjectFixture =
             )
 
         let cultivationFragmentSelectionProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Define cultivation observation window",
                 cultivationProtocolId,
                 completeEndpointSet sourceLeaf sampleLeaf cultivationLogData cultivationFragmentData,
@@ -288,7 +287,7 @@ type GraphObjectFixture =
             )
 
         let extractionSourceRegistrationProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Register extraction source material",
                 extractionProtocolId,
                 completeEndpointSet extractionSourceMaterial extractMaterial extractionManifestData extractionFragmentData,
@@ -296,7 +295,7 @@ type GraphObjectFixture =
             )
 
         let extractionProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Extract metabolites",
                 extractionProtocolId,
                 completeEndpointSet extractionSourceMaterial extractMaterial extractionManifestData extractionFragmentData,
@@ -304,7 +303,7 @@ type GraphObjectFixture =
             )
 
         let annotationProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Attach sample metadata",
                 extractionProtocolId,
                 completeEndpointSet extractionSourceMaterial extractMaterial extractionManifestData extractionFragmentData,
@@ -312,7 +311,7 @@ type GraphObjectFixture =
             )
 
         let extractionFragmentSelectionProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Define extraction window",
                 extractionProtocolId,
                 completeEndpointSet extractionSourceMaterial extractMaterial extractionManifestData extractionFragmentData,
@@ -320,7 +319,7 @@ type GraphObjectFixture =
             )
 
         let measurementSourceRegistrationProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Register measurement source material",
                 measurementProtocolId,
                 completeEndpointSet measurementSourceMaterial measurementSampleMaterial metadataData measurementFragmentData,
@@ -328,7 +327,7 @@ type GraphObjectFixture =
             )
 
         let measurementProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Quantify features",
                 measurementProtocolId,
                 completeEndpointSet measurementSourceMaterial measurementSampleMaterial metadataData measurementFragmentData,
@@ -336,7 +335,7 @@ type GraphObjectFixture =
             )
 
         let measurementInputProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Prepare acquisition metadata",
                 measurementProtocolId,
                 completeEndpointSet measurementSourceMaterial measurementSampleMaterial metadataData measurementFragmentData,
@@ -344,7 +343,7 @@ type GraphObjectFixture =
             )
 
         let measurementSamplePreparationProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Prepare measurement QC sample",
                 measurementProtocolId,
                 completeEndpointSet measurementSourceMaterial measurementSampleMaterial metadataData measurementFragmentData,
@@ -352,7 +351,7 @@ type GraphObjectFixture =
             )
 
         let measurementFragmentSelectionProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Define measurement window",
                 measurementProtocolId,
                 completeEndpointSet measurementSourceMaterial measurementSampleMaterial quantData measurementFragmentData,
@@ -360,7 +359,7 @@ type GraphObjectFixture =
             )
 
         let runSourceRegistrationProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Register run source material",
                 runProtocolId,
                 completeEndpointSet runSourceMaterial extractMaterial runLogData fragmentData,
@@ -368,7 +367,7 @@ type GraphObjectFixture =
             )
 
         let injectionProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Inject extracts",
                 runProtocolId,
                 completeEndpointSet runSourceMaterial extractMaterial runLogData fragmentData,
@@ -376,7 +375,7 @@ type GraphObjectFixture =
             )
 
         let fragmentSelectionProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Select fragment window",
                 runProtocolId,
                 completeEndpointSet runSourceMaterial extractMaterial quantData fragmentData,
@@ -384,7 +383,7 @@ type GraphObjectFixture =
             )
 
         let fragmentReviewProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Review fragment window",
                 runProtocolId,
                 completeEndpointSet runSourceMaterial extractMaterial quantData fragmentData,
@@ -392,7 +391,7 @@ type GraphObjectFixture =
             )
 
         let fragmentRefinementProcess =
-            GraphObjectFixture.makeProcess(
+            makeProcess(
                 "Refine fragment window",
                 runProtocolId,
                 completeEndpointSet runSourceMaterial extractMaterial quantData fragmentData,
@@ -428,13 +427,13 @@ type GraphObjectFixture =
         ]
 
         let cultivationProtocol =
-            GraphObjectFixture.makeProtocol(
+            makeProtocol(
                 cultivationProtocolId,
                 "Plant Cultivation",
                 "Prepare biological source material before extraction.",
                 "Generate healthy source and sample material.",
                 [
-                    GraphObjectFixture.makeFormalParameter(
+                    makeFormalParameter(
                         "fp:light-cycle",
                         "Light Cycle",
                         "Configured day/night cycle.",
@@ -446,20 +445,20 @@ type GraphObjectFixture =
             )
 
         let extractionProtocol =
-            GraphObjectFixture.makeProtocol(
+            makeProtocol(
                 extractionProtocolId,
                 "Extraction",
                 "Transform samples into assay-ready extracts.",
                 "Generate measurable extract material.",
                 [
-                    GraphObjectFixture.makeFormalParameter(
+                    makeFormalParameter(
                         "fp:solvent",
                         "Extraction Solvent",
                         "Solvent composition used for extraction.",
                         "Control extraction chemistry.",
                         extractionProcesses
                     )
-                    GraphObjectFixture.makeFormalParameter(
+                    makeFormalParameter(
                         "fp:temperature",
                         "Extraction Temperature",
                         "Extraction temperature in degrees Celsius.",
@@ -471,13 +470,13 @@ type GraphObjectFixture =
             )
 
         let measurementProtocol =
-            GraphObjectFixture.makeProtocol(
+            makeProtocol(
                 measurementProtocolId,
                 "LC-MS Measurement",
                 "Instrument acquisition for metabolomics feature detection.",
                 "Produce quantified metabolite features.",
                 [
-                    GraphObjectFixture.makeFormalParameter(
+                    makeFormalParameter(
                         "fp:instrument",
                         "Instrument Model",
                         "Mass spectrometer platform identifier.",
@@ -489,13 +488,13 @@ type GraphObjectFixture =
             )
 
         let runProtocol =
-            GraphObjectFixture.makeProtocol(
+            makeProtocol(
                 runProtocolId,
                 "Week 1 Injection",
                 "Run-specific acquisition execution.",
                 "Track one acquisition cycle.",
                 [
-                    GraphObjectFixture.makeFormalParameter(
+                    makeFormalParameter(
                         "fp:batch",
                         "Batch Identifier",
                         "Run batch label.",
@@ -507,7 +506,7 @@ type GraphObjectFixture =
             )
 
         let studyDataset =
-            GraphObjectFixture.makeDataset(
+            makeDataset(
                 ARCDatasets.Study,
                 "study-drought-response",
                 "Drought Response Study",
@@ -516,7 +515,7 @@ type GraphObjectFixture =
             )
 
         let assayDataset =
-            GraphObjectFixture.makeDataset(
+            makeDataset(
                 ARCDatasets.Assay,
                 "assay-metabolomics",
                 "Metabolomics Assay",
@@ -525,7 +524,7 @@ type GraphObjectFixture =
             )
 
         let workflowDataset =
-            GraphObjectFixture.makeDataset(
+            makeDataset(
                 ARCDatasets.Workflow,
                 "workflow-extraction",
                 "Extraction Workflow",
@@ -534,7 +533,7 @@ type GraphObjectFixture =
             )
 
         let runDataset =
-            GraphObjectFixture.makeDataset(
+            makeDataset(
                 ARCDatasets.Run,
                 "run-week-01",
                 "Week 1 Instrument Run",
@@ -547,8 +546,8 @@ type GraphObjectFixture =
             Datasets = [ studyDataset; assayDataset; workflowDataset; runDataset ]
         }
 
-    static member private fakeGraphModels() : ARC list =
-        let primaryArc = GraphObjectFixture.fakeGraphModel ()
+    let fakeGraphModels() : ARC list =
+        let primaryArc = fakeGraphModel ()
 
         let secondaryArc = {
             primaryArc with
@@ -565,9 +564,12 @@ type GraphObjectFixture =
 
         [ primaryArc; secondaryArc ]
 
+[<Erase; Mangle(false)>]
+type GraphObjectFixture =
+
     [<ReactComponent>]
     static member private StoryExample() =
-        let graphModels = React.useMemo ((fun () -> GraphObjectFixture.fakeGraphModels ()), [||])
+        let graphModels = React.useMemo ((fun () -> GraphObjectFixtureHelper.fakeGraphModels ()), [||])
 
         let nodes, nodeMetaById =
             React.useMemo ((fun () -> ToArcExplorerNodes.toArcExplorerNodesWithMetaFromArcs graphModels), [| box graphModels |])
@@ -586,7 +588,7 @@ type GraphObjectFixture =
 
         let collapsedExplorerItems =
             React.useMemo (
-                (fun () -> GraphObjectFixture.collapseExplorerItems viewModel.ExplorerItems),
+                (fun () -> GraphObjectFixtureHelper.collapseExplorerItems viewModel.ExplorerItems),
                 [| box viewModel.ExplorerItems |]
             )
 
