@@ -9,8 +9,11 @@ type TemplateToolbar =
 
     [<ReactComponent>]
     static member TemplateToolbar
-        (selectedCount: int, canImport: bool, isRefreshing: bool, onRefresh: unit -> unit, onImport: unit -> unit)
+        (selectedCount: int, isRefreshing: bool, onRefresh: unit -> unit, onImport: unit -> unit)
         =
+
+        let canImport = selectedCount > 0
+
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:items-end"
             prop.children [

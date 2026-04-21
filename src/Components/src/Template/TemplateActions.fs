@@ -3,32 +3,15 @@ module Swate.Components.Template.TemplateActions
 open ARCtrl
 open Swate.Components.Template.Types
 
+/// Syncs the selected template IDs with the currently loaded templates, removing any IDs that no longer exist in the loaded templates.
 let syncSelectedTemplateIds
     (loadedTemplates: Template[])
     (setSelectedTemplateIds: (Set<System.Guid> -> Set<System.Guid>) -> unit)
-    (setTemplateImportDecisions:
-        (Map<System.Guid, TemplateImportAction> -> Map<System.Guid, TemplateImportAction>) -> unit)
-    (setDeselectedTemplateColumns: (Set<System.Guid * int> -> Set<System.Guid * int>) -> unit)
     =
     let templateIds =
         loadedTemplates |> Seq.map (fun template -> template.Id) |> Set.ofSeq
 
     setSelectedTemplateIds (fun selected -> selected |> Set.intersect templateIds)
-    |> ignore
-
-    setTemplateImportDecisions (fun decisions ->
-        decisions |> Map.filter (fun templateId _ -> templateIds.Contains templateId)
-    )
-    |> ignore
-
-    setDeselectedTemplateColumns (fun deselected ->
-        deselected
-        |> Set.filter (fun (templateId, columnIndex) ->
-            loadedTemplates
-            |> Array.tryFind (fun template -> template.Id = templateId)
-            |> Option.exists (fun template -> columnIndex >= 0 && columnIndex < template.Table.Columns.Count)
-        )
-    )
     |> ignore
 
 let toggleTemplateSelection (templateId: System.Guid) (selectedTemplateIds: Set<System.Guid>) =
@@ -39,13 +22,7 @@ let toggleTemplateSelection (templateId: System.Guid) (selectedTemplateIds: Set<
     else
         selectedTemplateIds.Add templateId
 
-let toggleTemplateSelectionState
-    (templateId: System.Guid)
-    (selectedTemplateIds: Set<System.Guid>)
-    (setTemplateImportDecisions:
-        (Map<System.Guid, TemplateImportAction> -> Map<System.Guid, TemplateImportAction>) -> unit)
-    (setDeselectedTemplateColumns: (Set<System.Guid * int> -> Set<System.Guid * int>) -> unit)
-    =
+let toggleTemplateSelectionState (templateId: System.Guid) (selectedTemplateIds: Set<System.Guid>) =
     let isCurrentlySelected = selectedTemplateIds.Contains templateId
 
     if isCurrentlySelected then
