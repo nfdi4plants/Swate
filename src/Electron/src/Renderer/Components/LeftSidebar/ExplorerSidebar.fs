@@ -33,5 +33,5 @@ let Main () =
                 )
             ]
         ]
-        Renderer.Components.FileExplorer.FileTree()
+        Renderer.Components.FileExplorer.FileExplorer.FileTree()
     ]

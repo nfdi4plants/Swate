@@ -9,10 +9,11 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Feliz
+open Fable.Core
 open ARCtrl
 
 
-module FileExplorerCreate =
+module private FileExplorerHelper =
 
     type ArcCreateDraft = { ArcFile: ArcFiles; Path: string }
 
@@ -43,37 +44,27 @@ module FileExplorerCreate =
                     IsLFS = parent.isLfs
             }
 
-    let arcCreateKindLabel = ArcExplorerNodeKind.label
-
     let arcCreateKindIcon =
         function
         | ArcExplorerNodeKind.Study -> "swt:fluent--document-table-24-regular"
         | ArcExplorerNodeKind.Assay -> "swt:fluent--beaker-24-regular"
-        | ArcExplorerNodeKind.Workflow -> "swt:fluent--flowchart-24-regular"
-        | ArcExplorerNodeKind.Run -> "swt:fluent--play-24-regular"
         | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
 
     let arcCreateKinds = [
         ArcExplorerNodeKind.Study
         ArcExplorerNodeKind.Assay
-        ArcExplorerNodeKind.Workflow
-        ArcExplorerNodeKind.Run
     ]
 
     let arcCreateKindSortOrder =
         function
         | ArcExplorerNodeKind.Study -> 10
         | ArcExplorerNodeKind.Assay -> 20
-        | ArcExplorerNodeKind.Workflow -> 30
-        | ArcExplorerNodeKind.Run -> 40
         | _ -> 1000
 
     let arcCreateKindDefaultIdentifier =
         function
         | ArcExplorerNodeKind.Study -> "New Study"
         | ArcExplorerNodeKind.Assay -> "New Assay"
-        | ArcExplorerNodeKind.Workflow -> "New Workflow"
-        | ArcExplorerNodeKind.Run -> "New Run"
         | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
 
     let isArcCreateIdentifierValid (identifier: string) =
@@ -95,16 +86,11 @@ module FileExplorerCreate =
             let assay = ArcAssay.init identifier
             assay.InitTable($"{identifier} Table") |> ignore
             Ok(ArcFiles.Assay assay)
-        | ArcExplorerNodeKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow |> Ok
-        | ArcExplorerNodeKind.Run ->
-            let run = ArcRun.init identifier
-            run.InitTable($"{identifier} Table") |> ignore
-            Ok(ArcFiles.Run run)
         | kind -> Error $"Creating {ArcExplorerNodeKind.label kind} files is not supported from the file explorer."
 
     let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq) =
         let identifier = identifier.Trim()
-        let label = arcCreateKindLabel kind
+        let label = ArcExplorerNodeKind.label kind
 
         if isArcCreateIdentifierValid identifier |> not then
             Error arcCreateIdentifierError
@@ -129,32 +115,28 @@ module FileExplorerCreate =
                             Path = requestedPath
                         }
 
-open FileExplorerCreate
+open FileExplorerHelper
 
-[<ReactComponent>]
-let EmptyFileTreePlaceholder () =
-    Html.div [
-        prop.className "swt:p-4 swt:text-center swt:text-gray-500"
-        prop.text "No files found."
-    ]
+[<Erase; Mangle(false)>]
+type private ArcCreateModal =
 
-[<ReactComponent>]
-let private ArcCreateModal
-    (kind: ArcExplorerNodeKind option)
-    (identifier: string)
-    (setIdentifier: string -> unit)
-    (close: unit -> unit)
-    (submit: ArcExplorerNodeKind -> string -> unit)
-    =
+    [<ReactComponent>]
+    static member Main
+        (kind: ArcExplorerNodeKind, close: unit -> unit, submit: ArcExplorerNodeKind -> string -> unit)
+        =
 
-    let setIsOpen isOpen =
-        if not isOpen then
-            close ()
+        let identifier, setIdentifier = React.useState (arcCreateKindDefaultIdentifier kind)
 
-    match kind with
-    | None -> BaseModal.BaseModal(false, setIsOpen, Html.none)
-    | Some kind ->
-        let label = arcCreateKindLabel kind
+        React.useEffect (
+            (fun () -> setIdentifier (arcCreateKindDefaultIdentifier kind)),
+            [| box kind |]
+        )
+
+        let setIsOpen isOpen =
+            if not isOpen then
+                close ()
+
+        let label = ArcExplorerNodeKind.label kind
         let isValid = isArcCreateIdentifierValid identifier
 
         let submitIfValid () =
@@ -216,168 +198,176 @@ let private ArcCreateModal
             debug = "arc-create"
         )
 
-[<ReactComponent>]
-let FileTree () =
+[<Erase; Mangle(false)>]
+type FileExplorer =
 
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
+    [<ReactComponent>]
+    static member private EmptyFileTreePlaceholder() =
+        Html.div [
+            prop.className "swt:p-4 swt:text-center swt:text-gray-500"
+            prop.text "No files found."
+        ]
 
-    let pendingCreateKind, setPendingCreateKind =
-        React.useState<ArcExplorerNodeKind option> None
+    [<ReactComponent>]
+    static member FileTree() =
 
-    let createIdentifier, setCreateIdentifier = React.useState ""
-    let errorModal = ErrorModal.Context.useErrorModalCtx ()
-    let arcScopeId = useCurrentArcScopeId ()
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+        let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+        let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
-    match fileStateCtx.state.FileTree with
-    | [||] -> EmptyFileTreePlaceholder()
-    | _ ->
+        // Holds the ARC object kind selected from the context menu; Some opens the create modal.
+        let pendingCreateKind, setPendingCreateKind =
+            React.useState<ArcExplorerNodeKind option> None
 
-        let fileTree = fileStateCtx.state.FileTree |> toFileTreeNode
+        let errorModal = ErrorModal.Context.useErrorModalCtx ()
+        let arcScopeId = useCurrentArcScopeId ()
 
-        let fileItem = loopPaths fileStateCtx.state.Selection.TreePath fileTree
+        match fileStateCtx.state.FileTree with
+        | [||] -> FileExplorer.EmptyFileTreePlaceholder()
+        | _ ->
 
-        let setError (errorMsg: string option) =
-            match errorMsg with
-            | Some msg ->
-                errorModal.enqueue (
-                    ErrorModalRequest.create (msg, title = "Git LFS update failed", ?scopeId = arcScopeId)
-                )
-            | None -> ()
+            let fileTree = fileStateCtx.state.FileTree |> toFileTreeNode
 
-        let toggleLfsMark =
-            FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
+            let fileItem = loopPaths fileStateCtx.state.Selection.TreePath fileTree
 
-        let openPreview (item: FileItem) =
-            promise {
-                match item.Path with
-                | None ->
+            let setError (errorMsg: string option) =
+                match errorMsg with
+                | Some msg ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create (
-                            $"File '{item.Name}' has no path.",
-                            title = "Preview failed",
-                            ?scopeId = arcScopeId
-                        )
+                        ErrorModalRequest.create (msg, title = "Git LFS update failed", ?scopeId = arcScopeId)
                     )
-                | Some path when item.IsDirectory ->
-                    let selectedPath = normalizePath path
-                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                | None -> ()
 
-                    Renderer.Components.ARCHelper.clearArcObjectPreview
-                        arcObjectCtx.setArcFileState
-                        arcObjectCtx.setPreviewState
-                        arcObjectCtx.setStatusMessage
+            let toggleLfsMark =
+                FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
 
-                    pageStateCtx.setState None
-                | Some path ->
-                    let selectedPath = normalizePath path
-                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+            let openPreview (item: FileItem) =
+                promise {
+                    match item.Path with
+                    | None ->
+                        errorModal.enqueue (
+                            ErrorModalRequest.create (
+                                $"File '{item.Name}' has no path.",
+                                title = "Preview failed",
+                                ?scopeId = arcScopeId
+                            )
+                        )
+                    | Some path when item.IsDirectory ->
+                        let selectedPath = normalizePath path
+                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    let! result = Renderer.Components.ARCHelper.openView selectedPath
-
-                    match result with
-                    | Ok loaded ->
-                        console.log ("[Renderer] Received data, processing...")
-
-                        Renderer.Components.ARCHelper.applyLoadedView
-                            pageStateCtx.setState
+                        Renderer.Components.ARCHelper.clearArcObjectPreview
                             arcObjectCtx.setArcFileState
                             arcObjectCtx.setPreviewState
                             arcObjectCtx.setStatusMessage
-                            loaded
-                    | Error errorMessage ->
-                        let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
-                        console.log ($"[Renderer] Error: {fullErrorMessage}")
 
-                        Renderer.Components.ARCHelper.applyViewError
-                            pageStateCtx.setState
-                            arcObjectCtx.setArcFileState
-                            arcObjectCtx.setPreviewState
-                            arcObjectCtx.setStatusMessage
-                            fullErrorMessage
-            }
-            |> Promise.start
+                        pageStateCtx.setState None
+                    | Some path ->
+                        let selectedPath = normalizePath path
+                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-        let closeCreateModal () =
-            setPendingCreateKind None
-            setCreateIdentifier ""
+                        let! result = Renderer.Components.ARCHelper.openView selectedPath
 
-        let openCreateModal kind =
-            setCreateIdentifier (arcCreateKindDefaultIdentifier kind)
-            setPendingCreateKind (Some kind)
+                        match result with
+                        | Ok loaded ->
+                            console.log ("[Renderer] Received data, processing...")
 
-        let applyCreateError errorMessage =
-            Renderer.Components.ARCHelper.applyViewError
-                pageStateCtx.setState
-                arcObjectCtx.setArcFileState
-                arcObjectCtx.setPreviewState
-                arcObjectCtx.setStatusMessage
-                errorMessage
+                            Renderer.Components.ARCHelper.applyLoadedView
+                                pageStateCtx.setState
+                                arcObjectCtx.setArcFileState
+                                arcObjectCtx.setPreviewState
+                                arcObjectCtx.setStatusMessage
+                                loaded
+                        | Error errorMessage ->
+                            let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
+                            console.log ($"[Renderer] Error: {fullErrorMessage}")
 
-        let createArcEntry kind (identifier: string) =
-            let existingPaths =
-                fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
+                            Renderer.Components.ARCHelper.applyViewError
+                                pageStateCtx.setState
+                                arcObjectCtx.setArcFileState
+                                arcObjectCtx.setPreviewState
+                                arcObjectCtx.setStatusMessage
+                                fullErrorMessage
+                }
+                |> Promise.start
 
-            match tryBuildArcCreateDraft kind identifier existingPaths with
-            | Error errorMessage -> applyCreateError errorMessage
-            | Ok draft ->
-                fileStateCtx.setSelection (ArcSelection.forTreePath (Some draft.Path))
+            let closeCreateModal () =
+                setPendingCreateKind None
 
-                draft.ArcFile
-                |> Renderer.Components.ARCHelper.viewLoadResultOfArcFile
-                |> Renderer.Components.ARCHelper.applyLoadedView
+            let openCreateModal kind =
+                setPendingCreateKind (Some kind)
+
+            let applyCreateError errorMessage =
+                Renderer.Components.ARCHelper.applyViewError
                     pageStateCtx.setState
                     arcObjectCtx.setArcFileState
                     arcObjectCtx.setPreviewState
                     arcObjectCtx.setStatusMessage
+                    errorMessage
 
-                arcObjectCtx.setPendingArcFileSave (Some draft.ArcFile)
-                closeCreateModal ()
+            let createArcEntry kind (identifier: string) =
+                let existingPaths =
+                    fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
 
-        let arcCreateContextMenuItems (item: FileItem) =
-            if item.IsDirectory then
-                arcCreateKinds
-                |> List.sortBy arcCreateKindSortOrder
-                |> List.map (fun kind -> {
-                    Label = $"Add {arcCreateKindLabel kind}"
-                    Icon = arcCreateKindIcon kind
-                    OnClick = fun () -> openCreateModal kind
-                    Disabled = None
-                })
-            else
-                []
+                match tryBuildArcCreateDraft kind identifier existingPaths with
+                | Error errorMessage -> applyCreateError errorMessage
+                | Ok draft ->
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some draft.Path))
 
-        let contextMenuSortOrder (item: ContextMenuItem) =
-            match item.Label with
-            | "Add Study" -> 10
-            | "Add Assay" -> 20
-            | "Add Workflow" -> 30
-            | "Add Run" -> 40
-            | "Mark Git LFS"
-            | "Unmark Git LFS" -> 100
-            | "Git LFS: marked"
-            | "Git LFS: not marked" -> 110
-            | _ -> 1000
+                    draft.ArcFile
+                    |> Renderer.Components.ARCHelper.viewLoadResultOfArcFile
+                    |> Renderer.Components.ARCHelper.applyLoadedView
+                        pageStateCtx.setState
+                        arcObjectCtx.setArcFileState
+                        arcObjectCtx.setPreviewState
+                        arcObjectCtx.setStatusMessage
 
-        let sortContextMenuItems (items: ContextMenuItem list) =
-            items |> List.sortBy (fun item -> contextMenuSortOrder item, item.Label)
+                    arcObjectCtx.setPendingArcFileSave (Some draft.ArcFile)
+                    closeCreateModal ()
 
-        let contextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item
-            @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
-            |> sortContextMenuItems
+            let arcCreateContextMenuItems (item: FileItem) =
+                if item.IsDirectory then
+                    arcCreateKinds
+                    |> List.sortBy arcCreateKindSortOrder
+                    |> List.map (fun kind -> {
+                        Label = $"Add {ArcExplorerNodeKind.label kind}"
+                        Icon = arcCreateKindIcon kind
+                        OnClick = fun () -> openCreateModal kind
+                        Disabled = None
+                    })
+                else
+                    []
 
-        match fileItem with
+            let contextMenuSortOrder (item: ContextMenuItem) =
+                match item.Label with
+                | "Add Study" -> 10
+                | "Add Assay" -> 20
+                | "Mark Git LFS"
+                | "Unmark Git LFS" -> 100
+                | "Git LFS: marked"
+                | "Git LFS: not marked" -> 110
+                | _ -> 1000
 
-        | Some fileItem ->
-            React.Fragment [
-                Swate.Components.FileExplorer.FileExplorer(
-                    initialItems = [ fileItem ],
-                    onItemClick = openPreview,
-                    onContextMenu = contextMenuItems,
-                    selectedItemId = fileStateCtx.state.Selection.TreePath
-                )
-                ArcCreateModal pendingCreateKind createIdentifier setCreateIdentifier closeCreateModal createArcEntry
-            ]
-        | None -> EmptyFileTreePlaceholder()
+            let sortContextMenuItems (items: ContextMenuItem list) =
+                items |> List.sortBy (fun item -> contextMenuSortOrder item, item.Label)
+
+            let contextMenuItems (item: FileItem) =
+                arcCreateContextMenuItems item
+                @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+                |> sortContextMenuItems
+
+            match fileItem with
+
+            | Some fileItem ->
+                React.Fragment [
+                    Swate.Components.FileExplorer.FileExplorer(
+                        initialItems = [ fileItem ],
+                        onItemClick = openPreview,
+                        onContextMenu = contextMenuItems,
+                        selectedItemId = fileStateCtx.state.Selection.TreePath
+                    )
+                    match pendingCreateKind with
+                    | Some kind -> ArcCreateModal.Main(kind, closeCreateModal, createArcEntry)
+                    | None -> Html.none
+                ]
+            | None -> FileExplorer.EmptyFileTreePlaceholder()
