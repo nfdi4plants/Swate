@@ -18,13 +18,7 @@ type private ModalState =
 type Main =
 
     [<ReactComponent>]
-    static member EmptyTableView
-        (
-            arcFile: ArcFiles,
-            setArcFile: ArcFiles -> unit,
-            activeTableIndex: int option,
-            templateServices: TemplateWidgetServices
-        ) =
+    static member EmptyTableView(arcFile: ArcFiles, setArcFile: ArcFiles -> unit, activeTableIndex: int option) =
         let modal, setModal = React.useState (None: ModalState option)
 
         let setIsOpen (modal: ModalState) =
@@ -94,7 +88,7 @@ type Main =
                     arcFile,
                     activeTableIndex,
                     setArcFile,
-                    templateServices,
+
                     isTemplatesOpen,
                     setIsOpen ModalState.Templates
                 )

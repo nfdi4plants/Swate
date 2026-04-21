@@ -22,24 +22,6 @@ let toggleTemplateSelection (templateId: System.Guid) (selectedTemplateIds: Set<
     else
         selectedTemplateIds.Add templateId
 
-let toggleTemplateSelectionState (templateId: System.Guid) (selectedTemplateIds: Set<System.Guid>) =
-    let isCurrentlySelected = selectedTemplateIds.Contains templateId
-
-    if isCurrentlySelected then
-        setTemplateImportDecisions (fun decisions -> decisions.Remove templateId)
-        |> ignore
-
-        setDeselectedTemplateColumns (fun deselected ->
-            deselected
-            |> Set.filter (fun (candidateTemplateId, _) -> candidateTemplateId <> templateId)
-        )
-        |> ignore
-    else
-        setTemplateImportDecisions (fun decisions ->
-            decisions.Add(templateId, TemplateImportAction.AppendToActiveTable)
-        )
-        |> ignore
-
 let getTemplateImportAction
     (templateId: System.Guid)
     (templateImportDecisions: Map<System.Guid, TemplateImportAction>)

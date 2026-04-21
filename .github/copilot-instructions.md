@@ -1,0 +1,1 @@
+When performing a code review, please ensure that the guidelines in `docs\ReactComponentDesign.md` are followed.

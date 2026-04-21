@@ -7,24 +7,6 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types
 
-module private ArcFileEditorHelpers =
-
-    open ARCtrl.Json
-
-    let TemplateServices = {
-        loadTemplates =
-            fun () -> async {
-                try
-                    let! templatesJson = Api.SwateApi.SwateTemplateApi.getTemplates ()
-
-                    let templates = templatesJson |> ARCtrl.Json.Templates.fromJsonString |> Array.ofSeq
-
-                    return Ok templates
-                with error ->
-                    return Error error.Message
-            }
-    }
-
 type private AddRowsFooterViewProps = {
     rowsToAdd: int
     minRowsToAdd: int
@@ -67,12 +49,8 @@ type Main =
 
     [<ReactComponent>]
     static member private ArcFileContentView
-        (
-            activeView: ActiveView,
-            arcFileState: ArcFiles,
-            setArcFileState: ArcFiles -> unit,
-            templateServices: TemplateWidgetServices
-        ) =
+        (activeView: ActiveView, arcFileState: ArcFiles, setArcFileState: ArcFiles -> unit)
+        =
         match activeView with
         | ActiveView.Metadata -> ArcFileMetadata.View(arcFileState, setArcFileState)
         | ActiveView.Table index ->
@@ -91,7 +69,7 @@ type Main =
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
                 match table.ColumnCount with
-                | 0 -> EmptyTableView.Main.EmptyTableView(arcFileState, setArcFileState, Some index, templateServices)
+                | 0 -> EmptyTableView.Main.EmptyTableView(arcFileState, setArcFileState, Some index)
                 | _ -> AnnotationTable.AnnotationTable(table, setTable)
             | None ->
                 Html.div [
@@ -188,7 +166,6 @@ type Main =
         (
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
-            templateServices: TemplateWidgetServices,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView
         ) =
@@ -236,7 +213,7 @@ type Main =
             BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFile)
 
         let templateWidget =
-            Swate.Components.Widgets.TemplateWidget.Main(arcFile, activeTableIndex, setArcFile, templateServices)
+            Swate.Components.Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFile)
 
         AnnotationTableContextProvider.AnnotationTableContextProvider(
             Swate.Components.ArcFileEditor.Widgets.Main.Widgets(
@@ -246,9 +223,7 @@ type Main =
                         navbar
                         Html.div [
                             prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                            prop.children [
-                                Main.ArcFileContentView(activeView, arcFile, setArcFile, templateServices)
-                            ]
+                            prop.children [ Main.ArcFileContentView(activeView, arcFile, setArcFile) ]
                         ]
                         Main.AddRowsFooter(activeView, arcFile, setArcFile)
                         ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
@@ -301,10 +276,5 @@ type Main =
 
         Template.TemplateCacheProvider.TemplateCacheProvider(
             loadTemplates,
-            Main.ArcFileEditor(
-                arcFile,
-                setArcFile,
-                ArcFileEditorHelpers.TemplateServices,
-                startingActiveView = ActiveView.Table 0
-            )
+            Main.ArcFileEditor(arcFile, setArcFile, startingActiveView = ActiveView.Table 0)
         )

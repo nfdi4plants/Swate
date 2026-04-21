@@ -30,14 +30,7 @@ type TemplateToolbar =
                     prop.title "Refresh templates"
                     prop.disabled isRefreshing
                     prop.onClick (fun _ -> onRefresh ())
-                    prop.children [
-                        if isRefreshing then
-                            Html.span [
-                                prop.className "swt:loading swt:loading-spinner swt:loading-xs"
-                            ]
-                        else
-                            Icons.ArrowsRotate()
-                    ]
+                    prop.children [ Icons.ArrowsRotate() ]
                 ]
                 Html.button [
                     prop.className [

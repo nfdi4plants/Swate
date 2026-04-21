@@ -39,7 +39,6 @@ type Modals =
             arcFile: ArcFiles,
             activeTableIndex: int option,
             setArcFile: ArcFiles -> unit,
-            templateServices: TemplateWidgetServices,
             isOpen: bool,
             setIsOpen: bool -> unit
         ) =
@@ -53,12 +52,7 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select template(s)",
             children =
-                Swate.Components.Widgets.TemplateWidget.Main(
-                    arcFile,
-                    activeTableIndex,
-                    setArcFileAndClose,
-                    templateServices
-                ),
+                Swate.Components.Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFileAndClose),
             className = "swt:flex swt:min-w-fit"
         )
 
