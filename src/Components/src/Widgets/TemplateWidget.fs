@@ -4,6 +4,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components.Shared
+open Swate.Components.Widgets.Context
 
 
 type private TemplateLoadState =
@@ -390,7 +391,7 @@ type TemplateWidget =
             React.useStateWithUpdater (Set.empty<System.Guid * int>)
 
         let showImportDialog, setShowImportDialog = React.useState false
-        let widgetCtx = WidgetContext.useWidgetController ()
+        let widgetCtx = useWidgetControllerCtx ()
 
         let tryGetActiveTableIndex (arcFile: ArcFiles) =
             arcFile.TryGetActiveTable(activeTableIndex) |> Option.map fst

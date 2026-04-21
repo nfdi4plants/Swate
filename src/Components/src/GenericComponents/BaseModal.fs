@@ -2,13 +2,14 @@ namespace Swate.Components
 
 open Feliz
 open Fable.Core
+open Swate.Components.GenericComponents.BaseModalContext
 
 [<Mangle(false); Erase>]
 type BaseModal =
 
     [<ReactComponentAttribute>]
     static member ModalHeader(children: ReactElement, close: unit -> unit) =
-        let ctx = React.useContext (Contexts.BaseModal.BaseModalCtx)
+        let ctx = useBaseModalCtx ()
 
         Html.div [
             prop.className "swt:card-title"
@@ -25,7 +26,7 @@ type BaseModal =
 
     [<ReactComponent>]
     static member ModalDescription(children: ReactElement) =
-        let ctx = React.useContext (Contexts.BaseModal.BaseModalCtx)
+        let ctx = useBaseModalCtx ()
 
         Html.p [
             prop.className "swt:text-sm swt:opacity-60"
@@ -83,7 +84,7 @@ type BaseModal =
         let headerId = FloatingUI.useId ()
         let descId = FloatingUI.useId ()
 
-        let ctx: Contexts.BaseModal.BaseModalContext = {
+        let ctx: BaseModalContext = {
             isOpen = isOpen
             setIsOpen = setIsOpen
             headerId = headerId
@@ -100,7 +101,7 @@ type BaseModal =
                             FloatingUI.FloatingFocusManager(
                                 flui.context,
                                 children =
-                                    Contexts.BaseModal.BaseModalCtx.Provider(
+                                    BaseModalCtx.Provider(
                                         Some ctx,
                                         Html.div [
                                             prop.ariaDescribedBy descId

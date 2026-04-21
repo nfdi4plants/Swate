@@ -5,7 +5,7 @@ open Swate.Components
 
 [<ReactComponent>]
 let Main () =
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
     React.Fragment [
         Html.div [

@@ -1,12 +1,13 @@
 module Renderer.App
 
-open Browser.Dom
+
 open Elmish
 open Feliz
 open Feliz.UseElmish
 open Renderer.Components
 open Renderer.Types
 open Swate.Components
+open Swate.Components.Layout
 open Swate.Components.ErrorModal
 open Swate.Electron.Shared
 
@@ -87,7 +88,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
 [<ReactComponent>]
 let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget) =
-    let leftSidebarCtx = React.useContext Swate.Components.LayoutContext.LeftSidebarContext
+    let leftSidebarCtx = Swate.Components.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let toggleTarget target =
         if leftSidebarTarget = target then
@@ -162,16 +163,16 @@ let Main () =
     let showDetailsSidebarToggle =
         model.AppState.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectExplorer
 
-    Context.AppStateCtx.AppStateCtx.Provider(
+    Context.AppStateContext.AppStateCtx.Provider(
         appCtx,
-        Renderer.Context.FileStateCtx.FileStateCtxProvider(
-            Renderer.Context.ArcObjectExplorerCtx.ArcObjectExplorerCtxProvider(
-                Renderer.Context.PageStateCtx.PageStateCtx.Provider(
+        Renderer.Context.FileStateContext.FileStateCtxProvider(
+            Renderer.Context.ArcObjectExplorerContext.ArcObjectExplorerCtxProvider(
+                Renderer.Context.PageStateContext.PageStateCtx.Provider(
                     pageCtx,
                     ErrorModalProvider.ErrorModalProvider(
-                        Renderer.Context.AuthStateCtx.Provider(
-                            Renderer.Context.GitStateCtx.GitStateCtxProvider(
-                                AnnotationTableContextProvider.AnnotationTableContextProvider(
+                        Renderer.Context.AuthStateContext.Provider(
+                            Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
                                     Layout.Main(
                                         children =
                                             React.Fragment [|

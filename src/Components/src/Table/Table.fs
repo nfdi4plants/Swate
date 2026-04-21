@@ -1,11 +1,13 @@
-namespace Swate.Components
+namespace Swate.Components.Table
 
 open System
-open Swate.Components.Shared
 open Swate.Components
+open Swate.Components.Table
+open Swate.Components.Table.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+
 
 module private TableHelper =
 
@@ -240,7 +242,7 @@ swt:p-0"""
                             else
                                 GridSelect.selectAt (index, e.shiftKey)
 
-            Contexts.Table.TableState(
+            TableState(
                 isActive = isActive,
                 isOrigin = isOrigin,
                 isSelected = isSelected,
@@ -249,7 +251,7 @@ swt:p-0"""
                 onClick = onClick
             )
 
-        Contexts.Table.TableStateCtx.Provider(
+        TableStateCtx.Provider(
             ctx,
             React.Fragment [
                 Html.div [

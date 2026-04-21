@@ -5,10 +5,10 @@ open Swate.Components
 
 [<ReactComponent>]
 let Main () =
-    let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let viewModel =
         ArcObjectExplorerView.create

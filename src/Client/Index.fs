@@ -3,6 +3,8 @@ module Index
 
 open Messages
 open Model
+open Swate.Components.ThemeProvider.Context
+
 
 ///<summary> This is a basic test case used in Client unit tests </summary>
 let sayHello name = $"Hello {name}"
@@ -18,10 +20,10 @@ let View (model: Model) (dispatch: Msg -> unit) =
         | _ -> None
 
     // React.strictMode [
-    Swate.Components.ThemeProvider.ThemeProvider(
-        ReactContext.ThemeCtx,
-        Swate.Components.TermSearchConfigProvider.TIBQueryProvider(
-            Swate.Components.AnnotationTableContextProvider.AnnotationTableContextProvider(
+    Swate.Components.ThemeProvider.ThemeProvider.ThemeProvider(
+        ThemeCtx,
+        Swate.Components.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
+            Swate.Components.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
 
                 Html.div [
                     prop.id "ClientView"

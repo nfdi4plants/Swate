@@ -4,6 +4,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
+open Swate.Components.Widgets.Context
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types
 
@@ -31,8 +32,8 @@ module private WidgetNavbar =
         | WidgetType.Playground -> "Playground", Icons.Templates()
 
     [<ReactComponent>]
-    let Buttons (isEnabled: bool) =
-        let context = WidgetContext.useWidgetController ()
+    let Buttons(isEnabled: bool) =
+        let context = useWidgetControllerCtx ()
 
         let controlButton (widgetType: WidgetType) =
             let isActive = context.isActive widgetType
@@ -155,6 +156,16 @@ type Main =
         ]
 
     [<ReactComponent>]
+    static member private TableView(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
+
+        Html.div [
+            prop.className "swt:w-full swt:min-w-0 swt:pb-4"
+            prop.children [
+                Swate.Components.AnnotationTable.AnnotationTable.AnnotationTable(table, setTableInArcFile)
+            ]
+        ]
+
+    [<ReactComponent>]
     static member private ArcFileContentView
         (
             activeView: ActiveView,
@@ -181,7 +192,7 @@ type Main =
 
                 match table.ColumnCount with
                 | 0 -> EmptyTableView.Main.EmptyTableView(arcFileState, setArcFileState, Some index, templateServices)
-                | _ -> AnnotationTable.AnnotationTable(table, setTable)
+                | _ -> AnnotationTable.AnnotationTable.AnnotationTable(table, setTable)
             | None ->
                 Html.div [
                     prop.className "swt:p-4 swt:text-error"

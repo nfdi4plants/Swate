@@ -60,7 +60,7 @@ const meta = {
     // Activate our mock query key so provider uses it immediately
     localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify({
       disableDefault: false,
-      aktiveKeys: ["mock_search", "mock_parent", "mock_children"],
+      activeKeys: ["mock_search", "mock_parent", "mock_children"],
     }));
   },
   component: TermSearchConfigProviderComponent,

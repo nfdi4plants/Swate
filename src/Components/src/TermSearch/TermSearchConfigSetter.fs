@@ -1,10 +1,11 @@
-namespace Swate.Components
+namespace Swate.Components.TermSearch
 
-open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
+open Swate.Components.TermSearch.TermSearchAllKeysContext
+open Swate.Components.TermSearch.TermSearchActiveKeysContext
+
 
 [<Erase; Mangle(false)>]
 type TermSearchConfigSetter =
@@ -39,11 +40,11 @@ type TermSearchConfigSetter =
             |}
                 -> ReactElement)
         =
-        let activeKeysCtx = React.useContext (Contexts.TermSearch.TermSearchActiveKeysCtx)
-        let allKeysCtx = React.useContext (Contexts.TermSearch.TermSearchAllKeysCtx)
+        let activeKeysCtx = useTermSearchActiveKeysCtx ()
+        let allKeysCtx = useTermSearchAllKeysCtx ()
 
         let selectedIndices =
-            activeKeysCtx.state.aktiveKeys
+            activeKeysCtx.state.activeKeys
             |> Array.choose (fun key -> allKeysCtx |> Seq.tryFindIndex (fun activeKey -> activeKey = key))
             |> Set
 
@@ -56,13 +57,13 @@ type TermSearchConfigSetter =
 
                 activeKeysCtx.setState {
                     activeKeysCtx.state with
-                        aktiveKeys = Array.ofSeq nextActiveKeys
+                        activeKeys = Array.ofSeq nextActiveKeys
                 }
 
         let defaultSearchActive = not activeKeysCtx.state.disableDefault
 
         let TriggerRender =
-            fun _ -> TermSearchConfigSetter.TriggerRender(activeKeysCtx.state.aktiveKeys)
+            fun _ -> TermSearchConfigSetter.TriggerRender(activeKeysCtx.state.activeKeys)
 
         React.Fragment [
 
@@ -71,9 +72,9 @@ type TermSearchConfigSetter =
                 prop.className "swt:hidden"
                 prop.ariaHidden true
                 prop.testId "term-search-config-setter"
-                prop.custom ("data-activekeyscount", activeKeysCtx.state.aktiveKeys.Length)
+                prop.custom ("data-activekeyscount", activeKeysCtx.state.activeKeys.Length)
                 prop.custom ("data-defaultdisables", activeKeysCtx.state.disableDefault)
-                prop.custom ("data-activekeys", activeKeysCtx.state.aktiveKeys |> Array.sort |> String.concat "; ")
+                prop.custom ("data-activekeys", activeKeysCtx.state.activeKeys |> Array.sort |> String.concat "; ")
             ]
 
             renderer {|

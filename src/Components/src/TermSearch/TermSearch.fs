@@ -1,9 +1,11 @@
-namespace Swate.Components
+namespace Swate.Components.TermSearch
 
 open Swate.Components.Shared
 open Swate.Components
 open Fable.Core
 open Feliz
+open Swate.Components.TermSearch.TermSearchConfigContext
+
 
 module private APIExtentions =
 
@@ -798,7 +800,7 @@ type TermSearch =
         let inputText = term |> Option.bind _.name |> Option.defaultValue ""
         let input, setInput = React.useState (inputText)
 
-        let termSearchConfigCtx = React.useContext (Contexts.TermSearch.TermSearchConfigCtx)
+        let termSearchConfigCtx = useTermSearchConfigCtx ()
 
         React.useLayoutEffect (
             (fun () -> term |> Option.bind _.name |> Option.defaultValue "" |> setInput),
