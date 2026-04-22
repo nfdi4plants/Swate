@@ -103,7 +103,7 @@ type GraphObjectDetails =
                 |> Option.defaultValue (if selectedNode.isReference then "Reference" else "Canonical")
 
             let selectionRows = [
-                "Kind", selectionKind
+                "Type", selectionKind
                 "Role", selectionRole
                 "Path", (selectedNode.path |> Option.defaultValue "Virtual")
                 "Children", (string selectedNode.children.Length)

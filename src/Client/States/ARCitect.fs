@@ -19,8 +19,8 @@ module Interop =
         |}
 
     type IARCitectOutAPI = {
-        Init: unit -> JS.Promise<(ArcFilesDiscriminateStringEnum * string * DatamapParentInfo option) option>
-        Save: ArcFilesDiscriminateStringEnum * string * DatamapParentInfo option -> JS.Promise<unit>
+        Init: unit -> JS.Promise<(ArcFilesDiscriminate * string * DatamapParentInfo option) option>
+        Save: ArcFilesDiscriminate * string * DatamapParentInfo option -> JS.Promise<unit>
         /// selectDictionaries:bool -> JS.Promise<wasSuccessful: bool>
         RequestPaths: bool -> JS.Promise<bool>
         /// () -> JS.Promise<wasSuccessful: bool>
@@ -35,7 +35,7 @@ module Interop =
         ResponsePaths: string[] -> JS.Promise<bool>
         ResponseFile: InteropTypes.ARCitectFile -> JS.Promise<bool>
         Refresh: unit -> JS.Promise<bool>
-        SetARCFile: ArcFilesDiscriminateStringEnum * string * DatamapParentInfo option -> JS.Promise<bool>
+        SetARCFile: ArcFilesDiscriminate * string * DatamapParentInfo option -> JS.Promise<bool>
     }
 
 let api =
@@ -45,7 +45,7 @@ let api =
 open Elmish
 
 type Msg =
-    | Init of ApiCall<unit, (ArcFilesDiscriminateStringEnum * string * DatamapParentInfo option) option>
+    | Init of ApiCall<unit, (ArcFilesDiscriminate * string * DatamapParentInfo option) option>
     | Save of ArcFiles
     /// ApiCall<selectDirectories: bool, wasSuccessful: bool>
     | RequestPaths of ApiCall<bool, bool>

@@ -21,8 +21,15 @@ let arcObjectExplorerOptions: SelectItem<string>[] =
     |> Array.map createOption
 
 let graphObjectExplorerOptions: SelectItem<string>[] =
-    arcObjectExplorerOptions
-    |> Array.filter (fun option -> option.item <> "Note")
+    [|
+        "Datasets"
+        "Protocols"
+        "FormalParameters"
+        "Processes"
+        "Materials"
+        "Data"
+    |]
+    |> Array.map createOption
 
 let defaultSelectedIndices (options: SelectItem<string>[]) =
     options

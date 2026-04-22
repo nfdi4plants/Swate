@@ -407,7 +407,7 @@ type ArcObjectExplorerContent =
     [<ReactComponent>]
     static member private SelectionSection(selectedNode: ArcExplorerNode) =
         let rows = [
-            ArcObjectExplorerContentHelper.textRow "Kind" (nodeKindLabel selectedNode.kind)
+            ArcObjectExplorerContentHelper.textRow "Type" (nodeKindLabel selectedNode.kind)
             ArcObjectExplorerContentHelper.textRow "Role" (if selectedNode.isReference then "Reference" else "Canonical")
             if selectedNode.path.IsSome then
                 ArcObjectExplorerContentHelper.codeRow "Path" selectedNode.path.Value

@@ -176,7 +176,7 @@ type ARCObjectExplorer =
                                 Html.dl [
                                     prop.className "swt:grid swt:grid-cols-[auto_1fr] swt:gap-x-3 swt:gap-y-2 swt:text-sm"
                                     prop.children [
-                                        Html.dt [ prop.className "swt:font-medium"; prop.text "Kind" ]
+                                        Html.dt [ prop.className "swt:font-medium"; prop.text "Type" ]
                                         Html.dd kind
                                         Html.dt [ prop.className "swt:font-medium"; prop.text "Role" ]
                                         Html.dd role

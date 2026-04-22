@@ -2,11 +2,16 @@ module ElectronCore.ArcObjectGraphExplorerTests
 
 open System
 open Swate.Components.Shared
+open Swate.Components.ARCObjectExplorer
 open Swate.Components.ARCObjectExplorer.GraphExplorer
 open Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
 open Swate.Components.ARCObjectExplorer.GraphExplorer.ArcExplorerNodes
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 open Vitest
+
+type private EndpointValue =
+    | MaterialValue of Material
+    | DataValue of Data
 
 let rec private flattenNodes (nodes: ArcExplorerNode list) =
     seq {
@@ -41,57 +46,327 @@ let private extractEntryCount (metaById: Map<string, GraphNodeMeta>) (layerId: s
                 None)
         |> expectSome <| $"Missing numeric Entries row in metadata for {layerId}."
 
-let private collectSourceStats (models: ARCGraph list) =
-    let datasets =
-        models
-        |> List.collect _.Datasets
+let private flattenDatasetKinds (datasetKinds: DatasetKinds) =
+    [
+        yield! datasetKinds.Studies |> Array.toList
+        yield! datasetKinds.Assays |> Array.toList
+        yield! datasetKinds.Workflows |> Array.toList
+        yield! datasetKinds.Runs |> Array.toList
+    ]
 
-    let protocols =
-        datasets
-        |> List.collect _.about
+let private materialEndpointsFromKinds (materialKindsValues: MaterialKinds array) =
+    materialKindsValues
+    |> Array.toList
+    |> List.collect (fun materialKinds ->
+        [
+            yield! materialKinds.Sources |> Array.toList |> List.map MaterialValue
+            yield! materialKinds.Samples |> Array.toList |> List.map MaterialValue
+        ])
 
-    let formalParameters =
-        protocols
-        |> List.collect _.formalParameters
+let private dataEndpointsFromKinds (dataKindsValues: DataKinds array) =
+    dataKindsValues
+    |> Array.toList
+    |> List.collect (fun dataKinds ->
+        [
+            yield! dataKinds.Files |> Array.toList |> List.map DataValue
+            yield! dataKinds.FragmentSelector |> Array.toList |> List.map DataValue
+        ])
 
-    let processes =
-        protocols
-        |> List.collect _.processes
+let private processTypeEndpoints (processType: ProcessType) =
+    materialEndpointsFromKinds processType.Materials
+    @ dataEndpointsFromKinds processType.Data
 
-    let processValues =
-        processes
-        |> List.map (function
-            | CurrentProcess.Input processValue
-            | CurrentProcess.Output processValue -> processValue)
+let private materialEndpointsFromMaterials (materials: Material array) =
+    materials
+    |> Array.toList
+    |> List.map MaterialValue
 
-    let processEndpoints =
-        processValues
-        |> List.collect (fun processValue -> processValue.object @ processValue.result)
+let private dataEndpointsFromData (dataValues: Data array) =
+    dataValues
+    |> Array.toList
+    |> List.map DataValue
 
-    let materialEndpoints =
-        processEndpoints
-        |> List.filter (function
-            | ProcessType.Material _ -> true
-            | _ -> false)
+let private processLevelEndpoints (processValue: LabProcess) =
+    materialEndpointsFromMaterials processValue.Materials
+    @ dataEndpointsFromData processValue.Data
 
-    let dataEndpoints =
-        processEndpoints
-        |> List.filter (function
-            | ProcessType.Data _ -> true
-            | _ -> false)
+let private endpointIdentity =
+    function
+    | MaterialValue material ->
+        String.Join(
+            "|",
+            [
+                "material"
+                material.id
+                material.name
+                material.type'
+            ]
+        )
+    | DataValue data ->
+        String.Join(
+            "|",
+            [
+                "data"
+                (data.id |> Option.defaultValue "")
+                data.path
+                (data.selector |> Option.defaultValue "")
+                data.type'
+            ]
+        )
 
-    {| datasets = datasets
-       protocols = protocols
-       formalParameters = formalParameters
-       processes = processes
-       processEndpoints = processEndpoints
-       materialEndpoints = materialEndpoints
-       dataEndpoints = dataEndpoints |}
+let private unassociatedProcessEndpoints (processValue: LabProcess) =
+    let ioEndpointKeys =
+        [
+            yield! processValue.inputs |> Array.toList |> List.collect processTypeEndpoints
+            yield! processValue.outputs |> Array.toList |> List.collect processTypeEndpoints
+        ]
+        |> List.map endpointIdentity
+        |> Set.ofList
+
+    processLevelEndpoints processValue
+    |> List.filter (fun endpoint -> ioEndpointKeys.Contains(endpointIdentity endpoint) |> not)
+    |> List.distinctBy endpointIdentity
+
+let private endpointTypeCounts (endpoints: EndpointValue list) =
+    let materialCount =
+        endpoints
+        |> List.filter (function | MaterialValue _ -> true | DataValue _ -> false)
+        |> List.length
+
+    let dataCount =
+        endpoints
+        |> List.filter (function | DataValue _ -> true | MaterialValue _ -> false)
+        |> List.length
+
+    materialCount, dataCount
+
+let private collectSourceStats (graphObjects: ARCObjects list) =
+    let datasets = ResizeArray<Dataset>()
+    let protocols = ResizeArray<LabProtocol>()
+    let formalParameters = ResizeArray<FormalParameter>()
+    let processes = ResizeArray<LabProcess>()
+
+    let mutable arcCount = 0
+    let mutable materialEndpointCount = 0
+    let mutable dataEndpointCount = 0
+
+    let addEndpoints (endpoints: EndpointValue list) =
+        let materialCount, dataCount = endpointTypeCounts endpoints
+        materialEndpointCount <- materialEndpointCount + materialCount
+        dataEndpointCount <- dataEndpointCount + dataCount
+
+    let rec addProtocol (protocol: LabProtocol) =
+        protocols.Add protocol
+
+        protocol.parameters
+        |> Array.iter (fun formalParameter -> formalParameters.Add formalParameter)
+
+        protocol.processes
+        |> Array.iter addProcess
+
+    and addProcess (processValue: LabProcess) =
+        processes.Add processValue
+
+        let ioEndpoints =
+            [
+                yield! processValue.inputs |> Array.toList |> List.collect processTypeEndpoints
+                yield! processValue.outputs |> Array.toList |> List.collect processTypeEndpoints
+            ]
+
+        let unassociatedEndpoints =
+            unassociatedProcessEndpoints processValue
+
+        addEndpoints (ioEndpoints @ unassociatedEndpoints)
+
+    and addDataset (dataset: Dataset) =
+        datasets.Add dataset
+        dataset.about |> Array.iter addProtocol
+        dataset.hasPart |> Array.iter addDataset
+
+    graphObjects
+    |> List.iter (function
+        | ARCObjects.Arc arcs ->
+            arcs
+            |> Array.iter (fun arcGraph ->
+                arcCount <- arcCount + 1
+
+                arcGraph.Datasets
+                |> flattenDatasetKinds
+                |> List.iter addDataset)
+        | _ ->
+            ())
+
+    {| arcs = arcCount
+       datasets = datasets |> Seq.toList
+       protocols = protocols |> Seq.toList
+       formalParameters = formalParameters |> Seq.toList
+       processes = processes |> Seq.toList
+       materialEndpoints = materialEndpointCount
+       dataEndpoints = dataEndpointCount |}
+
+let private createPropertyValue
+    (
+        id: string,
+        name: string,
+        value: string option,
+        additionalType: string option
+    )
+    : PropertyValue =
+    {
+        id = id
+        type' = "PropertyValue"
+        additionalType = additionalType
+        name = name
+        value = value
+        unit = Some "UO:0000000"
+        nameTAN = Some $"{name}:tan"
+        valueTAN = value |> Option.map (fun valueText -> $"{valueText}:tan")
+        unitTAN = Some "UO:0000000:tan"
+    }
+
+let private graphObjectsWithPropertyValues () : ARCObjects list =
+    let datasetProperty =
+        createPropertyValue(
+            "prop:dataset-region",
+            "Dataset Region",
+            Some "Field-01",
+            Some "Geospatial"
+        )
+
+    let protocolProperty =
+        createPropertyValue(
+            "prop:protocol-revision",
+            "Protocol Revision",
+            Some "2026-04",
+            Some "RevisionTag"
+        )
+
+    let processParameterValue =
+        createPropertyValue(
+            "prop:process-batch",
+            "Batch",
+            Some "B-42",
+            Some "BatchNumber"
+        )
+
+    let materialProperty =
+        createPropertyValue(
+            "prop:material-origin",
+            "Material Origin",
+            Some "Greenhouse",
+            Some "OriginTag"
+        )
+
+    let dataProperty =
+        createPropertyValue(
+            "prop:data-format",
+            "Data Format",
+            Some "tsv",
+            Some "MimeHint"
+        )
+
+    let sourceMaterial: Material = {
+        id = "material:leaf-a"
+        type' = "Source"
+        additionalType = None
+        name = "Leaf-A"
+        additionalProperty = [| materialProperty |]
+    }
+
+    let measurementData: Data = {
+        id = Some "data:leaf-a-measurement"
+        type' = "Data"
+        additionalType = None
+        path = "assays/metabolomics/leaf-a.tsv"
+        selector = None
+        selectorFormat = None
+        encodingFormat = Some "text/tab-separated-values"
+        additionalProperty = [| dataProperty |]
+    }
+
+    let processType: ProcessType = {
+        Materials = [| {
+            Sources = [| sourceMaterial |]
+            Samples = [||]
+        } |]
+        Data = [| {
+            Files = [| measurementData |]
+            FragmentSelector = [||]
+        } |]
+    }
+
+    let processValue: LabProcess = {
+        id = Some "process:extract"
+        type' = "Process"
+        additionalType = None
+        name = "Extract metabolites"
+        inputs = [| processType |]
+        outputs = [| processType |]
+        Materials = [| sourceMaterial |]
+        Data = [| measurementData |]
+        executesProtocol = "protocol:extraction"
+        parameterValue = [| processParameterValue |]
+    }
+
+    let protocol: LabProtocol = {
+        id = Some "protocol:extraction"
+        type' = "Protocol"
+        additionalType = None
+        name = Some "Extraction"
+        parameters = [||]
+        description = Some "Minimal protocol fixture for property-value nodes."
+        intendedUse = None
+        processes = [| processValue |]
+        additionalProperty = Some protocolProperty
+        version = Some "1.0.0"
+        url = None
+    }
+
+    let dataset: Dataset = {
+        id = "study:property-values"
+        type' = ARCDatasets.Study
+        additionalType = "Study"
+        identifier = "study-property-values"
+        name = Some "Property Values Study"
+        description = Some "Fixture dataset for property-value graph coverage."
+        about = [| protocol |]
+        hasPart = [||]
+        additionalProperty = [| datasetProperty |]
+    }
+
+    let graph: ARCGraph = {
+        path = "C:/example/property-values-graph"
+        Datasets = {
+            Studies = [| dataset |]
+            Assays = [||]
+            Workflows = [||]
+            Runs = [||]
+        }
+    }
+
+    [
+        ARCObjects.Arc [| graph |]
+    ]
 
 Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
-    Vitest.test("builds expected top-level shape for graph explorer", fun () ->
-        let models = fakeGraphModels ()
-        let nodes, _ = toArcExplorerNodesWithMetaFromArcs models
+    Vitest.test("uses semantic graph filter options in storybook", fun () ->
+        let labels =
+            KindFilter.graphObjectExplorerOptions
+            |> Array.map _.item
+            |> Array.toList
+
+        Vitest.expect(labels).toEqual([
+            "Datasets"
+            "Protocols"
+            "FormalParameters"
+            "Processes"
+            "Materials"
+            "Data"
+        ]))
+
+    Vitest.test("builds expected top-level shape for graph explorer and omits standalone roots", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
 
         let topLevelNames = nodes |> List.map _.name
 
@@ -109,11 +384,213 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(datasetsLayer.children.Length > 0).toBe(true)
 
         let allLayer = nodes |> List.tryFind (fun node -> node.id = "graph:all") |> expectSome <| "Missing all layer."
-        Vitest.expect(allLayer.children.Length).toBe(models.Length))
+        Vitest.expect(allLayer.children.Length > 0).toBe(true)
 
-    Vitest.test("emits metadata labels for canonical datasets and process endpoints", fun () ->
-        let models = fakeGraphModels ()
-        let nodes, metaById = toArcExplorerNodesWithMetaFromArcs models
+        let standaloneRoots =
+            allLayer.children
+            |> List.filter (fun node -> node.id.StartsWith("graph:standalone-", StringComparison.Ordinal))
+
+        Vitest.expect(standaloneRoots.Length).toBe(0))
+
+    Vitest.test("shows only selected semantic top-level layer alongside ARCs root", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Datasets" ])
+                nodes
+                metaById
+
+        let topLevelIds =
+            filteredNodes
+            |> List.map _.id
+
+        Vitest.expect(topLevelIds).toEqual([
+            "graph:all"
+            "graph:datasets"
+        ])
+
+        Vitest.expect(topLevelIds |> List.contains "graph:protocols").toBe(false)
+        Vitest.expect(topLevelIds |> List.contains "graph:formal-parameters").toBe(false)
+        Vitest.expect(topLevelIds |> List.contains "graph:processes").toBe(false)
+        Vitest.expect(topLevelIds |> List.contains "graph:materials").toBe(false)
+        Vitest.expect(topLevelIds |> List.contains "graph:Data").toBe(false))
+
+    Vitest.test("isolates endpoint categories without kind-label leakage", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Materials" ])
+                nodes
+                metaById
+
+        let topLevelIds =
+            filteredNodes
+            |> List.map _.id
+
+        Vitest.expect(topLevelIds).toEqual([
+            "graph:all"
+            "graph:materials"
+        ])
+
+        let allLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer after semantic filtering."
+
+        let canonicalNodes =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.toList
+
+        let materialEndpointTag = GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Material
+        let dataEndpointTag = GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Data
+
+        let materialEndpointNodeCount =
+            canonicalNodes
+            |> List.filter (hasTag metaById materialEndpointTag)
+            |> List.length
+
+        let dataEndpointNodeCount =
+            canonicalNodes
+            |> List.filter (hasTag metaById dataEndpointTag)
+            |> List.length
+
+        let materialsLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:materials")
+            |> expectSome <| "Missing materials layer after semantic filtering."
+
+        Vitest.expect(materialsLayer.children.Length > 0).toBe(true)
+        Vitest.expect(materialEndpointNodeCount > 0).toBe(true)
+        Vitest.expect(dataEndpointNodeCount).toBe(0))
+
+    Vitest.test("ignores non-Arc ARCObjects entries when creating the canonical tree", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let baselineNodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let noiseProperty: PropertyValue = {
+            id = "prop:noise"
+            type' = "PropertyValue"
+            additionalType = None
+            name = "Noise"
+            value = Some "Standalone"
+            unit = None
+            nameTAN = None
+            valueTAN = None
+            unitTAN = None
+        }
+
+        let noiseMaterial: Material = {
+            id = "material:noise"
+            type' = "Sample"
+            additionalType = None
+            name = "Standalone Noise Material"
+            additionalProperty = [||]
+        }
+
+        let noiseData: Data = {
+            id = Some "data:noise"
+            type' = "Data"
+            additionalType = None
+            path = "standalone/noise.tsv"
+            selector = None
+            selectorFormat = None
+            encodingFormat = None
+            additionalProperty = [||]
+        }
+
+        let noiseProcessType: ProcessType = {
+            Materials = [| {
+                Sources = [||]
+                Samples = [| noiseMaterial |]
+            } |]
+            Data = [| {
+                Files = [| noiseData |]
+                FragmentSelector = [||]
+            } |]
+        }
+
+        let noiseProcess: LabProcess = {
+            id = Some "process:noise"
+            type' = "Process"
+            additionalType = None
+            name = "Standalone Noise Process"
+            inputs = [| noiseProcessType |]
+            outputs = [| noiseProcessType |]
+            Materials = [| noiseMaterial |]
+            Data = [| noiseData |]
+            executesProtocol = "protocol:noise"
+            parameterValue = [||]
+        }
+
+        let noiseFormalParameter: FormalParameter = {
+            id = "fp:noise"
+            type' = "FormalParameter"
+            name = Some "Noise Parameter"
+            nameTAN = None
+            defaultValue = Some "1"
+        }
+
+        let noiseProtocol: LabProtocol = {
+            id = Some "protocol:noise"
+            type' = "Protocol"
+            additionalType = None
+            name = Some "Standalone Noise Protocol"
+            parameters = [| noiseFormalParameter |]
+            description = Some "Standalone protocol that should be ignored."
+            intendedUse = None
+            processes = [| noiseProcess |]
+            additionalProperty = None
+            version = None
+            url = None
+        }
+
+        let noiseDataset: Dataset = {
+            id = "workflow:noise"
+            type' = ARCDatasets.Workflow
+            additionalType = "Workflow"
+            identifier = "workflow-noise"
+            name = Some "Standalone Noise Workflow"
+            description = Some "Standalone dataset that should be ignored."
+            about = [| noiseProtocol |]
+            hasPart = [||]
+            additionalProperty = [| noiseProperty |]
+        }
+
+        let noisyGraphObjects =
+            graphObjects @ [
+                ARCObjects.Datasets [| noiseDataset |]
+                ARCObjects.Protocols [| noiseProtocol |]
+                ARCObjects.FormalParameters [| noiseFormalParameter |]
+                ARCObjects.Processes [| noiseProcess |]
+            ]
+
+        let noisyNodes, _ = toArcExplorerNodesWithMetaFromArcObjects noisyGraphObjects
+
+        let baselineAllLayer =
+            baselineNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing baseline graph:all layer."
+
+        let noisyAllLayer =
+            noisyNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing noisy graph:all layer."
+
+        Vitest.expect(noisyAllLayer.children.Length).toBe(baselineAllLayer.children.Length)
+
+        let baselineDatasetsLayer = baselineNodes |> List.tryFind (fun node -> node.id = "graph:datasets") |> expectSome <| "Missing baseline datasets layer."
+        let noisyDatasetsLayer = noisyNodes |> List.tryFind (fun node -> node.id = "graph:datasets") |> expectSome <| "Missing noisy datasets layer."
+
+        Vitest.expect(noisyDatasetsLayer.children.Length).toBe(baselineDatasetsLayer.children.Length))
+
+    Vitest.test("emits metadata labels for canonical datasets, processes, and process endpoints", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
 
         let datasetNode =
             nodes
@@ -131,6 +608,17 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(datasetMeta.KindLabel).toBe("Study")
         Vitest.expect(datasetMeta.RoleLabel).toBe("Canonical")
 
+        let processMeta =
+            metaById
+            |> Map.values
+            |> Seq.tryFind (fun meta -> meta.Tag = Some GraphNodeTag.Process)
+            |> expectSome <| "Expected at least one process metadata entry."
+
+        Vitest.expect(processMeta.KindLabel).toBe("LabProcess")
+        Vitest.expect(processMeta.RoleLabel).toBe("Canonical")
+        Vitest.expect(processMeta.Rows |> List.exists (fun (label, value) -> label = "Type" && value = "LabProcess")).toBe(true)
+        Vitest.expect(processMeta.Rows |> List.exists (fun (label, _) -> label = "Object Type")).toBe(true)
+
         let materialMeta =
             metaById
             |> Map.values
@@ -139,8 +627,9 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
         Vitest.expect(materialMeta.KindLabel).toBe("Material")
         Vitest.expect(
-            materialMeta.RoleLabel.StartsWith("Object", StringComparison.Ordinal)
-            || materialMeta.RoleLabel.StartsWith("Result", StringComparison.Ordinal)
+            materialMeta.RoleLabel.StartsWith("Input", StringComparison.Ordinal)
+            || materialMeta.RoleLabel.StartsWith("Output", StringComparison.Ordinal)
+            || materialMeta.RoleLabel.StartsWith("Unassociated", StringComparison.Ordinal)
         ).toBe(true)
 
         let datasetsLayerMeta =
@@ -154,10 +643,56 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> List.exists (fun (label, _) -> label = "Entries")
         ).toBe(true))
 
-    Vitest.test("keeps category-layer counts aligned with aggregated source counts across all ARCs", fun () ->
-        let models = fakeGraphModels ()
-        let stats = collectSourceStats models
-        let nodes, metaById = toArcExplorerNodesWithMetaFromArcs models
+    Vitest.test("renders Inputs, Outputs, Unassociated, and Parameter Values endpoint groups for process nodes", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let allLayer =
+            nodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer."
+
+        let processNodes =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.filter (hasTag metaById GraphNodeTag.Process)
+            |> Seq.toList
+
+        Vitest.expect(processNodes.Length > 0).toBe(true)
+
+        processNodes
+        |> List.iter (fun processNode ->
+            Vitest.expect(processNode.children |> List.map _.name).toEqual([
+                "Inputs"
+                "Outputs"
+                "Unassociated"
+                "Parameter Values"
+            ])
+
+            let inputsGroup =
+                processNode.children
+                |> List.tryFind (fun child -> child.name = "Inputs")
+                |> expectSome <| "Missing Inputs group on process node."
+
+            let outputsGroup =
+                processNode.children
+                |> List.tryFind (fun child -> child.name = "Outputs")
+                |> expectSome <| "Missing Outputs group on process node."
+
+            Vitest.expect(inputsGroup.children |> List.map _.name).toEqual([
+                "Material"
+                "Data"
+            ])
+
+            Vitest.expect(outputsGroup.children |> List.map _.name).toEqual([
+                "Material"
+                "Data"
+            ])))
+
+    Vitest.test("keeps category-layer counts aligned with aggregated source counts across ARCObjects", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let stats = collectSourceStats graphObjects
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
 
         let allLayer =
             nodes
@@ -179,12 +714,13 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         let materialEndpointNodeCount = canonicalNodes |> List.filter (hasTag metaById materialEndpointTag) |> List.length
         let dataEndpointNodeCount = canonicalNodes |> List.filter (hasTag metaById dataEndpointTag) |> List.length
 
+        Vitest.expect(allLayer.children.Length).toBe(stats.arcs)
         Vitest.expect(datasetNodeCount).toBe(stats.datasets.Length)
         Vitest.expect(protocolNodeCount).toBe(stats.protocols.Length)
         Vitest.expect(formalParameterNodeCount).toBe(stats.formalParameters.Length)
         Vitest.expect(processNodeCount).toBe(stats.processes.Length)
-        Vitest.expect(materialEndpointNodeCount).toBe(stats.materialEndpoints.Length)
-        Vitest.expect(dataEndpointNodeCount).toBe(stats.dataEndpoints.Length)
+        Vitest.expect(materialEndpointNodeCount).toBe(stats.materialEndpoints)
+        Vitest.expect(dataEndpointNodeCount).toBe(stats.dataEndpoints)
 
         let datasetsLayer = nodes |> List.tryFind (fun node -> node.id = "graph:datasets") |> expectSome <| "Missing datasets layer."
         let protocolsLayer = nodes |> List.tryFind (fun node -> node.id = "graph:protocols") |> expectSome <| "Missing protocols layer."
@@ -197,19 +733,19 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(protocolsLayer.children.Length).toBe(stats.protocols.Length)
         Vitest.expect(formalParametersLayer.children.Length).toBe(stats.formalParameters.Length)
         Vitest.expect(processesLayer.children.Length).toBe(stats.processes.Length)
-        Vitest.expect(materialsLayer.children.Length).toBe(stats.materialEndpoints.Length)
-        Vitest.expect(dataLayer.children.Length).toBe(stats.dataEndpoints.Length)
+        Vitest.expect(materialsLayer.children.Length).toBe(stats.materialEndpoints)
+        Vitest.expect(dataLayer.children.Length).toBe(stats.dataEndpoints)
 
         Vitest.expect(extractEntryCount metaById "graph:datasets").toBe(stats.datasets.Length)
         Vitest.expect(extractEntryCount metaById "graph:protocols").toBe(stats.protocols.Length)
         Vitest.expect(extractEntryCount metaById "graph:formal-parameters").toBe(stats.formalParameters.Length)
         Vitest.expect(extractEntryCount metaById "graph:processes").toBe(stats.processes.Length)
-        Vitest.expect(extractEntryCount metaById "graph:materials").toBe(stats.materialEndpoints.Length)
-        Vitest.expect(extractEntryCount metaById "graph:Data").toBe(stats.dataEndpoints.Length))
+        Vitest.expect(extractEntryCount metaById "graph:materials").toBe(stats.materialEndpoints)
+        Vitest.expect(extractEntryCount metaById "graph:Data").toBe(stats.dataEndpoints))
 
-    Vitest.test("covers supported union-case labels on dataset and process endpoint metadata", fun () ->
-        let models = fakeGraphModels ()
-        let nodes, metaById = toArcExplorerNodesWithMetaFromArcs models
+    Vitest.test("covers supported dataset and process endpoint bucket labels on metadata", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
 
         let datasetsLayerMeta =
             metaById
@@ -246,6 +782,18 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
         Vitest.expect(endpointMetas.Length > 0).toBe(true)
 
+        let endpointDirections =
+            endpointMetas
+            |> List.choose (fun meta ->
+                meta.Rows
+                |> List.tryPick (fun (label, value) ->
+                    if label = "Endpoint Direction" then Some value else None))
+            |> Set.ofList
+
+        Vitest.expect(endpointDirections.Contains "Input").toBe(true)
+        Vitest.expect(endpointDirections.Contains "Output").toBe(true)
+        Vitest.expect(endpointDirections.Contains "Unassociated").toBe(true)
+
         endpointMetas
         |> List.iter (fun meta ->
             Vitest.expect(
@@ -275,4 +823,172 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
                 Vitest.expect(meta.Rows |> List.exists (fun (label, _) -> label = "Data Role")).toBe(true)
             | _ ->
                 failwith $"Unexpected endpoint Value Type: {valueType}"))
+
+    Vitest.test("adds grouped PropertyValue nodes with deterministic ids for all supported owners", fun () ->
+        let graphObjects = graphObjectsWithPropertyValues ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let allLayer =
+            nodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer."
+
+        let canonicalNodes =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.toList
+
+        let findCanonicalNodeByTag (tag: GraphNodeTag) (errorMessage: string) =
+            canonicalNodes
+            |> List.tryFind (fun node ->
+                not node.isReference
+                && hasTag metaById tag node)
+            |> expectSome <| errorMessage
+
+        let expectPropertyGroup
+            (ownerNode: ArcExplorerNode)
+            (groupLabel: string)
+            (fieldKey: string)
+            (expectedOwnerTag: GraphPropertyValueOwnerTag)
+            (expectedOwnerKind: string)
+            (expectedSourceField: string)
+            =
+            let groupNode =
+                ownerNode.children
+                |> List.tryFind (fun child -> child.name = groupLabel)
+                |> expectSome <| $"Missing '{groupLabel}' child group on '{ownerNode.id}'."
+
+            Vitest.expect(groupNode.id).toBe($"{ownerNode.id}:group:{fieldKey}")
+            Vitest.expect(groupNode.isSelectable).toBe(false)
+            Vitest.expect(groupNode.children.Length).toBe(1)
+
+            let valueNode =
+                groupNode.children
+                |> List.tryHead
+                |> expectSome <| $"Missing PropertyValue node in group '{groupNode.id}'."
+
+            Vitest.expect(valueNode.id).toBe($"{ownerNode.id}:{fieldKey}:0")
+            Vitest.expect(valueNode.isSelectable).toBe(true)
+
+            let valueMeta =
+                metaById
+                |> Map.tryFind valueNode.id
+                |> expectSome <| $"Missing metadata for PropertyValue node '{valueNode.id}'."
+
+            Vitest.expect(valueMeta.Tag).toEqual(Some(GraphNodeTag.PropertyValue expectedOwnerTag))
+            Vitest.expect(valueMeta.Rows |> List.exists (fun (label, value) -> label = "Owner Kind" && value = expectedOwnerKind)).toBe(true)
+            Vitest.expect(valueMeta.Rows |> List.exists (fun (label, value) -> label = "Source Field" && value = expectedSourceField)).toBe(true)
+            Vitest.expect(valueMeta.Rows |> List.exists (fun (label, _) -> label = "Id")).toBe(true)
+            Vitest.expect(valueMeta.Rows |> List.exists (fun (label, _) -> label = "Type")).toBe(true)
+            Vitest.expect(valueMeta.Rows |> List.exists (fun (label, _) -> label = "Name")).toBe(true)
+
+        let datasetNode =
+            findCanonicalNodeByTag
+                GraphNodeTag.Dataset
+                "Expected canonical dataset node."
+
+        let protocolNode =
+            findCanonicalNodeByTag
+                GraphNodeTag.Protocol
+                "Expected canonical protocol node."
+
+        let processNode =
+            findCanonicalNodeByTag
+                GraphNodeTag.Process
+                "Expected canonical process node."
+
+        let materialEndpointNode =
+            findCanonicalNodeByTag
+                (GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Material)
+                "Expected canonical material endpoint node."
+
+        let dataEndpointNode =
+            findCanonicalNodeByTag
+                (GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Data)
+                "Expected canonical data endpoint node."
+
+        expectPropertyGroup
+            datasetNode
+            "Additional Properties"
+            "additional-property"
+            GraphPropertyValueOwnerTag.Dataset
+            "Dataset"
+            "additionalProperty"
+
+        expectPropertyGroup
+            protocolNode
+            "Additional Properties"
+            "additional-property"
+            GraphPropertyValueOwnerTag.Protocol
+            "Protocol"
+            "additionalProperty"
+
+        expectPropertyGroup
+            processNode
+            "Parameter Values"
+            "parameter-value"
+            GraphPropertyValueOwnerTag.Process
+            "Process"
+            "parameterValue"
+
+        expectPropertyGroup
+            materialEndpointNode
+            "Additional Properties"
+            "additional-property"
+            (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Material)
+            "Material Endpoint"
+            "additionalProperty"
+
+        expectPropertyGroup
+            dataEndpointNode
+            "Additional Properties"
+            "additional-property"
+            (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Data)
+            "Data Endpoint"
+            "additionalProperty")
+
+    Vitest.test("keeps PropertyValue nodes visible in matching semantic filters", fun () ->
+        let graphObjects = graphObjectsWithPropertyValues ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let propertyOwnerTagsForSemanticKind (semanticKind: string) =
+            let filteredNodes =
+                GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                    (Set.ofList [ semanticKind ])
+                    nodes
+                    metaById
+
+            let allLayer =
+                filteredNodes
+                |> List.tryFind (fun node -> node.id = "graph:all")
+                |> expectSome <| $"Missing graph:all layer for semantic kind '{semanticKind}'."
+
+            allLayer.children
+            |> flattenNodes
+            |> Seq.choose (fun node ->
+                metaById
+                |> Map.tryFind node.id
+                |> Option.bind (fun meta ->
+                    match meta.Tag with
+                    | Some(GraphNodeTag.PropertyValue ownerTag) -> Some ownerTag
+                    | _ -> None))
+            |> Set.ofSeq
+
+        let assertSingleOwnerTag (semanticKind: string) (expectedOwnerTag: GraphPropertyValueOwnerTag) =
+            let ownerTags = propertyOwnerTagsForSemanticKind semanticKind
+
+            Vitest.expect(ownerTags.Count).toBe(1)
+            Vitest.expect(ownerTags.Contains expectedOwnerTag).toBe(true)
+
+        assertSingleOwnerTag "Datasets" GraphPropertyValueOwnerTag.Dataset
+        assertSingleOwnerTag "Protocols" GraphPropertyValueOwnerTag.Protocol
+        assertSingleOwnerTag "Processes" GraphPropertyValueOwnerTag.Process
+
+        assertSingleOwnerTag
+            "Materials"
+            (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Material)
+
+        assertSingleOwnerTag
+            "Data"
+            (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Data))
 )
