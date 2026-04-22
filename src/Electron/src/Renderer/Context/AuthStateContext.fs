@@ -1,66 +1,16 @@
 module Renderer.Context.AuthStateContext
 
 open Feliz
-open Swate.Electron.Shared.AuthTypes
 open Swate.Components.Authentication.Types
-
-
-module private Helper =
-
-    let private isEmptyAuthState (state: AuthStateDto) =
-        state.ActiveAccount.IsNone && state.StoredAccounts.Length = 0
-
-    let shouldLogRevalidationFailure (response: AuthResult) =
-        match response.Success, response.FailureKind, response.User with
-        | false, Some AuthFailureKind.Unauthorized, Some state when isEmptyAuthState state -> false
-        | false, _, _ -> true
-        | true, _, _ -> false
-
-    let refreshState (setAuthState) (onError) = promise {
-        let! stateResult = Api.ipcAuthApi.getAuthState ()
-
-        match stateResult with
-        | Ok state -> setAuthState state
-
-        | Error _ ->
-            setAuthState AuthStateDto.Empty
-            onError ()
-    }
 
 let AuthStateCtx = React.createContext<AuthStateDto> AuthStateDto.Empty
 
 [<Hook>]
 let useAuthStateCtx () = React.useContext AuthStateCtx
 
-open Helper
-
 /// This component stores the current account information. If you want to log out, switch account, login, etc.
 /// - you simply can use the IAuthApi via IPC. Any changes will be broadcasted to all open windows via: `authAccountsUpdate`
 [<ReactComponent>]
 let Provider (children: ReactElement) =
-    let authState, setAuthState = React.useState AuthStateDto.Empty
-
-    let authAccountsUpdate = Renderer.MainUpdateRendererBridge.useAuthAccountsUpdate ()
-
-    let providedAuthState =
-        match authAccountsUpdate with
-        | ValueSome state -> state
-        | ValueNone -> authState
-
-    React.useEffectOnce (fun () ->
-        // TODO: Add error handling.
-        promise {
-            match! Api.ipcAuthApi.revalidate () with
-            | Ok response ->
-                do! refreshState setAuthState ignore
-
-                if shouldLogRevalidationFailure response then
-                    console.error (response.FailureKind, Fable.Core.JS.JSON.stringify response.Message)
-            | Error ex -> console.error (Fable.Core.JS.JSON.stringify ex.Message)
-
-        }
-        |> Promise.start
-    )
-
-
-    AuthStateCtx.Provider(providedAuthState, children)
+    let authSnapshot = Renderer.MainUpdateRendererBridge.useAuthAccountsUpdate ()
+    AuthStateCtx.Provider(authSnapshot.Value, children)

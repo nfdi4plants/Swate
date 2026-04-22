@@ -5,6 +5,7 @@ open Elmish
 open Feliz
 open Feliz.UseElmish
 open Renderer.Components
+open Renderer.RendererStoreState
 open Renderer.Types
 open Swate.Components
 open Swate.Components.Layout
@@ -31,15 +32,8 @@ type private Msg =
     | SetDetailsSidebarIsOpen of bool
     | SetLeftSidebarTarget of LeftSidebarPage
 
-let private createGetOpenPathCmd () : Cmd<Msg> =
-    Cmd.OfPromise.either
-        (fun () -> Api.ipcArcVaultApi.getOpenPath (unbox null))
-        ()
-        SetArcRootPath
-        (fun _ -> SetArcRootPath None)
-
 let private init () : Model * Cmd<Msg> =
-    Model.Empty, createGetOpenPathCmd ()
+    Model.Empty, Cmd.none
 
 let private msgName =
     function
@@ -121,6 +115,12 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSideba
 [<ReactComponent>]
 let Main () =
     let model, dispatch = React.useElmish (init, update, [||])
+    let pathSnapshot = Renderer.MainUpdateRendererBridge.usePathChange ()
+
+    let pathSnapshotKey =
+        match pathSnapshot.Value with
+        | Some path -> $"some:{path}"
+        | None -> "none"
 
     let setAppState (appState: ArcRootPath) = dispatch (SetArcRootPath appState)
     let setPageState (pageState: PageState option) = dispatch (PageStateChanged pageState)
@@ -143,11 +143,14 @@ let Main () =
             [| box model.PageState |]
         )
 
-    React.useEffectOnce (fun () ->
-        Renderer.MainUpdateRendererBridge.subscribePathChange (fun pathOption ->
-            console.log ("[Swate] CHANGE PATH!")
-            dispatch (SetArcRootPath pathOption)
-        ))
+    React.useEffect (
+        (fun () ->
+            match pathSnapshot.Status with
+            | LoadStatus.Ready -> dispatch (SetArcRootPath pathSnapshot.Value)
+            | LoadStatus.NotRequested
+            | LoadStatus.Loading -> ()),
+        [| box pathSnapshot.Status; box pathSnapshotKey |]
+    )
 
     let children =
         Renderer.Components.MainContent.Main.Main(model.AppState, model.PageState, model.LeftSidebarTarget)
