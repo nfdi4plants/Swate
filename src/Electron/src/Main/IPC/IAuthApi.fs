@@ -51,10 +51,8 @@ let api: IAuthApi = {
     revalidate =
         fun () -> promise {
             try
-                let! result, didRevalidate = AuthService.revalidate ()
-
-                if didRevalidate then
-                    broadcastAccountsUpdate ()
+                let! result, _didRevalidate = AuthService.revalidate ()
+                broadcastAccountsUpdate ()
 
                 return Ok result
             with _ ->

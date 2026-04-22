@@ -33,6 +33,7 @@
     <Compile Include="IPC\IGitApi.fs" />
     <Compile Include="IPC\IGitLabApi.fs" />
     <Compile Include="IPC\IArcVaultsApi.fs" />
+    <Compile Include="IPC\IRendererBridgeSyncApi.fs" />
     <Compile Include="IPC\IAuthApi.fs" />
     <Compile Include="main.fs" />
     <None Include="SimpleGitTest.fsx" />

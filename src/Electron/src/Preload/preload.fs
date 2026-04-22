@@ -7,6 +7,7 @@ Remoting.init |> Remoting.buildTwoWayBridge<IArcVaultsApi>
 Remoting.init |> Remoting.buildTwoWayBridge<IGitApi>
 Remoting.init |> Remoting.buildTwoWayBridge<IGitLabApi>
 Remoting.init |> Remoting.buildTwoWayBridge<IAuthApi>
+Remoting.init |> Remoting.buildTwoWayBridge<IRendererBridgeSyncApi>
 
 Remoting.init |> Remoting.buildBridge<IPathChangeApi>
 Remoting.init |> Remoting.buildBridge<IRecentARCsUpdateApi>

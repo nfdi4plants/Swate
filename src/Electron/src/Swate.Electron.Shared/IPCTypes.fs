@@ -94,6 +94,12 @@ type IGitLabApi = {
     createProject: IpcMainEvent -> string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
 }
 
+/// Renderer -> Main request used to rehydrate durable Main -> Renderer state
+/// after a renderer startup or reload.
+type IRendererBridgeSyncApi = {
+    syncRendererBridgeState: IpcMainEvent -> JS.Promise<Result<unit, exn>>
+}
+
 /// One Way Bridge: Main -> Renderer (per-channel)
 type IPathChangeApi = { pathChange: string option -> unit }
 type IRecentARCsUpdateApi = { recentARCsUpdate: ARCPointer[] -> unit }

@@ -12,3 +12,4 @@ let ipcGitApi = Remoting.init |> Remoting.buildClient<IGitApi>
 let ipcGitLabApi = Remoting.init |> Remoting.buildClient<IGitLabApi>
 let ipcArcVaultApi = Remoting.init |> Remoting.buildClient<IArcVaultsApi>
 let ipcAuthApi = Remoting.init |> Remoting.buildClient<IAuthApi>
+let ipcRendererBridgeSyncApi = Remoting.init |> Remoting.buildClient<IRendererBridgeSyncApi>
