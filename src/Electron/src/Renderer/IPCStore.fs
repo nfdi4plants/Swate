@@ -1,16 +1,20 @@
 module Renderer.IPCStore
 
 open System.Collections.Generic
+open Renderer.RendererStoreState
 
-/// Minimal external-store adapter for React.useSyncExternalStore.
-/// Snapshots are ValueOption<'T> so "no IPC event yet" (ValueNone)
-/// is distinguishable from a valid domain value.
-///
-/// Subscribe uses integer IDs so disposal is deterministic.
-type IPCStore<'T>() =
-    let mutable snapshot: 'T voption = ValueNone
+type IPCStore<'T>(initialValue: 'T) =
+    let mutable snapshot: IPCSnapshot<'T> = {
+        Value = initialValue
+        Status = LoadStatus.NotRequested
+    }
+
     let mutable nextId = 0
     let listeners = Dictionary<int, unit -> unit>()
+
+    let notify () =
+        for listener in listeners.Values |> Seq.toArray do
+            listener()
 
     member _.GetSnapshot() = snapshot
 
@@ -20,9 +24,17 @@ type IPCStore<'T>() =
         listeners.[id] <- listener
         fun () -> listeners.Remove(id) |> ignore
 
-    member _.Update(value: 'T) =
-        snapshot <- ValueSome value
-        // Snapshot listeners before iterating so subscribe/dispose calls from
-        // within a listener do not mutate the collection mid-loop.
-        for listener in listeners.Values |> Seq.toArray do
-            listener()
+    member _.BeginRefresh() =
+        match snapshot.Status with
+        | LoadStatus.Loading -> ()
+        | LoadStatus.NotRequested
+        | LoadStatus.Ready ->
+            snapshot <- { snapshot with Status = LoadStatus.Loading }
+            notify ()
+
+    member _.Publish(value: 'T) =
+        snapshot <- {
+            Value = value
+            Status = LoadStatus.Ready
+        }
+        notify ()
