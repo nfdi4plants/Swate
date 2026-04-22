@@ -1,67 +1,41 @@
 module Renderer.Context.FileStateContext
 
 open Feliz
+open Renderer.Context.FileSelectionContext
 open Renderer.Context.FileStateTypes
+open Renderer.Context.FileTreeContext
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-
-type private FileSelectionController = {
-    selection: ArcSelection
-    setSelection: ArcSelection -> unit
-    updateSelection: (ArcSelection -> ArcSelection) -> unit
-}
-
-module private FileStateHelper =
-
-    let FileTreeCtx = React.createContext<FileEntry[]> [||]
-
-    let FileSelectionCtx =
-        React.createContext<FileSelectionController> (
-            {
-                selection = ArcSelection.empty
-                setSelection = ignore
-                updateSelection = ignore
-            }
-        )
-
-[<Hook>]
-let useFileTree () =
-    React.useContext FileStateHelper.FileTreeCtx
-
-[<Hook>]
-let private useFileSelection () =
-    React.useContext FileStateHelper.FileSelectionCtx
 
 [<Hook>]
 let useFileStateCtx () =
-    let fileTree = useFileTree ()
-    let selectionCtx = useFileSelection ()
+    let fileTreeState = useFileTreeCtx ()
+    let selectionCtx = useFileSelectionCtx ()
 
     React.useMemo (
         (fun _ -> {
             state = {
-                FileTree = fileTree
+                FileTree = fileTreeState.Entries
                 Selection = selectionCtx.selection
+                Status = fileTreeState.Status
             }
             setSelection = selectionCtx.setSelection
             updateSelection = selectionCtx.updateSelection
         }),
-        [| box fileTree; box selectionCtx.selection |]
+        [| box fileTreeState; box selectionCtx.selection |]
     )
 
 [<ReactComponent>]
 let FileStateCtxProvider (children: ReactElement) =
     let selection, setSelectionState = React.useStateWithUpdater ArcSelection.empty
+    let fileTreeSnapshot = Renderer.MainUpdateRendererBridge.useFileTreeUpdate ()
 
-    let fileTreeUpdate = Renderer.MainUpdateRendererBridge.useFileTreeUpdate ()
-
-    let fileTree =
+    let fileTreeState =
         React.useMemo (
-            (fun _ ->
-                match fileTreeUpdate with
-                | ValueSome fileTreeMap -> fileTreeMap.Values |> Seq.toArray
-                | ValueNone -> [||]),
-            [| box fileTreeUpdate |]
+            (fun _ -> {
+                Entries = fileTreeSnapshot.Value.Values |> Seq.toArray
+                Status = fileTreeSnapshot.Status
+            }),
+            [| box fileTreeSnapshot.Value; box fileTreeSnapshot.Status |]
         )
 
     let setSelection =
@@ -91,7 +65,4 @@ let FileStateCtxProvider (children: ReactElement) =
             [| box selection |]
         )
 
-    FileStateHelper.FileTreeCtx.Provider(
-        fileTree,
-        FileStateHelper.FileSelectionCtx.Provider(selectionCtx, children)
-    )
+    FileTreeCtx.Provider(fileTreeState, FileSelectionCtx.Provider(selectionCtx, children))

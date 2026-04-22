@@ -1,16 +1,19 @@
 module Renderer.Context.FileStateTypes
 
+open Renderer.RendererStoreState
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
 type FileState = {
     FileTree: FileEntry[]
     Selection: ArcSelection
+    Status: LoadStatus
 }
 with
     static member init() : FileState = {
         FileTree = [||]
         Selection = ArcSelection.empty
+        Status = LoadStatus.NotRequested
     }
 
 type FileStateController = {

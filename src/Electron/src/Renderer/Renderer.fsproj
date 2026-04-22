@@ -14,6 +14,8 @@
     <Compile Include="Context\AppStateContext.fs" />
     <Compile Include="Context\PageStateContext.fs" />
     <Compile Include="Context\FileStateTypes.fs" />
+    <Compile Include="Context\FileTreeContext.fs" />
+    <Compile Include="Context\FileSelectionContext.fs" />
     <Compile Include="Context\FileStateContext.fs" />
     <Compile Include="Context\ArcObjectExplorerContext.fs" />
     <Compile Include="Context\AuthStateContext.fs" />

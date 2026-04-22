@@ -5,6 +5,7 @@
   <ItemGroup>
     <Compile Include="IPCStore.test.fs" />
     <Compile Include="FileStateCtx.test.fs" />
+    <Compile Include="FileStateContextLayout.test.fs" />
     <Compile Include="GitWorkflow.test.fs" />
   </ItemGroup>
   <ItemGroup>
