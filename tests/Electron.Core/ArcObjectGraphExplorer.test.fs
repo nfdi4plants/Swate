@@ -621,6 +621,44 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(mergedOutputChildNames |> List.contains "Material").toBe(true)
         Vitest.expect(mergedOutputChildNames |> List.contains "Data").toBe(true))
 
+    Vitest.test("keeps direct ARC children first on flattened ARCs root before nested folders", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = ARCExplorer.toFileItems nodes
+
+        let treePaneItems =
+            GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
+
+        let arcsRoot =
+            treePaneItems
+            |> List.tryFind (fun item -> item.Id = "graph:all")
+            |> expectSome <| "Expected ARCs root node in flattened tree."
+
+        let arcsChildren = arcsRoot.Children |> Option.defaultValue []
+
+        let isDirectArcChild (item: FileItem) =
+            let prefix = "graph:arc:"
+
+            item.ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Arc
+            && item.Id.StartsWith(prefix, StringComparison.Ordinal)
+            && item.Id.Substring(prefix.Length).Contains(":") |> not
+
+        let arcChildren =
+            arcsChildren
+            |> List.filter isDirectArcChild
+
+        let firstNestedChildIndex =
+            arcsChildren
+            |> List.tryFindIndex (isDirectArcChild >> not)
+
+        Vitest.expect(arcChildren.Length > 0).toBe(true)
+
+        match firstNestedChildIndex with
+        | Some index ->
+            Vitest.expect(index).toBe(arcChildren.Length)
+        | None ->
+            Vitest.expect(arcsChildren.Length).toBe(arcChildren.Length))
+
     Vitest.test("fuses repeated non-directional group folders on flattened ARC root level", fun () ->
         let graphObjects = fakeGraphObjects ()
         let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects

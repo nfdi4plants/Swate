@@ -204,8 +204,17 @@ module GraphObjectExplorerTreeData =
                     |> List.map flattenItem
 
                 let descendantsForParent =
-                    flattenedChildren
-                    |> List.collect snd
+                    let directChildren =
+                        flattenedChildren
+                        |> List.map fst
+
+                    let nestedDescendants =
+                        flattenedChildren
+                        |> List.collect (fun (_, descendants) ->
+                            descendants
+                            |> List.skip 1)
+
+                    directChildren @ nestedDescendants
                     |> List.filter (fun descendant -> descendant.ItemType <> "empty")
 
                 let descendantsForCurrentItem =
