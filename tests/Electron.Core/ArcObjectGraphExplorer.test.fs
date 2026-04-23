@@ -741,11 +741,11 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(summaryFolder.IsDirectory).toBe(true)
         Vitest.expect(summarizedAdditionalProperties.Length > 0).toBe(true)
         Vitest.expect(summarizedAdditionalProperties |> List.forall (fun item -> item.Id.Contains(":additional-property:"))).toBe(true)
-        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Dataset Region=Field-01").toBe(true)
-        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Protocol Revision=2026-04").toBe(true)
-        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Material Origin=Greenhouse").toBe(true)
-        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Data Format=tsv").toBe(true)
-        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Batch=B-42").toBe(false))
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Dataset Region").toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Protocol Revision").toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Material Origin").toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Data Format").toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Batch").toBe(false))
 
     Vitest.test("summarizes nested parameter values into one parent-level folder in flattened tree view", fun () ->
         let graphObjects = graphObjectsWithPropertyValues ()
@@ -792,7 +792,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(summaryFolder.IsDirectory).toBe(true)
         Vitest.expect(summarizedParameterValues.Length > 0).toBe(true)
         Vitest.expect(summarizedParameterValues |> List.forall (fun item -> item.Id.Contains(":parameter-value:"))).toBe(true)
-        Vitest.expect(summarizedParameterValueNames |> List.contains "Batch=B-42").toBe(true))
+        Vitest.expect(summarizedParameterValueNames |> List.contains "Batch").toBe(true))
 
     Vitest.test("summarizes nested formal parameters into one parent-level folder in flattened tree view", fun () ->
         let graphObjects = fakeGraphObjects ()

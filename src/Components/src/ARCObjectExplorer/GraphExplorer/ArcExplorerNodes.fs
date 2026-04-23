@@ -55,11 +55,13 @@ let private optionalOptionRow label value =
 let private addMeta (nodeId: string) (meta: GraphNodeMeta) (metaById: Map<string, GraphNodeMeta>) =
     metaById |> Map.add nodeId meta
 
+let private propertyValueDisplayName (propertyValue: PropertyValue) =
+    propertyValue.name
+    |> asOptionalText
+    |> Option.defaultValue propertyValue.id
+
 let private formatPropertyValue (propertyValue: PropertyValue) =
-    let propertyLabel =
-        propertyValue.name
-        |> asOptionalText
-        |> Option.defaultValue propertyValue.id
+    let propertyLabel = propertyValueDisplayName propertyValue
 
     match propertyValue.value with
     | Some propertyContent when String.IsNullOrWhiteSpace propertyContent |> not ->
@@ -116,7 +118,7 @@ let private propertyValueNode
     (metaById: Map<string, GraphNodeMeta>)
     =
     let nodeId = $"{ownerNodeId}:{fieldKey}:{index}"
-    let nodeLabel = formatPropertyValue propertyValue
+    let nodeLabel = propertyValueDisplayName propertyValue
 
     let node =
         ArcExplorerNode.create (
@@ -524,13 +526,6 @@ let private processEndpointNode
     let relationshipRole = if isReference then "Reference" else "Canonical"
     let endpointRole = $"{directionLabel} ({relationshipRole})"
 
-    let endpointPosition =
-        match processTypeIndex with
-        | Some index -> $"{index + 1}.{endpointIndex + 1}"
-        | None -> string (endpointIndex + 1)
-
-    let title = $"{directionLabel} {endpointPosition} {valueTypeLabel} ({subtypeLabel}): {displayName}"
-
     let endpointPropertyValues, propertyOwnerTag, propertyOwnerLabel =
         match endpoint with
         | MaterialEndpoint(_, material) ->
@@ -557,7 +552,7 @@ let private processEndpointNode
     let node =
         ArcExplorerNode.create (
             nodeId,
-            title,
+            displayName,
             nodeKind,
             isReference = isReference,
             children = (additionalPropertyGroupNode |> Option.toList)
