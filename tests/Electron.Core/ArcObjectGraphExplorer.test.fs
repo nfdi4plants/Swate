@@ -28,6 +28,25 @@ let rec private flattenFileItems (items: FileItem list) =
             yield! flattenFileItems (item.Children |> Option.defaultValue [])
     }
 
+let private groupItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Group
+let private sampleItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Sample
+let private dataMapItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.DataMap
+
+let private isLeafRehomeCandidateAtSiblingLevel (item: FileItem) =
+    let hasMarker (marker: string) =
+        item.Id.Contains marker
+
+    item.ItemType = sampleItemType
+    || item.ItemType = dataMapItemType
+    || (
+        item.ItemType <> groupItemType
+        && (
+            hasMarker ":additional-property:"
+            || hasMarker ":parameter-value:"
+            || hasMarker ":formal-parameter:"
+        )
+    )
+
 let private expectSome value errorMessage =
     match value with
     | Some value -> value
@@ -400,7 +419,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
         Vitest.expect(standaloneRoots.Length).toBe(0))
 
-    Vitest.test("flattens nested assay descendants to left-tree parent level while keeping descendants expandable", fun () ->
+    Vitest.test("flattens assay descendants into structural folders while keeping folder descendants expandable", fun () ->
         let graphObjects = fakeGraphObjects ()
         let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
         let explorerItems = ARCExplorer.toFileItems nodes
@@ -417,60 +436,227 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected Metabolomics assay node in flattened tree."
 
         let assayChildren = assayNode.Children |> Option.defaultValue []
-        let assayChildNames = assayChildren |> List.map _.Name
 
-        let protocolNode =
+        let protocolNodesAtAssayLevel =
             assayChildren
-            |> List.tryFind (fun item -> item.Name = "LC-MS Measurement")
-            |> expectSome <| "Expected protocol node at assay parent level."
+            |> List.filter (fun item -> item.Name = "LC-MS Measurement")
 
-        let processNode =
+        let processNodesAtAssayLevel =
             assayChildren
-            |> List.tryFind (fun item -> item.Name = "Quantify features")
-            |> expectSome <| "Expected process node at assay parent level."
+            |> List.filter (fun item -> item.Name = "Quantify features")
 
         let protocolsGroup =
             assayChildren
             |> List.tryFind (fun item -> item.Name = "Protocols")
             |> expectSome <| "Expected structural Protocols group at assay parent level."
 
+        let processesGroup =
+            assayChildren
+            |> List.tryFind (fun item -> item.Name = "Processes")
+            |> expectSome <| "Expected structural Processes group at assay parent level."
+
         let inputsGroup =
             assayChildren
             |> List.tryFind (fun item -> item.Name = "Inputs")
             |> expectSome <| "Expected structural Inputs group at assay parent level."
 
-        let firstMaterialIndex =
-            assayChildNames
-            |> List.tryFindIndex (fun name -> name = "Material")
-            |> expectSome <| "Expected Material group at assay parent level."
+        let outputsGroup =
+            assayChildren
+            |> List.tryFind (fun item -> item.Name = "Outputs")
+            |> expectSome <| "Expected structural Outputs group at assay parent level."
 
-        let firstDataIndex =
-            assayChildNames
-            |> List.tryFindIndex (fun name -> name = "Data")
-            |> expectSome <| "Expected Data group at assay parent level."
+        let inputsAtAssayLevel =
+            assayChildren
+            |> List.filter (fun item -> item.Name = "Inputs")
 
-        let protocolIndex =
-            assayChildNames
-            |> List.tryFindIndex (fun name -> name = protocolNode.Name)
-            |> expectSome <| "Expected protocol index in flattened assay children."
+        let outputsAtAssayLevel =
+            assayChildren
+            |> List.filter (fun item -> item.Name = "Outputs")
 
-        let processIndex =
-            assayChildNames
-            |> List.tryFindIndex (fun name -> name = processNode.Name)
-            |> expectSome <| "Expected process index in flattened assay children."
+        let protocolNodeInProtocolsGroup =
+            protocolsGroup.Children
+            |> Option.defaultValue []
+            |> List.tryFind (fun item -> item.Name = "LC-MS Measurement")
+            |> expectSome <| "Expected protocol node inside Protocols group."
 
-        Vitest.expect(protocolIndex < processIndex).toBe(true)
-        Vitest.expect(processIndex < firstMaterialIndex).toBe(true)
-        Vitest.expect(processIndex < firstDataIndex).toBe(true)
+        let processNodeInProcessesGroup =
+            processesGroup.Children
+            |> Option.defaultValue []
+            |> List.tryFind (fun item -> item.Name = "Quantify features")
+            |> expectSome <| "Expected process node inside Processes group."
+
+        Vitest.expect(protocolNodesAtAssayLevel.Length).toBe(0)
+        Vitest.expect(processNodesAtAssayLevel.Length).toBe(0)
+        Vitest.expect(inputsAtAssayLevel.Length).toBe(1)
+        Vitest.expect(outputsAtAssayLevel.Length).toBe(1)
         Vitest.expect(protocolsGroup.Selectable).toBe(false)
+        Vitest.expect(processesGroup.Selectable).toBe(false)
         Vitest.expect(inputsGroup.Selectable).toBe(false)
+        Vitest.expect(outputsGroup.Selectable).toBe(false)
+        Vitest.expect(protocolNodeInProtocolsGroup.Selectable).toBe(true)
+        Vitest.expect(processNodeInProcessesGroup.Selectable).toBe(true)
 
-        let processChildren = processNode.Children |> Option.defaultValue []
+        let processChildren = processNodeInProcessesGroup.Children |> Option.defaultValue []
         let processChildNames = processChildren |> List.map _.Name
 
         Vitest.expect(processChildren.Length > 0).toBe(true)
         Vitest.expect(processChildNames |> List.contains "Inputs").toBe(true)
         Vitest.expect(processChildNames |> List.contains "Outputs").toBe(true))
+
+    Vitest.test("merges repeated Inputs and Outputs folders on flattened ARC root level", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = ARCExplorer.toFileItems nodes
+
+        let treePaneItems =
+            GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
+
+        let arcsRoot =
+            treePaneItems
+            |> List.tryFind (fun item -> item.Id = "graph:all")
+            |> expectSome <| "Expected ARCs root node in flattened tree."
+
+        let arcsChildren = arcsRoot.Children |> Option.defaultValue []
+
+        let inputFolders =
+            arcsChildren
+            |> List.filter (fun item -> item.Name = "Inputs")
+
+        let outputFolders =
+            arcsChildren
+            |> List.filter (fun item -> item.Name = "Outputs")
+
+        Vitest.expect(inputFolders.Length).toBe(1)
+        Vitest.expect(outputFolders.Length).toBe(1)
+
+        let mergedInputs = inputFolders |> List.head
+        let mergedOutputs = outputFolders |> List.head
+
+        let mergedInputChildren =
+            mergedInputs.Children
+            |> Option.defaultValue []
+
+        let mergedOutputChildren =
+            mergedOutputs.Children
+            |> Option.defaultValue []
+
+        let mergedInputChildNames = mergedInputChildren |> List.map _.Name
+        let mergedOutputChildNames = mergedOutputChildren |> List.map _.Name
+
+        let mergedInputChildIds = mergedInputChildren |> List.map _.Id
+        let mergedOutputChildIds = mergedOutputChildren |> List.map _.Id
+
+        let mergedInputMaterialFolders =
+            mergedInputChildren
+            |> List.filter (fun item ->
+                item.ItemType = groupItemType
+                && item.Name = "Material")
+
+        let mergedInputDataFolders =
+            mergedInputChildren
+            |> List.filter (fun item ->
+                item.ItemType = groupItemType
+                && item.Name = "Data")
+
+        let mergedOutputMaterialFolders =
+            mergedOutputChildren
+            |> List.filter (fun item ->
+                item.ItemType = groupItemType
+                && item.Name = "Material")
+
+        let mergedOutputDataFolders =
+            mergedOutputChildren
+            |> List.filter (fun item ->
+                item.ItemType = groupItemType
+                && item.Name = "Data")
+
+        let inputSiblingLeafCandidates =
+            mergedInputChildren
+            |> List.filter isLeafRehomeCandidateAtSiblingLevel
+
+        let outputSiblingLeafCandidates =
+            mergedOutputChildren
+            |> List.filter isLeafRehomeCandidateAtSiblingLevel
+
+        let mergedInputMaterialChildren =
+            mergedInputMaterialFolders
+            |> List.tryHead
+            |> Option.bind _.Children
+            |> Option.defaultValue []
+
+        let mergedInputDataChildren =
+            mergedInputDataFolders
+            |> List.tryHead
+            |> Option.bind _.Children
+            |> Option.defaultValue []
+
+        let mergedOutputMaterialChildren =
+            mergedOutputMaterialFolders
+            |> List.tryHead
+            |> Option.bind _.Children
+            |> Option.defaultValue []
+
+        let mergedOutputDataChildren =
+            mergedOutputDataFolders
+            |> List.tryHead
+            |> Option.bind _.Children
+            |> Option.defaultValue []
+
+        Vitest.expect(mergedInputs.Selectable).toBe(false)
+        Vitest.expect(mergedOutputs.Selectable).toBe(false)
+        Vitest.expect(mergedInputChildIds.Length).toBe((mergedInputChildIds |> List.distinct).Length)
+        Vitest.expect(mergedOutputChildIds.Length).toBe((mergedOutputChildIds |> List.distinct).Length)
+        Vitest.expect(mergedInputMaterialFolders.Length).toBe(1)
+        Vitest.expect(mergedInputDataFolders.Length).toBe(1)
+        Vitest.expect(mergedOutputMaterialFolders.Length).toBe(1)
+        Vitest.expect(mergedOutputDataFolders.Length).toBe(1)
+        Vitest.expect(inputSiblingLeafCandidates.Length).toBe(0)
+        Vitest.expect(outputSiblingLeafCandidates.Length).toBe(0)
+        Vitest.expect(mergedInputMaterialChildren |> List.exists (fun item -> item.ItemType = sampleItemType)).toBe(true)
+        Vitest.expect(mergedInputDataChildren |> List.exists (fun item -> item.ItemType = dataMapItemType)).toBe(true)
+        Vitest.expect(mergedOutputMaterialChildren |> List.exists (fun item -> item.ItemType = sampleItemType)).toBe(true)
+        Vitest.expect(mergedOutputDataChildren |> List.exists (fun item -> item.ItemType = dataMapItemType)).toBe(true)
+        Vitest.expect(mergedInputChildNames |> List.contains "Material").toBe(true)
+        Vitest.expect(mergedInputChildNames |> List.contains "Data").toBe(true)
+        Vitest.expect(mergedOutputChildNames |> List.contains "Material").toBe(true)
+        Vitest.expect(mergedOutputChildNames |> List.contains "Data").toBe(true))
+
+    Vitest.test("fuses repeated non-directional group folders on flattened ARC root level", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = ARCExplorer.toFileItems nodes
+
+        let treePaneItems =
+            GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
+
+        let arcsRoot =
+            treePaneItems
+            |> List.tryFind (fun item -> item.Id = "graph:all")
+            |> expectSome <| "Expected ARCs root node in flattened tree."
+
+        let arcsChildren = arcsRoot.Children |> Option.defaultValue []
+
+        let protocolGroupsAtRoot =
+            arcsChildren
+            |> List.filter (fun item ->
+                item.ItemType = groupItemType
+                && item.Name = "Protocols")
+
+        let processGroupsAtRoot =
+            arcsChildren
+            |> List.filter (fun item ->
+                item.ItemType = groupItemType
+                && item.Name = "Processes")
+
+        let additionalPropertiesGroupsAtRoot =
+            arcsChildren
+            |> List.filter (fun item ->
+                item.ItemType = groupItemType
+                && item.Name = "Additional Properties")
+
+        Vitest.expect(protocolGroupsAtRoot.Length).toBe(1)
+        Vitest.expect(processGroupsAtRoot.Length).toBe(1)
+        Vitest.expect(additionalPropertiesGroupsAtRoot.Length).toBe(1))
 
     Vitest.test("summarizes nested additional properties into one parent-level folder in flattened tree view", fun () ->
         let graphObjects = graphObjectsWithPropertyValues ()

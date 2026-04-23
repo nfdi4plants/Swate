@@ -9,6 +9,9 @@ open Swate.Components.FileExplorerTypes
 module GraphObjectExplorerTreeData =
 
     let private groupItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Group
+    let private sampleItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Sample
+    let private dataMapItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.DataMap
+    let private descendantSummaryGroupKeys = Set.ofList [ "additional-properties"; "parameter-value"; "formal-parameters" ]
 
     type private DescendantSummarySeed = {
         RuleKey: string
@@ -39,40 +42,58 @@ module GraphObjectExplorerTreeData =
             else
                 Some(id.Substring(keyStart))
 
+    let private normalizeSummaryRuleKey (groupNode: FileItem) (ruleKey: string) =
+        if String.Equals(groupNode.Name, "Additional Properties", StringComparison.OrdinalIgnoreCase) then
+            "additional-properties"
+        elif String.Equals(groupNode.Name, "Parameter Values", StringComparison.OrdinalIgnoreCase) then
+            "parameter-value"
+        elif String.Equals(groupNode.Name, "Formal Parameters", StringComparison.OrdinalIgnoreCase) then
+            "formal-parameters"
+        else
+            ruleKey
+
     let private keyFromGroupNode (groupNode: FileItem) =
-        groupNode.Id
-        |> tryGetGroupKeyFromId
-        |> Option.defaultValue (
-            groupNode.Name
-                .Trim()
-                .ToLowerInvariant()
-                .Replace(" ", "-")
-                .Replace("/", "-")
-                .Replace("\\", "-")
-                .Replace(":", "-")
-        )
+        let rawKey =
+            groupNode.Id
+            |> tryGetGroupKeyFromId
+            |> Option.defaultValue (
+                groupNode.Name
+                    .Trim()
+                    .ToLowerInvariant()
+                    .Replace(" ", "-")
+                    .Replace("/", "-")
+                    .Replace("\\", "-")
+                    .Replace(":", "-")
+            )
+
+        normalizeSummaryRuleKey groupNode rawKey
 
     let rec private collectSummarySeeds (item: FileItem) =
         let children = item.Children |> Option.defaultValue []
 
         let currentSeed =
             if item.ItemType = groupItemType then
-                let memberNodeIds =
-                    children
-                    |> List.filter (fun child ->
-                        child.ItemType <> groupItemType
-                        && child.ItemType <> "empty")
-                    |> List.map _.Id
+                let ruleKey = keyFromGroupNode item
 
-                if List.isEmpty memberNodeIds then
-                    None
+                if descendantSummaryGroupKeys.Contains ruleKey then
+                    let memberNodeIds =
+                        children
+                        |> List.filter (fun child ->
+                            child.ItemType <> groupItemType
+                            && child.ItemType <> "empty")
+                        |> List.map _.Id
+
+                    if List.isEmpty memberNodeIds then
+                        None
+                    else
+                        Some {
+                            RuleKey = ruleKey
+                            SummaryName = item.Name
+                            GroupNodeId = item.Id
+                            MemberNodeIds = memberNodeIds
+                        }
                 else
-                    Some {
-                        RuleKey = keyFromGroupNode item
-                        SummaryName = item.Name
-                        GroupNodeId = item.Id
-                        MemberNodeIds = memberNodeIds
-                    }
+                    None
             else
                 None
 
@@ -204,6 +225,161 @@ module GraphObjectExplorerTreeData =
 
         flattenedItem, flattenedItem :: descendantsForAncestors
 
+    let private siblingNameKey (name: string) =
+        name.Trim().ToLowerInvariant()
+
+    let private isMergeableGroupFolder (item: FileItem) =
+        item.ItemType = groupItemType
+        && item.IsDirectory
+
+    let rec private normalizeSiblingLevelOnly (children: FileItem list) =
+        children
+        |> mergeSameNameGroupsOnSiblingLevel
+        |> rehomeLeafLikeNodesIntoMatchingFolders
+        |> hideRepresentedNonGroupSiblings
+
+    and private mergeGroupFolderNodes (nodes: FileItem list) =
+        let firstNode = nodes |> List.head
+
+        let mergedChildren =
+            nodes
+            |> List.collect (fun node -> node.Children |> Option.defaultValue [])
+            |> List.distinctBy _.Id
+            |> normalizeSiblingLevelOnly
+
+        {
+            firstNode with
+                Children = Some mergedChildren
+        }
+
+    and private mergeSameNameGroupsOnSiblingLevel (children: FileItem list) =
+        let rec loop acc remaining =
+            match remaining with
+            | [] -> List.rev acc
+            | current :: tail when isMergeableGroupFolder current ->
+                let sameNameGroups, nonMatchingGroups =
+                    tail
+                    |> List.partition (fun sibling ->
+                        isMergeableGroupFolder sibling
+                        && String.Equals(sibling.Name, current.Name, StringComparison.OrdinalIgnoreCase))
+
+                let groupedNodes = current :: sameNameGroups
+
+                let mergedNode =
+                    if List.length groupedNodes > 1 then
+                        mergeGroupFolderNodes groupedNodes
+                    else
+                        current
+
+                loop (mergedNode :: acc) nonMatchingGroups
+            | current :: tail ->
+                loop (current :: acc) tail
+
+        loop [] children
+
+    and private collectNodeIds (item: FileItem) =
+        let childrenIds =
+            item.Children
+            |> Option.defaultValue []
+            |> List.collect collectNodeIds
+
+        item.Id :: childrenIds
+
+    and private hideRepresentedNonGroupSiblings (siblings: FileItem list) =
+        let representedIdsInsideGroups =
+            siblings
+            |> List.filter isMergeableGroupFolder
+            |> List.collect (fun folder ->
+                folder.Children
+                |> Option.defaultValue []
+                |> List.collect collectNodeIds)
+            |> Set.ofList
+
+        siblings
+        |> List.filter (fun sibling ->
+            isMergeableGroupFolder sibling
+            || representedIdsInsideGroups.Contains sibling.Id |> not)
+
+    and private tryGetTargetFolderNameForLeafLikeNode (item: FileItem) =
+        let idContains (marker: string) =
+            item.Id.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0
+
+        if item.ItemType = sampleItemType then
+            Some "Material"
+        elif item.ItemType = dataMapItemType then
+            Some "Data"
+        elif idContains ":additional-property:" then
+            Some "Additional Properties"
+        elif idContains ":parameter-value:" then
+            Some "Parameter Values"
+        elif idContains ":formal-parameter:" then
+            Some "Formal Parameters"
+        else
+            None
+
+    and private rehomeLeafLikeNodesIntoMatchingFolders (siblings: FileItem list) =
+        let foldersByName =
+            siblings
+            |> List.choose (fun item ->
+                if isMergeableGroupFolder item then
+                    Some(siblingNameKey item.Name, item)
+                else
+                    None)
+            |> Map.ofList
+
+        let movedByFolderId, movedNodeIds =
+            siblings
+            |> List.fold (fun (moves, movedIds) item ->
+                if isMergeableGroupFolder item then
+                    moves, movedIds
+                else
+                    match tryGetTargetFolderNameForLeafLikeNode item with
+                    | Some folderName ->
+                        match foldersByName |> Map.tryFind (siblingNameKey folderName) with
+                        | Some folder ->
+                            let movedNodesForFolder =
+                                moves
+                                |> Map.tryFind folder.Id
+                                |> Option.defaultValue []
+
+                            let updatedMoves =
+                                moves
+                                |> Map.add folder.Id (movedNodesForFolder @ [ item ])
+
+                            updatedMoves, movedIds |> Set.add item.Id
+                        | None ->
+                            moves, movedIds
+                    | None ->
+                        moves, movedIds) (Map.empty, Set.empty)
+
+        let siblingsWithoutMovedNodes =
+            siblings
+            |> List.filter (fun item -> movedNodeIds.Contains item.Id |> not)
+
+        siblingsWithoutMovedNodes
+        |> List.map (fun item ->
+            match movedByFolderId |> Map.tryFind item.Id with
+            | Some movedNodes ->
+                let existingChildren = item.Children |> Option.defaultValue []
+                let mergedChildren = (existingChildren @ movedNodes) |> List.distinctBy _.Id
+                { item with Children = Some mergedChildren }
+            | None ->
+                item)
+
+    let rec private normalizeTreeForGraphView (item: FileItem) =
+        let normalizedChildren =
+            item.Children
+            |> Option.map (fun children ->
+                children
+                |> List.map normalizeTreeForGraphView
+                |> normalizeSiblingLevelOnly)
+
+        { item with Children = normalizedChildren }
+
     let flattenNestedChildrenOnParentLevel (items: FileItem list) =
         items
-        |> List.map (fun item -> flattenItem item |> fst)
+        |> List.map (fun item ->
+            item
+            |> flattenItem
+            |> fst
+            |> normalizeTreeForGraphView)

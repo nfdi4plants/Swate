@@ -109,7 +109,10 @@ let FileTree () =
 
         let fileTree =
             React.useMemo (
-                (fun () -> fileStateCtx.state.FileTree |> toFileTreeNode),
+                (fun () ->
+                    fileStateCtx.state.FileTree
+                    |> toFileTreeNode
+                    |> collapseSingleChildSameNameDirectories),
                 [| box fileStateCtx.state.FileTree |]
             )
 

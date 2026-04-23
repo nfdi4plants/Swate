@@ -131,6 +131,34 @@ let toFileTreeNode (fileEntries: FileEntry[]) =
 
     rootElement
 
+let rec collapseSingleChildSameNameDirectories (node: FileTreeNode) =
+    let collapsedChildren =
+        node.children.Values
+        |> Seq.map collapseSingleChildSameNameDirectories
+        |> Seq.toList
+
+    let childrenByName = Dictionary<string, FileTreeNode>()
+
+    collapsedChildren
+    |> List.iter (fun child -> childrenByName.[child.name] <- child)
+
+    let nodeWithCollapsedChildren =
+        { node with
+            children = childrenByName }
+
+    if nodeWithCollapsedChildren.isDirectory && nodeWithCollapsedChildren.children.Count = 1 then
+        let onlyChild = nodeWithCollapsedChildren.children.Values |> Seq.exactlyOne
+
+        if onlyChild.isDirectory
+           && String.Equals(nodeWithCollapsedChildren.name, onlyChild.name, StringComparison.OrdinalIgnoreCase) then
+            // Preserve the displayed label while routing interactions to the deepest merged directory path.
+            { onlyChild with
+                name = nodeWithCollapsedChildren.name }
+        else
+            nodeWithCollapsedChildren
+    else
+        nodeWithCollapsedChildren
+
 let tryGetExistingNotesTargetRef (path: string) : ExistingTargetRef option =
     let tryResolveTarget folderName kind =
         tryGetPathSegmentAfterFolder folderName path
