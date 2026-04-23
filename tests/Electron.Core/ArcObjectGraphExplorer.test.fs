@@ -7,6 +7,7 @@ open Swate.Components.ARCObjectExplorer.GraphExplorer
 open Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
 open Swate.Components.ARCObjectExplorer.GraphExplorer.ArcExplorerNodes
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.FileExplorerTypes
 open Vitest
 
 type private EndpointValue =
@@ -18,6 +19,13 @@ let rec private flattenNodes (nodes: ArcExplorerNode list) =
         for node in nodes do
             yield node
             yield! flattenNodes node.children
+    }
+
+let rec private flattenFileItems (items: FileItem list) =
+    seq {
+        for item in items do
+            yield item
+            yield! flattenFileItems (item.Children |> Option.defaultValue [])
     }
 
 let private expectSome value errorMessage =
@@ -391,6 +399,222 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> List.filter (fun node -> node.id.StartsWith("graph:standalone-", StringComparison.Ordinal))
 
         Vitest.expect(standaloneRoots.Length).toBe(0))
+
+    Vitest.test("flattens nested assay descendants to left-tree parent level while keeping descendants expandable", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = ARCExplorer.toFileItems nodes
+
+        let treePaneItems =
+            GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
+
+        let assayNode =
+            treePaneItems
+            |> flattenFileItems
+            |> Seq.tryFind (fun item ->
+                item.ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Assay
+                && item.Name = "Metabolomics")
+            |> expectSome <| "Expected Metabolomics assay node in flattened tree."
+
+        let assayChildren = assayNode.Children |> Option.defaultValue []
+        let assayChildNames = assayChildren |> List.map _.Name
+
+        let protocolNode =
+            assayChildren
+            |> List.tryFind (fun item -> item.Name = "LC-MS Measurement")
+            |> expectSome <| "Expected protocol node at assay parent level."
+
+        let processNode =
+            assayChildren
+            |> List.tryFind (fun item -> item.Name = "Quantify features")
+            |> expectSome <| "Expected process node at assay parent level."
+
+        let protocolsGroup =
+            assayChildren
+            |> List.tryFind (fun item -> item.Name = "Protocols")
+            |> expectSome <| "Expected structural Protocols group at assay parent level."
+
+        let inputsGroup =
+            assayChildren
+            |> List.tryFind (fun item -> item.Name = "Inputs")
+            |> expectSome <| "Expected structural Inputs group at assay parent level."
+
+        let firstMaterialIndex =
+            assayChildNames
+            |> List.tryFindIndex (fun name -> name = "Material")
+            |> expectSome <| "Expected Material group at assay parent level."
+
+        let firstDataIndex =
+            assayChildNames
+            |> List.tryFindIndex (fun name -> name = "Data")
+            |> expectSome <| "Expected Data group at assay parent level."
+
+        let protocolIndex =
+            assayChildNames
+            |> List.tryFindIndex (fun name -> name = protocolNode.Name)
+            |> expectSome <| "Expected protocol index in flattened assay children."
+
+        let processIndex =
+            assayChildNames
+            |> List.tryFindIndex (fun name -> name = processNode.Name)
+            |> expectSome <| "Expected process index in flattened assay children."
+
+        Vitest.expect(protocolIndex < processIndex).toBe(true)
+        Vitest.expect(processIndex < firstMaterialIndex).toBe(true)
+        Vitest.expect(processIndex < firstDataIndex).toBe(true)
+        Vitest.expect(protocolsGroup.Selectable).toBe(false)
+        Vitest.expect(inputsGroup.Selectable).toBe(false)
+
+        let processChildren = processNode.Children |> Option.defaultValue []
+        let processChildNames = processChildren |> List.map _.Name
+
+        Vitest.expect(processChildren.Length > 0).toBe(true)
+        Vitest.expect(processChildNames |> List.contains "Inputs").toBe(true)
+        Vitest.expect(processChildNames |> List.contains "Outputs").toBe(true))
+
+    Vitest.test("summarizes nested additional properties into one parent-level folder in flattened tree view", fun () ->
+        let graphObjects = graphObjectsWithPropertyValues ()
+        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = ARCExplorer.toFileItems nodes
+
+        let treePaneItems =
+            GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
+
+        let studyNode =
+            treePaneItems
+            |> flattenFileItems
+            |> Seq.tryFind (fun item ->
+                item.ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Study
+                && item.Name = "Property Values Study")
+            |> expectSome <| "Expected Property Values Study node in flattened tree."
+
+        let studyChildren = studyNode.Children |> Option.defaultValue []
+
+        let summaryFolders =
+            studyChildren
+            |> List.filter (fun item ->
+                item.Name = "Additional Properties"
+                && item.Id.EndsWith(":group:flattened-additional-properties", StringComparison.Ordinal))
+
+        Vitest.expect(summaryFolders.Length).toBe(1)
+
+        let additionalPropertyBranchNodesAtStudyLevel =
+            studyChildren
+            |> List.filter (fun item ->
+                item.Id.Contains(":group:additional-property")
+                || item.Id.Contains(":additional-property:"))
+
+        Vitest.expect(additionalPropertyBranchNodesAtStudyLevel.Length).toBe(0)
+
+        let summaryFolder =
+            summaryFolders
+            |> List.head
+
+        let summarizedAdditionalProperties = summaryFolder.Children |> Option.defaultValue []
+        let summarizedAdditionalPropertyNames = summarizedAdditionalProperties |> List.map _.Name
+
+        Vitest.expect(summaryFolder.Selectable).toBe(false)
+        Vitest.expect(summaryFolder.IsDirectory).toBe(true)
+        Vitest.expect(summarizedAdditionalProperties.Length > 0).toBe(true)
+        Vitest.expect(summarizedAdditionalProperties |> List.forall (fun item -> item.Id.Contains(":additional-property:"))).toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Dataset Region=Field-01").toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Protocol Revision=2026-04").toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Material Origin=Greenhouse").toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Data Format=tsv").toBe(true)
+        Vitest.expect(summarizedAdditionalPropertyNames |> List.contains "Batch=B-42").toBe(false))
+
+    Vitest.test("summarizes nested parameter values into one parent-level folder in flattened tree view", fun () ->
+        let graphObjects = graphObjectsWithPropertyValues ()
+        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = ARCExplorer.toFileItems nodes
+
+        let treePaneItems =
+            GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
+
+        let studyNode =
+            treePaneItems
+            |> flattenFileItems
+            |> Seq.tryFind (fun item ->
+                item.ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Study
+                && item.Name = "Property Values Study")
+            |> expectSome <| "Expected Property Values Study node in flattened tree."
+
+        let studyChildren = studyNode.Children |> Option.defaultValue []
+
+        let summaryFolders =
+            studyChildren
+            |> List.filter (fun item ->
+                item.Name = "Parameter Values"
+                && item.Id.EndsWith(":group:flattened-parameter-value", StringComparison.Ordinal))
+
+        Vitest.expect(summaryFolders.Length).toBe(1)
+
+        let parameterValueBranchNodesAtStudyLevel =
+            studyChildren
+            |> List.filter (fun item ->
+                item.Id.Contains(":group:parameter-value")
+                || item.Id.Contains(":parameter-value:"))
+
+        Vitest.expect(parameterValueBranchNodesAtStudyLevel.Length).toBe(0)
+
+        let summaryFolder =
+            summaryFolders
+            |> List.head
+
+        let summarizedParameterValues = summaryFolder.Children |> Option.defaultValue []
+        let summarizedParameterValueNames = summarizedParameterValues |> List.map _.Name
+
+        Vitest.expect(summaryFolder.Selectable).toBe(false)
+        Vitest.expect(summaryFolder.IsDirectory).toBe(true)
+        Vitest.expect(summarizedParameterValues.Length > 0).toBe(true)
+        Vitest.expect(summarizedParameterValues |> List.forall (fun item -> item.Id.Contains(":parameter-value:"))).toBe(true)
+        Vitest.expect(summarizedParameterValueNames |> List.contains "Batch=B-42").toBe(true))
+
+    Vitest.test("summarizes nested formal parameters into one parent-level folder in flattened tree view", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = ARCExplorer.toFileItems nodes
+
+        let treePaneItems =
+            GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
+
+        let parentWithFormalSummary =
+            treePaneItems
+            |> flattenFileItems
+            |> Seq.tryFind (fun item ->
+                item.Children
+                |> Option.defaultValue []
+                |> List.exists (fun child -> child.Id.EndsWith(":group:flattened-formal-parameters", StringComparison.Ordinal)))
+            |> expectSome <| "Expected at least one flattened parent with a Formal Parameters summary folder."
+
+        let parentChildren = parentWithFormalSummary.Children |> Option.defaultValue []
+
+        let summaryFolders =
+            parentChildren
+            |> List.filter (fun item ->
+                item.Name = "Formal Parameters"
+                && item.Id.EndsWith(":group:flattened-formal-parameters", StringComparison.Ordinal))
+
+        Vitest.expect(summaryFolders.Length).toBe(1)
+
+        let formalParameterBranchNodesAtParentLevel =
+            parentChildren
+            |> List.filter (fun item ->
+                item.Id.Contains(":group:formal-parameters")
+                || item.Id.Contains(":formal-parameter:"))
+
+        Vitest.expect(formalParameterBranchNodesAtParentLevel.Length).toBe(0)
+
+        let summaryFolder =
+            summaryFolders
+            |> List.head
+
+        let summarizedFormalParameters = summaryFolder.Children |> Option.defaultValue []
+
+        Vitest.expect(summaryFolder.Selectable).toBe(false)
+        Vitest.expect(summaryFolder.IsDirectory).toBe(true)
+        Vitest.expect(summarizedFormalParameters.Length > 0).toBe(true)
+        Vitest.expect(summarizedFormalParameters |> List.forall (fun item -> item.Id.Contains(":formal-parameter:"))).toBe(true))
 
     Vitest.test("shows only selected semantic top-level layer alongside ARCs root", fun () ->
         let graphObjects = fakeGraphObjects ()

@@ -129,9 +129,18 @@ type GraphObjectExplorer =
                 KindFilter.arcObjectExplorerOptions
                 defaultArcKindIndices
 
-        let collapsedExplorerItems =
+        let explorerPaneItems =
             React.useMemo (
-                (fun () -> GraphObjectFixture.collapseExplorerItems viewModel.ExplorerItems),
+                (fun () -> viewModel.ExplorerItems),
+                [| box viewModel.ExplorerItems |]
+            )
+
+        let treePaneItems =
+            React.useMemo (
+                (fun () ->
+                    viewModel.ExplorerItems
+                    |> GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel
+                    |> GraphObjectFixture.collapseExplorerItems),
                 [| box viewModel.ExplorerItems |]
             )
 
@@ -149,7 +158,7 @@ type GraphObjectExplorer =
 
         let treePane =
             Swate.Components.FileExplorer.FileExplorer(
-                initialItems = collapsedExplorerItems,
+                initialItems = treePaneItems,
                 ?selectedItemId = Some(selectedItemId viewModel),
                 onItemClick =
                     (fun item ->
@@ -161,7 +170,7 @@ type GraphObjectExplorer =
 
         let explorerPane =
             ARCObjectWidget.ExplorerContent(
-                collapsedExplorerItems,
+                explorerPaneItems,
                 ?selectedItemId = selectedItemId viewModel,
                 onItemClick =
                     (fun item ->

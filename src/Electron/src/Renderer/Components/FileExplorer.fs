@@ -13,16 +13,61 @@ open Feliz
 
 module private FileExplorerHelper =
 
-    let rec loopPaths (selectedTreeItemPath: string option) (parent: FileTreeNode) =
+    let private normalizeNodePath (path: string) = normalizePath path
+
+    let rec private collectSelectedDirectoryPathChain
+        (selectedTreeItemPath: string option)
+        (node: FileTreeNode)
+        (loadedPaths: Set<string>)
+        =
+        let normalizedNodePath = normalizeNodePath node.path
+
+        let isInSelectedPathChain =
+            selectedTreeItemPath
+            |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath normalizedNodePath)
+
+        if node.isDirectory then
+            let nextLoadedPaths =
+                if isInSelectedPathChain then
+                    Set.add normalizedNodePath loadedPaths
+                else
+                    loadedPaths
+
+            node.children.Values
+            |> Seq.fold
+                (fun state child -> collectSelectedDirectoryPathChain selectedTreeItemPath child state)
+                nextLoadedPaths
+        else
+            loadedPaths
+
+    let requiredLoadedDirectoryPaths (selectedTreeItemPath: string option) (root: FileTreeNode) =
+        let rootPathSet =
+            if root.isDirectory then
+                Set.singleton (normalizeNodePath root.path)
+            else
+                Set.empty
+
+        collectSelectedDirectoryPathChain selectedTreeItemPath root rootPathSet
+
+    let rec loopPaths
+        (loadedDirectoryPaths: Set<string>)
+        (selectedTreeItemPath: string option)
+        (parent: FileTreeNode)
+        =
         match parent.isDirectory with
         | true ->
-            let tmp =
-                let ra = ResizeArray(parent.children.Values)
+            let normalizedParentPath = normalizeNodePath parent.path
 
-                ra.ToArray()
-                |> Array.map (fun entry -> loopPaths selectedTreeItemPath entry)
-                |> Array.choose id
-                |> List.ofArray
+            let tmp =
+                if loadedDirectoryPaths.Contains normalizedParentPath then
+                    let ra = ResizeArray(parent.children.Values)
+
+                    ra.ToArray()
+                    |> Array.map (fun entry -> loopPaths loadedDirectoryPaths selectedTreeItemPath entry)
+                    |> Array.choose id
+                    |> List.ofArray
+                else
+                    []
 
             Some {
                 FileTree.createFolder parent.name (Some parent.path) FileItemIcon.Folder with
@@ -62,9 +107,39 @@ let FileTree () =
     | [||] -> EmptyFileTreePlaceholder()
     | _ ->
 
-        let fileTree = fileStateCtx.state.FileTree |> toFileTreeNode
+        let fileTree =
+            React.useMemo (
+                (fun () -> fileStateCtx.state.FileTree |> toFileTreeNode),
+                [| box fileStateCtx.state.FileTree |]
+            )
 
-        let fileItem = loopPaths fileStateCtx.state.Selection.TreePath fileTree
+        let requiredLoadedDirectories =
+            React.useMemo (
+                (fun () -> requiredLoadedDirectoryPaths fileStateCtx.state.Selection.TreePath fileTree),
+                [| box fileTree; box fileStateCtx.state.Selection.TreePath |]
+            )
+
+        let loadedDirectoryPaths, setLoadedDirectoryPaths =
+            React.useStateWithUpdater requiredLoadedDirectories
+
+        React.useEffect (
+            (fun () -> setLoadedDirectoryPaths (fun _ -> requiredLoadedDirectories)),
+            [| box fileTree |]
+        )
+
+        React.useEffect (
+            (fun () ->
+                setLoadedDirectoryPaths (fun current ->
+                    let next = Set.union current requiredLoadedDirectories
+
+                    if next = current then
+                        current
+                    else
+                        next)),
+            [| box requiredLoadedDirectories |]
+        )
+
+        let fileItem = loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath fileTree
 
         let setError (errorMsg: string option) =
             match errorMsg with
@@ -85,6 +160,15 @@ let FileTree () =
                         ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed", ?scopeId = arcScopeId)
                     )
                 | Some path when item.IsDirectory ->
+                    if not item.IsExpanded then
+                        setLoadedDirectoryPaths (fun current ->
+                            let normalizedPath = normalizePath path
+
+                            if current.Contains normalizedPath then
+                                current
+                            else
+                                current.Add normalizedPath)
+
                     let selectedPath = normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
