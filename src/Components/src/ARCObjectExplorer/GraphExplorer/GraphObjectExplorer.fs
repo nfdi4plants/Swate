@@ -18,6 +18,22 @@ module GraphObjectExplorerFilter =
             GraphExplorerNodeKind.Run
         ]
 
+    let private datasetSemanticLabels =
+        datasetKinds
+        |> Set.toList
+        |> List.map GraphExplorerNodeKind.label
+        |> Set.ofList
+
+    let private semanticLabels =
+        Set.ofList [
+            yield! datasetSemanticLabels
+            "Protocols"
+            "FormalParameters"
+            "Processes"
+            "Materials"
+            "Data"
+        ]
+
     let private isDatasetSubKind (graphKind: GraphExplorerNodeKind) =
         datasetKinds.Contains graphKind
 
@@ -53,7 +69,6 @@ module GraphObjectExplorerFilter =
                 match tag with
                 | GraphNodeTag.Dataset ->
                     [
-                        "Datasets"
                         if isDatasetSubKind meta.GraphKind then
                             GraphExplorerNodeKind.label meta.GraphKind
                     ]
@@ -64,7 +79,6 @@ module GraphObjectExplorerFilter =
                 | GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Data -> [ "Data" ]
                 | GraphNodeTag.PropertyValue GraphPropertyValueOwnerTag.Dataset ->
                     [
-                        "Datasets"
                         yield! datasetKindInScope |> Option.toList
                     ]
                 | GraphNodeTag.PropertyValue GraphPropertyValueOwnerTag.Protocol -> [ "Protocols" ]
@@ -73,10 +87,57 @@ module GraphObjectExplorerFilter =
                 | GraphNodeTag.PropertyValue (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Data) -> [ "Data" ]))
         |> Option.defaultValue []
 
+    let private tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
+        let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
+            nodes
+            |> List.tryPick (fun node ->
+                if node.id = nodeId then
+                    Some(node, List.rev ancestors)
+                else
+                    loop (node :: ancestors) node.children)
+
+        loop [] nodes
+
+    let private selectedPathContext
+        (selectedSemanticKinds: Set<string>)
+        (nodes: ArcExplorerNode list)
+        (nodeMetaById: Map<string, GraphNodeMeta>)
+        (selectedNodeId: string option)
+        =
+        selectedNodeId
+        |> Option.bind (fun nodeId ->
+            tryGetNodeLineageById nodeId nodes
+            |> Option.map (fun (selectedNode, ancestors) ->
+                let lineage = ancestors @ [ selectedNode ]
+
+                let selectedDatasetKindInScope =
+                    lineage
+                    |> List.fold (fun datasetKindInScope node ->
+                        datasetKindFromNodeMeta node.id nodeMetaById
+                        |> Option.orElse datasetKindInScope) None
+
+                let selectedNodeLabels =
+                    semanticLabelsForNode
+                        selectedDatasetKindInScope
+                        selectedNode.id
+                        nodeMetaById
+
+                let isSelectedNodeVisibleByKinds =
+                    selectedNodeLabels
+                    |> List.exists selectedSemanticKinds.Contains
+
+                let selectedPathNodeIds =
+                    lineage
+                    |> List.map _.id
+                    |> Set.ofList
+
+                selectedPathNodeIds, isSelectedNodeVisibleByKinds))
+
     let filterNodesBySemanticKinds
         (selectedSemanticKinds: Set<string>)
         (nodes: ArcExplorerNode list)
         (nodeMetaById: Map<string, GraphNodeMeta>)
+        (selectedNodeId: string option)
         =
         let visibleLayerIds =
             layerIdToLabel
@@ -88,16 +149,20 @@ module GraphObjectExplorerFilter =
                     None)
             |> Set.ofList
 
-        let rec loop (isTopLevel: bool) (datasetKindInScope: string option) (node: ArcExplorerNode) =
+        let selectedPathNodeIds, preserveSelectedPath =
+            match selectedPathContext selectedSemanticKinds nodes nodeMetaById selectedNodeId with
+            | Some(pathNodeIds, true) -> pathNodeIds, true
+            | _ -> Set.empty, false
+
+        let rec loop
+            (isTopLevel: bool)
+            (datasetKindInScope: string option)
+            (branchHasHiddenAssociation: bool)
+            (node: ArcExplorerNode)
+            =
             let datasetKindForBranch =
                 datasetKindFromNodeMeta node.id nodeMetaById
                 |> Option.orElse datasetKindInScope
-
-            let filteredChildren =
-                node.children |> List.choose (loop false datasetKindForBranch)
-
-            let hasVisibleChildren =
-                filteredChildren |> List.isEmpty |> not
 
             let nodeSemanticLabels =
                 semanticLabelsForNode
@@ -105,9 +170,32 @@ module GraphObjectExplorerFilter =
                     node.id
                     nodeMetaById
 
+            let nodeHasHiddenAssociation =
+                nodeSemanticLabels
+                |> List.exists (fun label ->
+                    semanticLabels.Contains label
+                    && not (selectedSemanticKinds.Contains label))
+
+            let hiddenAssociationInBranch =
+                branchHasHiddenAssociation || nodeHasHiddenAssociation
+
+            let isSelectedPathNode =
+                preserveSelectedPath
+                && selectedPathNodeIds.Contains node.id
+
+            let filteredChildren =
+                node.children
+                |> List.choose (loop false datasetKindForBranch hiddenAssociationInBranch)
+
+            let hasVisibleChildren =
+                filteredChildren |> List.isEmpty |> not
+
             let isVisibleSemanticNode =
                 nodeSemanticLabels
                 |> List.exists selectedSemanticKinds.Contains
+
+            let isHiddenByAssociation =
+                hiddenAssociationInBranch && not isSelectedPathNode
 
             let includeNode =
                 if isTopLevel then
@@ -116,19 +204,21 @@ module GraphObjectExplorerFilter =
                     elif layerIdToLabel.ContainsKey node.id then
                         visibleLayerIds.Contains node.id
                     else
-                        true
+                        false
+                elif isHiddenByAssociation then
+                    false
                 else
                     match node.kind with
                     | ArcExplorerNodeKind.Arc
-                    | ArcExplorerNodeKind.Group -> hasVisibleChildren
-                    | _ -> isVisibleSemanticNode || hasVisibleChildren
+                    | ArcExplorerNodeKind.Group -> hasVisibleChildren || isSelectedPathNode
+                    | _ -> isVisibleSemanticNode || hasVisibleChildren || isSelectedPathNode
 
             if includeNode then
                 Some { node with children = filteredChildren }
             else
                 None
 
-        nodes |> List.choose (loop true None)
+        nodes |> List.choose (loop true None false)
 
 module private GraphObjectExplorerHelper =
 
@@ -243,14 +333,21 @@ type GraphObjectExplorer =
         let visibleSemanticKinds =
             KindFilter.selectedLabels KindFilter.graphObjectExplorerOptions selectedKindIndices
 
+        let selectedNodeIdInTree =
+            React.useMemo (
+                (fun () -> ARCExplorer.getSelectedItemId nodes selection),
+                [| box nodes; box selection |]
+            )
+
         let filteredNodes =
             React.useMemo (
                 (fun () ->
                     GraphObjectExplorerFilter.filterNodesBySemanticKinds
                         visibleSemanticKinds
                         nodes
-                        nodeMetaById),
-                [| box visibleSemanticKinds; box nodes; box nodeMetaById |]
+                        nodeMetaById
+                        selectedNodeIdInTree),
+                [| box visibleSemanticKinds; box nodes; box nodeMetaById; box selectedNodeIdInTree |]
             )
 
         let defaultArcKindIndices =

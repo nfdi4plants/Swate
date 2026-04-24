@@ -57,6 +57,17 @@ let private hasTag (metaById: Map<string, GraphNodeMeta>) (expectedTag: GraphNod
     |> Map.tryFind node.id
     |> Option.exists (fun meta -> meta.Tag = Some expectedTag)
 
+let private tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
+    let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
+        nodes
+        |> List.tryPick (fun node ->
+            if node.id = nodeId then
+                Some(node, List.rev ancestors)
+            else
+                loop (node :: ancestors) node.children)
+
+    loop [] nodes
+
 let private extractEntryCount (metaById: Map<string, GraphNodeMeta>) (layerId: string) =
     metaById
     |> Map.tryFind layerId
@@ -853,6 +864,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
                 (Set.ofList [ "Datasets" ])
                 nodes
                 metaById
+                None
 
         let topLevelIds =
             filteredNodes
@@ -878,6 +890,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
                 (Set.ofList [ "Study" ])
                 nodes
                 metaById
+                None
 
         let topLevelIds =
             filteredNodes
@@ -924,6 +937,220 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(workflowNodes.Length).toBe(0)
         Vitest.expect(runNodes.Length).toBe(0))
 
+    Vitest.test("keeps only assay datasets in canonical and datasets layers for Datasets + Assay", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Datasets"; "Assay" ])
+                nodes
+                metaById
+                None
+
+        let topLevelIds =
+            filteredNodes
+            |> List.map _.id
+
+        Vitest.expect(topLevelIds).toEqual([
+            "graph:all"
+            "graph:datasets"
+        ])
+
+        let datasetNodesInLayer (layerId: string) =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = layerId)
+            |> expectSome <| $"Missing {layerId} layer after semantic filtering."
+            |> fun layer ->
+                layer.children
+                |> flattenNodes
+                |> Seq.toList
+                |> List.filter (hasTag metaById GraphNodeTag.Dataset)
+
+        let assertContainsOnlyAssays (nodes: ArcExplorerNode list) =
+            let studyCount =
+                nodes
+                |> List.filter (fun node -> node.kind = ArcExplorerNodeKind.Study)
+                |> List.length
+
+            let assayCount =
+                nodes
+                |> List.filter (fun node -> node.kind = ArcExplorerNodeKind.Assay)
+                |> List.length
+
+            let workflowCount =
+                nodes
+                |> List.filter (fun node -> node.kind = ArcExplorerNodeKind.Workflow)
+                |> List.length
+
+            let runCount =
+                nodes
+                |> List.filter (fun node -> node.kind = ArcExplorerNodeKind.Run)
+                |> List.length
+
+            Vitest.expect(assayCount > 0).toBe(true)
+            Vitest.expect(studyCount).toBe(0)
+            Vitest.expect(workflowCount).toBe(0)
+            Vitest.expect(runCount).toBe(0)
+
+        assertContainsOnlyAssays (datasetNodesInLayer "graph:all")
+        assertContainsOnlyAssays (datasetNodesInLayer "graph:datasets"))
+
+    Vitest.test("prunes hidden dataset branches from graph:all for Protocols-only filtering", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Protocols" ])
+                nodes
+                metaById
+                None
+
+        let topLevelIds =
+            filteredNodes
+            |> List.map _.id
+
+        Vitest.expect(topLevelIds).toEqual([
+            "graph:all"
+            "graph:protocols"
+        ])
+
+        let allLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer after Protocols-only filtering."
+
+        let allLayerCanonicalNodes =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.toList
+
+        let datasetNodeCountInAllLayer =
+            allLayerCanonicalNodes
+            |> List.filter (hasTag metaById GraphNodeTag.Dataset)
+            |> List.length
+
+        let protocolNodeCountInAllLayer =
+            allLayerCanonicalNodes
+            |> List.filter (hasTag metaById GraphNodeTag.Protocol)
+            |> List.length
+
+        Vitest.expect(datasetNodeCountInAllLayer).toBe(0)
+        Vitest.expect(protocolNodeCountInAllLayer).toBe(0)
+
+        let protocolsLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:protocols")
+            |> expectSome <| "Missing graph:protocols layer after Protocols-only filtering."
+
+        let protocolNodeCountInProtocolsLayer =
+            protocolsLayer.children
+            |> flattenNodes
+            |> Seq.toList
+            |> List.filter (hasTag metaById GraphNodeTag.Protocol)
+            |> List.length
+
+        Vitest.expect(protocolNodeCountInProtocolsLayer > 0).toBe(true))
+
+    Vitest.test("keeps selected visible protocol and only its ancestor chain in graph:all", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let selectedProtocol =
+            nodes
+            |> flattenNodes
+            |> Seq.tryFind (fun node ->
+                not node.isReference
+                && hasTag metaById GraphNodeTag.Protocol node)
+            |> expectSome <| "Expected canonical protocol node for selected-path filtering."
+
+        let _, selectedAncestors =
+            tryGetNodeLineageById selectedProtocol.id nodes
+            |> expectSome <| $"Missing lineage for selected protocol {selectedProtocol.id}."
+
+        let selectedPathNodeIdsInAllLayer =
+            selectedAncestors
+            |> List.map _.id
+            |> Set.ofList
+            |> Set.remove "graph:all"
+            |> Set.add selectedProtocol.id
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Protocols" ])
+                nodes
+                metaById
+                (Some selectedProtocol.id)
+
+        let allLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer after selected-path filtering."
+
+        let allLayerNodes =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.toList
+
+        let allLayerNodeIds =
+            allLayerNodes
+            |> List.map _.id
+            |> Set.ofList
+
+        selectedPathNodeIdsInAllLayer
+        |> Set.iter (fun nodeId ->
+            Vitest.expect(allLayerNodeIds.Contains nodeId).toBe(true))
+
+        let visibleProtocolNodesInAllLayer =
+            allLayerNodes
+            |> List.filter (hasTag metaById GraphNodeTag.Protocol)
+
+        Vitest.expect(visibleProtocolNodesInAllLayer.Length).toBe(1)
+        Vitest.expect(visibleProtocolNodesInAllLayer.Head.id).toBe(selectedProtocol.id))
+
+    Vitest.test("does not preserve hidden selected nodes and keeps resolved selection empty", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let selectedStudy =
+            nodes
+            |> flattenNodes
+            |> Seq.tryFind (fun node ->
+                not node.isReference
+                && hasTag metaById GraphNodeTag.Dataset node
+                && node.kind = ArcExplorerNodeKind.Study)
+            |> expectSome <| "Expected canonical study node for hidden-selection regression."
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Protocols" ])
+                nodes
+                metaById
+                (Some selectedStudy.id)
+
+        let allLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer after hidden-selection filtering."
+
+        let allLayerNodeIds =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.map _.id
+            |> Set.ofSeq
+
+        Vitest.expect(allLayerNodeIds.Contains selectedStudy.id).toBe(false)
+
+        let viewModel =
+            Swate.Components.ARCObjectExplorer.Model.create
+                filteredNodes
+                (ArcSelection.forExplorerNode selectedStudy.id None)
+                KindFilter.arcObjectExplorerOptions
+                (KindFilter.defaultSelectedIndices KindFilter.arcObjectExplorerOptions)
+
+        Vitest.expect(viewModel.Selection.IsNone).toBe(true))
+
     Vitest.test("isolates endpoint categories without kind-label leakage", fun () ->
         let graphObjects = fakeGraphObjects ()
         let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
@@ -933,6 +1160,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
                 (Set.ofList [ "Materials" ])
                 nodes
                 metaById
+                None
 
         let topLevelIds =
             filteredNodes
@@ -1506,6 +1734,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
                     (Set.ofList [ semanticKind ])
                     nodes
                     metaById
+                    None
 
             let allLayer =
                 filteredNodes
@@ -1529,7 +1758,9 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             Vitest.expect(ownerTags.Count).toBe(1)
             Vitest.expect(ownerTags.Contains expectedOwnerTag).toBe(true)
 
-        assertSingleOwnerTag "Datasets" GraphPropertyValueOwnerTag.Dataset
+        let datasetOwnerTags = propertyOwnerTagsForSemanticKind "Datasets"
+        Vitest.expect(datasetOwnerTags.Count).toBe(0)
+
         assertSingleOwnerTag "Study" GraphPropertyValueOwnerTag.Dataset
         assertSingleOwnerTag "Protocols" GraphPropertyValueOwnerTag.Protocol
         assertSingleOwnerTag "Processes" GraphPropertyValueOwnerTag.Process
