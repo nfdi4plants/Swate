@@ -149,6 +149,81 @@ type GraphNodeTag =
     | ProcessEndpoint of GraphProcessEndpointValueType
     | PropertyValue of GraphPropertyValueOwnerTag
 
+[<StringEnum; RequireQualifiedAccess>]
+type GraphSemanticKind =
+    | [<CompiledName("Datasets")>] Datasets
+    | [<CompiledName("Study")>] Study
+    | [<CompiledName("Assay")>] Assay
+    | [<CompiledName("Workflow")>] Workflow
+    | [<CompiledName("Run")>] Run
+    | [<CompiledName("Protocols")>] Protocols
+    | [<CompiledName("FormalParameters")>] FormalParameters
+    | [<CompiledName("Processes")>] Processes
+    | [<CompiledName("Materials")>] Materials
+    | [<CompiledName("Data")>] Data
+
+[<RequireQualifiedAccess>]
+module GraphSemanticKind =
+
+    let label =
+        function
+        | GraphSemanticKind.Datasets -> "Datasets"
+        | GraphSemanticKind.Study -> "Study"
+        | GraphSemanticKind.Assay -> "Assay"
+        | GraphSemanticKind.Workflow -> "Workflow"
+        | GraphSemanticKind.Run -> "Run"
+        | GraphSemanticKind.Protocols -> "Protocols"
+        | GraphSemanticKind.FormalParameters -> "FormalParameters"
+        | GraphSemanticKind.Processes -> "Processes"
+        | GraphSemanticKind.Materials -> "Materials"
+        | GraphSemanticKind.Data -> "Data"
+
+    let tryParseLabel =
+        function
+        | "Datasets" -> Some GraphSemanticKind.Datasets
+        | "Study" -> Some GraphSemanticKind.Study
+        | "Assay" -> Some GraphSemanticKind.Assay
+        | "Workflow" -> Some GraphSemanticKind.Workflow
+        | "Run" -> Some GraphSemanticKind.Run
+        | "Protocols" -> Some GraphSemanticKind.Protocols
+        | "FormalParameters" -> Some GraphSemanticKind.FormalParameters
+        | "Processes" -> Some GraphSemanticKind.Processes
+        | "Materials" -> Some GraphSemanticKind.Materials
+        | "Data" -> Some GraphSemanticKind.Data
+        | _ -> None
+
+    let allInFilterOrder = [
+        GraphSemanticKind.Datasets
+        GraphSemanticKind.Study
+        GraphSemanticKind.Assay
+        GraphSemanticKind.Workflow
+        GraphSemanticKind.Run
+        GraphSemanticKind.Protocols
+        GraphSemanticKind.FormalParameters
+        GraphSemanticKind.Processes
+        GraphSemanticKind.Materials
+        GraphSemanticKind.Data
+    ]
+
+    let datasetParent = GraphSemanticKind.Datasets
+
+    let datasetChildren = [
+        GraphSemanticKind.Study
+        GraphSemanticKind.Assay
+        GraphSemanticKind.Workflow
+        GraphSemanticKind.Run
+    ]
+
+    let branchPrunableKinds =
+        Set.ofList [
+            yield! datasetChildren
+            GraphSemanticKind.Protocols
+            GraphSemanticKind.FormalParameters
+            GraphSemanticKind.Processes
+            GraphSemanticKind.Materials
+            GraphSemanticKind.Data
+        ]
+
 [<RequireQualifiedAccess>]
 type GraphExplorerNodeKind =
     | Arc

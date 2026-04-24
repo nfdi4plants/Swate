@@ -150,7 +150,7 @@ type GraphObjectExplorer =
         let defaultArcKindIndices =
             React.useMemo (
                 (fun () -> KindFilter.defaultSelectedIndices KindFilter.arcObjectExplorerOptions),
-                [||]
+                [| box KindFilter.defaultSelectedIndices |]
             )
 
         let viewModel =

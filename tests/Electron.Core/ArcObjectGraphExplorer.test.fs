@@ -498,6 +498,26 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(sortedIndices syncedFromSelectAll).toEqual(sortedIndices allIndices)
         Vitest.expect(sortedIndices syncedFromClearAll).toEqual(sortedIndices emptyIndices))
 
+    Vitest.test("ignores unknown semantic labels while filtering", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let baseline =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Protocols" ])
+                nodes
+                metaById
+                None
+
+        let withUnknownLabel =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Protocols"; "UnknownSemanticKind" ])
+                nodes
+                metaById
+                None
+
+        Vitest.expect(withUnknownLabel).toEqual(baseline))
+
     Vitest.test("builds expected top-level shape for graph explorer and omits standalone roots", fun () ->
         let graphObjects = fakeGraphObjects ()
         let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects

@@ -1,6 +1,7 @@
 module Swate.Components.ARCObjectExplorer.KindFilter
 
 open Swate.Components
+open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 
 let private createOption(label: string) : SelectItem<string> = {|
     label = label
@@ -21,18 +22,9 @@ let arcObjectExplorerOptions: SelectItem<string>[] =
     |> Array.map createOption
 
 let graphObjectExplorerOptions: SelectItem<string>[] =
-    [|
-        "Datasets"
-        "Study"
-        "Assay"
-        "Workflow"
-        "Run"
-        "Protocols"
-        "FormalParameters"
-        "Processes"
-        "Materials"
-        "Data"
-    |]
+    GraphSemanticKind.allInFilterOrder
+    |> List.map GraphSemanticKind.label
+    |> List.toArray
     |> Array.map createOption
 
 let defaultSelectedIndices (options: SelectItem<string>[]) =
