@@ -83,7 +83,7 @@
     <Compile Include="GenericComponents\Popover\Popover.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
     <Compile Include="GenericComponents\BaseModalContext.fs" />
-    <Compile Include="GenericComponents\SelectContextValue.fs" />
+    <Compile Include="GenericComponents\SelectContext.fs" />
     <Compile Include="GenericComponents\BaseModal.fs" />
     <Compile Include="GenericComponents\Select.fs" />
     <Compile Include="GenericComponents\ComboBox.fs" />
@@ -109,7 +109,7 @@
     <Compile Include="ThemeProvider\Context.fs" />
     <Compile Include="ThemeProvider\ThemeProvider.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
-    <Compile Include="TermSearch\TermSearchConfigLocalStorageActiveKeysContext.fs" />
+    <Compile Include="TermSearch\TermSearchActiveKeysContext.fs" />
     <Compile Include="TermSearch\TermSearchConfigContext.fs" />
     <Compile Include="TermSearch\TermSearchAllKeysContext.fs" />
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
@@ -189,6 +189,10 @@
     <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectFixture.fs" />
     <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectExplorerTreeData.fs" />
     <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectExplorer.fs" />
+    <Compile Include="Notes\Types.fs" />
+    <Compile Include="Notes\NoteSearch\ExampleNotes.fs" />
+    <Compile Include="Notes\NoteSearch\FilterLogic.fs" />
+    <Compile Include="Notes\NoteSearch\FilterComponent.fs" />
     <Compile Include="Notes\NoteSearch\NoteSearchComponent.fs" />
     <Compile Include="Notes\Editor\Types.fs" />
     <Compile Include="Notes\Editor\State.fs" />

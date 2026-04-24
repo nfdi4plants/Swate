@@ -1,4 +1,4 @@
-module Swate.Components.TermSearch.TermSearchConfigLocalStorageActiveKeysContext
+module Swate.Components.TermSearch.TermSearchActiveKeysContext
 
 open Feliz
 open Swate.Components.Types

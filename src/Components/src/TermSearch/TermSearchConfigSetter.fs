@@ -4,7 +4,7 @@ open Swate.Components
 open Fable.Core
 open Feliz
 open Swate.Components.TermSearch.TermSearchAllKeysContext
-open Swate.Components.TermSearch.TermSearchConfigLocalStorageActiveKeysContext
+open Swate.Components.TermSearch.TermSearchActiveKeysContext
 
 
 [<Erase; Mangle(false)>]

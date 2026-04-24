@@ -1,12 +1,13 @@
 module Renderer.App
 
-open Browser.Dom
+
 open Elmish
 open Feliz
 open Feliz.UseElmish
 open Renderer.Components
 open Renderer.Types
 open Swate.Components
+open Swate.Components.Layout
 open Swate.Components.ErrorModal
 open Swate.Electron.Shared
 
@@ -87,7 +88,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
 
 [<ReactComponent>]
 let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget) =
-    let leftSidebarCtx = Swate.Components.LayoutContexts.LeftSidebarContext.useLeftSidebarCtx ()
+    let leftSidebarCtx = Swate.Components.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let toggleTarget target =
         if leftSidebarTarget = target then

@@ -59,8 +59,9 @@
     "@nfdi4plants/arctrl": "^3.0.0-alpha.4",
     "@tanstack/react-virtual": "^3.13.2",
     "@uidotdev/usehooks": "^2.4.1",
-    "@uiw/react-md-editor": "^4.0.11",
     "@uiw/react-markdown-preview": "^5.1.4",
+    "@uiw/react-md-editor": "^4.0.11",
+    "fuse.js": "^7.1.0",
     "mermaid": "^11.12.3",
     "rehype-rewrite": "^4.0.4",
     "rehype-sanitize": "^6.0.0"

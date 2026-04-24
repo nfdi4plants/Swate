@@ -2,7 +2,7 @@ namespace Swate.Components
 
 open Fable.Core
 open Feliz
-open Swate.Components.GenericComponents.SelectContextValue
+open Swate.Components.GenericComponents.SelectContext
 
 [<Erase; Mangle(false)>]
 type Select =
@@ -258,13 +258,13 @@ type Select =
 
         let selectContext: SelectContextValue =
             React.useMemo (
-                (fun () -> {|
+                (fun () -> {
                     activeIndex = activeIndex
                     selectedIndices = selectedIndices
+                    optionCount = options.Length
                     getItemProps = interactions.getItemProps
                     handleSelect = handleSelect
-                    optionCount = options.Length
-                |}),
+                }),
                 [|
                     activeIndex
                     selectedIndices

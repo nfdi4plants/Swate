@@ -2,6 +2,7 @@ namespace Renderer.Components
 
 open Feliz
 open Swate.Components
+open Swate.Components.Layout
 open Swate.Components.Shared
 
 module NavbarHelper =

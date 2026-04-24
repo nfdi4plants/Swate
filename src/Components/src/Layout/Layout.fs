@@ -1,7 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.Layout
 
 open Feliz
 open Fable.Core
+open Swate.Components
 
 module private Mocks =
 
@@ -11,8 +12,8 @@ module private Mocks =
         | Settings
         | Info
 
-open Swate.Components.LayoutContexts.LeftSidebarContext
-open Swate.Components.LayoutContexts.RightSidebarContext
+open Swate.Components.Layout.LeftSidebarContext
+open Swate.Components.Layout.RightSidebarContext
 
 module private LayoutHelper =
 
@@ -472,7 +473,7 @@ type Layout =
                 setState = setLeftSidebarIsOpen
             },
             RightSidebarCtx.Provider(
-                toRightSidebarCtxState rightSidebarState,
+                RightSidebarHelper.toRightSidebarCtxState rightSidebarState,
                 Html.div [
                     prop.className "swt:flex-1 swt:flex swt:flex-col swt:h-screen swt:overflow-hidden"
                     prop.children [

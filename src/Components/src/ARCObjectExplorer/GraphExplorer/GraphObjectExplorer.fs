@@ -2,6 +2,7 @@ namespace Swate.Components.ARCObjectExplorer.GraphExplorer
 
 open Fable.Core
 open Feliz
+open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer
 open Swate.Components.ARCObjectExplorer.Model
@@ -33,6 +34,55 @@ module GraphObjectExplorerFilter =
             "Materials"
             "Data"
         ]
+
+    let private datasetParentLabel = "Datasets"
+
+    let private datasetChildLabels =
+        datasetKinds
+        |> Set.toList
+        |> List.map GraphExplorerNodeKind.label
+
+    let private tryFindSelectionIndexByLabel
+        (kindFilterOptions: SelectItem<string>[])
+        (targetLabel: string)
+        =
+        kindFilterOptions
+        |> Array.tryFindIndex (fun option -> option.item = targetLabel)
+
+    let private tryFindSelectionIndicesByLabels
+        (kindFilterOptions: SelectItem<string>[])
+        (targetLabels: string list)
+        =
+        let indices =
+            targetLabels
+            |> List.choose (tryFindSelectionIndexByLabel kindFilterOptions)
+
+        if indices.Length = targetLabels.Length then
+            Some(indices |> Set.ofList)
+        else
+            None
+
+    let syncDatasetKindSelection
+        (kindFilterOptions: SelectItem<string>[])
+        (previousSelectedKindIndices: Set<int>)
+        (nextSelectedKindIndices: Set<int>)
+        : Set<int> =
+        match
+            tryFindSelectionIndexByLabel kindFilterOptions datasetParentLabel,
+            tryFindSelectionIndicesByLabels kindFilterOptions datasetChildLabels
+        with
+        | Some datasetIndex, Some datasetChildIndices ->
+            let wasDatasetSelected = previousSelectedKindIndices.Contains datasetIndex
+            let isDatasetSelected = nextSelectedKindIndices.Contains datasetIndex
+
+            if wasDatasetSelected = isDatasetSelected then
+                nextSelectedKindIndices
+            elif isDatasetSelected then
+                Set.union nextSelectedKindIndices datasetChildIndices
+            else
+                Set.difference nextSelectedKindIndices datasetChildIndices
+        | _ ->
+            nextSelectedKindIndices
 
     let private isDatasetSubKind (graphKind: GraphExplorerNodeKind) =
         datasetKinds.Contains graphKind
@@ -330,6 +380,15 @@ type GraphObjectExplorer =
         let selectedKindIndices, setSelectedKindIndices =
             React.useState (KindFilter.defaultSelectedIndices KindFilter.graphObjectExplorerOptions)
 
+        let setSelectedKindIndicesWithDatasetCascade (nextSelectedKindIndices: Set<int>) =
+            let syncedSelection =
+                GraphObjectExplorerFilter.syncDatasetKindSelection
+                    KindFilter.graphObjectExplorerOptions
+                    selectedKindIndices
+                    nextSelectedKindIndices
+
+            setSelectedKindIndices syncedSelection
+
         let visibleSemanticKinds =
             KindFilter.selectedLabels KindFilter.graphObjectExplorerOptions selectedKindIndices
 
@@ -450,7 +509,7 @@ type GraphObjectExplorer =
                     selectedSubtitleText,
                     KindFilter.graphObjectExplorerOptions,
                     selectedKindIndices,
-                    setSelectedKindIndices,
+                    setSelectedKindIndicesWithDatasetCascade,
                     rightActions = searchAction
                 ),
             treePane = treePane,

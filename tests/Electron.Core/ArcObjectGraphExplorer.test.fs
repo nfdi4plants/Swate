@@ -5,7 +5,7 @@ open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer
 open Swate.Components.ARCObjectExplorer.GraphExplorer
 open Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
-open Swate.Components.ARCObjectExplorer.GraphExplorer.ArcExplorerNodes
+open Swate.Components.ARCObjectExplorer.GraphExplorer.GraphExplorerNodes
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 open Swate.Components.FileExplorerTypes
 open Vitest
@@ -67,6 +67,19 @@ let private tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list)
                 loop (node :: ancestors) node.children)
 
     loop [] nodes
+
+let private graphOptionIndexByLabel (label: string) =
+    KindFilter.graphObjectExplorerOptions
+    |> Array.tryFindIndex (fun option -> option.item = label)
+    |> expectSome <| $"Missing graph kind option '{label}'."
+
+let private graphOptionIndicesByLabels (labels: string list) =
+    labels
+    |> List.map graphOptionIndexByLabel
+    |> Set.ofList
+
+let private sortedIndices (indices: Set<int>) =
+    indices |> Seq.sort |> Seq.toList
 
 let private extractEntryCount (metaById: Map<string, GraphNodeMeta>) (layerId: string) =
     metaById
@@ -405,6 +418,85 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             "Materials"
             "Data"
         ]))
+
+    Vitest.test("syncs dataset child kinds when Datasets is toggled on", fun () ->
+        let datasetIndex = graphOptionIndexByLabel "Datasets"
+        let protocolsIndex = graphOptionIndexByLabel "Protocols"
+        let datasetChildIndices = graphOptionIndicesByLabels [ "Study"; "Assay"; "Workflow"; "Run" ]
+
+        let previousSelection = Set.singleton protocolsIndex
+        let nextSelection = previousSelection |> Set.add datasetIndex
+
+        let syncedSelection =
+            GraphObjectExplorerFilter.syncDatasetKindSelection
+                KindFilter.graphObjectExplorerOptions
+                previousSelection
+                nextSelection
+
+        let expectedSelection =
+            Set.union nextSelection datasetChildIndices
+
+        Vitest.expect(sortedIndices syncedSelection).toEqual(sortedIndices expectedSelection))
+
+    Vitest.test("syncs dataset child kinds when Datasets is toggled off", fun () ->
+        let datasetIndex = graphOptionIndexByLabel "Datasets"
+        let protocolsIndex = graphOptionIndexByLabel "Protocols"
+        let datasetChildIndices = graphOptionIndicesByLabels [ "Study"; "Assay"; "Workflow"; "Run" ]
+
+        let previousSelection =
+            Set.union (Set.ofList [ datasetIndex; protocolsIndex ]) datasetChildIndices
+
+        let nextSelection = previousSelection |> Set.remove datasetIndex
+
+        let syncedSelection =
+            GraphObjectExplorerFilter.syncDatasetKindSelection
+                KindFilter.graphObjectExplorerOptions
+                previousSelection
+                nextSelection
+
+        let expectedSelection =
+            Set.difference nextSelection datasetChildIndices
+
+        Vitest.expect(sortedIndices syncedSelection).toEqual(sortedIndices expectedSelection))
+
+    Vitest.test("keeps Datasets unchanged when only child kinds are toggled", fun () ->
+        let datasetIndex = graphOptionIndexByLabel "Datasets"
+        let studyIndex = graphOptionIndexByLabel "Study"
+        let datasetChildIndices = graphOptionIndicesByLabels [ "Study"; "Assay"; "Workflow"; "Run" ]
+
+        let previousSelection =
+            Set.union (Set.singleton datasetIndex) datasetChildIndices
+
+        let nextSelection =
+            previousSelection |> Set.remove studyIndex
+
+        let syncedSelection =
+            GraphObjectExplorerFilter.syncDatasetKindSelection
+                KindFilter.graphObjectExplorerOptions
+                previousSelection
+                nextSelection
+
+        Vitest.expect(sortedIndices syncedSelection).toEqual(sortedIndices nextSelection)
+        Vitest.expect(syncedSelection.Contains datasetIndex).toBe(true))
+
+    Vitest.test("keeps select-all and clear-all idempotent with dataset sync", fun () ->
+        let allIndices = KindFilter.defaultSelectedIndices KindFilter.graphObjectExplorerOptions
+        let emptyIndices = Set.empty<int>
+
+        let syncedFromSelectAll =
+            GraphObjectExplorerFilter.syncDatasetKindSelection
+                KindFilter.graphObjectExplorerOptions
+                emptyIndices
+                allIndices
+
+        let syncedFromClearAll =
+            GraphObjectExplorerFilter.syncDatasetKindSelection
+                KindFilter.graphObjectExplorerOptions
+                allIndices
+                emptyIndices
+
+        Vitest.expect(sortedIndices syncedFromSelectAll).toEqual(sortedIndices allIndices)
+        Vitest.expect(sortedIndices syncedFromClearAll).toEqual(sortedIndices emptyIndices))
 
     Vitest.test("builds expected top-level shape for graph explorer and omits standalone roots", fun () ->
         let graphObjects = fakeGraphObjects ()
