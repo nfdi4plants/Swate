@@ -6,6 +6,21 @@ open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 
 module GraphObjectExplorerFilter =
 
+    let private whitelistedGraphKinds =
+        Set.ofList [
+            GraphExplorerNodeKind.Arc
+            GraphExplorerNodeKind.Group
+            GraphExplorerNodeKind.Study
+            GraphExplorerNodeKind.Assay
+            GraphExplorerNodeKind.Workflow
+            GraphExplorerNodeKind.Run
+            GraphExplorerNodeKind.Protocol
+            GraphExplorerNodeKind.FormalParameter
+            GraphExplorerNodeKind.Process
+            GraphExplorerNodeKind.Material
+            GraphExplorerNodeKind.Data
+        ]
+
     let private datasetSemanticKindFromGraphKind
         (graphKind: GraphExplorerNodeKind)
         : GraphSemanticKind option
@@ -217,6 +232,22 @@ module GraphObjectExplorerFilter =
             | ArcExplorerNodeKind.Group -> hasVisibleChildren || isSelectedPathNode
             | _ -> isVisibleSemanticNode || hasVisibleChildren || isSelectedPathNode
 
+    let private graphKindForNode
+        (nodeMetaById: Map<string, GraphNodeMeta>)
+        (node: ArcExplorerNode)
+        =
+        nodeMetaById
+        |> Map.tryFind node.id
+        |> Option.map _.GraphKind
+        |> Option.defaultValue (GraphExplorerNodeKind.ofArcExplorerNodeKind node.kind)
+
+    let private isWhitelistedGraphKind
+        (nodeMetaById: Map<string, GraphNodeMeta>)
+        (node: ArcExplorerNode)
+        =
+        graphKindForNode nodeMetaById node
+        |> whitelistedGraphKinds.Contains
+
     let filterNodesBySemanticKinds
         (selectedSemanticKinds: Set<string>)
         (nodes: ArcExplorerNode list)
@@ -265,7 +296,7 @@ module GraphObjectExplorerFilter =
 
             let filteredChildren =
                 node.children
-                |> List.choose (loop false datasetKindForBranch hiddenAssociationInBranch)
+                |> List.collect (loop false datasetKindForBranch hiddenAssociationInBranch)
 
             let hasVisibleChildren =
                 filteredChildren |> List.isEmpty |> not
@@ -289,8 +320,13 @@ module GraphObjectExplorerFilter =
                         node
 
             if includeNode then
-                Some { node with children = filteredChildren }
-            else
-                None
+                let filteredNode = { node with children = filteredChildren }
 
-        nodes |> List.choose (loop true None false)
+                if isWhitelistedGraphKind nodeMetaById filteredNode then
+                    [ filteredNode ]
+                else
+                    filteredChildren
+            else
+                []
+
+        nodes |> List.collect (loop true None false)

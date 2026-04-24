@@ -1131,7 +1131,7 @@ let rec private datasetNode
     let children =
         [
             yield! optionalGroupNode $"{nodeId}:group:protocols" "Protocols" protocolNodes |> Option.toList
-            yield! optionalGroupNode $"{nodeId}:group:has-part" "Has Part" partDatasetGroups |> Option.toList
+            yield! optionalGroupNode $"{nodeId}:group:has-part" "DataSets" partDatasetGroups |> Option.toList
             yield! additionalPropertyGroupNode |> Option.toList
         ]
 
@@ -1143,7 +1143,7 @@ let rec private datasetNode
         yield! optionalOptionRow "Description" dataset.description
         yield! row "About Protocols" (string aboutProtocols.Length)
         yield! optionalRow "About Protocol Names" aboutProtocolNames
-        yield! row "Has Part" (string dataset.hasPart.Length)
+        yield! row "DataSets" (string dataset.hasPart.Length)
         yield! optionalRowsFromPropertyValues "Additional Property" dataset.additionalProperty
         yield! row "Dataset Id" dataset.id
     ]

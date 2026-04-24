@@ -57,6 +57,31 @@ let private hasTag (metaById: Map<string, GraphNodeMeta>) (expectedTag: GraphNod
     |> Map.tryFind node.id
     |> Option.exists (fun meta -> meta.Tag = Some expectedTag)
 
+let private graphKindForNode (metaById: Map<string, GraphNodeMeta>) (node: ArcExplorerNode) =
+    metaById
+    |> Map.tryFind node.id
+    |> Option.map _.GraphKind
+    |> Option.defaultValue (GraphExplorerNodeKind.ofArcExplorerNodeKind node.kind)
+
+let private whitelistedGraphKinds =
+    Set.ofList [
+        GraphExplorerNodeKind.Arc
+        GraphExplorerNodeKind.Group
+        GraphExplorerNodeKind.Study
+        GraphExplorerNodeKind.Assay
+        GraphExplorerNodeKind.Workflow
+        GraphExplorerNodeKind.Run
+        GraphExplorerNodeKind.Protocol
+        GraphExplorerNodeKind.FormalParameter
+        GraphExplorerNodeKind.Process
+        GraphExplorerNodeKind.Material
+        GraphExplorerNodeKind.Data
+    ]
+
+let private isWhitelistedGraphKind (metaById: Map<string, GraphNodeMeta>) (node: ArcExplorerNode) =
+    graphKindForNode metaById node
+    |> whitelistedGraphKinds.Contains
+
 let private tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
     let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
         nodes
@@ -993,6 +1018,95 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(topLevelIds |> List.contains "graph:materials").toBe(false)
         Vitest.expect(topLevelIds |> List.contains "graph:Data").toBe(false))
 
+    Vitest.test("keeps only whitelisted graph kinds in filtered graph:all and category layers", fun () ->
+        let graphObjects = graphObjectsWithPropertyValues ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let selectedSemanticKinds =
+            GraphSemanticKind.allInFilterOrder
+            |> List.map GraphSemanticKind.label
+            |> Set.ofList
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                selectedSemanticKinds
+                nodes
+                metaById
+                None
+
+        let allLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer while checking whitelist."
+
+        let allLayerKinds =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.map (graphKindForNode metaById)
+            |> Set.ofSeq
+
+        let categoryLayerKinds =
+            filteredNodes
+            |> List.filter (fun node -> node.id <> "graph:all")
+            |> List.collect _.children
+            |> flattenNodes
+            |> Seq.map (graphKindForNode metaById)
+            |> Set.ofSeq
+
+        Vitest.expect(allLayerKinds.Contains GraphExplorerNodeKind.Group).toBe(true)
+        Vitest.expect(allLayerKinds.Contains GraphExplorerNodeKind.PropertyValue).toBe(false)
+        Vitest.expect(categoryLayerKinds.Contains GraphExplorerNodeKind.Group).toBe(true)
+        Vitest.expect(categoryLayerKinds.Contains GraphExplorerNodeKind.PropertyValue).toBe(false)
+
+        let allFilteredKinds =
+            Set.union allLayerKinds categoryLayerKinds
+
+        allFilteredKinds
+        |> Set.iter (fun graphKind ->
+            Vitest.expect(whitelistedGraphKinds.Contains graphKind).toBe(true)))
+
+    Vitest.test("restores structural folders including Material and Data summaries in graph:all", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let selectedSemanticKinds =
+            GraphSemanticKind.allInFilterOrder
+            |> List.map GraphSemanticKind.label
+            |> Set.ofList
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                selectedSemanticKinds
+                nodes
+                metaById
+                None
+
+        let allLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer while checking structural folders."
+
+        let groupNamesInAllLayer =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.filter (fun node -> graphKindForNode metaById node = GraphExplorerNodeKind.Group)
+            |> Seq.map _.name
+            |> Set.ofSeq
+
+        let missingFolderNames =
+            [
+            "Protocols"
+            "Formal Parameters"
+            "Processes"
+            "Inputs"
+            "Outputs"
+            "Material"
+            "Data"
+            ]
+            |> List.filter (fun folderName -> not (groupNamesInAllLayer.Contains folderName))
+
+        Vitest.expect(missingFolderNames).toEqual([]))
+
     Vitest.test("shows study datasets without exposing datasets top-level layer", fun () ->
         let graphObjects = fakeGraphObjects ()
         let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
@@ -1183,6 +1297,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
         let selectedPathNodeIdsInAllLayer =
             selectedAncestors
+            |> List.filter (isWhitelistedGraphKind metaById)
             |> List.map _.id
             |> Set.ofList
             |> Set.remove "graph:all"
@@ -1312,7 +1427,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Missing materials layer after semantic filtering."
 
         Vitest.expect(materialsLayer.children.Length > 0).toBe(true)
-        Vitest.expect(materialEndpointNodeCount > 0).toBe(true)
+        Vitest.expect(materialEndpointNodeCount).toBe(0)
         Vitest.expect(dataEndpointNodeCount).toBe(0))
 
     Vitest.test("ignores non-Arc ARCObjects entries when creating the canonical tree", fun () ->
@@ -1453,7 +1568,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected metadata for canonical dataset node."
 
         Vitest.expect(datasetMeta.KindLabel).toBe("Study")
-        Vitest.expect(datasetMeta.GraphKind).toBe(GraphExplorerNodeKind.Study)
+        Vitest.expect(datasetMeta.GraphKind).toEqual(GraphExplorerNodeKind.Study)
         Vitest.expect(datasetMeta.RoleLabel).toBe("Canonical")
 
         let processMeta =
@@ -1463,7 +1578,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected at least one process metadata entry."
 
         Vitest.expect(processMeta.KindLabel).toBe("Process")
-        Vitest.expect(processMeta.GraphKind).toBe(GraphExplorerNodeKind.Process)
+        Vitest.expect(processMeta.GraphKind).toEqual(GraphExplorerNodeKind.Process)
         Vitest.expect(processMeta.RoleLabel).toBe("Canonical")
         Vitest.expect(processMeta.Rows |> List.exists (fun (label, value) -> label = "Type" && value = "LabProcess")).toBe(true)
         Vitest.expect(processMeta.Rows |> List.exists (fun (label, _) -> label = "Object Type")).toBe(true)
@@ -1475,7 +1590,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected at least one protocol metadata entry."
 
         Vitest.expect(protocolMeta.KindLabel).toBe("Protocol")
-        Vitest.expect(protocolMeta.GraphKind).toBe(GraphExplorerNodeKind.Protocol)
+        Vitest.expect(protocolMeta.GraphKind).toEqual(GraphExplorerNodeKind.Protocol)
 
         let formalParameterMeta =
             metaById
@@ -1484,7 +1599,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected at least one formal parameter metadata entry."
 
         Vitest.expect(formalParameterMeta.KindLabel).toBe("FormalParameter")
-        Vitest.expect(formalParameterMeta.GraphKind).toBe(GraphExplorerNodeKind.FormalParameter)
+        Vitest.expect(formalParameterMeta.GraphKind).toEqual(GraphExplorerNodeKind.FormalParameter)
 
         let materialMeta =
             metaById
@@ -1493,7 +1608,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected at least one material endpoint metadata entry."
 
         Vitest.expect(materialMeta.KindLabel).toBe("Material")
-        Vitest.expect(materialMeta.GraphKind).toBe(GraphExplorerNodeKind.Material)
+        Vitest.expect(materialMeta.GraphKind).toEqual(GraphExplorerNodeKind.Material)
         Vitest.expect(
             materialMeta.RoleLabel.StartsWith("Input", StringComparison.Ordinal)
             || materialMeta.RoleLabel.StartsWith("Output", StringComparison.Ordinal)
@@ -1507,7 +1622,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected at least one data endpoint metadata entry."
 
         Vitest.expect(dataMeta.KindLabel).toBe("Data")
-        Vitest.expect(dataMeta.GraphKind).toBe(GraphExplorerNodeKind.Data)
+        Vitest.expect(dataMeta.GraphKind).toEqual(GraphExplorerNodeKind.Data)
 
         let propertyValueMeta =
             metaById
@@ -1519,7 +1634,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected at least one property-value metadata entry."
 
         Vitest.expect(propertyValueMeta.KindLabel).toBe("PropertyValue")
-        Vitest.expect(propertyValueMeta.GraphKind).toBe(GraphExplorerNodeKind.PropertyValue)
+        Vitest.expect(propertyValueMeta.GraphKind).toEqual(GraphExplorerNodeKind.PropertyValue)
 
         let datasetsLayerMeta =
             metaById
@@ -1836,11 +1951,11 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             "Data Endpoint"
             "additionalProperty")
 
-    Vitest.test("keeps PropertyValue nodes visible in matching semantic filters", fun () ->
+    Vitest.test("hides PropertyValue nodes from semantic filter output due to whitelist", fun () ->
         let graphObjects = graphObjectsWithPropertyValues ()
         let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
 
-        let propertyOwnerTagsForSemanticKind (semanticKind: string) =
+        let propertyValueCountForSemanticKind (semanticKind: string) =
             let filteredNodes =
                 GraphObjectExplorerFilter.filterNodesBySemanticKinds
                     (Set.ofList [ semanticKind ])
@@ -1860,28 +1975,18 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
                 |> Map.tryFind node.id
                 |> Option.bind (fun meta ->
                     match meta.Tag with
-                    | Some(GraphNodeTag.PropertyValue ownerTag) -> Some ownerTag
+                    | Some(GraphNodeTag.PropertyValue _) -> Some node.id
                     | _ -> None))
-            |> Set.ofSeq
+            |> Seq.length
 
-        let assertSingleOwnerTag (semanticKind: string) (expectedOwnerTag: GraphPropertyValueOwnerTag) =
-            let ownerTags = propertyOwnerTagsForSemanticKind semanticKind
-
-            Vitest.expect(ownerTags.Count).toBe(1)
-            Vitest.expect(ownerTags.Contains expectedOwnerTag).toBe(true)
-
-        let datasetOwnerTags = propertyOwnerTagsForSemanticKind "Datasets"
-        Vitest.expect(datasetOwnerTags.Count).toBe(0)
-
-        assertSingleOwnerTag "Study" GraphPropertyValueOwnerTag.Dataset
-        assertSingleOwnerTag "Protocols" GraphPropertyValueOwnerTag.Protocol
-        assertSingleOwnerTag "Processes" GraphPropertyValueOwnerTag.Process
-
-        assertSingleOwnerTag
+        [
+            "Datasets"
+            "Study"
+            "Protocols"
+            "Processes"
             "Materials"
-            (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Material)
-
-        assertSingleOwnerTag
             "Data"
-            (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Data))
+        ]
+        |> List.iter (fun semanticKind ->
+            Vitest.expect(propertyValueCountForSemanticKind semanticKind).toBe(0)))
 )
