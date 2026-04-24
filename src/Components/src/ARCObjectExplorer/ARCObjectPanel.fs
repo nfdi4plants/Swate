@@ -1,5 +1,6 @@
 namespace Swate.Components.ARCObjectExplorer
 
+open System
 open Fable.Core
 open Feliz
 
@@ -27,10 +28,11 @@ type ARCObjectPanel =
             prop.className
                 "swt:flex swt:flex-1 swt:min-h-0 swt:min-w-0 swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:h-full swt:overflow-hidden"
             prop.children [
-                Html.h3 [
-                    prop.className "swt:text-sm swt:font-semibold"
-                    prop.text name
-                ]
+                if String.IsNullOrWhiteSpace name |> not then
+                    Html.h3 [
+                        prop.className "swt:text-sm swt:font-semibold"
+                        prop.text name
+                    ]
                 Html.div [
                     prop.className "swt:flex-1 swt:min-h-0 swt:min-w-0 swt:overflow-auto"
                     prop.children [ content ]

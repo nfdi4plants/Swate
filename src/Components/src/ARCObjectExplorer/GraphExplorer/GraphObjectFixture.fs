@@ -159,7 +159,7 @@ module private GraphObjectFixtureHelper =
 
         {
             id = Some(($"{executesProtocol}:{name}").ToLowerInvariant().Replace(" ", "-"))
-            type' = "Process"
+            type' = "LabProcess"
             additionalType = None
             name = name
             inputs = inputs |> List.toArray
@@ -218,7 +218,7 @@ module private GraphObjectFixtureHelper =
         : LabProtocol =
         {
             id = Some id
-            type' = "Protocol"
+            type' = "LabProtocol"
             additionalType = None
             name = Some name
             parameters = parameters |> List.toArray

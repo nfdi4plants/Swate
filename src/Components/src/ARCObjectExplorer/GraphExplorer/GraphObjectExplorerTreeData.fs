@@ -2,15 +2,15 @@ namespace Swate.Components.ARCObjectExplorer.GraphExplorer
 
 open System
 open Swate.Components.ARCObjectExplorer
-open Swate.Components.ARCObjectExplorer.Model
+open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
 
 module GraphObjectExplorerTreeData =
 
-    let private groupItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Group
-    let private sampleItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Sample
-    let private dataMapItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.DataMap
+    let private groupItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Group
+    let private materialItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Material
+    let private dataItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Data
     let private descendantSummaryGroupKeys = Set.ofList [ "additional-properties"; "parameter-value"; "formal-parameters" ]
 
     type private DescendantSummarySeed = {
@@ -150,7 +150,7 @@ module GraphObjectExplorerTreeData =
             Downloaded = None
             Size = None
             SizeFormatted = None
-            ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Group
+            ItemType = groupItemType
             Label = Some rule.SummaryName
             Selectable = false
             Path = None
@@ -313,9 +313,9 @@ module GraphObjectExplorerTreeData =
         let idContains (marker: string) =
             item.Id.IndexOf(marker, StringComparison.OrdinalIgnoreCase) >= 0
 
-        if item.ItemType = sampleItemType then
+        if item.ItemType = materialItemType then
             Some "Material"
-        elif item.ItemType = dataMapItemType then
+        elif item.ItemType = dataItemType then
             Some "Data"
         elif idContains ":additional-property:" then
             Some "Additional Properties"

@@ -58,7 +58,7 @@ let Main () =
                 ]
             | None -> Html.none
             ARCObjectPanel.Main(
-                "ARC Object Explorer",
+                "",
                 content =
                     ARCObjectWidget.ExplorerContent(
                         viewModel.ExplorerItems,

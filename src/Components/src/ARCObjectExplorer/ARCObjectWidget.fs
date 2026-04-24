@@ -361,9 +361,28 @@ type ARCObjectWidget =
         ]
 
     [<ReactComponent>]
-    static member ExplorerContent(items: FileItem list, ?selectedItemId: string, ?onItemClick: FileItem -> unit) =
+    static member ExplorerContent
+        (
+            items: FileItem list,
+            ?selectedItemId: string,
+            ?onItemClick: FileItem -> unit,
+            ?tileIconSizeClass: string,
+            ?contextIconSizeClass: string,
+            ?compactEntityTiles: bool,
+            ?stickyContextBreadcrumb: bool
+        ) =
         let onItemClick = defaultArg onItemClick ignore
+        let tileIconSizeClass = defaultArg tileIconSizeClass "swt:text-2xl"
+        let contextIconSizeClass = defaultArg contextIconSizeClass "swt:text-base"
+        let compactEntityTiles = defaultArg compactEntityTiles false
+        let stickyContextBreadcrumb = defaultArg stickyContextBreadcrumb false
         let explorerItems = ARCObjectWidgetHelper.getExplorerItems(selectedItemId, items)
+
+        let itemTypeLabel (item: FileItem) =
+            if System.String.IsNullOrWhiteSpace item.ItemType then
+                "Object"
+            else
+                item.ItemType
 
         let tileSubtitle sourceName (entry: ARCObjectExplorerVisibleItem) =
             match entry.Depth with
@@ -382,17 +401,18 @@ type ARCObjectWidget =
 
         let iconTile sourceName (entry: ARCObjectExplorerVisibleItem) isCurrentTarget =
             let item = entry.Item
+            let tileMinHeightClass = if compactEntityTiles then "swt:min-h-16" else "swt:min-h-20"
 
             Html.button [
                 prop.type'.button
                 prop.className [
-                    "swt:flex swt:w-full swt:min-w-0 swt:flex-col swt:items-center swt:justify-center swt:gap-2 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:min-h-20 swt:text-center swt:transition-colors hover:swt:border-primary/60 hover:swt:bg-base-200/60"
+                    $"swt:flex swt:w-full swt:min-w-0 swt:flex-col swt:items-center swt:justify-center swt:gap-2 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 {tileMinHeightClass} swt:text-center swt:transition-colors hover:swt:border-primary/60 hover:swt:bg-base-200/60"
                     if isCurrentTarget then "swt:border-primary swt:bg-primary/10"
                 ]
                 prop.onClick (fun _ -> onItemClick item)
                 prop.children [
                     Html.i [
-                        prop.className (ARCObjectWidgetHelper.iconClassName([ "swt:iconify"; "swt:text-2xl" ], item))
+                        prop.className (ARCObjectWidgetHelper.iconClassName([ "swt:iconify"; tileIconSizeClass ], item))
                     ]
                     Html.div [
                         prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-1 swt:w-full"
@@ -413,11 +433,20 @@ type ARCObjectWidget =
         let contextItem (entry: ARCObjectExplorerContextItem) =
             let sharedChildren = [
                 Html.i [
-                    prop.className (ARCObjectWidgetHelper.iconClassName([ "swt:iconify"; "swt:text-base" ], entry.Item))
+                    prop.className (ARCObjectWidgetHelper.iconClassName([ "swt:iconify"; contextIconSizeClass ], entry.Item))
                 ]
-                Html.span [
-                    prop.className "swt:truncate"
-                    prop.text entry.Item.Name
+                Html.div [
+                    prop.className "swt:flex swt:min-w-0 swt:flex-col swt:leading-tight swt:text-left"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:text-[0.65rem] swt:uppercase swt:tracking-wide swt:opacity-60 swt:truncate"
+                            prop.text (itemTypeLabel entry.Item)
+                        ]
+                        Html.span [
+                            prop.className "swt:truncate"
+                            prop.text entry.Item.Name
+                        ]
+                    ]
                 ]
             ]
 
@@ -447,6 +476,12 @@ type ARCObjectWidget =
                 ]
 
         let sectionView sourceName sourceId (section: ARCObjectExplorerSection) =
+            let tileGridClass =
+                if compactEntityTiles then
+                    "swt:grid swt:grid-cols-[repeat(auto-fill,minmax(8rem,1fr))] swt:gap-2 swt:overflow-x-hidden swt:pb-2"
+                else
+                    "swt:grid swt:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] swt:gap-2 swt:overflow-x-hidden swt:pb-2"
+
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:gap-3"
                 prop.children [
@@ -478,8 +513,7 @@ type ARCObjectWidget =
                         ]
                     ]
                     Html.div [
-                        prop.className
-                            "swt:grid swt:grid-cols-[repeat(auto-fill,minmax(10rem,1fr))] swt:gap-2 swt:overflow-x-hidden swt:pb-2"
+                        prop.className tileGridClass
                         prop.children [
                             for visibleItem in section.Items do
                                 iconTile
@@ -497,37 +531,56 @@ type ARCObjectWidget =
             prop.children [
                 match explorerItems with
                 | Some explorerItems ->
-                    Html.div [
-                        prop.className "swt:flex swt:flex-col swt:gap-1"
-                        prop.children [
-                            Html.span [
-                                prop.className "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
-                                prop.text "Hierarchy"
-                            ]
-                            Html.h4 [ prop.className "swt:text-lg swt:font-semibold"; prop.text explorerItems.SourceName ]
-                        ]
+                    let selectedContextItem =
+                        explorerItems.ContextItems
+                        |> List.tryFind (fun entry -> entry.IsCurrent)
+
+                    let contextContainerClasses = [
+                        "swt:flex swt:flex-col swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-4"
+                        if stickyContextBreadcrumb then
+                            "swt:sticky swt:top-0 swt:z-10 swt:pb-2 swt:gap-2"
+                        else
+                            "swt:gap-3"
                     ]
+
                     Html.div [
                         prop.className "swt:flex swt:flex-col swt:gap-4"
                         prop.children [
                             Html.div [
-                                prop.className "swt:flex swt:flex-col swt:gap-3 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-4"
+                                prop.className contextContainerClasses
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:flex swt:flex-col swt:gap-1"
                                         prop.children [
-                                            Html.h5 [
-                                                prop.className "swt:text-sm swt:font-semibold swt:uppercase swt:tracking-wide"
-                                                prop.text "Context"
-                                            ]
-                                            Html.p [
-                                                prop.className "swt:text-sm swt:opacity-70"
-                                                prop.text "Follow the parent chain left to right to understand where the current ARC object sits in the visible hierarchy."
-                                            ]
+                                            match selectedContextItem with
+                                            | Some selectedItem ->
+                                                Html.div [
+                                                    prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                                                    prop.children [
+                                                        Html.span [
+                                                            prop.className "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
+                                                            prop.text "Selected"
+                                                        ]
+                                                        Html.span [
+                                                            prop.className "swt:badge swt:badge-sm swt:badge-outline"
+                                                            prop.text (itemTypeLabel selectedItem.Item)
+                                                        ]
+                                                        Html.span [
+                                                            prop.className "swt:text-sm swt:font-semibold swt:break-words"
+                                                            prop.text selectedItem.Item.Name
+                                                        ]
+                                                    ]
+                                                ]
+                                            | None -> Html.none
+                                            if not stickyContextBreadcrumb then
+                                                Html.p [
+                                                    prop.className "swt:text-sm swt:opacity-70"
+                                                    prop.text "Follow the parent chain left to right to understand where the current ARC object sits in the visible hierarchy."
+                                                ]
                                         ]
                                     ]
                                     Html.div [
-                                        prop.className "swt:flex swt:items-center swt:gap-2 swt:overflow-x-auto swt:pb-1"
+                                        prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
                                         prop.children [
                                             for index, contextEntry in explorerItems.ContextItems |> List.indexed do
                                                 if index > 0 then
@@ -588,7 +641,7 @@ type ARCObjectWidget =
                         "swt:grid swt:grid-cols-1 swt:lg:grid-cols-[minmax(16rem,20rem)_minmax(0,1fr)_minmax(14rem,18rem)] swt:gap-3 swt:flex-1 swt:min-h-0"
                     prop.children [
                         ARCObjectPanel.Main("ARC Object Tree", ?content = treePane)
-                        ARCObjectPanel.Main("ARC Object Explorer", ?content = explorerPane)
+                        ARCObjectPanel.Main("", ?content = explorerPane)
                         ARCObjectPanel.Main("ARC Object Details", ?content = detailsPane)
                     ]
                 ]

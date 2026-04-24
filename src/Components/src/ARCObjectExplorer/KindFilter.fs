@@ -23,6 +23,10 @@ let arcObjectExplorerOptions: SelectItem<string>[] =
 let graphObjectExplorerOptions: SelectItem<string>[] =
     [|
         "Datasets"
+        "Study"
+        "Assay"
+        "Workflow"
+        "Run"
         "Protocols"
         "FormalParameters"
         "Processes"

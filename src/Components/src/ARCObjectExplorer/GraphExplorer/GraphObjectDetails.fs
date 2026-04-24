@@ -94,8 +94,9 @@ type GraphObjectDetails =
 
             let selectionKind =
                 selectedMeta
-                |> Option.map _.KindLabel
-                |> Option.defaultValue (ArcExplorerNodeKind.label selectedNode.kind)
+                |> Option.map _.GraphKind
+                |> Option.map GraphExplorerNodeKind.label
+                |> Option.defaultValue (GraphExplorerNodeKind.label (GraphExplorerNodeKind.ofArcExplorerNodeKind selectedNode.kind))
 
             let selectionRole =
                 selectedMeta
@@ -183,7 +184,7 @@ type GraphObjectDetails =
                             [
                                 GraphObjectDetails.DetailsTable(
                                     [
-                                        "Kind", meta.KindLabel
+                                        "Kind", (GraphExplorerNodeKind.label meta.GraphKind)
                                         "Role", meta.RoleLabel
                                         yield! meta.Rows
                                     ]

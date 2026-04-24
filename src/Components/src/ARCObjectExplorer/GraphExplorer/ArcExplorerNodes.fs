@@ -3,10 +3,16 @@ module Swate.Components.ARCObjectExplorer.GraphExplorer.ArcExplorerNodes
 open System
 open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.FileExplorerTypes
 
 type private ProcessEndpointValue =
     | MaterialEndpoint of materialRole: string * material: Material
     | DataEndpoint of dataRole: string * data: Data
+
+type private GraphFileItemAppearance = {
+    Icon: FileItemIcon
+    IconTone: FileItemIconTone option
+}
 
 let private asOptionalText (value: string) =
     if String.IsNullOrWhiteSpace value then
@@ -31,12 +37,15 @@ let private sanitizeIdSegment (value: string) =
         .Replace("\\", "-")
         .Replace(":", "-")
 
-let private nodeKindForDataset =
+let private graphKindForDataset =
     function
-    | ARCDatasets.Assay -> ArcExplorerNodeKind.Assay
-    | ARCDatasets.Study -> ArcExplorerNodeKind.Study
-    | ARCDatasets.Workflow -> ArcExplorerNodeKind.Workflow
-    | ARCDatasets.Run -> ArcExplorerNodeKind.Run
+    | ARCDatasets.Assay -> GraphExplorerNodeKind.Assay
+    | ARCDatasets.Study -> GraphExplorerNodeKind.Study
+    | ARCDatasets.Workflow -> GraphExplorerNodeKind.Workflow
+    | ARCDatasets.Run -> GraphExplorerNodeKind.Run
+
+let private graphKindLabel = GraphExplorerNodeKind.label
+let private arcKindForGraphKind = GraphExplorerNodeKind.toArcExplorerNodeKind
 
 let private row label value = [ label, value ]
 
@@ -124,7 +133,7 @@ let private propertyValueNode
         ArcExplorerNode.create (
             nodeId,
             nodeLabel,
-            ArcExplorerNodeKind.Table,
+            arcKindForGraphKind GraphExplorerNodeKind.PropertyValue,
             isReference = isReference
         )
 
@@ -132,7 +141,8 @@ let private propertyValueNode
 
     let meta = {
         Tag = Some(GraphNodeTag.PropertyValue ownerTag)
-        KindLabel = "PropertyValue"
+        GraphKind = GraphExplorerNodeKind.PropertyValue
+        KindLabel = graphKindLabel GraphExplorerNodeKind.PropertyValue
         RoleLabel = relationshipRole
         Description = Some $"{fieldLabel} entry attached to {ownerLabel.ToLowerInvariant()}."
         Rows = propertyValueRows ownerLabel fieldLabel index propertyValue
@@ -366,9 +376,9 @@ let private processEndpointDisplayName =
 let private processEndpointPresentation =
     function
     | MaterialEndpoint(materialRole, _) ->
-        "Material", materialRole, ArcExplorerNodeKind.Sample
+        "Material", materialRole, GraphExplorerNodeKind.Material
     | DataEndpoint(dataRole, _) ->
-        "Data", dataRole, ArcExplorerNodeKind.DataMap
+        "Data", dataRole, GraphExplorerNodeKind.Data
 
 let private processEndpointValueType =
     function
@@ -488,13 +498,14 @@ let private createCategoryLayer
         ArcExplorerNode.create (
             categoryNodeId,
             categoryLabel,
-            ArcExplorerNodeKind.Arc,
+            arcKindForGraphKind GraphExplorerNodeKind.Arc,
             children = referenceChildren
         )
 
     let categoryMeta = {
         Tag = None
-        KindLabel = ArcExplorerNodeKind.label ArcExplorerNodeKind.Arc
+        GraphKind = GraphExplorerNodeKind.Arc
+        KindLabel = graphKindLabel GraphExplorerNodeKind.Arc
         RoleLabel = "Canonical"
         Description = Some description
         Rows = [
@@ -522,7 +533,7 @@ let private processEndpointNode
 
     let nodeId = $"{processNodeId}:{directionKey}:{processTypeSegment}:{endpointIndex}"
     let displayName = processEndpointDisplayName endpoint
-    let valueTypeLabel, subtypeLabel, nodeKind = processEndpointPresentation endpoint
+    let _, subtypeLabel, graphKind = processEndpointPresentation endpoint
     let relationshipRole = if isReference then "Reference" else "Canonical"
     let endpointRole = $"{directionLabel} ({relationshipRole})"
 
@@ -553,7 +564,7 @@ let private processEndpointNode
         ArcExplorerNode.create (
             nodeId,
             displayName,
-            nodeKind,
+            arcKindForGraphKind graphKind,
             isReference = isReference,
             children = (additionalPropertyGroupNode |> Option.toList)
         )
@@ -561,7 +572,8 @@ let private processEndpointNode
     let meta =
         {
             Tag = Some(GraphNodeTag.ProcessEndpoint (processEndpointValueType endpoint))
-            KindLabel = valueTypeLabel
+            GraphKind = graphKind
+            KindLabel = graphKindLabel graphKind
             RoleLabel = endpointRole
             Description = Some $"{subtypeLabel} endpoint in process {directionLabel.ToLowerInvariant()} bundle."
             Rows = [
@@ -733,7 +745,8 @@ let rec private formalParameterNode
 
     let meta = {
         Tag = Some GraphNodeTag.FormalParameter
-        KindLabel = ArcExplorerNodeKind.label ArcExplorerNodeKind.Table
+        GraphKind = GraphExplorerNodeKind.FormalParameter
+        KindLabel = graphKindLabel GraphExplorerNodeKind.FormalParameter
         RoleLabel = "Canonical"
         Description = Some "Formal parameter definition from the graph model."
         Rows = rows
@@ -746,7 +759,7 @@ let rec private formalParameterNode
         ArcExplorerNode.create (
             nodeId,
             parameterName,
-            ArcExplorerNodeKind.Table
+            arcKindForGraphKind GraphExplorerNodeKind.FormalParameter
         )
 
     node, addMeta nodeId meta metaById
@@ -810,7 +823,8 @@ and private processNode
 
     let processMeta = {
         Tag = Some GraphNodeTag.Process
-        KindLabel = "LabProcess"
+        GraphKind = GraphExplorerNodeKind.Process
+        KindLabel = graphKindLabel GraphExplorerNodeKind.Process
         RoleLabel = "Canonical"
         Description = Some "LabProcess with input, output, and unassociated endpoint groups."
         Rows = rows
@@ -821,7 +835,7 @@ and private processNode
         ArcExplorerNode.create (
             processNodeId,
             processName,
-            ArcExplorerNodeKind.Run,
+            arcKindForGraphKind GraphExplorerNodeKind.Process,
             children =
                 [
                     inputNodeGroup
@@ -918,7 +932,8 @@ and private protocolNode
 
     let meta = {
         Tag = Some GraphNodeTag.Protocol
-        KindLabel = ArcExplorerNodeKind.label ArcExplorerNodeKind.Workflow
+        GraphKind = GraphExplorerNodeKind.Protocol
+        KindLabel = graphKindLabel GraphExplorerNodeKind.Protocol
         RoleLabel = "Canonical"
         Description = Some "Protocol metadata with formal parameters and process chain."
         Rows = rows
@@ -929,7 +944,7 @@ and private protocolNode
         ArcExplorerNode.create (
             nodeId,
             protocolName,
-            ArcExplorerNodeKind.Workflow,
+            arcKindForGraphKind GraphExplorerNodeKind.Protocol,
             children = children
         )
 
@@ -947,7 +962,7 @@ and private datasetNode
     (metaById: Map<string, GraphNodeMeta>)
     =
     let kindLabel = dataset.type'.ToString()
-    let datasetKind = nodeKindForDataset dataset.type'
+    let datasetKind = graphKindForDataset dataset.type'
     let title = datasetDisplayName dataset
     let nodeId = $"{scopeNodeId}:{kindLabel.ToLowerInvariant()}:{sanitizeIdSegment dataset.identifier}:{index}"
 
@@ -1024,7 +1039,8 @@ and private datasetNode
 
     let meta = {
         Tag = Some GraphNodeTag.Dataset
-        KindLabel = ArcExplorerNodeKind.label datasetKind
+        GraphKind = datasetKind
+        KindLabel = graphKindLabel datasetKind
         RoleLabel = "Canonical"
         Description = Some "Dataset entry in the graph model with protocol references and nested parts."
         Rows = rows
@@ -1035,7 +1051,7 @@ and private datasetNode
         ArcExplorerNode.create (
             nodeId,
             title,
-            datasetKind,
+            arcKindForGraphKind datasetKind,
             children = children
         )
 
@@ -1100,7 +1116,7 @@ let private arcNode
         ArcExplorerNode.create (
             arcNodeId,
             rootName,
-            ArcExplorerNodeKind.Arc,
+            arcKindForGraphKind GraphExplorerNodeKind.Arc,
             path = rootPath,
             children = groupNodes
         )
@@ -1112,7 +1128,8 @@ let private arcNode
 
     let arcMeta = {
         Tag = None
-        KindLabel = ArcExplorerNodeKind.label ArcExplorerNodeKind.Arc
+        GraphKind = GraphExplorerNodeKind.Arc
+        KindLabel = graphKindLabel GraphExplorerNodeKind.Arc
         RoleLabel = "Canonical"
         Description = Some "ARC node in the Storybook graph explorer."
         Rows = arcRows
@@ -1141,13 +1158,14 @@ let toArcExplorerNodesWithMetaFromArcObjects (arcObjects: ARCObjects list) =
         ArcExplorerNode.create (
             allNodeId,
             "ARCs",
-            ArcExplorerNodeKind.Arc,
+            arcKindForGraphKind GraphExplorerNodeKind.Arc,
             children = canonicalRoots
         )
 
     let allMeta = {
         Tag = None
-        KindLabel = ArcExplorerNodeKind.label ArcExplorerNodeKind.Arc
+        GraphKind = GraphExplorerNodeKind.Arc
+        KindLabel = graphKindLabel GraphExplorerNodeKind.Arc
         RoleLabel = "Canonical"
         Description = Some "Top layer containing all ARC-object roots."
         Rows = [
@@ -1257,6 +1275,119 @@ let toArcExplorerNodesWithMetaFromArcObjects (arcObjects: ARCObjects list) =
         materialsLayer
         datasLayer
     ], metaById
+
+let private graphAppearanceForKind (graphKind: GraphExplorerNodeKind) : GraphFileItemAppearance =
+    match graphKind with
+    | GraphExplorerNodeKind.Arc ->
+        {
+            Icon = FileItemIcon.Folder
+            IconTone = Some FileItemIconTone.BaseMuted
+        }
+    | GraphExplorerNodeKind.Group ->
+        {
+            Icon = FileItemIcon.Folder
+            IconTone = Some FileItemIconTone.BaseSubtle
+        }
+    | GraphExplorerNodeKind.Study ->
+        {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Secondary
+        }
+    | GraphExplorerNodeKind.Assay ->
+        {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Success
+        }
+    | GraphExplorerNodeKind.Workflow ->
+        {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Primary
+        }
+    | GraphExplorerNodeKind.Run ->
+        {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Warning
+        }
+    | GraphExplorerNodeKind.Protocol ->
+        {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Primary
+        }
+    | GraphExplorerNodeKind.Process ->
+        {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Warning
+        }
+    | GraphExplorerNodeKind.FormalParameter ->
+        {
+            Icon = FileItemIcon.Table
+            IconTone = Some FileItemIconTone.Info
+        }
+    | GraphExplorerNodeKind.Material ->
+        {
+            Icon = FileItemIcon.Tag
+            IconTone = Some FileItemIconTone.BaseMuted
+        }
+    | GraphExplorerNodeKind.Data ->
+        {
+            Icon = FileItemIcon.Database
+            IconTone = Some FileItemIconTone.Accent
+        }
+    | GraphExplorerNodeKind.PropertyValue ->
+        {
+            Icon = FileItemIcon.Table
+            IconTone = Some FileItemIconTone.Info
+        }
+
+let private graphKindForNodeId
+    (nodeId: string)
+    (fallbackArcKind: ArcExplorerNodeKind)
+    (nodeMetaById: Map<string, GraphNodeMeta>)
+    =
+    nodeMetaById
+    |> Map.tryFind nodeId
+    |> Option.map _.GraphKind
+    |> Option.defaultValue (GraphExplorerNodeKind.ofArcExplorerNodeKind fallbackArcKind)
+
+let private fileItemForGraphNode
+    (nodeMetaById: Map<string, GraphNodeMeta>)
+    (createItem: string -> string option -> FileItemIcon -> FileItem)
+    (node: ArcExplorerNode)
+    =
+    let graphKind = graphKindForNodeId node.id node.kind nodeMetaById
+    let appearance = graphAppearanceForKind graphKind
+
+    {
+        createItem node.name node.path appearance.Icon with
+            Id = node.id
+            ItemType = graphKindLabel graphKind
+            IconTone = appearance.IconTone
+            IsLFS = node.isLfs
+            Selectable = node.isSelectable
+    }
+
+let rec private toGraphFileItem
+    (nodeMetaById: Map<string, GraphNodeMeta>)
+    (node: ArcExplorerNode)
+    =
+    let graphKind = graphKindForNodeId node.id node.kind nodeMetaById
+    let children = node.children |> List.map (toGraphFileItem nodeMetaById)
+    let isDirectory = graphKind = GraphExplorerNodeKind.Arc || graphKind = GraphExplorerNodeKind.Group || not (List.isEmpty children)
+
+    if isDirectory then
+        {
+            fileItemForGraphNode nodeMetaById FileTree.createFolder node with
+                IsExpanded = graphKind = GraphExplorerNodeKind.Arc
+                Children = Some children
+        }
+    else
+        fileItemForGraphNode nodeMetaById FileTree.createFile node
+
+let toGraphFileItems
+    (nodeMetaById: Map<string, GraphNodeMeta>)
+    (nodes: ArcExplorerNode list)
+    =
+    nodes |> List.map (toGraphFileItem nodeMetaById)
 
 let toArcExplorerNodesWithMetaFromArcs (models: ARCGraph list) =
     toArcExplorerNodesWithMetaFromArcObjects [ ARCObjects.Arc(models |> List.toArray) ]

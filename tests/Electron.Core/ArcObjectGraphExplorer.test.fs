@@ -28,16 +28,16 @@ let rec private flattenFileItems (items: FileItem list) =
             yield! flattenFileItems (item.Children |> Option.defaultValue [])
     }
 
-let private groupItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Group
-let private sampleItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Sample
-let private dataMapItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.DataMap
+let private groupItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Group
+let private materialItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Material
+let private dataItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Data
 
 let private isLeafRehomeCandidateAtSiblingLevel (item: FileItem) =
     let hasMarker (marker: string) =
         item.Id.Contains marker
 
-    item.ItemType = sampleItemType
-    || item.ItemType = dataMapItemType
+    item.ItemType = materialItemType
+    || item.ItemType = dataItemType
     || (
         item.ItemType <> groupItemType
         && (
@@ -384,6 +384,10 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
         Vitest.expect(labels).toEqual([
             "Datasets"
+            "Study"
+            "Assay"
+            "Workflow"
+            "Run"
             "Protocols"
             "FormalParameters"
             "Processes"
@@ -421,8 +425,8 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
     Vitest.test("flattens assay descendants into structural folders while keeping folder descendants expandable", fun () ->
         let graphObjects = fakeGraphObjects ()
-        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
-        let explorerItems = ARCExplorer.toFileItems nodes
+        let nodes, nodeMetaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = toGraphFileItems nodeMetaById nodes
 
         let treePaneItems =
             GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
@@ -431,7 +435,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             treePaneItems
             |> flattenFileItems
             |> Seq.tryFind (fun item ->
-                item.ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Assay
+                item.ItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Assay
                 && item.Name = "Metabolomics")
             |> expectSome <| "Expected Metabolomics assay node in flattened tree."
 
@@ -505,8 +509,8 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
     Vitest.test("merges repeated Inputs and Outputs folders on flattened ARC root level", fun () ->
         let graphObjects = fakeGraphObjects ()
-        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
-        let explorerItems = ARCExplorer.toFileItems nodes
+        let nodes, nodeMetaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = toGraphFileItems nodeMetaById nodes
 
         let treePaneItems =
             GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
@@ -612,10 +616,10 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(mergedOutputDataFolders.Length).toBe(1)
         Vitest.expect(inputSiblingLeafCandidates.Length).toBe(0)
         Vitest.expect(outputSiblingLeafCandidates.Length).toBe(0)
-        Vitest.expect(mergedInputMaterialChildren |> List.exists (fun item -> item.ItemType = sampleItemType)).toBe(true)
-        Vitest.expect(mergedInputDataChildren |> List.exists (fun item -> item.ItemType = dataMapItemType)).toBe(true)
-        Vitest.expect(mergedOutputMaterialChildren |> List.exists (fun item -> item.ItemType = sampleItemType)).toBe(true)
-        Vitest.expect(mergedOutputDataChildren |> List.exists (fun item -> item.ItemType = dataMapItemType)).toBe(true)
+        Vitest.expect(mergedInputMaterialChildren |> List.exists (fun item -> item.ItemType = materialItemType)).toBe(true)
+        Vitest.expect(mergedInputDataChildren |> List.exists (fun item -> item.ItemType = dataItemType)).toBe(true)
+        Vitest.expect(mergedOutputMaterialChildren |> List.exists (fun item -> item.ItemType = materialItemType)).toBe(true)
+        Vitest.expect(mergedOutputDataChildren |> List.exists (fun item -> item.ItemType = dataItemType)).toBe(true)
         Vitest.expect(mergedInputChildNames |> List.contains "Material").toBe(true)
         Vitest.expect(mergedInputChildNames |> List.contains "Data").toBe(true)
         Vitest.expect(mergedOutputChildNames |> List.contains "Material").toBe(true)
@@ -623,8 +627,8 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
     Vitest.test("keeps direct ARC children first on flattened ARCs root before nested folders", fun () ->
         let graphObjects = fakeGraphObjects ()
-        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
-        let explorerItems = ARCExplorer.toFileItems nodes
+        let nodes, nodeMetaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = toGraphFileItems nodeMetaById nodes
 
         let treePaneItems =
             GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
@@ -639,7 +643,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         let isDirectArcChild (item: FileItem) =
             let prefix = "graph:arc:"
 
-            item.ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Arc
+            item.ItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Arc
             && item.Id.StartsWith(prefix, StringComparison.Ordinal)
             && item.Id.Substring(prefix.Length).Contains(":") |> not
 
@@ -661,8 +665,8 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
     Vitest.test("fuses repeated non-directional group folders on flattened ARC root level", fun () ->
         let graphObjects = fakeGraphObjects ()
-        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
-        let explorerItems = ARCExplorer.toFileItems nodes
+        let nodes, nodeMetaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = toGraphFileItems nodeMetaById nodes
 
         let treePaneItems =
             GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
@@ -698,8 +702,8 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
     Vitest.test("summarizes nested additional properties into one parent-level folder in flattened tree view", fun () ->
         let graphObjects = graphObjectsWithPropertyValues ()
-        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
-        let explorerItems = ARCExplorer.toFileItems nodes
+        let nodes, nodeMetaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = toGraphFileItems nodeMetaById nodes
 
         let treePaneItems =
             GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
@@ -708,7 +712,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             treePaneItems
             |> flattenFileItems
             |> Seq.tryFind (fun item ->
-                item.ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Study
+                item.ItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Study
                 && item.Name = "Property Values Study")
             |> expectSome <| "Expected Property Values Study node in flattened tree."
 
@@ -749,8 +753,8 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
     Vitest.test("summarizes nested parameter values into one parent-level folder in flattened tree view", fun () ->
         let graphObjects = graphObjectsWithPropertyValues ()
-        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
-        let explorerItems = ARCExplorer.toFileItems nodes
+        let nodes, nodeMetaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = toGraphFileItems nodeMetaById nodes
 
         let treePaneItems =
             GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
@@ -759,7 +763,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             treePaneItems
             |> flattenFileItems
             |> Seq.tryFind (fun item ->
-                item.ItemType = ArcExplorerNodeKind.label ArcExplorerNodeKind.Study
+                item.ItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Study
                 && item.Name = "Property Values Study")
             |> expectSome <| "Expected Property Values Study node in flattened tree."
 
@@ -796,8 +800,8 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
 
     Vitest.test("summarizes nested formal parameters into one parent-level folder in flattened tree view", fun () ->
         let graphObjects = fakeGraphObjects ()
-        let nodes, _ = toArcExplorerNodesWithMetaFromArcObjects graphObjects
-        let explorerItems = ARCExplorer.toFileItems nodes
+        let nodes, nodeMetaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+        let explorerItems = toGraphFileItems nodeMetaById nodes
 
         let treePaneItems =
             GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel explorerItems
@@ -864,6 +868,61 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(topLevelIds |> List.contains "graph:processes").toBe(false)
         Vitest.expect(topLevelIds |> List.contains "graph:materials").toBe(false)
         Vitest.expect(topLevelIds |> List.contains "graph:Data").toBe(false))
+
+    Vitest.test("shows study datasets without exposing datasets top-level layer", fun () ->
+        let graphObjects = fakeGraphObjects ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let filteredNodes =
+            GraphObjectExplorerFilter.filterNodesBySemanticKinds
+                (Set.ofList [ "Study" ])
+                nodes
+                metaById
+
+        let topLevelIds =
+            filteredNodes
+            |> List.map _.id
+
+        Vitest.expect(topLevelIds).toEqual([
+            "graph:all"
+        ])
+
+        Vitest.expect(topLevelIds |> List.contains "graph:datasets").toBe(false)
+
+        let allLayer =
+            filteredNodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer after Study semantic filtering."
+
+        let canonicalNodes =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.toList
+
+        let datasetNodes =
+            canonicalNodes
+            |> List.filter (hasTag metaById GraphNodeTag.Dataset)
+
+        let studyNodes =
+            datasetNodes
+            |> List.filter (fun node -> node.kind = ArcExplorerNodeKind.Study)
+
+        let assayNodes =
+            datasetNodes
+            |> List.filter (fun node -> node.kind = ArcExplorerNodeKind.Assay)
+
+        let workflowNodes =
+            datasetNodes
+            |> List.filter (fun node -> node.kind = ArcExplorerNodeKind.Workflow)
+
+        let runNodes =
+            datasetNodes
+            |> List.filter (fun node -> node.kind = ArcExplorerNodeKind.Run)
+
+        Vitest.expect(studyNodes.Length > 0).toBe(true)
+        Vitest.expect(assayNodes.Length).toBe(0)
+        Vitest.expect(workflowNodes.Length).toBe(0)
+        Vitest.expect(runNodes.Length).toBe(0))
 
     Vitest.test("isolates endpoint categories without kind-label leakage", fun () ->
         let graphObjects = fakeGraphObjects ()
@@ -1054,6 +1113,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected metadata for canonical dataset node."
 
         Vitest.expect(datasetMeta.KindLabel).toBe("Study")
+        Vitest.expect(datasetMeta.GraphKind).toBe(GraphExplorerNodeKind.Study)
         Vitest.expect(datasetMeta.RoleLabel).toBe("Canonical")
 
         let processMeta =
@@ -1062,10 +1122,29 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> Seq.tryFind (fun meta -> meta.Tag = Some GraphNodeTag.Process)
             |> expectSome <| "Expected at least one process metadata entry."
 
-        Vitest.expect(processMeta.KindLabel).toBe("LabProcess")
+        Vitest.expect(processMeta.KindLabel).toBe("Process")
+        Vitest.expect(processMeta.GraphKind).toBe(GraphExplorerNodeKind.Process)
         Vitest.expect(processMeta.RoleLabel).toBe("Canonical")
         Vitest.expect(processMeta.Rows |> List.exists (fun (label, value) -> label = "Type" && value = "LabProcess")).toBe(true)
         Vitest.expect(processMeta.Rows |> List.exists (fun (label, _) -> label = "Object Type")).toBe(true)
+
+        let protocolMeta =
+            metaById
+            |> Map.values
+            |> Seq.tryFind (fun meta -> meta.Tag = Some GraphNodeTag.Protocol)
+            |> expectSome <| "Expected at least one protocol metadata entry."
+
+        Vitest.expect(protocolMeta.KindLabel).toBe("Protocol")
+        Vitest.expect(protocolMeta.GraphKind).toBe(GraphExplorerNodeKind.Protocol)
+
+        let formalParameterMeta =
+            metaById
+            |> Map.values
+            |> Seq.tryFind (fun meta -> meta.Tag = Some GraphNodeTag.FormalParameter)
+            |> expectSome <| "Expected at least one formal parameter metadata entry."
+
+        Vitest.expect(formalParameterMeta.KindLabel).toBe("FormalParameter")
+        Vitest.expect(formalParameterMeta.GraphKind).toBe(GraphExplorerNodeKind.FormalParameter)
 
         let materialMeta =
             metaById
@@ -1074,11 +1153,33 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             |> expectSome <| "Expected at least one material endpoint metadata entry."
 
         Vitest.expect(materialMeta.KindLabel).toBe("Material")
+        Vitest.expect(materialMeta.GraphKind).toBe(GraphExplorerNodeKind.Material)
         Vitest.expect(
             materialMeta.RoleLabel.StartsWith("Input", StringComparison.Ordinal)
             || materialMeta.RoleLabel.StartsWith("Output", StringComparison.Ordinal)
             || materialMeta.RoleLabel.StartsWith("Unassociated", StringComparison.Ordinal)
         ).toBe(true)
+
+        let dataMeta =
+            metaById
+            |> Map.values
+            |> Seq.tryFind (fun meta -> meta.Tag = Some(GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Data))
+            |> expectSome <| "Expected at least one data endpoint metadata entry."
+
+        Vitest.expect(dataMeta.KindLabel).toBe("Data")
+        Vitest.expect(dataMeta.GraphKind).toBe(GraphExplorerNodeKind.Data)
+
+        let propertyValueMeta =
+            metaById
+            |> Map.values
+            |> Seq.tryFind (fun meta ->
+                match meta.Tag with
+                | Some(GraphNodeTag.PropertyValue _) -> true
+                | _ -> false)
+            |> expectSome <| "Expected at least one property-value metadata entry."
+
+        Vitest.expect(propertyValueMeta.KindLabel).toBe("PropertyValue")
+        Vitest.expect(propertyValueMeta.GraphKind).toBe(GraphExplorerNodeKind.PropertyValue)
 
         let datasetsLayerMeta =
             metaById
@@ -1429,6 +1530,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
             Vitest.expect(ownerTags.Contains expectedOwnerTag).toBe(true)
 
         assertSingleOwnerTag "Datasets" GraphPropertyValueOwnerTag.Dataset
+        assertSingleOwnerTag "Study" GraphPropertyValueOwnerTag.Dataset
         assertSingleOwnerTag "Protocols" GraphPropertyValueOwnerTag.Protocol
         assertSingleOwnerTag "Processes" GraphPropertyValueOwnerTag.Process
 

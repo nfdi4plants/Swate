@@ -6,22 +6,20 @@ open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer
 open Swate.Components.ARCObjectExplorer.Model
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.FileExplorerTypes
 
 module GraphObjectExplorerFilter =
 
-    let private semanticLabelFromTag =
-        function
-        | GraphNodeTag.Dataset -> Some "Datasets"
-        | GraphNodeTag.Protocol -> Some "Protocols"
-        | GraphNodeTag.FormalParameter -> Some "FormalParameters"
-        | GraphNodeTag.Process -> Some "Processes"
-        | GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Material -> Some "Materials"
-        | GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Data -> Some "Data"
-        | GraphNodeTag.PropertyValue GraphPropertyValueOwnerTag.Dataset -> Some "Datasets"
-        | GraphNodeTag.PropertyValue GraphPropertyValueOwnerTag.Protocol -> Some "Protocols"
-        | GraphNodeTag.PropertyValue GraphPropertyValueOwnerTag.Process -> Some "Processes"
-        | GraphNodeTag.PropertyValue (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Material) -> Some "Materials"
-        | GraphNodeTag.PropertyValue (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Data) -> Some "Data"
+    let private datasetKinds =
+        Set.ofList [
+            GraphExplorerNodeKind.Study
+            GraphExplorerNodeKind.Assay
+            GraphExplorerNodeKind.Workflow
+            GraphExplorerNodeKind.Run
+        ]
+
+    let private isDatasetSubKind (graphKind: GraphExplorerNodeKind) =
+        datasetKinds.Contains graphKind
 
     let private layerIdToLabel =
         Map.ofList [
@@ -32,6 +30,48 @@ module GraphObjectExplorerFilter =
             "graph:materials", "Materials"
             "graph:Data", "Data"
         ]
+
+    let private datasetKindFromNodeMeta (nodeId: string) (nodeMetaById: Map<string, GraphNodeMeta>) =
+        nodeMetaById
+        |> Map.tryFind nodeId
+        |> Option.bind (fun meta ->
+            match meta.Tag with
+            | Some GraphNodeTag.Dataset when isDatasetSubKind meta.GraphKind ->
+                Some(GraphExplorerNodeKind.label meta.GraphKind)
+            | _ -> None)
+
+    let private semanticLabelsForNode
+        (datasetKindInScope: string option)
+        (nodeId: string)
+        (nodeMetaById: Map<string, GraphNodeMeta>)
+        =
+        nodeMetaById
+        |> Map.tryFind nodeId
+        |> Option.bind (fun meta ->
+            meta.Tag
+            |> Option.map (fun tag ->
+                match tag with
+                | GraphNodeTag.Dataset ->
+                    [
+                        "Datasets"
+                        if isDatasetSubKind meta.GraphKind then
+                            GraphExplorerNodeKind.label meta.GraphKind
+                    ]
+                | GraphNodeTag.Protocol -> [ "Protocols" ]
+                | GraphNodeTag.FormalParameter -> [ "FormalParameters" ]
+                | GraphNodeTag.Process -> [ "Processes" ]
+                | GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Material -> [ "Materials" ]
+                | GraphNodeTag.ProcessEndpoint GraphProcessEndpointValueType.Data -> [ "Data" ]
+                | GraphNodeTag.PropertyValue GraphPropertyValueOwnerTag.Dataset ->
+                    [
+                        "Datasets"
+                        yield! datasetKindInScope |> Option.toList
+                    ]
+                | GraphNodeTag.PropertyValue GraphPropertyValueOwnerTag.Protocol -> [ "Protocols" ]
+                | GraphNodeTag.PropertyValue GraphPropertyValueOwnerTag.Process -> [ "Processes" ]
+                | GraphNodeTag.PropertyValue (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Material) -> [ "Materials" ]
+                | GraphNodeTag.PropertyValue (GraphPropertyValueOwnerTag.ProcessEndpoint GraphProcessEndpointValueType.Data) -> [ "Data" ]))
+        |> Option.defaultValue []
 
     let filterNodesBySemanticKinds
         (selectedSemanticKinds: Set<string>)
@@ -48,24 +88,26 @@ module GraphObjectExplorerFilter =
                     None)
             |> Set.ofList
 
-        let rec loop (isTopLevel: bool) (node: ArcExplorerNode) =
+        let rec loop (isTopLevel: bool) (datasetKindInScope: string option) (node: ArcExplorerNode) =
+            let datasetKindForBranch =
+                datasetKindFromNodeMeta node.id nodeMetaById
+                |> Option.orElse datasetKindInScope
+
             let filteredChildren =
-                node.children |> List.choose (loop false)
+                node.children |> List.choose (loop false datasetKindForBranch)
 
             let hasVisibleChildren =
                 filteredChildren |> List.isEmpty |> not
 
-            let nodeSemanticLabel =
-                nodeMetaById
-                |> Map.tryFind node.id
-                |> Option.bind (fun meta ->
-                    meta.Tag
-                    |> Option.bind semanticLabelFromTag)
+            let nodeSemanticLabels =
+                semanticLabelsForNode
+                    datasetKindForBranch
+                    node.id
+                    nodeMetaById
 
             let isVisibleSemanticNode =
-                nodeSemanticLabel
-                |> Option.map selectedSemanticKinds.Contains
-                |> Option.defaultValue false
+                nodeSemanticLabels
+                |> List.exists selectedSemanticKinds.Contains
 
             let includeNode =
                 if isTopLevel then
@@ -86,7 +128,102 @@ module GraphObjectExplorerFilter =
             else
                 None
 
-        nodes |> List.choose (loop true)
+        nodes |> List.choose (loop true None)
+
+module private GraphObjectExplorerHelper =
+
+    let private graphKindForNode (nodeMetaById: Map<string, GraphNodeMeta>) (node: ArcExplorerNode) =
+        nodeMetaById
+        |> Map.tryFind node.id
+        |> Option.map _.GraphKind
+        |> Option.defaultValue (GraphExplorerNodeKind.ofArcExplorerNodeKind node.kind)
+
+    let private graphKindLabelForNode (nodeMetaById: Map<string, GraphNodeMeta>) (node: ArcExplorerNode) =
+        graphKindForNode nodeMetaById node
+        |> GraphExplorerNodeKind.label
+
+    let private roleLabelForNode (nodeMetaById: Map<string, GraphNodeMeta>) (node: ArcExplorerNode) =
+        nodeMetaById
+        |> Map.tryFind node.id
+        |> Option.map _.RoleLabel
+        |> Option.defaultValue (if node.isReference then "Reference" else "Canonical")
+
+    let selectedSubtitle
+        (selection: ResolvedSelection option)
+        (nodeMetaById: Map<string, GraphNodeMeta>)
+        =
+        selection
+        |> Option.map (fun selection ->
+            let kindLabel = graphKindLabelForNode nodeMetaById selection.Node
+            let role = roleLabelForNode nodeMetaById selection.Node
+            $"{kindLabel} | {role}")
+        |> Option.defaultValue "Selection"
+
+    let private flattenFileItems (items: FileItem list) =
+        let rec loop (items: FileItem list) =
+            items
+            |> List.collect (fun item ->
+                item :: (item.Children |> Option.defaultValue [] |> loop))
+
+        loop items
+
+    let private flattenNodesWithAncestors (nodes: ArcExplorerNode list) =
+        let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
+            nodes
+            |> List.collect (fun node ->
+                let orderedAncestors = List.rev ancestors
+                (node, orderedAncestors) :: loop (node :: ancestors) node.children)
+
+        loop [] nodes
+
+    let searchableItems
+        (nodes: ArcExplorerNode list)
+        (items: FileItem list)
+        (nodeMetaById: Map<string, GraphNodeMeta>)
+        =
+        let itemsById =
+            items
+            |> flattenFileItems
+            |> List.map (fun item -> item.Id, item)
+            |> Map.ofList
+
+        nodes
+        |> flattenNodesWithAncestors
+        |> List.choose (fun (node, ancestors) ->
+            let graphKind = graphKindForNode nodeMetaById node
+
+            if
+                not node.isSelectable
+                || graphKind = GraphExplorerNodeKind.Arc
+                || graphKind = GraphExplorerNodeKind.Group
+            then
+                None
+            else
+                itemsById
+                |> Map.tryFind node.id
+                |> Option.map (fun item ->
+                    let lineagePart =
+                        ancestors
+                        |> List.filter (fun ancestor ->
+                            graphKindForNode nodeMetaById ancestor <> GraphExplorerNodeKind.Arc)
+                        |> List.map _.name
+                        |> function
+                            | [] -> None
+                            | lineage ->
+                                let lineageText = String.concat " / " lineage
+                                Some $"In: {lineageText}"
+                        |> Option.toList
+
+                    let subtitleParts = [
+                        graphKindLabelForNode nodeMetaById node
+                        roleLabelForNode nodeMetaById node
+                        yield! lineagePart
+                        yield! node.path |> Option.toList
+                    ]
+
+                    node.name, Some(String.concat " | " subtitleParts), item))
+        |> List.sortBy (fun (name, _, _) -> name.ToLowerInvariant())
+        |> List.toArray
 
 [<Erase; Mangle(false)>]
 type GraphObjectExplorer =
@@ -131,17 +268,33 @@ type GraphObjectExplorer =
 
         let explorerPaneItems =
             React.useMemo (
-                (fun () -> viewModel.ExplorerItems),
-                [| box viewModel.ExplorerItems |]
+                (fun () -> ArcExplorerNodes.toGraphFileItems nodeMetaById viewModel.FilteredTree),
+                [| box nodeMetaById; box viewModel.FilteredTree |]
+            )
+
+        let searchItems =
+            React.useMemo (
+                (fun () ->
+                    GraphObjectExplorerHelper.searchableItems
+                        viewModel.FilteredTree
+                        explorerPaneItems
+                        nodeMetaById),
+                [| box viewModel.FilteredTree; box explorerPaneItems; box nodeMetaById |]
+            )
+
+        let selectedSubtitleText =
+            React.useMemo (
+                (fun () -> GraphObjectExplorerHelper.selectedSubtitle viewModel.Selection nodeMetaById),
+                [| box viewModel.Selection; box nodeMetaById |]
             )
 
         let treePaneItems =
             React.useMemo (
                 (fun () ->
-                    viewModel.ExplorerItems
+                    explorerPaneItems
                     |> GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel
                     |> GraphObjectFixture.collapseExplorerItems),
-                [| box viewModel.ExplorerItems |]
+                [| box explorerPaneItems |]
             )
 
         let setExplorerSelection (nodeId: string) (path: string option) =
@@ -149,7 +302,7 @@ type GraphObjectExplorer =
 
         let searchAction =
             ARCObjectWidget.SearchActionForExplorerItems(
-                viewModel.SearchItems,
+                searchItems,
                 (fun item ->
                     if item.Selectable then
                         setExplorerSelection item.Id item.Path),
@@ -172,6 +325,10 @@ type GraphObjectExplorer =
             ARCObjectWidget.ExplorerContent(
                 explorerPaneItems,
                 ?selectedItemId = selectedItemId viewModel,
+                tileIconSizeClass = "swt:text-lg",
+                contextIconSizeClass = "swt:text-sm",
+                compactEntityTiles = true,
+                stickyContextBreadcrumb = true,
                 onItemClick =
                     (fun item ->
                         if item.Selectable then
@@ -193,7 +350,7 @@ type GraphObjectExplorer =
             navbar =
                 ARCObjectWidget.Navbar(
                     selectedTitle viewModel,
-                    selectedSubtitle viewModel,
+                    selectedSubtitleText,
                     KindFilter.graphObjectExplorerOptions,
                     selectedKindIndices,
                     setSelectedKindIndices,

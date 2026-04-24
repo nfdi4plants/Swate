@@ -1,6 +1,7 @@
 module Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 
 open Fable.Core
+open Swate.Components.Shared
 
 type PropertyValue = {
     id: string
@@ -148,8 +149,70 @@ type GraphNodeTag =
     | ProcessEndpoint of GraphProcessEndpointValueType
     | PropertyValue of GraphPropertyValueOwnerTag
 
+[<RequireQualifiedAccess>]
+type GraphExplorerNodeKind =
+    | Arc
+    | Group
+    | Study
+    | Assay
+    | Workflow
+    | Run
+    | Protocol
+    | Process
+    | FormalParameter
+    | Material
+    | Data
+    | PropertyValue
+
+[<RequireQualifiedAccess>]
+module GraphExplorerNodeKind =
+
+    let label =
+        function
+        | GraphExplorerNodeKind.Arc -> "ARC"
+        | GraphExplorerNodeKind.Group -> "Group"
+        | GraphExplorerNodeKind.Study -> "Study"
+        | GraphExplorerNodeKind.Assay -> "Assay"
+        | GraphExplorerNodeKind.Workflow -> "Workflow"
+        | GraphExplorerNodeKind.Run -> "Run"
+        | GraphExplorerNodeKind.Protocol -> "Protocol"
+        | GraphExplorerNodeKind.Process -> "Process"
+        | GraphExplorerNodeKind.FormalParameter -> "FormalParameter"
+        | GraphExplorerNodeKind.Material -> "Material"
+        | GraphExplorerNodeKind.Data -> "Data"
+        | GraphExplorerNodeKind.PropertyValue -> "PropertyValue"
+
+    let toArcExplorerNodeKind =
+        function
+        | GraphExplorerNodeKind.Arc -> ArcExplorerNodeKind.Arc
+        | GraphExplorerNodeKind.Group -> ArcExplorerNodeKind.Group
+        | GraphExplorerNodeKind.Study -> ArcExplorerNodeKind.Study
+        | GraphExplorerNodeKind.Assay -> ArcExplorerNodeKind.Assay
+        | GraphExplorerNodeKind.Workflow -> ArcExplorerNodeKind.Workflow
+        | GraphExplorerNodeKind.Run -> ArcExplorerNodeKind.Run
+        | GraphExplorerNodeKind.Protocol -> ArcExplorerNodeKind.Workflow
+        | GraphExplorerNodeKind.Process -> ArcExplorerNodeKind.Run
+        | GraphExplorerNodeKind.FormalParameter -> ArcExplorerNodeKind.Table
+        | GraphExplorerNodeKind.Material -> ArcExplorerNodeKind.Sample
+        | GraphExplorerNodeKind.Data -> ArcExplorerNodeKind.DataMap
+        | GraphExplorerNodeKind.PropertyValue -> ArcExplorerNodeKind.Table
+
+    let ofArcExplorerNodeKind =
+        function
+        | ArcExplorerNodeKind.Arc -> GraphExplorerNodeKind.Arc
+        | ArcExplorerNodeKind.Group -> GraphExplorerNodeKind.Group
+        | ArcExplorerNodeKind.Study -> GraphExplorerNodeKind.Study
+        | ArcExplorerNodeKind.Assay -> GraphExplorerNodeKind.Assay
+        | ArcExplorerNodeKind.Workflow -> GraphExplorerNodeKind.Workflow
+        | ArcExplorerNodeKind.Run -> GraphExplorerNodeKind.Run
+        | ArcExplorerNodeKind.Table -> GraphExplorerNodeKind.FormalParameter
+        | ArcExplorerNodeKind.DataMap -> GraphExplorerNodeKind.Data
+        | ArcExplorerNodeKind.Note -> GraphExplorerNodeKind.PropertyValue
+        | ArcExplorerNodeKind.Sample -> GraphExplorerNodeKind.Material
+
 type GraphNodeMeta = {
     Tag: GraphNodeTag option
+    GraphKind: GraphExplorerNodeKind
     KindLabel: string
     RoleLabel: string
     Description: string option
