@@ -188,6 +188,7 @@
     <Compile Include="ARCObjectExplorer\ARCObjectExplorer.fs" />
     <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectFixture.fs" />
     <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectExplorerTreeData.fs" />
+    <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectExplorerFilter.fs" />
     <Compile Include="ARCObjectExplorer\GraphExplorer\GraphObjectExplorer.fs" />
     <Compile Include="Notes\Types.fs" />
     <Compile Include="Notes\NoteSearch\ExampleNotes.fs" />
