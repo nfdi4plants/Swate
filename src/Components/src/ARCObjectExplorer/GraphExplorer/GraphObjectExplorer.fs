@@ -323,7 +323,7 @@ type GraphObjectExplorer =
         let graphObjects = React.useMemo ((fun () -> GraphObjectFixture.fakeGraphObjects ()), [||])
 
         let nodes, nodeMetaById =
-            React.useMemo ((fun () -> ArcExplorerNodes.toArcExplorerNodesWithMetaFromArcObjects graphObjects), [| box graphObjects |])
+            React.useMemo ((fun () -> GraphExplorerNodes.toArcExplorerNodesWithMetaFromArcObjects graphObjects), [| box graphObjects |])
 
         let selection, setSelection = React.useState ArcSelection.empty
 
@@ -365,7 +365,7 @@ type GraphObjectExplorer =
 
         let explorerPaneItems =
             React.useMemo (
-                (fun () -> ArcExplorerNodes.toGraphFileItems nodeMetaById viewModel.FilteredTree),
+                (fun () -> GraphExplorerNodes.toGraphFileItems nodeMetaById viewModel.FilteredTree),
                 [| box nodeMetaById; box viewModel.FilteredTree |]
             )
 

@@ -1,4 +1,4 @@
-module Swate.Components.ARCObjectExplorer.GraphExplorer.ArcExplorerNodes
+module Swate.Components.ARCObjectExplorer.GraphExplorer.GraphExplorerNodes
 
 open System
 open Swate.Components.Shared
