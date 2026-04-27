@@ -2,6 +2,7 @@ namespace Swate.Components.ArcFileEditor
 
 open ARCtrl
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.Shared
@@ -15,10 +16,75 @@ type private AddRowsFooterViewProps = {
     onAddRowsAndReset: unit -> unit
 }
 
+type private LazyComponents =
+
+    [<ReactLazyComponent>]
+    static member LazyDataMap(datamap: DataMap, setDatamap: DataMap -> unit) =
+        DataMapTable.DataMapTable(datamap, setDatamap)
+
+    [<ReactLazyComponent>]
+    static member LazyBuildingBlockWidget
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
+        =
+        Widgets.BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFile)
+
+    [<ReactLazyComponent>]
+    static member LazyTemplateWidget(arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
+        Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFile)
+
+    [<ReactLazyComponent>]
+    static member LazyArcFileMetadata(arcFile, setArcFile) =
+        ArcFileMetadata.ArcFileMetadata(arcFile, setArcFile)
+
 [<Erase; Mangle(false)>]
 type Main =
 
     [<ReactComponent>]
+    static member private LazyFallback(text: string) =
+        Html.div [
+            prop.className "swt:flex swt:items-center swt:justify-center swt:p-3 swt:text-sm swt:opacity-70"
+            prop.text text
+        ]
+
+    [<ReactComponent>]
+    static member private LazyDataMapView(datamap: DataMap, setDatamap: DataMap -> unit) =
+        React.Suspense(
+            [ LazyComponents.LazyDataMap(datamap, setDatamap) ],
+            fallback = Main.LazyFallback("Loading DataMap view...")
+        )
+
+    [<ReactComponent>]
+    static member private LazyBuildingBlockWidget
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
+        =
+        React.Suspense(
+            [
+                LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile)
+            ],
+            fallback = Main.LazyFallback("Loading building block widget...")
+        )
+
+    [<ReactComponent>]
+    static member private LazyTemplateWidget
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
+        =
+        React.Suspense(
+            [
+                LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile)
+            ],
+            fallback = Main.LazyFallback("Loading template widget...")
+        )
+
+    [<ReactComponent>]
+    static member private LazyArcFileMetadata(arcFileState, setArcFileState) =
+        React.Suspense(
+            [
+                LazyComponents.LazyArcFileMetadata(arcFileState, setArcFileState)
+            ],
+            fallback = Main.LazyFallback("Loading metadata view...")
+        )
+
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private AddRowsFooterView(props: AddRowsFooterViewProps) =
         Html.div [
             prop.className
@@ -52,7 +118,7 @@ type Main =
         (activeView: ActiveView, arcFileState: ArcFiles, setArcFileState: ArcFiles -> unit)
         =
         match activeView with
-        | ActiveView.Metadata -> ArcFileMetadata.View(arcFileState, setArcFileState)
+        | ActiveView.Metadata -> Main.LazyArcFileMetadata(arcFileState, setArcFileState)
         | ActiveView.Table index ->
             let tables = arcFileState.Tables()
 
@@ -83,30 +149,30 @@ type Main =
                     assay.DataMap <- Some nextDatamap
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
-                DataMapTable.DataMapTable(assay.DataMap.Value, setDatamap)
+                Main.LazyDataMapView(assay.DataMap.Value, setDatamap)
             | ArcFiles.Study(study, assays) when study.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     study.DataMap <- Some nextDatamap
                     setArcFileState (WidgetArcFile.refreshRef (ArcFiles.Study(study, assays)))
 
-                DataMapTable.DataMapTable(study.DataMap.Value, setDatamap)
+                Main.LazyDataMapView(study.DataMap.Value, setDatamap)
             | ArcFiles.Run run when run.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     run.DataMap <- Some nextDatamap
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
-                DataMapTable.DataMapTable(run.DataMap.Value, setDatamap)
+                Main.LazyDataMapView(run.DataMap.Value, setDatamap)
             | ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     workflow.DataMap <- Some nextDatamap
                     setArcFileState (WidgetArcFile.refreshRef arcFileState)
 
-                DataMapTable.DataMapTable(workflow.DataMap.Value, setDatamap)
+                Main.LazyDataMapView(workflow.DataMap.Value, setDatamap)
             | ArcFiles.DataMap(parent, datamap) ->
                 let setDatamap (nextDatamap: DataMap) =
                     setArcFileState (ArcFiles.DataMap(parent, nextDatamap))
 
-                DataMapTable.DataMapTable(datamap, setDatamap)
+                Main.LazyDataMapView(datamap, setDatamap)
             | _ ->
                 Html.div [
                     prop.className "swt:p-4 swt:text-error"
@@ -166,6 +232,7 @@ type Main =
         (
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
+            ?templateServices: TemplateWidgetServices,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView
         ) =
@@ -185,52 +252,103 @@ type Main =
             |]
         )
 
-        let headerProps = {
-            arcFile = arcFile
-            activeView = activeView
-        }
+        let headerProps =
+            React.useMemo (
+                (fun () -> {
+                    arcFile = arcFile
+                    activeView = activeView
+                }),
+                [| box arcFile; box activeView |]
+            )
 
         let activeTableIndex = activeView.TryTableIndex
 
-        let hasSelectedTable = arcFile.TryGetActiveTable(activeTableIndex) |> Option.isSome
+        let trailingNavbarElement =
+            React.useMemo (
+                (fun () ->
+                    match trailingNavbarElements with
+                    | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
+                    | None -> Html.none
+                ),
+                [| box trailingNavbarElements; box headerProps |]
+            )
 
         let navbar =
-            Html.div [
-                prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
-                prop.children [
-                    Navbar.Main(
-                        left = Swate.Components.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
-                        right =
-                            match trailingNavbarElements with
-                            | Some renderTrailingNavbarElements -> renderTrailingNavbarElements headerProps
-                            | None -> Html.none
-                    )
-                ]
-            ]
+            React.useMemo (
+                (fun () ->
+                    Html.div [
+                        prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
+                        prop.children [
+                            Navbar.Main(
+                                left = Swate.Components.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
+                                right = trailingNavbarElement
+                            )
+                        ]
+                    ]
+                ),
+                [| box trailingNavbarElement |]
+            )
 
+        let widgetElements =
+            React.useMemo (
+                (fun () -> {|
+                    buildingBlock = Main.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile)
+                    template = Main.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile)
+                |}),
+                [|
+                    box arcFile
+                    box activeTableIndex
+                    box setArcFile
+                    box templateServices
+                |]
+            )
 
-        let buildingBlockWidget =
-            BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFile)
+        /// ArcFiles type is too complex for react. Therefore we check hashcode instead and compare that.
+        let arcFileHashCode = arcFile.GetHashCode()
+        let activeViewHash = activeView.GetHashCode()
 
-        let templateWidget =
-            Swate.Components.Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFile)
+        let ArcFileContentViewMemo =
+            React.useMemo (
+                (fun () -> Main.ArcFileContentView(activeView, arcFile, setArcFile)),
+                [| box activeViewHash; box arcFileHashCode |]
+            )
+
+        let AddRowsFooterMemo =
+            React.useMemo (
+                (fun () -> Main.AddRowsFooter(activeView, arcFile, setArcFile)),
+                [| box activeViewHash; box arcFileHashCode |]
+            )
+
+        let content =
+            React.useMemo (
+                (fun () ->
+                    Html.div [
+                        prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
+                        prop.children [
+                            navbar
+                            Html.div [
+                                prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
+                                prop.children [ ArcFileContentViewMemo ]
+                            ]
+                            AddRowsFooterMemo
+                            ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
+                        ]
+                    ]
+                ),
+                [|
+                    box navbar
+                    box activeViewHash
+                    box arcFileHashCode
+                    box setArcFile
+                    box setActiveView
+                |]
+            )
 
         AnnotationTableContextProvider.AnnotationTableContextProvider(
             Swate.Components.ArcFileEditor.Widgets.Main.Widgets(
-                Html.div [
-                    prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                    prop.children [
-                        navbar
-                        Html.div [
-                            prop.className "swt:grow swt:flex swt:flex-col swt:overflow-hidden"
-                            prop.children [ Main.ArcFileContentView(activeView, arcFile, setArcFile) ]
-                        ]
-                        Main.AddRowsFooter(activeView, arcFile, setArcFile)
-                        ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
-                    ]
-                ],
-                buildingBlockWidget,
-                templateWidget
+                content,
+                widgetElements.buildingBlock,
+                widgetElements.template
             )
         )
 

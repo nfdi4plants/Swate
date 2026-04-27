@@ -29,7 +29,7 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select a building block",
             // TODO: This does not correctly mirror look from Client/
-            children = BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFileAndClose),
+            children = Widgets.BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFileAndClose),
             className = "swt:max-w-3xl"
         )
 

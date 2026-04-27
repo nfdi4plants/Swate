@@ -30,7 +30,7 @@ type TemplatesDisplay =
             prop.children [ Icons.ArrowsRotate() ]
         ]
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private TemplateTableItem
         (template: Template, isSelected: bool, toggleIsSelected: unit -> unit, ?key: obj)
         =

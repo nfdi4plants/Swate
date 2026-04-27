@@ -471,8 +471,11 @@ type ArcFileMetadata =
             Generic.BoxedField("DataMap", description = $"Data Contexts: {datamap.DataContexts.Count}")
         ]
 
-    [<ReactComponent>]
-    static member View(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
+    [<ReactComponent(true)>]
+    static member ArcFileMetadata
+        // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
+        (arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
+
         match arcFile with
         | ArcFiles.Investigation investigation ->
             ArcFileMetadata.InvestigationMetadata(

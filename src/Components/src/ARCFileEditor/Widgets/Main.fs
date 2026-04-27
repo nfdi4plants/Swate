@@ -83,7 +83,7 @@ open Swate.Components.WidgetContext
 [<Erase; Mangle(false)>]
 type Main =
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private WidgetToggleBtn(widgetType: WidgetType, isOpen: bool, toggle: unit -> unit) =
 
         let label, icon = widgetInfo widgetType
@@ -107,25 +107,31 @@ type Main =
             prop.children [
                 for widgetType in widgetTypes do
                     let isOpen = context.isActive widgetType
-                    let toggle = fun _ -> context.toggleWidget widgetType
+                    let toggle = fun () -> context.toggleWidget widgetType
                     Main.WidgetToggleBtn(widgetType, isOpen, toggle)
             ]
         ]
 
+    [<ReactComponent>]
     static member Widgets(children: ReactElement, buildingBlockWidget: ReactElement, templateWidget: ReactElement) =
         let widgets: Map<WidgetType, WidgetDefinition> =
-            [
-                WidgetType.BuildingBlock,
-                {|
-                    prefix = "ADD_BUILDINGBLOCK"
-                    content = buildingBlockWidget
-                |}
-                WidgetType.Template,
-                {|
-                    prefix = "ADD_TEMPLATE"
-                    content = templateWidget
-                |}
-            ]
-            |> Map.ofList
+            React.useMemo(
+                (fun () ->
+                    [
+                        WidgetType.BuildingBlock,
+                        {|
+                            prefix = "ADD_BUILDINGBLOCK"
+                            content = buildingBlockWidget
+                        |}
+                        WidgetType.Template,
+                        {|
+                            prefix = "ADD_TEMPLATE"
+                            content = templateWidget
+                        |}
+                    ]
+                    |> Map.ofList
+                ),
+                [| box buildingBlockWidget; box templateWidget |]
+            )
 
         Widget.WidgetController(widgets, children = children)

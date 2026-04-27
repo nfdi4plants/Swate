@@ -32,6 +32,16 @@ type TemplateBrowser =
         ]
 
     [<ReactComponent>]
+    static member private SelectedTemplatesLabel(selectedCount: int) =
+        if selectedCount > 0 then
+            Html.span [
+                prop.className "swt:text-xs swt:opacity-70"
+                prop.textf "%i selected" selectedCount
+            ]
+        else
+            Html.none
+
+    [<ReactComponent>]
     static member TemplateBrowser
         (
             templates: Template[],
@@ -46,6 +56,7 @@ type TemplateBrowser =
         TemplateFilter.TemplateFilterProvider(
             React.Fragment [
                 TemplateBrowser.TemplateImportButton(selectedTemplateIds.Count <= 0, openImportDialog)
+                TemplateBrowser.SelectedTemplatesLabel(selectedTemplateIds.Count)
 
                 TemplateFilter.TemplateFilter(templates, templateSearchClassName = "swt:grow")
                 TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->

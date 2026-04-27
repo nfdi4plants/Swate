@@ -1,8 +1,9 @@
-namespace Swate.Components
+namespace Swate.Components.Widgets
 
 open ARCtrl
 open Fable.Core
 open Feliz
+open Swate.Components
 open Swate.Components.Shared
 
 
@@ -303,8 +304,10 @@ type BuildingBlockWidget =
         else
             Html.none
 
-    [<ReactComponent>]
-    static member Main(arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
+    [<ReactComponent(true)>]
+    static member Main
+        // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
 
         let state, setState = React.useState (BuildingBlockWidgetState.Model.init ())
 

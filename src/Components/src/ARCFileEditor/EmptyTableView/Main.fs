@@ -17,7 +17,7 @@ type private ModalState =
 [<Erase; Mangle(false)>]
 type Main =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member EmptyTableView(arcFile: ArcFiles, setArcFile: ArcFiles -> unit, activeTableIndex: int option) =
         let modal, setModal = React.useState (None: ModalState option)
 

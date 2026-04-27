@@ -25,8 +25,10 @@ open TemplateWidgetHelper
 [<Erase; Mangle(false)>]
 type TemplateWidget =
 
-    [<ReactComponent>]
-    static member TemplateWidget(arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
+    [<ReactComponent(true)>]
+    static member TemplateWidget
+        // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
 
         let templateCacheCtx = TemplateCacheContext.useTemplateCacheCtx ()
         let templates = templateCacheCtx.Templates

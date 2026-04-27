@@ -344,45 +344,81 @@ type Widget =
             [| box closeAllWhen |]
         )
 
-        let closeWidget (widgetType: WidgetType) =
-            setActiveWidgets (fun widgets -> widgets |> List.filter (fun widget -> widget <> widgetType))
-
-        let focusWidget (widgetType: WidgetType) =
-            setActiveWidgets (fun widgets ->
-                if widgets |> List.contains widgetType then
-                    widgets
-                    |> List.filter (fun widget -> widget <> widgetType)
-                    |> fun nextWidgets -> nextWidgets @ [ widgetType ]
-                else
-                    widgets
+        let closeWidget =
+            React.useCallback(
+                (fun (widgetType: WidgetType) ->
+                    setActiveWidgets (fun widgets -> widgets |> List.filter (fun widget -> widget <> widgetType))
+                ),
+                [| box setActiveWidgets |]
             )
 
-        let openWidget (widgetType: WidgetType) =
-            setActiveWidgets (fun widgets ->
-                if widgets |> List.contains widgetType then
-                    widgets
-                    |> List.filter (fun widget -> widget <> widgetType)
-                    |> fun nextWidgets -> nextWidgets @ [ widgetType ]
-                else
-                    widgets @ [ widgetType ]
+        let focusWidget =
+            React.useCallback(
+                (fun (widgetType: WidgetType) ->
+                    setActiveWidgets (fun widgets ->
+                        if widgets |> List.contains widgetType then
+                            widgets
+                            |> List.filter (fun widget -> widget <> widgetType)
+                            |> fun nextWidgets -> nextWidgets @ [ widgetType ]
+                        else
+                            widgets
+                    )
+                ),
+                [| box setActiveWidgets |]
             )
 
-        let toggleWidget (widgetType: WidgetType) =
-            setActiveWidgets (fun widgets ->
-                if widgets |> List.contains widgetType then
-                    widgets |> List.filter (fun widget -> widget <> widgetType)
-                else
-                    widgets @ [ widgetType ]
+        let openWidget =
+            React.useCallback(
+                (fun (widgetType: WidgetType) ->
+                    setActiveWidgets (fun widgets ->
+                        if widgets |> List.contains widgetType then
+                            widgets
+                            |> List.filter (fun widget -> widget <> widgetType)
+                            |> fun nextWidgets -> nextWidgets @ [ widgetType ]
+                        else
+                            widgets @ [ widgetType ]
+                    )
+                ),
+                [| box setActiveWidgets |]
             )
 
-        let widgetContext: WidgetContext.WidgetControllerContext = {
-            activeWidgets = activeWidgets
-            isActive = fun widgetType -> activeWidgets |> List.contains widgetType
-            openWidget = openWidget
-            closeWidget = closeWidget
-            toggleWidget = toggleWidget
-            focusWidget = focusWidget
-        }
+        let toggleWidget =
+            React.useCallback(
+                (fun (widgetType: WidgetType) ->
+                    setActiveWidgets (fun widgets ->
+                        if widgets |> List.contains widgetType then
+                            widgets |> List.filter (fun widget -> widget <> widgetType)
+                        else
+                            widgets @ [ widgetType ]
+                    )
+                ),
+                [| box setActiveWidgets |]
+            )
+
+        let isActive =
+            React.useCallback((fun (widgetType: WidgetType) -> activeWidgets |> List.contains widgetType), [| box activeWidgets |])
+
+        let widgetContext: WidgetContext.WidgetControllerContext =
+            React.useMemo(
+                (fun () ->
+                    {
+                        activeWidgets = activeWidgets
+                        isActive = isActive
+                        openWidget = openWidget
+                        closeWidget = closeWidget
+                        toggleWidget = toggleWidget
+                        focusWidget = focusWidget
+                    }
+                ),
+                [|
+                    box activeWidgets
+                    box isActive
+                    box openWidget
+                    box closeWidget
+                    box toggleWidget
+                    box focusWidget
+                |]
+            )
 
         WidgetContext.ActiveWidgetContext.Provider(
             widgetContext,
