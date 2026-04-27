@@ -577,17 +577,6 @@ type GitSidebar =
             Html.div [
                 prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3"
                 prop.children [
-                    Html.label [
-                        prop.className "swt:col-span-2"
-                        prop.children [
-                            GitSidebar.DownloadLargeFilesToggle(
-                                props.DownloadLargeFilesInput,
-                                props.IsBusy,
-                                props.SubmitDownloadLargeFiles,
-                                testId = "GitSidebarDownloadLargeFilesCheckbox"
-                            )
-                        ]
-                    ]
                     GitSidebar.ActionButton(
                         "Update ARC from Online",
                         "swt:fluent--arrow-sync-24-regular",
@@ -683,6 +672,17 @@ type GitSidebar =
                                     props.IsBusy || not props.CanSwitchBranch,
                                     props.OpenSwitchBranchModal,
                                     testId = "GitSidebarSwitchBranchButton"
+                                )
+                            ]
+                        ]
+                        Html.div [
+                            prop.className "swt:mt-3"
+                            prop.children [
+                                GitSidebar.DownloadLargeFilesToggle(
+                                    props.DownloadLargeFilesInput,
+                                    props.IsBusy,
+                                    props.SubmitDownloadLargeFiles,
+                                    testId = "GitSidebarDownloadLargeFilesCheckbox"
                                 )
                             ]
                         ]

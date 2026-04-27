@@ -233,7 +233,6 @@ export const AdvancedActions: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox")).toBeChecked();
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
@@ -243,7 +242,17 @@ export const AdvancedActions: Story = {
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
-    await expect(canvas.getByTestId("GitSidebarLfsThresholdInput")).toHaveValue(1);
+    const downloadLargeFilesCheckbox = canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox");
+    const lfsThresholdInput = canvas.getByTestId("GitSidebarLfsThresholdInput");
+
+    await expect(downloadLargeFilesCheckbox).toBeChecked();
+    await expect(lfsThresholdInput).toHaveValue(1);
+    await expect(
+      Boolean(
+        downloadLargeFilesCheckbox.compareDocumentPosition(lfsThresholdInput) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
   },
 };
 
