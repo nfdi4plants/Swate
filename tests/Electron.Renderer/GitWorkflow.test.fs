@@ -1559,7 +1559,7 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.textContent.Contains("studies/s-study-01/protocol.md")).toBe (true)
-                Vitest.expect(container.textContent.Contains("Conflict")).toBe (true)
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusButton-3']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -1788,53 +1788,43 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar labels deleted files explicitly instead of showing only a generic Changed badge",
+            "GitSidebar hides the inline git return text and exposes it through a popover trigger",
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Html.div [
-                            prop.style [
-                                style.width 340
-                                style.height 760
-                            ]
-                            prop.children [
-                                Swate.Components.GitSidebar.Main(
-                                    status = {
-                                        CurrentBranch = Some "main"
-                                        TrackingBranch = Some "origin/main"
-                                        Ahead = 0
-                                        Behind = 0
-                                        IsClean = false
-                                        IsMergeInProgress = false
-                                    },
-                                    changedFiles =
-                                        [|
-                                            changedFile "obsolete.md" "D" " " false
-                                        |],
-                                    branchOptions = [| sidebarLocalBranch "main" true true |],
-                                    callbacks = {
-                                        OnRefresh = fun () -> ()
-                                        OnFetch = fun () -> ()
-                                        OnPull = fun () -> ()
-                                        OnPush = fun () -> ()
-                                        OnSync = fun () -> ()
-                                        OnCommitSelection = fun _ -> ()
-                                        OnCommitAll = fun _ -> ()
-                                        OnSaveDownloadLargeFiles = fun _ -> ()
-                                        OnSaveLfsAutoTrackThreshold = fun _ -> ()
-                                        OnCreateBranch = fun _ -> ()
-                                        OnSwitchBranch = fun _ -> ()
-                                        OnSelectChange = fun _ -> promise { return Ok() }
-                                    },
-                                    downloadLargeFiles = true,
-                                    lfsAutoTrackThresholdMb = 5
-                                )
-                            ]
-                        ]
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [| changedFile "obsolete.md" "D" " " false |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnSync = fun () -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
                     )
 
-                Vitest.expect(container.textContent.Contains("Deleted")).toBe (true)
-                Vitest.expect(container.textContent.Contains("git: D.")).toBe (true)
+                Vitest.expect(container.textContent.Contains("git: D.")).toBe (false)
+                Vitest.expect(container.textContent.Contains("Deleted")).toBe (false)
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusButton-0']")).not.toBeNull ()
 
                 cleanup ()
             }

@@ -140,10 +140,6 @@ type private ChangedFilesListProps = {
     OpenChange: GitSidebarChange -> unit
 }
 
-type private ChangeStatusBadgeProps = {
-    Change: GitSidebarChange
-}
-
 type private ChangedFileRowProps = {
     Change: GitSidebarChange
     Index: int
@@ -769,20 +765,38 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
-    static member private ChangeStatusBadge(props: ChangeStatusBadgeProps) =
-        let badgeLabel, badgeClass, iconClass = GitSidebarInternal.changePresentation props.Change
+    static member private ChangeStatusPopover(index: int, change: GitSidebarChange) =
+        let label, _, iconClass = GitSidebarInternal.changePresentation change
+        let gitReturn = GitSidebarInternal.describeChange change
 
-        Html.span [
-            prop.className [ badgeClass; "swt:gap-1" ]
-            prop.children [
-                Html.span [
-                    prop.className $"swt:iconify {iconClass} swt:size-3.5"
+        Popover.Popover(
+            debug = $"git_change_status_{index}",
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.span [ prop.className $"swt:iconify {iconClass} swt:size-4" ],
+                        className = "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-7 swt:w-7 swt:px-0",
+                        props = [ prop.testId $"GitSidebarChangeStatusButton-{index}" ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    Popover.Heading(Html.text "File status")
+                                    Html.p [
+                                        prop.className "swt:text-sm"
+                                        prop.text $"This file was {label.ToLowerInvariant()}."
+                                    ]
+                                    Html.p [
+                                        prop.className "swt:text-sm swt:font-mono"
+                                        prop.text $"Git return: {gitReturn}"
+                                    ]
+                                ]
+                            ]
+                    )
                 ]
-                Html.span [
-                    prop.text badgeLabel
-                ]
-            ]
-        ]
+        )
 
     [<ReactComponent>]
     static member private ChangedFileRow(props: ChangedFileRowProps) =
@@ -824,28 +838,12 @@ type GitSidebar =
                             prop.onClick (fun event -> event.stopPropagation ())
                             prop.onChange (fun (_: bool) -> props.ToggleCommitSelection change.Path)
                         ]
-                        Html.span [
-                            prop.className [
-                                "swt:mt-0.5 swt:font-mono swt:text-[0.7rem]"
-                                if change.IsConflicted then
-                                    "swt:text-error"
-                                else
-                                    "swt:text-base-content/60"
-                            ]
-                            prop.text (GitSidebarInternal.describeChange change)
-                        ]
                         Html.div [
                             prop.className "swt:min-w-0 swt:flex-1"
                             prop.children [
-                                Html.div [
-                                    prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1.5"
-                                    prop.children [
-                                        Html.span [
-                                            prop.className "swt:truncate swt:text-sm swt:font-medium"
-                                            prop.text change.Path
-                                        ]
-                                        GitSidebar.ChangeStatusBadge({ Change = change })
-                                    ]
+                                Html.span [
+                                    prop.className "swt:block swt:truncate swt:text-sm swt:font-medium"
+                                    prop.text change.Path
                                 ]
                                 match change.OriginalPath with
                                 | Some originalPath ->
@@ -855,6 +853,10 @@ type GitSidebar =
                                     ]
                                 | None -> Html.none
                             ]
+                        ]
+                        Html.div [
+                            prop.className "swt:ml-auto swt:shrink-0 swt:self-start"
+                            prop.children [ GitSidebar.ChangeStatusPopover(props.Index, change) ]
                         ]
                     ]
                 ]

@@ -263,7 +263,7 @@ export const ConflictsPresent: Story = {
       "Resolve all conflicted files before pushing.",
     );
     await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(4);
-    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("Conflict");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusButton-0")).toBeInTheDocument();
   },
 };
 
@@ -318,8 +318,11 @@ export const DeletedFile: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("Deleted");
-    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("git: D.");
+    const modal = within(document.body);
+    await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("git: D.");
+    await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("Deleted");
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeStatusButton-0"));
+    await expect(await modal.findByTestId("popover_content_git_change_status_0")).toHaveTextContent("Git return: git: D.");
   },
 };
 
