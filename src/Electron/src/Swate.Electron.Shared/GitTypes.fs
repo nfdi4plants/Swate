@@ -156,7 +156,10 @@ type GitCreateBranchRequest = {
     StartPoint: string option
 }
 
-type GitCheckoutBranchRequest = { Name: string }
+type GitCheckoutBranchRequest = {
+    Name: string
+    StartPoint: string option
+}
 
 type GitConfirmMergeResolutionRequest = {
     Path: string

@@ -339,7 +339,7 @@ Vitest.describe (
 
                         Vitest.expect(createdBranchStatus.Current |> Option.defaultValue "").toBe (featureBranchName)
 
-                        let! checkoutBaseBranchResult = GitService.checkoutBranch context.RepoPath initialBranch
+                        let! checkoutBaseBranchResult = GitService.checkoutBranch context.RepoPath { Name = initialBranch; StartPoint = None }
                         expectOk "checkout initial branch" checkoutBaseBranchResult |> ignore
 
                         let! baseBranchStatus =
@@ -349,7 +349,7 @@ Vitest.describe (
 
                         Vitest.expect(baseBranchStatus.Current |> Option.defaultValue "").toBe (initialBranch)
 
-                        let! checkoutFeatureBranchResult = GitService.checkoutBranch context.RepoPath featureBranchName
+                        let! checkoutFeatureBranchResult = GitService.checkoutBranch context.RepoPath { Name = featureBranchName; StartPoint = None }
                         expectOk "checkout feature branch" checkoutFeatureBranchResult |> ignore
 
                         let! featureBranchStatus =
@@ -1564,7 +1564,7 @@ Vitest.describe (
 
                         let! failure =
                             unwrapResultAsync
-                                (GitService.checkoutBranch context.RepoPath "missing/local-branch")
+                                (GitService.checkoutBranch context.RepoPath { Name = "missing/local-branch"; StartPoint = None })
                                 expectError
 
                         Vitest.expect(failure.Message.Contains("does not exist in the local repository")).toBe (true)
@@ -1620,10 +1620,10 @@ Vitest.describe (
 
                         Vitest.expect(poisonedStatus.Tracking).toEqual (Some $"origin/{initialBranch}")
 
-                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath initialBranch
+                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath { Name = initialBranch; StartPoint = None }
                         expectOk "checkout base branch" checkoutBaseResult |> ignore
 
-                        let! checkoutFeatureResult = GitService.checkoutBranch context.RepoPath featureBranchName
+                        let! checkoutFeatureResult = GitService.checkoutBranch context.RepoPath { Name = featureBranchName; StartPoint = None }
                         expectOk "checkout feature branch" checkoutFeatureResult |> ignore
 
                         let! featureStatus =
@@ -1741,7 +1741,7 @@ Vitest.describe (
                         let! featureCommitResult = GitService.commit context.RepoPath "test: feature change"
                         expectOk "commit feature change" featureCommitResult |> ignore
 
-                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath baseBranch
+                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath { Name = baseBranch; StartPoint = None }
                         expectOk "checkout base branch" checkoutBaseResult |> ignore
 
                         do! writeUtf8FileAsync filePath "main change\n"
@@ -1839,7 +1839,7 @@ Vitest.describe (
                         let! featureCommitResult = GitService.commit context.RepoPath "test: feature change"
                         expectOk "commit feature change" featureCommitResult |> ignore
 
-                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath baseBranch
+                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath { Name = baseBranch; StartPoint = None }
                         expectOk "checkout base branch" checkoutBaseResult |> ignore
 
                         do! writeUtf8FileAsync filePath "main change\n"

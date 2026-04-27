@@ -441,6 +441,9 @@ export const SwitchBranchModal: Story = {
     await expect(modal.getByTestId("GitSidebarSwitchBranchSelect")).toHaveTextContent(
       "main",
     );
+    await expect(modal.getByTestId("GitSidebarSwitchBranchSelect")).toHaveTextContent(
+      "origin/main",
+    );
     await userEvent.click(modal.getByTestId("GitSidebarSwitchBranchSubmit"));
   },
 };

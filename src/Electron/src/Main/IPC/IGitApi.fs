@@ -353,7 +353,7 @@ let api: IGitApi = {
                     withBusyWriting
                         vault
                         (fun () -> promise {
-                            let! result = GitService.checkoutBranch arcPath request.Name
+                            let! result = GitService.checkoutBranch arcPath request
                             do! vault.RefreshFileTree()
 
                             return

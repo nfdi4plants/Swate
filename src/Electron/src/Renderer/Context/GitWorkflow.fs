@@ -1278,7 +1278,27 @@ let update
         if String.IsNullOrWhiteSpace normalizedBranchName then
             model, Cmd.none
         else
-            model, Cmd.ofMsg (WriteRequested(SwitchBranch { Name = normalizedBranchName }))
+            let selectedBranch =
+                model.BranchOptions
+                |> Array.tryFind (fun b -> String.Equals(b.RefName, normalizedBranchName, StringComparison.Ordinal))
+
+            let startPoint, localName =
+                match selectedBranch with
+                | Some branch when branch.Kind = GitSidebarBranchKind.Remote ->
+                    let remotePrefix =
+                        let slashIndex = branch.RefName.IndexOf('/')
+                        if slashIndex > 0 then branch.RefName.[..slashIndex] else "origin/"
+
+                    let derivedLocalName =
+                        if normalizedBranchName.StartsWith(remotePrefix, StringComparison.Ordinal) then
+                            normalizedBranchName.[remotePrefix.Length..]
+                        else
+                            normalizedBranchName
+
+                    Some branch.RefName, derivedLocalName
+                | _ -> None, normalizedBranchName
+
+            model, Cmd.ofMsg (WriteRequested(SwitchBranch { Name = localName; StartPoint = startPoint }))
     | WriteRequested request when requiresArcForWriteRequest request && model.CurrentArcPath.IsNone -> model, Cmd.none
     | WriteRequested request ->
         let nextModel =

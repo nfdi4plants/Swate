@@ -181,7 +181,7 @@ type private ModalsProps = {
     SubmitCreateBranch: unit -> unit
     IsSwitchBranchModalOpen: bool
     SetSwitchBranchModalOpen: bool -> unit
-    LocalBranchOptionsForSwitch: GitSidebarBranchOption[]
+    BranchOptionsForSwitch: GitSidebarBranchOption[]
     SelectedSwitchBranch: string option
     SetSelectedSwitchBranch: string option -> unit
     SubmitSwitchBranch: unit -> unit
@@ -1086,7 +1086,7 @@ type GitSidebar =
                 isOpen = props.IsSwitchBranchModalOpen,
                 setIsOpen = props.SetSwitchBranchModalOpen,
                 header = Html.text "Switch Branch",
-                description = Html.text "Switch to an existing local branch.",
+                description = Html.text "Switch to an existing branch.",
                 debug = "GitSidebarSwitchBranchModal",
                 children =
                     Html.div [
@@ -1111,11 +1111,11 @@ type GitSidebar =
                                                 props.SetSelectedSwitchBranch(Some nextValue)
                                         )
                                         prop.children [
-                                            for branch in props.LocalBranchOptionsForSwitch do
+                                            for branch in props.BranchOptionsForSwitch do
                                                 Html.option [
                                                     prop.key branch.RefName
                                                     prop.value branch.RefName
-                                                    prop.text branch.DisplayLabel
+                                                    prop.text $"{branch.DisplayLabel} ({GitSidebarInternal.branchKindLabel branch.Kind})"
                                                 ]
                                         ]
                                     ]
@@ -1134,7 +1134,7 @@ type GitSidebar =
                         Html.button [
                             prop.testId "GitSidebarSwitchBranchSubmit"
                             prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                            prop.disabled (props.ActiveAction.IsSome || props.LocalBranchOptionsForSwitch.Length = 0)
+                            prop.disabled (props.ActiveAction.IsSome || props.BranchOptionsForSwitch.Length = 0)
                             prop.text (
                                 if props.ActiveAction = Some "Switch Branch" then
                                     "Switching..."
@@ -1348,9 +1348,11 @@ type GitSidebar =
                     )
                 )
 
-        let localBranchOptionsForSwitch =
+        let branchOptionsForSwitch =
             branchOptions
-            |> Array.filter (fun branch -> branch.Kind = GitSidebarBranchKind.Local && not branch.IsCurrent)
+            |> Array.filter (fun branch -> not branch.IsCurrent)
+
+        let canSwitchBranch = branchOptionsForSwitch.Length > 0
 
         let runSelectChangeAction (change: GitSidebarChange) =
             promise {
@@ -1385,7 +1387,7 @@ type GitSidebar =
             setLocalError None
 
             let defaultBranch =
-                localBranchOptionsForSwitch |> Array.tryHead |> Option.map _.RefName
+                branchOptionsForSwitch |> Array.tryHead |> Option.map _.RefName
 
             setSelectedSwitchBranch defaultBranch
             setActiveDialog ActiveDialog.SwitchBranch
@@ -1575,7 +1577,7 @@ type GitSidebar =
                                 onPush ()
                         OpenCreateBranchModal = openCreateBranchModal
                         OpenSwitchBranchModal = openSwitchBranchModal
-                        CanSwitchBranch = localBranchOptionsForSwitch.Length > 0
+                        CanSwitchBranch = canSwitchBranch
                         LfsSettings = {
                             IsBusy = isBusy
                             LfsThresholdInput = lfsThresholdInput
@@ -1650,7 +1652,7 @@ type GitSidebar =
                         SubmitCreateBranch = submitCreateBranch
                         IsSwitchBranchModalOpen = isSwitchBranchModalOpen
                         SetSwitchBranchModalOpen = setSwitchBranchModalOpen
-                        LocalBranchOptionsForSwitch = localBranchOptionsForSwitch
+                        BranchOptionsForSwitch = branchOptionsForSwitch
                         SelectedSwitchBranch = selectedSwitchBranch
                         SetSelectedSwitchBranch = setSelectedSwitchBranch
                         SubmitSwitchBranch = submitSwitchBranch

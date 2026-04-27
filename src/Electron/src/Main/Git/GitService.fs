@@ -1800,28 +1800,43 @@ let addRemote (arcPath: string) (remoteName: string) (remoteUrl: string) : JS.Pr
                     })
 }
 
-let checkoutBranch (arcPath: string) (branchName: string) : JS.Promise<GitResult<unit>> = promise {
-    match ensureValidBranchLikeName "Branch name" branchName with
-    | Error branchError -> return errorResult branchError
-    | Ok safeBranchName ->
-        return!
-            withLocalGit
-                arcPath
-                (fun git -> promise {
-                    let! localBranches = git.branchLocal ()
-                    let branches = valueOrEmptyArray localBranches.all
+let checkoutBranch (arcPath: string) (request: GitCheckoutBranchRequest) : JS.Promise<GitResult<unit>> =
+    promise {
+        match ensureValidBranchLikeName "Branch name" request.Name with
+        | Error branchError -> return errorResult branchError
+        | Ok safeBranchName ->
+            match request.StartPoint with
+            | Some startPoint ->
+                match ensureValidBranchLikeName "Start point" startPoint with
+                | Error startPointError -> return errorResult startPointError
+                | Ok safeStartPoint ->
+                    return!
+                        withLocalGit
+                            arcPath
+                            (fun git -> promise {
+                                let! _ = git.checkoutBranch (safeBranchName, safeStartPoint)
+                                do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
+                                return ()
+                            })
+            | None ->
+                return!
+                    withLocalGit
+                        arcPath
+                        (fun git -> promise {
+                            let! localBranches = git.branchLocal ()
+                            let branches = valueOrEmptyArray localBranches.all
 
-                    let exists =
-                        branches
-                        |> Array.exists (fun existing ->
-                            String.Equals(existing, safeBranchName, StringComparison.Ordinal)
-                        )
+                            let exists =
+                                branches
+                                |> Array.exists (fun existing ->
+                                    String.Equals(existing, safeBranchName, StringComparison.Ordinal)
+                                )
 
-                    if not exists then
-                        return abortGitPromise $"Branch '{safeBranchName}' does not exist in the local repository."
+                            if not exists then
+                                return abortGitPromise $"Branch '{safeBranchName}' does not exist in the local repository."
 
-                    let! _ = git.checkout (safeBranchName)
-                    do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
-                    return ()
-                })
-}
+                            let! _ = git.checkout (safeBranchName)
+                            do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
+                            return ()
+                        })
+    }
