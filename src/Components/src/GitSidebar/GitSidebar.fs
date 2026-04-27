@@ -34,7 +34,11 @@ module private GitSidebarInternal =
 
         if change.IsConflicted then
             GitChangeKind.Conflict
-        elif change.OriginalPath.IsSome || indexCode.StartsWith("R", StringComparison.Ordinal) || worktreeCode.StartsWith("R", StringComparison.Ordinal) then
+        elif
+            change.OriginalPath.IsSome
+            || indexCode.StartsWith("R", StringComparison.Ordinal)
+            || worktreeCode.StartsWith("R", StringComparison.Ordinal)
+        then
             GitChangeKind.Renamed
         elif indexCode = "?" || worktreeCode = "?" then
             GitChangeKind.Untracked
@@ -47,12 +51,9 @@ module private GitSidebarInternal =
 
     let changePresentation (change: GitSidebarChange) =
         match classifyChange change with
-        | GitChangeKind.Added ->
-            "Added", "swt:badge swt:badge-success swt:badge-sm", "swt:fluent--add-24-regular"
-        | GitChangeKind.Modified ->
-            "Modified", "swt:badge swt:badge-info swt:badge-sm", "swt:fluent--edit-24-regular"
-        | GitChangeKind.Deleted ->
-            "Deleted", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--delete-24-regular"
+        | GitChangeKind.Added -> "Added", "swt:badge swt:badge-success swt:badge-sm", "swt:fluent--add-24-regular"
+        | GitChangeKind.Modified -> "Modified", "swt:badge swt:badge-info swt:badge-sm", "swt:fluent--edit-24-regular"
+        | GitChangeKind.Deleted -> "Deleted", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--delete-24-regular"
         | GitChangeKind.Renamed ->
             "Renamed", "swt:badge swt:badge-warning swt:badge-sm", "swt:fluent--arrow-swap-24-regular"
         | GitChangeKind.Untracked ->
@@ -78,8 +79,10 @@ module private GitSidebarInternal =
 
     let tryRangeBetween (orderedPaths: string[]) (anchorPath: string) (clickedPath: string) =
         match
-            orderedPaths |> Array.tryFindIndex (fun path -> String.Equals(path, anchorPath, StringComparison.Ordinal)),
-            orderedPaths |> Array.tryFindIndex (fun path -> String.Equals(path, clickedPath, StringComparison.Ordinal))
+            orderedPaths
+            |> Array.tryFindIndex (fun path -> String.Equals(path, anchorPath, StringComparison.Ordinal)),
+            orderedPaths
+            |> Array.tryFindIndex (fun path -> String.Equals(path, clickedPath, StringComparison.Ordinal))
         with
         | Some anchorIndex, Some clickedIndex ->
             let lower = min anchorIndex clickedIndex
@@ -164,10 +167,7 @@ type private ChangedFileRowProps = {
     MeasureElementRef: VirtualMeasureElementRef
 }
 
-type private ChangedFileVirtualItem = {
-    Index: int
-    Start: int
-}
+type private ChangedFileVirtualItem = { Index: int; Start: int }
 
 type private ModalsProps = {
     IsCreateBranchModalOpen: bool
@@ -705,14 +705,9 @@ type GitSidebar =
                     Html.label [
                         prop.className "swt:flex swt:flex-col swt:gap-2"
                         prop.children [
-                            Html.span [
-                                prop.className "swt:text-sm swt:font-medium"
-                                prop.text "Save message"
-                            ]
                             Html.textarea [
                                 prop.testId "GitSidebarCommitMessageInput"
-                                prop.className
-                                    "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
+                                prop.className "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
                                 prop.disabled (not props.CanEditCommit)
                                 prop.value props.CommitMessage
                                 prop.placeholder (
@@ -776,6 +771,7 @@ type GitSidebar =
         let label, _, iconClass = GitSidebarInternal.changePresentation change
         let gitReturn = GitSidebarInternal.describeChange change
         let stopRowActivation (event: Event) = event.stopPropagation ()
+
         let triggerInteractionProps =
             createObj [
                 "onClick" ==> stopRowActivation
@@ -816,6 +812,7 @@ type GitSidebar =
     [<ReactComponent>]
     static member private ChangedFileRow(props: ChangedFileRowProps) =
         let change = props.Change
+
         let activateRow ctrlKey shiftKey =
             if not props.IsBusy then
                 props.UpdateMarkedSelection change ctrlKey shiftKey
@@ -824,7 +821,7 @@ type GitSidebar =
         Html.div [
             prop.role "listitem"
             prop.custom ("data-index", props.Index)
-            prop.ref (fun element -> props.MeasureElementRef (Option.ofObj element))
+            prop.ref (fun element -> props.MeasureElementRef(Option.ofObj element))
             prop.className "swt:absolute swt:left-0 swt:w-full"
             prop.style [
                 style.top 0
@@ -963,7 +960,9 @@ type GitSidebar =
                             prop.testId "GitSidebarChangedFilesVirtualContent"
                             prop.role "list"
                             prop.className "swt:relative swt:mt-1"
-                            prop.style [ style.height (changedFileListVirtualizer.getTotalSize ()) ]
+                            prop.style [
+                                style.height (changedFileListVirtualizer.getTotalSize ())
+                            ]
                             prop.children [
                                 for virtualItem in virtualItems do
                                     let change = props.ChangedFiles.[virtualItem.Index]
@@ -1169,7 +1168,8 @@ type GitSidebar =
             setIsOpen =
                 (fun isOpen ->
                     if not isOpen then
-                        props.CancelPendingRemoteAction ()),
+                        props.CancelPendingRemoteAction()
+                ),
             header = Html.text (props.PendingConfirmation |> Option.map _.Title |> Option.defaultValue "Confirm"),
             children =
                 Html.p [
@@ -1180,13 +1180,21 @@ type GitSidebar =
                 React.Fragment [
                     Html.button [
                         prop.className "swt:btn"
-                        prop.text (props.PendingConfirmation |> Option.map _.CancelLabel |> Option.defaultValue "Cancel")
-                        prop.onClick (fun _ -> props.CancelPendingRemoteAction ())
+                        prop.text (
+                            props.PendingConfirmation
+                            |> Option.map _.CancelLabel
+                            |> Option.defaultValue "Cancel"
+                        )
+                        prop.onClick (fun _ -> props.CancelPendingRemoteAction())
                     ]
                     Html.button [
                         prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                        prop.text (props.PendingConfirmation |> Option.map _.ConfirmLabel |> Option.defaultValue "Continue")
-                        prop.onClick (fun _ -> props.ConfirmPendingRemoteAction ())
+                        prop.text (
+                            props.PendingConfirmation
+                            |> Option.map _.ConfirmLabel
+                            |> Option.defaultValue "Continue"
+                        )
+                        prop.onClick (fun _ -> props.ConfirmPendingRemoteAction())
                     ]
                 ],
             debug = "GitSidebarPendingRemoteAction"
@@ -1247,8 +1255,7 @@ type GitSidebar =
         let lfsThresholdInput, setLfsThresholdInput =
             React.useState (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)
 
-        let markedPaths, setMarkedPaths =
-            React.useStateWithUpdater Set.empty<string>
+        let markedPaths, setMarkedPaths = React.useStateWithUpdater Set.empty<string>
 
         let selectionAnchorPath, setSelectionAnchorPath =
             React.useStateWithUpdater (None: string option)
@@ -1293,14 +1300,10 @@ type GitSidebar =
             (fun () ->
                 let changedPathSet = changedFiles |> Array.map _.Path |> Set.ofArray
 
-                setMarkedPaths (fun current ->
-                    current
-                    |> Set.filter (fun path -> Set.contains path changedPathSet)
-                )
+                setMarkedPaths (fun current -> current |> Set.filter (fun path -> Set.contains path changedPathSet))
 
                 setSelectionAnchorPath (fun current ->
-                    current
-                    |> Option.filter (fun path -> Set.contains path changedPathSet)
+                    current |> Option.filter (fun path -> Set.contains path changedPathSet)
                 )
             ),
             [| box changedFiles |]
