@@ -28,7 +28,7 @@ module ARCtrlHelper =
             | "datamaps" -> Some DataMap
             | "templates" -> Some Template
             | "assay" -> Some Assay
-            | "studie" -> Some Study
+            | "study" -> Some Study
             | "investigation" -> Some Investigation
             | "run" -> Some Run
             | "workflow" -> Some Workflow
