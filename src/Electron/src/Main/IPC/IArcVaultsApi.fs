@@ -236,6 +236,30 @@ let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, 
         | ArcFiles.Template _ -> Error(exn "Saving of template files is not supported.")
 
 
+let private pathsEqualForComparison (leftPath: string) (rightPath: string) =
+    let normalize = FileIOHelper.normalizePath >> ArcPathValidation.normalizePathForComparison
+    normalize leftPath = normalize rightPath
+
+let private tryPersistPendingArcFileSave (vault: ArcVault) : JS.Promise<Result<unit, exn>> = promise {
+    match vault.pendingArcFileSave with
+    | None -> return Ok()
+    | Some pendingArcFileSave ->
+        match vault.path, vault.arc with
+        | Some _, Some arc ->
+            match updateARCByFileContentDTO arc pendingArcFileSave with
+            | Error saveError -> return Error saveError
+            | Ok newArc ->
+                let! saveResult = vault.SetArc newArc
+
+                match saveResult with
+                | Ok() ->
+                    vault.pendingArcFileSave <- None
+                    return Ok()
+                | Error saveError -> return Error saveError
+        | _ -> return Error(exn "ARC is not loaded.")
+}
+
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api: IPCTypes.IArcVaultsApi = {
     openARC =
@@ -457,9 +481,31 @@ let api: IPCTypes.IArcVaultsApi = {
                         match updateARCByFileContentDTO arc request with
                         | Error saveError -> return Error saveError
                         | Ok newArc ->
-                            let! res = vault.SetArc newArc
-                            return res
+                            let! saveResult = vault.SetArc newArc
+
+                            match saveResult with
+                            | Ok() ->
+                                match vault.pendingArcFileSave with
+                                | Some pendingSave when pathsEqualForComparison pendingSave.path request.path ->
+                                    vault.pendingArcFileSave <- None
+                                | _ -> ()
+
+                                return Ok()
+                            | Error saveError -> return Error saveError
                     | _ -> return Error(exn "ARC is not loaded.")
+            with e ->
+                return Error e
+        }
+    setPendingArcFileSave =
+        fun (event: IpcMainEvent) (pendingArcFileSave: FileContentDTO option) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    vault.pendingArcFileSave <- pendingArcFileSave
+                    return Ok()
             with e ->
                 return Error e
         }
@@ -558,8 +604,18 @@ let api: IPCTypes.IArcVaultsApi = {
         fun (event: IpcMainEvent) (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
-                do! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
-                return Ok()
+
+                match decision with
+                | IPCTypesHelper.SaveBeforeQuitDecision.SaveAndClose ->
+                    match ARC_VAULTS.TryGetVault(windowId) with
+                    | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                    | Some vault ->
+                        let! saveResult = tryPersistPendingArcFileSave vault
+
+                        match saveResult with
+                        | Error saveError -> return Error saveError
+                        | Ok() -> return! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
+                | _ -> return! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
             with e ->
                 return Error e
         }

@@ -141,23 +141,21 @@ let Main () =
     Context.AppStateContext.AppStateCtx.Provider(
         appCtx,
         Renderer.Context.FileStateContext.FileStateCtxProvider(
-            Renderer.Context.PreviewStateContext.PreviewStateCtxProvider(
-                Renderer.Context.PageStateContext.PageStateCtx.Provider(
-                    pageCtx,
-                    ErrorModalProvider.ErrorModalProvider(
-                        Renderer.Context.AuthStateContext.Provider(
-                            Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
-                                    Layout.Main(
-                                        children =
-                                            React.Fragment [|
-                                                children
-                                                CloseWindowController.CloseWindowController.Subscription()
-                                            |],
-                                        navbar = Renderer.Components.Navbar.Main(),
-                                        leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
-                                        leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget)
-                                    )
+            Renderer.Context.PageStateContext.PageStateCtx.Provider(
+                pageCtx,
+                ErrorModalProvider.ErrorModalProvider(
+                    Renderer.Context.AuthStateContext.Provider(
+                        Renderer.Context.GitStateContext.GitStateCtxProvider(
+                            AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
+                                Layout.Main(
+                                    children =
+                                        React.Fragment [|
+                                            children
+                                            CloseWindowController.CloseWindowController.Subscription()
+                                        |],
+                                    navbar = Renderer.Components.Navbar.Main(),
+                                    leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
+                                    leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget)
                                 )
                             )
                         )
