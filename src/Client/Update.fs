@@ -4,7 +4,6 @@ module Update.Update
 open Elmish
 
 open Swate.Components.Shared
-open Database
 open Routing
 open Messages
 open Model
@@ -265,35 +264,35 @@ module History =
             if host = Some Swatehost.ARCitect then
                 match spreadsheetState.ArcFile with // model is not yet updated at this position.
                 | Some(ArcFiles.Assay assay) ->
-                    ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Assay, ArcAssay.toJsonString 0 assay, None)
+                    ARCitect.api.Save(ArcFilesDiscriminate.Assay, ArcAssay.toJsonString 0 assay, None)
                     |> Promise.start
                 | Some(ArcFiles.Study(study, _)) ->
-                    ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Study, ArcStudy.toJsonString 0 study, None)
+                    ARCitect.api.Save(ArcFilesDiscriminate.Study, ArcStudy.toJsonString 0 study, None)
                     |> Promise.start
                 | Some(ArcFiles.Investigation inv) ->
                     ARCitect.api.Save(
-                        ArcFilesDiscriminateStringEnum.Investigation,
+                        ArcFilesDiscriminate.Investigation,
                         ArcInvestigation.toJsonString 0 inv,
                         None
                     )
                     |> Promise.start
                 | Some(ArcFiles.Run run) ->
-                    ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Run, ArcRun.toJsonString 0 run, None)
+                    ARCitect.api.Save(ArcFilesDiscriminate.Run, ArcRun.toJsonString 0 run, None)
                     |> Promise.start
                 | Some(ArcFiles.Workflow workflow) ->
                     ARCitect.api.Save(
-                        ArcFilesDiscriminateStringEnum.Workflow,
+                        ArcFilesDiscriminate.Workflow,
                         ArcWorkflow.toJsonString 0 workflow,
                         None
                     )
                     |> Promise.start
                 | Some(ArcFiles.Template template) ->
-                    ARCitect.api.Save(ArcFilesDiscriminateStringEnum.Template, Template.toJsonString 0 template, None)
+                    ARCitect.api.Save(ArcFilesDiscriminate.Template, Template.toJsonString 0 template, None)
                     |> Promise.start
                 | Some(ArcFiles.DataMap(parent, datamap)) ->
                     if parent.IsSome then
                         ARCitect.api.Save(
-                            ArcFilesDiscriminateStringEnum.DataMap,
+                            ArcFilesDiscriminate.DataMap,
                             DataMap.toJsonString 0 datamap,
                             parent
                         )

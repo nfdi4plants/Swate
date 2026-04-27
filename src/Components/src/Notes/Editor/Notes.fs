@@ -89,7 +89,7 @@ type Notes =
                             createPayload NotesTarget.NewRootNote relativePath
 
         Html.div [
-            prop.className "swt:p-8 swt:flex swt:justify-center"
+            prop.className "swt:p-8 swt:flex swt:justify-center swt:overflow-y-auto"
             prop.children [
                 Html.div [
                     prop.className "swt:w-full swt:max-w-4xl swt:rounded-box swt:border swt:border-base-300 swt:bg-base-200 swt:p-6 swt:space-y-4"

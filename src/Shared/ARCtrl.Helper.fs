@@ -8,9 +8,8 @@ open ARCtrl
 [<AutoOpen>]
 module ARCtrlHelper =
 
-    [<RequireQualifiedAccessAttribute>]
-    [<StringEnum>]
-    type ArcFilesDiscriminateStringEnum =
+    [<RequireQualifiedAccess; StringEnum>]
+    type ArcFilesDiscriminate =
         | [<CompiledName("investigation")>] Investigation
         | [<CompiledName("study")>] Study
         | [<CompiledName("assay")>] Assay
@@ -19,18 +18,15 @@ module ARCtrlHelper =
         | [<CompiledName("datamap")>] DataMap
         | [<CompiledName("template")>] Template
 
-    [<RequireQualifiedAccess>]
-    type ArcFilesDiscriminate =
-        | Assay
-        | Study
-        | Investigation
-        | Run
-        | Workflow
-        | DataMap
-        | Template
-
         static member tryFromString(str: string) =
             match str.ToLower() with
+            | "assays" -> Some Assay
+            | "studies" -> Some Study
+            | "investigations" -> Some Investigation
+            | "runs" -> Some Run
+            | "workflows" -> Some Workflow
+            | "datamaps" -> Some DataMap
+            | "templates" -> Some Template
             | "assay" -> Some Assay
             | "study" -> Some Study
             | "investigation" -> Some Investigation

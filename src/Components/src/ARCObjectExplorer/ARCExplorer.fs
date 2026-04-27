@@ -1,9 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.ARCObjectExplorer
 
 open Browser.Dom
 open Swate.Components.Shared
 open Swate.Components.FileExplorerTypes
-open Fable.Core
 open Feliz
 
 //Replace with ARCtrl

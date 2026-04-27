@@ -17,16 +17,61 @@ module private FileExplorerHelper =
 
     type ArcCreateDraft = { ArcFile: ArcFiles; Path: string }
 
-    let rec loopPaths (selectedTreeItemPath: string option) (parent: FileTreeNode) =
+    let private normalizeNodePath (path: string) = normalizePath path
+
+    let rec private collectSelectedDirectoryPathChain
+        (selectedTreeItemPath: string option)
+        (node: FileTreeNode)
+        (loadedPaths: Set<string>)
+        =
+        let normalizedNodePath = normalizeNodePath node.path
+
+        let isInSelectedPathChain =
+            selectedTreeItemPath
+            |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath normalizedNodePath)
+
+        if node.isDirectory then
+            let nextLoadedPaths =
+                if isInSelectedPathChain then
+                    Set.add normalizedNodePath loadedPaths
+                else
+                    loadedPaths
+
+            node.children.Values
+            |> Seq.fold
+                (fun state child -> collectSelectedDirectoryPathChain selectedTreeItemPath child state)
+                nextLoadedPaths
+        else
+            loadedPaths
+
+    let requiredLoadedDirectoryPaths (selectedTreeItemPath: string option) (root: FileTreeNode) =
+        let rootPathSet =
+            if root.isDirectory then
+                Set.singleton (normalizeNodePath root.path)
+            else
+                Set.empty
+
+        collectSelectedDirectoryPathChain selectedTreeItemPath root rootPathSet
+
+    let rec loopPaths
+        (loadedDirectoryPaths: Set<string>)
+        (selectedTreeItemPath: string option)
+        (parent: FileTreeNode)
+        =
         match parent.isDirectory with
         | true ->
-            let tmp =
-                let ra = ResizeArray(parent.children.Values)
+            let normalizedParentPath = normalizeNodePath parent.path
 
-                ra.ToArray()
-                |> Array.map (fun entry -> loopPaths selectedTreeItemPath entry)
-                |> Array.choose id
-                |> List.ofArray
+            let tmp =
+                if loadedDirectoryPaths.Contains normalizedParentPath then
+                    let ra = ResizeArray(parent.children.Values)
+
+                    ra.ToArray()
+                    |> Array.map (fun entry -> loopPaths loadedDirectoryPaths selectedTreeItemPath entry)
+                    |> Array.choose id
+                    |> List.ofArray
+                else
+                    []
 
             Some {
                 FileTree.createFolder parent.name (Some parent.path) FileItemIcon.Folder with
@@ -222,152 +267,191 @@ type FileExplorer =
         let errorModal = ErrorModal.Context.useErrorModalCtx ()
         let arcScopeId = useCurrentArcScopeId ()
 
-        match fileStateCtx.state.FileTree with
-        | [||] -> FileExplorer.EmptyFileTreePlaceholder()
-        | _ ->
+        let fileTree =
+            React.useMemo (
+                (fun () ->
+                    match fileStateCtx.state.FileTree with
+                    | [||] -> None
+                    | _ ->
+                        fileStateCtx.state.FileTree
+                        |> toFileTreeNode
+                        |> collapseSingleChildSameNameDirectories
+                        |> Some),
+                [| box fileStateCtx.state.FileTree |]
+            )
 
-            let fileTree = fileStateCtx.state.FileTree |> toFileTreeNode
+        let requiredLoadedDirectories =
+            React.useMemo (
+                (fun () ->
+                    match fileTree with
+                    | Some tree -> requiredLoadedDirectoryPaths fileStateCtx.state.Selection.TreePath tree
+                    | None -> Set.empty),
+                [| box fileTree; box fileStateCtx.state.Selection.TreePath |]
+            )
 
-            let fileItem = loopPaths fileStateCtx.state.Selection.TreePath fileTree
+        let loadedDirectoryPaths, setLoadedDirectoryPaths =
+            React.useStateWithUpdater requiredLoadedDirectories
 
-            let setError (errorMsg: string option) =
-                match errorMsg with
-                | Some msg ->
+        React.useEffect (
+            (fun () -> setLoadedDirectoryPaths (fun _ -> requiredLoadedDirectories)),
+            [| box fileTree |]
+        )
+
+        React.useEffect (
+            (fun () ->
+                setLoadedDirectoryPaths (fun current ->
+                    let next = Set.union current requiredLoadedDirectories
+
+                    if next = current then
+                        current
+                    else
+                        next)),
+            [| box requiredLoadedDirectories |]
+        )
+
+        let fileItem =
+            fileTree
+            |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
+
+        let setError (errorMsg: string option) =
+            match errorMsg with
+            | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
+            | None -> ()
+
+        let toggleLfsMark =
+            FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
+
+        let openPreview (item: FileItem) =
+            promise {
+                match item.Path with
+                | None ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create (msg, title = "Git LFS update failed", ?scopeId = arcScopeId)
+                        ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed", ?scopeId = arcScopeId)
                     )
-                | None -> ()
+                | Some path when item.IsDirectory ->
+                    if not item.IsExpanded then
+                        setLoadedDirectoryPaths (fun current ->
+                            let normalizedPath = normalizePath path
 
-            let toggleLfsMark =
-                FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
+                            if current.Contains normalizedPath then
+                                current
+                            else
+                                current.Add normalizedPath)
 
-            let openPreview (item: FileItem) =
-                promise {
-                    match item.Path with
-                    | None ->
-                        errorModal.enqueue (
-                            ErrorModalRequest.create (
-                                $"File '{item.Name}' has no path.",
-                                title = "Preview failed",
-                                ?scopeId = arcScopeId
-                            )
-                        )
-                    | Some path when item.IsDirectory ->
-                        let selectedPath = normalizePath path
-                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                    let selectedPath = normalizePath path
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                        Renderer.Components.ARCHelper.clearArcObjectPreview
-                            arcObjectCtx.setArcFileState
-                            arcObjectCtx.setPreviewState
-                            arcObjectCtx.setStatusMessage
-
-                        pageStateCtx.setState None
-                    | Some path ->
-                        let selectedPath = normalizePath path
-                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                        let! result = Renderer.Components.ARCHelper.openView selectedPath
-
-                        match result with
-                        | Ok loaded ->
-                            console.log ("[Renderer] Received data, processing...")
-
-                            Renderer.Components.ARCHelper.applyLoadedView
-                                pageStateCtx.setState
-                                arcObjectCtx.setArcFileState
-                                arcObjectCtx.setPreviewState
-                                arcObjectCtx.setStatusMessage
-                                loaded
-                        | Error errorMessage ->
-                            let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
-                            console.log ($"[Renderer] Error: {fullErrorMessage}")
-
-                            Renderer.Components.ARCHelper.applyViewError
-                                pageStateCtx.setState
-                                arcObjectCtx.setArcFileState
-                                arcObjectCtx.setPreviewState
-                                arcObjectCtx.setStatusMessage
-                                fullErrorMessage
-                }
-                |> Promise.start
-
-            let closeCreateModal () =
-                setPendingCreateKind None
-
-            let openCreateModal kind =
-                setPendingCreateKind (Some kind)
-
-            let applyCreateError errorMessage =
-                Renderer.Components.ARCHelper.applyViewError
-                    pageStateCtx.setState
-                    arcObjectCtx.setArcFileState
-                    arcObjectCtx.setPreviewState
-                    arcObjectCtx.setStatusMessage
-                    errorMessage
-
-            let createArcEntry kind (identifier: string) =
-                let existingPaths =
-                    fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
-
-                match tryBuildArcCreateDraft kind identifier existingPaths with
-                | Error errorMessage -> applyCreateError errorMessage
-                | Ok draft ->
-                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some draft.Path))
-
-                    draft.ArcFile
-                    |> Renderer.Components.ARCHelper.viewLoadResultOfArcFile
-                    |> Renderer.Components.ARCHelper.applyLoadedView
-                        pageStateCtx.setState
+                    Renderer.Components.ARCHelper.clearArcObjectPreview
                         arcObjectCtx.setArcFileState
                         arcObjectCtx.setPreviewState
                         arcObjectCtx.setStatusMessage
 
-                    arcObjectCtx.setPendingArcFileSave (Some draft.ArcFile)
-                    closeCreateModal ()
+                    pageStateCtx.setState None
+                | Some path ->
+                    let selectedPath = normalizePath path
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-            let arcCreateContextMenuItems (item: FileItem) =
-                if item.IsDirectory then
-                    arcCreateKinds
-                    |> List.sortBy arcCreateKindSortOrder
-                    |> List.map (fun kind -> {
-                        Label = $"Add {ArcExplorerNodeKind.label kind}"
-                        Icon = arcCreateKindIcon kind
-                        OnClick = fun () -> openCreateModal kind
-                        Disabled = None
-                    })
-                else
-                    []
+                    let! result = Renderer.Components.ARCHelper.openView selectedPath
 
-            let contextMenuSortOrder (item: ContextMenuItem) =
-                match item.Label with
-                | "Add Study" -> 10
-                | "Add Assay" -> 20
-                | "Mark Git LFS"
-                | "Unmark Git LFS" -> 100
-                | "Git LFS: marked"
-                | "Git LFS: not marked" -> 110
-                | _ -> 1000
+                    match result with
+                    | Ok loaded ->
+                        console.log ("[Renderer] Received data, processing...")
 
-            let sortContextMenuItems (items: ContextMenuItem list) =
-                items |> List.sortBy (fun item -> contextMenuSortOrder item, item.Label)
+                        Renderer.Components.ARCHelper.applyLoadedView
+                            pageStateCtx.setState
+                            arcObjectCtx.setArcFileState
+                            arcObjectCtx.setPreviewState
+                            arcObjectCtx.setStatusMessage
+                            loaded
+                    | Error errorMessage ->
+                        let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
+                        console.log ($"[Renderer] Error: {fullErrorMessage}")
 
-            let contextMenuItems (item: FileItem) =
-                arcCreateContextMenuItems item
-                @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
-                |> sortContextMenuItems
+                        Renderer.Components.ARCHelper.applyViewError
+                            pageStateCtx.setState
+                            arcObjectCtx.setArcFileState
+                            arcObjectCtx.setPreviewState
+                            arcObjectCtx.setStatusMessage
+                            fullErrorMessage
+            }
+            |> Promise.start
 
-            match fileItem with
+        let closeCreateModal () =
+            setPendingCreateKind None
 
-            | Some fileItem ->
-                React.Fragment [
-                    Swate.Components.FileExplorer.FileExplorer(
-                        initialItems = [ fileItem ],
-                        onItemClick = openPreview,
-                        onContextMenu = contextMenuItems,
-                        selectedItemId = fileStateCtx.state.Selection.TreePath
-                    )
-                    match pendingCreateKind with
-                    | Some kind -> ArcCreateModal.Main(kind, closeCreateModal, createArcEntry)
-                    | None -> Html.none
-                ]
-            | None -> FileExplorer.EmptyFileTreePlaceholder()
+        let openCreateModal kind =
+            setPendingCreateKind (Some kind)
+
+        let applyCreateError errorMessage =
+            Renderer.Components.ARCHelper.applyViewError
+                pageStateCtx.setState
+                arcObjectCtx.setArcFileState
+                arcObjectCtx.setPreviewState
+                arcObjectCtx.setStatusMessage
+                errorMessage
+
+        let createArcEntry kind (identifier: string) =
+            let existingPaths =
+                fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
+
+            match tryBuildArcCreateDraft kind identifier existingPaths with
+            | Error errorMessage -> applyCreateError errorMessage
+            | Ok draft ->
+                fileStateCtx.setSelection (ArcSelection.forTreePath (Some draft.Path))
+
+                draft.ArcFile
+                |> Renderer.Components.ARCHelper.viewLoadResultOfArcFile
+                |> Renderer.Components.ARCHelper.applyLoadedView
+                    pageStateCtx.setState
+                    arcObjectCtx.setArcFileState
+                    arcObjectCtx.setPreviewState
+                    arcObjectCtx.setStatusMessage
+
+                arcObjectCtx.setPendingArcFileSave (Some draft.ArcFile)
+                closeCreateModal ()
+
+        let arcCreateContextMenuItems (item: FileItem) =
+            if item.IsDirectory then
+                arcCreateKinds
+                |> List.sortBy arcCreateKindSortOrder
+                |> List.map (fun kind -> {
+                    Label = $"Add {ArcExplorerNodeKind.label kind}"
+                    Icon = arcCreateKindIcon kind
+                    OnClick = fun () -> openCreateModal kind
+                    Disabled = None
+                })
+            else
+                []
+
+        let contextMenuSortOrder (item: ContextMenuItem) =
+            match item.Label with
+            | "Add Study" -> 10
+            | "Add Assay" -> 20
+            | "Mark Git LFS"
+            | "Unmark Git LFS" -> 100
+            | "Git LFS: marked"
+            | "Git LFS: not marked" -> 110
+            | _ -> 1000
+
+        let sortContextMenuItems (items: ContextMenuItem list) =
+            items |> List.sortBy (fun item -> contextMenuSortOrder item, item.Label)
+
+        let contextMenuItems (item: FileItem) =
+            arcCreateContextMenuItems item
+            @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+            |> sortContextMenuItems
+
+        match fileItem with
+        | Some fileItem ->
+            React.Fragment [
+                Swate.Components.FileExplorer.FileExplorer(
+                    initialItems = [ fileItem ],
+                    onItemClick = openPreview,
+                    onContextMenu = contextMenuItems,
+                    selectedItemId = fileStateCtx.state.Selection.TreePath
+                )
+                match pendingCreateKind with
+                | Some kind -> ArcCreateModal.Main(kind, closeCreateModal, createArcEntry)
+                | None -> Html.none
+            ]
+        | None -> FileExplorer.EmptyFileTreePlaceholder()

@@ -4,7 +4,10 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="CloseWindowSaveHelper.test.fs" />
+    <Compile Include="FileTreeCompaction.test.fs" />
     <Compile Include="ArcObjectWidget.test.fs" />
+    <Compile Include="ArcObjectGraphExplorer.test.fs" />
+    <Compile Include="JsonDTOUnwrapper.test.fs" />
     <Compile Include="ArcObjectTreeBuilder.test.fs" />
     <Compile Include="GitService.test.fs" />
     <Compile Include="GitValidation.test.fs" />

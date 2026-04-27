@@ -7,10 +7,12 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
 /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
-let normalizeSeparators (path: string) = Swate.Components.Shared.PathHelpers.normalizeSeparators path
+let normalizeSeparators (path: string) =
+    Swate.Components.Shared.PathHelpers.normalizeSeparators path
 
 /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
-let normalizePath (path: string) = Swate.Components.Shared.PathHelpers.normalizePath path
+let normalizePath (path: string) =
+    Swate.Components.Shared.PathHelpers.normalizePath path
 
 /// normalizes the path and splits it into parts
 let getPathParts (path: string) =
@@ -20,7 +22,8 @@ let getNonEmptyPathParts (path: string) =
     normalizePath path
     |> fun p -> p.Split('/', StringSplitOptions.RemoveEmptyEntries)
 
-let getPathDepth (path: string) = path |> getNonEmptyPathParts |> Array.length
+let getPathDepth (path: string) =
+    path |> getNonEmptyPathParts |> Array.length
 
 let getFileName (path: string) = path |> getPathParts |> Array.last
 
@@ -45,13 +48,11 @@ let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
     | Some index when index + 1 < segments.Length ->
         let name = segments.[index + 1].Trim()
 
-        if String.IsNullOrWhiteSpace name then
-            None
-        else
-            Some name
+        if String.IsNullOrWhiteSpace name then None else Some name
     | _ -> None
 
-let resolveArcPreviewPath (path: string) = Swate.Components.Shared.PathHelpers.resolveArcViewPath path
+let resolveArcPreviewPath (path: string) =
+    Swate.Components.Shared.PathHelpers.resolveArcViewPath path
 
 let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: FileEntry) =
     let parts = getNonEmptyPathParts entry.path
@@ -118,18 +119,40 @@ let toFileTreeNode (fileEntries: FileEntry[]) =
             fileEntries
             |> Array.find (fun fileEntry -> normalizePath fileEntry.path = rootPath)
 
-        FileTreeNode.create (
-            rootEntry.name,
-            rootEntry.isDirectory,
-            rootPath,
-            Dictionary(),
-            rootEntry.isLfs
-        )
+        FileTreeNode.create (rootEntry.name, rootEntry.isDirectory, rootPath, Dictionary(), rootEntry.isLfs)
 
     adaptedFileEntries
     |> Array.iter (fun fileEntry -> insertFileTreeEntry rootElement rootPath fileEntry)
 
     rootElement
+
+let rec collapseSingleChildSameNameDirectories (node: FileTreeNode) =
+    let collapsedChildren =
+        node.children.Values
+        |> Seq.map collapseSingleChildSameNameDirectories
+        |> Seq.toList
+
+    let childrenByName = Dictionary<string, FileTreeNode>()
+
+    collapsedChildren
+    |> List.iter (fun child -> childrenByName.[child.name] <- child)
+
+    let nodeWithCollapsedChildren =
+        { node with
+            children = childrenByName }
+
+    if nodeWithCollapsedChildren.isDirectory && nodeWithCollapsedChildren.children.Count = 1 then
+        let onlyChild = nodeWithCollapsedChildren.children.Values |> Seq.exactlyOne
+
+        if onlyChild.isDirectory
+           && String.Equals(nodeWithCollapsedChildren.name, onlyChild.name, StringComparison.OrdinalIgnoreCase) then
+            // Preserve the displayed label while routing interactions to the deepest merged directory path.
+            { onlyChild with
+                name = nodeWithCollapsedChildren.name }
+        else
+            nodeWithCollapsedChildren
+    else
+        nodeWithCollapsedChildren
 
 let tryGetExistingNotesTargetRef (path: string) : ExistingTargetRef option =
     let tryResolveTarget folderName kind =
@@ -160,8 +183,7 @@ let tryGetArcFilePath (arcRootPath: ArcRootPath) (arcFile: ArcFiles) =
     let arcRootPath = defaultArg arcRootPath ""
     let root = normalizePath arcRootPath
 
-    arcFile.TryGetRelativePath()
-    |> Option.map (fun p -> combineMany [| root; p |])
+    arcFile.TryGetRelativePath() |> Option.map (fun p -> combineMany [| root; p |])
 
 
 [<RequireQualifiedAccess>]
@@ -308,14 +330,14 @@ module FileContentDTO =
                 discFileType <- Some DTOType.ISA_Study
                 let identifier = (Identifier.Study.identifierFromFileName p)
                 let study = arc.TryGetStudy identifier
+
                 study
                 |> Option.map (fun s ->
                     let assignedAssays =
-                        s.RegisteredAssayIdentifiers
-                        |> Seq.choose arc.TryGetAssay
-                        |> List.ofSeq
+                        s.RegisteredAssayIdentifiers |> Seq.choose arc.TryGetAssay |> List.ofSeq
 
-                    ArcFiles.Study(s, assignedAssays))
+                    ArcFiles.Study(s, assignedAssays)
+                )
             | WorkflowPath p ->
                 discFileType <- Some DTOType.ISA_Workflow
 

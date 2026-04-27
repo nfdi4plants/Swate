@@ -36,25 +36,25 @@ module ARCitect =
 
                 let resolvedArcFile = // if the fable transpiled string from ARCitect.Interop.InteropTypes.ARCFile does not exactly match any available here it will somehow fallback to "ARCitect.Interop.InteropTypes.ARCFile.Assay"
                     match arcFile with
-                    | ArcFilesDiscriminateStringEnum.Assay ->
+                    | ArcFilesDiscriminate.Assay ->
                         let assay = ArcAssay.fromJsonString json
                         ArcFiles.Assay assay
-                    | ArcFilesDiscriminateStringEnum.Study ->
+                    | ArcFilesDiscriminate.Study ->
                         let study = ArcStudy.fromJsonString json
                         ArcFiles.Study(study, [])
-                    | ArcFilesDiscriminateStringEnum.Investigation ->
+                    | ArcFilesDiscriminate.Investigation ->
                         let inv = ArcInvestigation.fromJsonString json
                         ArcFiles.Investigation inv
-                    | ArcFilesDiscriminateStringEnum.Run ->
+                    | ArcFilesDiscriminate.Run ->
                         let run = ArcRun.fromJsonString json
                         ArcFiles.Run run
-                    | ArcFilesDiscriminateStringEnum.Workflow ->
+                    | ArcFilesDiscriminate.Workflow ->
                         let workflow = ArcWorkflow.fromJsonString json
                         ArcFiles.Workflow workflow
-                    | ArcFilesDiscriminateStringEnum.Template ->
+                    | ArcFilesDiscriminate.Template ->
                         let template = Template.fromJsonString json
                         ArcFiles.Template template
-                    | ArcFilesDiscriminateStringEnum.DataMap ->
+                    | ArcFilesDiscriminate.DataMap ->
                         if dataMapParent.IsNone then
                             failwith "No parent for datamap is available!"
 
@@ -70,17 +70,17 @@ module ARCitect =
         | ARCitect.Save arcFile ->
             let arcFileEnum, json, datamapParent =
                 match arcFile with
-                | ArcFiles.Assay assay -> ArcFilesDiscriminateStringEnum.Assay, ArcAssay.toJsonString 0 assay, None
-                | ArcFiles.Study(study, _) -> ArcFilesDiscriminateStringEnum.Study, ArcStudy.toJsonString 0 study, None
+                | ArcFiles.Assay assay -> ArcFilesDiscriminate.Assay, ArcAssay.toJsonString 0 assay, None
+                | ArcFiles.Study(study, _) -> ArcFilesDiscriminate.Study, ArcStudy.toJsonString 0 study, None
                 | ArcFiles.Investigation inv ->
-                    ArcFilesDiscriminateStringEnum.Investigation, ArcInvestigation.toJsonString 0 inv, None
-                | ArcFiles.Run run -> ArcFilesDiscriminateStringEnum.Run, ArcRun.toJsonString 0 run, None
+                    ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 inv, None
+                | ArcFiles.Run run -> ArcFilesDiscriminate.Run, ArcRun.toJsonString 0 run, None
                 | ArcFiles.Workflow workflow ->
-                    ArcFilesDiscriminateStringEnum.Workflow, ArcWorkflow.toJsonString 0 workflow, None
+                    ArcFilesDiscriminate.Workflow, ArcWorkflow.toJsonString 0 workflow, None
                 | ArcFiles.Template template ->
-                    ArcFilesDiscriminateStringEnum.Template, Template.toJsonString 0 template, None
+                    ArcFilesDiscriminate.Template, Template.toJsonString 0 template, None
                 | ArcFiles.DataMap(datamapParent, datamap) ->
-                    ArcFilesDiscriminateStringEnum.DataMap, DataMap.toJsonString 0 datamap, datamapParent
+                    ArcFilesDiscriminate.DataMap, DataMap.toJsonString 0 datamap, datamapParent
 
             let cmd =
                 Cmd.OfPromise.attempt
