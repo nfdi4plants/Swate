@@ -146,9 +146,10 @@
     <Compile Include="Template\TemplateCacheProvider.fs" />
     <Compile Include="Template\TemplateActions.fs" />
     <Compile Include="Template\TemplateFilter.fs" />
-    <Compile Include="Template\TemplateRows.fs" />
+    <Compile Include="Template\TemplatesDisplay.fs" />
     <Compile Include="Template\TemplatePreview.fs" />
-    <Compile Include="Template\TemplateToolbar.fs" />
+    <Compile Include="Template\TemplateImportModal.fs" />
+    <Compile Include="Template\TemplateBrowser.fs" />
     <Compile Include="Table\KeyboardNavigation.fs" />
     <Compile Include="Table\TableCell.fs" />
     <Compile Include="Table\Table.fs" />

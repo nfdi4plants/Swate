@@ -64,18 +64,24 @@ type Components =
             ]
         ]
 
-    static member CollapseButton(isCollapsed, setIsCollapsed, ?collapsedIcon, ?collapseIcon, ?classes: string) =
+    static member CollapseButton
+        (isCollapsed, setIsCollapsed, ?collapsedIcon, ?collapseIcon, ?classes: string, ?classFn: bool -> string)
+        =
         Html.label [
             prop.className [
                 "swt:btn swt:btn-square swt:swap swt:swap-rotate swt:grow-0"
                 if classes.IsSome then
                     classes.Value
+                match classFn with
+                | Some fn -> fn isCollapsed
+                | None -> ()
             ]
             prop.onClick (fun e ->
                 e.preventDefault ()
                 e.stopPropagation ()
                 not isCollapsed |> setIsCollapsed
             )
+            prop.onMouseDown (fun e -> e.stopPropagation ())
             prop.children [
                 Html.input [
                     prop.type'.checkbox

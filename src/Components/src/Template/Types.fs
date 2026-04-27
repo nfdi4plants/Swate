@@ -34,3 +34,9 @@ type SelectiveImportConfig = {
         DeselectedColumns = Set.empty
         TemplateName = None
     }
+
+type ImportModalConfirmPayload = {
+    ImportType: TableJoinOptions
+    SelectedTemplatesForImport: (Template * TemplateImportAction)[]
+    DeselectedTemplateColumns: Set<System.Guid * int>
+}
