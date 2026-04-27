@@ -37,10 +37,15 @@ let private expectTags (note: Note) =
     | Some tags -> tags
     | None -> failwith "Expected note tags to be present."
 
-let private expectTag (tag: OntologyAnnotation) expectedName expectedSource expectedAccession =
+let private expectTag
+    (tag: OntologyAnnotation)
+    (expectedName: string)
+    (expectedSource: string option)
+    (expectedAccession: string option)
+    =
     Vitest.expect(tag.NameText).toBe(expectedName)
-    Vitest.expect(tag.TermSourceREF).toEqual(Some expectedSource)
-    Vitest.expect(tag.TermAccessionNumber).toEqual(Some expectedAccession)
+    Vitest.expect(tag.TermSourceREF).toEqual(expectedSource)
+    Vitest.expect(tag.TermAccessionNumber).toEqual(expectedAccession)
 
 Vitest.describe (
     "NoteSearchInterop.rehydrateNote",
@@ -57,7 +62,7 @@ Vitest.describe (
                 let tags = expectTags hydrated
 
                 Vitest.expect(tags.Count).toBe(1)
-                expectTag tags.[0] "Planning" "SWATE" "SWATE:0001"
+                expectTag tags.[0] "Planning" (Some "SWATE") (Some "SWATE:0001")
         )
 
         Vitest.test (
@@ -72,19 +77,44 @@ Vitest.describe (
                 let tags = expectTags hydrated
 
                 Vitest.expect(tags.Count).toBe(1)
-                expectTag tags.[0] "Analysis" "MS" "MS:1000121"
+                expectTag tags.[0] "Analysis" (Some "MS") (Some "MS:1000121")
         )
 
         Vitest.test (
             "keeps semantic values when tags are already OntologyAnnotation instances",
             fun () ->
-                let existing = OntologyAnnotation("Existing", "EFO", "EFO:0001")
+                let existing = OntologyAnnotation(?name = Some "Existing")
                 let note = buildNote (Some(ResizeArray [ existing ]))
                 let hydrated = rehydrateNote note
                 let tags = expectTags hydrated
 
                 Vitest.expect(tags.Count).toBe(1)
-                expectTag tags.[0] "Existing" "EFO" "EFO:0001"
+                expectTag tags.[0] "Existing" None None
+        )
+
+        Vitest.test (
+            "keeps already-hydrated OntologyAnnotation tags in mixed arrays when other tags are rehydrated",
+            fun () ->
+                let validPascal =
+                    createPascalCaseTag "Planning" "SRC1" "ACC1"
+                    |> asOntologyAnnotation
+
+                let validUnderscore =
+                    createUnderscoreTag "Execution" "SRC2" "ACC2"
+                    |> asOntologyAnnotation
+
+                let alreadyHydrated = OntologyAnnotation(?name = Some "Review")
+
+                let note =
+                    buildNote (Some(ResizeArray [ validPascal; validUnderscore; alreadyHydrated ]))
+
+                let hydrated = rehydrateNote note
+                let tags = expectTags hydrated
+
+                Vitest.expect(tags.Count).toBe(3)
+                expectTag tags.[0] "Planning" (Some "SRC1") (Some "ACC1")
+                expectTag tags.[1] "Execution" (Some "SRC2") (Some "ACC2")
+                expectTag tags.[2] "Review" None None
         )
 
         Vitest.test (
@@ -136,8 +166,8 @@ Vitest.describe (
                 let tags = expectTags hydrated
 
                 Vitest.expect(tags.Count).toBe(3)
-                expectTag tags.[0] "Planning" "SRC1" "ACC1"
-                expectTag tags.[1] "Execution" "SRC2" "ACC2"
-                expectTag tags.[2] "Review" "SRC3" "ACC3"
+                expectTag tags.[0] "Planning" (Some "SRC1") (Some "ACC1")
+                expectTag tags.[1] "Execution" (Some "SRC2") (Some "ACC2")
+                expectTag tags.[2] "Review" (Some "SRC3") (Some "ACC3")
         )
 )

@@ -23,7 +23,7 @@ let private tryGetPreferredStringProperty (source: obj) (propertyNames: string l
 
 let private rehydrateTag (rawTag: obj) =
     let name =
-        tryGetPreferredStringProperty rawTag [ "Name"; "_name" ]
+        tryGetPreferredStringProperty rawTag [ "Name"; "_name"; "NameText"; "_nameText" ]
 
     let source =
         tryGetPreferredStringProperty rawTag [ "TermSourceREF"; "_termSourceREF" ]
