@@ -449,13 +449,10 @@ export const CommitComposer: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const commitMessageInput = canvas.getByTestId("GitSidebarCommitMessageInput");
-    await userEvent.type(commitMessageInput, "Add sidebar commit action");
-    await userEvent.click(
-      canvas.getByTestId("GitSidebarCommitSelectionCheckbox-README.md"),
-    );
-    await userEvent.click(canvas.getByTestId("GitSidebarCommitSelectionButton"));
-    await expect(canvas.getByTestId("GitSidebarCommitMessageInput")).toHaveValue("");
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save Selected Changes");
+    await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
+    await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
   },
 };
 

@@ -5,6 +5,7 @@ open Browser.Dom
 open Browser.Types
 open Elmish
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Renderer.Context.GitWorkflow
 open Renderer.Types
@@ -105,6 +106,9 @@ let private changedFile path indexStatus workingTreeStatus isConflicted = {
 
 [<Emit("new Event($0)")>]
 let private createEvent (eventType: string) : Browser.Types.Event = jsNative
+
+[<Emit("new MouseEvent($0, $1)")>]
+let private createMouseEvent (eventType: string) (eventInit: obj) : Browser.Types.MouseEvent = jsNative
 
 [<Emit("""
 globalThis.__swateOriginalFetch = globalThis.fetch;
@@ -1879,6 +1883,233 @@ Vitest.describe (
                 let statusSlot = container.querySelector("[data-testid='GitSidebarChangeStatusSlot-0']") :?> HTMLElement
                 Vitest.expect(statusSlot.className.Contains("swt:ml-auto")).toBe (true)
                 Vitest.expect(statusSlot.className.Contains("swt:shrink-0")).toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar marks rows with Windows Explorer click semantics and shows one primary save button",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnSync = fun () -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLButtonElement
+                let thirdRow = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLButtonElement
+
+                firstRow.click ()
+
+                let shiftClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "shiftKey" ==> true ])
+
+                thirdRow.dispatchEvent shiftClick |> ignore
+
+                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarPrimarySaveButton']").length).toBe (1)
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                Vitest.expect(container.querySelectorAll("[data-testid^='GitSidebarCommitSelectionCheckbox-']").length).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar plain click clears previous marks and ctrl-click toggles a row on and back off",
+            fun () -> promise {
+                let mutable capturedSelection: GitSidebarCommitSelectionRequest option = None
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnSync = fun () -> ()
+                                OnCommitSelection = fun request -> capturedSelection <- Some request
+                                OnCommitAll = fun _ -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLButtonElement
+                let row1 = container.querySelector("[data-testid='GitSidebarChangeRow-1']") :?> HTMLButtonElement
+                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLButtonElement
+                let messageInput = container.querySelector("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+                let saveButton = container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+
+                row0.click ()
+
+                let ctrlClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
+
+                row2.dispatchEvent ctrlClick |> ignore
+                row2.dispatchEvent ctrlClick |> ignore
+                row1.click ()
+
+                messageInput.value <- "save one file"
+                messageInput.dispatchEvent (createEvent "input") |> ignore
+                saveButton.click ()
+
+                Vitest.expect(capturedSelection |> Option.map _.Paths).toEqual (Some [| "src/file-001.txt" |])
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar ctrl-shift-click adds the anchor range to the existing marked set",
+            fun () -> promise {
+                let mutable capturedSelection: GitSidebarCommitSelectionRequest option = None
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnSync = fun () -> ()
+                                OnCommitSelection = fun request -> capturedSelection <- Some request
+                                OnCommitAll = fun _ -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLButtonElement
+                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLButtonElement
+                let messageInput = container.querySelector("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+                let saveButton = container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+
+                row0.click ()
+
+                let ctrlShiftClick =
+                    createMouseEvent
+                        "click"
+                        (createObj [ "bubbles" ==> true; "ctrlKey" ==> true; "shiftKey" ==> true ])
+
+                row2.dispatchEvent ctrlShiftClick |> ignore
+
+                messageInput.value <- "save range"
+                messageInput.dispatchEvent (createEvent "input") |> ignore
+                saveButton.click ()
+
+                Vitest
+                    .expect(capturedSelection |> Option.map _.Paths)
+                    .toEqual (Some [| "src/file-000.txt"; "src/file-001.txt"; "src/file-002.txt" |])
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar keeps marked rows selected even when diff opening fails",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [|
+                                changedFile "README.md" "M" " " false
+                                changedFile "docs/guide.md" "M" " " false
+                            |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnSync = fun () -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Error "Diff failed to load." }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLButtonElement
+                firstRow.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarErrorNotice']")).not.toBeNull ()
 
                 cleanup ()
             }
