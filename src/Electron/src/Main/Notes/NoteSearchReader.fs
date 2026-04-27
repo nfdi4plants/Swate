@@ -45,26 +45,46 @@ let private tryParseDateFromPath (relativePath: string) =
     (normalizePath relativePath).Split('/', StringSplitOptions.RemoveEmptyEntries)
     |> Array.tryPick tryParseDateText
 
-let private tryGetHeaderValue (prefix: string) (lines: string[]) =
+let private tryGetHeaderValue (headerKey: string) (lines: string[]) =
     lines
     |> Array.tryPick (fun line ->
-        if line.StartsWith(prefix) then
-            Some(line.Substring(prefix.Length).Trim())
-        else
+        let trimmedLine = line.Trim()
+        let separatorIndex = trimmedLine.IndexOf(':')
+
+        if separatorIndex < 0 then
             None
+        else
+            let key = trimmedLine.Substring(0, separatorIndex).Trim()
+
+            if String.Equals(key, headerKey, StringComparison.OrdinalIgnoreCase) then
+                Some(trimmedLine.Substring(separatorIndex + 1).Trim())
+            else
+                None
     )
 
 let private fallbackTitleFromPath (relativePath: string) =
     let fileName = pathDynamic?basename (relativePath, ".md") |> unbox<string>
     fileName.Replace("_", " ").Trim()
 
+let private mkTagFromText (tagText: string) =
+    let parts =
+        tagText.Split([| '|' |], StringSplitOptions.None)
+        |> Array.map (fun part -> part.Trim())
+        |> Array.filter (String.IsNullOrWhiteSpace >> not)
+
+    match parts with
+    | [| name |] -> Some(OntologyAnnotation(name, ""))
+    | [| name; source |] -> Some(OntologyAnnotation(name, source))
+    | [| name; source; accession |] -> Some(OntologyAnnotation(name, source, accession))
+    // Preserve legacy/fallback behavior for unexpected formats.
+    | _ when String.IsNullOrWhiteSpace tagText |> not -> Some(OntologyAnnotation(tagText.Trim(), ""))
+    | _ -> None
+
 let private parseTags (value: string option) =
     value
     |> Option.bind (fun tagText ->
         tagText.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
-        |> Array.map (fun tag -> tag.Trim())
-        |> Array.filter (String.IsNullOrWhiteSpace >> not)
-        |> Array.map (fun tag -> OntologyAnnotation(tag, ""))
+        |> Array.choose mkTagFromText
         |> ResizeArray
         |> fun tags -> if tags.Count = 0 then None else Some tags
     )
@@ -123,14 +143,14 @@ let private parseNote (relativePath: string) (content: string) (modifiedAt: Date
         |> Option.defaultValue (fallbackTitleFromPath relativePath)
 
     let date =
-        match tryGetHeaderValue "Date Created:" headerLines |> Option.bind tryParseDateText with
+        match tryGetHeaderValue "Date Created" headerLines |> Option.bind tryParseDateText with
         | Some parsedDate -> parsedDate
         | None ->
             match tryParseDateFromPath relativePath with
             | Some parsedDate -> parsedDate
             | None -> defaultArg modifiedAt DateTime.MinValue
 
-    let tags = headerLines |> tryGetHeaderValue "Tags:" |> parseTags
+    let tags = headerLines |> tryGetHeaderValue "Tags" |> parseTags
 
     let body =
         bodyLines
