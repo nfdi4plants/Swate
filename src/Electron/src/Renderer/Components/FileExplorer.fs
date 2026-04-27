@@ -93,23 +93,31 @@ module private FileExplorerHelper =
         function
         | ArcExplorerNodeKind.Study -> "swt:fluent--document-table-24-regular"
         | ArcExplorerNodeKind.Assay -> "swt:fluent--beaker-24-regular"
+        | ArcExplorerNodeKind.Workflow -> "swt:fluent--flowchart-24-regular"
+        | ArcExplorerNodeKind.Run -> "swt:fluent--play-24-regular"
         | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
 
     let arcCreateKinds = [
         ArcExplorerNodeKind.Study
         ArcExplorerNodeKind.Assay
+        ArcExplorerNodeKind.Workflow
+        ArcExplorerNodeKind.Run
     ]
 
     let arcCreateKindSortOrder =
         function
         | ArcExplorerNodeKind.Study -> 10
         | ArcExplorerNodeKind.Assay -> 20
+        | ArcExplorerNodeKind.Workflow -> 30
+        | ArcExplorerNodeKind.Run -> 40
         | _ -> 1000
 
     let arcCreateKindDefaultIdentifier =
         function
         | ArcExplorerNodeKind.Study -> "New Study"
         | ArcExplorerNodeKind.Assay -> "New Assay"
+        | ArcExplorerNodeKind.Workflow -> "New Workflow"
+        | ArcExplorerNodeKind.Run -> "New Run"
         | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
 
     let isArcCreateIdentifierValid (identifier: string) =
@@ -131,7 +139,26 @@ module private FileExplorerHelper =
             let assay = ArcAssay.init identifier
             assay.InitTable($"{identifier} Table") |> ignore
             Ok(ArcFiles.Assay assay)
+        | ArcExplorerNodeKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow |> Ok
+        | ArcExplorerNodeKind.Run ->
+            let run = ArcRun.init identifier
+            run.InitTable($"{identifier} Table") |> ignore
+            Ok(ArcFiles.Run run)
         | kind -> Error $"Creating {ArcExplorerNodeKind.label kind} files is not supported from the file explorer."
+
+    let tryGetInlineArcCreateKind (rootPath: string) (item: FileItem) =
+        if not item.IsDirectory then
+            None
+        else
+            match item.Path with
+            | Some path when getPathDepth path = getPathDepth rootPath + 1 ->
+                match PathHelpers.getNameFromPath path |> fun name -> name.ToLowerInvariant() with
+                | "studies" -> Some ArcExplorerNodeKind.Study
+                | "assays" -> Some ArcExplorerNodeKind.Assay
+                | "workflows" -> Some ArcExplorerNodeKind.Workflow
+                | "runs" -> Some ArcExplorerNodeKind.Run
+                | _ -> None
+            | _ -> None
 
     let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq) =
         let identifier = identifier.Trim()
@@ -167,7 +194,7 @@ type private ArcCreateModal =
 
     [<ReactComponent>]
     static member Main
-        (kind: ArcExplorerNodeKind, close: unit -> unit, submit: ArcExplorerNodeKind -> string -> unit)
+        (isOpen: bool, kind: ArcExplorerNodeKind, close: unit -> unit, submit: ArcExplorerNodeKind -> string -> unit)
         =
 
         let identifier, setIdentifier = React.useState (arcCreateKindDefaultIdentifier kind)
@@ -234,7 +261,7 @@ type private ArcCreateModal =
             ]
 
         BaseModal.Modal(
-            isOpen = true,
+            isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text $"Add {label}",
             description = Html.text $"Create a new {label.ToLowerInvariant()} in the current ARC.",
@@ -313,6 +340,8 @@ type FileExplorer =
             fileTree
             |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
 
+        let rootPath = fileTree |> Option.map (fun tree -> tree.path)
+
         let setError (errorMsg: string option) =
             match errorMsg with
             | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
@@ -382,6 +411,17 @@ type FileExplorer =
         let openCreateModal kind =
             setPendingCreateKind (Some kind)
 
+        let inlineCreateKindForItem item =
+            match rootPath with
+            | Some path -> tryGetInlineArcCreateKind path item
+            | None -> None
+
+        let canCreateFromItem item =
+            inlineCreateKindForItem item |> Option.isSome
+
+        let createFromItem item =
+            inlineCreateKindForItem item |> Option.iter openCreateModal
+
         let applyCreateError errorMessage =
             Renderer.Components.ARCHelper.applyViewError
                 pageStateCtx.setState
@@ -427,6 +467,8 @@ type FileExplorer =
             match item.Label with
             | "Add Study" -> 10
             | "Add Assay" -> 20
+            | "Add Workflow" -> 30
+            | "Add Run" -> 40
             | "Mark Git LFS"
             | "Unmark Git LFS" -> 100
             | "Git LFS: marked"
@@ -441,6 +483,17 @@ type FileExplorer =
             @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
             |> sortContextMenuItems
 
+        let activeCreateKind =
+            pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
+
+        let arcCreateModal =
+            ArcCreateModal.Main(
+                isOpen = pendingCreateKind.IsSome,
+                kind = activeCreateKind,
+                close = closeCreateModal,
+                submit = createArcEntry
+            )
+
         match fileItem with
         | Some fileItem ->
             React.Fragment [
@@ -448,10 +501,14 @@ type FileExplorer =
                     initialItems = [ fileItem ],
                     onItemClick = openPreview,
                     onContextMenu = contextMenuItems,
+                    canCreateItem = canCreateFromItem,
+                    onCreateItem = createFromItem,
                     selectedItemId = fileStateCtx.state.Selection.TreePath
                 )
-                match pendingCreateKind with
-                | Some kind -> ArcCreateModal.Main(kind, closeCreateModal, createArcEntry)
-                | None -> Html.none
+                arcCreateModal
             ]
-        | None -> FileExplorer.EmptyFileTreePlaceholder()
+        | None ->
+            React.Fragment [
+                FileExplorer.EmptyFileTreePlaceholder()
+                arcCreateModal
+            ]

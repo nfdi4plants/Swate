@@ -18,6 +18,8 @@ type FileExplorer =
             ?initialItems: FileItem list,
             ?onItemClick: FileItem -> unit,
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
+            ?canCreateItem: FileItem -> bool,
+            ?onCreateItem: FileItem -> unit,
             ?selectedItemId: string option,
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?useDirectoryChevronToggle: bool,
@@ -31,6 +33,7 @@ type FileExplorer =
         let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
         let showBreadcrumbs = defaultArg showBreadcrumbs true
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
+        let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
 
@@ -86,6 +89,11 @@ type FileExplorer =
                 else
                     dispatch (FileExplorerLogic.ToggleExpanded item.Id)
 
+        let handleCreateItem (item: FileItem) (ev: Browser.Types.MouseEvent) =
+            ev.preventDefault ()
+            ev.stopPropagation ()
+            onCreateItem |> Option.iter (fun fn -> fn item)
+
         let copyPathToClipboard (path: string) =
             promise {
                 try
@@ -140,6 +148,62 @@ type FileExplorer =
                 yield item.Icon |> FileItemIcon.className
                 yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
                 yield! getItemIconClass item |> Option.toList
+            ]
+
+        let renderCreateItemButton (item: FileItem) =
+            if item.IsDirectory && canCreateItem item && onCreateItem.IsSome then
+                Html.button [
+                    prop.type'.button
+                    prop.className
+                        "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity group-hover:swt:opacity-100 focus:swt:opacity-100"
+                    prop.ariaLabel $"Create new item in {item.Name}"
+                    prop.title $"Create new item in {item.Name}"
+                    prop.onClick (handleCreateItem item)
+                    prop.children [
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--add-24-regular swt:size-4"
+                        ]
+                    ]
+                ]
+            else
+                Html.none
+
+        let renderLfsControls (item: FileItem) =
+            if item.IsLFS = Some true then
+                Html.div [
+                    prop.className "swt:flex swt:gap-2 swt:items-center"
+                    prop.children [
+                        Html.button [
+                            prop.className "swt:btn swt:btn-xs"
+                            prop.disabled (item.Downloaded = Some true)
+                            prop.text "LFS"
+                            prop.onClick (fun e ->
+                                e.stopPropagation ()
+
+                                dispatch (
+                                    FileExplorerLogic.ToggleLFSDownload item.Id
+                                )
+                            )
+                        ]
+                        match item.SizeFormatted with
+                        | Some size ->
+                            Html.span [
+                                prop.className "swt:badge swt:badge-sm"
+                                prop.text size
+                            ]
+                        | None -> Html.none
+                    ]
+                ]
+            else
+                Html.none
+
+        let renderTrailingDirectoryControls (item: FileItem) =
+            Html.div [
+                prop.className "swt:flex swt:shrink-0 swt:items-center swt:gap-2"
+                prop.children [
+                    renderCreateItemButton item
+                    renderLfsControls item
+                ]
             ]
 
         let toComponentMenuItem (item: Swate.Components.FileExplorerTypes.ContextMenuItem) =
@@ -206,7 +270,7 @@ type FileExplorer =
                                 prop.children [
                                     Html.summary [
                                         prop.custom ("data-file-item-id", item.Id)
-                                        prop.className ("swt:list-none swt:px-2 swt:py-1 " + selectedClass)
+                                        prop.className ("swt:list-none swt:px-2 swt:py-1 swt:group " + selectedClass)
                                         prop.onClick (fun ev ->
                                             ev.preventDefault ()
                                             ev.stopPropagation ()
@@ -253,33 +317,7 @@ type FileExplorer =
                                                             ]
                                                         ]
                                                     ]
-
-                                                    // LFS badge and size if applicable
-                                                    if item.IsLFS = Some true then
-                                                        Html.div [
-                                                            prop.className "swt:flex swt:gap-2 swt:items-center"
-                                                            prop.children [
-                                                                Html.button [
-                                                                    prop.className "swt:btn swt:btn-xs"
-                                                                    prop.disabled (item.Downloaded = Some true)
-                                                                    prop.text "LFS"
-                                                                    prop.onClick (fun e ->
-                                                                        e.stopPropagation ()
-
-                                                                        dispatch (
-                                                                            FileExplorerLogic.ToggleLFSDownload item.Id
-                                                                        )
-                                                                    )
-                                                                ]
-                                                                match item.SizeFormatted with
-                                                                | Some size ->
-                                                                    Html.span [
-                                                                        prop.className "swt:badge swt:badge-sm"
-                                                                        prop.text size
-                                                                    ]
-                                                                | None -> Html.none
-                                                            ]
-                                                        ]
+                                                    renderTrailingDirectoryControls item
                                                 ]
                                             ]
                                         ]
@@ -299,7 +337,7 @@ type FileExplorer =
                                 prop.children [
                                     Html.summary [
                                         prop.custom ("data-file-item-id", item.Id)
-                                        prop.className ("swt:px-2 swt:py-1 swt:cursor-pointer " + selectedClass)
+                                        prop.className ("swt:px-2 swt:py-1 swt:cursor-pointer swt:group " + selectedClass)
                                         prop.onClick (handleDirectoryClick item isExpanded)
                                         prop.children [
                                             Html.div [
@@ -312,33 +350,7 @@ type FileExplorer =
                                                             Html.span item.Name
                                                         ]
                                                     ]
-
-                                                    // LFS badge and size if applicable
-                                                    if item.IsLFS = Some true then
-                                                        Html.div [
-                                                            prop.className "swt:flex swt:gap-2 swt:items-center"
-                                                            prop.children [
-                                                                Html.button [
-                                                                    prop.className "swt:btn swt:btn-xs"
-                                                                    prop.disabled (item.Downloaded = Some true)
-                                                                    prop.text "LFS"
-                                                                    prop.onClick (fun e ->
-                                                                        e.stopPropagation ()
-
-                                                                        dispatch (
-                                                                            FileExplorerLogic.ToggleLFSDownload item.Id
-                                                                        )
-                                                                    )
-                                                                ]
-                                                                match item.SizeFormatted with
-                                                                | Some size ->
-                                                                    Html.span [
-                                                                        prop.className "swt:badge swt:badge-sm"
-                                                                        prop.text size
-                                                                    ]
-                                                                | None -> Html.none
-                                                            ]
-                                                        ]
+                                                    renderTrailingDirectoryControls item
                                                 ]
                                             ]
                                         ]
