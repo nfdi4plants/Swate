@@ -224,6 +224,7 @@ let private defaultDependencies: GitDependencies = {
     initGitRepository = fun path -> unexpectedPromise $"initGitRepository:{path}"
     createDataHubProject = fun name -> unexpectedPromise $"createDataHubProject:{name}"
     installGitLfs = fun () -> unexpectedPromise "installGitLfs"
+    previewGitPull = fun _ -> unexpectedPromise "previewGitPull"
     gitFetch = fun _ -> unexpectedPromise "gitFetch"
     gitPull = fun _ -> unexpectedPromise "gitPull"
     gitPush = fun _ -> unexpectedPromise "gitPush"
@@ -374,7 +375,6 @@ Vitest.describe (
             }
         )
 )
-
 Vitest.describe (
     "GitWorkflow update command flow",
     fun () ->
@@ -1165,6 +1165,361 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Primary save commits locally, preflights pull, pulls, and pushes when the preflight is safe",
+            fun () -> promise {
+                let mutable stageCalls = 0
+                let mutable commitCalls = 0
+                let mutable previewCalls = 0
+                let mutable pullCalls = 0
+                let mutable pushCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                        gitStagePaths =
+                            fun _ -> promise {
+                                stageCalls <- stageCalls + 1
+                                return Ok okOperationResult
+                            }
+                        gitCommit =
+                            fun _ -> promise {
+                                commitCalls <- commitCalls + 1
+                                return Ok okOperationResult
+                            }
+                        previewGitPull =
+                            fun _ -> promise {
+                                previewCalls <- previewCalls + 1
+                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+                            }
+                        gitPull =
+                            fun _ -> promise {
+                                pullCalls <- pullCalls + 1
+                                return Ok okOperationResult
+                            }
+                        gitPush =
+                            fun _ -> promise {
+                                pushCalls <- pushCalls + 1
+                                return Ok okOperationResult
+                            }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Add polish") initialState
+
+                let! requestMessages = collectMessages requestCmd
+
+                let _, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, PrimarySave _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
+                        update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the primary save flow to finish as one completed write request."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(stageCalls).toBe (1)
+                Vitest.expect(commitCalls).toBe (1)
+                Vitest.expect(previewCalls).toBe (1)
+                Vitest.expect(pullCalls).toBe (1)
+                Vitest.expect(pushCalls).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "Primary save publishes the branch first when no upstream is configured yet",
+            fun () -> promise {
+                let mutable previewCalls = 0
+                let mutable pullCalls = 0
+                let mutable pushCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok(statusForBranch "feature/new-branch") }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "feature/new-branch" true false |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                        gitStagePaths = fun _ -> promise { return Ok okOperationResult }
+                        gitCommit = fun _ -> promise { return Ok okOperationResult }
+                        previewGitPull =
+                            fun _ -> promise {
+                                previewCalls <- previewCalls + 1
+                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+                            }
+                        gitPull =
+                            fun _ -> promise {
+                                pullCalls <- pullCalls + 1
+                                return Ok okOperationResult
+                            }
+                        gitPush =
+                            fun _ -> promise {
+                                pushCalls <- pushCalls + 1
+                                return Ok okOperationResult
+                            }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        Status = {
+                            GitState.Empty.Status with
+                                CurrentBranch = Some "feature/new-branch"
+                                TrackingBranch = None
+                                IsClean = false
+                        }
+                        BranchOptions = [| sidebarLocalBranch "feature/new-branch" true false |]
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Publish branch") initialState
+
+                let! requestMessages = collectMessages requestCmd
+
+                let _, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, PrimarySave _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
+                        update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected the primary save flow to publish the branch and finish."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(pushCalls).toBe (1)
+                Vitest.expect(previewCalls).toBe (0)
+                Vitest.expect(pullCalls).toBe (0)
+            }
+        )
+
+        Vitest.test (
+            "Local-only save keeps the old add-and-commit behavior and never requests pull preflight",
+            fun () -> promise {
+                let mutable previewCalled = false
+
+                let deps = {
+                    defaultDependencies with
+                        gitStagePaths = fun _ -> promise { return Ok okOperationResult }
+                        gitCommit = fun _ -> promise { return Ok okOperationResult }
+                        previewGitPull =
+                            fun _ -> promise {
+                                previewCalled <- true
+                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+                            }
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let _, cmd = update deps ignore (CommitAllRequested "Local only") state
+                let! _ = collectMessages cmd
+
+                Vitest.expect(previewCalled).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "Primary save keeps a warning and pending confirmation when preflight says online sync still needs merge resolution",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                        gitStagePaths = fun _ -> promise { return Ok okOperationResult }
+                        gitCommit = fun _ -> promise { return Ok okOperationResult }
+                        previewGitPull =
+                            fun _ -> promise {
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                        Message = Some "Pulling would require merge resolution."
+                                    }
+                            }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Add polish") initialState
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteConfirmation(UnitSuccess(_, _, _, Some warningText), _, GitPendingRemoteAction.CompletePrimarySavePush))) |] ->
+                        let updatedState, cmd = update deps ignore requestMessages[0] stateAfterRequest
+                        Vitest.expect(warningText).toContain ("saved locally")
+                        updatedState, cmd
+                    | _ -> failwith "Expected the primary save flow to request remote confirmation."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(nextState.PendingConfirmation.IsSome).toBe (true)
+                Vitest.expect(nextState.PendingRemoteAction).toEqual (GitPendingRemoteAction.CompletePrimarySavePush)
+                Vitest.expect(nextState.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+
+                let stateAfterCancel, cancelCmd =
+                    update deps ignore CancelPendingRemoteActionRequested nextState
+
+                let! cancelMessages = collectMessages cancelCmd
+
+                Vitest.expect(cancelMessages).toEqual ([||])
+                Vitest.expect(stateAfterCancel.PendingConfirmation).toEqual (None)
+                Vitest.expect(stateAfterCancel.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+            }
+        )
+
+        Vitest.test (
+            "UpdateFromOnlineRequested opens a confirmation dialog instead of pulling when preflight predicts merge resolution",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        previewGitPull =
+                            fun _ -> promise {
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                        Message = Some "Pulling would require merge resolution."
+                                    }
+                            }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                }
+
+                let nextState, cmd = update deps ignore UpdateFromOnlineRequested state
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.PendingConfirmation.IsSome).toBe (true)
+                Vitest.expect(nextState.PendingRemoteAction).toEqual (GitPendingRemoteAction.UpdateFromOnline)
+            }
+        )
+
+        Vitest.test (
+            "UpdateFromOnlineRequested does nothing when no ARC is loaded",
+            fun () -> promise {
+                let nextState, cmd =
+                    update defaultDependencies ignore UpdateFromOnlineRequested GitState.Empty
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState).toEqual (GitState.Empty)
+            }
+        )
+
+        Vitest.test (
+            "UpdateFromOnlineRequested shows the indeterminate confirmation wording when preflight cannot classify safely",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        previewGitPull =
+                            fun _ -> promise {
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.Indeterminate
+                                        Message = Some "Git pull preflight could not be classified safely."
+                                    }
+                            }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                }
+
+                let nextState, cmd = update deps ignore UpdateFromOnlineRequested state
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.PendingConfirmation |> Option.map _.Title).toEqual (Some "Update could not be previewed")
+                Vitest
+                    .expect(nextState.PendingConfirmation |> Option.map _.Message |> Option.defaultValue "")
+                    .toContain ("could not determine safely")
+            }
+        )
+
+        Vitest.test (
+            "UpdatePreflightCompleted ignores results from the previous ARC session",
+            fun () -> promise {
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-b"
+                        ArcSessionId = 4
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (UpdatePreflightCompleted(
+                            3,
+                            Ok {
+                                Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                Message = Some "stale"
+                            }
+                        ))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.PendingConfirmation).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "ConfirmMergeResolutionCompleted dispatches Push when the pending primary-save push can resume",
+            fun () -> promise {
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ArcSessionId = 5
+                        PendingPostMergePush = true
+                        BusyOperation = Some(GitBusyOperation.ConfirmingMergeResolution "conflict.txt")
+                        MergeResolutionPendingPath = Some "conflict.txt"
+                        SelectedChangePath = Some "conflict.txt"
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (ConfirmMergeResolutionCompleted(
+                            5,
+                            Ok {
+                                UpdatedStatus = cleanStatus
+                                NextConflictedPath = None
+                                PageChange = GitPageChange.Clear
+                            }
+                        ))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.PendingPostMergePush).toBe (false)
+                Vitest.expect(messages).toEqual ([| WriteRequested Push |])
+            }
+        )
+
+        Vitest.test (
             "ArcPathChanged schedules a bare RefreshRequested when switching repositories",
             fun () -> promise {
                 let nextState, cmd =
@@ -1381,9 +1736,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1454,9 +1813,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1467,15 +1830,15 @@ Vitest.describe (
                             lfsAutoTrackThresholdMb = 5,
                             remoteActionsEnabled = false,
                             remoteActionsWarning =
-                                "Sign in to a DataHub account to use fetch, pull, push, or sync."
+                                "Sign in to a DataHub account to use fetch, pull, push, or update."
                         )
                     )
 
-                let syncButton =
-                    container.querySelector ("[data-testid='GitSidebarSyncButton']")
+                let updateButton =
+                    container.querySelector ("[data-testid='GitSidebarUpdateArcButton']")
                     :?> HTMLButtonElement
 
-                Vitest.expect(syncButton.disabled).toBe (true)
+                Vitest.expect(updateButton.disabled).toBe (true)
                 Vitest.expect(container.textContent.Contains("Sign in to a DataHub account")).toBe (true)
 
                 cleanup ()
@@ -1503,9 +1866,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1548,9 +1915,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1596,9 +1967,13 @@ Vitest.describe (
                                         OnFetch = fun () -> ()
                                         OnPull = fun () -> ()
                                         OnPush = fun () -> ()
-                                        OnSync = fun () -> ()
+                                        OnUpdateFromOnline = fun () -> ()
+                                        OnPrimarySaveSelection = fun _ -> ()
+                                        OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnConfirmPendingRemoteAction = fun () -> ()
+                                        OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
@@ -1673,9 +2048,13 @@ Vitest.describe (
                                         OnFetch = fun () -> ()
                                         OnPull = fun () -> ()
                                         OnPush = fun () -> ()
-                                        OnSync = fun () -> ()
+                                        OnUpdateFromOnline = fun () -> ()
+                                        OnPrimarySaveSelection = fun _ -> ()
+                                        OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnConfirmPendingRemoteAction = fun () -> ()
+                                        OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
@@ -1753,9 +2132,13 @@ Vitest.describe (
                                                         OnFetch = fun () -> ()
                                                         OnPull = fun () -> ()
                                                         OnPush = fun () -> ()
-                                                        OnSync = fun () -> ()
+                                                        OnUpdateFromOnline = fun () -> ()
+                                                        OnPrimarySaveSelection = fun _ -> ()
+                                                        OnPrimarySaveAll = fun _ -> ()
                                                         OnCommitSelection = fun _ -> ()
                                                         OnCommitAll = fun _ -> ()
+                                                        OnConfirmPendingRemoteAction = fun () -> ()
+                                                        OnCancelPendingRemoteAction = fun () -> ()
                                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                                         OnCreateBranch = fun _ -> ()
@@ -1812,9 +2195,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1864,9 +2251,13 @@ Vitest.describe (
                                         OnFetch = fun () -> ()
                                         OnPull = fun () -> ()
                                         OnPush = fun () -> ()
-                                        OnSync = fun () -> ()
+                                        OnUpdateFromOnline = fun () -> ()
+                                        OnPrimarySaveSelection = fun _ -> ()
+                                        OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnConfirmPendingRemoteAction = fun () -> ()
+                                        OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
@@ -1909,9 +2300,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1964,9 +2359,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun request -> capturedSelection <- Some request
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -2026,9 +2425,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun request -> capturedSelection <- Some request
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -2090,9 +2493,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()

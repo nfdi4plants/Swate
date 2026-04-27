@@ -115,7 +115,10 @@ type private AdvancedActionsProps = {
     RemoteActionsEnabled: bool
     RemoteActionsWarning: string option
     SubmitDownloadLargeFiles: bool -> unit
-    SubmitSync: unit -> unit
+    SubmitUpdateFromOnline: unit -> unit
+    SubmitLocalCommit: unit -> unit
+    HasMarkedFiles: bool
+    CanRunPrimarySave: bool
     IsAdvancedActionsOpen: bool
     ToggleAdvancedActions: unit -> unit
     SubmitFetch: unit -> unit
@@ -184,6 +187,13 @@ type private ModalsProps = {
     IsMissingMessageModalOpen: bool
     SetMissingMessageModalOpen: bool -> unit
     CloseDialog: unit -> unit
+}
+
+[<NoEquality; NoComparison>]
+type private PendingRemoteActionDialogProps = {
+    PendingConfirmation: GitSidebarConfirmationDialog option
+    ConfirmPendingRemoteAction: unit -> unit
+    CancelPendingRemoteAction: unit -> unit
 }
 
 [<Erase; Mangle(false)>]
@@ -578,11 +588,11 @@ type GitSidebar =
                         ]
                     ]
                     GitSidebar.ActionButton(
-                        "Synchronize Changes",
+                        "Update ARC from Online",
                         "swt:fluent--arrow-sync-24-regular",
                         props.IsBusy || not props.RemoteActionsEnabled,
-                        props.SubmitSync,
-                        testId = "GitSidebarSyncButton"
+                        props.SubmitUpdateFromOnline,
+                        testId = "GitSidebarUpdateArcButton"
                     )
                     GitSidebar.ActionButton(
                         "More Git Actions",
@@ -628,6 +638,16 @@ type GitSidebar =
                         Html.div [
                             prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
                             prop.children [
+                                GitSidebar.ActionButton(
+                                    (if props.HasMarkedFiles then
+                                         "Add and commit selected Changes"
+                                     else
+                                         "Add and commit all Changes"),
+                                    "swt:fluent--save-24-regular",
+                                    not props.CanRunPrimarySave,
+                                    props.SubmitLocalCommit,
+                                    testId = "GitSidebarLocalCommitButton"
+                                )
                                 GitSidebar.ActionButton(
                                     "Check for Changes",
                                     "swt:fluent--arrow-download-24-regular",
@@ -1125,6 +1145,36 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
+    static member private PendingRemoteActionDialog(props: PendingRemoteActionDialogProps) =
+        BaseModal.Modal(
+            isOpen = props.PendingConfirmation.IsSome,
+            setIsOpen =
+                (fun isOpen ->
+                    if not isOpen then
+                        props.CancelPendingRemoteAction ()),
+            header = Html.text (props.PendingConfirmation |> Option.map _.Title |> Option.defaultValue "Confirm"),
+            children =
+                Html.p [
+                    prop.className "swt:whitespace-pre-wrap"
+                    prop.text (props.PendingConfirmation |> Option.map _.Message |> Option.defaultValue "")
+                ],
+            footer =
+                React.Fragment [
+                    Html.button [
+                        prop.className "swt:btn"
+                        prop.text (props.PendingConfirmation |> Option.map _.CancelLabel |> Option.defaultValue "Cancel")
+                        prop.onClick (fun _ -> props.CancelPendingRemoteAction ())
+                    ]
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                        prop.text (props.PendingConfirmation |> Option.map _.ConfirmLabel |> Option.defaultValue "Continue")
+                        prop.onClick (fun _ -> props.ConfirmPendingRemoteAction ())
+                    ]
+                ],
+            debug = "GitSidebarPendingRemoteAction"
+        )
+
+    [<ReactComponent>]
     static member Main
         (
             status: GitSidebarStatus,
@@ -1137,6 +1187,7 @@ type GitSidebar =
             ?selectedFile: string,
             ?errorNotice: string,
             ?warningNotice: string,
+            ?pendingConfirmation: GitSidebarConfirmationDialog,
             ?remoteActionsEnabled: bool,
             ?remoteActionsWarning: string
         ) =
@@ -1144,6 +1195,7 @@ type GitSidebar =
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
         let errorNotice = errorNotice
         let warningNotice = warningNotice
+        let pendingConfirmation = pendingConfirmation
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
         let selectedFile = selectedFile
@@ -1151,9 +1203,13 @@ type GitSidebar =
         let onFetch = callbacks.OnFetch
         let onPull = callbacks.OnPull
         let onPush = callbacks.OnPush
-        let onSync = callbacks.OnSync
+        let onUpdateFromOnline = callbacks.OnUpdateFromOnline
+        let onPrimarySaveSelection = callbacks.OnPrimarySaveSelection
+        let onPrimarySaveAll = callbacks.OnPrimarySaveAll
         let onCommitSelection = callbacks.OnCommitSelection
         let onCommitAll = callbacks.OnCommitAll
+        let onConfirmPendingRemoteAction = callbacks.OnConfirmPendingRemoteAction
+        let onCancelPendingRemoteAction = callbacks.OnCancelPendingRemoteAction
         let onSaveDownloadLargeFiles = callbacks.OnSaveDownloadLargeFiles
         let onSaveLfsAutoTrackThreshold = callbacks.OnSaveLfsAutoTrackThreshold
         let onCreateBranch = callbacks.OnCreateBranch
@@ -1345,7 +1401,7 @@ type GitSidebar =
             elif hasMarkedFiles then
                 setLocalError None
 
-                onCommitSelection {
+                onPrimarySaveSelection {
                     Message = normalizedCommitMessage
                     Paths = markedPaths |> Set.toArray |> Array.sort
                 }
@@ -1354,9 +1410,25 @@ type GitSidebar =
                 setMarkedPaths (fun _ -> Set.empty)
             else
                 setLocalError None
-                onCommitAll normalizedCommitMessage
+                onPrimarySaveAll normalizedCommitMessage
                 setCommitMessage ""
 
+        let submitLocalCommit () =
+            let normalizedCommitMessage = commitMessage.Trim()
+            let hasMarkedFiles = (Set.count markedPaths) > 0
+
+            if String.IsNullOrWhiteSpace normalizedCommitMessage then
+                setMissingMessageModalOpen true
+            elif hasMarkedFiles then
+                setLocalError None
+
+                onCommitSelection {
+                    Message = normalizedCommitMessage
+                    Paths = markedPaths |> Set.toArray |> Array.sort
+                }
+            else
+                setLocalError None
+                onCommitAll normalizedCommitMessage
 
         let submitLfsThreshold () =
             let normalizedInput = lfsThresholdInput.Trim()
@@ -1448,10 +1520,13 @@ type GitSidebar =
                         RemoteActionsEnabled = remoteActionsEnabled
                         RemoteActionsWarning = remoteActionsWarning
                         SubmitDownloadLargeFiles = submitDownloadLargeFiles
-                        SubmitSync =
+                        SubmitUpdateFromOnline =
                             fun () ->
                                 setLocalError None
-                                onSync ()
+                                onUpdateFromOnline ()
+                        SubmitLocalCommit = submitLocalCommit
+                        HasMarkedFiles = hasMarkedFiles
+                        CanRunPrimarySave = canRunPrimarySave
                         IsAdvancedActionsOpen = isAdvancedActionsOpen
                         ToggleAdvancedActions =
                             fun () ->
@@ -1557,6 +1632,14 @@ type GitSidebar =
                         IsMissingMessageModalOpen = isMissingMessageModalOpen
                         SetMissingMessageModalOpen = setMissingMessageModalOpen
                         CloseDialog = fun () -> setActiveDialog ActiveDialog.None
+                    }
+                )
+
+                GitSidebar.PendingRemoteActionDialog(
+                    {
+                        PendingConfirmation = pendingConfirmation
+                        ConfirmPendingRemoteAction = onConfirmPendingRemoteAction
+                        CancelPendingRemoteAction = onCancelPendingRemoteAction
                     }
                 )
             ]

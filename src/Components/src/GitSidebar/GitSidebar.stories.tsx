@@ -21,9 +21,13 @@ const baseCallbacks = {
   OnFetch: noop,
   OnPull: noop,
   OnPush: noop,
-  OnSync: noop,
+  OnUpdateFromOnline: noop,
+  OnPrimarySaveSelection: noopWithSelection,
+  OnPrimarySaveAll: noopWithMessage,
   OnCommitSelection: noopWithSelection,
   OnCommitAll: noopWithMessage,
+  OnConfirmPendingRemoteAction: noop,
+  OnCancelPendingRemoteAction: noop,
   OnSaveDownloadLargeFiles: noopWithDownloadPreference,
   OnSaveLfsAutoTrackThreshold: noopWithThreshold,
   OnCreateBranch: noopWithArg,
@@ -233,6 +237,9 @@ export const AdvancedActions: Story = {
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveTextContent("Update ARC from Online");
+    await expect(canvas.queryByTestId("GitSidebarSyncButton")).toBeNull();
+    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
@@ -466,15 +473,15 @@ export const RemoteActionsDisabled: Story = {
     lfsAutoTrackThresholdMb: 1,
     remoteActionsEnabled: false,
     remoteActionsWarning:
-      "Sign in to a DataHub account to use fetch, pull, push, or sync.",
+      "Sign in to a DataHub account to use fetch, pull, push, or update.",
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebarSyncButton")).toBeDisabled();
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toBeDisabled();
     await expect(
       canvas.getByTestId("GitSidebarRemoteAuthWarning"),
     ).toHaveTextContent(
-      "Sign in to a DataHub account to use fetch, pull, push, or sync.",
+      "Sign in to a DataHub account to use fetch, pull, push, or update.",
     );
   },
 };
