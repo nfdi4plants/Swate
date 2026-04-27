@@ -24,7 +24,6 @@ type TemplatesDisplay =
             prop.onClick (fun e ->
                 e.preventDefault ()
                 e.stopPropagation ()
-                console.log ("Refreshing templates...")
                 onRefresh ()
             )
             prop.children [ Icons.ArrowsRotate() ]

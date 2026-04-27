@@ -34,7 +34,7 @@ type private LazyComponents =
 
     [<ReactLazyComponent>]
     static member LazyArcFileMetadata(arcFile, setArcFile) =
-        ArcFileMetadata.ArcFileMetadata(arcFile, setArcFile)
+        Metadata.ArcFileMetadata.ArcFileMetadata(arcFile, setArcFile)
 
 [<Erase; Mangle(false)>]
 type Main =
@@ -193,7 +193,7 @@ type Main =
 
         let hasColumns =
             activeView.TryGetActiveTable(arcFileState)
-            |> Option.map (fun t -> t.Columns.Count > 0)
+            |> Option.map (fun t -> t.ColumnCount > 0)
             |> Option.defaultValue false
 
         let canAddRows = tryGetAddRowsTarget () |> Option.isSome && hasColumns
@@ -355,7 +355,7 @@ type Main =
     [<ReactComponent>]
     static member Entry() =
 
-        let startArcFile = ArcFiles.Assay(ArcAssay.init ("Test"))
+        let startAssay = ArcAssay.init ("Test")
 
         let fullerTable = ArcTable("Fuller Table")
 
@@ -373,13 +373,13 @@ type Main =
 
         fullerTable.AddRowsEmpty 5
 
-        for i in 0..10 do
+        for i in 0..2 do
             if i = 0 then
-                startArcFile.Tables().Add(fullerTable)
+                startAssay.AddTable(fullerTable)
             else
-                startArcFile.Tables().Add(ArcTable.init (sprintf "Table %i" i))
+                startAssay.AddTable(ArcTable.init (sprintf "Table %i" i))
 
-        let arcFile, setArcFile = React.useState (startArcFile)
+        let (arcFile: ArcFiles), setArcFile = React.useState (ArcFiles.Assay startAssay)
 
         let loadTemplates =
             fun () ->

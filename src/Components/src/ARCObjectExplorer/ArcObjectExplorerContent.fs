@@ -14,19 +14,16 @@ type private ArcObjectPropertyRow = {
     Value: ArcObjectPropertyValue
 }
 
+open Swate.Components.Metadata
 
 [<RequireQualifiedAccess>]
 type ArcObjectExplorerContent =
 
-    static member private asOptionalText (value: string option) =
+    static member private asOptionalText(value: string option) =
         value
-        |> Option.bind (fun text ->
-            if String.IsNullOrWhiteSpace text then
-                None
-            else
-                Some text)
+        |> Option.bind (fun text -> if String.IsNullOrWhiteSpace text then None else Some text)
 
-    static member private summarizeStrings (values: seq<string>) =
+    static member private summarizeStrings(values: seq<string>) =
         values
         |> Seq.filter (fun value -> String.IsNullOrWhiteSpace value |> not)
         |> Seq.distinct
@@ -37,7 +34,7 @@ type ArcObjectExplorerContent =
             | [ first; second ] -> Some $"{first}; {second}"
             | first :: second :: rest -> Some $"{first}; {second}; +{rest.Length} more"
 
-    static member private summariseStringList (values: string list) =
+    static member private summariseStringList(values: string list) =
         values
         |> List.filter (fun value -> String.IsNullOrWhiteSpace value |> not)
         |> List.distinct
@@ -47,15 +44,18 @@ type ArcObjectExplorerContent =
             | [ first; second ] -> Some $"{first}; {second}"
             | first :: second :: rest -> Some $"{first}; {second}; +{rest.Length} more"
 
-    static member private personDisplayName (person: Person) =
+    static member private personDisplayName(person: Person) =
         [ person.FirstName; person.MidInitials; person.LastName ]
         |> List.choose id
         |> List.filter (fun value -> String.IsNullOrWhiteSpace value |> not)
         |> function
-            | [] -> person.ORCID |> ArcObjectExplorerContent.asOptionalText |> Option.defaultValue "Unnamed person"
+            | [] ->
+                person.ORCID
+                |> ArcObjectExplorerContent.asOptionalText
+                |> Option.defaultValue "Unnamed person"
             | parts -> String.concat " " parts
 
-    static member private ontologyLabel (annotation: OntologyAnnotation option) =
+    static member private ontologyLabel(annotation: OntologyAnnotation option) =
         annotation |> Option.map _.NameText |> ArcObjectExplorerContent.asOptionalText
 
     static member private usesDetailedMetadataForm =
@@ -66,10 +66,7 @@ type ArcObjectExplorerContent =
         | ArcExplorerNodeKind.Run -> true
         | _ -> false
 
-    static member private arcFileMatchesMetadataNodeKind
-        (selectedNodeKind: ArcExplorerNodeKind,
-        arcFile: ArcFiles)
-        =
+    static member private arcFileMatchesMetadataNodeKind(selectedNodeKind: ArcExplorerNodeKind, arcFile: ArcFiles) =
         match selectedNodeKind, arcFile with
         | ArcExplorerNodeKind.Arc, ArcFiles.Investigation _
         | ArcExplorerNodeKind.Study, ArcFiles.Study _
@@ -93,7 +90,7 @@ type ArcObjectExplorerContent =
         |> ArcObjectExplorerContent.asOptionalText
         |> Option.map (fun text -> ArcObjectExplorerContent.TextRow label text)
 
-    static member private DataMapSummaryRows (dataMap: DataMap) =
+    static member private DataMapSummaryRows(dataMap: DataMap) =
         let headers =
             seq {
                 for index in 0 .. dataMap.ColumnCount - 1 do
@@ -104,54 +101,61 @@ type ArcObjectExplorerContent =
         [
             ArcObjectExplorerContent.TextRow "Data Contexts" (string dataMap.DataContexts.Count)
             ArcObjectExplorerContent.TextRow "Columns" (string dataMap.ColumnCount)
-            yield! headers |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Headers" value) |> Option.toList
+            yield!
+                headers
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Headers" value)
+                |> Option.toList
         ]
 
-    static member private TableSummaryRows (table: ArcTable) =
-        let headers = table.Headers |> Seq.map _.ToString() |> ArcObjectExplorerContent.summarizeStrings
+    static member private TableSummaryRows(table: ArcTable) =
+        let headers =
+            table.Headers
+            |> Seq.map _.ToString()
+            |> ArcObjectExplorerContent.summarizeStrings
 
         [
             ArcObjectExplorerContent.TextRow "Name" table.Name
             ArcObjectExplorerContent.TextRow "Rows" (string table.RowCount)
             ArcObjectExplorerContent.TextRow "Columns" (string table.ColumnCount)
-            yield! headers |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Headers" value) |> Option.toList
+            yield!
+                headers
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Headers" value)
+                |> Option.toList
         ]
 
-    static member private SampleSummaryRows (sampleName: string, sampleSummary: ArcExplorerSampleSummary) =
-        [
-            ArcObjectExplorerContent.TextRow "Name" sampleName
-            ArcObjectExplorerContent.TextRow "Characteristics" (string sampleSummary.Characteristics.Length)
-            yield!
-                ArcObjectExplorerContent.summariseStringList sampleSummary.Characteristics
-                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Characteristic Fields" value)
-                |> Option.toList
-            ArcObjectExplorerContent.TextRow "Factors" (string sampleSummary.Factors.Length)
-            yield!
-                ArcObjectExplorerContent.summariseStringList sampleSummary.Factors
-                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Factor Fields" value)
-                |> Option.toList
-            yield!
-                ArcObjectExplorerContent.summariseStringList sampleSummary.DerivesFrom
-                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Derives From" value)
-                |> Option.toList
-            yield!
-                ArcObjectExplorerContent.summariseStringList sampleSummary.SourceTables
-                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Source Tables" value)
-                |> Option.toList
-            yield!
-                ArcObjectExplorerContent.summariseStringList sampleSummary.Studies
-                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Studies" value)
-                |> Option.toList
-            yield!
-                ArcObjectExplorerContent.summariseStringList sampleSummary.Assays
-                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Assays" value)
-                |> Option.toList
-        ]
+    static member private SampleSummaryRows(sampleName: string, sampleSummary: ArcExplorerSampleSummary) = [
+        ArcObjectExplorerContent.TextRow "Name" sampleName
+        ArcObjectExplorerContent.TextRow "Characteristics" (string sampleSummary.Characteristics.Length)
+        yield!
+            ArcObjectExplorerContent.summariseStringList sampleSummary.Characteristics
+            |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Characteristic Fields" value)
+            |> Option.toList
+        ArcObjectExplorerContent.TextRow "Factors" (string sampleSummary.Factors.Length)
+        yield!
+            ArcObjectExplorerContent.summariseStringList sampleSummary.Factors
+            |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Factor Fields" value)
+            |> Option.toList
+        yield!
+            ArcObjectExplorerContent.summariseStringList sampleSummary.DerivesFrom
+            |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Derives From" value)
+            |> Option.toList
+        yield!
+            ArcObjectExplorerContent.summariseStringList sampleSummary.SourceTables
+            |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Source Tables" value)
+            |> Option.toList
+        yield!
+            ArcObjectExplorerContent.summariseStringList sampleSummary.Studies
+            |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Studies" value)
+            |> Option.toList
+        yield!
+            ArcObjectExplorerContent.summariseStringList sampleSummary.Assays
+            |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Assays" value)
+            |> Option.toList
+    ]
 
     [<ReactComponent>]
-    static member private AssociatedSampleLinksSection(
-        links: ArcExplorerNodeLink list,
-        onSelectNodeId: string -> unit)
+    static member private AssociatedSampleLinksSection
+        (links: ArcExplorerNodeLink list, onSelectNodeId: string -> unit)
         =
         ArcObjectExplorerContent.ARCObjectSection(
             "Associated Samples",
@@ -201,7 +205,8 @@ type ArcObjectExplorerContent =
                                                 prop.text "Open"
                                             ]
                                         ]
-                                    ])
+                                    ]
+                                )
                             )
                         ]
                     ]
@@ -209,113 +214,236 @@ type ArcObjectExplorerContent =
             ]
         )
 
-    static member private MetadataRows (arcFile: ArcFiles) =
+    static member private MetadataRows(arcFile: ArcFiles) =
         match arcFile with
-        | ArcFiles.Investigation investigation ->
-            [
-                ArcObjectExplorerContent.TextRow "Identifier" investigation.Identifier
-                yield! ArcObjectExplorerContent.OptionalTextRow "Title" (ArcObjectExplorerContent.asOptionalText investigation.Title) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Description" (ArcObjectExplorerContent.asOptionalText investigation.Description) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Submission Date" (ArcObjectExplorerContent.asOptionalText investigation.SubmissionDate) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Public Release" (ArcObjectExplorerContent.asOptionalText investigation.PublicReleaseDate) |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings (investigation.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
-                    |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Publications" (string investigation.Publications.Count)) |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Ontology Sources" (string investigation.OntologySourceReferences.Count)) |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Comments" (string investigation.Comments.Count)) |> Option.toList
-            ]
-        | ArcFiles.Study(study, _) ->
-            [
-                ArcObjectExplorerContent.TextRow "Identifier" study.Identifier
-                yield! ArcObjectExplorerContent.OptionalTextRow "Title" (ArcObjectExplorerContent.asOptionalText study.Title) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Description" (ArcObjectExplorerContent.asOptionalText study.Description) |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Tables" (string study.TableCount)) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Submission Date" (ArcObjectExplorerContent.asOptionalText study.SubmissionDate) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Public Release" (ArcObjectExplorerContent.asOptionalText study.PublicReleaseDate) |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings (study.StudyDesignDescriptors |> Seq.map _.NameText)
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Design" value)
-                    |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings (study.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
-                    |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Publications" (string study.Publications.Count)) |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Comments" (string study.Comments.Count)) |> Option.toList
-            ]
-        | ArcFiles.Assay assay ->
-            [
-                ArcObjectExplorerContent.TextRow "Identifier" assay.Identifier
-                yield! ArcObjectExplorerContent.OptionalTextRow "Title" (ArcObjectExplorerContent.asOptionalText assay.Title) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Description" (ArcObjectExplorerContent.asOptionalText assay.Description) |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Tables" (string assay.TableCount)) |> Option.toList
-                yield! ArcObjectExplorerContent.ontologyLabel assay.MeasurementType |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Measurement" value) |> Option.toList
-                yield! ArcObjectExplorerContent.ontologyLabel assay.TechnologyType |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Technology" value) |> Option.toList
-                yield! ArcObjectExplorerContent.ontologyLabel assay.TechnologyPlatform |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Platform" value) |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings (assay.Performers |> Seq.map ArcObjectExplorerContent.personDisplayName)
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Performers" value)
-                    |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Comments" (string assay.Comments.Count)) |> Option.toList
-            ]
-        | ArcFiles.Workflow workflow ->
-            [
-                ArcObjectExplorerContent.TextRow "Identifier" workflow.Identifier
-                yield! ArcObjectExplorerContent.OptionalTextRow "Title" (ArcObjectExplorerContent.asOptionalText workflow.Title) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Description" (ArcObjectExplorerContent.asOptionalText workflow.Description) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Version" (ArcObjectExplorerContent.asOptionalText workflow.Version) |> Option.toList
-                yield! ArcObjectExplorerContent.ontologyLabel workflow.WorkflowType |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Type" value) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "URI" (ArcObjectExplorerContent.asOptionalText workflow.URI) |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings workflow.SubWorkflowIdentifiers
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Subworkflows" value)
-                    |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings (workflow.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName)
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
-                    |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Comments" (string workflow.Comments.Count)) |> Option.toList
-            ]
-        | ArcFiles.Run run ->
-            [
-                ArcObjectExplorerContent.TextRow "Identifier" run.Identifier
-                yield! ArcObjectExplorerContent.OptionalTextRow "Title" (ArcObjectExplorerContent.asOptionalText run.Title) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Description" (ArcObjectExplorerContent.asOptionalText run.Description) |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Tables" (string run.TableCount)) |> Option.toList
-                yield! ArcObjectExplorerContent.ontologyLabel run.MeasurementType |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Measurement" value) |> Option.toList
-                yield! ArcObjectExplorerContent.ontologyLabel run.TechnologyType |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Technology" value) |> Option.toList
-                yield! ArcObjectExplorerContent.ontologyLabel run.TechnologyPlatform |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Platform" value) |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings run.WorkflowIdentifiers
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Workflows" value)
-                    |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings (run.Performers |> Seq.map ArcObjectExplorerContent.personDisplayName)
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Performers" value)
-                    |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Comments" (string run.Comments.Count)) |> Option.toList
-            ]
+        | ArcFiles.Investigation investigation -> [
+            ArcObjectExplorerContent.TextRow "Identifier" investigation.Identifier
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Title"
+                    (ArcObjectExplorerContent.asOptionalText investigation.Title)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Description"
+                    (ArcObjectExplorerContent.asOptionalText investigation.Description)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Submission Date"
+                    (ArcObjectExplorerContent.asOptionalText investigation.SubmissionDate)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Public Release"
+                    (ArcObjectExplorerContent.asOptionalText investigation.PublicReleaseDate)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings (
+                    investigation.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName
+                )
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Publications" (string investigation.Publications.Count))
+                |> Option.toList
+            yield!
+                Some(
+                    ArcObjectExplorerContent.TextRow
+                        "Ontology Sources"
+                        (string investigation.OntologySourceReferences.Count)
+                )
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Comments" (string investigation.Comments.Count))
+                |> Option.toList
+          ]
+        | ArcFiles.Study(study, _) -> [
+            ArcObjectExplorerContent.TextRow "Identifier" study.Identifier
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow "Title" (ArcObjectExplorerContent.asOptionalText study.Title)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Description"
+                    (ArcObjectExplorerContent.asOptionalText study.Description)
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Tables" (string study.TableCount))
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Submission Date"
+                    (ArcObjectExplorerContent.asOptionalText study.SubmissionDate)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Public Release"
+                    (ArcObjectExplorerContent.asOptionalText study.PublicReleaseDate)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings (study.StudyDesignDescriptors |> Seq.map _.NameText)
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Design" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings (
+                    study.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName
+                )
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Publications" (string study.Publications.Count))
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Comments" (string study.Comments.Count))
+                |> Option.toList
+          ]
+        | ArcFiles.Assay assay -> [
+            ArcObjectExplorerContent.TextRow "Identifier" assay.Identifier
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow "Title" (ArcObjectExplorerContent.asOptionalText assay.Title)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Description"
+                    (ArcObjectExplorerContent.asOptionalText assay.Description)
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Tables" (string assay.TableCount))
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.ontologyLabel assay.MeasurementType
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Measurement" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.ontologyLabel assay.TechnologyType
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Technology" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.ontologyLabel assay.TechnologyPlatform
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Platform" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings (
+                    assay.Performers |> Seq.map ArcObjectExplorerContent.personDisplayName
+                )
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Performers" value)
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Comments" (string assay.Comments.Count))
+                |> Option.toList
+          ]
+        | ArcFiles.Workflow workflow -> [
+            ArcObjectExplorerContent.TextRow "Identifier" workflow.Identifier
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Title"
+                    (ArcObjectExplorerContent.asOptionalText workflow.Title)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Description"
+                    (ArcObjectExplorerContent.asOptionalText workflow.Description)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Version"
+                    (ArcObjectExplorerContent.asOptionalText workflow.Version)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.ontologyLabel workflow.WorkflowType
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Type" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow "URI" (ArcObjectExplorerContent.asOptionalText workflow.URI)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings workflow.SubWorkflowIdentifiers
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Subworkflows" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings (
+                    workflow.Contacts |> Seq.map ArcObjectExplorerContent.personDisplayName
+                )
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Contacts" value)
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Comments" (string workflow.Comments.Count))
+                |> Option.toList
+          ]
+        | ArcFiles.Run run -> [
+            ArcObjectExplorerContent.TextRow "Identifier" run.Identifier
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow "Title" (ArcObjectExplorerContent.asOptionalText run.Title)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Description"
+                    (ArcObjectExplorerContent.asOptionalText run.Description)
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Tables" (string run.TableCount))
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.ontologyLabel run.MeasurementType
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Measurement" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.ontologyLabel run.TechnologyType
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Technology" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.ontologyLabel run.TechnologyPlatform
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Platform" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings run.WorkflowIdentifiers
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Workflows" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings (
+                    run.Performers |> Seq.map ArcObjectExplorerContent.personDisplayName
+                )
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Performers" value)
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Comments" (string run.Comments.Count))
+                |> Option.toList
+          ]
         | ArcFiles.DataMap(_, dataMap) -> ArcObjectExplorerContent.DataMapSummaryRows dataMap
-        | ArcFiles.Template template ->
-            [
-                ArcObjectExplorerContent.TextRow "Name" template.Name
-                yield! ArcObjectExplorerContent.OptionalTextRow "Description" (ArcObjectExplorerContent.asOptionalText (Some template.Description)) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Version" (ArcObjectExplorerContent.asOptionalText (Some template.Version)) |> Option.toList
-                yield! ArcObjectExplorerContent.OptionalTextRow "Last Updated" (Some(template.LastUpdated.ToString("yyyy-MM-dd HH:mm"))) |> Option.toList
-                yield! Some(ArcObjectExplorerContent.TextRow "Organisation" (template.Organisation.ToString())) |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings (template.Tags |> Seq.map _.NameText)
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Tags" value)
-                    |> Option.toList
-                yield!
-                    ArcObjectExplorerContent.summarizeStrings (template.Authors |> Seq.map ArcObjectExplorerContent.personDisplayName)
-                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Authors" value)
-                    |> Option.toList
-            ]
+        | ArcFiles.Template template -> [
+            ArcObjectExplorerContent.TextRow "Name" template.Name
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Description"
+                    (ArcObjectExplorerContent.asOptionalText (Some template.Description))
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Version"
+                    (ArcObjectExplorerContent.asOptionalText (Some template.Version))
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.OptionalTextRow
+                    "Last Updated"
+                    (Some(template.LastUpdated.ToString("yyyy-MM-dd HH:mm")))
+                |> Option.toList
+            yield!
+                Some(ArcObjectExplorerContent.TextRow "Organisation" (template.Organisation.ToString()))
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings (template.Tags |> Seq.map _.NameText)
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Tags" value)
+                |> Option.toList
+            yield!
+                ArcObjectExplorerContent.summarizeStrings (
+                    template.Authors |> Seq.map ArcObjectExplorerContent.personDisplayName
+                )
+                |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Authors" value)
+                |> Option.toList
+          ]
 
-    static member private CurrentPreviewRowsForNode (selectedNode: ArcExplorerNode, arcFile: ArcFiles) =
+    static member private CurrentPreviewRowsForNode(selectedNode: ArcExplorerNode, arcFile: ArcFiles) =
         match selectedNode.kind with
         | ArcExplorerNodeKind.Sample ->
             selectedNode.sampleSummary
@@ -323,24 +451,37 @@ type ArcObjectExplorerContent =
         | ArcExplorerNodeKind.Table ->
             match selectedNode.previewTarget with
             | ArcExplorerNodeViewTarget.Table tableIndex when tableIndex >= 0 && tableIndex < arcFile.Tables().Count ->
-                arcFile.Tables().[tableIndex] |> ArcObjectExplorerContent.TableSummaryRows |> Some
+                arcFile.Tables().[tableIndex]
+                |> ArcObjectExplorerContent.TableSummaryRows
+                |> Some
             | _ -> None
-        | ArcExplorerNodeKind.DataMap -> arcFile.TryGetDataMap() |> Option.map ArcObjectExplorerContent.DataMapSummaryRows
+        | ArcExplorerNodeKind.DataMap ->
+            arcFile.TryGetDataMap()
+            |> Option.map ArcObjectExplorerContent.DataMapSummaryRows
         | _ when arcFile.Tables().Count > 0 ->
-            let tableNames = arcFile.Tables() |> Seq.map _.Name |> ArcObjectExplorerContent.summarizeStrings
+            let tableNames =
+                arcFile.Tables() |> Seq.map _.Name |> ArcObjectExplorerContent.summarizeStrings
 
             Some [
                 ArcObjectExplorerContent.TextRow "Tables" (string (arcFile.Tables().Count))
-                yield! tableNames |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Names" value) |> Option.toList
+                yield!
+                    tableNames
+                    |> Option.map (fun value -> ArcObjectExplorerContent.TextRow "Names" value)
+                    |> Option.toList
             ]
-        | _ -> arcFile.TryGetDataMap() |> Option.map ArcObjectExplorerContent.DataMapSummaryRows
+        | _ ->
+            arcFile.TryGetDataMap()
+            |> Option.map ArcObjectExplorerContent.DataMapSummaryRows
 
     [<ReactComponent>]
     static member private ARCObjectSection(title: string, children: ReactElement list) =
         Html.div [
             prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
             prop.children [
-                Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-3"; prop.text title ]
+                Html.h5 [
+                    prop.className "swt:text-sm swt:font-semibold swt:mb-3"
+                    prop.text title
+                ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-3"
                     prop.children children
@@ -372,12 +513,15 @@ type ArcObjectExplorerContent =
                         prop.className "swt:flex swt:flex-col swt:gap-1"
                         prop.children [
                             Html.dt [
-                                prop.className "swt:text-xs swt:font-semibold swt:uppercase swt:tracking-wide swt:opacity-60"
+                                prop.className
+                                    "swt:text-xs swt:font-semibold swt:uppercase swt:tracking-wide swt:opacity-60"
                                 prop.text row.Label
                             ]
                             Html.dd [
                                 prop.className "swt:min-w-0"
-                                prop.children [ ArcObjectExplorerContent.ARCObjectPropertyValueView(row.Value) ]
+                                prop.children [
+                                    ArcObjectExplorerContent.ARCObjectPropertyValueView(row.Value)
+                                ]
                             ]
                         ]
                     ]
@@ -388,7 +532,12 @@ type ArcObjectExplorerContent =
     static member private ARCObjectSelectionSection(selectedNode: ArcExplorerNode) =
         let rows = [
             ArcObjectExplorerContent.TextRow "Kind" (ArcObjectExplorerView.nodeKindLabel selectedNode.kind)
-            ArcObjectExplorerContent.TextRow "Role" (if selectedNode.isReference then "Reference" else "Canonical")
+            ArcObjectExplorerContent.TextRow
+                "Role"
+                (if selectedNode.isReference then
+                     "Reference"
+                 else
+                     "Canonical")
             if selectedNode.path.IsSome then
                 ArcObjectExplorerContent.CodeRow "Path" selectedNode.path.Value
             else
@@ -398,7 +547,10 @@ type ArcObjectExplorerContent =
         ArcObjectExplorerContent.ARCObjectSection(
             "Selection",
             [
-                Html.h4 [ prop.className "swt:text-base swt:font-semibold swt:break-words"; prop.text selectedNode.name ]
+                Html.h4 [
+                    prop.className "swt:text-base swt:font-semibold swt:break-words"
+                    prop.text selectedNode.name
+                ]
                 ArcObjectExplorerContent.ARCObjectPropertyTable rows
             ]
         )
@@ -435,32 +587,17 @@ type ArcObjectExplorerContent =
         )
 
     [<ReactComponent>]
-    static member private ARCObjectDetailedMetadataContent(
-        arcFile: ArcFiles,
-        setArcFileState: ArcFiles option -> unit)
+    static member private ARCObjectDetailedMetadataContent
+        (arcFile: ArcFiles, setArcFileState: ArcFiles option -> unit)
         =
         let setArcFile arcFile = setArcFileState (Some arcFile)
 
         Html.div [
             prop.className "swt:min-w-0"
-            prop.children [
-                match arcFile with
-                | ArcFiles.Study(study, assays) ->
-                    ArcFileMetadata.StudyMetadata(study, fun updated -> setArcFile (ArcFiles.Study(updated, assays)))
-                | ArcFiles.Assay assay ->
-                    ArcFileMetadata.AssayMetadata(assay, fun updated -> setArcFile (ArcFiles.Assay updated))
-                | ArcFiles.Workflow workflow ->
-                    ArcFileMetadata.WorkflowMetadata(workflow, fun updated -> setArcFile (ArcFiles.Workflow updated))
-                | ArcFiles.Run run ->
-                    ArcFileMetadata.RunMetadata(run, fun updated -> setArcFile (ArcFiles.Run updated))
-                | _ -> Html.none
-            ]
+            prop.children [ ArcFileMetadata.ArcFileMetadata(arcFile, setArcFile) ]
         ]
 
-    static member private arcFileMatchesSelectedNodePreviewPath(
-        selectedNode: ArcExplorerNode,
-        arcFile: ArcFiles)
-        =
+    static member private arcFileMatchesSelectedNodePreviewPath(selectedNode: ArcExplorerNode, arcFile: ArcFiles) =
         match selectedNode.path, arcFile.TryGetRelativePath() with
         | Some nodePath, Some arcFilePath ->
             let expectedPreviewPath = PathHelpers.resolveArcViewPath nodePath
@@ -468,15 +605,16 @@ type ArcObjectExplorerContent =
         | _ -> false
 
     [<ReactComponent>]
-    static member ARCObjectDetailsContent(
-        selectedNode: ArcExplorerNode option,
-        selectedAncestors: ArcExplorerNode list,
-        previewState: PageState option,
-        arcFileState: ArcFiles option,
-        setArcFileState: ArcFiles option -> unit,
-        onSelectNodeId: string -> unit,
-        useDetailedMetadataForms: bool)
-        =
+    static member ARCObjectDetailsContent
+        (
+            selectedNode: ArcExplorerNode option,
+            selectedAncestors: ArcExplorerNode list,
+            previewState: PageState option,
+            arcFileState: ArcFiles option,
+            setArcFileState: ArcFiles option -> unit,
+            onSelectNodeId: string -> unit,
+            useDetailedMetadataForms: bool
+        ) =
         match selectedNode with
         | None ->
             Html.div [
@@ -492,19 +630,27 @@ type ArcObjectExplorerContent =
         | Some selectedNode ->
             let previewArcFile =
                 arcFileState
-                |> Option.filter (fun state -> ArcObjectExplorerContent.arcFileMatchesSelectedNodePreviewPath(selectedNode, state))
+                |> Option.filter (fun state ->
+                    ArcObjectExplorerContent.arcFileMatchesSelectedNodePreviewPath (selectedNode, state)
+                )
 
             let metadataArcFile =
                 previewArcFile
-                |> Option.filter (fun file -> ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind(selectedNode.kind, file))
+                |> Option.filter (fun file ->
+                    ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind (selectedNode.kind, file)
+                )
 
             let selectedObjectRows =
                 match selectedNode.kind, metadataArcFile with
                 | ArcExplorerNodeKind.Sample, _ ->
                     selectedNode.sampleSummary
-                    |> Option.map (fun summary -> ArcObjectExplorerContent.SampleSummaryRows(selectedNode.name, summary))
+                    |> Option.map (fun summary ->
+                        ArcObjectExplorerContent.SampleSummaryRows(selectedNode.name, summary)
+                    )
                 | _, Some _ -> None
-                | _, None -> previewArcFile |> Option.bind (fun file -> ArcObjectExplorerContent.CurrentPreviewRowsForNode(selectedNode, file))
+                | _, None ->
+                    previewArcFile
+                    |> Option.bind (fun file -> ArcObjectExplorerContent.CurrentPreviewRowsForNode(selectedNode, file))
 
             let parentMetadataContext =
                 match metadataArcFile, previewArcFile with
@@ -512,7 +658,9 @@ type ArcObjectExplorerContent =
                 | None, Some arcFile ->
                     selectedAncestors
                     |> List.rev
-                    |> List.tryFind (fun ancestor -> ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind(ancestor.kind, arcFile))
+                    |> List.tryFind (fun ancestor ->
+                        ArcObjectExplorerContent.arcFileMatchesMetadataNodeKind (ancestor.kind, arcFile)
+                    )
                     |> Option.map (fun parentNode -> parentNode, arcFile)
                 | None, None -> None
 
@@ -522,7 +670,8 @@ type ArcObjectExplorerContent =
                     ArcObjectExplorerContent.ARCObjectSelectionSection(selectedNode)
                     match previewState with
                     | Some(PageState.TextPage content) -> ArcObjectExplorerContent.ARCObjectNoteContentSection(content)
-                    | Some(PageState.ErrorPage message) -> ArcObjectExplorerContent.ARCObjectErrorSection("Note Content", message)
+                    | Some(PageState.ErrorPage message) ->
+                        ArcObjectExplorerContent.ARCObjectErrorSection("Note Content", message)
                     | _ -> Html.none
                     match selectedObjectRows with
                     | Some rows ->
@@ -536,14 +685,19 @@ type ArcObjectExplorerContent =
                         ArcObjectExplorerContent.AssociatedSampleLinksSection(relatedSamples, onSelectNodeId)
                     | _ -> Html.none
                     match metadataArcFile with
-                    | Some arcFile
-                        when useDetailedMetadataForms
-                                && ArcObjectExplorerContent.usesDetailedMetadataForm selectedNode.kind ->
+                    | Some arcFile when
+                        useDetailedMetadataForms
+                        && ArcObjectExplorerContent.usesDetailedMetadataForm selectedNode.kind
+                        ->
                         ArcObjectExplorerContent.ARCObjectDetailedMetadataContent(arcFile, setArcFileState)
                     | Some arcFile ->
                         ArcObjectExplorerContent.ARCObjectSection(
                             "Metadata",
-                            [ ArcObjectExplorerContent.ARCObjectPropertyTable (ArcObjectExplorerContent.MetadataRows arcFile) ]
+                            [
+                                ArcObjectExplorerContent.ARCObjectPropertyTable(
+                                    ArcObjectExplorerContent.MetadataRows arcFile
+                                )
+                            ]
                         )
                     | None ->
                         match parentMetadataContext with
@@ -567,7 +721,9 @@ type ArcObjectExplorerContent =
                                 "Parent Metadata",
                                 [
                                     parentSubtitle
-                                    ArcObjectExplorerContent.ARCObjectPropertyTable (ArcObjectExplorerContent.MetadataRows arcFile)
+                                    ArcObjectExplorerContent.ARCObjectPropertyTable(
+                                        ArcObjectExplorerContent.MetadataRows arcFile
+                                    )
                                 ]
                             )
                         | None -> Html.none
