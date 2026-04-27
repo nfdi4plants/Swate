@@ -1296,6 +1296,109 @@ let fetch
                 return result
     }
 
+let previewPull
+    (arcPath: string)
+    (remoteName: string option)
+    (branchName: string option)
+    (progressCallback: GitProgressCallback option)
+    : JS.Promise<GitResult<GitPullPreflightResult>> =
+    promise {
+        match validateRemoteName (remoteName |> Option.defaultValue "origin") with
+        | Error remoteError -> return errorResult remoteError
+        | Ok safeRemoteName ->
+            match validateOptionalBranchName branchName with
+            | Error branchError -> return errorResult branchError
+            | Ok safeBranchName ->
+                return!
+                    withAuthenticatedGit
+                        arcPath
+                        safeRemoteName
+                        progressCallback
+                        (fun git -> promise {
+                            match safeBranchName with
+                            | None ->
+                                let! _ = git.fetch safeRemoteName
+                                ()
+                            | Some safeBranch ->
+                                let! _ = git.fetch (safeRemoteName, safeBranch)
+                                ()
+
+                            let! status = git.status ()
+
+                            let currentBranch =
+                                status.current
+                                |> Option.bind Option.ofObj
+                                |> Option.map _.Trim()
+                                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+                            match status.detached, currentBranch with
+                            | true, _
+                            | _, None ->
+                                return {
+                                    Status = GitPullPreflightStatus.Indeterminate
+                                    Message = Some "Cannot preview pull for a detached HEAD."
+                                }
+                            | false, Some _ ->
+                                let upstreamRef =
+                                    safeBranchName
+                                    |> Option.map (fun safeBranch -> $"{safeRemoteName}/{safeBranch}")
+                                    |> Option.orElseWith (fun () ->
+                                        status.tracking
+                                        |> Option.bind Option.ofObj
+                                        |> Option.map _.Trim()
+                                        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                                    )
+
+                                match upstreamRef with
+                                | None ->
+                                    return {
+                                        Status = GitPullPreflightStatus.Indeterminate
+                                        Message =
+                                            Some "No upstream tracking branch is configured for the current branch."
+                                    }
+                                | Some resolvedUpstreamRef ->
+                                    let! mergeTreeResult =
+                                        runGitCaptured {
+                                            WorkingDirectory = Some arcPath
+                                            Arguments = [| "merge-tree"; "--write-tree"; "HEAD"; resolvedUpstreamRef |]
+                                            Environment = None
+                                            StandardInput = None
+                                            TimeoutMs = Some 30000
+                                        }
+
+                                    if mergeTreeResult.ExitCode = 0 then
+                                        return {
+                                            Status = GitPullPreflightStatus.SafeToPull
+                                            Message = None
+                                        }
+                                    else
+                                        let diagnosticText =
+                                            $"{mergeTreeResult.StdoutText}\n{mergeTreeResult.StderrText}"
+
+                                        let normalizedDiagnostic = diagnosticText.ToLowerInvariant()
+
+                                        if
+                                            normalizedDiagnostic.Contains("conflict")
+                                            || normalizedDiagnostic.Contains("merge conflict")
+                                        then
+                                            return {
+                                                Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                                Message = Some "Pulling would require merge resolution."
+                                            }
+                                        else
+                                            let trimmedDiagnostic = diagnosticText.Trim()
+
+                                            return {
+                                                Status = GitPullPreflightStatus.Indeterminate
+                                                Message =
+                                                    if String.IsNullOrWhiteSpace trimmedDiagnostic then
+                                                        Some "Git pull preflight could not be classified safely."
+                                                    else
+                                                        Some $"Git pull preflight could not be classified safely: {trimmedDiagnostic}"
+                                            }
+                        })
+    }
+
 let pull
     (arcPath: string)
     (remoteName: string option)

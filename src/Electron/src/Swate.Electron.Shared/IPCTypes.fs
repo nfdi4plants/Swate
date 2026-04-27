@@ -59,6 +59,7 @@ type IGitApi = {
     getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
     getGitBranches: IpcMainEvent -> JS.Promise<Result<GitBranchRefDto[], exn>>
     getGitLfsSettings: IpcMainEvent -> JS.Promise<Result<GitLfsSettingsDto, exn>>
+    previewGitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
     getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
     getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
     getGitDiffViewData: IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>

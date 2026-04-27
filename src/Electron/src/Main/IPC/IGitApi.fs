@@ -103,6 +103,18 @@ let api: IGitApi = {
                 | Ok settings -> return Ok settings
                 | Error failure -> return Error(exn $"git lfs settings failed ({failure.Kind}): {failure.Message}")
         }
+    previewGitPull =
+        fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+                let! result = GitService.previewPull arcPath request.Remote request.Branch (Some progressReporter)
+
+                match result with
+                | Ok preview -> return Ok preview
+                | Error failure -> return Error(exn $"git pull preview failed ({failure.Kind}): {failure.Message}")
+        }
     getGitDiffSummary =
         fun (event: IpcMainEvent) -> promise {
             match tryGetVaultAndArcPath event with

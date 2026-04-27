@@ -47,6 +47,9 @@ let gitFetch (request: GitRemoteOperationRequest) =
 let gitPull (request: GitRemoteOperationRequest) =
     callIpcWith request (gitApi.gitPull (unbox null))
 
+let previewGitPull (request: GitRemoteOperationRequest) =
+    callIpcWith request (gitApi.previewGitPull (unbox null))
+
 let gitPush (request: GitRemoteOperationRequest) =
     callIpcWith request (gitApi.gitPush (unbox null))
 

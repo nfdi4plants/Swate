@@ -381,6 +381,163 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "previewPull reports SafeToPull when the fetched upstream can be merged without conflicts",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let remotePath = join [| context.RootPath; "origin.git" |]
+                        let clonePath = join [| context.RootPath; "incoming" |]
+                        let repoFilePath = join [| context.RepoPath; "workflow.txt" |]
+
+                        do! writeUtf8FileAsync repoFilePath "base\n"
+                        let! stageBase = GitService.stagePaths context.RepoPath [| "workflow.txt" |]
+                        expectOk "stage base file" stageBase |> ignore
+
+                        let! commitBase = GitService.commit context.RepoPath "test: base commit"
+                        expectOk "commit base" commitBase |> ignore
+
+                        let! baseStatus =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status after base commit")
+
+                        let baseBranch =
+                            baseStatus.Current
+                            |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
+
+                        let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                        let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+                        let! _ = context.Git.raw [| "push"; "-u"; "origin"; baseBranch |]
+
+                        let! _ = context.Git.raw [| "clone"; remotePath; clonePath |]
+                        let cloneGit = createSimpleGit clonePath
+                        do! configureRepositoryAsync cloneGit
+
+                        let cloneFilePath = join [| clonePath; "workflow.txt" |]
+                        do! writeUtf8FileAsync cloneFilePath "remote only change\n"
+                        let! _ = cloneGit.raw [| "add"; "workflow.txt" |]
+                        let! _ = cloneGit.raw [| "commit"; "-m"; "test: remote only change" |]
+                        let! _ = cloneGit.raw [| "push"; "origin"; baseBranch |]
+
+                        let! preview =
+                            unwrapResultAsync
+                                (GitService.previewPull context.RepoPath None None None)
+                                (expectOk "preview pull")
+
+                        Vitest.expect(preview.Status).toBe (GitPullPreflightStatus.SafeToPull)
+                    })
+            })
+
+        Vitest.test (
+            "previewPull reports WouldRequireMergeResolution when local and fetched upstream change the same lines differently",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let remotePath = join [| context.RootPath; "origin.git" |]
+                        let clonePath = join [| context.RootPath; "incoming" |]
+                        let repoFilePath = join [| context.RepoPath; "conflict.txt" |]
+
+                        do! writeUtf8FileAsync repoFilePath "base\n"
+                        let! stageBase = GitService.stagePaths context.RepoPath [| "conflict.txt" |]
+                        expectOk "stage base file" stageBase |> ignore
+                        let! commitBase = GitService.commit context.RepoPath "test: base commit"
+                        expectOk "commit base" commitBase |> ignore
+
+                        let! baseStatus =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status after base commit")
+
+                        let baseBranch =
+                            baseStatus.Current
+                            |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
+
+                        let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                        let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+                        let! _ = context.Git.raw [| "push"; "-u"; "origin"; baseBranch |]
+
+                        let! _ = context.Git.raw [| "clone"; remotePath; clonePath |]
+                        let cloneGit = createSimpleGit clonePath
+                        do! configureRepositoryAsync cloneGit
+
+                        do! writeUtf8FileAsync repoFilePath "local change\n"
+                        let! localStage = GitService.stagePaths context.RepoPath [| "conflict.txt" |]
+                        expectOk "stage local change" localStage |> ignore
+                        let! commitLocal = GitService.commit context.RepoPath "test: local change"
+                        expectOk "commit local" commitLocal |> ignore
+
+                        let cloneFilePath = join [| clonePath; "conflict.txt" |]
+                        do! writeUtf8FileAsync cloneFilePath "remote change\n"
+                        let! _ = cloneGit.raw [| "add"; "conflict.txt" |]
+                        let! _ = cloneGit.raw [| "commit"; "-m"; "test: remote change" |]
+                        let! _ = cloneGit.raw [| "push"; "origin"; baseBranch |]
+
+                        let! preview =
+                            unwrapResultAsync
+                                (GitService.previewPull context.RepoPath None None None)
+                                (expectOk "preview pull")
+
+                        Vitest.expect(preview.Status).toBe (GitPullPreflightStatus.WouldRequireMergeResolution)
+                    })
+            })
+
+        Vitest.test (
+            "previewPull returns Indeterminate when HEAD is detached",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let filePath = join [| context.RepoPath; "detached.txt" |]
+
+                        do! writeUtf8FileAsync filePath "base\n"
+                        let! stageBase = GitService.stagePaths context.RepoPath [| "detached.txt" |]
+                        expectOk "stage detached file" stageBase |> ignore
+
+                        let! commitBase = GitService.commit context.RepoPath "test: detached base"
+                        expectOk "commit detached base" commitBase |> ignore
+
+                        let! _ = context.Git.raw [| "checkout"; "--detach"; "HEAD" |]
+
+                        let! preview =
+                            unwrapResultAsync
+                                (GitService.previewPull context.RepoPath None None None)
+                                (expectOk "preview pull on detached head")
+
+                        Vitest.expect(preview.Status).toBe (GitPullPreflightStatus.Indeterminate)
+                    })
+            })
+
+        Vitest.test (
+            "previewPull returns Indeterminate when no upstream tracking branch can be resolved",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let filePath = join [| context.RepoPath; "no-upstream.txt" |]
+
+                        do! writeUtf8FileAsync filePath "base\n"
+                        let! stageBase = GitService.stagePaths context.RepoPath [| "no-upstream.txt" |]
+                        expectOk "stage no-upstream file" stageBase |> ignore
+
+                        let! commitBase = GitService.commit context.RepoPath "test: no upstream base"
+                        expectOk "commit no-upstream base" commitBase |> ignore
+
+                        let! _ = GitService.createBranch context.RepoPath "feature/no-upstream" None
+                        let! status =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status on branch without upstream")
+
+                        Vitest.expect(status.Tracking).toEqual (None)
+
+                        let! preview =
+                            unwrapResultAsync
+                                (GitService.previewPull context.RepoPath None None None)
+                                (expectOk "preview pull without upstream")
+
+                        Vitest.expect(preview.Status).toBe (GitPullPreflightStatus.Indeterminate)
+                    })
+            })
+
+        Vitest.test (
             "commit keeps the staged version when the working tree changes again before commit",
             fun () -> promise {
                 do!
