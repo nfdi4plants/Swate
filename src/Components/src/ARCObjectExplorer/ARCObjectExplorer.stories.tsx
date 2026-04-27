@@ -1,6 +1,6 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { within, expect, userEvent } from 'storybook/test';
-import { Entry as ARCObjectExplorerEntry } from './ARCObjectExplorer.fs.js';
+import { ARCObjectExplorer } from './ARCObjectExplorer.fs.js';
 
 const meta = {
   title: 'Components/ARCObjectExplorer',
@@ -8,18 +8,26 @@ const meta = {
   parameters: {
     layout: 'fullscreen',
   },
-  component: ARCObjectExplorerEntry,
-} satisfies Meta<typeof ARCObjectExplorerEntry>;
+  component: ARCObjectExplorer,
+} satisfies Meta<typeof ARCObjectExplorer>;
 
 export default meta;
 type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
-  render: () => <ARCObjectExplorerEntry />,
+  render: () => (
+    <ARCObjectExplorer>
+      <div>ARC Object Widget</div>
+    </ARCObjectExplorer>
+  ),
 };
 
 export const OpensFixture: Story = {
-  render: () => <ARCObjectExplorerEntry />,
+  render: () => (
+    <ARCObjectExplorer>
+      <div>ARC Object Widget</div>
+    </ARCObjectExplorer>
+  ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 

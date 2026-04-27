@@ -107,7 +107,15 @@ module private GraphObjectExplorerHelper =
 type GraphObjectExplorer =
 
     [<ReactComponent>]
-    static member private StoryExample() =
+    static member GraphObjectExplorer(children: ReactElement) =
+        Html.div [
+            prop.className "swt:min-h-screen swt:bg-base-200 swt:p-6"
+            prop.children children
+        ]
+
+    [<ReactComponent>]
+    static member Entry() =
+
         let graphObjects = React.useMemo ((fun () -> GraphObjectFixture.fakeGraphObjects ()), [||])
 
         let nodes, nodeMetaById =
@@ -240,28 +248,23 @@ type GraphObjectExplorer =
                     | None -> setSelection (ArcSelection.forExplorerNode nodeId None))
             )
 
-        ARCObjectWidget.Main(
-            navbar =
-                ARCObjectWidget.Navbar(
-                    selectedTitle viewModel,
-                    selectedSubtitleText,
-                    KindFilter.graphObjectExplorerOptions,
-                    selectedKindIndices,
-                    setSelectedKindIndicesWithDatasetCascade,
-                    rightActions = searchAction
-                ),
-            treePane = treePane,
-            explorerPane = explorerPane,
-            detailsPane = detailsPane
-        )
-
-    [<ReactComponent>]
-    static member GraphObjectExplorer() =
         Html.div [
             prop.className "swt:min-h-screen swt:bg-base-200 swt:p-6"
-            prop.children [ GraphObjectExplorer.StoryExample() ]
-        ]
+            prop.children [
+                ARCObjectWidget.Main(
+                    navbar =
+                        ARCObjectWidget.Navbar(
+                            selectedTitle viewModel,
+                            selectedSubtitleText,
+                            KindFilter.graphObjectExplorerOptions,
+                            selectedKindIndices,
+                            setSelectedKindIndicesWithDatasetCascade,
+                            rightActions = searchAction
+                        ),
+                    treePane = treePane,
+                    explorerPane = explorerPane,
+                    detailsPane = detailsPane
+                )
 
-    [<ReactComponent>]
-    static member Entry() =
-        GraphObjectExplorer.GraphObjectExplorer()
+            ]
+        ]

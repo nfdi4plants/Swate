@@ -91,7 +91,28 @@ module private ARCObjectExplorerHelper =
 type ARCObjectExplorer =
 
     [<ReactComponent>]
-    static member private StoryExample() =
+    static member ARCObjectExplorer(children: ReactElement) =
+        let isOpen, setIsOpen = React.useState false
+
+        Html.div [
+            prop.className "swt:min-h-screen swt:bg-base-200 swt:p-6"
+            prop.children [
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-primary"
+                    prop.text "Open ARC Object"
+                    prop.onClick (fun _ -> setIsOpen true)
+                ]
+                if isOpen then
+                    Html.div [
+                        prop.className "swt:mt-6"
+                        prop.children children
+                    ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private Entry() =
         let selectedId, setSelectedId = React.useState ARCObjectFixture.StoryItemIdStudy
 
         let selectedKindIndices, setSelectedKindIndices =
@@ -233,28 +254,3 @@ type ARCObjectExplorer =
                 ]
 
         ARCObjectWidget.Main(navbar = navbar, treePane = treePane, explorerPane = explorerPane, detailsPane = detailsPane)
-
-    [<ReactComponent>]
-    static member ARCObjectExplorer() =
-        let isOpen, setIsOpen = React.useState false
-
-        Html.div [
-            prop.className "swt:min-h-screen swt:bg-base-200 swt:p-6"
-            prop.children [
-                Html.button [
-                    prop.type'.button
-                    prop.className "swt:btn swt:btn-primary"
-                    prop.text "Open ARC Object"
-                    prop.onClick (fun _ -> setIsOpen true)
-                ]
-                if isOpen then
-                    Html.div [
-                        prop.className "swt:mt-6"
-                        prop.children [ ARCObjectExplorer.StoryExample() ]
-                    ]
-            ]
-        ]
-
-    [<ReactComponent>]
-    static member Entry() =
-        ARCObjectExplorer.ARCObjectExplorer()
