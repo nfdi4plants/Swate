@@ -3,7 +3,7 @@ namespace Swate.Components.NoteSearch.FilterLogic
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Feliz
+open ARCtrl
 open Swate.Components.NoteTypes
 open System
 
@@ -27,6 +27,31 @@ type FuzzySearch =
         |> Array.map (fun (result: obj) -> unbox<Swate.Components.NoteTypes.Note> (result?item))
         |> Array.toList
 
+module TagText =
+
+    let private normalize (value: string) =
+        if isNull value then
+            None
+        else
+            let trimmed = value.Trim()
+
+            if String.IsNullOrWhiteSpace trimmed then
+                None
+            else
+                Some trimmed
+
+    let candidates (tag: OntologyAnnotation) : string list =
+        [
+            tag.Name |> Option.bind normalize
+            normalize tag.NameText
+            tag.TermAccessionNumber |> Option.bind normalize
+            tag.TermSourceREF |> Option.bind normalize
+        ]
+        |> List.choose id
+        |> List.distinct
+
+    let tryDisplayLabel (tag: OntologyAnnotation) : string option = candidates tag |> List.tryHead
+
 type ExactMatchSearch =
     static member private containsIgnoreCase(needle: string, haystack: string) =
         if String.IsNullOrEmpty(needle) || String.IsNullOrEmpty(haystack) then
@@ -42,21 +67,27 @@ type ExactMatchSearch =
         : Swate.Components.NoteTypes.Note list =
         notes
         |> List.filter (fun note ->
+            let trimmedSearchTerm = searchTerm.Trim()
 
             // let inTitle = ExactMatchSearch.containsIgnoreCase (searchTerm.Trim()) note.Title
             let inContent =
-                ExactMatchSearch.containsIgnoreCase (searchTerm.Trim(), note.Content)
+                ExactMatchSearch.containsIgnoreCase (trimmedSearchTerm, note.Content)
 
             let inTags =
                 match note.Tags with
                 | Some tags ->
                     tags
-                    |> Seq.exists (fun tag -> ExactMatchSearch.containsIgnoreCase (searchTerm.Trim(), tag.NameText))
+                    |> Seq.exists (fun tag ->
+                        TagText.candidates tag
+                        |> List.exists (fun candidate ->
+                            ExactMatchSearch.containsIgnoreCase (trimmedSearchTerm, candidate)
+                        )
+                    )
                 | None -> false
 
             if Set.isEmpty selectedIndices then
                 // Default behavior: no selected filter means search in all fields.
-                if (searchTerm.Trim()) = "" then
+                if trimmedSearchTerm = "" then
                     true
                 else
                     // inTitle ||
