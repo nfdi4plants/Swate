@@ -112,6 +112,13 @@
     <Compile Include="Metadata\Generic.fs" />
     <Compile Include="Metadata\TextInput.fs" />
     <Compile Include="Metadata\Forms.fs" />
+    <Compile Include="Metadata\InvestigationMetadata.fs" />
+    <Compile Include="Metadata\StudyMetadata.fs" />
+    <Compile Include="Metadata\AssayMetadata.fs" />
+    <Compile Include="Metadata\RunMetadata.fs" />
+    <Compile Include="Metadata\WorkflowMetadata.fs" />
+    <Compile Include="Metadata\DataMapMetadata.fs" />
+    <Compile Include="Metadata\TemplateMetadata.fs" />
     <Compile Include="Metadata\ArcFileMetadata.fs" />
     <Compile Include="MarkdownText\Types.fs" />
     <Compile Include="MarkdownText\JsBindings\ReactMDEditor.fs" />
