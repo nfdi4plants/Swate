@@ -12,12 +12,12 @@ open Swate.Components.ErrorModal
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
+    let previewStateCtx = Renderer.Context.PreviewStateContext.usePreviewStateCtx ()
     let errorModal = ErrorModal.Context.useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 
     let isPendingSaveForCurrentArcFile =
-        match arcObjectCtx.state.PendingArcFileSave, arcFile.TryGetRelativePath() with
+        match previewStateCtx.state.PendingArcFileSave, arcFile.TryGetRelativePath() with
         | Some pendingArcFile, Some currentRelativePath ->
             pendingArcFile.TryGetRelativePath()
             |> Option.exists (fun pendingRelativePath -> PathHelpers.pathsEqual pendingRelativePath currentRelativePath)
@@ -28,16 +28,13 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             let page = Renderer.Types.PageState.ArcFilePage nextArcFile
 
             pageStateCtx.setState (Some page)
-            arcObjectCtx.setArcFileState (Some nextArcFile)
-            arcObjectCtx.setPreviewState (Some(Swate.Components.Shared.PageState.ArcFilePage nextArcFile))
-            arcObjectCtx.setPendingArcFileSave (Some nextArcFile)
-            arcObjectCtx.setStatusMessage None
+            previewStateCtx.setPendingArcFileSave (Some nextArcFile)
 
     let onSaveArcFile =
         fun _ ->
             promise {
                 match! MainContentHelper.saveArcFile arcFile with
-                | Ok() when isPendingSaveForCurrentArcFile -> arcObjectCtx.setPendingArcFileSave None
+                | Ok() when isPendingSaveForCurrentArcFile -> previewStateCtx.setPendingArcFileSave None
                 | Ok() -> ()
                 | Error exn ->
                     errorModal.enqueue (

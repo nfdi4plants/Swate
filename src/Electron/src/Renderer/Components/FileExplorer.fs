@@ -99,7 +99,6 @@ let FileTree () =
 
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
     let errorModal = ErrorModal.Context.useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 
@@ -179,12 +178,6 @@ let FileTree () =
 
                 let selectedPath = normalizePath path
                 fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                Renderer.Components.ARCHelper.clearArcObjectPreview
-                    arcObjectCtx.setArcFileState
-                    arcObjectCtx.setPreviewState
-                    arcObjectCtx.setStatusMessage
-
                 pageStateCtx.setState None
             | Some path ->
                 let selectedPath = normalizePath path
@@ -196,22 +189,12 @@ let FileTree () =
                 | Ok loaded ->
                     console.log ("[Renderer] Received data, processing...")
 
-                    Renderer.Components.ARCHelper.applyLoadedView
-                        pageStateCtx.setState
-                        arcObjectCtx.setArcFileState
-                        arcObjectCtx.setPreviewState
-                        arcObjectCtx.setStatusMessage
-                        loaded
+                    Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
                 | Error errorMessage ->
                     let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
                     console.log ($"[Renderer] Error: {fullErrorMessage}")
 
-                    Renderer.Components.ARCHelper.applyViewError
-                        pageStateCtx.setState
-                        arcObjectCtx.setArcFileState
-                        arcObjectCtx.setPreviewState
-                        arcObjectCtx.setStatusMessage
-                        fullErrorMessage
+                    Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
         }
         |> Promise.start
 

@@ -17,7 +17,6 @@ let NotesDraftTarget () =
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let availableNotesTargets =
         React.useMemo (
@@ -59,19 +58,11 @@ let NotesDraftTarget () =
                     | Ok previewData ->
                         previewData
                         |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView
-                            pageStateCtx.setState
-                            arcObjectCtx.setArcFileState
-                            arcObjectCtx.setPreviewState
-                            arcObjectCtx.setStatusMessage
+                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
                     | Result.Error _ ->
                         FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
                         |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView
-                            pageStateCtx.setState
-                            arcObjectCtx.setArcFileState
-                            arcObjectCtx.setPreviewState
-                            arcObjectCtx.setStatusMessage
+                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
             }
             |> Promise.start
 

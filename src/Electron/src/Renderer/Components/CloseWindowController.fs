@@ -20,11 +20,11 @@ type CloseWindowController =
 
         let modalIsOpen, setModalIsOpen = React.useState false
         let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-        let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
+        let previewStateCtx = Renderer.Context.PreviewStateContext.usePreviewStateCtx ()
 
         let saveBeforeClose () : JS.Promise<Result<unit, exn>> = promise {
             let saveTarget =
-                match arcObjectCtx.state.PendingArcFileSave with
+                match previewStateCtx.state.PendingArcFileSave with
                 | Some pendingArcFile -> Some pendingArcFile
                 | None ->
                     match pageCtx.state with
@@ -37,7 +37,7 @@ type CloseWindowController =
 
                 match saveResult with
                 | Ok() ->
-                    arcObjectCtx.setPendingArcFileSave None
+                    previewStateCtx.setPendingArcFileSave None
                     return Ok()
                 | Error exn -> return Error exn
             | None -> return Ok()

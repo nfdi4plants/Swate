@@ -14,21 +14,18 @@ open Swate.Electron.Shared
 type private Model = {
     AppState: ArcRootPath
     PageState: PageState option
-    DetailsSidebarIsOpen: bool
     LeftSidebarTarget: LeftSidebarPage
 }
 with
     static member Empty = {
         AppState = None
         PageState = None
-        DetailsSidebarIsOpen = false
         LeftSidebarTarget = LeftSidebarPage.FileExplorer
     }
 
 type private Msg =
     | SetArcRootPath of ArcRootPath
     | PageStateChanged of PageState option
-    | SetDetailsSidebarIsOpen of bool
     | SetLeftSidebarTarget of LeftSidebarPage
 
 let private createGetOpenPathCmd () : Cmd<Msg> =
@@ -45,7 +42,6 @@ let private msgName =
     function
     | SetArcRootPath _ -> "SetArcRootPath"
     | PageStateChanged _ -> "PageStateChanged"
-    | SetDetailsSidebarIsOpen _ -> "SetDetailsSidebarIsOpen"
     | SetLeftSidebarTarget _ -> "SetLeftSidebarTarget"
 
 let private traceUpdateMsg (msg: Msg) =
@@ -76,13 +72,6 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
         {
             model with
                 LeftSidebarTarget = leftSidebarTarget
-                DetailsSidebarIsOpen = (leftSidebarTarget = LeftSidebarPage.ArcObjectExplorer)
-        },
-        Cmd.none
-    | SetDetailsSidebarIsOpen isOpen ->
-        {
-            model with
-                DetailsSidebarIsOpen = isOpen
         },
         Cmd.none
 
@@ -103,12 +92,6 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSideba
             tooltip = "File explorer",
             isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
             onClick = fun () -> toggleTarget LeftSidebarPage.FileExplorer
-        )
-        Layout.LayoutBtn(
-            iconClassName = "swt:fluent--database-24-regular",
-            tooltip = "ARC object explorer",
-            isActive = (leftSidebarTarget = LeftSidebarPage.ArcObjectExplorer),
-            onClick = fun () -> toggleTarget LeftSidebarPage.ArcObjectExplorer
         )
         Layout.LayoutBtn(
             iconClassName = "swt:fluent--branch-fork-24-regular",
@@ -150,23 +133,15 @@ let Main () =
         ))
 
     let children =
-        Renderer.Components.MainContent.Main.Main(model.AppState, model.PageState, model.LeftSidebarTarget)
+        Renderer.Components.MainContent.Main.Main(model.AppState, model.PageState)
 
     let setLeftSidebarTarget =
         React.useCallback ((fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)), [||])
 
-    let detailsSidebar =
-        match model.AppState, model.LeftSidebarTarget with
-        | Some _, LeftSidebarPage.ArcObjectExplorer -> Some(Renderer.Components.DetailsSidebar.ArcObjectDetailsSidebar.Main())
-        | _ -> None
-
-    let showDetailsSidebarToggle =
-        model.AppState.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectExplorer
-
     Context.AppStateContext.AppStateCtx.Provider(
         appCtx,
         Renderer.Context.FileStateContext.FileStateCtxProvider(
-            Renderer.Context.ArcObjectExplorerContext.ArcObjectExplorerCtxProvider(
+            Renderer.Context.PreviewStateContext.PreviewStateCtxProvider(
                 Renderer.Context.PageStateContext.PageStateCtx.Provider(
                     pageCtx,
                     ErrorModalProvider.ErrorModalProvider(
@@ -179,16 +154,9 @@ let Main () =
                                                 children
                                                 CloseWindowController.CloseWindowController.Subscription()
                                             |],
-                                        navbar = Renderer.Components.Navbar.Main(showDetailsSidebarToggle = showDetailsSidebarToggle),
+                                        navbar = Renderer.Components.Navbar.Main(),
                                         leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
-                                        ?rightSidebar = detailsSidebar,
-                                        leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget),
-                                        rightSidebarState = {
-                                            isOpen = model.DetailsSidebarIsOpen
-                                            setIsOpen = fun isOpen -> dispatch (SetDetailsSidebarIsOpen isOpen)
-                                            sidebarType = model.LeftSidebarTarget
-                                            setSidebarType = fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)
-                                        }
+                                        leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget)
                                     )
                                 )
                             )

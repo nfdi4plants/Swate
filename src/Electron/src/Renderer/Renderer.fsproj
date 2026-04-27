@@ -12,7 +12,7 @@
     <Compile Include="Context\AppStateContext.fs" />
     <Compile Include="Context\PageStateContext.fs" />
     <Compile Include="Context\FileStateContext.fs" />
-    <Compile Include="Context\ArcObjectExplorerContext.fs" />
+    <Compile Include="Context\PreviewStateContext.fs" />
     <Compile Include="Context\AuthStateContext.fs" />
     <Compile Include="Context\GitWorkflow.fs" />
     <Compile Include="Context\GitStateContext.fs" />
@@ -21,7 +21,6 @@
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\FileExplorer.fs" />
     <Compile Include="Components\WidgetRegister.fs" />
-    <Compile Include="Components\LeftSidebar\ArcObjectTreeSidebar.fs" />
     <Compile Include="Components\LeftSidebar\ExplorerSidebar.fs" />
     <Compile Include="Components\LeftSidebar\GitSidebarEmptyState.fs" />
     <Compile Include="Components\LeftSidebar\GitSidebarPanel.fs" />
@@ -40,9 +39,7 @@
     <Compile Include="Components\MainContent\GitUnsupportedTarget.fs" />
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
-    <Compile Include="Components\MainContent\ArcObjectExplorerTarget.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
-    <Compile Include="Components\RightSidebar\ArcObjectDetailsSidebar.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
