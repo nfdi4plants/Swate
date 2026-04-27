@@ -698,75 +698,70 @@ type GitSidebar =
             GitSidebar.SectionHeader("Save", None)
 
             Html.div [
-                prop.className "swt:px-3"
+                prop.testId "GitSidebarCommitSection"
+                prop.className "swt:px-3 swt:pb-3"
                 prop.children [
-                    Html.div [
-                        prop.className "swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3"
+                    Html.label [
+                        prop.className "swt:flex swt:flex-col swt:gap-2"
                         prop.children [
-                            Html.label [
-                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                            Html.span [
+                                prop.className "swt:text-sm swt:font-medium"
+                                prop.text "Save message"
+                            ]
+                            Html.textarea [
+                                prop.testId "GitSidebarCommitMessageInput"
+                                prop.className
+                                    "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
+                                prop.disabled (not props.CanEditCommit)
+                                prop.value props.CommitMessage
+                                prop.placeholder (
+                                    if props.HasConflicts then
+                                        "Resolve merge conflicts before saving."
+                                    elif props.Status.IsClean then
+                                        "No changes to save."
+                                    else
+                                        "Describe your changes"
+                                )
+                                prop.onChange props.SetCommitMessage
+                            ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className
+                            "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
+                        prop.children [
+                            Html.span (
+                                if props.MarkedCount = 1 then
+                                    "1 file marked to save"
+                                else
+                                    $"{props.MarkedCount} files marked to save"
+                            )
+                            if not props.CanEditCommit && props.HasConflicts then
+                                Html.span "Saving files is disabled while conflicts remain."
+                            elif not props.CanEditCommit && props.Status.IsClean then
+                                Html.span "No changes available to save."
+                            else
+                                Html.none
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                        prop.children [
+                            Html.button [
+                                prop.testId "GitSidebarPrimarySaveButton"
+                                prop.className "swt:btn swt:btn-sm swt:btn-success swt:gap-2 swt:normal-case"
+                                prop.disabled (not props.CanRunPrimarySave)
+                                prop.onClick (fun _ -> props.SubmitPrimarySave())
                                 prop.children [
                                     Html.span [
-                                        prop.className "swt:text-sm swt:font-medium"
-                                        prop.text "Save message"
+                                        prop.className "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
                                     ]
-                                    Html.textarea [
-                                        prop.testId "GitSidebarCommitMessageInput"
-                                        prop.className
-                                            "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
-                                        prop.disabled (not props.CanEditCommit)
-                                        prop.value props.CommitMessage
-                                        prop.placeholder (
-                                            if props.HasConflicts then
-                                                "Resolve merge conflicts before saving."
-                                            elif props.Status.IsClean then
-                                                "No changes to save."
-                                            else
-                                                "Describe your changes"
-                                        )
-                                        prop.onChange props.SetCommitMessage
-                                    ]
-                                ]
-                            ]
-                            Html.div [
-                                prop.className
-                                    "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
-                                prop.children [
                                     Html.span (
-                                        if props.MarkedCount = 1 then
-                                            "1 file marked to save"
+                                        if props.HasMarkedFiles then
+                                            "Save Selected Changes"
                                         else
-                                            $"{props.MarkedCount} files marked to save"
+                                            "Save All Changes"
                                     )
-                                    if not props.CanEditCommit && props.HasConflicts then
-                                        Html.span "Saving files is disabled while conflicts remain."
-                                    elif not props.CanEditCommit && props.Status.IsClean then
-                                        Html.span "No changes available to save."
-                                    else
-                                        Html.none
-                                ]
-                            ]
-                            Html.div [
-                                prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-center swt:gap-2"
-                                prop.children [
-                                    Html.button [
-                                        prop.testId "GitSidebarPrimarySaveButton"
-                                        prop.className "swt:btn swt:btn-sm swt:btn-success swt:gap-2 swt:normal-case"
-                                        prop.disabled (not props.CanRunPrimarySave)
-                                        prop.onClick (fun _ -> props.SubmitPrimarySave())
-                                        prop.children [
-                                            Html.span [
-                                                prop.className
-                                                    "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
-                                            ]
-                                            Html.span (
-                                                if props.HasMarkedFiles then
-                                                    "Save Selected Changes"
-                                                else
-                                                    "Save All Changes"
-                                            )
-                                        ]
-                                    ]
                                 ]
                             ]
                         ]

@@ -154,6 +154,9 @@ let private lastGitLabCreateProjectBody () : obj = jsNative
 [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
 let private hasOwnProperty (target: obj) (propertyName: string) : bool = jsNative
 
+[<Emit("$0.firstElementChild")>]
+let private firstElementChild (target: HTMLElement) : HTMLElement = jsNative
+
 [<Emit("$0[$1]")>]
 let private getProperty<'T> (target: obj) (propertyName: string) : 'T = jsNative
 
@@ -261,6 +264,25 @@ let private renderToBody (element: ReactElement) = promise {
             root.unmount ()
             container.remove ()
         )
+}
+
+let private noopCallbacks: GitSidebarCallbacks = {
+    OnRefresh = fun () -> ()
+    OnFetch = fun () -> ()
+    OnPull = fun () -> ()
+    OnPush = fun () -> ()
+    OnUpdateFromOnline = fun () -> ()
+    OnPrimarySaveSelection = fun _ -> ()
+    OnPrimarySaveAll = fun _ -> ()
+    OnCommitSelection = fun _ -> ()
+    OnCommitAll = fun _ -> ()
+    OnConfirmPendingRemoteAction = fun () -> ()
+    OnCancelPendingRemoteAction = fun () -> ()
+    OnSaveDownloadLargeFiles = fun _ -> ()
+    OnSaveLfsAutoTrackThreshold = fun _ -> ()
+    OnCreateBranch = fun _ -> ()
+    OnSwitchBranch = fun _ -> ()
+    OnSelectChange = fun _ -> promise { return Ok() }
 }
 
 Vitest.afterEach (fun () -> document.body.innerHTML <- "")
@@ -2517,6 +2539,37 @@ Vitest.describe (
 
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarErrorNotice']")).not.toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar renders the save section without the old outer card wrapper",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [| changedFile "README.md" "M" " " false |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = noopCallbacks,
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let saveSection = container.querySelector("[data-testid='GitSidebarCommitSection']") :?> HTMLElement
+                let legacyCard = firstElementChild saveSection
+                Vitest.expect(legacyCard.className.Contains("swt:rounded-box")).toBe (false)
+                Vitest.expect(legacyCard.className.Contains("swt:border")).toBe (false)
 
                 cleanup ()
             }

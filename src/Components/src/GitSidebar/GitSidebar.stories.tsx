@@ -456,6 +456,9 @@ export const CommitComposer: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const legacyCard = canvas.getByTestId("GitSidebarCommitSection").firstElementChild as HTMLElement;
+    await expect(legacyCard).not.toHaveClass("swt:rounded-box");
+    await expect(legacyCard).not.toHaveClass("swt:border");
     await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
     await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save Selected Changes");
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
