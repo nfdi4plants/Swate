@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="GitWorkflow.test.fs" />
+    <Compile Include="NoteSearchInterop.test.fs" />
   </ItemGroup>
   <ItemGroup>
     <ProjectReference Include="..\..\src\Electron\src\Renderer\Renderer.fsproj" />
