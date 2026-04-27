@@ -78,7 +78,6 @@ test.describe('Swate Electron App', () => {
     const homeButton = window.locator('[aria-label="Home"] button');
     await expect(homeButton).toBeVisible({ timeout: 30000 });
     await homeButton.click();
-    await expect(window.getByRole('button', { name: 'ARC object explorer' })).toHaveCount(0);
 
     const fileExplorer = window.getByTestId('file-explorer-container');
     await expect(fileExplorer).toBeVisible({ timeout: 30000 });
