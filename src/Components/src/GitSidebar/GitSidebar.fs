@@ -837,7 +837,7 @@ type GitSidebar =
                     prop.tabIndex (if props.IsBusy then -1 else 0)
                     prop.custom ("aria-disabled", if props.IsBusy then "true" else "false")
                     prop.className [
-                        "swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors"
+                        "swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors swt:select-none"
                         if props.IsBusy then
                             "swt:cursor-not-allowed swt:opacity-60"
                         else
@@ -1399,18 +1399,22 @@ type GitSidebar =
                 |> Option.defaultValue [| change.Path |]
                 |> Set.ofArray
 
-            setMarkedPaths (fun current ->
+            let nextMarkedPaths =
                 match ctrlKey, shiftKey with
-                | false, false -> Set.singleton change.Path
-                | true, false ->
-                    if Set.contains change.Path current then
-                        Set.remove change.Path current
+                | false, false ->
+                    if Set.contains change.Path markedPaths then
+                        Set.remove change.Path markedPaths
                     else
-                        Set.add change.Path current
+                        Set.singleton change.Path
+                | true, false ->
+                    if Set.contains change.Path markedPaths then
+                        Set.remove change.Path markedPaths
+                    else
+                        Set.add change.Path markedPaths
                 | false, true -> rangePaths
-                | true, true -> Set.union current rangePaths
-            )
+                | true, true -> Set.union markedPaths rangePaths
 
+            setMarkedPaths (fun _ -> nextMarkedPaths)
             setSelectionAnchorPath (fun _ -> Some change.Path)
 
         let submitPrimarySave () =

@@ -459,10 +459,13 @@ export const CommitComposer: Story = {
     const legacyCard = canvas.getByTestId("GitSidebarCommitSection").firstElementChild as HTMLElement;
     await expect(legacyCard).not.toHaveClass("swt:rounded-box");
     await expect(legacyCard).not.toHaveClass("swt:border");
-    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
     await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save Selected Changes");
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
+    // Click again to deselect – button text should switch back to "Save All Changes"
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes");
   },
 };
 

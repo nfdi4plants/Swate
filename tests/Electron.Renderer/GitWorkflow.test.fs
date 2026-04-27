@@ -2676,6 +2676,67 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "GitSidebar plain click on a marked row deselects it and rows suppress native text selection",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [|
+                                changedFile "README.md" "M" " " false
+                                changedFile "docs/guide.md" "M" " " false
+                            |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                firstRow.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+
+                firstRow.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(container.textContent.Contains("Save All Changes")).toBe (true)
+
+                let rowClass = firstRow.className
+                Vitest.expect(rowClass.Contains("swt:select-none")).toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
             "GitSidebar status popover trigger does not open the changed file row",
             fun () -> promise {
                 let mutable selectCalls = 0
