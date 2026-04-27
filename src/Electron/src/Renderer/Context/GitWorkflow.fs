@@ -162,6 +162,7 @@ type WriteSuccess =
 type WriteAttemptOutcome =
     | Completed of WriteSuccess
     | CompletedWithPendingRemoteConfirmation of WriteSuccess * GitSidebarConfirmationDialog * GitPendingRemoteAction
+    | CompletedWithPendingRemoteFailure of WriteSuccess * string
     | RequiresLfsInstall of string
 
 type private WriteOperationClassification =
@@ -583,6 +584,7 @@ let private resolveStaleWriteCompletedCmd request result =
     match result with
     | Ok(Completed success) -> resolveCloneReplyCmd request (Ok success)
     | Ok(CompletedWithPendingRemoteConfirmation(success, _, _)) -> resolveCloneReplyCmd request (Ok success)
+    | Ok(CompletedWithPendingRemoteFailure(success, _)) -> resolveCloneReplyCmd request (Ok success)
     | Ok(RequiresLfsInstall _) -> resolveCloneReplyCmd request (Error staleArcSessionMessage)
     | Error message -> resolveCloneReplyCmd request (Error message)
 
@@ -727,6 +729,17 @@ let private runCommitAttemptAsync (deps: GitDependencies) (prepared: PreparedCom
 let private pendingPrimarySaveWarning =
     "Changes were saved locally. Online sync is still pending."
 
+let private indeterminateUpdateMessage (message: string option) =
+    let fallback =
+        "Swate could not determine safely whether updating will require merge resolution. Continue anyway?"
+
+    match message |> Option.map _.Trim() |> Option.filter (String.IsNullOrWhiteSpace >> not) with
+    | Some diagnostic -> $"{fallback} {diagnostic}"
+    | None -> fallback
+
+let private pendingPrimarySaveRemoteFailure localSuccess message =
+    Ok(CompletedWithPendingRemoteFailure(localSuccess, message))
+
 let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState) (prepared: PreparedCommitOperation) = promise {
     let! commitAttempt = runCommitAttemptAsync deps prepared
 
@@ -734,39 +747,41 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
     | Error message -> return Error message
     | Ok(RequiresLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
     | Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, _))) ->
+        let localSuccessWithPendingWarning =
+            UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, Some pendingPrimarySaveWarning)
+
+        let runPushAfterLocalCommit () =
+            promise {
+                let! pushResult = deps.gitPush { Remote = None; Branch = None }
+
+                match classifyWriteResult GitBusyOperation.PushingToRemote pushResult with
+                | Error message -> return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
+                | Ok(WriteOperationNeedsLfsInstall promptMessage) ->
+                    return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning promptMessage
+                | Ok(WriteOperationReady operationResult) ->
+                    return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
+            }
+
         if shouldPublishCurrentBranchFirst state then
-            return!
-                runSimpleWriteAttemptAsync
-                    deps
-                    GitBusyOperation.PushingToRemote
-                    (fun () -> deps.gitPush { Remote = None; Branch = None })
+            return! runPushAfterLocalCommit ()
         else
             let! previewResult = deps.previewGitPull { Remote = None; Branch = None }
 
             match previewResult with
-            | Error message -> return Error message
+            | Error message -> return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
             | Ok { Status = GitPullPreflightStatus.SafeToPull } ->
                 let! pullResult = deps.gitPull { Remote = None; Branch = None }
 
                 match classifyWriteResult GitBusyOperation.PullingFromRemote pullResult with
-                | Error message -> return Error message
-                | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
-                | Ok(WriteOperationReady _) ->
-                    return!
-                        runSimpleWriteAttemptAsync
-                            deps
-                            GitBusyOperation.PushingToRemote
-                            (fun () -> deps.gitPush { Remote = None; Branch = None })
+                | Error message -> return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
+                | Ok(WriteOperationNeedsLfsInstall promptMessage) ->
+                    return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning promptMessage
+                | Ok(WriteOperationReady _) -> return! runPushAfterLocalCommit ()
             | Ok { Status = GitPullPreflightStatus.WouldRequireMergeResolution; Message = message } ->
                 return
                     Ok(
                         CompletedWithPendingRemoteConfirmation(
-                            UnitSuccess(
-                                refreshResult,
-                                pageChange,
-                                selectedChangePathOverride,
-                                Some pendingPrimarySaveWarning
-                            ),
+                            localSuccessWithPendingWarning,
                             {
                                 Title = "Merge resolution required"
                                 Message = defaultArg message "Updating from online will require merge resolution. Continue?"
@@ -780,18 +795,10 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                 return
                     Ok(
                         CompletedWithPendingRemoteConfirmation(
-                            UnitSuccess(
-                                refreshResult,
-                                pageChange,
-                                selectedChangePathOverride,
-                                Some pendingPrimarySaveWarning
-                            ),
+                            localSuccessWithPendingWarning,
                             {
                                 Title = "Update could not be previewed"
-                                Message =
-                                    defaultArg
-                                        message
-                                        "Swate could not determine safely whether updating will require merge resolution. Continue anyway?"
+                                Message = indeterminateUpdateMessage message
                                 ConfirmLabel = "Continue"
                                 CancelLabel = "Cancel"
                             },
@@ -800,6 +807,7 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                     )
     | Ok(Completed(CloneSuccess _)) -> return Error "Primary save produced an invalid result."
     | Ok(CompletedWithPendingRemoteConfirmation _ as outcome) -> return Ok outcome
+    | Ok(CompletedWithPendingRemoteFailure _ as outcome) -> return Ok outcome
 }
 
 let private runSaveLfsSettingsAttemptAsync
@@ -1206,10 +1214,7 @@ let update
                 PendingConfirmation =
                     Some {
                         Title = "Update could not be previewed"
-                        Message =
-                            defaultArg
-                                message
-                                "Swate could not determine safely whether updating will require merge resolution. Continue anyway?"
+                        Message = indeterminateUpdateMessage message
                         ConfirmLabel = "Continue"
                         CancelLabel = "Cancel"
                     }
@@ -1417,8 +1422,42 @@ let update
         }
 
         nextModel, applyPageChangeCmd setPageState pageChange
+    | WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteFailure(success, message))) ->
+        let baseModel, pageChange, warningMessage =
+            match success with
+            | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->
+                let refreshedModel = applyRefreshResult refreshResult model
+
+                let selectionAdjustedModel =
+                    match selectedChangePathOverride with
+                    | Some selectedChangePath -> {
+                        refreshedModel with
+                            SelectedChangePath = selectedChangePath
+                      }
+                    | None -> refreshedModel
+
+                selectionAdjustedModel, pageChange, warningMessage
+            | CloneSuccess _ -> model, GitPageChange.NoChange, None
+
+        let nextModel = {
+            baseModel with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = Some message
+                WarningNotice = warningMessage
+                PendingConfirmation = None
+                PendingRemoteAction = GitPendingRemoteAction.None
+                PendingPostMergePush = false
+        }
+
+        nextModel, applyPageChangeCmd setPageState pageChange
     | WriteCompleted(_, request, Ok(CompletedWithPendingRemoteConfirmation(_, _, _))) ->
         let message = "Git operation produced an invalid pending remote confirmation."
+        let nextModel = writeErrorModel message model
+        nextModel, resolveCloneReplyCmd request (Error message)
+    | WriteCompleted(_, request, Ok(CompletedWithPendingRemoteFailure(_, _))) ->
+        let message = "Git operation produced an invalid pending remote failure."
         let nextModel = writeErrorModel message model
         nextModel, resolveCloneReplyCmd request (Error message)
     | WriteCompleted(_, request, Ok(Completed success)) ->

@@ -104,11 +104,18 @@ let private changedFile path indexStatus workingTreeStatus isConflicted = {
     IsConflicted = isConflicted
 }
 
-[<Emit("new Event($0)")>]
+[<Emit("new Event($0, { bubbles: true })")>]
 let private createEvent (eventType: string) : Browser.Types.Event = jsNative
 
 [<Emit("new MouseEvent($0, $1)")>]
 let private createMouseEvent (eventType: string) (eventInit: obj) : Browser.Types.MouseEvent = jsNative
+
+[<Emit("""
+const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+setter.call($0, $1);
+$0.dispatchEvent(new Event("input", { bubbles: true }));
+""")>]
+let private setTextAreaValue (element: HTMLTextAreaElement) (value: string) : unit = jsNative
 
 [<Emit("""
 globalThis.__swateOriginalFetch = globalThis.fetch;
@@ -293,6 +300,21 @@ let private collectMessages (cmd: Cmd<Msg>) = promise {
     do! Promise.sleep 0
     return messages |> Seq.toArray
 }
+
+let private updateFromSingleMessage
+    (deps: GitDependencies)
+    (setPageState: PageState option -> unit)
+    (failureMessage: string)
+    (model: GitState)
+    (cmd: Cmd<Msg>)
+    =
+    promise {
+        let! messages = collectMessages cmd
+
+        match messages with
+        | [| message |] -> return update deps setPageState message model
+        | _ -> return failwith failureMessage
+    }
 
 Vitest.describe (
     "GitWorkflow request preparation",
@@ -1236,12 +1258,20 @@ Vitest.describe (
                 let stateAfterRequest, requestCmd =
                     update deps ignore (PrimarySaveAllRequested "Add polish") initialState
 
-                let! requestMessages = collectMessages requestCmd
+                let! stateAfterWriteRequest, writeCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected the primary save request to enqueue a write request."
+                        stateAfterRequest
+                        requestCmd
+
+                let! requestMessages = collectMessages writeCmd
 
                 let _, finishCmd =
                     match requestMessages with
                     | [| WriteCompleted(_, PrimarySave _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
-                        update deps ignore requestMessages[0] stateAfterRequest
+                        update deps ignore requestMessages[0] stateAfterWriteRequest
                     | _ -> failwith "Expected the primary save flow to finish as one completed write request."
 
                 let! _ = collectMessages finishCmd
@@ -1301,12 +1331,20 @@ Vitest.describe (
                 let stateAfterRequest, requestCmd =
                     update deps ignore (PrimarySaveAllRequested "Publish branch") initialState
 
-                let! requestMessages = collectMessages requestCmd
+                let! stateAfterWriteRequest, writeCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected the primary save request to enqueue a write request."
+                        stateAfterRequest
+                        requestCmd
+
+                let! requestMessages = collectMessages writeCmd
 
                 let _, finishCmd =
                     match requestMessages with
                     | [| WriteCompleted(_, PrimarySave _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
-                        update deps ignore requestMessages[0] stateAfterRequest
+                        update deps ignore requestMessages[0] stateAfterWriteRequest
                     | _ -> failwith "Expected the primary save flow to publish the branch and finish."
 
                 let! _ = collectMessages finishCmd
@@ -1378,12 +1416,20 @@ Vitest.describe (
                 let stateAfterRequest, requestCmd =
                     update deps ignore (PrimarySaveAllRequested "Add polish") initialState
 
-                let! requestMessages = collectMessages requestCmd
+                let! stateAfterWriteRequest, writeCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected the primary save request to enqueue a write request."
+                        stateAfterRequest
+                        requestCmd
+
+                let! requestMessages = collectMessages writeCmd
 
                 let nextState, finishCmd =
                     match requestMessages with
                     | [| WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteConfirmation(UnitSuccess(_, _, _, Some warningText), _, GitPendingRemoteAction.CompletePrimarySavePush))) |] ->
-                        let updatedState, cmd = update deps ignore requestMessages[0] stateAfterRequest
+                        let updatedState, cmd = update deps ignore requestMessages[0] stateAfterWriteRequest
                         Vitest.expect(warningText).toContain ("saved locally")
                         updatedState, cmd
                     | _ -> failwith "Expected the primary save flow to request remote confirmation."
@@ -1402,6 +1448,53 @@ Vitest.describe (
                 Vitest.expect(cancelMessages).toEqual ([||])
                 Vitest.expect(stateAfterCancel.PendingConfirmation).toEqual (None)
                 Vitest.expect(stateAfterCancel.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+            }
+        )
+
+        Vitest.test (
+            "Primary save preserves the local commit warning when remote preflight fails after commit",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                        gitStagePaths = fun _ -> promise { return Ok okOperationResult }
+                        gitCommit = fun _ -> promise { return Ok okOperationResult }
+                        previewGitPull = fun _ -> promise { return Error "Network unavailable during pull preflight." }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Save locally first") initialState
+
+                let! stateAfterWriteRequest, writeCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected the primary save request to enqueue a write request."
+                        stateAfterRequest
+                        requestCmd
+
+                let! requestMessages = collectMessages writeCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, PrimarySave _, Ok _) |] ->
+                        update deps ignore requestMessages[0] stateAfterWriteRequest
+                    | _ -> failwith "Expected the primary save command to complete with a local-save outcome."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(finishMessages).toEqual ([||])
+                Vitest.expect(nextState.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "Network unavailable during pull preflight.")
+                Vitest.expect(nextState.Status.IsClean).toBe (true)
             }
         )
 
@@ -1425,8 +1518,17 @@ Vitest.describe (
                         CurrentArcPath = Some "C:/arc"
                 }
 
-                let nextState, cmd = update deps ignore UpdateFromOnlineRequested state
-                let! messages = collectMessages cmd
+                let stateAfterRequest, cmd = update deps ignore UpdateFromOnlineRequested state
+
+                let! nextState, finishCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected update preflight to complete."
+                        stateAfterRequest
+                        cmd
+
+                let! messages = collectMessages finishCmd
 
                 Vitest.expect(messages).toEqual ([||])
                 Vitest.expect(nextState.PendingConfirmation.IsSome).toBe (true)
@@ -1467,8 +1569,17 @@ Vitest.describe (
                         CurrentArcPath = Some "C:/arc"
                 }
 
-                let nextState, cmd = update deps ignore UpdateFromOnlineRequested state
-                let! messages = collectMessages cmd
+                let stateAfterRequest, cmd = update deps ignore UpdateFromOnlineRequested state
+
+                let! nextState, finishCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected update preflight to complete."
+                        stateAfterRequest
+                        cmd
+
+                let! messages = collectMessages finishCmd
 
                 Vitest.expect(messages).toEqual ([||])
                 Vitest.expect(nextState.PendingConfirmation |> Option.map _.Title).toEqual (Some "Update could not be previewed")
@@ -2340,15 +2451,17 @@ Vitest.describe (
                         )
                     )
 
-                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLButtonElement
-                let thirdRow = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLButtonElement
+                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let thirdRow = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
 
                 firstRow.click ()
+                do! Promise.sleep 0
 
                 let shiftClick =
                     createMouseEvent "click" (createObj [ "bubbles" ==> true; "shiftKey" ==> true ])
 
                 thirdRow.dispatchEvent shiftClick |> ignore
+                do! Promise.sleep 0
 
                 Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarPrimarySaveButton']").length).toBe (1)
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
@@ -2382,9 +2495,9 @@ Vitest.describe (
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
-                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveSelection = fun request -> capturedSelection <- Some request
                                 OnPrimarySaveAll = fun _ -> ()
-                                OnCommitSelection = fun request -> capturedSelection <- Some request
+                                OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
@@ -2399,24 +2512,34 @@ Vitest.describe (
                         )
                     )
 
-                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLButtonElement
-                let row1 = container.querySelector("[data-testid='GitSidebarChangeRow-1']") :?> HTMLButtonElement
-                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLButtonElement
+                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let row1 = container.querySelector("[data-testid='GitSidebarChangeRow-1']") :?> HTMLElement
+                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
                 let messageInput = container.querySelector("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
-                let saveButton = container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
 
                 row0.click ()
+                do! Promise.sleep 0
 
                 let ctrlClick =
                     createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
 
                 row2.dispatchEvent ctrlClick |> ignore
+                do! Promise.sleep 0
                 row2.dispatchEvent ctrlClick |> ignore
+                do! Promise.sleep 0
                 row1.click ()
+                do! Promise.sleep 0
 
-                messageInput.value <- "save one file"
-                messageInput.dispatchEvent (createEvent "input") |> ignore
+                setTextAreaValue messageInput "save one file"
+                do! Promise.sleep 0
+
+                let saveButton =
+                    container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+
+                Vitest.expect(saveButton.disabled).toBe (false)
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 saveButton.click ()
+                do! Promise.sleep 0
 
                 Vitest.expect(capturedSelection |> Option.map _.Paths).toEqual (Some [| "src/file-001.txt" |])
 
@@ -2448,9 +2571,9 @@ Vitest.describe (
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
                                 OnUpdateFromOnline = fun () -> ()
-                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveSelection = fun request -> capturedSelection <- Some request
                                 OnPrimarySaveAll = fun _ -> ()
-                                OnCommitSelection = fun request -> capturedSelection <- Some request
+                                OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
@@ -2465,12 +2588,12 @@ Vitest.describe (
                         )
                     )
 
-                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLButtonElement
-                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLButtonElement
+                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
                 let messageInput = container.querySelector("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
-                let saveButton = container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
 
                 row0.click ()
+                do! Promise.sleep 0
 
                 let ctrlShiftClick =
                     createMouseEvent
@@ -2478,10 +2601,18 @@ Vitest.describe (
                         (createObj [ "bubbles" ==> true; "ctrlKey" ==> true; "shiftKey" ==> true ])
 
                 row2.dispatchEvent ctrlShiftClick |> ignore
+                do! Promise.sleep 0
 
-                messageInput.value <- "save range"
-                messageInput.dispatchEvent (createEvent "input") |> ignore
+                setTextAreaValue messageInput "save range"
+                do! Promise.sleep 0
+
+                let saveButton =
+                    container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+
+                Vitest.expect(saveButton.disabled).toBe (false)
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 saveButton.click ()
+                do! Promise.sleep 0
 
                 Vitest
                     .expect(capturedSelection |> Option.map _.Paths)
@@ -2533,12 +2664,54 @@ Vitest.describe (
                         )
                     )
 
-                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLButtonElement
+                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
                 firstRow.click ()
                 do! Promise.sleep 0
 
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 Vitest.expect(container.querySelector("[data-testid='GitSidebarErrorNotice']")).not.toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar status popover trigger does not open the changed file row",
+            fun () -> promise {
+                let mutable selectCalls = 0
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [| changedFile "README.md" "M" " " false |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                noopCallbacks with
+                                    OnSelectChange =
+                                        fun _ ->
+                                            selectCalls <- selectCalls + 1
+                                            promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let statusButton =
+                    container.querySelector("[data-testid='GitSidebarChangeStatusButton-0']") :?> HTMLButtonElement
+
+                statusButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(selectCalls).toBe (0)
 
                 cleanup ()
             }

@@ -3,6 +3,7 @@ namespace Swate.Components
 open System
 open Browser.Types
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 
 open Swate.Components.GitSidebarTypes
@@ -774,6 +775,13 @@ type GitSidebar =
     static member private ChangeStatusPopover(index: int, change: GitSidebarChange) =
         let label, _, iconClass = GitSidebarInternal.changePresentation change
         let gitReturn = GitSidebarInternal.describeChange change
+        let stopRowActivation (event: Event) = event.stopPropagation ()
+        let triggerInteractionProps =
+            createObj [
+                "onClick" ==> stopRowActivation
+                "onMouseDown" ==> stopRowActivation
+                "onKeyDown" ==> stopRowActivation
+            ]
 
         Popover.Popover(
             debug = $"git_change_status_{index}",
@@ -782,6 +790,7 @@ type GitSidebar =
                     Popover.Trigger(
                         Html.span [ prop.className $"swt:iconify {iconClass} swt:size-4" ],
                         className = "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-7 swt:w-7 swt:px-0",
+                        interactionProps = triggerInteractionProps,
                         props = [ prop.testId $"GitSidebarChangeStatusButton-{index}" ]
                     )
                     Popover.Content(
@@ -807,6 +816,10 @@ type GitSidebar =
     [<ReactComponent>]
     static member private ChangedFileRow(props: ChangedFileRowProps) =
         let change = props.Change
+        let activateRow ctrlKey shiftKey =
+            if not props.IsBusy then
+                props.UpdateMarkedSelection change ctrlKey shiftKey
+                props.OpenChange change
 
         Html.div [
             prop.role "listitem"
@@ -820,12 +833,18 @@ type GitSidebar =
                 style.custom ("transform", $"translateY({props.VirtualStart}px)")
             ]
             prop.children [
-                Html.button [
+                Html.div [
                     prop.testId $"GitSidebarChangeRow-{props.Index}"
                     prop.custom ("data-index", props.Index)
-                    prop.disabled props.IsBusy
+                    prop.role "button"
+                    prop.tabIndex (if props.IsBusy then -1 else 0)
+                    prop.custom ("aria-disabled", if props.IsBusy then "true" else "false")
                     prop.className [
                         "swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors"
+                        if props.IsBusy then
+                            "swt:cursor-not-allowed swt:opacity-60"
+                        else
+                            "swt:cursor-pointer"
                         if change.IsConflicted then
                             "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
                         elif props.IsSelected then
@@ -836,8 +855,12 @@ type GitSidebar =
                             "swt:border-base-content/10 swt:bg-base-100 hover:swt:bg-base-200/80"
                     ]
                     prop.onClick (fun (event: MouseEvent) ->
-                        props.UpdateMarkedSelection change (event.ctrlKey || event.metaKey) event.shiftKey
-                        props.OpenChange change
+                        activateRow (event.ctrlKey || event.metaKey) event.shiftKey
+                    )
+                    prop.onKeyDown (fun (event: KeyboardEvent) ->
+                        if event.key = "Enter" || event.key = " " then
+                            event.preventDefault ()
+                            activateRow (event.ctrlKey || event.metaKey) event.shiftKey
                     )
                     prop.children [
                         Html.div [

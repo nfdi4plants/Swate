@@ -14,6 +14,7 @@ module GitProvisioningService = Main.Git.GitProvisioningService
 module GitAuthAdapter = Main.Git.GitAuthAdapter
 module GitLfsAdapter = Main.Git.GitLfsAdapter
 module GitLfsService = Main.Git.GitLfsService
+module GitTokenProvider = Main.Git.GitTokenProvider
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"
@@ -148,6 +149,44 @@ let private runSimpleGitRawWithFakeGit
 
 let private splitNonEmptyLines (text: string) =
     text.Split([| '\r'; '\n' |], StringSplitOptions.RemoveEmptyEntries)
+
+let private testRemoteHost = "git.local.test"
+let private testRemoteToken = "swate-test-token"
+let private testRemoteUrl = $"https://{testRemoteHost}/origin.git"
+let private testAuthenticatedRemoteUrl = $"https://oauth2:{testRemoteToken}@{testRemoteHost}/origin.git"
+
+let private toFileRemoteUrl (path: string) =
+    let normalized = path.Replace("\\", "/")
+
+    if normalized.StartsWith("/", StringComparison.Ordinal) then
+        $"file://{normalized}"
+    else
+        $"file:///{normalized}"
+
+let private configureLocalRemoteRewrite (git: ISimpleGit) (remotePath: string) = promise {
+    let localRemoteUrl = toFileRemoteUrl remotePath
+    let! _ = git.raw [| "config"; "--add"; $"url.{localRemoteUrl}.insteadOf"; testRemoteUrl |]
+    let! _ = git.raw [| "config"; "--add"; $"url.{localRemoteUrl}.insteadOf"; testAuthenticatedRemoteUrl |]
+    return ()
+}
+
+let private withTestTokenProvider (body: unit -> JS.Promise<'T>) = promise {
+    GitTokenProvider.setTokenProvider {
+        TryGetAccessToken =
+            fun host -> promise {
+                return
+                    if String.Equals(host, testRemoteHost, StringComparison.OrdinalIgnoreCase) then
+                        Some testRemoteToken
+                    else
+                        None
+            }
+    }
+
+    try
+        return! body ()
+    finally
+        GitTokenProvider.setTokenProvider GitTokenProvider.defaultTokenProvider
+}
 
 let private withTempRepository (testBody: TempRepositoryContext -> JS.Promise<unit>) : JS.Promise<unit> = promise {
     let! rootPath = createTempDirectoryAsync ()
@@ -406,7 +445,8 @@ Vitest.describe (
                             |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
 
                         let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
-                        let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+                        do! configureLocalRemoteRewrite context.Git remotePath
+                        let! _ = context.Git.raw [| "remote"; "add"; "origin"; testRemoteUrl |]
                         let! _ = context.Git.raw [| "push"; "-u"; "origin"; baseBranch |]
 
                         let! _ = context.Git.raw [| "clone"; remotePath; clonePath |]
@@ -420,11 +460,13 @@ Vitest.describe (
                         let! _ = cloneGit.raw [| "push"; "origin"; baseBranch |]
 
                         let! preview =
-                            unwrapResultAsync
-                                (GitService.previewPull context.RepoPath None None None)
-                                (expectOk "preview pull")
+                            withTestTokenProvider (fun () ->
+                                unwrapResultAsync
+                                    (GitService.previewPull context.RepoPath None None None)
+                                    (expectOk "preview pull")
+                            )
 
-                        Vitest.expect(preview.Status).toBe (GitPullPreflightStatus.SafeToPull)
+                        Vitest.expect(preview.Status).toEqual (GitPullPreflightStatus.SafeToPull)
                     })
             })
 
@@ -453,7 +495,8 @@ Vitest.describe (
                             |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
 
                         let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
-                        let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+                        do! configureLocalRemoteRewrite context.Git remotePath
+                        let! _ = context.Git.raw [| "remote"; "add"; "origin"; testRemoteUrl |]
                         let! _ = context.Git.raw [| "push"; "-u"; "origin"; baseBranch |]
 
                         let! _ = context.Git.raw [| "clone"; remotePath; clonePath |]
@@ -473,11 +516,13 @@ Vitest.describe (
                         let! _ = cloneGit.raw [| "push"; "origin"; baseBranch |]
 
                         let! preview =
-                            unwrapResultAsync
-                                (GitService.previewPull context.RepoPath None None None)
-                                (expectOk "preview pull")
+                            withTestTokenProvider (fun () ->
+                                unwrapResultAsync
+                                    (GitService.previewPull context.RepoPath None None None)
+                                    (expectOk "preview pull")
+                            )
 
-                        Vitest.expect(preview.Status).toBe (GitPullPreflightStatus.WouldRequireMergeResolution)
+                        Vitest.expect(preview.Status).toEqual (GitPullPreflightStatus.WouldRequireMergeResolution)
                     })
             })
 
@@ -502,7 +547,7 @@ Vitest.describe (
                                 (GitService.previewPull context.RepoPath None None None)
                                 (expectOk "preview pull on detached head")
 
-                        Vitest.expect(preview.Status).toBe (GitPullPreflightStatus.Indeterminate)
+                        Vitest.expect(preview.Status).toEqual (GitPullPreflightStatus.Indeterminate)
                     })
             })
 
@@ -526,14 +571,14 @@ Vitest.describe (
                                 (GitService.getStatus context.RepoPath)
                                 (expectOk "git status on branch without upstream")
 
-                        Vitest.expect(status.Tracking).toEqual (None)
+                        Vitest.expect(status.Tracking.IsNone).toBe (true)
 
                         let! preview =
                             unwrapResultAsync
                                 (GitService.previewPull context.RepoPath None None None)
                                 (expectOk "preview pull without upstream")
 
-                        Vitest.expect(preview.Status).toBe (GitPullPreflightStatus.Indeterminate)
+                        Vitest.expect(preview.Status).toEqual (GitPullPreflightStatus.Indeterminate)
                     })
             })
 
