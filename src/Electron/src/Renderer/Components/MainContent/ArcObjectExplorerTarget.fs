@@ -2,6 +2,8 @@ module Renderer.Components.MainContent.ArcObjectExplorerTarget
 
 open Feliz
 open Swate.Components
+open Swate.Components.ARCObjectExplorer
+open Swate.Components.ARCObjectExplorer.Model
 
 [<ReactComponent>]
 let Main () =
@@ -10,9 +12,10 @@ let Main () =
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let viewModel =
-        ArcObjectExplorerView.create
+        Swate.Components.ARCObjectExplorer.Model.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
+            KindFilter.arcObjectExplorerOptions
             arcObjectCtx.state.SelectedKindIndices
 
     let services =
@@ -23,16 +26,14 @@ let Main () =
             arcObjectCtx.setStatusMessage
 
     let handleExplorerSelection =
-        Swate.Components.ARCExplorer.createOpenPreviewHandler
+        ARCExplorer.createOpenPreviewHandler
             fileStateCtx.setSelection
             services
 
     let searchAction =
-        Swate.Components.ARCObjectWidget.SearchAction(
+        ARCObjectWidget.SearchActionForExplorerItems(
             viewModel.SearchItems,
-            (fun (name, _, _) -> name),
-            (fun (_, _, item) -> promise { do! handleExplorerSelection item } |> Promise.start),
-            itemSubtitle = (fun (_, subtitle, _) -> subtitle)
+            (fun item -> promise { do! handleExplorerSelection item } |> Promise.start)
         )
 
     Html.div [
@@ -40,9 +41,10 @@ let Main () =
         prop.className
             "swt:size-full swt:min-w-0 swt:min-h-0 swt:flex swt:flex-col swt:gap-3 swt:overflow-hidden swt:p-4"
         prop.children [
-            Swate.Components.ARCObjectWidget.Navbar(
-                ArcObjectExplorerView.selectedTitle viewModel,
-                ArcObjectExplorerView.selectedSubtitle viewModel,
+            ARCObjectWidget.Navbar(
+                Swate.Components.ARCObjectExplorer.Model.selectedTitle viewModel,
+                Swate.Components.ARCObjectExplorer.Model.selectedSubtitle viewModel,
+                KindFilter.arcObjectExplorerOptions,
                 arcObjectCtx.state.SelectedKindIndices,
                 arcObjectCtx.setSelectedKindIndices,
                 rightActions = searchAction
@@ -55,12 +57,12 @@ let Main () =
                     prop.text statusMessage
                 ]
             | None -> Html.none
-            Swate.Components.ARCObjectPanel.Main(
-                "ARC Object Explorer",
+            ARCObjectPanel.Main(
+                "",
                 content =
-                    Swate.Components.ARCObjectWidget.ExplorerContent(
+                    ARCObjectWidget.ExplorerContent(
                         viewModel.ExplorerItems,
-                        ?selectedItemId = ArcObjectExplorerView.selectedItemId viewModel,
+                        ?selectedItemId = Swate.Components.ARCObjectExplorer.Model.selectedItemId viewModel,
                         onItemClick =
                             (fun item ->
                                 if item.Selectable then
@@ -69,3 +71,4 @@ let Main () =
             )
         ]
     ]
+

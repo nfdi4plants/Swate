@@ -2,6 +2,7 @@ module Renderer.Context.ArcObjectExplorerContext
 
 open Feliz
 open Swate.Components
+open Swate.Components.ARCObjectExplorer
 open Swate.Components.Shared
 
 type ArcObjectExplorerState = {
@@ -15,7 +16,8 @@ type ArcObjectExplorerState = {
 
     static member init() = {
         Nodes = []
-        SelectedKindIndices = Swate.Components.ARCObjectWidget.DefaultKindFilterIndices()
+        SelectedKindIndices =
+            KindFilter.defaultSelectedIndices(KindFilter.arcObjectExplorerOptions)
         ArcFileState = None
         PageState = None
         PendingArcFileSave = None
@@ -164,3 +166,4 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
         )
 
     ArcObjectExplorerCtx.Provider(ctx, children)
+

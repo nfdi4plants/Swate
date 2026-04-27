@@ -1,6 +1,8 @@
 module ElectronCore.ArcObjectWidgetTests
 
 open Swate.Components
+open Swate.Components.ARCObjectExplorer
+open Swate.Components.ARCObjectExplorer.Types
 open Swate.Components.FileExplorerTypes
 open Vitest
 
@@ -36,7 +38,7 @@ let private expectEntry itemId (result: ARCObjectExplorerItems) =
     | Some entry -> entry
     | None -> failwith $"Expected explorer item {itemId}."
 
-Vitest.describe("ARCObjectWidgetHelper.GetExplorerItems", fun () ->
+Vitest.describe("ARCObjectWidgetData.getExplorerItems", fun () ->
     Vitest.test("returns selectable descendants recursively and skips structural groups", fun () ->
         let sample = file "sample" "Leaf-01" FileItemIcon.Tag "Sample" true
         let table = folder "table" "Metabolite Measurements" "Table" true [ sample ]
@@ -44,7 +46,7 @@ Vitest.describe("ARCObjectWidgetHelper.GetExplorerItems", fun () ->
         let note = file "note" "Sampling protocol" FileItemIcon.Document "Note" true
         let study = folder "study" "PlantStressStudy" "Study" true [ tablesGroup; note ]
 
-        let result = ARCObjectWidgetHelper.GetExplorerItems(Some "study", [ study ]) |> expectSome
+        let result = ARCObjectWidgetData.getExplorerItems(Some "study", [ study ]) |> expectSome
 
         Vitest.expect(result.SourceName).toBe("PlantStressStudy")
         Vitest.expect(result.ContextItems |> List.map (fun item -> item.Item.Id)).toEqual([ "study" ])
@@ -71,7 +73,7 @@ Vitest.describe("ARCObjectWidgetHelper.GetExplorerItems", fun () ->
         let tablesGroup = folder "tables-group" "Tables" "Group" false [ table ]
         let study = folder "study" "PlantStressStudy" "Study" true [ tablesGroup ]
 
-        let result = ARCObjectWidgetHelper.GetExplorerItems(Some "sample", [ study ]) |> expectSome
+        let result = ARCObjectWidgetData.getExplorerItems(Some "sample", [ study ]) |> expectSome
 
         Vitest.expect(result.ContextItems |> List.map (fun item -> item.Item.Id)).toEqual([ "study"; "tables-group"; "table"; "sample" ])
         Vitest.expect(result.ContextItems |> List.filter (fun item -> item.IsCurrent) |> List.map (fun item -> item.Item.Id)).toEqual([ "sample" ])
@@ -80,7 +82,7 @@ Vitest.describe("ARCObjectWidgetHelper.GetExplorerItems", fun () ->
     Vitest.test("returns the selected item when it has no visible descendants", fun () ->
         let note = file "note" "Sampling protocol" FileItemIcon.Document "Note" true
 
-        let result = ARCObjectWidgetHelper.GetExplorerItems(Some "note", [ note ]) |> expectSome
+        let result = ARCObjectWidgetData.getExplorerItems(Some "note", [ note ]) |> expectSome
 
         Vitest.expect(result.SourceId).toBe("note")
         Vitest.expect(result.ContextItems |> List.map (fun item -> item.Item.Id)).toEqual([ "note" ])
