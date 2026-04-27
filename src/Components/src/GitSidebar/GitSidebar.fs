@@ -120,7 +120,6 @@ type private AdvancedActionsProps = {
     RemoteActionsWarning: string option
     SubmitDownloadLargeFiles: bool -> unit
     SubmitUpdateFromOnline: unit -> unit
-    SubmitLocalCommit: unit -> unit
     HasMarkedFiles: bool
     CanRunPrimarySave: bool
     IsAdvancedActionsOpen: bool
@@ -144,6 +143,7 @@ type private CommitSectionProps = {
     HasMarkedFiles: bool
     CanRunPrimarySave: bool
     SubmitPrimarySave: unit -> unit
+    SubmitLocalCommit: unit -> unit
 }
 
 type private ChangedFilesListProps = {
@@ -629,16 +629,6 @@ type GitSidebar =
                             prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
                             prop.children [
                                 GitSidebar.ActionButton(
-                                    (if props.HasMarkedFiles then
-                                         "Add and commit selected Changes"
-                                     else
-                                         "Add and commit all Changes"),
-                                    "swt:fluent--save-24-regular",
-                                    not props.CanRunPrimarySave,
-                                    props.SubmitLocalCommit,
-                                    testId = "GitSidebarLocalCommitButton"
-                                )
-                                GitSidebar.ActionButton(
                                     "Check for Changes",
                                     "swt:fluent--arrow-download-24-regular",
                                     props.IsBusy || not props.RemoteActionsEnabled,
@@ -694,9 +684,61 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
+    static member private SaveOptionsHelpPopover() =
+        Popover.Popover(
+            debug = "GitSidebarSaveOptionsHelp",
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.span "?",
+                        className = "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-6 swt:w-6 swt:px-0 swt:text-xs swt:font-bold",
+                        props = [ prop.testId "GitSidebarSaveOptionsHelpButton" ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:max-w-72 swt:flex-col swt:gap-2 swt:text-sm"
+                                prop.children [
+                                    Popover.Heading(Html.text "Save options")
+                                    Html.p [
+                                        prop.text
+                                            "Save changes commits locally, then updates and uploads online when the repository can sync safely."
+                                    ]
+                                    Html.p [
+                                        prop.text
+                                            "Add and commit changes only writes the local Git commit. Online sync stays pending until you update or upload later."
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
+        )
+
+    [<ReactComponent>]
     static member private CommitSection(props: CommitSectionProps) =
+        let isSaveMenuOpen, setSaveMenuOpen = React.useState false
+        let saveMenuRef = React.useElementRef ()
+
+        React.useListener.onClickAway (saveMenuRef, fun _ -> setSaveMenuOpen false)
+
+        let primarySaveLabel =
+            if props.HasMarkedFiles then
+                "Save Selected Changes"
+            else
+                "Save All Changes"
+
+        let localCommitLabel =
+            if props.HasMarkedFiles then
+                "Add and commit selected Changes"
+            else
+                "Add and commit all Changes"
+
         React.Fragment [
-            GitSidebar.SectionHeader("Save", None)
+            Html.div [
+                prop.className
+                    "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
+                prop.children [ Html.span "Save" ]
+            ]
 
             Html.div [
                 prop.testId "GitSidebarCommitSection"
@@ -741,24 +783,76 @@ type GitSidebar =
                         ]
                     ]
                     Html.div [
-                        prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                        prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2"
                         prop.children [
-                            Html.button [
-                                prop.testId "GitSidebarPrimarySaveButton"
-                                prop.className "swt:btn swt:btn-sm swt:btn-success swt:gap-2 swt:normal-case"
-                                prop.disabled (not props.CanRunPrimarySave)
-                                prop.onClick (fun _ -> props.SubmitPrimarySave())
+                            Html.div [
+                                prop.ref saveMenuRef
+                                prop.className "swt:relative swt:inline-flex"
                                 prop.children [
-                                    Html.span [
-                                        prop.className "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
+                                    Html.div [
+                                        prop.className "swt:join"
+                                        prop.children [
+                                            Html.button [
+                                                prop.testId "GitSidebarPrimarySaveButton"
+                                                prop.className "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:gap-2 swt:normal-case"
+                                                prop.disabled (not props.CanRunPrimarySave)
+                                                prop.onClick (fun _ -> props.SubmitPrimarySave())
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className
+                                                            "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
+                                                    ]
+                                                    Html.span primarySaveLabel
+                                                ]
+                                            ]
+                                            Html.button [
+                                                prop.testId "GitSidebarSaveOptionsButton"
+                                                prop.className
+                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:min-w-0 swt:px-2"
+                                                prop.disabled (not props.CanRunPrimarySave)
+                                                prop.onClick (fun _ -> setSaveMenuOpen (not isSaveMenuOpen))
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className "swt:iconify swt:fluent--chevron-down-24-regular swt:size-4"
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
                                     ]
-                                    Html.span (
-                                        if props.HasMarkedFiles then
-                                            "Save Selected Changes"
-                                        else
-                                            "Save All Changes"
-                                    )
+                                    if isSaveMenuOpen then
+                                        Html.ul [
+                                            prop.testId "GitSidebarSaveOptionsMenu"
+                                            prop.tabIndex 0
+                                            prop.className
+                                                "swt:menu swt:absolute swt:left-0 swt:top-full swt:z-99 swt:mt-1 swt:w-full swt:min-w-0 swt:rounded-box swt:bg-base-200 swt:p-2 swt:shadow-sm"
+                                            prop.onClick (fun _ -> setSaveMenuOpen false)
+                                            prop.children [
+                                                Html.li [
+                                                    prop.children [
+                                                        Html.button [
+                                                            prop.testId "GitSidebarLocalCommitButton"
+                                                            prop.className "swt:items-start swt:gap-2 swt:whitespace-normal swt:text-left"
+                                                            prop.onClick (fun _ -> props.SubmitLocalCommit())
+                                                            prop.children [
+                                                                Html.span [
+                                                                    prop.className
+                                                                        "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
+                                                                ]
+                                                                Html.span [
+                                                                    prop.className "swt:min-w-0 swt:break-words"
+                                                                    prop.text localCommitLabel
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
                                 ]
+                            ]
+                            Html.div [
+                                prop.className "swt:ml-auto"
+                                prop.children [ GitSidebar.SaveOptionsHelpPopover() ]
                             ]
                         ]
                     ]
@@ -1551,7 +1645,6 @@ type GitSidebar =
                             fun () ->
                                 setLocalError None
                                 onUpdateFromOnline ()
-                        SubmitLocalCommit = submitLocalCommit
                         HasMarkedFiles = hasMarkedFiles
                         CanRunPrimarySave = canRunPrimarySave
                         IsAdvancedActionsOpen = isAdvancedActionsOpen
@@ -1600,6 +1693,7 @@ type GitSidebar =
                         HasMarkedFiles = hasMarkedFiles
                         CanRunPrimarySave = canRunPrimarySave
                         SubmitPrimarySave = submitPrimarySave
+                        SubmitLocalCommit = submitLocalCommit
                     }
                 )
 

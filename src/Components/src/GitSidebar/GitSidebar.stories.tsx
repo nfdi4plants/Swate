@@ -238,7 +238,7 @@ export const AdvancedActions: Story = {
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveTextContent("Update ARC from Online");
     await expect(canvas.queryByTestId("GitSidebarSyncButton")).toBeNull();
-    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toBeInTheDocument();
+    await expect(canvas.queryByTestId("GitSidebarLocalCommitButton")).toBeNull();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
@@ -468,16 +468,36 @@ export const CommitComposer: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const modal = within(document.body);
     const legacyCard = canvas.getByTestId("GitSidebarCommitSection").firstElementChild as HTMLElement;
     await expect(legacyCard).not.toHaveClass("swt:rounded-box");
     await expect(legacyCard).not.toHaveClass("swt:border");
-await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
     await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save Selected Changes");
+    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
+    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
+      "Add and commit selected Changes",
+    );
+    const sidebarBounds = canvas.getByTestId("GitSidebar").getBoundingClientRect();
+    const menuBounds = canvas.getByTestId("GitSidebarSaveOptionsMenu").getBoundingClientRect();
+    expect(menuBounds.left).toBeGreaterThanOrEqual(sidebarBounds.left);
+    expect(menuBounds.right).toBeLessThanOrEqual(sidebarBounds.right);
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
     // Click again to deselect – button text should switch back to "Save All Changes"
     await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
     await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes");
+    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
+    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
+      "Add and commit all Changes",
+    );
+    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsHelpButton"));
+    await expect(await modal.findByTestId("popover_content_GitSidebarSaveOptionsHelp")).toHaveTextContent(
+      "Save changes commits locally",
+    );
+    await expect(modal.getByTestId("popover_content_GitSidebarSaveOptionsHelp")).toHaveTextContent(
+      "Add and commit changes only writes the local Git commit",
+    );
   },
 };
 
