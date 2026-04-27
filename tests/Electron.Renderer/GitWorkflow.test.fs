@@ -1829,4 +1829,58 @@ Vitest.describe (
                 cleanup ()
             }
         )
+
+        Vitest.test (
+            "GitSidebar keeps the change-status icon in a fixed right-edge slot",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Html.div [
+                            prop.style [ style.width 340; style.height 760 ]
+                            prop.children [
+                                Swate.Components.GitSidebar.Main(
+                                    status = {
+                                        CurrentBranch = Some "main"
+                                        TrackingBranch = Some "origin/main"
+                                        Ahead = 0
+                                        Behind = 0
+                                        IsClean = false
+                                        IsMergeInProgress = false
+                                    },
+                                    changedFiles = [|
+                                        changedFile
+                                            "src/very/long/path/that/wraps/in/the/sidebar/and/needs/a/fixed/status/icon.txt"
+                                            "M"
+                                            " "
+                                            false
+                                    |],
+                                    branchOptions = [| sidebarLocalBranch "main" true true |],
+                                    callbacks = {
+                                        OnRefresh = fun () -> ()
+                                        OnFetch = fun () -> ()
+                                        OnPull = fun () -> ()
+                                        OnPush = fun () -> ()
+                                        OnSync = fun () -> ()
+                                        OnCommitSelection = fun _ -> ()
+                                        OnCommitAll = fun _ -> ()
+                                        OnSaveDownloadLargeFiles = fun _ -> ()
+                                        OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                        OnCreateBranch = fun _ -> ()
+                                        OnSwitchBranch = fun _ -> ()
+                                        OnSelectChange = fun _ -> promise { return Ok() }
+                                    },
+                                    downloadLargeFiles = true,
+                                    lfsAutoTrackThresholdMb = 5
+                                )
+                            ]
+                        ]
+                    )
+
+                let statusSlot = container.querySelector("[data-testid='GitSidebarChangeStatusSlot-0']") :?> HTMLElement
+                Vitest.expect(statusSlot.className.Contains("swt:ml-auto")).toBe (true)
+                Vitest.expect(statusSlot.className.Contains("swt:shrink-0")).toBe (true)
+
+                cleanup ()
+            }
+        )
 )

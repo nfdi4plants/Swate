@@ -841,20 +841,26 @@ type GitSidebar =
                         Html.div [
                             prop.className "swt:min-w-0 swt:flex-1"
                             prop.children [
-                                Html.span [
-                                    prop.className "swt:block swt:truncate swt:text-sm swt:font-medium"
-                                    prop.text change.Path
-                                ]
-                                match change.OriginalPath with
-                                | Some originalPath ->
-                                    Html.div [
-                                        prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
-                                        prop.text $"Renamed from {originalPath}"
+                                Html.div [
+                                    prop.className "swt:min-w-0"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:block swt:break-words swt:text-sm swt:font-medium"
+                                            prop.text change.Path
+                                        ]
+                                        match change.OriginalPath with
+                                        | Some originalPath ->
+                                            Html.div [
+                                                prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
+                                                prop.text $"Renamed from {originalPath}"
+                                            ]
+                                        | None -> Html.none
                                     ]
-                                | None -> Html.none
+                                ]
                             ]
                         ]
                         Html.div [
+                            prop.testId $"GitSidebarChangeStatusSlot-{props.Index}"
                             prop.className "swt:ml-auto swt:shrink-0 swt:self-start"
                             prop.children [ GitSidebar.ChangeStatusPopover(props.Index, change) ]
                         ]

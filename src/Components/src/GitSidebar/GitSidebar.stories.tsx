@@ -326,6 +326,30 @@ export const DeletedFile: Story = {
   },
 };
 
+export const LongWrappedFile: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: [
+      {
+        Path: "src/very/long/path/that/wraps/in/the/sidebar/and/needs/a/fixed/status/icon.txt",
+        OriginalPath: undefined,
+        IndexStatus: "M",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+    ],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:ml-auto");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:shrink-0");
+  },
+};
+
 export const BusyProgressState: Story = {
   args: {
     status: baseStatus,
