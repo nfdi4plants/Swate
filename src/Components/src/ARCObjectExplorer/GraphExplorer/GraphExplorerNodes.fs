@@ -14,19 +14,18 @@ type private GraphFileItemAppearance = {
     IconTone: FileItemIconTone option
 }
 
-let private asOptionalText (value: string) =
+let private normalizeText (value: string) =
     if String.IsNullOrWhiteSpace value then
         None
     else
         Some value
 
+let private asOptionalText (value: string) =
+    normalizeText value
+
 let private asOptionalTextOption (value: string option) =
     value
-    |> Option.bind (fun text ->
-        if String.IsNullOrWhiteSpace text then
-            None
-        else
-            Some text)
+    |> Option.bind normalizeText
 
 let private sanitizeIdSegment (value: string) =
     value
@@ -49,17 +48,19 @@ let private arcKindForGraphKind = GraphExplorerNodeKind.toArcExplorerNodeKind
 
 let private row label value = [ label, value ]
 
-let private optionalRow label value =
-    value
-    |> asOptionalText
-    |> Option.map (fun text -> [ label, text ])
-    |> Option.defaultValue []
-
-let private optionalOptionRow label value =
+let private optionalRowFromOption label (value: string option) =
     value
     |> asOptionalTextOption
     |> Option.map (fun text -> [ label, text ])
     |> Option.defaultValue []
+
+let private optionalRow label value =
+    value
+    |> Some
+    |> optionalRowFromOption label
+
+let private optionalOptionRow label value =
+    optionalRowFromOption label value
 
 let private addMeta (nodeId: string) (meta: GraphNodeMeta) (metaById: Map<string, GraphNodeMeta>) =
     metaById |> Map.add nodeId meta
@@ -118,21 +119,24 @@ let private formatPropertyValue (propertyValue: PropertyValue) =
     | _ ->
         propertyLabel
 
-let private optionalRowsFromPropertyValues label (values: PropertyValue array) =
-    if Array.isEmpty values then
+let private optionalRowsFromPropertyList label (values: PropertyValue list) =
+    if List.isEmpty values then
         []
     else
         values
-        |> Array.map formatPropertyValue
+        |> List.map formatPropertyValue
         |> String.concat "; "
         |> row label
 
+let private optionalRowsFromPropertyValues label (values: PropertyValue array) =
+    values
+    |> Array.toList
+    |> optionalRowsFromPropertyList label
+
 let private optionalRowsFromPropertyOption label (value: PropertyValue option) =
     value
-    |> Option.map (fun propertyValue ->
-        formatPropertyValue propertyValue
-        |> row label)
-    |> Option.defaultValue []
+    |> Option.toList
+    |> optionalRowsFromPropertyList label
 
 let private propertyValueRows
     (ownerLabel: string)
@@ -867,7 +871,6 @@ let private formatIntendedUse (intendedUse: (DefinedTerm * string) option) =
         let termLabel =
             definedTerm.name
             |> asOptionalText
-            |> asOptionalTextOption
             |> Option.defaultValue definedTerm.id
 
         match intendedUseValue |> asOptionalText with

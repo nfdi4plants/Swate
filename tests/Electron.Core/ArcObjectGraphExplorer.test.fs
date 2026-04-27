@@ -424,6 +424,131 @@ let private graphObjectsWithPropertyValues () : ARCObjects list =
         ARCObjects.Arc [| graph |]
     ]
 
+let private graphObjectsWithWhitespaceOptionalText () : ARCObjects list =
+    let definedTerm: DefinedTerm = {
+        id = "term:intended-use"
+        type' = "DefinedTerm"
+        name = "   "
+        termCode = None
+        inDefinedTermSet = None
+        additionalProperty = None
+    }
+
+    let processValue: LabProcess = {
+        id = Some "   "
+        type' = "LabProcess"
+        additionalType = Some "  "
+        name = "   "
+        inputs = [||]
+        outputs = [||]
+        Materials = [||]
+        Data = [||]
+        executesProtocol = "protocol:whitespace"
+        parameterValue = [||]
+    }
+
+    let protocol: LabProtocol = {
+        id = Some "   "
+        type' = "Protocol"
+        additionalType = Some ""
+        name = Some "   "
+        parameters = [||]
+        description = Some "   "
+        intendedUse = Some(definedTerm, "   ")
+        processes = [| processValue |]
+        additionalProperty = None
+        version = Some ""
+        url = Some "   "
+    }
+
+    let dataset: Dataset = {
+        id = "study:whitespace"
+        type' = ARCDatasets.Study
+        additionalType = "Study"
+        identifier = "study-whitespace"
+        name = Some "   "
+        description = Some ""
+        about = [| protocol |]
+        hasPart = [||]
+        additionalProperty = [||]
+    }
+
+    let graph: ARCGraph = {
+        path = "   "
+        Datasets = {
+            Studies = [| dataset |]
+            Assays = [||]
+            Workflows = [||]
+            Runs = [||]
+        }
+    }
+
+    [
+        ARCObjects.Arc [| graph |]
+    ]
+
+let private graphObjectsWithPropertyRowParity () : ARCObjects list =
+    let sharedProperty =
+        createPropertyValue(
+            "prop:shared",
+            "   ",
+            Some "Shared Value",
+            Some "SharedType"
+        )
+
+    let processValue: LabProcess = {
+        id = Some "process:shared"
+        type' = "LabProcess"
+        additionalType = None
+        name = "Shared process"
+        inputs = [||]
+        outputs = [||]
+        Materials = [||]
+        Data = [||]
+        executesProtocol = "protocol:shared"
+        parameterValue = [| sharedProperty |]
+    }
+
+    let protocol: LabProtocol = {
+        id = Some "protocol:shared"
+        type' = "Protocol"
+        additionalType = None
+        name = Some "Shared protocol"
+        parameters = [||]
+        description = None
+        intendedUse = None
+        processes = [| processValue |]
+        additionalProperty = Some sharedProperty
+        version = None
+        url = None
+    }
+
+    let dataset: Dataset = {
+        id = "study:shared"
+        type' = ARCDatasets.Study
+        additionalType = "Study"
+        identifier = "study-shared"
+        name = Some "Shared dataset"
+        description = None
+        about = [| protocol |]
+        hasPart = [||]
+        additionalProperty = [| sharedProperty |]
+    }
+
+    let graph: ARCGraph = {
+        path = "C:/example/property-row-parity"
+        Datasets = {
+            Studies = [| dataset |]
+            Assays = [||]
+            Workflows = [||]
+            Runs = [||]
+        }
+    }
+
+    [
+        ARCObjects.Arc [| graph |]
+    ]
+
 Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
     Vitest.test("uses semantic graph filter options in storybook", fun () ->
         let labels =
@@ -1827,6 +1952,140 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
                 Vitest.expect(meta.Rows |> List.exists (fun (label, _) -> label = "Data Role")).toBe(true)
             | _ ->
                 failwith $"Unexpected endpoint Value Type: {valueType}"))
+
+    Vitest.test("normalizes whitespace consistently for direct and optional text fields", fun () ->
+        let graphObjects = graphObjectsWithWhitespaceOptionalText ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let allLayer =
+            nodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer."
+
+        let canonicalArcNode =
+            allLayer.children
+            |> List.tryHead
+            |> expectSome <| "Expected canonical ARC node."
+
+        let arcMeta =
+            metaById
+            |> Map.tryFind canonicalArcNode.id
+            |> expectSome <| $"Expected metadata for ARC node '{canonicalArcNode.id}'."
+
+        let canonicalNodes =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.toList
+
+        let findCanonicalNodeByTag (tag: GraphNodeTag) (errorMessage: string) =
+            canonicalNodes
+            |> List.tryFind (fun node ->
+                not node.isReference
+                && hasTag metaById tag node)
+            |> expectSome <| errorMessage
+
+        let findMetaForNode (node: ArcExplorerNode) (errorMessage: string) =
+            metaById
+            |> Map.tryFind node.id
+            |> expectSome <| errorMessage
+
+        Vitest.expect(canonicalArcNode.name).toBe("ARC Graph 1")
+        Vitest.expect(arcMeta.Rows |> List.exists (fun (label, _) -> label = "Path")).toBe(false)
+
+        let datasetNode =
+            findCanonicalNodeByTag GraphNodeTag.Dataset "Expected canonical dataset node."
+
+        let datasetMeta =
+            findMetaForNode datasetNode $"Expected metadata for dataset node '{datasetNode.id}'."
+
+        Vitest.expect(datasetNode.name).toBe("study-whitespace")
+        Vitest.expect(datasetMeta.Rows |> List.exists (fun (label, _) -> label = "Name")).toBe(false)
+        Vitest.expect(datasetMeta.Rows |> List.exists (fun (label, _) -> label = "Description")).toBe(false)
+
+        let protocolNode =
+            findCanonicalNodeByTag GraphNodeTag.Protocol "Expected canonical protocol node."
+
+        let protocolMeta =
+            findMetaForNode protocolNode $"Expected metadata for protocol node '{protocolNode.id}'."
+
+        Vitest.expect(protocolNode.name).toBe("Protocol 1")
+
+        [ "Id"; "Additional Type"; "Description"; "Version"; "URL" ]
+        |> List.iter (fun label ->
+            Vitest.expect(protocolMeta.Rows |> List.exists (fun (rowLabel, _) -> rowLabel = label)).toBe(false))
+
+        Vitest.expect(protocolMeta.Rows |> List.exists (fun (label, value) -> label = "Intended Use" && value = "term:intended-use")).toBe(true)
+
+        let processNode =
+            findCanonicalNodeByTag GraphNodeTag.Process "Expected canonical process node."
+
+        let processMeta =
+            findMetaForNode processNode $"Expected metadata for process node '{processNode.id}'."
+
+        Vitest.expect(processNode.name).toBe("Unnamed process")
+        Vitest.expect(processMeta.Rows |> List.exists (fun (label, _) -> label = "Process Id")).toBe(false)
+        Vitest.expect(processMeta.Rows |> List.exists (fun (label, _) -> label = "Additional Type")).toBe(false))
+
+    Vitest.test("formats property rows equally for array and option property sources", fun () ->
+        let graphObjects = graphObjectsWithPropertyRowParity ()
+        let nodes, metaById = toArcExplorerNodesWithMetaFromArcObjects graphObjects
+
+        let allLayer =
+            nodes
+            |> List.tryFind (fun node -> node.id = "graph:all")
+            |> expectSome <| "Missing graph:all layer."
+
+        let canonicalNodes =
+            allLayer.children
+            |> flattenNodes
+            |> Seq.toList
+
+        let findCanonicalMetaByTag (tag: GraphNodeTag) (errorMessage: string) =
+            canonicalNodes
+            |> List.tryFind (fun node ->
+                not node.isReference
+                && hasTag metaById tag node)
+            |> Option.bind (fun node -> metaById |> Map.tryFind node.id)
+            |> expectSome <| errorMessage
+
+        let findRowValue (rowLabel: string) (rows: (string * string) list) =
+            rows
+            |> List.tryPick (fun (label, value) ->
+                if label = rowLabel then Some value else None)
+
+        let datasetMeta =
+            findCanonicalMetaByTag
+                GraphNodeTag.Dataset
+                "Expected metadata for canonical dataset node."
+
+        let protocolMeta =
+            findCanonicalMetaByTag
+                GraphNodeTag.Protocol
+                "Expected metadata for canonical protocol node."
+
+        let processMeta =
+            findCanonicalMetaByTag
+                GraphNodeTag.Process
+                "Expected metadata for canonical process node."
+
+        let datasetAdditionalProperty =
+            datasetMeta.Rows
+            |> findRowValue "Additional Property"
+            |> expectSome <| "Expected dataset Additional Property row."
+
+        let protocolAdditionalProperty =
+            protocolMeta.Rows
+            |> findRowValue "Additional Property"
+            |> expectSome <| "Expected protocol Additional Property row."
+
+        let processParameterValue =
+            processMeta.Rows
+            |> findRowValue "Parameter Value"
+            |> expectSome <| "Expected process Parameter Value row."
+
+        Vitest.expect(datasetAdditionalProperty).toBe("prop:shared=Shared Value")
+        Vitest.expect(protocolAdditionalProperty).toBe("prop:shared=Shared Value")
+        Vitest.expect(processParameterValue).toBe("prop:shared=Shared Value"))
 
     Vitest.test("adds grouped PropertyValue nodes with deterministic ids for all supported owners", fun () ->
         let graphObjects = graphObjectsWithPropertyValues ()
