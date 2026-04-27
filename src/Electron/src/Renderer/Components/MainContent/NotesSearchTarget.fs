@@ -29,13 +29,13 @@ module private NoteSearchInterop =
 
     let private rehydrateTag (rawTag: obj) =
         let name =
-            tryGetPreferredStringProperty rawTag [ "Name"; "_name"; "NameText"; "name"; "nameText" ]
+            tryGetPreferredStringProperty rawTag [ "Name"; "_name" ]
 
         let source =
-            tryGetPreferredStringProperty rawTag [ "TermSourceREF"; "_termSourceREF"; "termSourceREF" ]
+            tryGetPreferredStringProperty rawTag [ "TermSourceREF"; "_termSourceREF" ]
 
         let accession =
-            tryGetPreferredStringProperty rawTag [ "TermAccessionNumber"; "_termAccessionNumber"; "termAccessionNumber" ]
+            tryGetPreferredStringProperty rawTag [ "TermAccessionNumber"; "_termAccessionNumber" ]
 
         if name.IsNone && source.IsNone && accession.IsNone then
             None

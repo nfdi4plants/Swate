@@ -62,12 +62,6 @@ type SearchComponent =
 
     [<ReactComponent>]
     static member SearchSuggestion(note: Note, onOpen: string -> unit) =
-        let tagLabels =
-            note.Tags
-            |> Option.defaultValue (ResizeArray [])
-            |> Seq.choose Swate.Components.NoteSearch.FilterLogic.TagText.tryDisplayLabel
-            |> Seq.toList
-
         Html.div [
             prop.className "swt:p-3"
             prop.children [
@@ -89,19 +83,17 @@ type SearchComponent =
                     prop.className "swt:text-sm swt:text-gray-600"
                     prop.text (note.Date.ToString("yyyy-MM-dd"))
                 ]
-                if not tagLabels.IsEmpty then
-                    Html.div [
-                        prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:mt-1"
-                        prop.children [
-                            for tagLabel in tagLabels do
-                                Html.span [
-                                    prop.testId "notes-search-tag"
-                                    prop.className
-                                        "swt:text-xs swt:text-base-content swt:border swt:border-base-300 swt:bg-base-200 swt:inline-flex swt:items-center swt:px-2 swt:py-1 swt:rounded-md"
-                                    prop.text tagLabel
-                                ]
-                        ]
+                Html.div [
+                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:mt-1"
+                    prop.children [
+                        for tag in (note.Tags |> Option.defaultValue (ResizeArray [])) do
+                            Html.span [
+                                prop.className
+                                    "swt:text-sm swt:text-gray-500 swt:border swt:border-current swt:inline-block swt:px-2 swt:py-1 swt:rounded"
+                                prop.text tag.NameText
+                            ]
                     ]
+                ]
                 Html.p [
                     prop.className "swt:mt-2"
                     prop.text (helperFnctions.createContentPreview note)
