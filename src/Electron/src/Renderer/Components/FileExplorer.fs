@@ -57,9 +57,11 @@ module private FileExplorerHelper =
         match parent.isDirectory with
         | true ->
             let normalizedParentPath = normalizeNodePath parent.path
+            let isDirectoryLoaded = loadedDirectoryPaths.Contains normalizedParentPath
+            let hasSourceChildren = parent.children.Count > 0
 
-            let tmp =
-                if loadedDirectoryPaths.Contains normalizedParentPath then
+            let mappedChildren =
+                if isDirectoryLoaded then
                     let ra = ResizeArray(parent.children.Values)
 
                     ra.ToArray()
@@ -69,6 +71,14 @@ module private FileExplorerHelper =
                 else
                     []
 
+            let children =
+                if isDirectoryLoaded then
+                    Some mappedChildren
+                elif hasSourceChildren then
+                    None
+                else
+                    Some []
+
             Some {
                 FileTree.createFolder parent.name (Some parent.path) FileItemIcon.Folder with
                     Id = parent.path
@@ -76,7 +86,7 @@ module private FileExplorerHelper =
                         selectedTreeItemPath
                         |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath parent.path)
                     IsLFS = parent.isLfs
-                    Children = Some tmp
+                    Children = children
             }
         | false ->
             Some {
@@ -97,6 +107,7 @@ let EmptyFileTreePlaceholder () =
 [<ReactComponent>]
 let FileTree () =
 
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
     let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
@@ -215,12 +226,56 @@ let FileTree () =
         }
         |> Promise.start
 
+    let handleDirectoryArrowToggle (item: FileItem) (willExpand: bool) =
+        if willExpand then
+            match item.Path with
+            | Some path ->
+                setLoadedDirectoryPaths (fun current ->
+                    let normalizedPath = normalizePath path
+
+                    if current.Contains normalizedPath then
+                        current
+                    else
+                        current.Add normalizedPath)
+            | None -> ()
+
+    let arcName =
+        let fromRootItem = fileItem |> Option.map (fun root -> root.Name)
+
+        let fromAppPath =
+            appStateCtx.state
+            |> Option.bind (fun path ->
+                let normalizedPath = normalizePath path
+                if System.String.IsNullOrWhiteSpace normalizedPath then
+                    None
+                else
+                    Some(getFileName normalizedPath)
+            )
+
+        fromAppPath
+        |> Option.orElse fromRootItem
+        |> Option.defaultValue "ARC"
+
     match fileItem with
-    | Some fileItem ->
-        Swate.Components.FileExplorer.FileExplorer(
-            initialItems = [ fileItem ],
-            onItemClick = openPreview,
-            onContextMenu = contextMenuItems,
-            selectedItemId = fileStateCtx.state.Selection.TreePath
-        )
+    | Some rootItem ->
+        let visibleItems = rootItem.Children |> Option.defaultValue []
+
+        Html.div [
+            prop.className "swt:w-full"
+            prop.children [
+                Html.div [
+                    prop.testId "left-sidebar-file-explorer-arc-name"
+                    prop.className "swt:mb-2 swt:px-2 swt:text-sm swt:font-semibold swt:truncate"
+                    prop.text arcName
+                ]
+                Swate.Components.FileExplorer.FileExplorer(
+                    initialItems = visibleItems,
+                    onItemClick = openPreview,
+                    onDirectoryArrowToggle = handleDirectoryArrowToggle,
+                    onContextMenu = contextMenuItems,
+                    selectedItemId = fileStateCtx.state.Selection.TreePath,
+                    showBreadcrumbs = false
+                )
+            ]
+        ]
     | None -> EmptyFileTreePlaceholder()

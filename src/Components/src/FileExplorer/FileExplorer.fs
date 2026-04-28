@@ -19,6 +19,7 @@ type FileExplorer =
             ?onItemClick: FileItem -> unit,
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
             ?selectedItemId: string option,
+            ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?useDirectoryChevronToggle: bool,
             ?showBreadcrumbs: bool,
@@ -58,33 +59,12 @@ type FileExplorer =
             ev.stopPropagation ()
             handleItemClick item
 
-        let handleDirectoryToggle (item: FileItem) (ev: Browser.Types.MouseEvent) =
+        let handleDirectoryArrowToggle (item: FileItem) (isExpanded: bool) (ev: Browser.Types.MouseEvent) =
             ev.preventDefault ()
             ev.stopPropagation ()
+            let willExpand = not isExpanded
             dispatch (FileExplorerLogic.ToggleExpanded item.Id)
-
-        let handleDirectoryClick (item: FileItem) (isExpanded: bool) (ev: Browser.Types.MouseEvent) =
-            ev.preventDefault ()
-            ev.stopPropagation ()
-
-            match directoryInteractionMode with
-            | DirectoryInteractionMode.SingleClickToggle ->
-                dispatch (FileExplorerLogic.ToggleExpanded item.Id)
-                handleItemClick item
-            | DirectoryInteractionMode.OpenOnDoubleClickCloseOnSingleClick ->
-                if isExpanded then
-                    dispatch (FileExplorerLogic.ToggleExpanded item.Id)
-                    handleItemClick item
-                elif ev.detail >= 2 then
-                    dispatch (FileExplorerLogic.ToggleExpanded item.Id)
-                else
-                    handleItemClick item
-            | DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick ->
-                if ev.detail >= 2 then
-                    if item.Selectable then
-                        handleItemClick item
-                else
-                    dispatch (FileExplorerLogic.ToggleExpanded item.Id)
+            onDirectoryArrowToggle |> Option.iter (fun fn -> fn item willExpand)
 
         let copyPathToClipboard (path: string) =
             promise {
@@ -97,6 +77,11 @@ type FileExplorer =
             |> Promise.start
 
         let defaultContextMenuItems (item: FileItem) : ContextMenuItem list =
+            let canExpandDirectory =
+                match item.Children with
+                | Some children -> not (List.isEmpty children)
+                | None -> true
+
             [
                 if not item.IsDirectory then
                     {
@@ -113,7 +98,7 @@ type FileExplorer =
                     Disabled = None
                   }
                 | None -> ()
-                if item.IsDirectory then
+                if item.IsDirectory && canExpandDirectory then
                     let isExpanded = model.ExpandedIds.Contains item.Id
 
                     {
@@ -192,68 +177,56 @@ type FileExplorer =
             let isSelected = model.SelectedId = Some item.Id
             let selectedClass = if isSelected then "swt:bg-base-300" else ""
             let isExpanded = model.ExpandedIds.Contains item.Id
+            let canExpandDirectory =
+                match item.Children with
+                | Some children -> not (List.isEmpty children)
+                | None -> true
 
-            match item.Children with
-            | Some children ->
+            if item.IsDirectory then
+                let directoryNameClick = handleDirectorySelection item
+
                 Html.li [
                     prop.key item.Id
                     prop.custom ("data-file-item-id", item.Id)
+                    prop.className "swt:w-full"
                     prop.children [
-                        if useDirectoryChevronToggle then
-                            Html.details [
-                                if isExpanded then
-                                    prop.custom ("open", true)
-                                prop.children [
-                                    Html.summary [
-                                        prop.custom ("data-file-item-id", item.Id)
-                                        prop.className ("swt:list-none swt:px-2 swt:py-1 " + selectedClass)
-                                        prop.onClick (fun ev ->
-                                            ev.preventDefault ()
-                                            ev.stopPropagation ()
-                                        )
-                                        prop.children [
-                                            Html.div [
-                                                prop.className "swt:flex swt:items-center swt:justify-between swt:gap-2"
-                                                prop.children [
-                                                    Html.div [
-                                                        prop.className "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2"
-                                                        prop.children [
-                                                            Html.button [
-                                                                prop.type'.button
-                                                                prop.className
-                                                                    "swt:flex swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:bg-transparent swt:p-0 hover:swt:bg-base-200"
-                                                                prop.ariaLabel (
-                                                                    if isExpanded then
-                                                                        $"Collapse {item.Name}"
-                                                                    else
-                                                                        $"Expand {item.Name}"
-                                                                )
-                                                                prop.onClick (handleDirectoryToggle item)
-                                                                prop.children [
-                                                                    Html.span [
-                                                                        prop.className "swt:text-xs swt:font-mono"
-                                                                        prop.text (if isExpanded then "v" else ">")
-                                                                    ]
-                                                                ]
-                                                            ]
-                                                            Html.button [
-                                                                prop.type'.button
-                                                                prop.className
-                                                                    "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:bg-transparent swt:border-0 swt:p-0 swt:text-left"
-                                                                prop.onClick (handleDirectorySelection item)
-                                                                prop.children [
-                                                                    Html.i [
-                                                                        prop.className (iconClassName [ "swt:iconify"; "swt:shrink-0" ] item)
-                                                                    ]
-                                                                    Html.span [
-                                                                        prop.className "swt:truncate"
-                                                                        prop.text item.Name
-                                                                    ]
-                                                                ]
-                                                            ]
-                                                        ]
-                                                    ]
+                        Html.div [
+                            prop.custom ("data-file-item-id", item.Id)
+                            prop.className (
+                                "swt:w-full swt:px-2 swt:py-1 "
+                                + (if not useDirectoryChevronToggle then "swt:cursor-pointer " else "")
+                                + selectedClass
+                            )
+                            prop.style [
+                                style.display.flex
+                                style.width (length.percent 100)
+                            ]
+                            if not useDirectoryChevronToggle then
+                                prop.onClick (handleDirectorySelection item)
+                            prop.children [
+                                Html.div [
+                                    prop.className "swt:flex swt:w-full swt:items-center swt:gap-2"
+                                    prop.children [
+                                        Html.button [
+                                            prop.type'.button
+                                            prop.className
+                                                "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:bg-transparent swt:border-0 swt:p-0 swt:text-left"
+                                            prop.onClick directoryNameClick
+                                            prop.children [
+                                                Html.i [
+                                                    prop.className (iconClassName [ "swt:iconify"; "swt:shrink-0" ] item)
+                                                ]
+                                                Html.span [
+                                                    prop.className "swt:truncate"
+                                                    prop.text item.Name
+                                                ]
+                                            ]
+                                        ]
 
+                                        if item.IsLFS = Some true || canExpandDirectory then
+                                            Html.div [
+                                                prop.className "swt:ml-auto swt:shrink-0 swt:flex swt:items-center swt:gap-2"
+                                                prop.children [
                                                     // LFS badge and size if applicable
                                                     if item.IsLFS = Some true then
                                                         Html.div [
@@ -280,80 +253,44 @@ type FileExplorer =
                                                                 | None -> Html.none
                                                             ]
                                                         ]
-                                                ]
-                                            ]
-                                        ]
-                                    ]
 
-                                    if isExpanded then
-                                        Html.ul [
-                                            prop.className "swt:ml-4"
-                                            prop.children (children |> List.map renderItem)
-                                        ]
-                                ]
-                            ]
-                        else
-                            Html.details [
-                                if isExpanded then
-                                    prop.custom ("open", true)
-                                prop.children [
-                                    Html.summary [
-                                        prop.custom ("data-file-item-id", item.Id)
-                                        prop.className ("swt:px-2 swt:py-1 swt:cursor-pointer " + selectedClass)
-                                        prop.onClick (handleDirectoryClick item isExpanded)
-                                        prop.children [
-                                            Html.div [
-                                                prop.className "swt:flex swt:items-center swt:justify-between swt:gap-2"
-                                                prop.children [
-                                                    Html.div [
-                                                        prop.className "swt:flex swt:items-center swt:gap-2"
-                                                        prop.children [
-                                                            Html.i [ prop.className (iconClassName [ "swt:iconify" ] item) ]
-                                                            Html.span item.Name
-                                                        ]
-                                                    ]
-
-                                                    // LFS badge and size if applicable
-                                                    if item.IsLFS = Some true then
-                                                        Html.div [
-                                                            prop.className "swt:flex swt:gap-2 swt:items-center"
+                                                    if canExpandDirectory then
+                                                        Html.button [
+                                                            prop.type'.button
+                                                            prop.className
+                                                                "swt:flex swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:bg-transparent swt:p-0 hover:swt:bg-base-200"
+                                                            prop.ariaLabel (
+                                                                if isExpanded then
+                                                                    $"Collapse {item.Name}"
+                                                                else
+                                                                    $"Expand {item.Name}"
+                                                            )
+                                                            prop.onClick (handleDirectoryArrowToggle item isExpanded)
                                                             prop.children [
-                                                                Html.button [
-                                                                    prop.className "swt:btn swt:btn-xs"
-                                                                    prop.disabled (item.Downloaded = Some true)
-                                                                    prop.text "LFS"
-                                                                    prop.onClick (fun e ->
-                                                                        e.stopPropagation ()
-
-                                                                        dispatch (
-                                                                            FileExplorerLogic.ToggleLFSDownload item.Id
-                                                                        )
-                                                                    )
+                                                                Html.span [
+                                                                    prop.className "swt:text-xs swt:font-mono"
+                                                                    prop.text (if isExpanded then "v" else ">")
                                                                 ]
-                                                                match item.SizeFormatted with
-                                                                | Some size ->
-                                                                    Html.span [
-                                                                        prop.className "swt:badge swt:badge-sm"
-                                                                        prop.text size
-                                                                    ]
-                                                                | None -> Html.none
                                                             ]
                                                         ]
-                                                ]
+                                                    ]
                                             ]
-                                        ]
                                     ]
-
-                                    if isExpanded then
-                                        Html.ul [
-                                            prop.className "swt:ml-4"
-                                            prop.children (children |> List.map renderItem)
-                                        ]
                                 ]
                             ]
+                        ]
+
+                        if isExpanded then
+                            match item.Children with
+                            | Some children ->
+                                Html.ul [
+                                    prop.className "swt:ml-4"
+                                    prop.children (children |> List.map renderItem)
+                                ]
+                            | None -> Html.none
                     ]
                 ]
-            | None ->
+            else
                 Html.li [
                     prop.key item.Id
                     prop.custom ("data-file-item-id", item.Id)
@@ -424,6 +361,9 @@ module FileExplorerExample =
             {
                 FileTree.createFolder "My Files" None FileItemIcon.Folder with
                     IsExpanded = false
+                    IsLFS = Some true
+                    Downloaded = Some false
+                    SizeFormatted = Some "2 KB"
                     Children =
                         Some [
                             FileTree.createFile "Project-final.psd" None FileItemIcon.Document
@@ -446,6 +386,11 @@ module FileExplorerExample =
                                         ]
                             }
                         ]
+            }
+            {
+                FileTree.createFolder "Empty Folder" None FileItemIcon.Folder with
+                    IsExpanded = false
+                    Children = Some []
             }
             FileTree.createFile "notes.txt" None FileItemIcon.Document
         ]
