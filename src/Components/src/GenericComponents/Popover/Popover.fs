@@ -12,7 +12,8 @@ module private PopoverHelper =
         | Some ctx when not (isNullOrUndefined ctx) -> Some ctx
         | _ -> None
 
-    let missingContextError (componentName: string) =
+    [<ReactComponent>]
+    let MissingContextError (componentName: string) =
         Html.div [
             prop.className "swt:text-error swt:text-xs swt:p-1 swt:border swt:border-error swt:rounded"
             prop.text $"⚠ Popover.{componentName} must be used inside Popover.Popover."
@@ -125,7 +126,7 @@ type Popover =
     static member Trigger
         (children: ReactElement, ?className: string, ?interactionProps: obj, ?props: IReactProperty list, ?debug: string) =
         match PopoverHelper.tryContext () with
-        | None -> PopoverHelper.missingContextError "Trigger"
+        | None -> PopoverHelper.MissingContextError "Trigger"
         | Some ctx ->
             let resolvedDebug = debug |> Option.orElse ctx.debug
 
@@ -156,7 +157,7 @@ type Popover =
             ?interactionProps: obj
         ) =
         match PopoverHelper.tryContext () with
-        | None -> PopoverHelper.missingContextError "TriggerRender"
+        | None -> PopoverHelper.MissingContextError "TriggerRender"
         | Some ctx ->
             render {|
                 isOpen = ctx.isOpen
@@ -175,7 +176,7 @@ type Popover =
             ?ariaLabel: string
         ) =
         match PopoverHelper.tryContext () with
-        | None -> PopoverHelper.missingContextError "Content"
+        | None -> PopoverHelper.MissingContextError "Content"
         | Some ctx ->
             let resolvedDebug = debug |> Option.orElse ctx.debug
 
@@ -259,7 +260,7 @@ type Popover =
         )
 
         match ctxOpt with
-        | None -> PopoverHelper.missingContextError "Heading"
+        | None -> PopoverHelper.MissingContextError "Heading"
         | Some _ ->
             Html.h2 [
                 prop.id headingId
@@ -305,7 +306,7 @@ type Popover =
         )
 
         match ctxOpt with
-        | None -> PopoverHelper.missingContextError "Description"
+        | None -> PopoverHelper.MissingContextError "Description"
         | Some _ ->
             Html.p [
                 prop.id descriptionId
@@ -320,7 +321,7 @@ type Popover =
     [<ReactComponent>]
     static member Close(?children: ReactElement, ?className: string, ?props: IReactProperty list) =
         match PopoverHelper.tryContext () with
-        | None -> PopoverHelper.missingContextError "Close"
+        | None -> PopoverHelper.MissingContextError "Close"
         | Some ctx ->
             match children with
             | Some c ->
