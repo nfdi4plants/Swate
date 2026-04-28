@@ -48,7 +48,7 @@ Vitest.describe("IPC architecture review fixes", fun () ->
             expectSourceContains appStateContextSource "React.createContext<ArcRootPath>"
             expectSourceNotContains appStateContextSource "MainSyncedState<ArcRootPath>"
             expectSourceContains appSource "Context.AppStateContext.AppStateCtx.Provider("
-            expectSourceContains appSource "appState.state,"
+            expectSourceContains appSource "model.ArcRootPath,"
         })
 
     Vitest.test("Git LFS remoting helper is internal to Main and does not expose unused raw channels", fun () ->
