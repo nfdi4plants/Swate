@@ -70,7 +70,7 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
         (fun () ->
             let mutable isCurrent = true
 
-            match appStateCtx.state with
+            match appStateCtx with
             | None -> setState (fun _ -> ArcObjectExplorerState.init ())
             | Some _ ->
                 promise {
@@ -116,7 +116,7 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                 { new System.IDisposable with
                     member _.Dispose() = isCurrent <- false
                 }),
-        [| box appStateCtx.state; box fileStateCtx.state.FileTree |]
+        [| box appStateCtx; box fileStateCtx.state.FileTree |]
     )
 
     let ctx =

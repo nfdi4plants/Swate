@@ -117,7 +117,7 @@ type private Selector =
                 actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle),
                 isLoading = recentArcs.isLoading,
                 controlRef = selectorControlRef,
-                ?currentlyOpenArcPath = appStateCtx.state
+                ?currentlyOpenArcPath = appStateCtx
             )
         ]
 

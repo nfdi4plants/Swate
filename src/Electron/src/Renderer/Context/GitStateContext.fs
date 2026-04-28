@@ -175,7 +175,7 @@ let GitStateCtxProvider (children: ReactElement) =
     let confirmMergeResolutionAction request =
         dispatch (ConfirmMergeResolutionRequested request)
 
-    React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx.state)), [| box appStateCtx.state |])
+    React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx)), [| box appStateCtx |])
 
     let gitStateController: GitStateController =
         React.useMemo (

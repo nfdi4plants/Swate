@@ -13,7 +13,7 @@ open Swate.Electron.Shared.GitTypes
 let useCurrentArcScopeId () =
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
-    appStateCtx.state
+    appStateCtx
     |> Option.map normalizePath
     |> Option.bind (fun path ->
         if String.IsNullOrWhiteSpace path then

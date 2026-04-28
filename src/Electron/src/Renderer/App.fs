@@ -143,7 +143,7 @@ let Main () =
         appState.state.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectExplorer
 
     Context.AppStateContext.AppStateCtx.Provider(
-        appState,
+        appState.state,
         Renderer.Context.FileStateContext.FileStateCtxProvider(
             (fun () -> Api.ipcArcVaultApi.getFileTree ()),
             Renderer.Context.ArcObjectExplorerContext.ArcObjectExplorerCtxProvider(
