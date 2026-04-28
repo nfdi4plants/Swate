@@ -240,8 +240,11 @@ let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, 
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
         fun () -> promise {
+            let window = dialogParentFromIpcEvent event
+
             let! r =
                 dialog.showOpenDialog (
+                    ?window = window,
                     properties = [|
                         Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                     |]
@@ -268,8 +271,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         }
     createARC =
         fun (identifier: string) -> promise {
+            let window = dialogParentFromIpcEvent event
+
             let! r =
                 dialog.showOpenDialog (
+                    ?window = window,
                     properties = [|
                         Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                     |]
@@ -333,8 +339,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                             Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                         |]
+                        let window = dialogParentFromIpcEvent event
 
-                        let! result = dialog.showOpenDialog (properties = properties, defaultPath = arcPath)
+                        let! result = dialog.showOpenDialog (?window = window, properties = properties, defaultPath = arcPath)
 
                         if result.canceled then
                             return Error(exn "Cancelled")
@@ -363,7 +370,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let properties = [|
                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                 |]
-                let window = windowFromIpcEvent event |> Option.map (fun window -> unbox<BaseWindow> window)
+                let window = dialogParentFromIpcEvent event
 
                 let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
@@ -383,7 +390,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                     Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                 |]
-                let window = windowFromIpcEvent event |> Option.map (fun window -> unbox<BaseWindow> window)
+                let window = dialogParentFromIpcEvent event
 
                 let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
@@ -403,8 +410,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 |]
 
                 let filters = [| FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |]) |]
+                let window = dialogParentFromIpcEvent event
 
-                let! result = dialog.showOpenDialog (properties = properties, filters = filters)
+                let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
 
                 if result.canceled then
                     return Error(exn "Cancelled")
@@ -574,7 +582,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 | Some arcPath ->
                     // Always enforce the active ARC root to avoid running against arbitrary repos.
                     let enforcedRequest = { request with RepoPath = arcPath }
-                    let! result = GitLfs.registerGitLfsIpc event |> fun api -> api.runChannel enforcedRequest
+                    let! result = GitLfs.runChannel event enforcedRequest
 
                     match result with
                     | Error e ->
@@ -589,7 +597,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         return Ok successResult
         }
     cancelGitLfs =
-        fun (requestId: string) -> GitLfs.registerGitLfsIpc event |> fun api -> api.cancelChannel requestId
+        fun (requestId: string) -> GitLfs.cancelChannel requestId
     resolveCloseRequest =
         fun (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
             try

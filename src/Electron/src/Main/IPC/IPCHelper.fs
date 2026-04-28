@@ -10,6 +10,10 @@ module IPCHelper =
     let windowFromIpcEvent(event: IpcMainInvokeEvent) =
         BrowserWindow.fromWebContents(event.sender)
 
+    let dialogParentFromIpcEvent(event: IpcMainInvokeEvent) : BaseWindow option =
+        windowFromIpcEvent event
+        |> Option.map (fun window -> unbox<BaseWindow> window)
+
     let windowIdFromIpcEvent(event: IpcMainInvokeEvent) =
         BrowserWindow.fromWebContents(event.sender)
         |> Option.map _.id
