@@ -53,7 +53,8 @@ type TemplateBrowser =
             ?disabledMessage: string
         ) =
 
-        let templateImportDisabled = selectedTemplateIds.Count > 0 || disabledMessage.IsSome
+        let templateImportDisabled =
+            selectedTemplateIds.Count <= 0 || disabledMessage.IsSome
 
         TemplateFilter.TemplateFilterProvider(
             React.Fragment [

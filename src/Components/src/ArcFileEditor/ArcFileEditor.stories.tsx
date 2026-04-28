@@ -1,56 +1,9 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { within, expect, userEvent, waitFor } from 'storybook/test';
-import { ArcFileEditor as ArcFileEditorComponent, Entry as ArcFileEditorEntry } from './ArcFileEditor.fs.js';
-import { ActiveView_Table } from './Types.fs.js';
-import { TemplateWidgetServices } from '../Widgets/WidgetSupport.fs.js';
-import { ArcAssay } from '../fable_modules/ARCtrl.Core.3.0.0-beta.12/ArcTypes.fs.js';
-import {
-  CompositeHeader_Input,
-  CompositeHeader_Output,
-  IOType_Sample,
-  IOType_Source,
-} from '../fable_modules/ARCtrl.Core.3.0.0-beta.12/Table/CompositeHeader.fs.js';
-import { Organisation_DataPLANT, Template } from '../fable_modules/ARCtrl.Core.3.0.0-beta.12/Template.fs.js';
-import { singleton as asyncBuilder } from '../fable_modules/fable-library-ts.5.0.0-alpha.21/AsyncBuilder.ts';
-import { FSharpResult$2_Ok } from '../fable_modules/fable-library-ts.5.0.0-alpha.21/Result.ts';
-import type { MutableArray } from '../fable_modules/fable-library-ts.5.0.0-alpha.21/Util.ts';
-import {
-  ARCtrlHelper_ArcFiles_Assay,
-  ARCtrlHelper_ArcFiles__TryGetActiveTable_71136F3F,
-} from '../../../Shared/ARCtrl.Helper.fs.js';
-import type { ARCtrlHelper_ArcFiles_$union } from '../../../Shared/ARCtrl.Helper.fs.js';
-
-const createAssayWithTable = () => {
-  const assay = ArcAssay.init('NavbarTestAssay');
-  assay.InitTable('Assay Table');
-  return ARCtrlHelper_ArcFiles_Assay(assay);
-};
+import { Entry as ArcFileEditor } from './ArcFileEditor.fs.js';
 
 const STORY_TEMPLATE_NAME = 'Story Import Template';
-
-const createImportTemplate = () => {
-  const template = Template.init(STORY_TEMPLATE_NAME);
-  template.Organisation = Organisation_DataPLANT();
-  template.Version = '1.0.0';
-  template.Table.AddColumn(CompositeHeader_Input(IOType_Source()));
-  template.Table.AddColumn(CompositeHeader_Output(IOType_Sample()));
-  template.Table.AddRowsEmpty(1);
-  return template;
-};
-
-const templateServices = new TemplateWidgetServices(() =>
-  asyncBuilder.Delay(() =>
-    asyncBuilder.Return(
-      FSharpResult$2_Ok<MutableArray<Template>, string>([createImportTemplate()] as unknown as MutableArray<Template>),
-    ),
-  ),
-);
-
-const getActiveColumnCount = (arcFile: ARCtrlHelper_ArcFiles_$union) => {
-  const activeTable = ARCtrlHelper_ArcFiles__TryGetActiveTable_71136F3F(arcFile, 0);
-  return activeTable ? activeTable[1].ColumnCount : 0;
-};
 
 const parseColumnCount = (text: string | null) => {
   const match = text?.match(/\d+/);
@@ -59,30 +12,12 @@ const parseColumnCount = (text: string | null) => {
 
 const FullSizeArcEditor = () => {
   return (
-    <div className='swt:size-full swt:grow'>
-      <ArcFileEditorEntry />
+    <div className='swt:flex swt:flex-col swt:gap-4 swt:h-screen swt:w-screen swt:overflow-hidden'>
+      <ArcFileEditor debug/>
     </div>
   );
 };
 
-const TemplateImportTestEditor = () => {
-  const [arcFile, setArcFile] = React.useState<ARCtrlHelper_ArcFiles_$union>(() => createAssayWithTable());
-  const activeColumnCount = getActiveColumnCount(arcFile);
-
-  return (
-    <div className='swt:size-full swt:grow swt:flex swt:flex-col'>
-      <div data-testid='arc-file-editor-column-count' className='swt:px-2 swt:py-1 swt:text-sm swt:font-medium'>
-        {`Column count: ${activeColumnCount}`}
-      </div>
-      <ArcFileEditorComponent
-        arcFile={arcFile}
-        setArcFile={(nextArcFile) => setArcFile(nextArcFile)}
-        templateServices={templateServices}
-        startingActiveView={ActiveView_Table(0)}
-      />
-    </div>
-  );
-};
 
 const meta = {
   title: 'Components/ArcFileEditor',
@@ -136,7 +71,6 @@ export const NavbarWidgetToggle: Story = {
 
 export const AddTemplateWidget: Story = {
   parameters: { isolated: true },
-  render: () => <TemplateImportTestEditor />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const portal = within(canvasElement.ownerDocument.body);

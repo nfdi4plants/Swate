@@ -359,7 +359,7 @@ type Main =
         )
 
     [<ReactComponent>]
-    static member Entry() =
+    static member Entry(?debug: bool) =
 
         let startAssay =
             React.useMemo (fun _ ->
@@ -396,16 +396,56 @@ type Main =
 
         let loadTemplates =
             fun () ->
-                promise {
-                    let! json = Api.SwateApi.SwateTemplateApi.getTemplates () |> Async.StartAsPromise
-                    return Ok(ARCtrl.Json.Templates.fromJsonString json)
-                }
-                |> Promise.catch (fun error ->
-                    // Handle error, e.g., log it or show a notification
-                    Error(sprintf "Error loading templates: %s" error.Message)
-                )
+                match debug with
+                | Some true -> promise {
+                    let STORY_TEMPLATE_NAME = "Story Import Template"
+
+                    let createImportTemplate =
+                        let template = Template.init (STORY_TEMPLATE_NAME)
+                        template.Organisation <- Organisation.DataPLANT
+                        template.Table.AddColumn(CompositeHeader.Input(IOType.Source))
+                        template.Table.AddColumn(CompositeHeader.Output(IOType.Sample))
+
+                        template.Table.AddColumn(
+                            CompositeHeader.Component(
+                                OntologyAnnotation("My Awesome component", tsr = "COMASS", tan = "COMASS:12345")
+                            )
+                        )
+
+                        template.Table.AddRowsEmpty(1)
+                        template.Version <- "1.0.0"
+                        template
+
+                    return Ok([| createImportTemplate |])
+                  }
+                | _ ->
+
+                    promise {
+                        let! json = Api.SwateApi.SwateTemplateApi.getTemplates () |> Async.StartAsPromise
+                        return Ok(ARCtrl.Json.Templates.fromJsonString json)
+                    }
+                    |> Promise.catch (fun error ->
+                        // Handle error, e.g., log it or show a notification
+                        Error(sprintf "Error loading templates: %s" error.Message)
+                    )
+
+        let ColumnCountTestDisplay () =
+            let firstTableColumnCount =
+                arcFile.TryGetActiveTable(Some 0)
+                |> Option.map (fun (_, t) -> string t.ColumnCount)
+                |> Option.defaultValue "N/A"
+
+            Html.div [
+                prop.className "swt:p-4 swt:text-sm swt:opacity-70"
+                prop.testId "arc-file-editor-column-count"
+                prop.text ("Column count: " + firstTableColumnCount)
+            ]
+
 
         Template.TemplateCacheProvider.TemplateCacheProvider(
             loadTemplates,
-            Main.ArcFileEditor(arcFile, setArcFile, startingActiveView = ActiveView.Table 0)
+            React.Fragment [
+                ColumnCountTestDisplay()
+                Main.ArcFileEditor(arcFile, setArcFile, startingActiveView = ActiveView.Table 0)
+            ]
         )
