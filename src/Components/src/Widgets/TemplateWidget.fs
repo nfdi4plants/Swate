@@ -6,6 +6,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Template
+open Swate.Components.Widgets.Context
 
 
 module TemplateTypes = Swate.Components.Template.Types

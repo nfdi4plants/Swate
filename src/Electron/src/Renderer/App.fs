@@ -172,7 +172,6 @@ let Main () =
                             Renderer.Context.GitStateContext.GitStateCtxProvider(
                                 AnnotationTable
                                     .AnnotationTableContextProvider
-                                    .AnnotationTableContextProvider
                                     .AnnotationTableContextProvider(
                                         Layout.Main(
                                             children =

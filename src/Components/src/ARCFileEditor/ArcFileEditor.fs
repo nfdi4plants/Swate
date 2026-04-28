@@ -8,6 +8,7 @@ open Swate.Components
 open Swate.Components.Widgets.Context
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types
+open Swate.Components.AnnotationTable
 
 type private AddRowsFooterViewProps = {
     rowsToAdd: int
@@ -120,7 +121,7 @@ type Main =
         Html.div [
             prop.className "swt:w-full swt:min-w-0 swt:pb-4"
             prop.children [
-                Swate.Components.AnnotationTable.AnnotationTable.AnnotationTable(table, setTableInArcFile)
+                AnnotationTable.AnnotationTable(table, setTableInArcFile)
             ]
         ]
 

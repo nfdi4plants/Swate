@@ -4,6 +4,7 @@ open Feliz
 open Browser.Types
 open Swate
 open Swate.Components
+open Swate.Components.Widgets.LocalStorage
 open Swate.Components.Widgets.Context
 
 module InitExtensions =
@@ -359,7 +360,7 @@ type Widget =
                 [| box activeWidgets |]
             )
 
-        let widgetContext: WidgetContext.WidgetControllerContext =
+        let widgetContext: Context.WidgetControllerContext =
             React.useMemo (
                 (fun () -> {
                     activeWidgets = activeWidgets

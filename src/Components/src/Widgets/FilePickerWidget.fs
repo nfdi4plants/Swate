@@ -87,12 +87,8 @@ type FilePickerWidget =
 
     [<ReactComponent>]
     static member private ActionButtons
-        (
-            clearPaths: unit -> unit,
-            insertPaths: unit -> unit,
-            canInsert: bool,
-            widgetCtx: WidgetControllerContext
-        ) =
+        (clearPaths: unit -> unit, insertPaths: unit -> unit, canInsert: bool, widgetCtx: WidgetControllerContext)
+        =
         Html.div [
             prop.className "swt:flex swt:gap-2"
             prop.children [

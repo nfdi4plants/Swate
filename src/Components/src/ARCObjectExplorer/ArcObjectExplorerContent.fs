@@ -7,6 +7,7 @@ open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer.Model
+open Swate.Components.Metadata
 
 type private ArcObjectPropertyValue =
     | Text of string

@@ -6,6 +6,7 @@ open ARCtrl
 open Swate.Components
 open Swate.Components.ArcFileEditor
 open Swate.Components.Widgets
+open Swate.Components.Widgets.Context
 
 module private MainHelper =
 
@@ -101,7 +102,7 @@ type Main =
     [<ReactComponent>]
     static member WidgetToggleBtns() =
 
-        let context = WidgetContext.useWidgetController ()
+        let context = useWidgetControllerCtx ()
 
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:justify-center"
