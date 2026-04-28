@@ -53,9 +53,11 @@ type TemplateBrowser =
             ?disabledMessage: string
         ) =
 
+        let templateImportDisabled = selectedTemplateIds.Count > 0 || disabledMessage.IsSome
+
         TemplateFilter.TemplateFilterProvider(
             React.Fragment [
-                TemplateBrowser.TemplateImportButton(selectedTemplateIds.Count <= 0, openImportDialog)
+                TemplateBrowser.TemplateImportButton(templateImportDisabled, openImportDialog)
                 TemplateBrowser.SelectedTemplatesLabel(selectedTemplateIds.Count)
 
                 TemplateFilter.TemplateFilter(templates, templateSearchClassName = "swt:grow")
