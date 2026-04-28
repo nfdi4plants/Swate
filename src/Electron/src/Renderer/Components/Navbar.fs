@@ -13,7 +13,7 @@ module NavbarHelper =
         let openARC =
             fun _ ->
                 promise {
-                    let! r = Api.ipcArcVaultApi.openARC (unbox null)
+                    let! r = Api.ipcArcVaultApi.openARC ()
 
                     match r with
                     | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
@@ -24,7 +24,7 @@ module NavbarHelper =
         /// Click on a recent ARC: main process decides open-or-focus.
         let openArcByPath (clickedARC: ARCPointer) =
             promise {
-                match! Api.ipcArcVaultApi.openARCByPath (unbox null) clickedARC.path with
+                match! Api.ipcArcVaultApi.openARCByPath clickedARC.path with
                 | Ok _ -> ()
                 | Error exn -> console.error (Fable.Core.JS.JSON.stringify exn.Message)
             }
@@ -83,31 +83,17 @@ type private Selector =
 
     [<ReactComponent>]
     static member Main() =
-        let recentArc, setRecentArc = React.useState ([||]: ARCPointer[])
-        let isLoading, setIsLoading = React.useState true
-
-        let currentlyOpenArcPath, setCurrentlyOpenArcPath =
-            React.useState (None: string option)
-
+        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
 
-        React.useLayoutEffectOnce (fun () ->
-            promise {
-                let! arcs = Api.ipcArcVaultApi.getRecentARCs ()
-                let! currentlyOpenArcPath = Api.ipcArcVaultApi.getOpenPath (unbox null)
-                setCurrentlyOpenArcPath currentlyOpenArcPath
-                setRecentArc arcs
-                setIsLoading false
+        let recentArcs =
+            Renderer.MainSyncedState.useMainSyncedState {
+                initial = [||]
+                load = fun () -> Api.ipcArcVaultApi.getRecentARCs ()
+                subscribe = Renderer.MainUpdateRendererBridge.subscribeRecentArcsUpdate
+                onError = fun ex -> console.error ("Failed to load recent ARCs.", ex.Message)
+                dependencies = [||]
             }
-            |> Promise.start
-
-            let disposePathChange = Renderer.MainUpdateRendererBridge.subscribePathChange setCurrentlyOpenArcPath
-            let disposeRecentArcs = Renderer.MainUpdateRendererBridge.subscribeRecentArcsUpdate setRecentArc
-
-            fun () ->
-                disposePathChange ()
-                disposeRecentArcs ()
-        )
 
         let selectorControlRef =
             React.useRef ({ toggle = ignore }: SelectorRef)
@@ -115,7 +101,7 @@ type private Selector =
         let onOpen =
             fun (isOpen: bool) ->
                 if isOpen then
-                    Api.ipcArcVaultApi.getRecentARCs () |> Promise.map setRecentArc |> Promise.start
+                    recentArcs.refresh ()
 
         React.Fragment [
             BaseModal.BaseModal(
@@ -124,14 +110,14 @@ type private Selector =
                 Renderer.Components.InitState.CreateNewArcModalContent(fun () -> setNewArcModalIsOpen false)
             )
             Swate.Components.Selector.Main(
-                recentArc,
+                recentArcs.state,
                 NavbarHelper.Selector.openArcByPath,
                 rmvRecentArc = NavbarHelper.Selector.rmvRecentArc,
                 onOpenChange = onOpen,
                 actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle),
-                isLoading = isLoading,
+                isLoading = recentArcs.isLoading,
                 controlRef = selectorControlRef,
-                ?currentlyOpenArcPath = currentlyOpenArcPath
+                ?currentlyOpenArcPath = appStateCtx.state
             )
         ]
 

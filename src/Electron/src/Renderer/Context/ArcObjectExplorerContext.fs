@@ -74,25 +74,19 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
             | None -> setState (fun _ -> ArcObjectExplorerState.init ())
             | Some _ ->
                 promise {
-                    let! result = Api.ipcArcVaultApi.getArcObjectTree (unbox null)
+                    let! result = Api.ipcArcVaultApi.getArcObjectTree ()
 
                     if isCurrent then
                         match result with
                         | Ok nodes ->
-                            fileStateCtx.setState (fun currentFileState ->
+                            fileStateCtx.updateSelection (fun currentSelection ->
                                 let nextSelection =
-                                    match currentFileState.Selection.ExplorerNodeId with
-                                    | Some nodeId when containsNodeId nodeId nodes -> currentFileState.Selection
-                                    | Some _ -> ArcSelection.clearExplorerNode currentFileState.Selection
-                                    | None -> currentFileState.Selection
+                                    match currentSelection.ExplorerNodeId with
+                                    | Some nodeId when containsNodeId nodeId nodes -> currentSelection
+                                    | Some _ -> ArcSelection.clearExplorerNode currentSelection
+                                    | None -> currentSelection
 
-                                if nextSelection = currentFileState.Selection then
-                                    currentFileState
-                                else
-                                    {
-                                        currentFileState with
-                                            Selection = nextSelection
-                                    })
+                                nextSelection)
 
                             setState (fun currentState ->
                                 {
@@ -101,17 +95,11 @@ let ArcObjectExplorerCtxProvider (children: ReactElement) =
                                         StatusMessage = None
                                 })
                         | Error exn ->
-                            fileStateCtx.setState (fun currentFileState ->
+                            fileStateCtx.updateSelection (fun currentSelection ->
                                 let nextSelection =
-                                    ArcSelection.clearExplorerNode currentFileState.Selection
+                                    ArcSelection.clearExplorerNode currentSelection
 
-                                if nextSelection = currentFileState.Selection then
-                                    currentFileState
-                                else
-                                    {
-                                        currentFileState with
-                                            Selection = nextSelection
-                                    })
+                                nextSelection)
 
                             setState (fun currentState -> {
                                 currentState with

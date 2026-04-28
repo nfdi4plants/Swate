@@ -1,12 +1,17 @@
 module Renderer.Context.AppStateContext
 
-open Swate.Components
 open Swate.Electron.Shared
 
 open Feliz
 
 let AppStateCtx =
-    React.createContext<StateContext<ArcRootPath>> ({ state = None; setState = ignore })
+    React.createContext<Renderer.MainSyncedState.MainSyncedState<ArcRootPath>> (
+        {
+            state = None
+            isLoading = true
+            refresh = ignore
+        }
+    )
 
 [<Hook>]
 let useAppStateCtx () = React.useContext AppStateCtx

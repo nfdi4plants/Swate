@@ -12,38 +12,29 @@ open Swate.Components.ErrorModal
 open Swate.Electron.Shared
 
 type private Model = {
-    AppState: ArcRootPath
     PageState: PageState option
     DetailsSidebarIsOpen: bool
     LeftSidebarTarget: LeftSidebarPage
 }
 with
     static member Empty = {
-        AppState = None
         PageState = None
         DetailsSidebarIsOpen = false
         LeftSidebarTarget = LeftSidebarPage.FileExplorer
     }
 
 type private Msg =
-    | SetArcRootPath of ArcRootPath
+    | ArcRootPathChanged of ArcRootPath
     | PageStateChanged of PageState option
     | SetDetailsSidebarIsOpen of bool
     | SetLeftSidebarTarget of LeftSidebarPage
 
-let private createGetOpenPathCmd () : Cmd<Msg> =
-    Cmd.OfPromise.either
-        (fun () -> Api.ipcArcVaultApi.getOpenPath (unbox null))
-        ()
-        SetArcRootPath
-        (fun _ -> SetArcRootPath None)
-
 let private init () : Model * Cmd<Msg> =
-    Model.Empty, createGetOpenPathCmd ()
+    Model.Empty, Cmd.none
 
 let private msgName =
     function
-    | SetArcRootPath _ -> "SetArcRootPath"
+    | ArcRootPathChanged _ -> "ArcRootPathChanged"
     | PageStateChanged _ -> "PageStateChanged"
     | SetDetailsSidebarIsOpen _ -> "SetDetailsSidebarIsOpen"
     | SetLeftSidebarTarget _ -> "SetLeftSidebarTarget"
@@ -55,17 +46,10 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     traceUpdateMsg msg
 
     match msg with
-    | SetArcRootPath appState ->
-        let nextModel =
-            match appState with
-            | Some path ->
-                {
-                    model with
-                        AppState = Some path
-                }
-            | None -> Model.Empty
-
-        nextModel, Cmd.none
+    | ArcRootPathChanged appState ->
+        match appState with
+        | Some _ -> model, Cmd.none
+        | None -> Model.Empty, Cmd.none
     | PageStateChanged pageStateOption ->
         {
             model with
@@ -122,17 +106,18 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSideba
 let Main () =
     let model, dispatch = React.useElmish (init, update, [||])
 
-    let setAppState (appState: ArcRootPath) = dispatch (SetArcRootPath appState)
     let setPageState (pageState: PageState option) = dispatch (PageStateChanged pageState)
 
-    let appCtx: StateContext<ArcRootPath> =
-        React.useMemo (
-            (fun _ -> {
-                state = model.AppState
-                setState = setAppState
-            }),
-            [| box model.AppState |]
-        )
+    let appState =
+        Renderer.MainSyncedState.useMainSyncedState {
+            initial = None
+            load = fun () -> Api.ipcArcVaultApi.getOpenPath ()
+            subscribe = Renderer.MainUpdateRendererBridge.subscribePathChange
+            onError = ignore
+            dependencies = [||]
+        }
+
+    React.useEffect ((fun () -> dispatch (ArcRootPathChanged appState.state)), [| box appState.state |])
 
     let pageCtx: StateContext<PageState option> =
         React.useMemo (
@@ -143,29 +128,24 @@ let Main () =
             [| box model.PageState |]
         )
 
-    React.useEffectOnce (fun () ->
-        Renderer.MainUpdateRendererBridge.subscribePathChange (fun pathOption ->
-            console.log ("[Swate] CHANGE PATH!")
-            dispatch (SetArcRootPath pathOption)
-        ))
-
     let children =
-        Renderer.Components.MainContent.Main.Main(model.AppState, model.PageState, model.LeftSidebarTarget)
+        Renderer.Components.MainContent.Main.Main(appState.state, model.PageState, model.LeftSidebarTarget)
 
     let setLeftSidebarTarget =
         React.useCallback ((fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)), [||])
 
     let detailsSidebar =
-        match model.AppState, model.LeftSidebarTarget with
+        match appState.state, model.LeftSidebarTarget with
         | Some _, LeftSidebarPage.ArcObjectExplorer -> Some(Renderer.Components.DetailsSidebar.ArcObjectDetailsSidebar.Main())
         | _ -> None
 
     let showDetailsSidebarToggle =
-        model.AppState.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectExplorer
+        appState.state.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectExplorer
 
     Context.AppStateContext.AppStateCtx.Provider(
-        appCtx,
+        appState,
         Renderer.Context.FileStateContext.FileStateCtxProvider(
+            (fun () -> Api.ipcArcVaultApi.getFileTree ()),
             Renderer.Context.ArcObjectExplorerContext.ArcObjectExplorerCtxProvider(
                 Renderer.Context.PageStateContext.PageStateCtx.Provider(
                     pageCtx,
