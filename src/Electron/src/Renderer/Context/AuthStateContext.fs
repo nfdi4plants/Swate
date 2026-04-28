@@ -2,6 +2,7 @@ module Renderer.Context.AuthStateContext
 
 open Feliz
 open Swate.Electron.Shared.AuthTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Components.Authentication.Types
 
 
@@ -47,7 +48,11 @@ let Provider (children: ReactElement) =
         Renderer.MainSyncedState.useMainSyncedState {
             initial = AuthStateDto.Empty
             load = loadAuthState
-            subscribe = Renderer.MainUpdateRendererBridge.subscribeAuthAccountsUpdate
+            subscribe =
+                fun setAuthState ->
+                    Renderer.IpcReceiver.subscribeProxyReceiver<IAuthAccountsRendererApi> {
+                        authAccountsUpdate = setAuthState
+                    }
             onError = fun ex -> console.error (Fable.Core.JS.JSON.stringify ex.Message)
             dependencies = [||]
         }

@@ -9,6 +9,7 @@ open Swate.Components.Api.GitLabApi
 open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.GitTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 [<RequireQualifiedAccess>]
 type GitRefreshState =
@@ -1516,9 +1517,10 @@ let subscribe (_model: GitState) : Sub<Msg> = [
     [ "gitProgress" ],
     fun dispatch ->
         let dispose =
-            Renderer.MainUpdateRendererBridge.subscribeGitProgressUpdate (fun progress ->
-                dispatch (SetCurrentProgress(Some(mapProgress progress)))
-            )
+            Renderer.IpcReceiver.subscribeProxyReceiver<IGitProgressRendererApi> {
+                gitProgressUpdate =
+                    fun progress -> dispatch (SetCurrentProgress(Some(mapProgress progress)))
+            }
 
         { new System.IDisposable with
             member _.Dispose() = dispose ()

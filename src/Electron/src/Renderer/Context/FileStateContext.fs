@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 type FileState = {
     FileTree: FileEntry[]
@@ -58,9 +59,9 @@ let FileStateCtxProviderWithFileTreeSnapshot (loadFileTreeSnapshot: FileTreeSnap
                 }
             subscribe =
                 fun setFileTree ->
-                    Renderer.MainUpdateRendererBridge.subscribeFileTreeUpdate (
-                        fileTreeFromDictionary >> setFileTree
-                    )
+                    Renderer.IpcReceiver.subscribeProxyReceiver<IFileTreeRendererApi> {
+                        fileTreeUpdate = fileTreeFromDictionary >> setFileTree
+                    }
             onError = fun ex -> console.error ("Failed to load file tree snapshot.", ex.Message)
             dependencies = [||]
         }

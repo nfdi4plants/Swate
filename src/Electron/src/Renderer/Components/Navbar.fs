@@ -4,6 +4,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.Layout
 open Swate.Components.Shared
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 module NavbarHelper =
 
@@ -90,7 +91,11 @@ type private Selector =
             Renderer.MainSyncedState.useMainSyncedState {
                 initial = [||]
                 load = fun () -> Api.ipcArcVaultApi.getRecentARCs ()
-                subscribe = Renderer.MainUpdateRendererBridge.subscribeRecentArcsUpdate
+                subscribe =
+                    fun setRecentArcs ->
+                        Renderer.IpcReceiver.subscribeProxyReceiver<IRecentArcsRendererApi> {
+                            recentARCsUpdate = setRecentArcs
+                        }
                 onError = fun ex -> console.error ("Failed to load recent ARCs.", ex.Message)
                 dependencies = [||]
             }

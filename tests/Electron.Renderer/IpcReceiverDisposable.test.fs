@@ -5,7 +5,6 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Renderer.IpcReceiver
-open Renderer.MainUpdateRendererBridge
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Vitest
 
@@ -15,6 +14,9 @@ let private setBridgeProperty name value = window?(name) <- value
 
 let private clearBridgeProperty name =
     emitJsStatement name "delete window[$0]"
+
+let private subscribePathChange handler =
+    subscribeProxyReceiver<IPathChangeRendererApi> { pathChange = handler }
 
 let rec private waitUntil (predicate: unit -> bool, attempts: int) =
     promise {
