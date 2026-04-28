@@ -7,10 +7,10 @@ open Swate.Components.Api.GitLabApi
 open Swate.Components.Authentication.Types
 open Swate.Components.DataHubTypes
 open Swate.Components.Shared
+open NoteSearchDto
 open AuthTypes
 open FileIOTypes
 open GitTypes
-open Swate.Components.NoteTypes
 
 module IPCTypesHelper =
 
@@ -41,7 +41,7 @@ type IArcVaultsApi = {
     pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
     getArcObjectTree: IpcMainEvent -> JS.Promise<Result<ArcExplorerNode list, exn>>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
-    readNotes: IpcMainEvent -> JS.Promise<Result<Note[], exn>>
+    readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearchDto[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
     saveArcFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
     writeFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>

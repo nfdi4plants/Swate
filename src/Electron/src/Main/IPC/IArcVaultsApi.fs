@@ -15,6 +15,7 @@ open Main
 open Node.Api
 open ARCtrl
 open ARCtrl.Json
+open Swate.Electron.Shared.NoteSearchDto
 
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -461,7 +462,7 @@ let api: IPCTypes.IArcVaultsApi = {
                                 getFileEntries arcPath
 
                         let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
-                        return Ok notes
+                        return Ok(notes |> Array.map NoteSearchNoteDto.ofNote)
             with e ->
                 return Error e
         }

@@ -30,7 +30,7 @@ let NotesSearchTarget () =
                 if not isDisposed then
                     match result with
                     | Ok nextNotes ->
-                        setNotes (nextNotes |> Array.map NoteSearchInterop.rehydrateNote |> Array.toList)
+                        setNotes (nextNotes |> Array.map NoteSearchInterop.toDomainNote |> Array.toList)
                         setIsLoading false
                     | Result.Error exn ->
                         setNotes []
