@@ -21,14 +21,17 @@ type GitFailure = {
     Message: string
 }
 
+/// Internal result type returned by Main Git services before IPC maps it to shared DTOs.
 type GitResult<'T> = Result<'T, GitFailure>
 
+/// Resolved push target used by push workflow and tests to decide refspec/upstream behavior.
 type GitPushTarget = {
     RefSpec: string
     PushBranch: string
     SetUpstream: bool
 }
 
+/// Pull result payload. Warning is reserved for recoverable follow-up issues such as LFS hydration failures.
 type GitPullResult = { Warning: GitFailure option }
 
 type GitProgressCallback = GitInternals.GitProgressCallback
@@ -58,6 +61,7 @@ let private lfsInstallRequiredTokens =
         "clean filter 'lfs' failed"
     |]
 
+/// Classifies git/simple-git/LFS error text into the shared failure taxonomy used over IPC.
 let classifyFailureKind (message: string) =
     let normalizedMessage =
         message
@@ -209,6 +213,7 @@ let private tryGetFileSizeInBytes (absolutePath: string) : JS.Promise<int64 opti
             | _ -> return raise error
     }
 
+/// Validates local branch names and branch-like start points before passing them to git.
 let ensureValidBranchLikeName (label: string) (value: string) =
     let trimmed = value.Trim()
     let containsControlCharacter = trimmed |> Seq.exists Char.IsControl
@@ -238,6 +243,7 @@ let ensureValidBranchLikeName (label: string) (value: string) =
     else
         Ok trimmed
 
+/// Validates renderer-provided pathspecs as ARC-relative paths before file or git access.
 let ensureValidPathspec (pathSpec: string) =
     let normalized = pathSpec.Replace("\\", "/").Trim()
 
@@ -257,6 +263,7 @@ let ensureValidPathspec (pathSpec: string) =
     else
         Ok normalized
 
+/// Validates a non-empty pathspec array and returns normalized pathspecs for git commands.
 let validatePathspecs (pathSpecs: string[]) =
     if isNull pathSpecs || pathSpecs.Length = 0 then
         Error(exn "At least one pathspec is required.")
@@ -272,6 +279,7 @@ let validatePathspecs (pathSpecs: string[]) =
             )
             (Ok [||])
 
+/// Validates a remote name and defaults blank input to `origin`.
 let validateRemoteName (remoteName: string) =
     let normalized =
         remoteName
@@ -285,6 +293,7 @@ let validateRemoteName (remoteName: string) =
     else
         Error(exn "Remote name contains unsupported characters.")
 
+/// Enforces Swate's remote URL policy before clone/add-remote/auth lookup.
 let ensureAllowedRemoteUrl (remoteUrl: string) =
     let normalized = remoteUrl.Trim()
 
@@ -317,6 +326,7 @@ let private unsupportedGitContentResult<'T> (path: string) : GitResult<'T> =
         Message = unsupportedGitContentMessage path
     }
 
+/// Converts the service's unsupported-content sentinel into a DTO that IPC can return without throwing.
 let tryGetUnsupportedGitContent (requestedPath: string) (failure: GitFailure) : GitUnsupportedContentDto option =
     if String.Equals(failure.Message, unsupportedGitContentMessage requestedPath, StringComparison.Ordinal) then
         Some {
@@ -579,6 +589,8 @@ let private normalizeOptionalGitRef (value: string option) =
     |> Option.map _.Trim()
     |> Option.filter (fun item -> not (String.IsNullOrWhiteSpace item))
 
+/// Resolves the branch/refspec to push and whether `--set-upstream` should be used.
+/// Exposed for tests because this policy affects new-branch publishing behavior.
 let resolvePushTarget
     (requestedBranchName: string option)
     (currentBranch: string option)
@@ -952,7 +964,7 @@ let private createAuthenticatedGitSession
         let! remoteResult =
             runSimpleGit
                 (fun git -> promise {
-                    let! remoteUrl = git.raw [| "remote"; "get-url"; remoteName |]
+                    let! remoteUrl = git.raw [| "config"; "--get"; $"remote.{remoteName}.url" |]
                     return remoteUrl.Trim()
                 })
                 probeGit
@@ -1021,6 +1033,7 @@ let private withAuthenticatedGit
         | Ok session -> return! runSimpleGit operation session.Git
     }
 
+/// Reads status for the active ARC repository, including conflict metadata used by the sidebar and merge UI.
 let getStatus (arcPath: string) : JS.Promise<GitResult<GitStatusDto>> =
     withLocalGit
         arcPath
@@ -1029,6 +1042,7 @@ let getStatus (arcPath: string) : JS.Promise<GitResult<GitStatusDto>> =
             return toStatusDto arcPath status
         })
 
+/// Lists local and remote branch refs for the sidebar branch picker.
 let getBranches (arcPath: string) : JS.Promise<GitResult<GitBranchRefDto[]>> =
     withLocalGit
         arcPath
@@ -1081,7 +1095,7 @@ let getBranches (arcPath: string) : JS.Promise<GitResult<GitBranchRefDto[]>> =
                 )
         })
 
-// GitService exposes LFS settings because the sidebar consumes them as part of the git workflow configuration surface.
+/// Exposes persisted LFS workflow settings consumed by the Git sidebar.
 let getLfsSettings (arcPath: string) : JS.Promise<GitResult<GitLfsSettingsDto>> =
     withLocalGit
         arcPath
@@ -1095,6 +1109,7 @@ let getLfsSettings (arcPath: string) : JS.Promise<GitResult<GitLfsSettingsDto>> 
             }
         })
 
+/// Returns aggregate unstaged diff counts for the active ARC repository.
 let getDiffSummary (arcPath: string) : JS.Promise<GitResult<GitDiffSummaryDto>> =
     withLocalGit
         arcPath
@@ -1108,6 +1123,7 @@ let getDiffSummary (arcPath: string) : JS.Promise<GitResult<GitDiffSummaryDto>> 
             }
         })
 
+/// Returns raw `git diff` text for validated pathspecs. Used by tests and lower-level consumers.
 let getDiff (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<string>> = promise {
     match validatePathspecs pathSpecs with
     | Error validationError -> return errorResult validationError
@@ -1122,6 +1138,7 @@ let getDiff (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<strin
                 })
 }
 
+/// Returns porcelain word-diff text for validated pathspecs.
 let getWordDiff (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<string>> = promise {
     match validatePathspecs pathSpecs with
     | Error validationError -> return errorResult validationError
@@ -1143,6 +1160,8 @@ let getWordDiff (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<s
                 })
 }
 
+/// Loads previous/current text plus word-diff metadata for the renderer diff view.
+/// Binary or explicitly unsupported files return the unsupported-content sentinel.
 let getDiffViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<GitDiffViewDataDto>> = promise {
     match ensureValidPathspec requestedPath with
     | Error validationError -> return errorResult validationError
@@ -1232,6 +1251,7 @@ let getDiffViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitRe
                     })
 }
 
+/// Loads the current conflicted file content for the merge-resolution view.
 let getMergeConflictViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<GitMergeConflictViewDataDto>> = promise {
     match ensureValidPathspec requestedPath with
     | Error validationError -> return errorResult validationError
@@ -1265,6 +1285,7 @@ let getMergeConflictViewData (arcPath: string) (requestedPath: string) : JS.Prom
                     })
 }
 
+/// Fetches from a validated remote using the configured token provider and optional progress callback.
 let fetch
     (arcPath: string)
     (remoteName: string option)
@@ -1296,6 +1317,118 @@ let fetch
                 return result
     }
 
+/// Fetches and runs a merge-tree preflight to classify whether pull is likely safe or requires merge resolution.
+/// Renderer workflow uses this before "update from online" actions.
+let previewPull
+    (arcPath: string)
+    (remoteName: string option)
+    (branchName: string option)
+    (progressCallback: GitProgressCallback option)
+    : JS.Promise<GitResult<GitPullPreflightResult>> =
+    promise {
+        match validateRemoteName (remoteName |> Option.defaultValue "origin") with
+        | Error remoteError -> return errorResult remoteError
+        | Ok safeRemoteName ->
+            match validateOptionalBranchName branchName with
+            | Error branchError -> return errorResult branchError
+            | Ok safeBranchName ->
+                let! statusResult = withLocalGit arcPath (fun git -> git.status ())
+
+                match statusResult with
+                | Error failure -> return Error failure
+                | Ok status ->
+                    let currentBranch =
+                        status.current
+                        |> Option.bind Option.ofObj
+                        |> Option.map _.Trim()
+                        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+                    match status.detached, currentBranch with
+                    | true, _
+                    | _, None ->
+                        return
+                            Ok {
+                                Status = GitPullPreflightStatus.Indeterminate
+                                Message = Some "Cannot preview pull for a detached HEAD."
+                            }
+                    | false, Some _ ->
+                        let upstreamRef =
+                            safeBranchName
+                            |> Option.map (fun safeBranch -> $"{safeRemoteName}/{safeBranch}")
+                            |> Option.orElseWith (fun () ->
+                                status.tracking
+                                |> Option.bind Option.ofObj
+                                |> Option.map _.Trim()
+                                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                            )
+
+                        match upstreamRef with
+                        | None ->
+                            return
+                                Ok {
+                                    Status = GitPullPreflightStatus.Indeterminate
+                                    Message =
+                                        Some "No upstream tracking branch is configured for the current branch."
+                                }
+                        | Some resolvedUpstreamRef ->
+                            return!
+                                withAuthenticatedGit
+                                    arcPath
+                                    safeRemoteName
+                                    progressCallback
+                                    (fun git -> promise {
+                                        match safeBranchName with
+                                        | None ->
+                                            let! _ = git.fetch safeRemoteName
+                                            ()
+                                        | Some safeBranch ->
+                                            let! _ = git.fetch (safeRemoteName, safeBranch)
+                                            ()
+
+                                        let! mergeTreeResult =
+                                            runGitCaptured {
+                                                WorkingDirectory = Some arcPath
+                                                Arguments = [| "merge-tree"; "--write-tree"; "HEAD"; resolvedUpstreamRef |]
+                                                Environment = None
+                                                StandardInput = None
+                                                TimeoutMs = Some 30000
+                                            }
+
+                                        if mergeTreeResult.ExitCode = 0 then
+                                            return {
+                                                Status = GitPullPreflightStatus.SafeToPull
+                                                Message = None
+                                            }
+                                        else
+                                            let diagnosticText =
+                                                $"{mergeTreeResult.StdoutText}\n{mergeTreeResult.StderrText}"
+
+                                            let normalizedDiagnostic = diagnosticText.ToLowerInvariant()
+
+                                            if
+                                                normalizedDiagnostic.Contains("conflict")
+                                                || normalizedDiagnostic.Contains("merge conflict")
+                                            then
+                                                return {
+                                                    Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                                    Message = Some "Pulling would require merge resolution."
+                                                }
+                                            else
+                                                let trimmedDiagnostic = diagnosticText.Trim()
+
+                                                return {
+                                                    Status = GitPullPreflightStatus.Indeterminate
+                                                    Message =
+                                                        if String.IsNullOrWhiteSpace trimmedDiagnostic then
+                                                            Some "Git pull preflight could not be classified safely."
+                                                        else
+                                                            Some $"Git pull preflight could not be classified safely: {trimmedDiagnostic}"
+                                                }
+                                    })
+    }
+
+/// Pulls from a validated remote using token-backed auth and the repository LFS download preference.
+/// When large-file download is enabled, LFS content is hydrated after the git pull.
 let pull
     (arcPath: string)
     (remoteName: string option)
@@ -1342,6 +1475,8 @@ let pull
                 return result
     }
 
+/// Coordinates LFS upload planning, optional LFS upload, and the final git push.
+/// Kept separately testable because it controls when git hooks are skipped after an explicit LFS upload.
 let executePushWorkflow
     (pushTarget: GitPushTarget)
     (buildOutboundPlan: unit -> JS.Promise<Result<OutboundPushPlan, GitFailure>>)
@@ -1373,7 +1508,7 @@ let executePushWorkflow
                     }
     }
 
-// Push keeps LFS planning and optional upload here because they are part of the repository push workflow.
+/// Pushes the current or requested branch, uploading referenced LFS objects first when needed.
 let push
     (arcPath: string)
     (remoteName: string option)
@@ -1458,7 +1593,7 @@ let push
                                         git)
     }
 
-// GitService writes LFS settings because the threshold is a git workflow policy setting owned by this service.
+/// Persists Git workflow LFS settings in local repository config.
 let setLfsSettings (arcPath: string) (settings: GitLfsSettingsDto) : JS.Promise<GitResult<unit>> =
     promise {
         match validateLfsThresholdMb settings.AutoTrackThresholdMb with
@@ -1488,7 +1623,7 @@ let setLfsSettings (arcPath: string) (settings: GitLfsSettingsDto) : JS.Promise<
                     })
     }
 
-// Staging keeps automatic LFS enforcement here because the decision must happen immediately after normal git add updates the index.
+/// Stages validated pathspecs and auto-tracks oversized selected files in Git LFS before restaging.
 let stagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {
     match validatePathspecs pathSpecs with
     | Error validationError -> return errorResult validationError
@@ -1506,6 +1641,7 @@ let stagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<un
                 })
 }
 
+/// Unstages validated pathspecs with a mixed reset while leaving working tree files unchanged.
 let unstagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {
     match validatePathspecs pathSpecs with
     | Error validationError -> return errorResult validationError
@@ -1521,7 +1657,7 @@ let unstagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<
                 })
 }
 
-// Commit validates the staged index only and never mutates staging.
+/// Commits the current index after validating the commit message and staged LFS policy.
 let commit (arcPath: string) (message: string) : JS.Promise<GitResult<string>> = promise {
     let normalizedMessage = message.Trim()
 
@@ -1548,6 +1684,8 @@ let commit (arcPath: string) (message: string) : JS.Promise<GitResult<string>> =
                 })
 }
 
+/// Writes resolved merge-conflict content, stages it, and optionally commits when no conflicts remain.
+/// The expected content guard prevents overwriting a file that changed since the renderer opened the conflict view.
 let confirmMergeResolution
     (arcPath: string)
     (requestedPath: string)
@@ -1634,6 +1772,8 @@ let confirmMergeResolution
                         })
     }
 
+/// Creates and checks out a new local branch, optionally from a validated start point.
+/// Tracking is reconciled against `origin/<branch>` when that remote branch exists.
 let createBranch (arcPath: string) (branchName: string) (startPoint: string option) : JS.Promise<GitResult<unit>> = promise {
     match ensureValidBranchLikeName "Branch name" branchName with
     | Error branchError -> return errorResult branchError
@@ -1662,6 +1802,7 @@ let createBranch (arcPath: string) (branchName: string) (startPoint: string opti
                         })
 }
 
+/// Adds a new validated remote to the active ARC repository.
 let addRemote (arcPath: string) (remoteName: string) (remoteUrl: string) : JS.Promise<GitResult<unit>> = promise {
     match validateRemoteName remoteName with
     | Error remoteError -> return errorResult remoteError
@@ -1692,28 +1833,45 @@ let addRemote (arcPath: string) (remoteName: string) (remoteUrl: string) : JS.Pr
                     })
 }
 
-let checkoutBranch (arcPath: string) (branchName: string) : JS.Promise<GitResult<unit>> = promise {
-    match ensureValidBranchLikeName "Branch name" branchName with
-    | Error branchError -> return errorResult branchError
-    | Ok safeBranchName ->
-        return!
-            withLocalGit
-                arcPath
-                (fun git -> promise {
-                    let! localBranches = git.branchLocal ()
-                    let branches = valueOrEmptyArray localBranches.all
+/// Checks out an existing local branch, or creates/checks out a local branch from StartPoint.
+/// Renderer passes remote branch switches as Name=<local name>, StartPoint=<remote ref>.
+let checkoutBranch (arcPath: string) (request: GitCheckoutBranchRequest) : JS.Promise<GitResult<unit>> =
+    promise {
+        match ensureValidBranchLikeName "Branch name" request.Name with
+        | Error branchError -> return errorResult branchError
+        | Ok safeBranchName ->
+            match request.StartPoint with
+            | Some startPoint ->
+                match ensureValidBranchLikeName "Start point" startPoint with
+                | Error startPointError -> return errorResult startPointError
+                | Ok safeStartPoint ->
+                    return!
+                        withLocalGit
+                            arcPath
+                            (fun git -> promise {
+                                let! _ = git.checkoutBranch (safeBranchName, safeStartPoint)
+                                do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
+                                return ()
+                            })
+            | None ->
+                return!
+                    withLocalGit
+                        arcPath
+                        (fun git -> promise {
+                            let! localBranches = git.branchLocal ()
+                            let branches = valueOrEmptyArray localBranches.all
 
-                    let exists =
-                        branches
-                        |> Array.exists (fun existing ->
-                            String.Equals(existing, safeBranchName, StringComparison.Ordinal)
-                        )
+                            let exists =
+                                branches
+                                |> Array.exists (fun existing ->
+                                    String.Equals(existing, safeBranchName, StringComparison.Ordinal)
+                                )
 
-                    if not exists then
-                        return abortGitPromise $"Branch '{safeBranchName}' does not exist in the local repository."
+                            if not exists then
+                                return abortGitPromise $"Branch '{safeBranchName}' does not exist in the local repository."
 
-                    let! _ = git.checkout (safeBranchName)
-                    do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
-                    return ()
-                })
-}
+                            let! _ = git.checkout (safeBranchName)
+                            do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
+                            return ()
+                        })
+    }

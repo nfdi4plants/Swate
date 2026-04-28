@@ -90,6 +90,8 @@ let private tryGetExistingPathKind (pathValue: string) : JS.Promise<Result<Exist
 let private tryGetExistingPathKindNoFollow (pathValue: string) : JS.Promise<Result<ExistingPathKind option, exn>> =
     tryGetExistingPathKindWithStats lstatAsync pathValue
 
+/// Validates a user-selected repository path and normalizes it with the supplied resolver.
+/// Kept injectable so validation tests can avoid depending on OS path resolution.
 let validateAndNormalizeTargetPathWithResolver
     (resolvePath: string -> string)
     (targetPath: string)
@@ -110,6 +112,7 @@ let validateAndNormalizeTargetPathWithResolver
         with error ->
             Error(exn $"Target path could not be normalized: {error.Message}")
 
+/// Classifies whether a clone destination may be used by the provisioning flow.
 let classifyCloneTargetState (directoryExists: bool) (entryCount: int) : CloneTargetState =
     if directoryExists && entryCount > 0 then
         CloneTargetState.ExistingNonEmpty
@@ -118,6 +121,7 @@ let classifyCloneTargetState (directoryExists: bool) (entryCount: int) : CloneTa
     else
         CloneTargetState.Missing
 
+/// Enforces clone's strict "missing or empty directory only" destination rule.
 let ensureCloneTargetIsEmpty (state: CloneTargetState) : Result<unit, exn> =
     match state with
     | CloneTargetState.ExistingNonEmpty ->
@@ -126,6 +130,7 @@ let ensureCloneTargetIsEmpty (state: CloneTargetState) : Result<unit, exn> =
     | CloneTargetState.Missing ->
         Ok ()
 
+/// Converts an optional validated branch name into simple-git clone arguments.
 let buildCloneBranchOptions (branch: string option) : string[] =
     match branch with
     | None -> [||]
@@ -270,6 +275,8 @@ let private persistCloneDownloadPreference
         })
         repoGit
 
+/// Initializes a Git repository at a user-selected path.
+/// This is path-driven provisioning: it does not require an active ARC window and returns the normalized repository path.
 let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string>> =
     promise {
         match validateAndNormalizeTargetPathWithResolver resolveAbsolutePath targetPath with
@@ -329,6 +336,9 @@ let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string
                 return errorResult error
     }
 
+/// Clones a remote repository into a missing or empty target directory.
+/// If a token is available for the remote host, the clone and optional LFS hydration run authenticated; otherwise clone runs unauthenticated.
+/// The DownloadLargeFiles flag persists the repo preference and, when true, runs `git lfs pull` after clone.
 let cloneRepository
     (remoteUrl: string)
     (targetPath: string)

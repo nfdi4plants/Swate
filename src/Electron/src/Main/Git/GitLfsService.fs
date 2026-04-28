@@ -9,9 +9,11 @@ open Main.Bindings.SimpleGit
 open Main.Git.GitLfsAdapter
 open Main.Git.GitAuthAdapter
 
+/// Default timeout for interactive Git LFS commands launched by the Electron main process.
 [<Literal>]
 let DefaultTimeoutMs = 30000
 
+/// Describes whether an outbound Git push needs a separate LFS object upload before the git ref push.
 [<RequireQualifiedAccess>]
 type OutboundPushPlan =
     | SkipLfsUpload
@@ -20,6 +22,7 @@ type OutboundPushPlan =
 let private maxLfsPointerProbeBytes = 1024L
 let mutable private cachedSystemInstalled = false
 
+/// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
     let errorText = result.Error |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
     let outputText = result.Output |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
@@ -37,6 +40,7 @@ let private redactDiagnosticText (text: string) =
     else
         redactToken text
 
+/// Builds a GitLfsRequest with a generated request id and default timeout.
 let createRequest
     (repoPath: string)
     (command: GitLfsCommand)
@@ -51,6 +55,7 @@ let createRequest
         TimeoutMs = Some(defaultArg timeoutMs DefaultTimeoutMs)
     }
 
+/// Runs a Git LFS adapter request and normalizes unsuccessful adapter results to Result.Error.
 let run
     (request: GitLfsRequest)
     (onProgress: string -> unit)
@@ -68,9 +73,11 @@ let run
             return Error ex
     }
 
+/// Runs Git LFS without progress or cancellation hooks.
 let runSilently (request: GitLfsRequest) : JS.Promise<Result<GitLfsResult, exn>> =
     run request ignore (fun () -> false)
 
+/// Tracks a repository-relative path in Git LFS. GitService uses this during automatic large-file staging.
 let track (repoPath: string) (relativePath: string) : JS.Promise<Result<unit, string>> =
     promise {
         let! result =
@@ -83,6 +90,7 @@ let track (repoPath: string) (relativePath: string) : JS.Promise<Result<unit, st
             | Error exn -> Error exn.Message
     }
 
+/// Runs `git lfs install` for a specific repository.
 let install (repoPath: string) : JS.Promise<Result<unit, string>> =
     promise {
         let! result =
@@ -95,6 +103,7 @@ let install (repoPath: string) : JS.Promise<Result<unit, string>> =
             | Error exn -> Error exn.Message
     }
 
+/// Runs system-level Git LFS install from the Main IPC endpoint and updates the installation cache on success.
 let installSystem () : JS.Promise<Result<unit, string>> =
     promise {
         try
@@ -110,6 +119,7 @@ let installSystem () : JS.Promise<Result<unit, string>> =
             return Error ex.Message
     }
 
+/// Probes whether `git lfs` is available on PATH. The positive result is cached for the Main process lifetime.
 let isSystemInstalled () : JS.Promise<bool> =
     promise {
         if cachedSystemInstalled then
@@ -124,6 +134,7 @@ let isSystemInstalled () : JS.Promise<bool> =
             return isInstalled
     }
 
+/// Checks whether `.gitattributes` marks a path for Git LFS.
 let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
     gitLfs.IsTrackedByAttributes repoRoot relativePath
 
@@ -151,6 +162,7 @@ let private tryRunRawDiagnosticCommand
                 |> Option.map (fun message -> $"Unavailable: {message}")
     }
 
+/// Collects redacted Git LFS diagnostics after an LFS upload failure so push errors are actionable.
 let collectPushDiagnostics
     (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
     (getFailureMessage: 'Failure -> string option)
@@ -183,6 +195,7 @@ let collectPushDiagnostics
                 | sections -> Some(String.concat "\n\n" sections)
     }
 
+/// Appends optional LFS diagnostic sections to the original push failure message.
 let appendPushDiagnostics (message: string) (diagnostics: string option) =
     match diagnostics |> Option.map _.Trim() with
     | Some value when not (String.IsNullOrWhiteSpace value) ->
@@ -600,6 +613,8 @@ let private getOutboundObjectIdsFromRemoteTips
                     Error(spawnFailure revListResult)
     }
 
+/// Determines whether an upcoming git push references LFS pointer objects that must be uploaded explicitly.
+/// Tests call this directly because the planning logic has several fallbacks for older git versions.
 let planOutboundPush
     (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
     (runSpawnedGit: GitSpawnRequest -> JS.Promise<GitSpawnResult>)
@@ -695,6 +710,8 @@ let planOutboundPush
                                         )
     }
 
+/// Uploads the exact LFS object ids needed for a push, falling back to refspec upload when the local git-lfs is older.
+/// Authentication is supplied by GitAuthAdapter and is passed only for this spawned command.
 let uploadObjects
     (runSpawnedGit: GitSpawnRequest -> JS.Promise<GitSpawnResult>)
     (commandAuth: GitCommandAuthentication)
