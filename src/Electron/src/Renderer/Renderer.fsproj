@@ -20,7 +20,6 @@
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\FileExplorer.fs" />
-    <Compile Include="Components\WidgetRegister.fs" />
     <Compile Include="Components\LeftSidebar\ArcObjectTreeSidebar.fs" />
     <Compile Include="Components\LeftSidebar\ExplorerSidebar.fs" />
     <Compile Include="Components\LeftSidebar\GitSidebarEmptyState.fs" />

@@ -211,14 +211,7 @@ type TemplatesDisplay =
                                         prop.colSpan TemplatesDisplayHelper.ColCount
                                         prop.style [ style.textAlign.center ]
                                         prop.children [
-                                            Html.span [
-                                                prop.className
-                                                    "swt:flex swt:flex-col swt:items-center swt:gap-2 swt:py-10"
-                                                prop.children [
-                                                    Html.div [ prop.className "swt:loading swt:loading-xl" ]
-                                                    Html.span [ prop.text "Loading templates..." ]
-                                                ]
-                                            ]
+                                            Components.LoadingSpinner("Loading templates...", size = DaisyuiSize.XL)
                                         ]
                                     ]
                                 ]

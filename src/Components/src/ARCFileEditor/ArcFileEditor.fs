@@ -132,7 +132,7 @@ type Main =
             | Some table ->
                 let setTable (nextTable: ArcTable) =
                     tables.[index] <- nextTable
-                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
+                    setArcFileState (ArcFiles.refreshRef arcFileState)
 
                 match table.ColumnCount with
                 | 0 -> EmptyTableView.Main.EmptyTableView(arcFileState, setArcFileState, Some index)
@@ -147,25 +147,25 @@ type Main =
             | ArcFiles.Assay assay when assay.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     assay.DataMap <- Some nextDatamap
-                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
+                    setArcFileState (ArcFiles.refreshRef arcFileState)
 
                 Main.LazyDataMapView(assay.DataMap.Value, setDatamap)
             | ArcFiles.Study(study, assays) when study.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     study.DataMap <- Some nextDatamap
-                    setArcFileState (WidgetArcFile.refreshRef (ArcFiles.Study(study, assays)))
+                    setArcFileState (ArcFiles.refreshRef (ArcFiles.Study(study, assays)))
 
                 Main.LazyDataMapView(study.DataMap.Value, setDatamap)
             | ArcFiles.Run run when run.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     run.DataMap <- Some nextDatamap
-                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
+                    setArcFileState (ArcFiles.refreshRef arcFileState)
 
                 Main.LazyDataMapView(run.DataMap.Value, setDatamap)
             | ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     workflow.DataMap <- Some nextDatamap
-                    setArcFileState (WidgetArcFile.refreshRef arcFileState)
+                    setArcFileState (ArcFiles.refreshRef arcFileState)
 
                 Main.LazyDataMapView(workflow.DataMap.Value, setDatamap)
             | ArcFiles.DataMap(parent, datamap) ->
@@ -202,10 +202,10 @@ type Main =
             match tryGetAddRowsTarget () with
             | Some(AddRowsTarget.Table table) ->
                 table.AddRowsEmpty rowCount
-                setArcFileState (WidgetArcFile.refreshRef arcFileState)
+                setArcFileState (ArcFiles.refreshRef arcFileState)
             | Some(AddRowsTarget.DataMap dataMap) ->
                 dataMap.DataContexts.AddRange(Array.init rowCount (fun _ -> DataContext()))
-                setArcFileState (WidgetArcFile.refreshRef arcFileState)
+                setArcFileState (ArcFiles.refreshRef arcFileState)
             | None -> ()
 
         let addRows () =

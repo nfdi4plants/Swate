@@ -1,10 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.Widgets
 
 open Feliz
 open Browser.Types
-open WidgetsLocalStorage
 open Swate
 open Swate.Components
+open Swate.Components.Widgets.LocalStorage
 
 module InitExtensions =
 
@@ -345,7 +345,7 @@ type Widget =
         )
 
         let closeWidget =
-            React.useCallback(
+            React.useCallback (
                 (fun (widgetType: WidgetType) ->
                     setActiveWidgets (fun widgets -> widgets |> List.filter (fun widget -> widget <> widgetType))
                 ),
@@ -353,7 +353,7 @@ type Widget =
             )
 
         let focusWidget =
-            React.useCallback(
+            React.useCallback (
                 (fun (widgetType: WidgetType) ->
                     setActiveWidgets (fun widgets ->
                         if widgets |> List.contains widgetType then
@@ -368,7 +368,7 @@ type Widget =
             )
 
         let openWidget =
-            React.useCallback(
+            React.useCallback (
                 (fun (widgetType: WidgetType) ->
                     setActiveWidgets (fun widgets ->
                         if widgets |> List.contains widgetType then
@@ -383,7 +383,7 @@ type Widget =
             )
 
         let toggleWidget =
-            React.useCallback(
+            React.useCallback (
                 (fun (widgetType: WidgetType) ->
                     setActiveWidgets (fun widgets ->
                         if widgets |> List.contains widgetType then
@@ -396,20 +396,21 @@ type Widget =
             )
 
         let isActive =
-            React.useCallback((fun (widgetType: WidgetType) -> activeWidgets |> List.contains widgetType), [| box activeWidgets |])
+            React.useCallback (
+                (fun (widgetType: WidgetType) -> activeWidgets |> List.contains widgetType),
+                [| box activeWidgets |]
+            )
 
         let widgetContext: WidgetContext.WidgetControllerContext =
-            React.useMemo(
-                (fun () ->
-                    {
-                        activeWidgets = activeWidgets
-                        isActive = isActive
-                        openWidget = openWidget
-                        closeWidget = closeWidget
-                        toggleWidget = toggleWidget
-                        focusWidget = focusWidget
-                    }
-                ),
+            React.useMemo (
+                (fun () -> {
+                    activeWidgets = activeWidgets
+                    isActive = isActive
+                    openWidget = openWidget
+                    closeWidget = closeWidget
+                    toggleWidget = toggleWidget
+                    focusWidget = focusWidget
+                }),
                 [|
                     box activeWidgets
                     box isActive

@@ -4,6 +4,8 @@ open Feliz
 open Fable.Core
 open ARCtrl
 open Swate.Components
+open Swate.Components.ArcFileEditor
+open Swate.Components.Widgets
 
 module private MainHelper =
 
@@ -78,7 +80,6 @@ module private MainHelper =
 //     |> Map.ofList
 
 open MainHelper
-open Swate.Components.WidgetContext
 
 [<Erase; Mangle(false)>]
 type Main =
@@ -115,7 +116,7 @@ type Main =
     [<ReactComponent>]
     static member Widgets(children: ReactElement, buildingBlockWidget: ReactElement, templateWidget: ReactElement) =
         let widgets: Map<WidgetType, WidgetDefinition> =
-            React.useMemo(
+            React.useMemo (
                 (fun () ->
                     [
                         WidgetType.BuildingBlock,

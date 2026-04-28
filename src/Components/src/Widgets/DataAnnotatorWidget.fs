@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.Widgets
 
 open System
 open ARCtrl
@@ -467,9 +467,7 @@ type DataAnnotatorWidget =
                         float importedFile.Content.Length
                     )
 
-                match
-                    DataAnnotatorWidget.parseDataFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile
-                with
+                match DataAnnotatorWidget.parseDataFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile with
                 | Ok parsed ->
                     setLoadedFile importedFile.Name loadedDataFile (Some parsed)
                     setStatusMessage (Some $"Loaded {importedFile.Name} ({parsed.BodyRows.Length} rows).")
@@ -550,7 +548,7 @@ type DataAnnotatorWidget =
                     }
 
                     let applySuccess count =
-                        setArcFile (WidgetArcFile.refreshRef arcFile)
+                        setArcFile (ArcFiles.refreshRef arcFile)
                         setErrorMessage None
                         setStatusMessage (Some $"Applied {count} data annotation(s).")
                         widgetCtx.closeWidget WidgetType.DataAnnotator
@@ -649,13 +647,7 @@ type DataAnnotatorWidget =
                             ]
                         ]
                     ]
-                    DataAnnotatorWidget.FileControllerElements(
-                        pickFile,
-                        loading,
-                        selectedFileName,
-                        dataFile,
-                        reset
-                    )
+                    DataAnnotatorWidget.FileControllerElements(pickFile, loading, selectedFileName, dataFile, reset)
                     if dataFile.IsSome then
                         Html.div [
                             prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:items-center"

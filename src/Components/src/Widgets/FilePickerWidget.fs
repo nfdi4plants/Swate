@@ -1,8 +1,9 @@
-namespace Swate.Components
+namespace Swate.Components.Widgets
 
 open ARCtrl
 open Fable.Core
 open Feliz
+open Swate.Components
 open Swate.Components.Shared
 
 
@@ -235,7 +236,7 @@ type FilePickerWidget =
                     setStatusMessage (Some "Could not write into the selected column.")
                 else
                     table.SetCellsAt cellsToInsert
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setArcFile (ArcFiles.refreshRef arcFile)
                     setPathEntries (fun _ -> [])
                     setStatusMessage None
                     widgetCtx.closeWidget WidgetType.FilePicker

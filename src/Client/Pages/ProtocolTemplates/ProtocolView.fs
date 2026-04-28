@@ -64,7 +64,9 @@ type Templates =
                             ]
                         ]
                         Html.td [
-                            prop.children [ Html.div [ prop.title template.Name; prop.text template.Name ] ]
+                            prop.children [
+                                Html.div [ prop.title template.Name; prop.text template.Name ]
+                            ]
                         ]
                         Html.td [
                             prop.children [
@@ -113,7 +115,10 @@ type Templates =
                                 prop.className "swt:pt-0"
                                 prop.colSpan TemplatesAux.ColCount
                                 prop.children [
-                                    Html.div [ prop.className "swt:py-2 swt:text-xs"; prop.text template.Description ]
+                                    Html.div [
+                                        prop.className "swt:py-2 swt:text-xs"
+                                        prop.text template.Description
+                                    ]
                                     Html.div [
                                         prop.className "swt:flex swt:gap-1"
                                         prop.children [
@@ -184,7 +189,12 @@ type Templates =
                                     Html.td [
                                         prop.colSpan TemplatesAux.ColCount
                                         prop.style [ style.textAlign.center ]
-                                        prop.children [ Swate.Components.Icons.SpinningSpinner() ]
+                                        prop.children [
+                                            Swate.Components.Components.LoadingSpinner(
+                                                "Loading templates...",
+                                                size = Swate.Components.Types.DaisyuiSize.XL
+                                            )
+                                        ]
                                     ]
                                 ]
                             | false ->

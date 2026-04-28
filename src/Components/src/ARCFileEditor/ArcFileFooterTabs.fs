@@ -357,7 +357,7 @@ type ArcFileFooterTabs =
 
                     arcFile.ArcTables().AddTable nextTable
 
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setArcFile (ArcFiles.refreshRef arcFile)
                     setActiveView (ActiveView.Table(tables.TableCount - 1))
 
         let deleteTable (tableIndex: int) =
@@ -369,7 +369,7 @@ type ArcFileFooterTabs =
             | ActiveView.Table i when i > tableIndex -> setActiveView (ActiveView.Table(i - 1))
             | _ -> ()
 
-            setArcFile (WidgetArcFile.refreshRef arcFile)
+            setArcFile (ArcFiles.refreshRef arcFile)
 
         let updateTableOrder (oldIndex: int, newIndex: int) =
             closeEditorMode ()
@@ -377,7 +377,7 @@ type ArcFileFooterTabs =
             let lastIndex = tables.TableCount - 1
             let nextActiveIndex = max 0 (min newIndex lastIndex)
             setActiveView (ActiveView.Table nextActiveIndex)
-            setArcFile (WidgetArcFile.refreshRef arcFile)
+            setArcFile (ArcFiles.refreshRef arcFile)
 
         let handleDragEnd =
             React.useCallback (
@@ -430,7 +430,7 @@ type ArcFileFooterTabs =
                     | true -> ()
                     | false ->
                         arcFile.ArcTables().RenameTableAt(tableIndex, newName)
-                        setArcFile (WidgetArcFile.refreshRef arcFile)
+                        setArcFile (ArcFiles.refreshRef arcFile)
                         closeEditorMode ()
                 ),
                 [|

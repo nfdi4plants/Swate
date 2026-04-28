@@ -3,6 +3,7 @@ module Swate.Components.ArcFileEditor.Types
 open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
+open Swate.Components.Widgets
 
 type AddRowsTarget =
     | Table of ArcTable

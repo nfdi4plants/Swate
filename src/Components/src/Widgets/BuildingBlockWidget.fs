@@ -402,7 +402,7 @@ type BuildingBlockWidget =
                     | None -> table.ColumnCount
 
                 table.AddColumn(header, cells, insertionIndex, true)
-                setArcFile (WidgetArcFile.refreshRef arcFile)
+                setArcFile (ArcFiles.refreshRef arcFile)
 
             let header = BuildingBlockWidgetState.createCompositeHeaderFromState state
             let isValid = BuildingBlockWidgetState.isValidColumn header

@@ -1,6 +1,6 @@
 module Swate.Components.MockData.DataHub
 
-open Swate.Components.DataHubTypes
+open Swate.Components.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
 
 

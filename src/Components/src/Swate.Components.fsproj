@@ -202,8 +202,8 @@
     <Compile Include="DataHub\Types.fs" />
     <Compile Include="DataHub\MockData.fs" />
     <Compile Include="DataHub\GenericComponents.fs" />
+    <Compile Include="DataHub\DataHubBrowserModel.fs" />
     <Compile Include="DataHub\DataHubBrowser.fs" />
-    <Compile Include="DataHub\DataHubSidebar.fs" />
     <Compile Include="Style.fs" />
     <None Include="GitSidebar\GitSidebar.stories.tsx" />
   </ItemGroup>
