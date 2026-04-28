@@ -21,8 +21,14 @@ type MainSyncedState<'T> = {
 let useMainSyncedState<'T> (config: MainSyncedStateConfig<'T>) : MainSyncedState<'T> =
     let state, setState = React.useState config.initial
     let isLoading, setIsLoading = React.useState true
+    // Guards async snapshot loads and IPC callbacks after this hook unmounts or its dependencies change.
+    // Case: React StrictMode or a dependency change disposes the subscription while a load is still pending.
     let activeTokenRef = React.useRef 0
+    // Counts pushed main-process updates received after subscription.
+    // Case: a live update arrives while the initial snapshot is pending; the older snapshot must not overwrite it.
     let liveUpdateVersionRef = React.useRef 0
+    // Counts snapshot requests started by the hook, including manual refresh calls.
+    // Case: repeated refreshes resolve out of order; only the latest request can update state or loading.
     let requestVersionRef = React.useRef 0
 
     let loadSnapshot =
