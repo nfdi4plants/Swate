@@ -232,7 +232,6 @@ type Main =
         (
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
-            ?templateServices: TemplateWidgetServices,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView
         ) =
@@ -295,12 +294,7 @@ type Main =
                     buildingBlock = Main.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile)
                     template = Main.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile)
                 |}),
-                [|
-                    box arcFile
-                    box activeTableIndex
-                    box setArcFile
-                    box templateServices
-                |]
+                [| box arcFile; box activeTableIndex; box setArcFile |]
             )
 
         /// ArcFiles type is too complex for react. Therefore we check hashcode instead and compare that.
@@ -355,31 +349,38 @@ type Main =
     [<ReactComponent>]
     static member Entry() =
 
-        let startAssay = ArcAssay.init ("Test")
+        let startAssay =
+            React.useMemo (fun _ ->
+                let startAssay = ArcAssay.init ("Test")
 
-        let fullerTable = ArcTable("Fuller Table")
+                let fullerTable = ArcTable("Fuller Table")
 
-        fullerTable.AddColumn(CompositeHeader.Input IOType.Source)
-        fullerTable.AddColumn(CompositeHeader.Output IOType.Sample)
-        fullerTable.AddColumn(CompositeHeader.ProtocolREF)
-        fullerTable.AddColumn(CompositeHeader.ProtocolDescription)
-        fullerTable.AddColumn(CompositeHeader.ProtocolType)
-        fullerTable.AddColumn(CompositeHeader.ProtocolUri)
-        fullerTable.AddColumn(CompositeHeader.ProtocolVersion)
+                fullerTable.AddColumn(CompositeHeader.Input IOType.Source)
+                fullerTable.AddColumn(CompositeHeader.Output IOType.Sample)
+                fullerTable.AddColumn(CompositeHeader.ProtocolREF)
+                fullerTable.AddColumn(CompositeHeader.ProtocolDescription)
+                fullerTable.AddColumn(CompositeHeader.ProtocolType)
+                fullerTable.AddColumn(CompositeHeader.ProtocolUri)
+                fullerTable.AddColumn(CompositeHeader.ProtocolVersion)
 
-        fullerTable.AddColumn(
-            CompositeHeader.Component(OntologyAnnotation("Component Name", "Component Accession", "Component Source"))
-        )
+                fullerTable.AddColumn(
+                    CompositeHeader.Component(
+                        OntologyAnnotation("Component Name", "Component Accession", "Component Source")
+                    )
+                )
 
-        fullerTable.AddRowsEmpty 5
+                fullerTable.AddRowsEmpty 5
 
-        for i in 0..2 do
-            if i = 0 then
-                startAssay.AddTable(fullerTable)
-            else
-                startAssay.AddTable(ArcTable.init (sprintf "Table %i" i))
+                for i in 0..2 do
+                    if i = 0 then
+                        startAssay.AddTable(fullerTable)
+                    else
+                        startAssay.AddTable(ArcTable.init (sprintf "Table %i" i))
 
-        let (arcFile: ArcFiles), setArcFile = React.useState (ArcFiles.Assay startAssay)
+                startAssay
+            )
+
+        let (arcFile: ArcFiles), setArcFile = React.useState (ArcFiles.Assay(startAssay))
 
         let loadTemplates =
             fun () ->

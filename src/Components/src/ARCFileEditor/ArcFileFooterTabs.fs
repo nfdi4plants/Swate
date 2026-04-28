@@ -300,6 +300,8 @@ type ArcFileFooterTabs =
         let isEditorModeTableTab, setIsEditorModeTableTab =
             React.useState (None: int option)
 
+        let arcFileHash = arcFile.GetHashCode()
+
         let metadataTabLabel =
             React.useMemo (
                 (fun () ->
@@ -312,7 +314,7 @@ type ArcFileFooterTabs =
                     | ArcFiles.Template _ -> "Template"
                     | ArcFiles.DataMap _ -> "Datamap"
                 ),
-                [| box arcFile |]
+                [| box arcFileHash |]
             )
 
         let setEditorMode =
@@ -342,29 +344,21 @@ type ArcFileFooterTabs =
                 [| box setIsEditorModeTableTab |]
             )
 
-        let addNewTable _ =
-            closeEditorMode ()
+        let tableNamesKey =
+            tables |> Seq.map (fun table -> table.Name) |> String.concat "||"
 
-            if canAddTable then
-                let nextName = Helper.createNewTableName tables.Tables
-                let nextTable = ArcTable.init nextName
+        let addNewTable =
+            fun _ ->
+                closeEditorMode ()
 
-                console.log ("Adding new table with name", nextName)
+                if canAddTable then
+                    let nextName = Helper.createNewTableName tables.Tables
+                    let nextTable = ArcTable.init nextName
 
-                console.log (
-                    "Current tables before adding",
-                    arcFile.ArcTables().Tables |> Seq.map (fun t -> t.Name) |> String.concat ", "
-                )
+                    arcFile.ArcTables().AddTable nextTable
 
-                arcFile.ArcTables().AddTable nextTable
-
-                console.log (
-                    "Current tables after adding",
-                    arcFile.ArcTables().Tables |> Seq.map (fun t -> t.Name) |> String.concat ", "
-                )
-
-                setArcFile (WidgetArcFile.refreshRef arcFile)
-                setActiveView (ActiveView.Table(tables.TableCount - 1))
+                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setActiveView (ActiveView.Table(tables.TableCount - 1))
 
         let deleteTable (tableIndex: int) =
             closeEditorMode ()
@@ -403,14 +397,12 @@ type ArcFileFooterTabs =
                 [| box isEditorModeTableTab; box updateTableOrder |]
             )
 
+
         let tableIds =
             React.useMemo (
                 (fun () -> tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray),
-                [| box tables.TableCount |]
+                [| box tables.TableCount; box tableNamesKey |]
             )
-
-        let tableNamesKey =
-            tables |> Seq.map (fun table -> table.Name) |> String.concat "||"
 
         let tableTabModels: TableTabViewModel[] =
             React.useMemo (
