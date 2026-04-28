@@ -125,7 +125,10 @@ type TemplateImportModal =
                         Html.div [
                             prop.className "swt:max-h-64 swt:overflow-y-auto"
                             prop.children [
-                                TemplatePreview.TemplatePreview(selectedTemplates, previewCallbacks)
+                                TemplateImportModalPreview.TemplateImportModalPreview(
+                                    selectedTemplates,
+                                    previewCallbacks
+                                )
                             ]
                         ]
                     ]

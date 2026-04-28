@@ -8,10 +8,10 @@ module TemplateHelper = Swate.Components.Template.Helper
 module TemplateTypes = Swate.Components.Template.Types
 
 [<Erase; Mangle(false)>]
-type TemplatePreview =
+type TemplateImportModalPreview =
 
     [<ReactComponent>]
-    static member TemplatePreview(templates: Template[], callbacks: TemplateTypes.TemplatePreviewCallbacks) =
+    static member TemplateImportModalPreview(templates: Template[], callbacks: TemplateTypes.TemplatePreviewCallbacks) =
         if templates.Length = 0 then
             Html.div [
                 prop.className "swt:text-sm swt:opacity-70"
