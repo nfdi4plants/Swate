@@ -9,6 +9,7 @@ open Main.Bindings.Node
 [<Literal>]
 let private repoValidationTimeoutMs = 5000
 
+/// Low-level spawned `git` request used when simple-git cannot stream or feed stdin in the shape needed by LFS planning.
 type GitSpawnRequest = {
     WorkingDirectory: string option
     Arguments: string[]
@@ -17,6 +18,7 @@ type GitSpawnRequest = {
     TimeoutMs: int option
 }
 
+/// Captured process result for spawned git commands, including raw stdout for binary-safe batch parsing.
 type GitSpawnResult = {
     ExitCode: int
     StdoutBuffer: obj
@@ -25,6 +27,7 @@ type GitSpawnResult = {
     TimedOut: bool
 }
 
+/// Runs `git` without a shell and captures stdout/stderr for callers that need exact output or stdin support.
 let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> =
     promise {
         let! result =
@@ -116,6 +119,8 @@ let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> =
         return result
     }
 
+/// Runs a small git command and returns stdout text, or None on command failure.
+/// Used for feature probes where failure should not surface as a user-facing Git error.
 let tryExecGitText
     (workingDirectory: string option)
     (timeoutMs: int)
@@ -155,6 +160,7 @@ let tryExecGitText
     }
 
 
+/// Adapter contract for Git LFS commands. Main services depend on this shape instead of direct child-process calls.
 type IGitLfs =
     abstract Run:
         request: GitLfsRequest -> onProgress: (string -> unit) -> cancel: (unit -> bool) -> Promise<GitLfsResult>
@@ -420,7 +426,8 @@ type NodeGitLfsAdapter() =
 
 
 
+/// Factory for the default Node-backed Git LFS adapter.
 let gitLfsAdapter () : IGitLfs = NodeGitLfsAdapter() :> IGitLfs
 
-// Adapter instance
+/// Process-wide adapter instance used by GitLfsService.
 let gitLfs = gitLfsAdapter ()
