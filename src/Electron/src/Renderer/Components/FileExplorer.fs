@@ -19,6 +19,26 @@ module private FileExplorerHelper =
 
     let private normalizeNodePath (path: string) = normalizePath path
 
+    let tryGetArcFileRelativePath (arcFile: ArcFiles) =
+        arcFile.TryGetRelativePath() |> Option.map normalizePath
+
+    let tryPendingArcFileEntry (arcFile: ArcFiles) =
+        tryGetArcFileRelativePath arcFile
+        |> Option.map (fun path -> FileEntry.create (getFileName path, path, false))
+
+    let withPendingArcFileEntry (fileTree: FileEntry[]) (pendingArcFile: ArcFiles option) =
+        match pendingArcFile |> Option.bind tryPendingArcFileEntry with
+        | Some pendingEntry when fileTree |> Array.exists (fun entry -> PathHelpers.pathsEqual entry.path pendingEntry.path) |> not ->
+            Array.append fileTree [| pendingEntry |]
+        | _ -> fileTree
+
+    let tryFindPendingArcFileByPath (path: string) (pendingArcFile: ArcFiles option) =
+        pendingArcFile
+        |> Option.filter (fun arcFile ->
+            tryGetArcFileRelativePath arcFile
+            |> Option.exists (fun pendingPath -> PathHelpers.pathsEqual pendingPath path)
+        )
+
     let rec private collectSelectedDirectoryPathChain
         (selectedTreeItemPath: string option)
         (node: FileTreeNode)
@@ -294,17 +314,23 @@ type FileExplorer =
         let errorModal = ErrorModal.Context.useErrorModalCtx ()
         let arcScopeId = useCurrentArcScopeId ()
 
+        let effectiveFileTree =
+            React.useMemo (
+                (fun () -> withPendingArcFileEntry fileStateCtx.state.FileTree arcObjectCtx.state.PendingArcFileSave),
+                [| box fileStateCtx.state.FileTree; box arcObjectCtx.state.PendingArcFileSave |]
+            )
+
         let fileTree =
             React.useMemo (
                 (fun () ->
-                    match fileStateCtx.state.FileTree with
+                    match effectiveFileTree with
                     | [||] -> None
                     | _ ->
-                        fileStateCtx.state.FileTree
+                        effectiveFileTree
                         |> toFileTreeNode
                         |> collapseSingleChildSameNameDirectories
                         |> Some),
-                [| box fileStateCtx.state.FileTree |]
+                [| box effectiveFileTree |]
             )
 
         let requiredLoadedDirectories =
@@ -380,28 +406,38 @@ type FileExplorer =
                     let selectedPath = normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    let! result = Renderer.Components.ARCHelper.openView selectedPath
-
-                    match result with
-                    | Ok loaded ->
-                        console.log ("[Renderer] Received data, processing...")
-
-                        Renderer.Components.ARCHelper.applyLoadedView
+                    match tryFindPendingArcFileByPath selectedPath arcObjectCtx.state.PendingArcFileSave with
+                    | Some pendingArcFile ->
+                        pendingArcFile
+                        |> Renderer.Components.ARCHelper.viewLoadResultOfArcFile
+                        |> Renderer.Components.ARCHelper.applyLoadedView
                             pageStateCtx.setState
                             arcObjectCtx.setArcFileState
                             arcObjectCtx.setPreviewState
                             arcObjectCtx.setStatusMessage
-                            loaded
-                    | Error errorMessage ->
-                        let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
-                        console.log ($"[Renderer] Error: {fullErrorMessage}")
+                    | None ->
+                        let! result = Renderer.Components.ARCHelper.openView selectedPath
 
-                        Renderer.Components.ARCHelper.applyViewError
-                            pageStateCtx.setState
-                            arcObjectCtx.setArcFileState
-                            arcObjectCtx.setPreviewState
-                            arcObjectCtx.setStatusMessage
-                            fullErrorMessage
+                        match result with
+                        | Ok loaded ->
+                            console.log ("[Renderer] Received data, processing...")
+
+                            Renderer.Components.ARCHelper.applyLoadedView
+                                pageStateCtx.setState
+                                arcObjectCtx.setArcFileState
+                                arcObjectCtx.setPreviewState
+                                arcObjectCtx.setStatusMessage
+                                loaded
+                        | Error errorMessage ->
+                            let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
+                            console.log ($"[Renderer] Error: {fullErrorMessage}")
+
+                            Renderer.Components.ARCHelper.applyViewError
+                                pageStateCtx.setState
+                                arcObjectCtx.setArcFileState
+                                arcObjectCtx.setPreviewState
+                                arcObjectCtx.setStatusMessage
+                                fullErrorMessage
             }
             |> Promise.start
 
@@ -432,7 +468,7 @@ type FileExplorer =
 
         let createArcEntry kind (identifier: string) =
             let existingPaths =
-                fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
+                effectiveFileTree |> Array.map (fun entry -> entry.path)
 
             match tryBuildArcCreateDraft kind identifier existingPaths with
             | Error errorMessage -> applyCreateError errorMessage

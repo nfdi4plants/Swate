@@ -155,7 +155,7 @@ type FileExplorer =
                 Html.button [
                     prop.type'.button
                     prop.className
-                        "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity group-hover:swt:opacity-100 focus:swt:opacity-100"
+                        "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
                     prop.ariaLabel $"Create new item in {item.Name}"
                     prop.title $"Create new item in {item.Name}"
                     prop.onClick (handleCreateItem item)
