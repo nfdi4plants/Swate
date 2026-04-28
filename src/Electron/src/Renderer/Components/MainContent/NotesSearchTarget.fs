@@ -25,7 +25,7 @@ let NotesSearchTarget () =
             setError None
 
             promise {
-                let! result = Api.ipcArcVaultApi.readNotes (unbox null)
+                let! result = Api.ipcArcVaultApi.readNotes ()
 
                 if not isDisposed then
                     match result with
@@ -47,7 +47,7 @@ let NotesSearchTarget () =
     let openNote (relativePath: string) =
         promise {
 
-            let! result = Api.ipcArcVaultApi.openFile (unbox null) relativePath
+            let! result = Api.ipcArcVaultApi.openFile relativePath
 
             match result with
             | Ok dto ->

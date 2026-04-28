@@ -24,41 +24,41 @@ let private callIpcWith
     }
 
 let checkGitVersions () =
-    callIpc (fun () -> gitApi.checkGitVersions (unbox null))
+    callIpc (fun () -> gitApi.checkGitVersions ())
 
 let getGitStatus () =
-    callIpc (fun () -> gitApi.getGitStatus (unbox null))
+    callIpc (fun () -> gitApi.getGitStatus ())
 
 let getGitBranches () =
-    callIpc (fun () -> gitApi.getGitBranches (unbox null))
+    callIpc (fun () -> gitApi.getGitBranches ())
 
 let getGitLfsSettings () =
-    callIpc (fun () -> gitApi.getGitLfsSettings (unbox null))
+    callIpc (fun () -> gitApi.getGitLfsSettings ())
 
 let getGitDiffViewData (requestedPath: string) =
-    callIpcWith requestedPath (gitApi.getGitDiffViewData (unbox null))
+    callIpcWith requestedPath (gitApi.getGitDiffViewData)
 
 let getGitMergeConflictViewData (requestedPath: string) =
-    callIpcWith requestedPath (gitApi.getGitMergeConflictViewData (unbox null))
+    callIpcWith requestedPath (gitApi.getGitMergeConflictViewData)
 
 let installGitLfs () =
-    callIpc (fun () -> gitApi.installGitLfs (unbox null))
+    callIpc (fun () -> gitApi.installGitLfs ())
 
 let gitFetch (request: GitRemoteOperationRequest) =
-    callIpcWith request (gitApi.gitFetch (unbox null))
+    callIpcWith request (gitApi.gitFetch)
 
 let gitPull (request: GitRemoteOperationRequest) =
-    callIpcWith request (gitApi.gitPull (unbox null))
+    callIpcWith request (gitApi.gitPull)
 
 let previewGitPull (request: GitRemoteOperationRequest) =
-    callIpcWith request (gitApi.previewGitPull (unbox null))
+    callIpcWith request (gitApi.previewGitPull)
 
 let gitPush (request: GitRemoteOperationRequest) =
-    callIpcWith request (gitApi.gitPush (unbox null))
+    callIpcWith request (gitApi.gitPush)
 
 let gitInitRepository (targetPath: string) =
     promise {
-        let! result = gitApi.gitInitRepository (unbox null) targetPath
+        let! result = gitApi.gitInitRepository targetPath
 
         return
             result
@@ -72,28 +72,28 @@ let gitInitRepository (targetPath: string) =
     }
 
 let gitAddRemote (request: GitRemoteConfigRequest) =
-    callIpcWith request (gitApi.gitAddRemote (unbox null))
+    callIpcWith request (gitApi.gitAddRemote)
 
 let gitCloneRepository (request: GitCloneRepositoryRequest) =
-    callIpcWith request (gitApi.gitCloneRepository (unbox null))
+    callIpcWith request (gitApi.gitCloneRepository)
 
 let createBranch (request: GitCreateBranchRequest) =
-    callIpcWith request (gitApi.createBranch (unbox null))
+    callIpcWith request (gitApi.createBranch)
 
 let checkoutBranch (request: GitCheckoutBranchRequest) =
-    callIpcWith request (gitApi.checkoutBranch (unbox null))
+    callIpcWith request (gitApi.checkoutBranch)
 
 let gitStagePaths (request: GitPathspecRequest) =
-    callIpcWith request (gitApi.gitStagePaths (unbox null))
+    callIpcWith request (gitApi.gitStagePaths)
 
 let gitUnstagePaths (request: GitPathspecRequest) =
-    callIpcWith request (gitApi.gitUnstagePaths (unbox null))
+    callIpcWith request (gitApi.gitUnstagePaths)
 
 let gitCommit (request: GitCommitRequest) =
-    callIpcWith request (gitApi.gitCommit (unbox null))
+    callIpcWith request (gitApi.gitCommit)
 
 let setGitLfsSettings (settings: GitLfsSettingsDto) =
-    callIpcWith settings (gitApi.setGitLfsSettings (unbox null))
+    callIpcWith settings (gitApi.setGitLfsSettings)
 
 let confirmGitMergeResolution (request: GitConfirmMergeResolutionRequest) =
-    callIpcWith request (gitApi.confirmGitMergeResolution (unbox null))
+    callIpcWith request (gitApi.confirmGitMergeResolution)

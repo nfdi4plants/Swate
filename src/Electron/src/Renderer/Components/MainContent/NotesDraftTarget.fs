@@ -37,7 +37,7 @@ let NotesDraftTarget () =
                 let request: FileContentDTO =
                     FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
 
-                let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
+                let! writeResult = Api.ipcArcVaultApi.writeFile request
 
                 match writeResult with
                 | Result.Error exn ->
@@ -53,7 +53,7 @@ let NotesDraftTarget () =
                     setNotesDraft NotesDraft.init
                     setNotesUiState NotesUiState.init
 
-                    let! previewResult = Api.ipcArcVaultApi.openFile (unbox null) payload.Intent.RelativePath
+                    let! previewResult = Api.ipcArcVaultApi.openFile payload.Intent.RelativePath
 
                     match previewResult with
                     | Ok previewData ->

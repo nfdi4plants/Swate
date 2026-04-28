@@ -11,7 +11,7 @@ open Swate.Electron.Shared.IPCTypes
 let private filePickerServices: FilePickerWidgetServices = {
     pickPaths =
         fun () -> promise {
-            let! result = Api.ipcArcVaultApi.pickAbsolutePaths (unbox null)
+            let! result = Api.ipcArcVaultApi.pickAbsolutePaths ()
             return result |> Result.mapError (fun error -> error.Message)
         }
 }
@@ -19,7 +19,7 @@ let private filePickerServices: FilePickerWidgetServices = {
 let private dataAnnotatorServices: DataAnnotatorWidgetServices = {
     pickTextFiles =
         fun () -> promise {
-            let! result = Api.ipcArcVaultApi.pickExternalTextFiles (unbox null)
+            let! result = Api.ipcArcVaultApi.pickExternalTextFiles ()
             return result |> Result.mapError (fun error -> error.Message)
         }
 }

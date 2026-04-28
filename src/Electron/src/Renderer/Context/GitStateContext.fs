@@ -66,7 +66,7 @@ module private Helper =
         initGitRepository = Renderer.GitApiClient.gitInitRepository
         createDataHubProject =
             fun projectName -> promise {
-                let! result = Api.ipcGitLabApi.createProject (unbox null) projectName
+                let! result = Api.ipcGitLabApi.createProject projectName
                 return result |> Result.mapError _.GitLabErrorToString
             }
         installGitLfs = Renderer.GitApiClient.installGitLfs

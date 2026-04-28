@@ -7,15 +7,15 @@ open Main
 
 [<AutoOpen>]
 module IPCHelper =
-    let windowFromIpcEvent(event: IpcMainEvent) =
+    let windowFromIpcEvent(event: IpcMainInvokeEvent) =
         BrowserWindow.fromWebContents(event.sender)
 
-    let windowIdFromIpcEvent(event: IpcMainEvent) =
+    let windowIdFromIpcEvent(event: IpcMainInvokeEvent) =
         BrowserWindow.fromWebContents(event.sender)
         |> Option.map _.id
         |> function | Some id -> id | None -> failwith $"Unable to access window from web-contents-id: '{event.sender.id}'"
 
-    let tryGetVaultAndArcPath (event: IpcMainEvent) =
+    let tryGetVaultAndArcPath (event: IpcMainInvokeEvent) =
         let windowId = windowIdFromIpcEvent event
 
         match ARC_VAULTS.TryGetVault(windowId) with

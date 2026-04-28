@@ -2,7 +2,6 @@ module Main.IPC.IGitLabApi
 
 open System
 open Fable.Core
-open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
 open Swate.Components.DataHubTypes
 open Swate.Components.Api.GitLabApi
@@ -32,7 +31,7 @@ let private tryGetBrowseContext () : Result<string * string, GitLabError> =
 
 let api: IGitLabApi = {
     loadAllRepos =
-        fun (_event: IpcMainEvent) (query: ExploreRepoQuery) -> promise {
+        fun (query: ExploreRepoQuery) -> promise {
             match tryGetBrowseContext () with
             | Error err -> return Error err
             | Ok(baseUrl, activeToken) ->
@@ -51,7 +50,7 @@ let api: IGitLabApi = {
                     )
         }
     loadMostStarredRepos =
-        fun (_event: IpcMainEvent) (query: ExploreMostStarredQuery) -> promise {
+        fun (query: ExploreMostStarredQuery) -> promise {
             match tryGetBrowseContext () with
             | Error err -> return Error err
             | Ok(baseUrl, activeToken) ->
@@ -68,7 +67,7 @@ let api: IGitLabApi = {
                     )
         }
     loadUserRepos =
-        fun (_event: IpcMainEvent) (query: ExploreRepoQuery) -> promise {
+        fun (query: ExploreRepoQuery) -> promise {
             match tryGetActiveGitLabContext () with
             | Error err -> return Error err
             | Ok(baseUrl, token) ->
@@ -84,14 +83,14 @@ let api: IGitLabApi = {
                     )
         }
     loadOrganisationGroups =
-        fun (_event: IpcMainEvent) (query: ExploreGroupsQuery) -> promise {
+        fun (query: ExploreGroupsQuery) -> promise {
             match tryGetActiveGitLabContext () with
             | Error err -> return Error err
             | Ok(baseUrl, token) ->
                 return! GitLabApi.ListGroupsForCurrentUser(baseUrl, token, page = query.Page, perPage = query.PerPage)
         }
     loadOrganisationRepos =
-        fun (_event: IpcMainEvent) (query: ExploreGroupProjectsQuery) -> promise {
+        fun (query: ExploreGroupProjectsQuery) -> promise {
             match tryGetActiveGitLabContext () with
             | Error err -> return Error err
             | Ok(baseUrl, token) ->
@@ -110,7 +109,7 @@ let api: IGitLabApi = {
                     )
         }
     createProject =
-        fun (_event: IpcMainEvent) (projectName: string) -> promise {
+        fun (projectName: string) -> promise {
             match tryGetActiveGitLabContext () with
             | Error err -> return Error err
             | Ok(baseUrl, token) -> return! GitLabApi.CreateProject(baseUrl, token, projectName)

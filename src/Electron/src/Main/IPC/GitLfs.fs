@@ -1,6 +1,7 @@
 module Main.IPC.GitLfs
 
 open Fable.Electron
+open Fable.Electron.Main
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
 
@@ -35,11 +36,11 @@ let cancellations = System.Collections.Generic.Dictionary<string, bool>()
 // ==========================
 
 /// git lfs file IPC call method :/
-let registerGitLfsIpc: IGitLfsApi =
+let registerGitLfsIpc (event: IpcMainInvokeEvent) : IGitLfsApi =
 
     {
         runChannel =
-            fun (event: IpcMainEvent) (request: GitLfsRequest) ->
+            fun (request: GitLfsRequest) ->
 
                 promise {
                     cancellations.[request.RequestId] <- false
@@ -60,7 +61,7 @@ let registerGitLfsIpc: IGitLfsApi =
                 }
 
         cancelChannel =
-            fun (_: IpcMainEvent) (requestId: string) ->
+            fun (requestId: string) ->
 
                 promise {
                     if cancellations.ContainsKey requestId then

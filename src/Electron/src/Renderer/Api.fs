@@ -8,7 +8,7 @@ open Fable.Core.JsInterop
 open Fable.Remoting.Client
 open Fable.Electron.Remoting.Renderer
 
-let ipcGitApi = Remoting.init |> Remoting.buildClient<IGitApi>
-let ipcGitLabApi = Remoting.init |> Remoting.buildClient<IGitLabApi>
-let ipcArcVaultApi = Remoting.init |> Remoting.buildClient<IArcVaultsApi>
-let ipcAuthApi = Remoting.init |> Remoting.buildClient<IAuthApi>
+let ipcGitApi = Remoting.createIpc () |> Remoting.buildProxySender<IGitApi>
+let ipcGitLabApi = Remoting.createIpc () |> Remoting.buildProxySender<IGitLabApi>
+let ipcArcVaultApi = Remoting.createIpc () |> Remoting.buildProxySender<IArcVaultsApi>
+let ipcAuthApi = Remoting.createIpc () |> Remoting.buildProxySender<IAuthApi>
