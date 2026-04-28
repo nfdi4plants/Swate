@@ -51,11 +51,6 @@ type IArcVaultsApi = {
     resolveCloseRequest: SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
 }
 
-type IGitLfsApi = {
-    runChannel: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
-    cancelChannel: string -> JS.Promise<Result<string, exn>>
-}
-
 /// Two Way Bridge: Renderer <-> Main
 type IGitApi = {
     checkGitVersions: unit -> JS.Promise<Result<unit, exn>>
