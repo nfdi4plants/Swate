@@ -6,6 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <Compile Include="ARCtrlJsonObject.fs" />
     <Compile Include="FileIOTypes.fs" />
     <Compile Include="AuthTypes.fs" />
     <Compile Include="GitTypes.fs" />

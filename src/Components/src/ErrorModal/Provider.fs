@@ -2,7 +2,7 @@ namespace Swate.Components.ErrorModal
 
 open Feliz
 open Fable.Core
-
+open Swate.Components.ErrorModal.Context
 
 [<Erase; Mangle(false)>]
 type ErrorModalProvider =
@@ -272,7 +272,7 @@ type ErrorModalProvider =
                 |]
             )
 
-        Context.ErrorModalCtx.Provider(
+        ErrorModalCtx.Provider(
             contextValue,
             React.Fragment [
                 children
@@ -293,7 +293,7 @@ type ErrorModalProvider =
             showQueued: bool,
             showBatch: bool
         ) =
-        let errorModal = Context.useErrorModal ()
+        let errorModal = useErrorModalCtx ()
 
         let enqueueSingle () =
             errorModal.enqueue (
@@ -362,7 +362,7 @@ type ErrorModalProvider =
 
     [<ReactComponent>]
     static member private ScopedEntryContent() =
-        let errorModal = Context.useErrorModal ()
+        let errorModal = useErrorModalCtx ()
 
         let enqueueScopedQueue () =
             errorModal.enqueue (

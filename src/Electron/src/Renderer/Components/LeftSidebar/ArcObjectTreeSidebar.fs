@@ -2,18 +2,21 @@ module Renderer.Components.LeftSidebar.ArcObjectTreeSidebar
 
 open Feliz
 open Swate.Components
+open Swate.Components.ARCObjectExplorer
+open Swate.Components.ARCObjectExplorer.Model
 
 [<ReactComponent>]
 let Main () =
-    let appStateCtx = Renderer.Context.AppStateCtx.useAppState ()
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
-    let fileStateCtx = Renderer.Context.FileStateCtx.useFileState ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerCtx.useArcObjectExplorer ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let viewModel =
-        ArcObjectExplorerView.create
+        Swate.Components.ARCObjectExplorer.Model.create
             arcObjectCtx.state.Nodes
             fileStateCtx.state.Selection
+            KindFilter.arcObjectExplorerOptions
             arcObjectCtx.state.SelectedKindIndices
 
     let services =
@@ -31,9 +34,10 @@ let Main () =
             prop.text "No ARC objects found."
         ]
     | Some rootRepoPath, _ ->
-        Swate.Components.ARCExplorer.CreateArcExplorer
+        ARCExplorer.CreateArcExplorer
             rootRepoPath
             viewModel.FilteredTree
             fileStateCtx.state.Selection
             fileStateCtx.setSelection
             services
+

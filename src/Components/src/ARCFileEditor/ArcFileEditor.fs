@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
+open Swate.Components.Widgets.Context
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types
 
@@ -110,6 +111,16 @@ type Main =
                         ]
                     ]
                 ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private TableView(table: ArcTable, setTableInArcFile: ArcTable -> unit) =
+
+        Html.div [
+            prop.className "swt:w-full swt:min-w-0 swt:pb-4"
+            prop.children [
+                Swate.Components.AnnotationTable.AnnotationTable.AnnotationTable(table, setTableInArcFile)
             ]
         ]
 

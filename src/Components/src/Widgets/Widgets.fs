@@ -4,7 +4,7 @@ open Feliz
 open Browser.Types
 open Swate
 open Swate.Components
-open Swate.Components.Widgets.LocalStorage
+open Swate.Components.Widgets.Context
 
 module InitExtensions =
 
@@ -118,54 +118,12 @@ module ResizeEventListener =
             FsReact.createDisposable (fun () -> Browser.Dom.window.removeEventListener ("resize", onResize))
         )
 
-[<RequireQualifiedAccess>]
-[<StringEnum>]
-type WidgetType =
-    | BuildingBlock
-    | Template
-    | FilePicker
-    | DataAnnotator
-    | Playground
-
 type WidgetBlock = {
     prefix: string
     content: ReactElement
 } with
 
     static member CreateWidgetBlock prefix content : WidgetBlock = { prefix = prefix; content = content }
-
-module WidgetContext =
-
-    type WidgetControllerContext = {
-        activeWidgets: WidgetType list
-        isActive: WidgetType -> bool
-        openWidget: WidgetType -> unit
-        closeWidget: WidgetType -> unit
-        toggleWidget: WidgetType -> unit
-        focusWidget: WidgetType -> unit
-    }
-
-    module WidgetControllerContext =
-
-        let init () = {
-            activeWidgets = []
-            isActive = fun _ -> false
-            openWidget = fun _ -> ()
-            closeWidget = fun _ -> ()
-            toggleWidget = fun _ -> ()
-            focusWidget = fun _ -> ()
-        }
-
-    let ActiveWidgetContext =
-        React.createContext<WidgetControllerContext> (WidgetControllerContext.init ())
-
-    [<Hook>]
-    let useWidgetController () = React.useContext ActiveWidgetContext
-
-type WidgetDefinition = {|
-    prefix: string
-    content: ReactElement
-|}
 
 [<RequireQualifiedAccess>]
 [<Erase; Mangle(false)>]
@@ -421,7 +379,7 @@ type Widget =
                 |]
             )
 
-        WidgetContext.ActiveWidgetContext.Provider(
+        WidgetControllerCtx.Provider(
             widgetContext,
             [
                 children
@@ -444,7 +402,7 @@ type Widget =
     /// This component is only used for testing and development via playground
     [<ReactComponent>]
     static member private EntryControls(widgetTypes: WidgetType list) =
-        let context = WidgetContext.useWidgetController ()
+        let context = useWidgetControllerCtx ()
 
         let controlButton (widgetType: WidgetType) =
             let isActive = context.isActive widgetType
@@ -543,7 +501,7 @@ type Widget =
                             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-80"
                             prop.children [
                                 Html.h3 [ prop.className "swt:font-bold"; prop.text "Template POC" ]
-                                TermSearch.TermSearch(term, setTerm)
+                                TermSearch.TermSearch.TermSearch(term, setTerm)
                                 Html.span [
                                     prop.className "swt:text-xs swt:opacity-70"
                                     prop.textf

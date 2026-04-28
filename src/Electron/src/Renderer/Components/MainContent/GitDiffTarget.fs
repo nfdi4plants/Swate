@@ -5,7 +5,7 @@ open Swate.Electron.Shared.GitTypes
 
 [<ReactComponent>]
 let Main (diffData: GitDiffViewDataDto) =
-    let pageStateCtx = Renderer.Context.PageStateCtx.usePageState ()
+    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
     Html.div [
         prop.className "swt:flex swt:h-full swt:w-full swt:min-h-0 swt:min-w-0 swt:flex-col"

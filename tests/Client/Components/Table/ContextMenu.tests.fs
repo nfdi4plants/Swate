@@ -3,9 +3,10 @@ module Components.Tests.Table.ContextMenu
 open Fable.Mocha
 open ARCtrl
 open Swate.Components
+open Swate.Components.AnnotationTable
 open AnnotationTableContextMenu
 open Browser.Types
-open Fixture
+
 
 type TestCases =
 

@@ -52,14 +52,25 @@ type GitSidebarCreateBranchRequest = {
 
 type GitSidebarCommitSelectionRequest = { Message: string; Paths: string[] }
 
+type GitSidebarConfirmationDialog = {
+    Title: string
+    Message: string
+    ConfirmLabel: string
+    CancelLabel: string
+}
+
 type GitSidebarCallbacks = {
     OnRefresh: unit -> unit
     OnFetch: unit -> unit
     OnPull: unit -> unit
     OnPush: unit -> unit
-    OnSync: unit -> unit
+    OnUpdateFromOnline: unit -> unit
+    OnPrimarySaveSelection: GitSidebarCommitSelectionRequest -> unit
+    OnPrimarySaveAll: string -> unit
     OnCommitSelection: GitSidebarCommitSelectionRequest -> unit
     OnCommitAll: string -> unit
+    OnConfirmPendingRemoteAction: unit -> unit
+    OnCancelPendingRemoteAction: unit -> unit
     OnSaveDownloadLargeFiles: bool -> unit
     OnSaveLfsAutoTrackThreshold: int -> unit
     OnCreateBranch: GitSidebarCreateBranchRequest -> unit

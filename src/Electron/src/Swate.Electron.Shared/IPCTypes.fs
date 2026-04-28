@@ -10,6 +10,7 @@ open Swate.Components.Shared
 open AuthTypes
 open FileIOTypes
 open GitTypes
+open Swate.Components.NoteTypes
 
 module IPCTypesHelper =
 
@@ -40,7 +41,7 @@ type IArcVaultsApi = {
     pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
     getArcObjectTree: IpcMainEvent -> JS.Promise<Result<ArcExplorerNode list, exn>>
     openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
-    readNotes: IpcMainEvent -> JS.Promise<Result<NoteSearch[], exn>>
+    readNotes: IpcMainEvent -> JS.Promise<Result<Note[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
     saveArcFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
     writeFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
@@ -56,9 +57,11 @@ type IGitLfsApi = {
 
 /// Two Way Bridge: Renderer <-> Main
 type IGitApi = {
+    checkGitVersions: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
     getGitBranches: IpcMainEvent -> JS.Promise<Result<GitBranchRefDto[], exn>>
     getGitLfsSettings: IpcMainEvent -> JS.Promise<Result<GitLfsSettingsDto, exn>>
+    previewGitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
     getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
     getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
     getGitDiffViewData: IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>

@@ -4,7 +4,11 @@ open Feliz
 open Fable.Core
 open ARCtrl
 open Fable.Core.JsInterop
+open Swate.Components.Table
 open Swate.Components.Shared
+open Swate.Components.AnnotationTable
+open Swate.Components.AnnotationTable.Context
+
 
 module private DataMapTableHelper =
     [<RequireQualifiedAccess>]
@@ -60,7 +64,7 @@ type DataMapTable =
         let Content =
             match tempCell with
             | CompositeCell.FreeText txt ->
-                AnnotationTableModals.InputField.Input(
+                InputField.Input(
                     txt,
                     (fun input -> setTempCell (CompositeCell.FreeText input)),
                     label = "Free Text",
@@ -72,7 +76,7 @@ type DataMapTable =
                 let parentOa = datamap.GetHeader(index.x - 1).TryGetTerm()
 
                 React.Fragment [
-                    AnnotationTableModals.InputField.TermCombi(
+                    InputField.TermCombi(
                         oa |> Term.fromOntologyAnnotation |> Some,
                         (fun (term: Term option) ->
                             term
@@ -87,7 +91,7 @@ type DataMapTable =
                         autofocus = true,
                         ?parentOa = parentOa
                     )
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         oa.TermSourceREF |> Option.defaultValue "",
                         (fun input ->
                             let copy = oa.Copy()
@@ -98,7 +102,7 @@ type DataMapTable =
                         rmv = close,
                         submit = submit
                     )
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         oa.TermAccessionNumber |> Option.defaultValue "",
                         (fun input ->
                             let copy = oa.Copy()
@@ -114,7 +118,7 @@ type DataMapTable =
                 let parentOa = datamap.GetHeader(index.x - 1).TryGetTerm()
 
                 React.Fragment [
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         v,
                         (fun input -> setTempCell (CompositeCell.Unitized(input, oa))),
                         label = "Value",
@@ -122,7 +126,7 @@ type DataMapTable =
                         autofocus = true,
                         submit = submit
                     )
-                    AnnotationTableModals.InputField.TermCombi(
+                    InputField.TermCombi(
                         oa |> Term.fromOntologyAnnotation |> Some,
                         (fun (term: Term option) ->
                             term
@@ -136,7 +140,7 @@ type DataMapTable =
                         submit = submit,
                         ?parentOa = parentOa
                     )
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         oa.TermSourceREF |> Option.defaultValue "",
                         (fun input ->
                             let copy = oa.Copy()
@@ -147,7 +151,7 @@ type DataMapTable =
                         rmv = close,
                         submit = submit
                     )
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         oa.TermAccessionNumber |> Option.defaultValue "",
                         (fun input ->
                             let copy = oa.Copy()
@@ -161,7 +165,7 @@ type DataMapTable =
                 ]
             | CompositeCell.Data data ->
                 React.Fragment [
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         data.FilePath |> Option.defaultValue "",
                         (fun input ->
                             let copy = data.Copy()
@@ -173,7 +177,7 @@ type DataMapTable =
                         submit = submit,
                         autofocus = true
                     )
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         data.Selector |> Option.defaultValue "",
                         (fun input ->
                             let copy = data.Copy()
@@ -185,7 +189,7 @@ type DataMapTable =
                         submit = submit,
                         autofocus = true
                     )
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         data.Format |> Option.defaultValue "",
                         (fun input ->
                             let copy = data.Copy()
@@ -197,7 +201,7 @@ type DataMapTable =
                         submit = submit,
                         autofocus = true
                     )
-                    AnnotationTableModals.InputField.Input(
+                    InputField.Input(
                         data.SelectorFormat |> Option.defaultValue "",
                         (fun input ->
                             let copy = data.Copy()
@@ -219,8 +223,8 @@ type DataMapTable =
 
             BaseModal.ModalFooter(
                 React.Fragment [
-                    AnnotationTableModals.FooterButtons.Cancel(close)
-                    AnnotationTableModals.FooterButtons.Submit(submit)
+                    FooterButtons.Cancel(close)
+                    FooterButtons.Submit(submit)
                 ]
             )
         ]
@@ -274,14 +278,14 @@ type DataMapTable =
                     ContextMenuItem(
                         text = Html.div "Details",
                         icon = Icons.MagnifyingGlassPlus(),
-                        kbdbutton = AnnotationTableContextMenu.ATCMC.KbdHint("D"),
+                        kbdbutton = ATCMC.KbdHint("D"),
                         onClick = (fun _ -> setModal (Some(Modal.Details index)))
                     )
                     ContextMenuItem(isDivider = true)
                     ContextMenuItem(
                         text = Html.div "Delete Row",
                         icon = Icons.DeleteLeft(),
-                        kbdbutton = AnnotationTableContextMenu.ATCMC.KbdHint("DelR"),
+                        kbdbutton = ATCMC.KbdHint("DelR"),
                         onClick = (fun x -> deleteRow index)
                     )
                 ]
@@ -312,16 +316,13 @@ type DataMapTable =
         let tableRef = React.useRef<TableHandle> (unbox null)
         let containerRef = React.useElementRef ()
         let defaultDebug = defaultArg debug false
-
-        let annotationTableCtx =
-            React.useContext Contexts.AnnotationTable.AnnotationTableStateCtx
-
+        let annotationTableCtx = useAnnotationTableStateCtx ()
         let hasAnnotationCtx = isNullOrUndefined annotationTableCtx |> not
 
         let onSelect: GridSelect.OnSelect =
             fun _ range ->
                 if hasAnnotationCtx then
-                    let nextDataMapCtx: Contexts.AnnotationTable.AnnotationTableContext = { SelectedCells = range }
+                    let nextDataMapCtx: AnnotationTableContext = { SelectedCells = range }
 
                     let nextData =
                         annotationTableCtx.state.Add(DataMapTable.SelectionContextKey, nextDataMapCtx)
