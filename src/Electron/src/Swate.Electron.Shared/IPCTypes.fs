@@ -56,6 +56,7 @@ type IGitLfsApi = {
 
 /// Two Way Bridge: Renderer <-> Main
 type IGitApi = {
+    checkGitVersions: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
     getGitBranches: IpcMainEvent -> JS.Promise<Result<GitBranchRefDto[], exn>>
     getGitLfsSettings: IpcMainEvent -> JS.Promise<Result<GitLfsSettingsDto, exn>>

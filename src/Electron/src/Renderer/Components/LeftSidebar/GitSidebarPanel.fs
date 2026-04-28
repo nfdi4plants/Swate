@@ -2,6 +2,8 @@ module Renderer.Components.LeftSidebar.GitSidebarPanel
 
 open Feliz
 
+let mutable private gitVersionCheckStarted = false
+
 [<ReactComponent>]
 let Main () =
 
@@ -10,6 +12,17 @@ let Main () =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
+
+    React.useEffectOnce (fun () ->
+        if not gitVersionCheckStarted then
+            gitVersionCheckStarted <- true
+
+            Renderer.GitApiClient.checkGitVersions ()
+            |> Promise.map (function
+                | Ok () -> ()
+                | Error message -> Browser.Dom.window.alert message)
+            |> ignore
+    )
 
     let remoteActionsEnabled =
         authState.UsableActiveUser().IsSome

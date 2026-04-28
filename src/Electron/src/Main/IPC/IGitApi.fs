@@ -1,6 +1,7 @@
 module Main.IPC.IGitApi
 
 open System
+open System.Text.RegularExpressions
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
 open Fable.Core
@@ -9,6 +10,37 @@ open Fable.Electron.Main
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Git
+open Main.Git.GitLfsAdapter
+
+let private versionPattern = Regex(@"(\d+)\.(\d+)(?:\.(\d+))?")
+
+let private isAtLeast (major, minor, patch) (minMajor, minMinor, minPatch) =
+    major > minMajor
+    || (major = minMajor && minor > minMinor)
+    || (major = minMajor && minor = minMinor && patch >= minPatch)
+
+let private hasMinVersion minimum (output: string option) =
+    let m = versionPattern.Match(defaultArg output "")
+
+    if m.Success then
+        isAtLeast
+            (Int32.Parse m.Groups.[1].Value,
+             Int32.Parse m.Groups.[2].Value,
+             if m.Groups.[3].Success then Int32.Parse m.Groups.[3].Value else 0)
+            minimum
+    else
+        false
+
+let private checkGitVersions () = promise {
+    let! gitVersion = tryExecGitText None 5000 [| "--version" |]
+    let! gitLfsVersion = tryExecGitText None 5000 [| "lfs"; "--version" |]
+
+    return
+        if hasMinVersion (2, 32, 0) gitVersion && hasMinVersion (3, 7, 0) gitLfsVersion then
+            Ok()
+        else
+            Error(exn "Swate requires Git 2.32.0+ and Git LFS 3.7.0+ (`git lfs --version`).")
+}
 
 let private toGitOperationResult
     (successMessage: 'T -> string option)
@@ -70,6 +102,7 @@ let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgress
         }
 
 let api: IGitApi = {
+    checkGitVersions = fun (_event: IpcMainEvent) -> checkGitVersions ()
     getGitStatus =
         fun (event: IpcMainEvent) -> promise {
             match tryGetVaultAndArcPath event with

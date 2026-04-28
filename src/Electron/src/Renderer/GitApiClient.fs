@@ -23,6 +23,9 @@ let private callIpcWith
         return mapExnResult result
     }
 
+let checkGitVersions () =
+    callIpc (fun () -> gitApi.checkGitVersions (unbox null))
+
 let getGitStatus () =
     callIpc (fun () -> gitApi.getGitStatus (unbox null))
 
