@@ -7,7 +7,9 @@
   <ItemGroup>
     <Compile Include="Api.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="IpcReceiver.fs" />
     <Compile Include="MainUpdateRendererBridge.fs" />
+    <Compile Include="MainSyncedState.fs" />
     <Compile Include="GitApiClient.fs" />
     <Compile Include="Context\AppStateContext.fs" />
     <Compile Include="Context\PageStateContext.fs" />

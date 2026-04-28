@@ -1,53 +1,19 @@
 module Renderer.MainUpdateRendererBridge
 
-open System.Collections.Generic
-open Fable.Electron.Remoting.Renderer
-open Swate.Components.Authentication.Types
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.GitTypes
-open Swate.Electron.Shared.IPCTypes
+open Renderer.IpcReceiver
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
-let mutable private isInitialized = false
-let mutable private nextSubscriptionId = 0
+let subscribePathChange handler =
+    subscribeProxyReceiver<IPathChangeRendererApi> { pathChange = handler }
 
-let private pathChangeSubscribers = Dictionary<int, string option -> unit>()
-let private recentArcsSubscribers = Dictionary<int, ARCPointer[] -> unit>()
-let private authAccountsSubscribers = Dictionary<int, AuthStateDto -> unit>()
-let private fileTreeSubscribers = Dictionary<int, Dictionary<string, FileEntry> -> unit>()
-let private gitProgressSubscribers = Dictionary<int, GitProgressDto -> unit>()
+let subscribeRecentArcsUpdate handler =
+    subscribeProxyReceiver<IRecentArcsRendererApi> { recentARCsUpdate = handler }
 
-let private notify (subscribers: Dictionary<int, 'T -> unit>) (payload: 'T) =
-    subscribers.Values
-    |> Seq.toArray
-    |> Array.iter (fun handler -> handler payload)
+let subscribeAuthAccountsUpdate handler =
+    subscribeProxyReceiver<IAuthAccountsRendererApi> { authAccountsUpdate = handler }
 
-let private ensureInitialized () =
-    if not isInitialized then
-        isInitialized <- true
+let subscribeFileTreeUpdate handler =
+    subscribeProxyReceiver<IFileTreeRendererApi> { fileTreeUpdate = handler }
 
-        // The preload bridge uses additive ipcRenderer.on listeners, so build this handler once
-        // and fan out to local subscribers instead of registering duplicate no-op handlers.
-        let ipcHandler: IMainUpdateRendererApi = {
-            pathChange = notify pathChangeSubscribers
-            recentARCsUpdate = notify recentArcsSubscribers
-            authAccountsUpdate = notify authAccountsSubscribers
-            fileTreeUpdate = notify fileTreeSubscribers
-            gitProgressUpdate = notify gitProgressSubscribers
-        }
-
-        Remoting.init |> Remoting.buildHandler ipcHandler
-
-let private subscribe (subscribers: Dictionary<int, 'T -> unit>) (handler: 'T -> unit) =
-    ensureInitialized ()
-    nextSubscriptionId <- nextSubscriptionId + 1
-    let subscriptionId = nextSubscriptionId
-    subscribers[subscriptionId] <- handler
-
-    fun () -> subscribers.Remove subscriptionId |> ignore
-
-let subscribePathChange = subscribe pathChangeSubscribers
-let subscribeRecentArcsUpdate = subscribe recentArcsSubscribers
-let subscribeAuthAccountsUpdate = subscribe authAccountsSubscribers
-let subscribeFileTreeUpdate = subscribe fileTreeSubscribers
-let subscribeGitProgressUpdate = subscribe gitProgressSubscribers
+let subscribeGitProgressUpdate handler =
+    subscribeProxyReceiver<IGitProgressRendererApi> { gitProgressUpdate = handler }
