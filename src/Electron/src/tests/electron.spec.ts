@@ -171,8 +171,12 @@ test.describe('Swate Electron App', () => {
 
     const scrollFolderToggle = fileExplorer.getByRole('button', { name: `Expand ${scrollDirectoryName}` });
     await expect(scrollFolderToggle).toBeVisible({ timeout: 30000 });
+    await expect(scrollFolderToggle).toHaveClass(/swt:border/, { timeout: 30000 });
+    await expect(scrollFolderToggle).toHaveClass(/swt:bg-base-100/, { timeout: 30000 });
     const scrollFolderRowContainer = scrollFolderToggle.locator('xpath=ancestor::li[@data-file-item-id][1]/div[@data-file-item-id]');
     await expect(scrollFolderRowContainer).toBeVisible({ timeout: 30000 });
+    const scrollFolderNameButton = fileExplorer.getByRole('button', { name: scrollDirectoryName });
+    await expect(scrollFolderNameButton).toBeVisible({ timeout: 30000 });
 
     const rootFolderRowBox = await scrollFolderRowContainer.boundingBox();
     const rootFolderRowPaddingRight = await scrollFolderRowContainer.evaluate((element: HTMLElement) => {
@@ -189,12 +193,16 @@ test.describe('Swate Electron App', () => {
       expect(Math.abs(treeRight - arrowRight)).toBeLessThanOrEqual(2);
     }
 
-    await expect(scrollFolderToggle).toHaveText('>');
+    await scrollFolderNameButton.click();
+    await expect(scrollFolderToggle).toHaveClass(/swt:bg-base-300/, { timeout: 30000 });
+    await expect(scrollFolderToggle.locator('i')).toHaveClass(/swt:fluent--caret-right-24-filled/, { timeout: 30000 });
     await scrollFolderToggle.click();
 
     const rootFolderCollapseToggle = fileExplorer.getByRole('button', { name: `Collapse ${scrollDirectoryName}` });
     await expect(rootFolderCollapseToggle).toBeVisible({ timeout: 30000 });
-    await expect(rootFolderCollapseToggle).toHaveText('v');
+    await expect(rootFolderCollapseToggle.locator('i')).toHaveClass(/swt:fluent--caret-down-24-filled/, {
+      timeout: 30000,
+    });
 
     await expect(fileExplorer).toContainText('scroll-file-159.txt', { timeout: 30000 });
 
@@ -233,9 +241,13 @@ test.describe('Swate Electron App', () => {
     await targetFile.scrollIntoViewIfNeeded();
     await targetFile.click();
     await expect(targetFile).toHaveClass(/swt:bg-base-300/, { timeout: 30000 });
+    const targetFileLabel = targetFile.locator('span').filter({ hasText: 'scroll-file-030.txt' }).first();
+    await expect(targetFileLabel).toHaveClass(/swt:font-semibold/, { timeout: 30000 });
+    await expect(targetFileLabel).toHaveClass(/swt:text-primary/, { timeout: 30000 });
 
     const collapseRootAfterSelection = fileExplorer.getByRole('button', { name: `Collapse ${scrollDirectoryName}` });
     await expect(collapseRootAfterSelection).toBeVisible({ timeout: 30000 });
+    await expect(collapseRootAfterSelection).toHaveClass(/swt:bg-base-300/, { timeout: 30000 });
     await collapseRootAfterSelection.click();
 
     const expandRootAfterCollapse = fileExplorer.getByRole('button', { name: `Expand ${scrollDirectoryName}` });
@@ -244,5 +256,8 @@ test.describe('Swate Electron App', () => {
 
     const targetFileAfterReopen = fileExplorer.locator('a').filter({ hasText: 'scroll-file-030.txt' }).first();
     await expect(targetFileAfterReopen).toHaveClass(/swt:bg-base-300/, { timeout: 30000 });
+    const targetFileLabelAfterReopen = targetFileAfterReopen.locator('span').filter({ hasText: 'scroll-file-030.txt' }).first();
+    await expect(targetFileLabelAfterReopen).toHaveClass(/swt:font-semibold/, { timeout: 30000 });
+    await expect(targetFileLabelAfterReopen).toHaveClass(/swt:text-primary/, { timeout: 30000 });
   });
 });

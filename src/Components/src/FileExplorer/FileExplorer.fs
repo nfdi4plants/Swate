@@ -173,10 +173,22 @@ type FileExplorer =
                     )
             )
 
+        let selectedPathIds =
+            model.BreadcrumbPath
+            |> List.map _.Id
+            |> Set.ofList
+
         let rec renderItem item =
             let isSelected = model.SelectedId = Some item.Id
-            let selectedClass = if isSelected then "swt:bg-base-300" else ""
+            let isInSelectedPath = selectedPathIds.Contains item.Id
+            let selectedClass = if isInSelectedPath then "swt:bg-base-300" else ""
+            let selectedNameClass = if isSelected then "swt:font-semibold swt:text-primary" else ""
             let isExpanded = model.ExpandedIds.Contains item.Id
+            let directoryToggleIconClass =
+                if isExpanded then
+                    "swt:iconify swt:fluent--caret-down-24-filled swt:size-4 swt:shrink-0"
+                else
+                    "swt:iconify swt:fluent--caret-right-24-filled swt:size-4 swt:shrink-0"
             let canExpandDirectory =
                 match item.Children with
                 | Some children -> not (List.isEmpty children)
@@ -217,7 +229,10 @@ type FileExplorer =
                                                     prop.className (iconClassName [ "swt:iconify"; "swt:shrink-0" ] item)
                                                 ]
                                                 Html.span [
-                                                    prop.className "swt:truncate"
+                                                    prop.className [
+                                                        "swt:truncate"
+                                                        selectedNameClass
+                                                    ]
                                                     prop.text item.Name
                                                 ]
                                             ]
@@ -257,8 +272,11 @@ type FileExplorer =
                                                     if canExpandDirectory then
                                                         Html.button [
                                                             prop.type'.button
-                                                            prop.className
-                                                                "swt:flex swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:bg-transparent swt:p-0 hover:swt:bg-base-200"
+                                                            prop.className [
+                                                                "swt:flex swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border swt:border-base-300 swt:bg-base-100 swt:p-0 hover:swt:bg-base-200"
+                                                                if isInSelectedPath then
+                                                                    "swt:bg-base-300"
+                                                            ]
                                                             prop.ariaLabel (
                                                                 if isExpanded then
                                                                     $"Collapse {item.Name}"
@@ -267,10 +285,7 @@ type FileExplorer =
                                                             )
                                                             prop.onClick (handleDirectoryArrowToggle item isExpanded)
                                                             prop.children [
-                                                                Html.span [
-                                                                    prop.className "swt:text-xs swt:font-mono"
-                                                                    prop.text (if isExpanded then "v" else ">")
-                                                                ]
+                                                                Html.i [ prop.className directoryToggleIconClass ]
                                                             ]
                                                         ]
                                                     ]
@@ -307,7 +322,10 @@ type FileExplorer =
                                     prop.className "swt:flex swt:items-center swt:gap-2"
                                     prop.children [
                                         Html.i [ prop.className (iconClassName [ "swt:iconify" ] item) ]
-                                        Html.span item.Name
+                                        Html.span [
+                                            prop.className selectedNameClass
+                                            prop.text item.Name
+                                        ]
                                     ]
                                 ]
 

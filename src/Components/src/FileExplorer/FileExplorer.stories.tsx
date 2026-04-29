@@ -39,6 +39,8 @@ export const Default: Story = {
 
     const folderNameButton = await canvas.findByRole("button", { name: "My Files" });
     let expandFolderButton = await canvas.findByRole("button", { name: "Expand My Files" });
+    expect(expandFolderButton.className).toContain("swt:border");
+    expect(expandFolderButton.className).toContain("swt:bg-base-100");
     expect((folderNameButton.compareDocumentPosition(expandFolderButton) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
     const myFilesRowContainer = expandFolderButton.closest("div[data-file-item-id]") as HTMLElement | null;
     expect(myFilesRowContainer).toBeTruthy();
@@ -53,20 +55,39 @@ export const Default: Story = {
     await userEvent.click(folderNameButton);
     expect(canvas.queryByText("Project-final.psd")).toBeNull();
     await expectBreadcrumbContains("My Files");
+    const selectedFolderNameButton = await canvas.findByRole("button", { name: "My Files" });
+    const selectedFolderLabel = selectedFolderNameButton.querySelector("span");
+    expect(selectedFolderLabel).toBeTruthy();
+    expect(selectedFolderLabel!.className).toContain("swt:font-semibold");
+    expect(selectedFolderLabel!.className).toContain("swt:text-primary");
     expandFolderButton = await canvas.findByRole("button", { name: "Expand My Files" });
-    expect(expandFolderButton.textContent).toBe(">");
+    expect(expandFolderButton.className).toContain("swt:bg-base-300");
+    const expandIcon = expandFolderButton.querySelector("i");
+    expect(expandIcon).toBeTruthy();
+    expect(expandIcon!.className).toContain("swt:fluent--caret-right-24-filled");
 
     await userEvent.click(expandFolderButton);
     await expectBreadcrumbContains("My Files");
 
     const collapseFolderButton = await canvas.findByRole("button", { name: "Collapse My Files" });
-    expect(collapseFolderButton.textContent).toBe("v");
+    expect(collapseFolderButton.className).toContain("swt:bg-base-300");
+    const collapseIcon = collapseFolderButton.querySelector("i");
+    expect(collapseIcon).toBeTruthy();
+    expect(collapseIcon!.className).toContain("swt:fluent--caret-down-24-filled");
 
     const nestedFile = await canvas.findByText("Project-final.psd");
     expect(nestedFile).toBeTruthy();
+    await userEvent.click(nestedFile);
+    await expectBreadcrumbContains("Project-final.psd");
 
-    await userEvent.click(collapseFolderButton);
-    expect(canvas.queryByText("Project-final.psd")).toBeNull();
-    await expectBreadcrumbContains("My Files");
+    const parentFolderCollapseToggle = await canvas.findByRole("button", { name: "Collapse My Files" });
+    expect(parentFolderCollapseToggle.className).toContain("swt:bg-base-300");
+    const parentFolderRowAfterChildSelection = parentFolderCollapseToggle.closest("div[data-file-item-id]") as HTMLElement | null;
+    expect(parentFolderRowAfterChildSelection).toBeTruthy();
+    expect(parentFolderRowAfterChildSelection!.className).toContain("swt:bg-base-300");
+
+    await userEvent.click(parentFolderCollapseToggle);
+    expect(within(container).queryByText("Project-final.psd")).toBeNull();
+    await expectBreadcrumbContains("Project-final.psd");
   }),
 };
