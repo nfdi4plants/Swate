@@ -2,7 +2,6 @@
 module Swate.Electron.Shared.IPCTypes
 
 open Fable.Core
-open Fable.Electron
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Authentication.Types
 open Swate.Components.DataHub.DataHubTypes
@@ -42,7 +41,7 @@ type IArcVaultsApi = {
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     getArcObjectTree: unit -> JS.Promise<Result<ArcExplorerNode list, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
-    readNotes: unit -> JS.Promise<Result<Note[], exn>>
+    readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
     saveArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
