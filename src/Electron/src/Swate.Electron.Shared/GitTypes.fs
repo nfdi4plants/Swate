@@ -28,6 +28,11 @@ type GitLfsResult = {
     Error: string
 }
 
+type GitLfsProgressDto = {
+    RequestId: string
+    Message: string
+}
+
 [<RequireQualifiedAccess>]
 type GitFailureKind =
     | Unauthorized

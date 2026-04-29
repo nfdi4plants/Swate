@@ -582,7 +582,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 | Some arcPath ->
                     // Always enforce the active ARC root to avoid running against arbitrary repos.
                     let enforcedRequest = { request with RepoPath = arcPath }
-                    let! result = GitLfs.runChannel event enforcedRequest
+                    let! result = GitLfs.runChannel vault.window enforcedRequest
 
                     match result with
                     | Error e ->

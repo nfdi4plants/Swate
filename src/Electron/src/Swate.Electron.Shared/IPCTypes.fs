@@ -113,6 +113,10 @@ module MainToRendererIpc =
         gitProgressUpdate: GitProgressDto -> unit
     }
 
+    type IGitLfsProgressRendererApi = {
+        gitLfsProgressUpdate: GitLfsProgressDto -> unit
+    }
+
 // TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer
 type IArcFileWatcherApi = {

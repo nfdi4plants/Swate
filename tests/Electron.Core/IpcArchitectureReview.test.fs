@@ -55,10 +55,15 @@ Vitest.describe("IPC architecture review fixes", fun () ->
         promise {
             let! ipcTypesSource = sourcePath [| "Swate.Electron.Shared"; "IPCTypes.fs" |] |> readUtf8FileAsync
             let! gitLfsSource = sourcePath [| "Main"; "IPC"; "GitLfs.fs" |] |> readUtf8FileAsync
+            let! preloadSource = sourcePath [| "Preload"; "preload.fs" |] |> readUtf8FileAsync
 
             expectSourceNotContains ipcTypesSource "type IGitLfsApi"
             expectSourceNotContains gitLfsSource "GitLfsRunChannel"
             expectSourceNotContains gitLfsSource "GitLfsCancelChannel"
-            expectSourceContains gitLfsSource "GitLfsProgressChannel"
+            expectSourceNotContains gitLfsSource "GitLfsProgressChannel"
+            expectSourceNotContains gitLfsSource "event.sender.send"
+            expectSourceContains ipcTypesSource "type IGitLfsProgressRendererApi"
+            expectSourceContains preloadSource "Remoting.buildBridge<IGitLfsProgressRendererApi>"
+            expectSourceContains gitLfsSource "Remoting.buildProxySender<IGitLfsProgressRendererApi>"
         })
 )
