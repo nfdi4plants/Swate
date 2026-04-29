@@ -13,8 +13,11 @@ open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 type private Model = {
+    // Current ARC root shared with renderer contexts.
     ArcRootPath: ArcRootPath
+    // Bumped for main-process live updates so stale snapshot replies are ignored.
     ArcRootPathLiveUpdateVersion: int
+    // Bumped for each snapshot request so older async replies cannot win.
     ArcRootPathRequestVersion: int
     PageState: PageState option
     DetailsSidebarIsOpen: bool
