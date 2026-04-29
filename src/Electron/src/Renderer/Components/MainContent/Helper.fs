@@ -16,7 +16,7 @@ module MainContentHelper =
         | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
         | Some request ->
 
-            let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
+            let! saveResult = Api.ipcArcVaultApi.saveArcFile request
 
             return saveResult
     }
@@ -29,12 +29,12 @@ module MainContentHelper =
         | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
         | Some request ->
 
-            let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
+            let! saveResult = Api.ipcArcVaultApi.saveArcFile request
 
             match saveResult with
             | Error exn -> return Error exn
             | Ok() ->
-                let! openResult = Api.ipcArcVaultApi.openFile (unbox null) request.path
+                let! openResult = Api.ipcArcVaultApi.openFile request.path
 
                 return openResult
     }

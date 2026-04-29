@@ -13,7 +13,7 @@ open Swate.Electron.Shared.GitTypes
 let useCurrentArcScopeId () =
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
-    appStateCtx.state
+    appStateCtx
     |> Option.map normalizePath
     |> Option.bind (fun path ->
         if String.IsNullOrWhiteSpace path then
@@ -93,7 +93,7 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
         TimeoutMs = Some 10000
     }
 
-    let! result = Api.ipcArcVaultApi.runGitLfs (unbox null) request
+    let! result = Api.ipcArcVaultApi.runGitLfs request
 
     return
         match result with
@@ -102,7 +102,7 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
 }
 
 let private loadViewResult (previewPath: string) = promise {
-    let! result = Api.ipcArcVaultApi.openFile (unbox null) previewPath
+    let! result = Api.ipcArcVaultApi.openFile previewPath
 
     return
         match result with

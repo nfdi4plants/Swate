@@ -10,7 +10,9 @@ let Main () =
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
+
+    let arcObjectCtx =
+        Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let viewModel =
         Swate.Components.ARCObjectExplorer.Model.create
@@ -29,7 +31,7 @@ let Main () =
     Html.div [
         prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col"
         prop.children [
-            match appStateCtx.state, viewModel.FilteredTree with
+            match appStateCtx, viewModel.FilteredTree with
             | None, _
             | _, [] ->
                 Html.div [
@@ -51,4 +53,3 @@ let Main () =
                 ]
         ]
     ]
-

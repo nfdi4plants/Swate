@@ -237,11 +237,14 @@ let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, 
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
-let api: IPCTypes.IArcVaultsApi = {
+let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
-        fun event -> promise {
+        fun () -> promise {
+            let window = dialogParentFromIpcEvent event
+
             let! r =
                 dialog.showOpenDialog (
+                    ?window = window,
                     properties = [|
                         Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                     |]
@@ -258,7 +261,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Ok(ArcOpenDisposition.path disposition)
         }
     openARCByPath =
-        fun event (arcPath: string) -> promise {
+        fun (arcPath: string) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
@@ -267,9 +270,12 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     createARC =
-        fun (event: IpcMainEvent) (identifier: string) -> promise {
+        fun (identifier: string) -> promise {
+            let window = dialogParentFromIpcEvent event
+
             let! r =
                 dialog.showOpenDialog (
+                    ?window = window,
                     properties = [|
                         Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                     |]
@@ -287,7 +293,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Ok(ArcOpenDisposition.path disposition)
         }
     closeARC =
-        fun event -> promise {
+        fun () -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
                 let vault = ARC_VAULTS.TryGetVault(windowId)
@@ -302,7 +308,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     getOpenPath =
-        fun event -> promise {
+        fun () -> promise {
             let windowId = windowIdFromIpcEvent event
             let vault = ARC_VAULTS.TryGetVault(windowId)
 
@@ -319,7 +325,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     pickArcPaths =
-        fun event -> promise {
+        fun () -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
@@ -333,8 +339,9 @@ let api: IPCTypes.IArcVaultsApi = {
                             Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                             Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                         |]
+                        let window = dialogParentFromIpcEvent event
 
-                        let! result = dialog.showOpenDialog (properties = properties, defaultPath = arcPath)
+                        let! result = dialog.showOpenDialog (?window = window, properties = properties, defaultPath = arcPath)
 
                         if result.canceled then
                             return Error(exn "Cancelled")
@@ -358,13 +365,14 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     pickDirectory =
-        fun _ -> promise {
+        fun () -> promise {
             try
                 let properties = [|
                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                 |]
+                let window = dialogParentFromIpcEvent event
 
-                let! result = dialog.showOpenDialog (properties = properties)
+                let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then
                     return Error(exn "Cancelled")
@@ -376,14 +384,15 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error(exn $"Could not pick directory: {e.Message}")
         }
     pickAbsolutePaths =
-        fun _ -> promise {
+        fun () -> promise {
             try
                 let properties = [|
                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                     Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                 |]
+                let window = dialogParentFromIpcEvent event
 
-                let! result = dialog.showOpenDialog (properties = properties)
+                let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then
                     return Error(exn "Cancelled")
@@ -401,8 +410,9 @@ let api: IPCTypes.IArcVaultsApi = {
                 |]
 
                 let filters = [| FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |]) |]
+                let window = dialogParentFromIpcEvent event
 
-                let! result = dialog.showOpenDialog (properties = properties, filters = filters)
+                let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
 
                 if result.canceled then
                     return Error(exn "Cancelled")
@@ -422,8 +432,21 @@ let api: IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error(exn $"Could not import external text files: {e.Message}")
         }
+    getFileTree =
+        fun () -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    let! fileTree = vault.GetRendererFileTreeSnapshot()
+                    return Ok fileTree
+            with e ->
+                return Error e
+        }
     getArcObjectTree =
-        fun event -> promise {
+        fun () -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
@@ -444,7 +467,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     readNotes =
-        fun event -> promise {
+        fun () -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
@@ -466,7 +489,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     saveArcFile =
-        fun (event: IpcMainEvent) (request: FileContentDTO) -> promise {
+        fun (request: FileContentDTO) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
@@ -485,7 +508,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     writeFile =
-        fun (event: IpcMainEvent) (request: FileContentDTO) -> promise {
+        fun (request: FileContentDTO) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
 
@@ -522,7 +545,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     openFile =
-        fun (event: IpcMainEvent) (relativePath: string) -> promise {
+        fun (relativePath: string) -> promise {
             let windowId = windowIdFromIpcEvent event
 
             match ARC_VAULTS.TryGetVault(windowId) with
@@ -548,7 +571,7 @@ let api: IPCTypes.IArcVaultsApi = {
             | _ -> return Error(exn "ARC is not loaded.")
         }
     runGitLfs =
-        fun (event: IpcMainEvent) (request: GitLfsRequest) -> promise {
+        fun (request: GitLfsRequest) -> promise {
             let windowId = windowIdFromIpcEvent event
 
             match ARC_VAULTS.TryGetVault(windowId) with
@@ -559,7 +582,7 @@ let api: IPCTypes.IArcVaultsApi = {
                 | Some arcPath ->
                     // Always enforce the active ARC root to avoid running against arbitrary repos.
                     let enforcedRequest = { request with RepoPath = arcPath }
-                    let! result = GitLfs.registerGitLfsIpc.runChannel event enforcedRequest
+                    let! result = GitLfs.runChannel vault.window enforcedRequest
 
                     match result with
                     | Error e ->
@@ -574,9 +597,9 @@ let api: IPCTypes.IArcVaultsApi = {
                         return Ok successResult
         }
     cancelGitLfs =
-        fun (event: IpcMainEvent) (requestId: string) -> GitLfs.registerGitLfsIpc.cancelChannel event requestId
+        fun (requestId: string) -> GitLfs.cancelChannel requestId
     resolveCloseRequest =
-        fun (event: IpcMainEvent) (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
+        fun (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
                 do! ARC_VAULTS.ResolveCloseRequest(windowId, decision)

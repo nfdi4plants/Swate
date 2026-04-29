@@ -2,6 +2,7 @@ module Renderer.Context.AuthStateContext
 
 open Feliz
 open Swate.Electron.Shared.AuthTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Components.Authentication.Types
 
 
@@ -16,17 +17,6 @@ module private Helper =
         | false, _, _ -> true
         | true, _, _ -> false
 
-    let refreshState (setAuthState) (onError) = promise {
-        let! stateResult = Api.ipcAuthApi.getAuthState ()
-
-        match stateResult with
-        | Ok state -> setAuthState state
-
-        | Error _ ->
-            setAuthState AuthStateDto.Empty
-            onError ()
-    }
-
 let AuthStateCtx = React.createContext<AuthStateDto> AuthStateDto.Empty
 
 [<Hook>]
@@ -38,26 +28,33 @@ open Helper
 /// - you simply can use the IAuthApi via IPC. Any changes will be broadcasted to all open windows via: `authAccountsUpdate`
 [<ReactComponent>]
 let Provider (children: ReactElement) =
-    let authState, setAuthState = React.useState AuthStateDto.Empty
+    let loadAuthState () = promise {
+        match! Api.ipcAuthApi.revalidate () with
+        | Ok response ->
+            let! stateResult = Api.ipcAuthApi.getAuthState ()
 
-    React.useEffectOnce (fun () ->
-        let disposeAuthSubscription = Renderer.MainUpdateRendererBridge.subscribeAuthAccountsUpdate setAuthState
+            if shouldLogRevalidationFailure response then
+                console.error (response.FailureKind, Fable.Core.JS.JSON.stringify response.Message)
 
-        // TODO: Add error handling.
-        promise {
-            match! Api.ipcAuthApi.revalidate () with
-            | Ok response ->
-                do! refreshState setAuthState ignore
+            match stateResult with
+            | Ok state -> return state
+            | Error _ -> return AuthStateDto.Empty
+        | Error ex ->
+            console.error (Fable.Core.JS.JSON.stringify ex.Message)
+            return AuthStateDto.Empty
+    }
 
-                if shouldLogRevalidationFailure response then
-                    console.error (response.FailureKind, Fable.Core.JS.JSON.stringify response.Message)
-            | Error ex -> console.error (Fable.Core.JS.JSON.stringify ex.Message)
-
+    let authState =
+        Renderer.MainSyncedState.useMainSyncedState {
+            initial = AuthStateDto.Empty
+            load = loadAuthState
+            subscribe =
+                fun setAuthState ->
+                    Renderer.IpcReceiver.subscribeProxyReceiver<IAuthAccountsRendererApi> {
+                        authAccountsUpdate = setAuthState
+                    }
+            onError = fun ex -> console.error (Fable.Core.JS.JSON.stringify ex.Message)
+            dependencies = [||]
         }
-        |> Promise.start
 
-        disposeAuthSubscription
-    )
-
-
-    AuthStateCtx.Provider(authState, children)
+    AuthStateCtx.Provider(authState.state, children)
