@@ -48,7 +48,7 @@ Vitest.describe("NoteSearchInterop.toDomainNote", fun () ->
             expectTag tags.[1] "Execution" (Some "MS") (Some "MS:1000121")
         | None -> failwith "Expected note tags to be present.")
 
-    Vitest.test("drops malformed serialized tags while preserving valid order", fun () ->
+    Vitest.test("drops undecodable serialized tags while preserving decodable order", fun () ->
         let dto =
             buildNoteDto (
                 Some
@@ -65,9 +65,10 @@ Vitest.describe("NoteSearchInterop.toDomainNote", fun () ->
 
         match note.Tags with
         | Some tags ->
-            Vitest.expect(tags.Count).toBe(2)
+            Vitest.expect(tags.Count).toBe(3)
             expectTag tags.[0] "Planning" (Some "SRC1") (Some "ACC1")
-            expectTag tags.[1] "Review" (Some "SRC2") (Some "ACC2")
+            expectTag tags.[1] "42" None None
+            expectTag tags.[2] "Review" (Some "SRC2") (Some "ACC2")
         | None -> failwith "Expected note tags to be present.")
 
     Vitest.test("preserves None for missing tags", fun () ->
