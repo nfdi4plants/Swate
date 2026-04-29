@@ -1,4 +1,4 @@
-module Swate.Components.AnnotationTable.AnnotationTableContextProvider
+namespace Swate.Components.AnnotationTable
 
 open Feliz
 open Fable.Core

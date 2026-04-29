@@ -1,4 +1,4 @@
-module Swate.Components.DataHubComponents
+module Swate.Components.DataHub.DataHubComponents
 
 open Fable.Core
 open Fable.Core.JsInterop

@@ -28,17 +28,28 @@ let Main () =
             arcObjectCtx.setPreviewState
             arcObjectCtx.setStatusMessage
 
-    match appStateCtx, viewModel.FilteredTree with
-    | None, _
-    | _, [] ->
-        Html.div [
-            prop.className "swt:p-4 swt:text-sm swt:opacity-70"
-            prop.text "No ARC objects found."
+    Html.div [
+        prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col"
+        prop.children [
+            match appStateCtx, viewModel.FilteredTree with
+            | None, _
+            | _, [] ->
+                Html.div [
+                    prop.className "swt:p-4 swt:text-sm swt:opacity-70"
+                    prop.text "No ARC objects found."
+                ]
+            | Some rootRepoPath, _ ->
+                Html.div [
+                    prop.className
+                        "swt:flex-1 swt:min-h-0 swt:overflow-y-auto swt:overflow-x-hidden swt:[scrollbar-gutter:stable]"
+                    prop.children [
+                        ARCExplorer.CreateArcExplorer
+                            rootRepoPath
+                            viewModel.FilteredTree
+                            fileStateCtx.state.Selection
+                            fileStateCtx.setSelection
+                            services
+                    ]
+                ]
         ]
-    | Some rootRepoPath, _ ->
-        ARCExplorer.CreateArcExplorer
-            rootRepoPath
-            viewModel.FilteredTree
-            fileStateCtx.state.Selection
-            fileStateCtx.setSelection
-            services
+    ]

@@ -8,6 +8,7 @@ open Swate.Components
 open ARCtrl
 open BuildingBlock.SearchComponent
 open Swate.Components.Shared
+open Swate.Components.Widgets
 
 
 module InitExtensions =
@@ -356,7 +357,7 @@ type Widget =
                         )
                     ]
                     if model.SpreadsheetModel.ArcFile.IsSome then
-                        Swate.Components.DataAnnotatorWidget.Main(
+                        Swate.Components.Widgets.DataAnnotatorWidget.Main(
                             model.SpreadsheetModel.ArcFile.Value,
                             activeView,
                             model.SpreadsheetModel.ActiveView.TryTableIndex,

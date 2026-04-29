@@ -29,7 +29,7 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select a building block",
             // TODO: This does not correctly mirror look from Client/
-            children = BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFileAndClose),
+            children = Widgets.BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFileAndClose),
             className = "swt:max-w-3xl"
         )
 
@@ -39,12 +39,9 @@ type Modals =
             arcFile: ArcFiles,
             activeTableIndex: int option,
             setArcFile: ArcFiles -> unit,
-            templateServices: TemplateWidgetServices,
             isOpen: bool,
             setIsOpen: bool -> unit
         ) =
-
-        let importType, setImportType = React.useState TableJoinOptions.Headers
 
         let setArcFileAndClose nextArcFile =
             setArcFile nextArcFile
@@ -55,14 +52,7 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select template(s)",
             children =
-                TemplateWidget.Main(
-                    arcFile,
-                    activeTableIndex,
-                    setArcFileAndClose,
-                    importType,
-                    setImportType,
-                    templateServices
-                ),
+                Swate.Components.Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFileAndClose),
             className = "swt:flex swt:min-w-fit"
         )
 

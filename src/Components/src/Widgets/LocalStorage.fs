@@ -1,4 +1,4 @@
-module Swate.Components.WidgetsLocalStorage
+module Swate.Components.Widgets.LocalStorage
 
 open Feliz
 open Fable.Core.JsInterop

@@ -1,4 +1,4 @@
-module Swate.Components.DataHubTypes
+module Swate.Components.DataHub.DataHubTypes
 
 open Fable.Core
 open Swate.Components.Api.GitLabApi

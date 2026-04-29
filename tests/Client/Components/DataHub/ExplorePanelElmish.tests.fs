@@ -4,12 +4,13 @@ open Fable.Core
 open Fable.Mocha
 open Swate.Components
 open Swate.Components.Api.GitLabApi
-open Swate.Components.DataHubTypes
+open Swate.Components.DataHub
+open Swate.Components.DataHub.DataHubTypes
 
 let private noopLoadRepos (_: ExploreLoadRequest) = promise { return Ok ExploreLoadResult.empty }
 
 let private reduce msg state =
-    DatahubBrowserModel.update noopLoadRepos msg state |> fst
+    DataHubBrowserModel.update noopLoadRepos msg state |> fst
 
 let private mkPageMeta page : PaginationMetadata = {
     Link = None
@@ -27,17 +28,17 @@ let Main =
     testList "DataHub ExplorePanel Elmish" [
         testCase "SetTab resets page to first"
         <| fun _ ->
-            let initial, _ = DatahubBrowserModel.init None
+            let initial, _ = DataHubBrowserModel.init None
             let seeded = { initial with Page = 4 }
 
-            let next = reduce (DatahubBrowserModel.SetTab ExploreTab.MostStarred) seeded
+            let next = reduce (DataHubBrowserModel.SetTab ExploreTab.MostStarred) seeded
 
             Expect.equal next.Tab ExploreTab.MostStarred "Tab should update to selected tab."
             Expect.equal next.Page 1 "Changing tab should reset pagination to page 1."
 
         testCase "SubmitSearch promotes draft term and resets page"
         <| fun _ ->
-            let initial, _ = DatahubBrowserModel.init None
+            let initial, _ = DataHubBrowserModel.init None
 
             let seeded = {
                 initial with
@@ -46,14 +47,14 @@ let Main =
                     Page = 5
             }
 
-            let next = reduce DatahubBrowserModel.SubmitSearch seeded
+            let next = reduce DataHubBrowserModel.SubmitSearch seeded
 
             Expect.equal next.SubmittedSearchTerm "rnaseq" "Submitted search should use the draft term."
             Expect.equal next.Page 1 "Submitting search should reset pagination to page 1."
 
         testCase "LoadReposResponse Ok updates repos pagination and groups"
         <| fun _ ->
-            let initial, _ = DatahubBrowserModel.init None
+            let initial, _ = DataHubBrowserModel.init None
             let expectedRepos = MockData.DataHub.mostStarred |> Array.truncate 2
             let expectedGroups = MockData.DataHub.groups |> Array.truncate 2
 
@@ -74,7 +75,7 @@ let Main =
                     Error = GitLabError.Unknown(exn "stale") |> Some
             }
 
-            let next = reduce (DatahubBrowserModel.LoadReposResponse(guid, Ok loaded)) seeded
+            let next = reduce (DataHubBrowserModel.LoadReposResponse(guid, Ok loaded)) seeded
 
             Expect.equal next.Repos expectedRepos "Successful response should populate repositories."
             Expect.equal next.Pagination loaded.Pagination "Successful response should set pagination metadata."
@@ -86,7 +87,7 @@ let Main =
 
         testCase "LoadReposResponse Error sets error and clears list state"
         <| fun _ ->
-            let initial, _ = DatahubBrowserModel.init None
+            let initial, _ = DataHubBrowserModel.init None
 
             let guid = System.Guid.NewGuid()
 
@@ -99,7 +100,7 @@ let Main =
             }
 
             let next =
-                reduce (DatahubBrowserModel.LoadReposResponse(guid, Error(GitLabError.Unknown(exn "boom")))) seeded
+                reduce (DataHubBrowserModel.LoadReposResponse(guid, Error(GitLabError.Unknown(exn "boom")))) seeded
 
             Expect.isTrue next.Error.Value.IsUnknown "Error response should be stored in model."
 
@@ -112,7 +113,7 @@ let Main =
 
         testCase "YourOrganisations fallback selects first group"
         <| fun _ ->
-            let initial, _ = DatahubBrowserModel.init None
+            let initial, _ = DataHubBrowserModel.init None
             let expectedFirstGroup = MockData.DataHub.groups[0]
             let guid = System.Guid.NewGuid()
 
@@ -132,7 +133,7 @@ let Main =
                 GroupsLoadError = None
             }
 
-            let next = reduce (DatahubBrowserModel.LoadReposResponse(guid, Ok loaded)) seeded
+            let next = reduce (DataHubBrowserModel.LoadReposResponse(guid, Ok loaded)) seeded
 
             Expect.equal
                 next.SelectedGroupId

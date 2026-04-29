@@ -19,8 +19,8 @@ type private Model = {
     PageState: PageState option
     DetailsSidebarIsOpen: bool
     LeftSidebarTarget: LeftSidebarPage
-}
-with
+} with
+
     static member Empty = {
         ArcRootPath = None
         ArcRootPathLiveUpdateVersion = 0
@@ -208,25 +208,34 @@ let Main () =
                     ErrorModalProvider.ErrorModalProvider(
                         Renderer.Context.AuthStateContext.Provider(
                             Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
-                                    Layout.Main(
-                                        children =
-                                            React.Fragment [|
-                                                children
-                                                CloseWindowController.CloseWindowController.Subscription()
-                                            |],
-                                        navbar = Renderer.Components.Navbar.Main(showDetailsSidebarToggle = showDetailsSidebarToggle),
-                                        leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
-                                        ?rightSidebar = detailsSidebar,
-                                        leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget),
-                                        rightSidebarState = {
-                                            isOpen = model.DetailsSidebarIsOpen
-                                            setIsOpen = fun isOpen -> dispatch (SetDetailsSidebarIsOpen isOpen)
-                                            sidebarType = model.LeftSidebarTarget
-                                            setSidebarType = fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)
-                                        }
+                                AnnotationTable
+                                    .AnnotationTableContextProvider
+                                    .AnnotationTableContextProvider(
+                                        Layout.Main(
+                                            children =
+                                                React.Fragment [|
+                                                    children
+                                                    CloseWindowController.CloseWindowController.Subscription()
+                                                |],
+                                            navbar =
+                                                Renderer.Components.Navbar.Main(
+                                                    showDetailsSidebarToggle = showDetailsSidebarToggle
+                                                ),
+                                            leftSidebar =
+                                                Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
+                                            ?rightSidebar = detailsSidebar,
+                                            leftActions =
+                                                LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget),
+                                            rightSidebarState = {
+                                                isOpen = model.DetailsSidebarIsOpen
+                                                setIsOpen = fun isOpen -> dispatch (SetDetailsSidebarIsOpen isOpen)
+                                                sidebarType = model.LeftSidebarTarget
+                                                setSidebarType =
+                                                    fun leftSidebarTarget ->
+                                                        dispatch (SetLeftSidebarTarget leftSidebarTarget)
+                                            }
+                                        )
                                     )
-                                )
                             )
                         )
                     )
