@@ -722,6 +722,17 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Git discard paths is exposed through the typed renderer client and workflow dependencies",
+            fun () ->
+                let clientSourceText = getGitApiClientSource ()
+                let stateContextSourceText = getGitStateCtxSource ()
+
+                expectSourceContains clientSourceText "let gitDiscardPaths (request: GitPathspecRequest)"
+                expectSourceContains clientSourceText "gitApi.gitDiscardPaths"
+                expectSourceContains stateContextSourceText "gitDiscardPaths = Renderer.GitApiClient.gitDiscardPaths"
+        )
+
+        Vitest.test (
             "GitStateCtx uses the typed git client and no longer uses dynamic IPC dispatch",
             fun () ->
                 let sourceText = getGitStateCtxSource ()
@@ -789,6 +800,17 @@ Vitest.describe (
 
                 Vitest.expect(argumentTypes.Length).toBe (1)
                 Vitest.expect(argumentTypes.[0].FullName).toBe (typeof<GitCloneRepositoryRequest>.FullName)
+        )
+
+        Vitest.test (
+            "IGitApi.gitDiscardPaths uses GitPathspecRequest without IpcMainEvent",
+            fun () ->
+                let discardField = getRecordField typeof<IGitApi> "gitDiscardPaths"
+                let argumentTypes, returnType = flattenFunctionSignature discardField.PropertyType
+
+                Vitest.expect(argumentTypes.Length).toBe (1)
+                Vitest.expect(argumentTypes.[0].FullName).toBe (typeof<GitPathspecRequest>.FullName)
+                Vitest.expect(returnType.FullName.Contains("GitOperationResult")).toBe (true)
         )
 
         Vitest.test (

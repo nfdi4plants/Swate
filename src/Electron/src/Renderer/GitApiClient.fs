@@ -89,6 +89,9 @@ let gitStagePaths (request: GitPathspecRequest) =
 let gitUnstagePaths (request: GitPathspecRequest) =
     callIpcWith request (gitApi.gitUnstagePaths)
 
+let gitDiscardPaths (request: GitPathspecRequest) =
+    callIpcWith request (gitApi.gitDiscardPaths)
+
 let gitCommit (request: GitCommitRequest) =
     callIpcWith request (gitApi.gitCommit)
 

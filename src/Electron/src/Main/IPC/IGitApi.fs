@@ -328,6 +328,21 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                             return toGitOperationResult (fun () -> Some "Files unstaged.") None None result
                         })
         }
+    gitDiscardPaths =
+        fun (request: GitPathspecRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                return!
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.discardPaths arcPath request.Pathspecs
+                            if Result.isOk result then
+                                do! vault.RefreshFileTree()
+                            return toGitOperationResult (fun () -> Some "Files discarded.") None None result
+                        })
+        }
     gitCommit =
         fun (request: GitCommitRequest) -> promise {
             match tryGetVaultAndArcPath event with

@@ -70,6 +70,7 @@ type IGitApi = {
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitUnstagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
     setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>

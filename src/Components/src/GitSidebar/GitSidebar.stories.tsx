@@ -10,6 +10,7 @@ const noop = () => {};
 const noopWithArg = (_arg: unknown) => {};
 const noopWithMessage = (_message: string) => {};
 const noopWithSelection = (_request: unknown) => {};
+const noopWithPaths = (_paths: string[]) => {};
 const noopWithBranch = (_branchName: string) => {};
 const noopWithThreshold = (_thresholdMb: number) => {};
 const noopWithDownloadPreference = (_downloadLargeFiles: boolean) => {};
@@ -26,6 +27,7 @@ const baseCallbacks = {
   OnPrimarySaveAll: noopWithMessage,
   OnCommitSelection: noopWithSelection,
   OnCommitAll: noopWithMessage,
+  OnDiscardSelection: noopWithPaths,
   OnConfirmPendingRemoteAction: noop,
   OnCancelPendingRemoteAction: noop,
   OnSaveDownloadLargeFiles: noopWithDownloadPreference,
