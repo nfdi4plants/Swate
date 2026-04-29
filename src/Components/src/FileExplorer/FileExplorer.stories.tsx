@@ -39,8 +39,8 @@ export const Default: Story = {
 
     const folderNameButton = await canvas.findByRole("button", { name: "My Files" });
     let expandFolderButton = await canvas.findByRole("button", { name: "Expand My Files" });
-    expect(expandFolderButton.className).toContain("swt:border");
-    expect(expandFolderButton.className).toContain("swt:bg-base-100");
+    expect(expandFolderButton.className).toContain("swt:h-5");
+    expect(expandFolderButton.className).toContain("swt:w-5");
     expect((folderNameButton.compareDocumentPosition(expandFolderButton) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
     const myFilesRowContainer = expandFolderButton.closest("div[data-file-item-id]") as HTMLElement | null;
     expect(myFilesRowContainer).toBeTruthy();
@@ -60,6 +60,18 @@ export const Default: Story = {
     expect(selectedFolderLabel).toBeTruthy();
     expect(selectedFolderLabel!.className).toContain("swt:font-semibold");
     expect(selectedFolderLabel!.className).toContain("swt:text-primary");
+    const notesLabel = await canvas.findByText("notes.txt");
+    const notesRow = notesLabel.closest("a[data-file-item-id]") as HTMLElement | null;
+    expect(notesRow).toBeTruthy();
+    const notesLabelInitialStyle = getComputedStyle(notesLabel);
+    const initialNotesLabelColor = notesLabelInitialStyle.color;
+    const initialNotesLabelWeight = notesLabelInitialStyle.fontWeight;
+    await userEvent.hover(notesRow!);
+    await waitFor(() => {
+      const hoveredNotesLabelStyle = getComputedStyle(notesLabel);
+      expect(hoveredNotesLabelStyle.color).toBe(initialNotesLabelColor);
+      expect(hoveredNotesLabelStyle.fontWeight).toBe(initialNotesLabelWeight);
+    });
     expandFolderButton = await canvas.findByRole("button", { name: "Expand My Files" });
     expect(expandFolderButton.className).toContain("swt:bg-base-300");
     const expandIcon = expandFolderButton.querySelector("i");

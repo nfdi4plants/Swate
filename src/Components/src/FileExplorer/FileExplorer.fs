@@ -59,9 +59,7 @@ type FileExplorer =
             ev.stopPropagation ()
             handleItemClick item
 
-        let handleDirectoryArrowToggle (item: FileItem) (isExpanded: bool) (ev: Browser.Types.MouseEvent) =
-            ev.preventDefault ()
-            ev.stopPropagation ()
+        let handleDirectoryArrowToggle (item: FileItem) (isExpanded: bool) =
             let willExpand = not isExpanded
             dispatch (FileExplorerLogic.ToggleExpanded item.Id)
             onDirectoryArrowToggle |> Option.iter (fun fn -> fn item willExpand)
@@ -181,8 +179,17 @@ type FileExplorer =
         let rec renderItem item =
             let isSelected = model.SelectedId = Some item.Id
             let isInSelectedPath = selectedPathIds.Contains item.Id
-            let selectedClass = if isInSelectedPath then "swt:bg-base-300" else ""
-            let selectedNameClass = if isSelected then "swt:font-semibold swt:text-primary" else ""
+            let isHighlighted = isSelected || isInSelectedPath
+            let rowHighlightClass =
+                if isHighlighted then
+                    "swt:bg-base-300 swt:active:bg-base-300"
+                else
+                    "swt:hover:bg-base-300 swt:active:bg-base-300"
+            let selectedNameClass =
+                if isSelected then
+                    "swt:font-semibold swt:text-primary"
+                else
+                    ""
             let isExpanded = model.ExpandedIds.Contains item.Id
             let directoryToggleIconClass =
                 if isExpanded then
@@ -204,11 +211,12 @@ type FileExplorer =
                     prop.children [
                         Html.div [
                             prop.custom ("data-file-item-id", item.Id)
-                            prop.className (
-                                "swt:w-full swt:px-2 swt:py-1 "
-                                + (if not useDirectoryChevronToggle then "swt:cursor-pointer " else "")
-                                + selectedClass
-                            )
+                            prop.className [
+                                "swt:group swt:w-full swt:px-2 swt:py-1"
+                                if not useDirectoryChevronToggle then
+                                    "swt:cursor-pointer"
+                                rowHighlightClass
+                            ]
                             prop.style [
                                 style.display.flex
                                 style.width (length.percent 100)
@@ -273,9 +281,8 @@ type FileExplorer =
                                                         Html.button [
                                                             prop.type'.button
                                                             prop.className [
-                                                                "swt:flex swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border swt:border-base-300 swt:bg-base-100 swt:p-0 hover:swt:bg-base-200"
-                                                                if isInSelectedPath then
-                                                                    "swt:bg-base-300"
+                                                                "swt:flex swt:min-h-0 swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border-0 swt:bg-transparent swt:p-0"
+                                                                rowHighlightClass
                                                             ]
                                                             prop.ariaLabel (
                                                                 if isExpanded then
@@ -283,7 +290,11 @@ type FileExplorer =
                                                                 else
                                                                     $"Expand {item.Name}"
                                                             )
-                                                            prop.onClick (handleDirectoryArrowToggle item isExpanded)
+                                                            prop.onClick (fun e ->
+                                                                e.preventDefault ()
+                                                                e.stopPropagation ()
+                                                                handleDirectoryArrowToggle item isExpanded
+                                                            )
                                                             prop.children [
                                                                 Html.i [ prop.className directoryToggleIconClass ]
                                                             ]
@@ -312,10 +323,10 @@ type FileExplorer =
                     prop.children [
                         Html.a [
                             prop.custom ("data-file-item-id", item.Id)
-                            prop.className (
-                                "swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between "
-                                + selectedClass
-                            )
+                            prop.className [
+                                "swt:group swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between"
+                                rowHighlightClass
+                            ]
                             prop.onClick (fun _ -> handleItemClick item)
                             prop.children [
                                 Html.div [
@@ -362,7 +373,7 @@ type FileExplorer =
                     Breadcrumbs.Breadcrumbs(model.BreadcrumbPath, fun id -> dispatch (FileExplorerLogic.NavigateTo id))
                 Html.ul [
                     prop.testId "file-explorer-container"
-                    prop.className "swt:menu swt:w-full"
+                    prop.className "swt:w-full swt:list-none swt:m-0 swt:p-0"
                     prop.children (model.Items |> List.map renderItem)
                 ]
                 contextMenu

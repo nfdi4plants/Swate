@@ -171,8 +171,8 @@ test.describe('Swate Electron App', () => {
 
     const scrollFolderToggle = fileExplorer.getByRole('button', { name: `Expand ${scrollDirectoryName}` });
     await expect(scrollFolderToggle).toBeVisible({ timeout: 30000 });
-    await expect(scrollFolderToggle).toHaveClass(/swt:border/, { timeout: 30000 });
-    await expect(scrollFolderToggle).toHaveClass(/swt:bg-base-100/, { timeout: 30000 });
+    await expect(scrollFolderToggle).toHaveClass(/swt:h-5/, { timeout: 30000 });
+    await expect(scrollFolderToggle).toHaveClass(/swt:w-5/, { timeout: 30000 });
     const scrollFolderRowContainer = scrollFolderToggle.locator('xpath=ancestor::li[@data-file-item-id][1]/div[@data-file-item-id]');
     await expect(scrollFolderRowContainer).toBeVisible({ timeout: 30000 });
     const scrollFolderNameButton = fileExplorer.getByRole('button', { name: scrollDirectoryName });
@@ -208,6 +208,7 @@ test.describe('Swate Electron App', () => {
 
     const treeViewport = window.getByTestId('left-sidebar-file-explorer-tree');
     await expect(treeViewport).toBeVisible({ timeout: 30000 });
+    await expect(treeViewport).toHaveClass(/swt:overflow-x-auto/, { timeout: 30000 });
 
     const hasOverflow = await treeViewport.evaluate((element: HTMLElement) => {
       return element.scrollHeight > element.clientHeight;
