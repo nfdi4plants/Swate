@@ -15,8 +15,8 @@ type private Model = {
     AppState: ArcRootPath
     PageState: PageState option
     LeftSidebarTarget: LeftSidebarPage
-}
-with
+} with
+
     static member Empty = {
         AppState = None
         PageState = None
@@ -35,8 +35,7 @@ let private createGetOpenPathCmd () : Cmd<Msg> =
         SetArcRootPath
         (fun _ -> SetArcRootPath None)
 
-let private init () : Model * Cmd<Msg> =
-    Model.Empty, createGetOpenPathCmd ()
+let private init () : Model * Cmd<Msg> = Model.Empty, createGetOpenPathCmd ()
 
 let private msgName =
     function
@@ -54,11 +53,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | SetArcRootPath appState ->
         let nextModel =
             match appState with
-            | Some path ->
-                {
-                    model with
-                        AppState = Some path
-                }
+            | Some path -> { model with AppState = Some path }
             | None -> Model.Empty
 
         nextModel, Cmd.none
@@ -130,7 +125,8 @@ let Main () =
         Renderer.MainUpdateRendererBridge.subscribePathChange (fun pathOption ->
             console.log ("[Swate] CHANGE PATH!")
             dispatch (SetArcRootPath pathOption)
-        ))
+        )
+    )
 
     let children =
         Renderer.Components.MainContent.Main.Main(model.AppState, model.PageState)
@@ -146,7 +142,7 @@ let Main () =
                 ErrorModalProvider.ErrorModalProvider(
                     Renderer.Context.AuthStateContext.Provider(
                         Renderer.Context.GitStateContext.GitStateCtxProvider(
-                            AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
+                            AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
                                 Layout.Main(
                                     children =
                                         React.Fragment [|

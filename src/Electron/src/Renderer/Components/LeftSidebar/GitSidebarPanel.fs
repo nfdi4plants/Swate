@@ -2,6 +2,8 @@ module Renderer.Components.LeftSidebar.GitSidebarPanel
 
 open Feliz
 
+let mutable private gitVersionCheckStarted = false
+
 [<ReactComponent>]
 let Main () =
 
@@ -11,6 +13,17 @@ let Main () =
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
 
+    React.useEffectOnce (fun () ->
+        if not gitVersionCheckStarted then
+            gitVersionCheckStarted <- true
+
+            Renderer.GitApiClient.checkGitVersions ()
+            |> Promise.map (function
+                | Ok () -> ()
+                | Error message -> Browser.Dom.window.alert message)
+            |> ignore
+    )
+
     let remoteActionsEnabled =
         authState.UsableActiveUser().IsSome
 
@@ -18,7 +31,7 @@ let Main () =
         if remoteActionsEnabled then
             None
         else
-            Some "Sign in to a DataHub account to use fetch, pull, push, sync, and remote bootstrap."
+            Some "Sign in to a DataHub account to use fetch, pull, push, update, and remote bootstrap."
 
     let normalizedRemoteProjectName =
         remoteProjectName.Trim()
@@ -104,14 +117,19 @@ let Main () =
             ?selectedFile = gitStateCtx.state.SelectedChangePath,
             ?errorNotice = gitStateCtx.state.ErrorNotice,
             ?warningNotice = gitStateCtx.state.WarningNotice,
+            ?pendingConfirmation = gitStateCtx.state.PendingConfirmation,
             callbacks = {
                 OnRefresh = gitStateCtx.refresh
                 OnFetch = gitStateCtx.fetch
                 OnPull = gitStateCtx.pull
                 OnPush = gitStateCtx.push
-                OnSync = gitStateCtx.sync
+                OnUpdateFromOnline = gitStateCtx.updateFromOnline
+                OnPrimarySaveSelection = gitStateCtx.primarySaveSelection
+                OnPrimarySaveAll = gitStateCtx.primarySaveAll
                 OnCommitSelection = gitStateCtx.commitSelection
                 OnCommitAll = gitStateCtx.commitAll
+                OnConfirmPendingRemoteAction = gitStateCtx.confirmPendingRemoteAction
+                OnCancelPendingRemoteAction = gitStateCtx.cancelPendingRemoteAction
                 OnSaveDownloadLargeFiles = gitStateCtx.saveDownloadLargeFiles
                 OnSaveLfsAutoTrackThreshold = gitStateCtx.saveLfsAutoTrackThreshold
                 OnCreateBranch = gitStateCtx.createBranch

@@ -29,6 +29,8 @@ let internal syncTimeout =
         stdErr = false
     )
 
+/// Creates the standard simple-git options used by Main Git services.
+/// maxConcurrentProcesses is intentionally one to serialize commands for a repository-scoped instance.
 let internal createOptions
     (baseDir: string)
     (timeout: SimpleGitTimeoutOptions)
@@ -48,9 +50,12 @@ let internal createOptions
 
     options
 
+/// Creates a simple-git instance with non-interactive prompt suppression applied.
 let internal createGit (options: SimpleGitOptions) : ISimpleGit =
     SimpleGit.create options |> applyNonInteractiveEnv
 
+/// Converts exceptions from simple-git/spawned Git into the service-specific failure record.
+/// Messages are redacted here before they can cross IPC.
 let internal toFailure
     (classifyFailureKind: string -> 'GitFailureKind)
     (createFailure: 'GitFailureKind -> string -> 'GitFailure)
@@ -65,6 +70,7 @@ let internal toFailure
 
     createFailure (classifyFailureKind message) message
 
+/// Convenience wrapper for returning a redacted, classified failure as Result.Error.
 let internal errorResult
     (classifyFailureKind: string -> 'GitFailureKind)
     (createFailure: 'GitFailureKind -> string -> 'GitFailure)
@@ -72,6 +78,8 @@ let internal errorResult
     : Result<'T, 'GitFailure> =
     Error(toFailure classifyFailureKind createFailure error)
 
+/// Runs a simple-git operation and maps thrown exceptions into the caller's GitResult shape.
+/// Services use this boundary so validation and command failures are reported consistently.
 let internal runSimpleGit
     (toFailure: exn -> 'GitFailure)
     (operation: ISimpleGit -> JS.Promise<'T>)

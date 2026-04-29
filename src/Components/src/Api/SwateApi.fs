@@ -10,3 +10,8 @@ let SwateApi: IOntologyAPIv3 =
     Remoting.createApi ()
     |> Remoting.withRouteBuilder Route.builder
     |> Remoting.buildProxy<IOntologyAPIv3>
+
+let SwateTemplateApi: ITemplateAPIv1 =
+    Remoting.createApi ()
+    |> Remoting.withRouteBuilder Route.builder
+    |> Remoting.buildProxy<ITemplateAPIv1>
