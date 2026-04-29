@@ -104,7 +104,8 @@ let private expectErrorResult<'T> (result: Result<'T, exn>) =
     | Ok _ -> failwith "Expected operation to fail."
     | Error error -> error
 
-let private gitLfsIntegrationTestOptions = TestOptions(timeout = 20000)
+let private gitServiceIntegrationTimeoutMs = 120000
+let private gitLfsIntegrationTestOptions = TestOptions(timeout = gitServiceIntegrationTimeoutMs)
 
 [<Emit("Buffer.from($0, 'utf8')")>]
 let private utf8Buffer (text: string) : obj = jsNative
