@@ -125,6 +125,40 @@ type FileExplorer =
                 yield! getItemIconClass item |> Option.toList
             ]
 
+        let renderLfsStatusBadge (item: FileItem) =
+            let isDownloaded = item.Downloaded = Some true
+            let badgeText =
+                if isDownloaded then
+                    "LFS Downloaded"
+                else
+                    "LFS Not Downloaded"
+            let badgeClassName =
+                if isDownloaded then
+                    "swt:badge swt:badge-sm swt:badge-success swt:cursor-default"
+                else
+                    "swt:badge swt:badge-sm swt:badge-warning swt:cursor-default"
+
+            Html.span [
+                prop.className "swt:flex swt:items-center swt:cursor-default"
+                prop.custom (
+                    "data-lfs-download-status",
+                    if isDownloaded then
+                        "downloaded"
+                    else
+                        "not-downloaded"
+                )
+                prop.onClick (fun e ->
+                    e.preventDefault ()
+                    e.stopPropagation ()
+                )
+                prop.children [
+                    Html.span [
+                        prop.className badgeClassName
+                        prop.text badgeText
+                    ]
+                ]
+            ]
+
         let toComponentMenuItem (item: Swate.Components.FileExplorerTypes.ContextMenuItem) =
             let isDisabled = defaultArg item.Disabled false
             let className = if isDisabled then "swt:opacity-50" else ""
@@ -212,9 +246,7 @@ type FileExplorer =
                         Html.div [
                             prop.custom ("data-file-item-id", item.Id)
                             prop.className [
-                                "swt:group swt:w-full swt:px-2 swt:py-1"
-                                if not useDirectoryChevronToggle then
-                                    "swt:cursor-pointer"
+                                "swt:group swt:w-full swt:px-2 swt:py-1 swt:cursor-default"
                                 rowHighlightClass
                             ]
                             prop.style [
@@ -230,7 +262,7 @@ type FileExplorer =
                                         Html.button [
                                             prop.type'.button
                                             prop.className
-                                                "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:bg-transparent swt:border-0 swt:p-0 swt:text-left"
+                                                "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:bg-transparent swt:border-0 swt:p-0 swt:text-left swt:cursor-default"
                                             prop.onClick directoryNameClick
                                             prop.children [
                                                 Html.i [
@@ -255,22 +287,11 @@ type FileExplorer =
                                                         Html.div [
                                                             prop.className "swt:flex swt:gap-2 swt:items-center"
                                                             prop.children [
-                                                                Html.button [
-                                                                    prop.className "swt:btn swt:btn-xs"
-                                                                    prop.disabled (item.Downloaded = Some true)
-                                                                    prop.text "LFS"
-                                                                    prop.onClick (fun e ->
-                                                                        e.stopPropagation ()
-
-                                                                        dispatch (
-                                                                            FileExplorerLogic.ToggleLFSDownload item.Id
-                                                                        )
-                                                                    )
-                                                                ]
+                                                                renderLfsStatusBadge item
                                                                 match item.SizeFormatted with
                                                                 | Some size ->
                                                                     Html.span [
-                                                                        prop.className "swt:badge swt:badge-sm"
+                                                                        prop.className "swt:badge swt:badge-sm swt:cursor-default"
                                                                         prop.text size
                                                                     ]
                                                                 | None -> Html.none
@@ -281,7 +302,7 @@ type FileExplorer =
                                                         Html.button [
                                                             prop.type'.button
                                                             prop.className [
-                                                                "swt:flex swt:min-h-0 swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border-0 swt:bg-transparent swt:p-0"
+                                                                "swt:flex swt:min-h-0 swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border-0 swt:bg-transparent swt:p-0 swt:cursor-default"
                                                                 rowHighlightClass
                                                             ]
                                                             prop.ariaLabel (
@@ -324,7 +345,7 @@ type FileExplorer =
                         Html.a [
                             prop.custom ("data-file-item-id", item.Id)
                             prop.className [
-                                "swt:group swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between"
+                                "swt:group swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between swt:cursor-default"
                                 rowHighlightClass
                             ]
                             prop.onClick (fun _ -> handleItemClick item)
@@ -345,18 +366,10 @@ type FileExplorer =
                                     Html.div [
                                         prop.className "swt:flex swt:gap-2 swt:items-center"
                                         prop.children [
-                                            Html.button [
-                                                prop.className "swt:btn swt:btn-xs"
-                                                prop.disabled (item.Downloaded = Some true)
-                                                prop.text "LFS"
-                                                prop.onClick (fun e ->
-                                                    e.stopPropagation ()
-                                                    dispatch (FileExplorerLogic.ToggleLFSDownload item.Id)
-                                                )
-                                            ]
+                                            renderLfsStatusBadge item
                                             match item.SizeFormatted with
                                             | Some size ->
-                                                Html.span [ prop.className "swt:badge swt:badge-sm"; prop.text size ]
+                                                Html.span [ prop.className "swt:badge swt:badge-sm swt:cursor-default"; prop.text size ]
                                             | None -> Html.none
                                         ]
                                     ]
@@ -396,6 +409,12 @@ module FileExplorerExample =
                     Children =
                         Some [
                             FileTree.createFile "Project-final.psd" None FileItemIcon.Document
+                            |> fun file -> {
+                                file with
+                                    IsLFS = Some true
+                                    Downloaded = Some true
+                                    SizeFormatted = Some "6 MB"
+                            }
                             {
                                 FileTree.createFolder "Subfolder" None FileItemIcon.Folder with
                                     IsExpanded = false
