@@ -1,79 +1,96 @@
-﻿# Swate Git Guide (Electron)
+# Swate Git Functionality Guide
 
-This guide is about the implemented Git functionality in Swate Electron: how to call it, how auth is wired, and how the Main/IPC Git modules behave.
+This guide describes the current Git implementation used by Swate Electron. It is for developers who need to call, extend, test, or troubleshoot Git functionality in this repository.
 
-## 1. Quick Use
+## 1. Architecture
 
-### Where to call from
+Git functionality is implemented in the Electron Main process and exposed to Renderer through the typed IPC bridge.
 
-Renderer code calls Git via the `IGitApi` IPC bridge:
+Primary files:
 
-- Contract: `src/Electron/src/Swate.Electron.Shared/IPCTypes.fs` (`type IGitApi`)
-- Renderer client binding: `src/Electron/src/Swate.Electron.Shared/Api.fs` (`gitApi`)
+- Shared IPC and DTO contracts: `src/Electron/src/Swate.Electron.Shared/IPCTypes.fs`, `src/Electron/src/Swate.Electron.Shared/GitTypes.fs`
+- Main IPC implementation: `src/Electron/src/Main/IPC/IGitApi.fs`
+- Main Git implementation: `src/Electron/src/Main/Git`
+- Renderer wrapper: `src/Electron/src/Renderer/GitApiClient.fs`
+- Renderer workflow/state machine: `src/Electron/src/Renderer/Context/GitWorkflow.fs`
+- Renderer wiring: `src/Electron/src/Renderer/Context/GitStateContext.fs`
 
-Note: `Api.fs` only exposes the raw `IGitApi` client binding (`gitApi`) and no per-endpoint Git helper functions.
+Use `Renderer.GitApiClient` from Renderer code. It wraps the raw `IGitApi` bridge, supplies the Electron event placeholder required by the remoting library, and maps `Result<'T, exn>` to `Result<'T, string>`.
 
-All `IGitApi` methods are `IpcMainEvent -> ...`, where the `IpcMainEvent` is supplied by Electron/Main. Renderer code must **not** pass a placeholder event argument (it would get sent over IPC and shift the real arguments). Instead, coerce each endpoint once to a signature **without** the event parameter using `unbox` (see examples).
+Do not call `Api.ipcGitApi` directly from feature code unless you are extending the wrapper itself.
 
-Avoid calling endpoints as `gitApi.someMethod null ...` / `gitApi.someMethod Unchecked.defaultof<IpcMainEvent> ...` — this shifts arguments for methods that take parameters.
+## 2. Current Renderer API
 
-### `IGitApi` endpoints
+`Renderer.GitApiClient` exposes:
 
-- `getGitStatus`
-- `getGitDiffSummary`
-- `gitFetch`
-- `gitPull`
-- `gitPush`
-- `gitInitRepository`
-- `gitCloneRepository`
-- `gitStagePaths`
-- `gitUnstagePaths`
-- `gitCommit`
-- `createBranch`
-- `checkoutBranch`
+```fsharp
+getGitStatus: unit -> JS.Promise<Result<GitStatusDto, string>>
+getGitBranches: unit -> JS.Promise<Result<GitBranchRefDto[], string>>
+getGitLfsSettings: unit -> JS.Promise<Result<GitLfsSettingsDto, string>>
+getGitDiffViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, string>>
+getGitMergeConflictViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, string>>
+installGitLfs: unit -> JS.Promise<Result<GitOperationResult, string>>
+previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, string>>
+gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitInitRepository: string -> JS.Promise<Result<string, string>>
+gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
+createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
+checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitUnstagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, string>>
+setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, string>>
+confirmGitMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, string>>
+```
 
-### Core result shape
+Most app code should access these through `GitWorkflow.GitDependencies`, which is populated in `GitStateContext.fs`. That dependency layer maps diff and merge page-load DTOs to `PageState`.
 
-Most write/sync operations return:
+## 3. Result Shapes
+
+Most write and sync operations return `GitOperationResult`:
 
 ```fsharp
 type GitOperationResult = {
     Success: bool
     Message: string option
     FailureKind: GitFailureKind option
+    WarningMessage: string option
+    WarningKind: GitFailureKind option
     Path: string option
 }
 ```
 
-Interpretation:
+Use it as follows:
 
-- `Success=true`: operation completed.
-- `Success=false`: Git operation failed; inspect `FailureKind` and `Message`.
-- outer `Result.Error exn`: IPC-level failure.
-- `Path` is used by provisioning endpoints:
-  - `gitInitRepository` success -> normalized path
-  - `gitCloneRepository` success -> normalized path
-  - other operations -> `None`
+- `Ok op` and `op.Success = true`: operation completed.
+- `Ok op` and `op.Success = false`: Git operation failed; inspect `FailureKind` and `Message`.
+- `Ok op` with `WarningMessage = Some ...`: main operation completed, but follow-up work had a recoverable warning.
+- `Error message`: IPC or wrapper-level failure.
+- `Path`: normalized path returned by provisioning operations. `gitInitRepository` maps success directly to `Result<string, string>` in the renderer wrapper.
 
-### Read operation result shapes
-
-`getGitStatus` and `getGitDiffSummary` return their own typed DTOs, not `GitOperationResult`:
+Read operations return typed DTOs:
 
 ```fsharp
-type GitFileStatusDto = {
-    Path: string
-    Index: string
-    WorkingDir: string
-    OriginalPath: string option
-}
-
 type GitStatusDto = {
     Current: string option
     Tracking: string option
     Ahead: int
     Behind: int
     IsClean: bool
+    Conflicted: string[]
+    IsMergeInProgress: bool
     Files: GitFileStatusDto[]
+}
+
+type GitBranchRefDto = {
+    RefName: string
+    DisplayLabel: string
+    Kind: GitBranchRefKind
+    IsCurrent: bool
+    IsTracking: bool
 }
 
 type GitDiffSummaryDto = {
@@ -83,488 +100,300 @@ type GitDiffSummaryDto = {
 }
 ```
 
-Return type: `JS.Promise<Result<GitStatusDto, exn>>` / `JS.Promise<Result<GitDiffSummaryDto, exn>>`.
+Failure kinds are `Unauthorized`, `Forbidden`, `Network`, `Timeout`, `Canceled`, `LfsInstallRequired`, and `Unknown`.
 
-Note: on failure, these operations return `Result.Error exn` with the failure kind embedded in the exception message (e.g., `"git status failed (Network): ..."`) — unlike write/sync operations which return structured `GitOperationResult` with a typed `FailureKind` field.
+## 4. Common Calls
 
----
-
-## 2. Usage Examples
-
-### 2.0 Check repository status
+Refresh status, branches, and LFS settings:
 
 ```fsharp
-open Fable.Core
-open Swate.Electron.Shared.IPCTypes
-open Api
+promise {
+    let! statusResult = Renderer.GitApiClient.getGitStatus ()
+    let! branchResult = Renderer.GitApiClient.getGitBranches ()
+    let! lfsSettingsResult = Renderer.GitApiClient.getGitLfsSettings ()
 
-let getGitStatus : unit -> JS.Promise<Result<GitStatusDto, exn>> =
-    unbox gitApi.getGitStatus
-
-let getGitDiffSummary : unit -> JS.Promise<Result<GitDiffSummaryDto, exn>> =
-    unbox gitApi.getGitDiffSummary
-
-let checkStatus () =
-    promise {
-        let! statusRes = getGitStatus ()
-        match statusRes with
-        | Ok status ->
-            Browser.Dom.console.log($"Branch: {status.Current}, Clean: {status.IsClean}")
-            Browser.Dom.console.log($"Ahead: {status.Ahead}, Behind: {status.Behind}")
-            for file in status.Files do
-                Browser.Dom.console.log($"  {file.Index}{file.WorkingDir} {file.Path}")
-        | Error ex ->
-            Browser.Dom.console.error($"Status error: {ex.Message}")
-
-        let! diffRes = getGitDiffSummary ()
-        match diffRes with
-        | Ok diff ->
-            Browser.Dom.console.log($"Changed: {diff.Changed}, +{diff.Insertions}, -{diff.Deletions}")
-        | Error ex ->
-            Browser.Dom.console.error($"Diff error: {ex.Message}")
-    }
+    match statusResult, branchResult, lfsSettingsResult with
+    | Ok status, Ok branches, Ok settings ->
+        Browser.Dom.console.log($"Branch: {status.Current}")
+        Browser.Dom.console.log($"Changes: {status.Files.Length}")
+        Browser.Dom.console.log($"Branches: {branches.Length}")
+        Browser.Dom.console.log($"LFS threshold: {settings.AutoTrackThresholdMb} MB")
+    | _ ->
+        Browser.Dom.console.warn("Could not refresh all Git state.")
+}
 ```
 
-### 2.1 Init a new repository
+Initialize an ARC folder as a repository:
 
 ```fsharp
-open Fable.Core
-open Swate.Electron.Shared.IPCTypes
-open Api
+promise {
+    let! result = Renderer.GitApiClient.gitInitRepository arcPath
 
-let gitInitRepository : string -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.gitInitRepository
-
-let initRepo (targetPath: string) =
-    promise {
-        let! response = gitInitRepository targetPath
-        match response with
-        | Error ex ->
-            Browser.Dom.console.error($"IPC error: {ex.Message}")
-        | Ok op when op.Success ->
-            Browser.Dom.console.log($"Initialized at {op.Path}")
-        | Ok op ->
-            Browser.Dom.console.error($"Init failed: {op.FailureKind} {op.Message}")
-    }
+    match result with
+    | Ok normalizedPath -> Browser.Dom.console.log($"Initialized: {normalizedPath}")
+    | Error message -> Browser.Dom.console.error(message)
+}
 ```
 
-### 2.2 Clone a repository
+Clone a repository:
 
 ```fsharp
-open Fable.Core
-open Swate.Electron.Shared.IPCTypes
-open Api
-
-let gitCloneRepository : GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.gitCloneRepository
-
-let cloneRepo () =
-    promise {
-        let request = {
-            RemoteUrl = "https://github.com/org/repo.git"
-            TargetPath = @"C:\repos\repo"
-            Branch = Some "main"
-        }
-
-        let! response = gitCloneRepository request
-        match response with
-        | Error ex ->
-            Browser.Dom.console.error($"IPC error: {ex.Message}")
-        | Ok op when op.Success ->
-            Browser.Dom.console.log($"Cloned to {op.Path}")
-        | Ok op ->
-            Browser.Dom.console.error($"Clone failed: {op.FailureKind} {op.Message}")
-    }
-```
-
-### 2.3 Fetch/pull/push
-
-```fsharp
-open Fable.Core
-open Swate.Electron.Shared.IPCTypes
-open Api
-
-let gitFetch : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.gitFetch
-
-let gitPull : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.gitPull
-
-let gitPush : GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.gitPush
-
-let syncRemote () =
-    promise {
-        let req = { Remote = Some "origin"; Branch = Some "main" }
-
-        let! fetchRes = gitFetch req
-        let! pullRes  = gitPull req
-        let! pushRes  = gitPush req
-
-        let report name result =
-            match result with
-            | Error ex -> Browser.Dom.console.error($"{name} IPC error: {ex.Message}")
-            | Ok op when op.Success -> Browser.Dom.console.log($"{name} ok")
-            | Ok op -> Browser.Dom.console.error($"{name} failed: {op.FailureKind} {op.Message}")
-
-        report "fetch" fetchRes
-        report "pull" pullRes
-        report "push" pushRes
-    }
-```
-
-### 2.4 Stage/unstage/commit
-
-```fsharp
-open Fable.Core
-open Swate.Electron.Shared.IPCTypes
-open Api
-
-let gitStagePaths : GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.gitStagePaths
-
-let gitCommit : GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.gitCommit
-
-let commitFlow () =
-    promise {
-        let! stageRes = gitStagePaths { Pathspecs = [| "README.md" |] }
-        match stageRes with
-        | Ok s when s.Success ->
-            let! commitRes = gitCommit { Message = "Update README" }
-            match commitRes with
-            | Ok c when c.Success -> Browser.Dom.console.log("Commit complete")
-            | Ok c -> Browser.Dom.console.error($"Commit failed: {c.Message}")
-            | Error ex -> Browser.Dom.console.error($"Commit IPC error: {ex.Message}")
-        | Ok s -> Browser.Dom.console.error($"Stage failed: {s.Message}")
-        | Error ex -> Browser.Dom.console.error($"Stage IPC error: {ex.Message}")
-    }
-```
-
-### 2.5 Branch operations
-
-`createBranch` both creates and switches to the new branch (via `checkoutLocalBranch` or `checkoutBranch` in simple-git). There is no need to call `checkoutBranch` afterwards.
-
-`checkoutBranch` switches to an existing local branch. It fails if the branch does not exist locally.
-
-```fsharp
-open Fable.Core
-open Swate.Electron.Shared.IPCTypes
-open Api
-
-let createBranch : GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.createBranch
-
-let checkoutBranch : GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>> =
-    unbox gitApi.checkoutBranch
-
-// Create a new branch and switch to it in one step:
-let createAndSwitch () =
-    promise {
-        let! result = createBranch { Name = "feature/my-change"; StartPoint = None }
-        match result with
-        | Ok op when op.Success -> Browser.Dom.console.log("Created and switched to feature/my-change")
-        | Ok op -> Browser.Dom.console.error($"Create failed: {op.FailureKind} {op.Message}")
-        | Error ex -> Browser.Dom.console.error($"IPC error: {ex.Message}")
-    }
-
-// Switch to an existing local branch:
-let switchBranch () =
-    promise {
-        let! result = checkoutBranch { Name = "main" }
-        match result with
-        | Ok op when op.Success -> Browser.Dom.console.log("Switched to main")
-        | Ok op -> Browser.Dom.console.error($"Checkout failed: {op.FailureKind} {op.Message}")
-        | Error ex -> Browser.Dom.console.error($"IPC error: {ex.Message}")
-    }
-```
-
----
-
-## 3. Token Provider (`GitTokenProvider.fs`)
-
-File:
-
-- `src/Electron/src/Main/Git/GitTokenProvider.fs`
-
-### 3.1 How it works
-
-```fsharp
-type GitTokenProvider = { TryGetAccessToken: string -> JS.Promise<string option> }
-```
-
-- Main process stores an active provider in memory.
-- Default provider always returns `None`.
-- Git services call `tryGetAccessToken host`.
-- Host comes from `tryExtractHostFromRemoteUrl` and must be from `https://` or `ssh://` URL.
-
-### 3.2 How to add your own provider
-
-```fsharp
-open Fable.Core
-open Main.Git.GitTokenProvider
-
-let provider : GitTokenProvider = {
-    TryGetAccessToken = fun host -> promise {
-        match host with
-        | "github.com" -> return Some "ghp_..."
-        | _ -> return None
-    }
+let request: GitCloneRepositoryRequest = {
+    RemoteUrl = "https://git.nfdi4plants.org/group/project.git"
+    TargetPath = @"C:\ARCs\project"
+    Branch = None
+    DownloadLargeFiles = true
 }
 
-setTokenProvider provider
+promise {
+    let! result = Renderer.GitApiClient.gitCloneRepository request
+
+    match result with
+    | Ok op when op.Success -> Browser.Dom.console.log(op.Path)
+    | Ok op -> Browser.Dom.console.error(op.Message |> Option.defaultValue "Clone failed.")
+    | Error message -> Browser.Dom.console.error(message)
+}
 ```
 
-Call this during Main startup before user-triggered Git operations.
+Commit selected files:
 
-### 3.3 Behavior impact
+```fsharp
+promise {
+    let! stageResult =
+        Renderer.GitApiClient.gitStagePaths {
+            Pathspecs = [| "assays/a1/dataset.xlsx"; "README.md" |]
+        }
 
-- Fetch/pull/push always require a token from the configured provider. If no token is available for the extracted host, the operation fails with `Unauthorized` — even for public remotes. There is no unauthenticated fallback for these operations.
-- Clone provisioning uses token-first strategy with one unauthenticated fallback for auth failures only. If no token is available, clone runs unauthenticated directly.
+    match stageResult with
+    | Ok op when op.Success ->
+        let! commitResult =
+            Renderer.GitApiClient.gitCommit {
+                Message = "Update assay metadata"
+            }
 
----
+        match commitResult with
+        | Ok commit when commit.Success -> Browser.Dom.console.log(commit.Message)
+        | Ok commit -> Browser.Dom.console.error(commit.Message)
+        | Error message -> Browser.Dom.console.error(message)
+    | Ok op -> Browser.Dom.console.error(op.Message)
+    | Error message -> Browser.Dom.console.error(message)
+}
+```
 
-## 4. `GitAuthAdapter.fs` internals
+Fetch, preview pull, pull, and push:
 
-File:
+```fsharp
+let remoteRequest: GitRemoteOperationRequest = {
+    Remote = None
+    Branch = None
+}
 
-- `src/Electron/src/Main/Git/GitAuthAdapter.fs`
+promise {
+    let! preview = Renderer.GitApiClient.previewGitPull remoteRequest
 
-### What it does
+    match preview with
+    | Ok { Status = GitPullPreflightStatus.SafeToPull } ->
+        let! pull = Renderer.GitApiClient.gitPull remoteRequest
+        Browser.Dom.console.log(pull)
+    | Ok { Status = GitPullPreflightStatus.WouldRequireMergeResolution; Message = message } ->
+        Browser.Dom.console.warn(defaultArg message "Pull would require merge resolution.")
+    | Ok { Status = GitPullPreflightStatus.Indeterminate; Message = message } ->
+        Browser.Dom.console.warn(defaultArg message "Pull preview was inconclusive.")
+    | Error message ->
+        Browser.Dom.console.error(message)
+}
+```
 
-1. Applies non-interactive env:
-   - `GIT_TERMINAL_PROMPT=0`
-2. Builds per-operation auth config:
-   - `-c http.extraHeader=Authorization: Bearer <token>`
-3. Redacts secrets in text/args.
+## 5. Main Git Services
 
-### Key functions
+`GitService.fs` owns Git operations for the active ARC repository path:
 
-- `createNonInteractiveEnv`
-- `applyNonInteractiveEnv`
-- `buildAuthArgs` (note: the `host` parameter is currently unused — host-specific auth argument shaping is reserved for future use)
-- `toConfigEntries`
-- `applyAuth`
-- `redactToken`
-- `redactArgs`
+- Status and refs: `getStatus`, `getBranches`
+- Diff and page data: `getDiffSummary`, `getDiff`, `getWordDiff`, `getDiffViewData`, `getMergeConflictViewData`
+- Remote sync: `fetch`, `previewPull`, `pull`, `push`
+- Local writes: `stagePaths`, `unstagePaths`, `commit`, `createBranch`, `checkoutBranch`, `addRemote`
+- LFS settings: `getLfsSettings`, `setLfsSettings`
+- Merge resolution: `confirmMergeResolution`
 
-Important detail: auth is injected in-memory per operation; token is not persisted to repo config files.
+`GitProvisioningService.fs` owns path-driven operations that do not require an active ARC:
 
----
+- `initRepository`
+- `cloneRepository`
 
-## 5. `GitService.fs` internals (ARC-scoped operations)
+`GitLfsService.fs` owns Git LFS command orchestration and push planning:
 
-File:
+- System install/probe: `installSystem`, `isSystemInstalled`
+- Tracking: `track`, `isTrackedByAttributes`
+- Push support: `planOutboundPush`, `uploadObjects`, `collectPushDiagnostics`
 
-- `src/Electron/src/Main/Git/GitService.fs`
+`GitAuthAdapter.fs` builds scoped auth config and redacts secrets. `GitTokenProvider.fs` is the process-wide token lookup hook installed by `AuthService`.
 
-### 5.1 Role
+## 6. Validation and Security Rules
 
-Handles Git operations for the active ARC repository path.
+Branch-like names are validated by `GitService.ensureValidBranchLikeName`.
 
-### 5.2 Validation layer
+Pathspecs are validated by `GitService.ensureValidPathspec` and must be ARC-relative. Empty values, absolute paths, traversal segments (`.` or `..`), and null characters are rejected.
 
-- `ensureValidBranchLikeName`
-- `ensureValidPathspec`
-- `validatePathspecs`
-- `validateRemoteName`
-- `ensureAllowedRemoteUrl`
+Remote names are validated by `GitService.validateRemoteName`; blank input defaults to `origin`.
 
-These block invalid refs, traversal, blocked protocols, and protocol override attempts.
+Remote URLs are validated by `GitService.ensureAllowedRemoteUrl`. Only full `https://` and `ssh://` URLs are accepted. These are rejected:
 
-### 5.3 Failure classification
+- `file://`
+- `ext::`
+- `fd::`
+- protocol override attempts such as `-c protocol...`
+- SCP-style SSH URLs such as `git@git.nfdi4plants.org:group/project.git`
 
-`classifyFailureKind` maps text to:
+Use `ssh://git@git.nfdi4plants.org/group/project.git` instead of SCP-style SSH.
 
-- `Unauthorized`
-- `Forbidden`
-- `Network`
-- `Timeout`
-- `Canceled`
-- `Unknown`
+All simple-git instances are created through `GitInternals.createGit`, which applies `GIT_TERMINAL_PROMPT=0`. Credentials are injected per command through config entries or command environment and are not persisted to repository config.
 
-Error text is redacted in shared failure pipeline.
+## 7. Authentication
 
-### 5.4 Execution wrappers
+`AuthService.fs` installs the active `GitTokenProvider` after sign-in. Git services extract the host from the remote URL and call `tryGetAccessToken host`.
 
-- `withLocalGit`: ensures repo exists at ARC path, then runs operation.
-- `withAuthenticatedGit`: resolves authenticated git instance then runs operation.
+Current behavior:
 
-`createAuthenticatedGit` steps:
+- `fetch`, `previewPull`, `pull`, and `push` require a token for the selected remote host. If none is available, they fail with `Unauthorized`.
+- `cloneRepository` uses a token when one is available. If no token is available, clone runs unauthenticated.
+- Authenticated clone failures are returned as failures. There is no unauthenticated retry/fallback after an authenticated clone failure.
+- `initRepository`, local status/diff/stage/commit/branch operations, and `addRemote` do not need a token.
 
-1. read remote URL (`remote get-url`)
-2. URL policy check
-3. host extraction
-4. token lookup
-5. auth-scoped git instance creation
+Auth config is scoped through `GitAuthAdapter.buildAuthArgs` and `GitAuthAdapter.applyAuth`. Error messages and diagnostics must pass through `redactToken` or the shared failure path before crossing IPC.
 
-### 5.5 Public operations
+## 8. Git LFS
 
-- Read:
-  - `getStatus`
-  - `getDiffSummary`
-- Remote sync:
-  - `fetch`
-  - `pull`
-  - `push`
-- Local modifications:
-  - `stagePaths`
-  - `unstagePaths`
-  - `commit`
-  - `createBranch`
-  - `checkoutBranch`
+Swate uses Git LFS in three places:
 
----
+- Stage-time auto tracking for selected files larger than `swate.lfs.autotrackthresholdmb`.
+- Commit-time validation that oversized staged blobs are tracked by LFS.
+- Pull/clone hydration of LFS content when `swate.lfs.downloadlargefiles` is true.
+- Push-time explicit upload of outbound LFS objects before the git ref push.
 
-## 6. `GitProvisioningService.fs` internals (init/clone)
+Settings are stored in local repository config:
 
-File:
+- `swate.lfs.autotrackthresholdmb`: integer, default `1`, maximum `100`.
+- `swate.lfs.downloadlargefiles`: boolean, default `true` in Main Git service.
 
-- `src/Electron/src/Main/Git/GitProvisioningService.fs`
+Renderer state starts with `DownloadLargeFiles = false` until repository settings are loaded. Use `getGitLfsSettings` after opening an ARC to get the effective repository values.
 
-### 6.1 `initRepository`
+When Git LFS is required but unavailable, operations return `FailureKind = Some GitFailureKind.LfsInstallRequired` with a message suitable for the install prompt. The renderer workflow calls `installGitLfs` and retries the original operation after a successful install.
 
-Flow:
+Clone always sets `GIT_LFS_SKIP_SMUDGE=1` first. If `DownloadLargeFiles = true`, clone then persists the setting and runs `git lfs pull` to hydrate content.
 
-1. validate target path (non-empty, no null byte)
-2. normalize absolute path
-3. if target exists:
-   - reject non-directory targets (files, symlinks/junctions)
-   - reject when already a git repository
-4. if missing, create directory recursively
-5. run `git init`
-6. return normalized path
+Pull applies `GIT_LFS_SKIP_SMUDGE` when large-file download is disabled. When enabled, it hydrates with `git lfs pull` after the git pull.
 
-### 6.2 `cloneRepository`
+Push uses `GitLfsService.planOutboundPush` to detect outbound LFS pointer objects. If needed, `GitLfsService.uploadObjects` uploads exact object IDs before the git push; if exact upload is unsupported by the installed git-lfs, it falls back to refspec upload.
 
-Flow:
+## 9. Branches and Pull Workflow
 
-1. validate remote URL policy
-2. extract host
-3. validate/normalize target path
-4. validate optional branch
-5. ensure parent path exists and is a directory (create if missing; reject non-directory/symlink)
-6. reject non-directory clone target (files, symlinks/junctions)
-7. enforce strict target emptiness (missing or empty directory only)
-8. set clone git `baseDir = targetParent`
-9. run token-first auth strategy
+`getGitBranches` returns local branches and remote branch refs. The renderer maps remote branch switches to:
 
-### 6.3 Clone auth/fallback behavior
+```fsharp
+{
+    Name = derivedLocalBranchName
+    StartPoint = Some remoteRefName
+}
+```
 
-- token present:
-  - try authenticated clone
-  - on `Forbidden`: retry once unauthenticated
-  - on `Unauthorized`: retry once unauthenticated **only** for common auth failures (HTTP 401/auth prompts/SSH publickey); otherwise no retry
-- token missing:
-  - unauthenticated clone directly
-- token provider throws:
-  - fail immediately
+`checkoutBranch` behavior:
 
-### 6.4 Retry cleanup behavior
+- `StartPoint = None`: switch to an existing local branch only.
+- `StartPoint = Some ref`: create/check out `Name` from the provided start point.
 
-Before the unauthenticated retry (after an auth failure), the service performs a guarded cleanup to avoid retrying against a dirty partially-cloned state.
+`createBranch` creates and switches to a new local branch. After branch creation or checkout, Main reconciles tracking against `origin/<branch>` when that remote branch exists.
 
-Current guard rules:
+`previewGitPull` fetches the remote and runs `git merge-tree --write-tree HEAD <upstream>` to classify the pull:
 
-- if target path is missing: nothing to clean
-- if target path is an empty directory: nothing to clean (keep it)
-- if target directory contains **only** a `.git` entry (case-insensitive): delete `.git` **only**
-- otherwise: refuse cleanup and fail the retry (unexpected files, symlinks/junctions, `.git` not a directory, concurrent directory changes)
+- `SafeToPull`: renderer may continue directly.
+- `WouldRequireMergeResolution`: renderer should ask before opening merge resolution flow.
+- `Indeterminate`: renderer should ask because the preflight could not classify safely.
 
----
+## 10. Diff and Merge Resolution
 
-## 7. IPC integration (`IGitApi`)
+The renderer loads diff pages through `getGitDiffViewData`. Main returns previous content, current content, and porcelain word-diff metadata. Explicitly unsupported binary-like extensions and likely binary buffers return `GitPageLoadResultDto.Unsupported`, which the IPC layer maps to an unsupported-content page instead of throwing.
 
-Files:
+Merge conflict flow:
 
-- `src/Electron/src/Swate.Electron.Shared/IPCTypes.fs` (shared contract)
-- `src/Electron/src/Main/IPC/IGitApi.fs`
-- `src/Electron/src/Main/main.fs` (Main registration)
-- `src/Electron/src/Preload/preload.fs` (Preload bridge)
+1. `getGitStatus` exposes `Conflicted` and `IsMergeInProgress`.
+2. `getGitMergeConflictViewData path` loads the current conflicted file content.
+3. Renderer edits the resolved content.
+4. `confirmGitMergeResolution` checks that the file still matches the expected conflict content, writes the resolved content, stages the path, and optionally commits when no conflicts remain.
 
-### 7.1 Added provisioning endpoints
+The expected-content guard prevents overwriting a file that changed after the renderer opened it.
 
-- `gitInitRepository`
-- `gitCloneRepository`
+## 11. IPC Busy and Progress Behavior
 
-These are path-driven and do not require active ARC path.
+`Main.IPC.IGitApi` maps `GitService.GitResult<'T>` to shared DTOs.
 
-### 7.2 Result mapping
+Operations wrapped in `withBusyWriting`:
 
-`toGitOperationResult` maps `GitService.GitResult<'T>` into shared DTO and now supports optional success path projection.
-
-- init/clone set `Path = Some normalizedPath` on success
-- existing operations keep `Path = None`
-
-### 7.3 Progress behavior
-
-- fetch/pull/push: progress reporter from active vault.
-- clone: progress reporter only if vault can be resolved from window id; otherwise clone still runs without progress callback.
-
-### 7.4 Busy-writing policy
-
-Operations wrapped with `withBusyWriting`:
 - `gitPull`
 - `gitStagePaths`
 - `gitUnstagePaths`
 - `gitCommit`
 - `createBranch`
 - `checkoutBranch`
+- `confirmGitMergeResolution`
 
-Operations **not** wrapped:
-- `gitFetch`, `gitPush` (no working tree edits; remote sync / `.git` metadata only)
-- `getGitStatus`, `getGitDiffSummary` (read-only)
-- `gitInitRepository`, `gitCloneRepository` (provisioning, no active ARC vault)
+Operations not wrapped:
 
----
+- Read-only calls: `getGitStatus`, `getGitBranches`, `getGitLfsSettings`, diff view loaders, merge conflict view loader.
+- Remote metadata/sync calls without working tree writes: `gitFetch`, `gitPush`, `previewGitPull`.
+- Provisioning calls: `gitInitRepository`, `gitCloneRepository`.
+- System Git LFS install.
 
-## 8. Troubleshooting
+Progress is sent through `IMainUpdateRendererApi.gitProgressUpdate`. Fetch, preview pull, pull, push, and clone can report progress. Clone only reports progress when Main can resolve a vault from the IPC window id; otherwise the clone still runs.
 
-### 8.1 Unauthorized on fetch/pull/push
+## 12. Extending Git Functionality
 
-Check:
+When adding a new Git operation:
 
-1. `setTokenProvider` registration exists in Main startup.
-2. provider returns token for extracted host.
-3. token is valid for target remote.
+1. Add or reuse DTOs in `Swate.Electron.Shared.GitTypes`.
+2. Add the IPC function to `IGitApi` in `IPCTypes.fs`.
+3. Implement Main handling in `src/Electron/src/Main/IPC/IGitApi.fs`.
+4. Put Git command logic in the appropriate Main service:
+   - Active ARC repo operation: `GitService.fs`
+   - Init/clone/path provisioning: `GitProvisioningService.fs`
+   - Git LFS orchestration: `GitLfsService.fs`
+   - Low-level spawned git: `GitLfsAdapter.fs`
+5. Add a wrapper in `Renderer.GitApiClient.fs`.
+6. Wire it into `GitWorkflow.GitDependencies` if renderer workflow state needs it.
+7. Add or update tests in `tests/Electron.Core`.
+8. Update this guide if behavior or consumer usage changes.
 
-### 8.2 Clone fallback still fails
+Keep validation in Main even if Renderer already validates input. Renderer validation is for UX; Main validation is the trust boundary.
 
-Possible reasons:
+## 13. Troubleshooting
 
-- cleanup before fallback retry failed
-- `Unauthorized` did not match an auth-failure signal -> no fallback retry
-- non-auth failure kind (network/timeout/canceled/unknown) -> no fallback retry
-- remote blocked by URL policy
+`Unauthorized` on fetch, preview pull, pull, or push:
 
-### 8.3 Remote URL rejected
+- Confirm an account is signed in and `AuthService` has installed a token provider.
+- Confirm the provider returns a token for the remote host.
+- Confirm the remote URL is `https://` or full-form `ssh://`.
 
-Only `https://` and `ssh://` full-URI forms are accepted.
+Clone fails although the repository is public:
 
-SCP-style SSH URLs (e.g., `git@github.com:org/repo.git`) are **not** accepted. Use the full URI form instead: `ssh://git@github.com/org/repo.git`.
+- If a token is available, clone runs authenticated and does not retry unauthenticated after failure.
+- Sign out or adjust the active account if you intentionally need unauthenticated clone behavior.
+- Check target path rules: target must be missing or an empty directory, not a symlink/junction.
 
-### 8.4 Pathspec rejected
+Git LFS install prompt appears:
 
-Pathspecs must be relative, non-empty, and must not include traversal segments (`.` or `..`), null characters, or Windows-style absolute prefixes (e.g., `C:/`).
+- The operation needs Git LFS but `git lfs` is not available.
+- Use `installGitLfs` through the renderer workflow; after success, retry the original operation.
 
-### 8.5 `checkoutBranch` fails for remote-only branches
+Pathspec rejected:
 
-`checkoutBranch` only works for branches that already exist locally. If you need to switch to a remote branch, fetch first, then create a local tracking branch with `createBranch`.
+- Use ARC-relative paths with `/`.
+- Do not pass absolute paths, `.` or `..` segments, empty values, or null characters.
 
----
+Remote branch checkout fails:
 
-## 9. Security and scope boundaries
+- For remote-only branches, call `checkoutBranch` with `StartPoint = Some "origin/branch"` and `Name = "branch"`.
+- Calling with `StartPoint = None` only works for existing local branches.
 
-Current behavior enforces:
+Unsupported diff or merge content:
 
-- no token persistence in repository files
-- non-interactive git env (`GIT_TERMINAL_PROMPT=0`)
-- redaction of bearer credentials/credential URLs in error paths
-- no automatic ARC opening/window switching after clone
-- no auto stage/commit/push after init
-
-### Additional notes
-
-- All git instances are created through `GitInternals.createGit`, which always applies `applyNonInteractiveEnv` to enforce `GIT_TERMINAL_PROMPT=0`.
-- `maxConcurrentProcesses = 1` serializes operations per repository instance to avoid overlapping write/sync races.
-- Cancellation/abort support is intentionally deferred. No cancel IPC contract exists in this milestone.
+- Binary files and explicitly unsupported extensions are intentionally routed to the unsupported-content page.
+- Text-based diff and merge views only support files Main can safely read as text.

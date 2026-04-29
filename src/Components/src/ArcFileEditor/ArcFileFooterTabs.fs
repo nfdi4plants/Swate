@@ -77,6 +77,13 @@ module private ArcFileFooterTabsHelper =
 
 open ArcFileFooterTabsHelper
 
+type private TableTabViewModel = {
+    index: int
+    tableName: string
+    isEditorMode: bool
+    isActive: bool
+}
+
 [<Erase; Mangle(false)>]
 type ArcFileFooterTabs =
 
@@ -110,7 +117,7 @@ type ArcFileFooterTabs =
             ]
         ]
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private TableTab(index: int, tableName: string, onClick, isActive: bool, ?onDoubleClick, ?key: int) =
 
         let sortable = DndKit.useSortable ({| id = mkTableDragId index |})
@@ -149,7 +156,7 @@ type ArcFileFooterTabs =
             ?key = key
         )
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private EditTableNameTab
         (currentName: string, onNameChange: string -> unit, closeEdit: unit -> unit, isActive: bool)
         =
@@ -186,21 +193,10 @@ type ArcFileFooterTabs =
             isActive = isActive
         )
 
-    [<ReactComponent>]
-    static member private MetadataTab(arcFile: ArcFiles, onClick, isActive: bool) =
-
-        let text =
-            match arcFile with
-            | ArcFiles.Assay _ -> "Assay"
-            | ArcFiles.Study _ -> "Study"
-            | ArcFiles.Investigation _ -> "Investigation"
-            | ArcFiles.Run _ -> "Run"
-            | ArcFiles.Workflow _ -> "Workflow"
-            | ArcFiles.Template _ -> "Template"
-            | ArcFiles.DataMap _ -> "Datamap" // Not sure about this one.
-
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
+    static member private MetadataTab(label: string, onClick, isActive: bool) =
         ArcFileFooterTabs.BaseTab(
-            Html.span text,
+            Html.span label,
             onClick,
             "swt:iconify swt:fluent--info-20-filled",
             isActive = isActive,
@@ -208,7 +204,7 @@ type ArcFileFooterTabs =
             key = "MetadataTab"
         )
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private DataMapTab(onClick, isActive: bool) =
 
         ArcFileFooterTabs.BaseTab(
@@ -220,7 +216,7 @@ type ArcFileFooterTabs =
             key = "DataMapTab"
         )
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private PlusBtn(onClick) =
 
         ArcFileFooterTabs.BaseTab(Html.none, onClick, "swt:iconify swt:fluent--add-12-filled")
@@ -296,26 +292,76 @@ type ArcFileFooterTabs =
     static member Main
         (arcFile: ArcFiles, activeView: ActiveView, setActiveView: ActiveView -> unit, setArcFile: ArcFiles -> unit)
         =
-        let tables = arcFile.Tables()
+        let tables = arcFile.ArcTables()
         let canAddTable = arcFile.CanCreateTables()
+        let canRenderDataMap = arcFile.CanRenderDataMapView()
         let tabsRef = React.useElementRef ()
 
         let isEditorModeTableTab, setIsEditorModeTableTab =
             React.useState (None: int option)
 
-        let addNewTable _ =
-            setIsEditorModeTableTab None
+        let arcFileHash = arcFile.GetHashCode()
 
-            if canAddTable then
-                let nextName = Helper.createNewTableName tables
-                let nextTable = ArcTable.init nextName
+        let metadataTabLabel =
+            React.useMemo (
+                (fun () ->
+                    match arcFile with
+                    | ArcFiles.Assay _ -> "Assay"
+                    | ArcFiles.Study _ -> "Study"
+                    | ArcFiles.Investigation _ -> "Investigation"
+                    | ArcFiles.Run _ -> "Run"
+                    | ArcFiles.Workflow _ -> "Workflow"
+                    | ArcFiles.Template _ -> "Template"
+                    | ArcFiles.DataMap _ -> "Datamap"
+                ),
+                [| box arcFileHash |]
+            )
 
-                tables.Add nextTable
-                setArcFile (WidgetArcFile.refreshRef arcFile)
-                setActiveView (ActiveView.Table(tables.Count - 1))
+        let setEditorMode =
+            React.useCallback (
+                (fun (nextMode: int option) -> setIsEditorModeTableTab nextMode),
+                [| box setIsEditorModeTableTab |]
+            )
+
+        let closeEditorMode =
+            React.useCallback ((fun () -> setIsEditorModeTableTab None), [| box setIsEditorModeTableTab |])
+
+        let activateMetadataView =
+            React.useCallback ((fun _ -> setActiveView ActiveView.Metadata), [| box setActiveView |])
+
+        let activateDataMapView =
+            React.useCallback ((fun _ -> setActiveView ActiveView.DataMap), [| box setActiveView |])
+
+        let activateTableView =
+            React.useCallback (
+                (fun (tableIndex: int) -> setActiveView (ActiveView.Table tableIndex)),
+                [| box setActiveView |]
+            )
+
+        let openTableNameEditor =
+            React.useCallback (
+                (fun (tableIndex: int) -> setIsEditorModeTableTab (Some tableIndex)),
+                [| box setIsEditorModeTableTab |]
+            )
+
+        let tableNamesKey =
+            tables |> Seq.map (fun table -> table.Name) |> String.concat "||"
+
+        let addNewTable =
+            fun _ ->
+                closeEditorMode ()
+
+                if canAddTable then
+                    let nextName = Helper.createNewTableName tables.Tables
+                    let nextTable = ArcTable.init nextName
+
+                    arcFile.ArcTables().AddTable nextTable
+
+                    setArcFile (ArcFiles.refreshRef arcFile)
+                    setActiveView (ActiveView.Table(tables.TableCount - 1))
 
         let deleteTable (tableIndex: int) =
-            setIsEditorModeTableTab None
+            closeEditorMode ()
             arcFile.ArcTables().RemoveTableAt tableIndex
 
             match activeView with
@@ -323,33 +369,80 @@ type ArcFileFooterTabs =
             | ActiveView.Table i when i > tableIndex -> setActiveView (ActiveView.Table(i - 1))
             | _ -> ()
 
-            setArcFile (WidgetArcFile.refreshRef arcFile)
+            setArcFile (ArcFiles.refreshRef arcFile)
 
         let updateTableOrder (oldIndex: int, newIndex: int) =
-            setIsEditorModeTableTab None
+            closeEditorMode ()
             arcFile.ArcTables().MoveTable(oldIndex, newIndex)
-            let lastIndex = tables.Count - 1
+            let lastIndex = tables.TableCount - 1
             let nextActiveIndex = max 0 (min newIndex lastIndex)
             setActiveView (ActiveView.Table nextActiveIndex)
-            setArcFile (WidgetArcFile.refreshRef arcFile)
+            setArcFile (ArcFiles.refreshRef arcFile)
 
-        let handleDragEnd (event: DndKit.IDndKitEvent) =
+        let handleDragEnd =
+            React.useCallback (
+                (fun (event: DndKit.IDndKitEvent) ->
 
-            if isEditorModeTableTab.IsSome then
-                ()
-            else
-                match tryGetDndEventId (box event.active), tryGetDndEventId (box event.over) with
-                | Some activeId, Some overId when activeId <> overId ->
-                    match tryParseTableDragId activeId, resolveDropTargetTableIndex overId with
-                    | Some oldIndex, Some newIndex when oldIndex <> newIndex -> updateTableOrder (oldIndex, newIndex)
-                    | _ -> ()
-                | _ -> ()
+                    if isEditorModeTableTab.IsSome then
+                        ()
+                    else
+                        match tryGetDndEventId (box event.active), tryGetDndEventId (box event.over) with
+                        | Some activeId, Some overId when activeId <> overId ->
+                            match tryParseTableDragId activeId, resolveDropTargetTableIndex overId with
+                            | Some oldIndex, Some newIndex when oldIndex <> newIndex ->
+                                updateTableOrder (oldIndex, newIndex)
+                            | _ -> ()
+                        | _ -> ()
+                ),
+                [| box isEditorModeTableTab; box updateTableOrder |]
+            )
+
 
         let tableIds =
-            tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray
+            React.useMemo (
+                (fun () -> tables |> Seq.mapi (fun index _ -> mkTableDragId index) |> ResizeArray),
+                [| box tables.TableCount; box tableNamesKey |]
+            )
+
+        let tableTabModels: TableTabViewModel[] =
+            React.useMemo (
+                (fun () -> [|
+                    for index = 0 to tables.TableCount - 1 do
+                        {
+                            index = index
+                            tableName = tables.[index].Name
+                            isEditorMode = isEditorModeTableTab = Some index
+                            isActive = activeView = ActiveView.Table index
+                        }
+                |]),
+                [|
+                    box tables.TableCount
+                    box tableNamesKey
+                    box isEditorModeTableTab
+                    box activeView
+                |]
+            )
+
+        let renameTable =
+            React.useCallback (
+                (fun (tableIndex: int) (newName: string) ->
+                    match System.String.IsNullOrWhiteSpace newName || newName = tables.[tableIndex].Name with
+                    | true -> ()
+                    | false ->
+                        arcFile.ArcTables().RenameTableAt(tableIndex, newName)
+                        setArcFile (ArcFiles.refreshRef arcFile)
+                        closeEditorMode ()
+                ),
+                [|
+                    box arcFile
+                    box setArcFile
+                    box closeEditorMode
+                    box tableNamesKey
+                |]
+            )
 
         React.Fragment [
-            ArcFileFooterTabs.ContextMenu(tabsRef, setIsEditorModeTableTab, deleteTable)
+            ArcFileFooterTabs.ContextMenu(tabsRef, setEditorMode, deleteTable)
             Html.div [
                 prop.className "swt:bg-base-300"
                 prop.children [
@@ -368,14 +461,14 @@ type ArcFileFooterTabs =
                             ]
 
                             ArcFileFooterTabs.MetadataTab(
-                                arcFile,
-                                (fun _ -> setActiveView ActiveView.Metadata),
+                                metadataTabLabel,
+                                activateMetadataView,
                                 isActive = (activeView = ActiveView.Metadata)
                             )
 
-                            if arcFile.CanRenderDataMapView() then
+                            if canRenderDataMap then
                                 ArcFileFooterTabs.DataMapTab(
-                                    (fun _ -> setActiveView ActiveView.DataMap),
+                                    activateDataMapView,
                                     isActive = (activeView = ActiveView.DataMap)
                                 )
 
@@ -385,40 +478,24 @@ type ArcFileFooterTabs =
                                 children =
                                     React.Fragment [
 
-                                        for index = 0 to tables.Count - 1 do
-                                            let table = tables.[index]
+                                        for tableModel in tableTabModels do
 
-                                            let isEditorMode = isEditorModeTableTab = Some index
-                                            let isActive = activeView = ActiveView.Table index
-
-                                            match isEditorMode with
+                                            match tableModel.isEditorMode with
                                             | true ->
-                                                let renameTable newName =
-                                                    match
-                                                        System.String.IsNullOrWhiteSpace newName || newName = table.Name
-                                                    with
-                                                    | true -> ()
-                                                    | false ->
-                                                        arcFile.ArcTables().RenameTableAt(index, newName)
-                                                        setArcFile (WidgetArcFile.refreshRef arcFile)
-                                                        setIsEditorModeTableTab None
-
-                                                let closeEdit () = setIsEditorModeTableTab None
-
                                                 ArcFileFooterTabs.EditTableNameTab(
-                                                    table.Name,
-                                                    renameTable,
-                                                    closeEdit,
-                                                    isActive = isActive
+                                                    tableModel.tableName,
+                                                    renameTable tableModel.index,
+                                                    closeEditorMode,
+                                                    isActive = tableModel.isActive
                                                 )
                                             | false ->
                                                 ArcFileFooterTabs.TableTab(
-                                                    index,
-                                                    table.Name,
-                                                    (fun _ -> setActiveView (ActiveView.Table index)),
-                                                    isActive = isActive,
-                                                    onDoubleClick = (fun _ -> setIsEditorModeTableTab (Some index)),
-                                                    key = index
+                                                    tableModel.index,
+                                                    tableModel.tableName,
+                                                    (fun _ -> activateTableView tableModel.index),
+                                                    isActive = tableModel.isActive,
+                                                    onDoubleClick = (fun _ -> openTableNameEditor tableModel.index),
+                                                    key = tableModel.index
                                                 )
 
                                     ]

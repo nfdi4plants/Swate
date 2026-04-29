@@ -17,10 +17,10 @@ app
 
         ARC_VAULTS.RegisterVault() |> ignore
 
-        Remoting.init |> Remoting.buildHandler IPC.IGitApi.api
-        Remoting.init |> Remoting.buildHandler IPC.IGitLabApi.api
-        Remoting.init |> Remoting.buildHandler IPC.ArcVaultsApi.api
-        Remoting.init |> Remoting.buildHandler Main.IPC.AuthApi.api
+        Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.IGitApi.api
+        Remoting.createIpc () |> Remoting.fromValue IPC.IGitLabApi.api
+        Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.ArcVaultsApi.api
+        Remoting.createIpc () |> Remoting.fromValue Main.IPC.AuthApi.api
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then

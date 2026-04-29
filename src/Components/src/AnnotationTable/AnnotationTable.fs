@@ -421,13 +421,7 @@ type AnnotationTable =
 
                     let header = arcTable.Headers.[cc.x - 1]
 
-                    CompositeCellModal.CompositeCellModal(
-                        cell,
-                        setCell,
-                        rmv,
-                        header,
-                        ?debug = debug
-                    )
+                    CompositeCellModal.CompositeCellModal(cell, setCell, rmv, header, ?debug = debug)
             | Some(ModalTypes.Transform cc) ->
                 if cc.x = 0 then // no details modal for index col
                     Html.none
@@ -457,21 +451,9 @@ type AnnotationTable =
                 if cc.x = 0 then // no details modal for index col
                     Html.none
                 elif cc.y = 0 then // headers
-                    EditConfig.CompositeCellEditModal(
-                        cc.x - 1,
-                        arcTable,
-                        setArcTable,
-                        rmv,
-                        ?debug = debug
-                    )
+                    EditConfig.CompositeCellEditModal(cc.x - 1, arcTable, setArcTable, rmv, ?debug = debug)
                 else
-                    EditConfig.CompositeCellEditModal(
-                        cc.x - 1,
-                        arcTable,
-                        setArcTable,
-                        rmv,
-                        ?debug = debug
-                    )
+                    EditConfig.CompositeCellEditModal(cc.x - 1, arcTable, setArcTable, rmv, ?debug = debug)
             | Some(ModalTypes.MoveColumn(uiTableIndex, arcTableIndex)) ->
                 ContextMenuModals.MoveColumnModal(
                     arcTable,
@@ -494,12 +476,7 @@ type AnnotationTable =
                 )
             | Some(ModalTypes.Error(exn)) -> ContextMenuModals.ErrorModal(exn, setModal, tableRef)
             | Some(ModalTypes.UnknownPasteCase(PasteCases.Unknown unknownPasteCase)) ->
-                ContextMenuModals.UnknownPasteCase(
-                    unknownPasteCase.data,
-                    unknownPasteCase.headers,
-                    setModal,
-                    tableRef
-                )
+                ContextMenuModals.UnknownPasteCase(unknownPasteCase.data, unknownPasteCase.headers, setModal, tableRef)
             | anyElse ->
                 console.warn ("Unknown modal type", anyElse)
                 Html.none

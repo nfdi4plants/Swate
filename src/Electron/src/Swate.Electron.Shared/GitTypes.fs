@@ -28,6 +28,11 @@ type GitLfsResult = {
     Error: string
 }
 
+type GitLfsProgressDto = {
+    RequestId: string
+    Message: string
+}
+
 [<RequireQualifiedAccess>]
 type GitFailureKind =
     | Unauthorized
@@ -119,6 +124,17 @@ type GitRemoteOperationRequest = {
     Branch: string option
 }
 
+[<RequireQualifiedAccess>]
+type GitPullPreflightStatus =
+    | SafeToPull
+    | WouldRequireMergeResolution
+    | Indeterminate
+
+type GitPullPreflightResult = {
+    Status: GitPullPreflightStatus
+    Message: string option
+}
+
 type GitRemoteConfigRequest = {
     RemoteName: string
     RemoteUrl: string
@@ -145,7 +161,10 @@ type GitCreateBranchRequest = {
     StartPoint: string option
 }
 
-type GitCheckoutBranchRequest = { Name: string }
+type GitCheckoutBranchRequest = {
+    Name: string
+    StartPoint: string option
+}
 
 type GitConfirmMergeResolutionRequest = {
     Path: string

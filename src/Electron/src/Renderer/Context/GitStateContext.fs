@@ -19,10 +19,14 @@ type GitStateController = {
     fetch: unit -> unit
     pull: unit -> unit
     push: unit -> unit
+    updateFromOnline: unit -> unit
+    primarySaveSelection: GitSidebarCommitSelectionRequest -> unit
+    primarySaveAll: string -> unit
     cloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<string, string>>
-    sync: unit -> unit
     commitSelection: GitSidebarCommitSelectionRequest -> unit
     commitAll: string -> unit
+    confirmPendingRemoteAction: unit -> unit
+    cancelPendingRemoteAction: unit -> unit
     saveLfsAutoTrackThreshold: int -> unit
     saveDownloadLargeFiles: bool -> unit
     createBranch: GitSidebarCreateBranchRequest -> unit
@@ -62,10 +66,11 @@ module private Helper =
         initGitRepository = Renderer.GitApiClient.gitInitRepository
         createDataHubProject =
             fun projectName -> promise {
-                let! result = Api.ipcGitLabApi.createProject (unbox null) projectName
+                let! result = Api.ipcGitLabApi.createProject projectName
                 return result |> Result.mapError _.GitLabErrorToString
             }
         installGitLfs = Renderer.GitApiClient.installGitLfs
+        previewGitPull = Renderer.GitApiClient.previewGitPull
         gitFetch = Renderer.GitApiClient.gitFetch
         gitPull = Renderer.GitApiClient.gitPull
         gitPush = Renderer.GitApiClient.gitPush
@@ -90,10 +95,14 @@ let GitStateCtx =
             fetch = fun () -> ()
             pull = fun () -> ()
             push = fun () -> ()
+            updateFromOnline = fun () -> ()
+            primarySaveSelection = fun _ -> ()
+            primarySaveAll = fun _ -> ()
             cloneRepository = fun _ -> promise { return Ok "" }
-            sync = fun () -> ()
             commitSelection = fun _ -> ()
             commitAll = fun _ -> ()
+            confirmPendingRemoteAction = fun () -> ()
+            cancelPendingRemoteAction = fun () -> ()
             saveLfsAutoTrackThreshold = fun _ -> ()
             saveDownloadLargeFiles = fun _ -> ()
             createBranch = fun _ -> ()
@@ -126,15 +135,27 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let push () = dispatch PushRequested
 
+    let updateFromOnline () = dispatch UpdateFromOnlineRequested
+
+    let primarySaveSelection (request: GitSidebarCommitSelectionRequest) =
+        dispatch (PrimarySaveSelectionRequested request)
+
+    let primarySaveAll (message: string) =
+        dispatch (PrimarySaveAllRequested message)
+
     let cloneRepository (request: GitCloneRepositoryRequest) =
         Promise.create (fun resolve _reject -> dispatch (CloneRequested(request, resolve)))
-
-    let sync () = dispatch SyncRequested
 
     let commitSelection (request: GitSidebarCommitSelectionRequest) =
         dispatch (CommitSelectionRequested request)
 
     let commitAll (message: string) = dispatch (CommitAllRequested message)
+
+    let confirmPendingRemoteAction () =
+        dispatch ConfirmPendingRemoteActionRequested
+
+    let cancelPendingRemoteAction () =
+        dispatch CancelPendingRemoteActionRequested
 
     let saveLfsAutoTrackThreshold (thresholdMb: int) =
         dispatch (SaveLfsAutoTrackThresholdRequested thresholdMb)
@@ -154,7 +175,7 @@ let GitStateCtxProvider (children: ReactElement) =
     let confirmMergeResolutionAction request =
         dispatch (ConfirmMergeResolutionRequested request)
 
-    React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx.state)), [| box appStateCtx.state |])
+    React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx)), [| box appStateCtx |])
 
     let gitStateController: GitStateController =
         React.useMemo (
@@ -165,10 +186,14 @@ let GitStateCtxProvider (children: ReactElement) =
                 fetch = fetch
                 pull = pull
                 push = push
+                updateFromOnline = updateFromOnline
+                primarySaveSelection = primarySaveSelection
+                primarySaveAll = primarySaveAll
                 cloneRepository = cloneRepository
-                sync = sync
                 commitSelection = commitSelection
                 commitAll = commitAll
+                confirmPendingRemoteAction = confirmPendingRemoteAction
+                cancelPendingRemoteAction = cancelPendingRemoteAction
                 saveLfsAutoTrackThreshold = saveLfsAutoTrackThreshold
                 saveDownloadLargeFiles = saveDownloadLargeFiles
                 createBranch = createBranchFrom

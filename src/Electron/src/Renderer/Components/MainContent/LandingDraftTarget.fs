@@ -58,7 +58,7 @@ let LandingDraftTarget () =
                         let request: FileContentDTO =
                             FileContentDTO.create DTOType.PlainText protocolIntent.Content protocolIntent.RelativePath
 
-                        let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
+                        let! writeResult = Api.ipcArcVaultApi.writeFile request
 
                         match writeResult with
                         | Ok() -> finishSuccess previewData

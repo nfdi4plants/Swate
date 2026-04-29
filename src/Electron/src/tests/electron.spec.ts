@@ -5,6 +5,7 @@ import path from 'path';
 
 const ARC_VAULT_API_NAME = 'FABLE_REMOTING_IArcVaultsApi';
 const ARC_IDENTIFIER = 'playwright-test-arc';
+const SIDEBAR_OVERFLOW_FILE_COUNT = 160;
 
 async function waitForArcVaultApi(window: Page) {
   await window.waitForFunction((apiName) => typeof (window as any)[apiName] !== 'undefined', ARC_VAULT_API_NAME);
@@ -36,6 +37,13 @@ async function createArc(window: Page, identifier: string) {
     },
     { apiName: ARC_VAULT_API_NAME, arcIdentifier: identifier }
   );
+}
+
+function seedArcWithOverflowFiles(arcPath: string, count: number) {
+  for (let i = 0; i < count; i += 1) {
+    const fileName = `scroll-file-${String(i).padStart(3, '0')}.txt`;
+    fs.writeFileSync(path.join(arcPath, fileName), `seeded file ${i}\n`);
+  }
 }
 
 test.describe('Swate Electron App', () => {
@@ -83,5 +91,61 @@ test.describe('Swate Electron App', () => {
     await expect(fileExplorer).toBeVisible({ timeout: 30000 });
     await expect(fileExplorer).toContainText(ARC_IDENTIFIER, { timeout: 30000 });
     await expect(fileExplorer.locator('li').first()).toBeVisible({ timeout: 30000 });
+  });
+
+  test('keeps the file explorer toolbar visible while the file tree scrolls', async () => {
+    await mockOpenDialogSelection(electronApp, tempArcParentDir);
+
+    const arcPath = await createArc(window, `${ARC_IDENTIFIER}-scroll`);
+    seedArcWithOverflowFiles(arcPath, SIDEBAR_OVERFLOW_FILE_COUNT);
+
+    const homeButton = window.locator('[aria-label="Home"] button');
+    await expect(homeButton).toBeVisible({ timeout: 30000 });
+    await homeButton.click();
+
+    const fileExplorer = window.getByTestId('file-explorer-container');
+    await expect(fileExplorer).toBeVisible({ timeout: 30000 });
+
+    const rootFolderSummary = fileExplorer.locator('summary').filter({ hasText: `${ARC_IDENTIFIER}-scroll` }).first();
+    await expect(rootFolderSummary).toBeVisible({ timeout: 30000 });
+    await rootFolderSummary.click();
+
+    await expect(fileExplorer).toContainText('scroll-file-159.txt', { timeout: 30000 });
+
+    const treeViewport = window.getByTestId('left-sidebar-file-explorer-tree');
+    await expect(treeViewport).toBeVisible({ timeout: 30000 });
+
+    const hasOverflow = await treeViewport.evaluate((element: HTMLElement) => {
+      return element.scrollHeight > element.clientHeight;
+    });
+    expect(hasOverflow).toBeTruthy();
+
+    const toolbar = window.getByTestId('left-sidebar-file-explorer-toolbar');
+    await expect(toolbar).toBeVisible({ timeout: 30000 });
+
+    const toolbarTopBeforeScroll = await toolbar.evaluate((element: HTMLElement) => {
+      return element.getBoundingClientRect().top;
+    });
+
+    await treeViewport.evaluate((element: HTMLElement) => {
+      element.scrollTop = Math.min(320, element.scrollHeight);
+    });
+
+    await window.waitForTimeout(100);
+
+    const scrollTop = await treeViewport.evaluate((element: HTMLElement) => {
+      return element.scrollTop;
+    });
+    expect(scrollTop).toBeGreaterThan(0);
+
+    const toolbarTopAfterScroll = await toolbar.evaluate((element: HTMLElement) => {
+      return element.getBoundingClientRect().top;
+    });
+    expect(Math.abs(toolbarTopAfterScroll - toolbarTopBeforeScroll)).toBeLessThanOrEqual(2);
+
+    const targetFile = fileExplorer.locator('a').filter({ hasText: 'scroll-file-030.txt' }).first();
+    await targetFile.scrollIntoViewIfNeeded();
+    await targetFile.click();
+    await expect(targetFile).toHaveClass(/swt:bg-base-300/, { timeout: 30000 });
   });
 });

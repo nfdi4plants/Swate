@@ -5,6 +5,7 @@ open Browser.Dom
 open Browser.Types
 open Elmish
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Renderer.Context.GitWorkflow
 open Renderer.Types
@@ -103,8 +104,18 @@ let private changedFile path indexStatus workingTreeStatus isConflicted = {
     IsConflicted = isConflicted
 }
 
-[<Emit("new Event($0)")>]
+[<Emit("new Event($0, { bubbles: true })")>]
 let private createEvent (eventType: string) : Browser.Types.Event = jsNative
+
+[<Emit("new MouseEvent($0, $1)")>]
+let private createMouseEvent (eventType: string) (eventInit: obj) : Browser.Types.MouseEvent = jsNative
+
+[<Emit("""
+const setter = Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, "value").set;
+setter.call($0, $1);
+$0.dispatchEvent(new Event("input", { bubbles: true }));
+""")>]
+let private setTextAreaValue (element: HTMLTextAreaElement) (value: string) : unit = jsNative
 
 [<Emit("""
 globalThis.__swateOriginalFetch = globalThis.fetch;
@@ -149,6 +160,9 @@ let private lastGitLabCreateProjectBody () : obj = jsNative
 
 [<Emit("Object.prototype.hasOwnProperty.call($0, $1)")>]
 let private hasOwnProperty (target: obj) (propertyName: string) : bool = jsNative
+
+[<Emit("$0.firstElementChild")>]
+let private firstElementChild (target: HTMLElement) : HTMLElement = jsNative
 
 [<Emit("$0[$1]")>]
 let private getProperty<'T> (target: obj) (propertyName: string) : 'T = jsNative
@@ -220,6 +234,7 @@ let private defaultDependencies: GitDependencies = {
     initGitRepository = fun path -> unexpectedPromise $"initGitRepository:{path}"
     createDataHubProject = fun name -> unexpectedPromise $"createDataHubProject:{name}"
     installGitLfs = fun () -> unexpectedPromise "installGitLfs"
+    previewGitPull = fun _ -> unexpectedPromise "previewGitPull"
     gitFetch = fun _ -> unexpectedPromise "gitFetch"
     gitPull = fun _ -> unexpectedPromise "gitPull"
     gitPush = fun _ -> unexpectedPromise "gitPush"
@@ -258,6 +273,25 @@ let private renderToBody (element: ReactElement) = promise {
         )
 }
 
+let private noopCallbacks: GitSidebarCallbacks = {
+    OnRefresh = fun () -> ()
+    OnFetch = fun () -> ()
+    OnPull = fun () -> ()
+    OnPush = fun () -> ()
+    OnUpdateFromOnline = fun () -> ()
+    OnPrimarySaveSelection = fun _ -> ()
+    OnPrimarySaveAll = fun _ -> ()
+    OnCommitSelection = fun _ -> ()
+    OnCommitAll = fun _ -> ()
+    OnConfirmPendingRemoteAction = fun () -> ()
+    OnCancelPendingRemoteAction = fun () -> ()
+    OnSaveDownloadLargeFiles = fun _ -> ()
+    OnSaveLfsAutoTrackThreshold = fun _ -> ()
+    OnCreateBranch = fun _ -> ()
+    OnSwitchBranch = fun _ -> ()
+    OnSelectChange = fun _ -> promise { return Ok() }
+}
+
 Vitest.afterEach (fun () -> document.body.innerHTML <- "")
 
 let private collectMessages (cmd: Cmd<Msg>) = promise {
@@ -266,6 +300,21 @@ let private collectMessages (cmd: Cmd<Msg>) = promise {
     do! Promise.sleep 0
     return messages |> Seq.toArray
 }
+
+let private updateFromSingleMessage
+    (deps: GitDependencies)
+    (setPageState: PageState option -> unit)
+    (failureMessage: string)
+    (model: GitState)
+    (cmd: Cmd<Msg>)
+    =
+    promise {
+        let! messages = collectMessages cmd
+
+        match messages with
+        | [| message |] -> return update deps setPageState message model
+        | _ -> return failwith failureMessage
+    }
 
 Vitest.describe (
     "GitWorkflow request preparation",
@@ -370,7 +419,6 @@ Vitest.describe (
             }
         )
 )
-
 Vitest.describe (
     "GitWorkflow update command flow",
     fun () ->
@@ -1161,6 +1209,450 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Primary save commits locally, preflights pull, pulls, and pushes when the preflight is safe",
+            fun () -> promise {
+                let mutable stageCalls = 0
+                let mutable commitCalls = 0
+                let mutable previewCalls = 0
+                let mutable pullCalls = 0
+                let mutable pushCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                        gitStagePaths =
+                            fun _ -> promise {
+                                stageCalls <- stageCalls + 1
+                                return Ok okOperationResult
+                            }
+                        gitCommit =
+                            fun _ -> promise {
+                                commitCalls <- commitCalls + 1
+                                return Ok okOperationResult
+                            }
+                        previewGitPull =
+                            fun _ -> promise {
+                                previewCalls <- previewCalls + 1
+                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+                            }
+                        gitPull =
+                            fun _ -> promise {
+                                pullCalls <- pullCalls + 1
+                                return Ok okOperationResult
+                            }
+                        gitPush =
+                            fun _ -> promise {
+                                pushCalls <- pushCalls + 1
+                                return Ok okOperationResult
+                            }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Add polish") initialState
+
+                let! stateAfterWriteRequest, writeCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected the primary save request to enqueue a write request."
+                        stateAfterRequest
+                        requestCmd
+
+                let! requestMessages = collectMessages writeCmd
+
+                let _, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, PrimarySave _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
+                        update deps ignore requestMessages[0] stateAfterWriteRequest
+                    | _ -> failwith "Expected the primary save flow to finish as one completed write request."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(stageCalls).toBe (1)
+                Vitest.expect(commitCalls).toBe (1)
+                Vitest.expect(previewCalls).toBe (1)
+                Vitest.expect(pullCalls).toBe (1)
+                Vitest.expect(pushCalls).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "Primary save publishes the branch first when no upstream is configured yet",
+            fun () -> promise {
+                let mutable previewCalls = 0
+                let mutable pullCalls = 0
+                let mutable pushCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok(statusForBranch "feature/new-branch") }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "feature/new-branch" true false |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                        gitStagePaths = fun _ -> promise { return Ok okOperationResult }
+                        gitCommit = fun _ -> promise { return Ok okOperationResult }
+                        previewGitPull =
+                            fun _ -> promise {
+                                previewCalls <- previewCalls + 1
+                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+                            }
+                        gitPull =
+                            fun _ -> promise {
+                                pullCalls <- pullCalls + 1
+                                return Ok okOperationResult
+                            }
+                        gitPush =
+                            fun _ -> promise {
+                                pushCalls <- pushCalls + 1
+                                return Ok okOperationResult
+                            }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        Status = {
+                            GitState.Empty.Status with
+                                CurrentBranch = Some "feature/new-branch"
+                                TrackingBranch = None
+                                IsClean = false
+                        }
+                        BranchOptions = [| sidebarLocalBranch "feature/new-branch" true false |]
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Publish branch") initialState
+
+                let! stateAfterWriteRequest, writeCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected the primary save request to enqueue a write request."
+                        stateAfterRequest
+                        requestCmd
+
+                let! requestMessages = collectMessages writeCmd
+
+                let _, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, PrimarySave _, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
+                        update deps ignore requestMessages[0] stateAfterWriteRequest
+                    | _ -> failwith "Expected the primary save flow to publish the branch and finish."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(pushCalls).toBe (1)
+                Vitest.expect(previewCalls).toBe (0)
+                Vitest.expect(pullCalls).toBe (0)
+            }
+        )
+
+        Vitest.test (
+            "Local-only save keeps the old add-and-commit behavior and never requests pull preflight",
+            fun () -> promise {
+                let mutable previewCalled = false
+
+                let deps = {
+                    defaultDependencies with
+                        gitStagePaths = fun _ -> promise { return Ok okOperationResult }
+                        gitCommit = fun _ -> promise { return Ok okOperationResult }
+                        previewGitPull =
+                            fun _ -> promise {
+                                previewCalled <- true
+                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+                            }
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let _, cmd = update deps ignore (CommitAllRequested "Local only") state
+                let! _ = collectMessages cmd
+
+                Vitest.expect(previewCalled).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "Primary save keeps a warning and pending confirmation when preflight says online sync still needs merge resolution",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                        gitStagePaths = fun _ -> promise { return Ok okOperationResult }
+                        gitCommit = fun _ -> promise { return Ok okOperationResult }
+                        previewGitPull =
+                            fun _ -> promise {
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                        Message = Some "Pulling would require merge resolution."
+                                    }
+                            }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Add polish") initialState
+
+                let! stateAfterWriteRequest, writeCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected the primary save request to enqueue a write request."
+                        stateAfterRequest
+                        requestCmd
+
+                let! requestMessages = collectMessages writeCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteConfirmation(UnitSuccess(_, _, _, Some warningText), _, GitPendingRemoteAction.CompletePrimarySavePush))) |] ->
+                        let updatedState, cmd = update deps ignore requestMessages[0] stateAfterWriteRequest
+                        Vitest.expect(warningText).toContain ("saved locally")
+                        updatedState, cmd
+                    | _ -> failwith "Expected the primary save flow to request remote confirmation."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(nextState.PendingConfirmation.IsSome).toBe (true)
+                Vitest.expect(nextState.PendingRemoteAction).toEqual (GitPendingRemoteAction.CompletePrimarySavePush)
+                Vitest.expect(nextState.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+
+                let stateAfterCancel, cancelCmd =
+                    update deps ignore CancelPendingRemoteActionRequested nextState
+
+                let! cancelMessages = collectMessages cancelCmd
+
+                Vitest.expect(cancelMessages).toEqual ([||])
+                Vitest.expect(stateAfterCancel.PendingConfirmation).toEqual (None)
+                Vitest.expect(stateAfterCancel.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+            }
+        )
+
+        Vitest.test (
+            "Primary save preserves the local commit warning when remote preflight fails after commit",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                        gitStagePaths = fun _ -> promise { return Ok okOperationResult }
+                        gitCommit = fun _ -> promise { return Ok okOperationResult }
+                        previewGitPull = fun _ -> promise { return Error "Network unavailable during pull preflight." }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ChangedFiles = [| changedFile "README.md" "M" " " false |]
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (PrimarySaveAllRequested "Save locally first") initialState
+
+                let! stateAfterWriteRequest, writeCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected the primary save request to enqueue a write request."
+                        stateAfterRequest
+                        requestCmd
+
+                let! requestMessages = collectMessages writeCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, PrimarySave _, Ok _) |] ->
+                        update deps ignore requestMessages[0] stateAfterWriteRequest
+                    | _ -> failwith "Expected the primary save command to complete with a local-save outcome."
+
+                let! finishMessages = collectMessages finishCmd
+
+                Vitest.expect(finishMessages).toEqual ([||])
+                Vitest.expect(nextState.WarningNotice |> Option.defaultValue "").toContain ("saved locally")
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "Network unavailable during pull preflight.")
+                Vitest.expect(nextState.Status.IsClean).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "UpdateFromOnlineRequested opens a confirmation dialog instead of pulling when preflight predicts merge resolution",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        previewGitPull =
+                            fun _ -> promise {
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                        Message = Some "Pulling would require merge resolution."
+                                    }
+                            }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                }
+
+                let stateAfterRequest, cmd = update deps ignore UpdateFromOnlineRequested state
+
+                let! nextState, finishCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected update preflight to complete."
+                        stateAfterRequest
+                        cmd
+
+                let! messages = collectMessages finishCmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.PendingConfirmation.IsSome).toBe (true)
+                Vitest.expect(nextState.PendingRemoteAction).toEqual (GitPendingRemoteAction.UpdateFromOnline)
+            }
+        )
+
+        Vitest.test (
+            "UpdateFromOnlineRequested does nothing when no ARC is loaded",
+            fun () -> promise {
+                let nextState, cmd =
+                    update defaultDependencies ignore UpdateFromOnlineRequested GitState.Empty
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState).toEqual (GitState.Empty)
+            }
+        )
+
+        Vitest.test (
+            "UpdateFromOnlineRequested shows the indeterminate confirmation wording when preflight cannot classify safely",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        previewGitPull =
+                            fun _ -> promise {
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.Indeterminate
+                                        Message = Some "Git pull preflight could not be classified safely."
+                                    }
+                            }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                }
+
+                let stateAfterRequest, cmd = update deps ignore UpdateFromOnlineRequested state
+
+                let! nextState, finishCmd =
+                    updateFromSingleMessage
+                        deps
+                        ignore
+                        "Expected update preflight to complete."
+                        stateAfterRequest
+                        cmd
+
+                let! messages = collectMessages finishCmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.PendingConfirmation |> Option.map _.Title).toEqual (Some "Update could not be previewed")
+                Vitest
+                    .expect(nextState.PendingConfirmation |> Option.map _.Message |> Option.defaultValue "")
+                    .toContain ("could not determine safely")
+            }
+        )
+
+        Vitest.test (
+            "UpdatePreflightCompleted ignores results from the previous ARC session",
+            fun () -> promise {
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-b"
+                        ArcSessionId = 4
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (UpdatePreflightCompleted(
+                            3,
+                            Ok {
+                                Status = GitPullPreflightStatus.WouldRequireMergeResolution
+                                Message = Some "stale"
+                            }
+                        ))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.PendingConfirmation).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "ConfirmMergeResolutionCompleted dispatches Push when the pending primary-save push can resume",
+            fun () -> promise {
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ArcSessionId = 5
+                        PendingPostMergePush = true
+                        BusyOperation = Some(GitBusyOperation.ConfirmingMergeResolution "conflict.txt")
+                        MergeResolutionPendingPath = Some "conflict.txt"
+                        SelectedChangePath = Some "conflict.txt"
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (ConfirmMergeResolutionCompleted(
+                            5,
+                            Ok {
+                                UpdatedStatus = cleanStatus
+                                NextConflictedPath = None
+                                PageChange = GitPageChange.Clear
+                            }
+                        ))
+                        state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.PendingPostMergePush).toBe (false)
+                Vitest.expect(messages).toEqual ([| WriteRequested Push |])
+            }
+        )
+
+        Vitest.test (
             "ArcPathChanged schedules a bare RefreshRequested when switching repositories",
             fun () -> promise {
                 let nextState, cmd =
@@ -1377,9 +1869,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1450,9 +1946,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1463,15 +1963,15 @@ Vitest.describe (
                             lfsAutoTrackThresholdMb = 5,
                             remoteActionsEnabled = false,
                             remoteActionsWarning =
-                                "Sign in to a DataHub account to use fetch, pull, push, or sync."
+                                "Sign in to a DataHub account to use fetch, pull, push, or update."
                         )
                     )
 
-                let syncButton =
-                    container.querySelector ("[data-testid='GitSidebarSyncButton']")
+                let updateButton =
+                    container.querySelector ("[data-testid='GitSidebarUpdateArcButton']")
                     :?> HTMLButtonElement
 
-                Vitest.expect(syncButton.disabled).toBe (true)
+                Vitest.expect(updateButton.disabled).toBe (true)
                 Vitest.expect(container.textContent.Contains("Sign in to a DataHub account")).toBe (true)
 
                 cleanup ()
@@ -1499,9 +1999,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1544,9 +2048,13 @@ Vitest.describe (
                                 OnFetch = fun () -> ()
                                 OnPull = fun () -> ()
                                 OnPush = fun () -> ()
-                                OnSync = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
                                 OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                 OnCreateBranch = fun _ -> ()
@@ -1559,7 +2067,7 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.textContent.Contains("studies/s-study-01/protocol.md")).toBe (true)
-                Vitest.expect(container.textContent.Contains("Conflict")).toBe (true)
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusButton-3']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -1592,9 +2100,13 @@ Vitest.describe (
                                         OnFetch = fun () -> ()
                                         OnPull = fun () -> ()
                                         OnPush = fun () -> ()
-                                        OnSync = fun () -> ()
+                                        OnUpdateFromOnline = fun () -> ()
+                                        OnPrimarySaveSelection = fun _ -> ()
+                                        OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnConfirmPendingRemoteAction = fun () -> ()
+                                        OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
@@ -1669,9 +2181,13 @@ Vitest.describe (
                                         OnFetch = fun () -> ()
                                         OnPull = fun () -> ()
                                         OnPush = fun () -> ()
-                                        OnSync = fun () -> ()
+                                        OnUpdateFromOnline = fun () -> ()
+                                        OnPrimarySaveSelection = fun _ -> ()
+                                        OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnConfirmPendingRemoteAction = fun () -> ()
+                                        OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
@@ -1749,9 +2265,13 @@ Vitest.describe (
                                                         OnFetch = fun () -> ()
                                                         OnPull = fun () -> ()
                                                         OnPush = fun () -> ()
-                                                        OnSync = fun () -> ()
+                                                        OnUpdateFromOnline = fun () -> ()
+                                                        OnPrimarySaveSelection = fun _ -> ()
+                                                        OnPrimarySaveAll = fun _ -> ()
                                                         OnCommitSelection = fun _ -> ()
                                                         OnCommitAll = fun _ -> ()
+                                                        OnConfirmPendingRemoteAction = fun () -> ()
+                                                        OnCancelPendingRemoteAction = fun () -> ()
                                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                                         OnCreateBranch = fun _ -> ()
@@ -1788,15 +2308,59 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar labels deleted files explicitly instead of showing only a generic Changed badge",
+            "GitSidebar hides the inline git return text and exposes it through a popover trigger",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [| changedFile "obsolete.md" "D" " " false |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                Vitest.expect(container.textContent.Contains("git: D.")).toBe (false)
+                Vitest.expect(container.textContent.Contains("Deleted")).toBe (false)
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusButton-0']")).not.toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar keeps the change-status icon in a fixed right-edge slot",
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
                         Html.div [
-                            prop.style [
-                                style.width 340
-                                style.height 760
-                            ]
+                            prop.style [ style.width 340; style.height 760 ]
                             prop.children [
                                 Swate.Components.GitSidebar.Main(
                                     status = {
@@ -1807,19 +2371,26 @@ Vitest.describe (
                                         IsClean = false
                                         IsMergeInProgress = false
                                     },
-                                    changedFiles =
-                                        [|
-                                            changedFile "obsolete.md" "D" " " false
-                                        |],
+                                    changedFiles = [|
+                                        changedFile
+                                            "src/very/long/path/that/wraps/in/the/sidebar/and/needs/a/fixed/status/icon.txt"
+                                            "M"
+                                            " "
+                                            false
+                                    |],
                                     branchOptions = [| sidebarLocalBranch "main" true true |],
                                     callbacks = {
                                         OnRefresh = fun () -> ()
                                         OnFetch = fun () -> ()
                                         OnPull = fun () -> ()
                                         OnPush = fun () -> ()
-                                        OnSync = fun () -> ()
+                                        OnUpdateFromOnline = fun () -> ()
+                                        OnPrimarySaveSelection = fun _ -> ()
+                                        OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnConfirmPendingRemoteAction = fun () -> ()
+                                        OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
                                         OnSaveLfsAutoTrackThreshold = fun _ -> ()
                                         OnCreateBranch = fun _ -> ()
@@ -1833,8 +2404,406 @@ Vitest.describe (
                         ]
                     )
 
-                Vitest.expect(container.textContent.Contains("Deleted")).toBe (true)
-                Vitest.expect(container.textContent.Contains("git: D.")).toBe (true)
+                let statusSlot = container.querySelector("[data-testid='GitSidebarChangeStatusSlot-0']") :?> HTMLElement
+                Vitest.expect(statusSlot.className.Contains("swt:ml-auto")).toBe (true)
+                Vitest.expect(statusSlot.className.Contains("swt:shrink-0")).toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar marks rows with Windows Explorer click semantics and shows one primary save button",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let thirdRow = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+
+                firstRow.click ()
+                do! Promise.sleep 0
+
+                let shiftClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "shiftKey" ==> true ])
+
+                thirdRow.dispatchEvent shiftClick |> ignore
+                do! Promise.sleep 0
+
+                Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarPrimarySaveButton']").length).toBe (1)
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                Vitest.expect(container.querySelectorAll("[data-testid^='GitSidebarCommitSelectionCheckbox-']").length).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar plain click clears previous marks and ctrl-click toggles a row on and back off",
+            fun () -> promise {
+                let mutable capturedSelection: GitSidebarCommitSelectionRequest option = None
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun request -> capturedSelection <- Some request
+                                OnPrimarySaveAll = fun _ -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let row1 = container.querySelector("[data-testid='GitSidebarChangeRow-1']") :?> HTMLElement
+                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+                let messageInput = container.querySelector("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                row0.click ()
+                do! Promise.sleep 0
+
+                let ctrlClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
+
+                row2.dispatchEvent ctrlClick |> ignore
+                do! Promise.sleep 0
+                row2.dispatchEvent ctrlClick |> ignore
+                do! Promise.sleep 0
+                row1.click ()
+                do! Promise.sleep 0
+
+                setTextAreaValue messageInput "save one file"
+                do! Promise.sleep 0
+
+                let saveButton =
+                    container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+
+                Vitest.expect(saveButton.disabled).toBe (false)
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                saveButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(capturedSelection |> Option.map _.Paths).toEqual (Some [| "src/file-001.txt" |])
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar ctrl-shift-click adds the anchor range to the existing marked set",
+            fun () -> promise {
+                let mutable capturedSelection: GitSidebarCommitSelectionRequest option = None
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun request -> capturedSelection <- Some request
+                                OnPrimarySaveAll = fun _ -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+                let messageInput = container.querySelector("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+
+                row0.click ()
+                do! Promise.sleep 0
+
+                let ctrlShiftClick =
+                    createMouseEvent
+                        "click"
+                        (createObj [ "bubbles" ==> true; "ctrlKey" ==> true; "shiftKey" ==> true ])
+
+                row2.dispatchEvent ctrlShiftClick |> ignore
+                do! Promise.sleep 0
+
+                setTextAreaValue messageInput "save range"
+                do! Promise.sleep 0
+
+                let saveButton =
+                    container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+
+                Vitest.expect(saveButton.disabled).toBe (false)
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                saveButton.click ()
+                do! Promise.sleep 0
+
+                Vitest
+                    .expect(capturedSelection |> Option.map _.Paths)
+                    .toEqual (Some [| "src/file-000.txt"; "src/file-001.txt"; "src/file-002.txt" |])
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar keeps marked rows selected even when diff opening fails",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [|
+                                changedFile "README.md" "M" " " false
+                                changedFile "docs/guide.md" "M" " " false
+                            |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Error "Diff failed to load." }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                firstRow.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarErrorNotice']")).not.toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar plain click on a marked row deselects it and rows suppress native text selection",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [|
+                                changedFile "README.md" "M" " " false
+                                changedFile "docs/guide.md" "M" " " false
+                            |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                OnRefresh = fun () -> ()
+                                OnFetch = fun () -> ()
+                                OnPull = fun () -> ()
+                                OnPush = fun () -> ()
+                                OnUpdateFromOnline = fun () -> ()
+                                OnPrimarySaveSelection = fun _ -> ()
+                                OnPrimarySaveAll = fun _ -> ()
+                                OnCommitSelection = fun _ -> ()
+                                OnCommitAll = fun _ -> ()
+                                OnConfirmPendingRemoteAction = fun () -> ()
+                                OnCancelPendingRemoteAction = fun () -> ()
+                                OnSaveDownloadLargeFiles = fun _ -> ()
+                                OnSaveLfsAutoTrackThreshold = fun _ -> ()
+                                OnCreateBranch = fun _ -> ()
+                                OnSwitchBranch = fun _ -> ()
+                                OnSelectChange = fun _ -> promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                firstRow.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
+
+                firstRow.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(container.textContent.Contains("Save All Changes")).toBe (true)
+
+                let rowClass = firstRow.className
+                Vitest.expect(rowClass.Contains("swt:select-none")).toBe (true)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar status popover trigger does not open the changed file row",
+            fun () -> promise {
+                let mutable selectCalls = 0
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [| changedFile "README.md" "M" " " false |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                noopCallbacks with
+                                    OnSelectChange =
+                                        fun _ ->
+                                            selectCalls <- selectCalls + 1
+                                            promise { return Ok() }
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let statusButton =
+                    container.querySelector("[data-testid='GitSidebarChangeStatusButton-0']") :?> HTMLButtonElement
+
+                statusButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(selectCalls).toBe (0)
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar renders the save section without the old outer card wrapper",
+            fun () -> promise {
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [| changedFile "README.md" "M" " " false |],
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = noopCallbacks,
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let saveSection = container.querySelector("[data-testid='GitSidebarCommitSection']") :?> HTMLElement
+                let legacyCard = firstElementChild saveSection
+                Vitest.expect(legacyCard.className.Contains("swt:rounded-box")).toBe (false)
+                Vitest.expect(legacyCard.className.Contains("swt:border")).toBe (false)
 
                 cleanup ()
             }

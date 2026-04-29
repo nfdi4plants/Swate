@@ -8,6 +8,8 @@ open Main.Bindings.SimpleGit
 
 type GitFactory = SimpleGitOptions -> ISimpleGit
 
+/// Auth material that can be applied either through simple-git config entries or spawned git commands.
+/// ConfigArgs contains `-c key=value` pairs; Environment includes non-interactive prompt suppression.
 type GitCommandAuthentication = {
     ConfigArgs: string[]
     Environment: obj
@@ -25,6 +27,8 @@ let private credentialUrlPattern =
 let private baseConfigEntries (options: SimpleGitOptions) =
     options.config |> Option.defaultValue [||]
 
+/// Converts command-line `-c key=value` pairs into simple-git config entries.
+/// Used by applyAuth so credentials stay scoped to the in-memory git instance.
 let toConfigEntries (args: string[]) =
     args
     |> Array.mapi (fun index value ->
@@ -35,10 +39,13 @@ let toConfigEntries (args: string[]) =
     )
     |> Array.choose id
 
+/// Builds a git process environment that disables terminal prompts.
+/// All Git entry points should use this so Electron never blocks waiting for credentials.
 let createNonInteractiveEnv () : obj =
     // Keep all existing environment variables and disable git interactive prompts.
     emitJsExpr () "{ ...process.env, GIT_TERMINAL_PROMPT: '0' }"
 
+/// Applies the non-interactive environment to a simple-git instance.
 let applyNonInteractiveEnv (git: ISimpleGit) = git.env (createNonInteractiveEnv ())
 
 [<Emit("Buffer.from($0, 'utf8').toString('base64')")>]
@@ -80,6 +87,8 @@ let private tryBuildScopedAuthUrl (remoteUrl: string) =
     else
         None
 
+/// Builds per-command auth config for HTTPS Git and Git LFS operations.
+/// The token is injected as scoped config and optional authenticated remote URLs; nothing is persisted to repository config.
 let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (remoteUrl: string option) : string[] = [|
     let authorizationValue = buildBasicAuthorizationValue gitLabBasicAuthUsername token
 
@@ -111,6 +120,7 @@ let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (r
         ()
 |]
 
+/// Creates auth data for lower-level spawned commands such as `git lfs push`.
 let createCommandAuthentication
     (host: string)
     (token: string)
@@ -122,6 +132,8 @@ let createCommandAuthentication
         Environment = createNonInteractiveEnv ()
     }
 
+/// Returns a simple-git instance with authentication config merged into the supplied base options.
+/// Use this instead of writing credentials to `.git/config`.
 let applyAuth
     (gitFactory: GitFactory)
     (baseOptions: SimpleGitOptions)
@@ -143,6 +155,7 @@ let applyAuth
 
     gitFactory scopedOptions
 
+/// Redacts bearer/basic headers and credential URLs before errors or diagnostics leave Main.
 let redactToken (text: string) : string =
     if String.IsNullOrWhiteSpace text then
         text
@@ -160,4 +173,5 @@ let redactToken (text: string) : string =
             )
         |> fun t -> credentialUrlPattern.Replace(t, "$1[REDACTED]@")
 
+/// Redacts each command argument for diagnostic output.
 let redactArgs (args: string[]) : string[] = args |> Array.map redactToken

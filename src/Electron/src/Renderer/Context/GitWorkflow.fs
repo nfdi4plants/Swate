@@ -9,6 +9,7 @@ open Swate.Components.Api.GitLabApi
 open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.GitTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 [<RequireQualifiedAccess>]
 type GitRefreshState =
@@ -49,6 +50,12 @@ type GitPageChange =
     | Set of PageState
     | Clear
 
+[<RequireQualifiedAccess>]
+type GitPendingRemoteAction =
+    | None
+    | UpdateFromOnline
+    | CompletePrimarySavePush
+
 type GitPullWorkflowResult = {
     Status: GitStatusDto option
     WarningMessage: string option
@@ -61,6 +68,9 @@ type GitState = {
     Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
     BranchOptions: GitSidebarBranchOption[]
+    PendingConfirmation: GitSidebarConfirmationDialog option
+    PendingRemoteAction: GitPendingRemoteAction
+    PendingPostMergePush: bool
     LfsAutoTrackThresholdMb: int
     DownloadLargeFiles: bool
     RepositoryAvailability: GitRepositoryAvailability
@@ -91,6 +101,9 @@ type GitState = {
         }
         ChangedFiles = [||]
         BranchOptions = [||]
+        PendingConfirmation = None
+        PendingRemoteAction = GitPendingRemoteAction.None
+        PendingPostMergePush = false
         LfsAutoTrackThresholdMb = 1
         DownloadLargeFiles = false
         RepositoryAvailability = GitRepositoryAvailability.Ready
@@ -135,7 +148,7 @@ type WriteRequest =
     | Fetch
     | Pull
     | Push
-    | Sync
+    | PrimarySave of PreparedCommitOperation
     | Clone of GitCloneRepositoryRequest * Reply<string>
     | CommitSelection of PreparedCommitOperation
     | CommitAll of PreparedCommitOperation
@@ -149,6 +162,8 @@ type WriteSuccess =
 
 type WriteAttemptOutcome =
     | Completed of WriteSuccess
+    | CompletedWithPendingRemoteConfirmation of WriteSuccess * GitSidebarConfirmationDialog * GitPendingRemoteAction
+    | CompletedWithPendingRemoteFailure of WriteSuccess * string
     | RequiresLfsInstall of string
 
 type private WriteOperationClassification =
@@ -176,10 +191,15 @@ type Msg =
     | FetchRequested
     | PullRequested
     | PushRequested
-    | SyncRequested
+    | UpdateFromOnlineRequested
+    | UpdatePreflightCompleted of sessionId: int * Result<GitPullPreflightResult, string>
     | CloneRequested of GitCloneRepositoryRequest * Reply<string>
+    | PrimarySaveSelectionRequested of GitSidebarCommitSelectionRequest
+    | PrimarySaveAllRequested of string
     | CommitSelectionRequested of GitSidebarCommitSelectionRequest
     | CommitAllRequested of string
+    | ConfirmPendingRemoteActionRequested
+    | CancelPendingRemoteActionRequested
     | CreateBranchRequested of GitSidebarCreateBranchRequest
     | SwitchBranchRequested of string
     | WriteRequested of WriteRequest
@@ -196,6 +216,7 @@ type GitDependencies = {
     initGitRepository: string -> JS.Promise<Result<string, string>>
     createDataHubProject: string -> JS.Promise<Result<ExploreProjectDto, string>>
     installGitLfs: unit -> JS.Promise<Result<GitOperationResult, string>>
+    previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, string>>
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -540,7 +561,7 @@ let private busyOperationForWriteRequest =
     | Fetch -> GitBusyOperation.FetchingFromRemote
     | Pull -> GitBusyOperation.PullingFromRemote
     | Push -> GitBusyOperation.PushingToRemote
-    | Sync -> GitBusyOperation.PushingToRemote
+    | PrimarySave prepared -> prepared.BusyOperation
     | Clone _ -> GitBusyOperation.CloningRepository
     | CommitSelection prepared -> prepared.BusyOperation
     | CommitAll prepared -> prepared.BusyOperation
@@ -563,6 +584,8 @@ let private resolveCloneReplyCmd request result =
 let private resolveStaleWriteCompletedCmd request result =
     match result with
     | Ok(Completed success) -> resolveCloneReplyCmd request (Ok success)
+    | Ok(CompletedWithPendingRemoteConfirmation(success, _, _)) -> resolveCloneReplyCmd request (Ok success)
+    | Ok(CompletedWithPendingRemoteFailure(success, _)) -> resolveCloneReplyCmd request (Ok success)
     | Ok(RequiresLfsInstall _) -> resolveCloneReplyCmd request (Error staleArcSessionMessage)
     | Error message -> resolveCloneReplyCmd request (Error message)
 
@@ -671,59 +694,6 @@ let private runPullAttemptAsync (deps: GitDependencies) = promise {
                 Ok(Completed(UnitSuccess(refreshResult, GitPageChange.NoChange, None, operationResult.WarningMessage)))
 }
 
-let private runSyncAttemptAsync (deps: GitDependencies) (state: GitState) = promise {
-    if shouldPublishCurrentBranchFirst state then
-        return!
-            runSimpleWriteAttemptAsync
-                deps
-                GitBusyOperation.PushingToRemote
-                (fun () -> deps.gitPush { Remote = None; Branch = None })
-    else
-        let! pullResult = deps.gitPull { Remote = None; Branch = None }
-
-        match classifyWriteResult GitBusyOperation.PullingFromRemote pullResult with
-        | Error message -> return Error message
-        | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
-        | Ok(WriteOperationReady pullOperation) ->
-            let! refreshResult = refreshAllAsync deps
-
-            match refreshResult.Status, refreshErrorMessage refreshResult with
-            | Error message, _ -> return Error message
-            | Ok _, Some message -> return Error message
-            | Ok latestStatus, None when
-                pullOperation.WarningMessage.IsSome
-                || latestStatus.Conflicted.Length > 0
-                || latestStatus.IsMergeInProgress
-                ->
-                let selectedChangePathOverride =
-                    latestStatus.Conflicted |> Array.tryHead |> Option.map Some
-
-                let! pageChangeResult =
-                    if latestStatus.Conflicted.Length > 0 then
-                        loadPageAsync deps latestStatus.Conflicted.[0] true
-                    else
-                        promise { return Ok GitPageChange.NoChange }
-
-                return
-                    pageChangeResult
-                    |> Result.map (fun pageChange ->
-                        Completed(
-                            UnitSuccess(
-                                refreshResult,
-                                pageChange,
-                                selectedChangePathOverride,
-                                pullOperation.WarningMessage
-                            )
-                        )
-                    )
-            | Ok _, None ->
-                return!
-                    runSimpleWriteAttemptAsync
-                        deps
-                        GitBusyOperation.PushingToRemote
-                        (fun () -> deps.gitPush { Remote = None; Branch = None })
-}
-
 let private runCommitAttemptAsync (deps: GitDependencies) (prepared: PreparedCommitOperation) = promise {
     if String.IsNullOrWhiteSpace prepared.NormalizedMessage then
         return Error "Commit message must not be empty."
@@ -757,6 +727,90 @@ let private runCommitAttemptAsync (deps: GitDependencies) (prepared: PreparedCom
                     return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
 }
 
+let private pendingPrimarySaveWarning =
+    "Changes were saved locally. Online sync is still pending."
+
+let private indeterminateUpdateMessage (message: string option) =
+    let fallback =
+        "Swate could not determine safely whether updating will require merge resolution. Continue anyway?"
+
+    match message |> Option.map _.Trim() |> Option.filter (String.IsNullOrWhiteSpace >> not) with
+    | Some diagnostic -> $"{fallback} {diagnostic}"
+    | None -> fallback
+
+let private pendingPrimarySaveRemoteFailure localSuccess message =
+    Ok(CompletedWithPendingRemoteFailure(localSuccess, message))
+
+let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState) (prepared: PreparedCommitOperation) = promise {
+    let! commitAttempt = runCommitAttemptAsync deps prepared
+
+    match commitAttempt with
+    | Error message -> return Error message
+    | Ok(RequiresLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+    | Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, _))) ->
+        let localSuccessWithPendingWarning =
+            UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, Some pendingPrimarySaveWarning)
+
+        let runPushAfterLocalCommit () =
+            promise {
+                let! pushResult = deps.gitPush { Remote = None; Branch = None }
+
+                match classifyWriteResult GitBusyOperation.PushingToRemote pushResult with
+                | Error message -> return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
+                | Ok(WriteOperationNeedsLfsInstall promptMessage) ->
+                    return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning promptMessage
+                | Ok(WriteOperationReady operationResult) ->
+                    return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
+            }
+
+        if shouldPublishCurrentBranchFirst state then
+            return! runPushAfterLocalCommit ()
+        else
+            let! previewResult = deps.previewGitPull { Remote = None; Branch = None }
+
+            match previewResult with
+            | Error message -> return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
+            | Ok { Status = GitPullPreflightStatus.SafeToPull } ->
+                let! pullResult = deps.gitPull { Remote = None; Branch = None }
+
+                match classifyWriteResult GitBusyOperation.PullingFromRemote pullResult with
+                | Error message -> return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
+                | Ok(WriteOperationNeedsLfsInstall promptMessage) ->
+                    return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning promptMessage
+                | Ok(WriteOperationReady _) -> return! runPushAfterLocalCommit ()
+            | Ok { Status = GitPullPreflightStatus.WouldRequireMergeResolution; Message = message } ->
+                return
+                    Ok(
+                        CompletedWithPendingRemoteConfirmation(
+                            localSuccessWithPendingWarning,
+                            {
+                                Title = "Merge resolution required"
+                                Message = defaultArg message "Updating from online will require merge resolution. Continue?"
+                                ConfirmLabel = "Open Merge Resolution"
+                                CancelLabel = "Cancel"
+                            },
+                            GitPendingRemoteAction.CompletePrimarySavePush
+                        )
+                    )
+            | Ok { Status = GitPullPreflightStatus.Indeterminate; Message = message } ->
+                return
+                    Ok(
+                        CompletedWithPendingRemoteConfirmation(
+                            localSuccessWithPendingWarning,
+                            {
+                                Title = "Update could not be previewed"
+                                Message = indeterminateUpdateMessage message
+                                ConfirmLabel = "Continue"
+                                CancelLabel = "Cancel"
+                            },
+                            GitPendingRemoteAction.CompletePrimarySavePush
+                        )
+                    )
+    | Ok(Completed(CloneSuccess _)) -> return Error "Primary save produced an invalid result."
+    | Ok(CompletedWithPendingRemoteConfirmation _ as outcome) -> return Ok outcome
+    | Ok(CompletedWithPendingRemoteFailure _ as outcome) -> return Ok outcome
+}
+
 let private runSaveLfsSettingsAttemptAsync
     (deps: GitDependencies)
     (busyOperation: GitBusyOperation)
@@ -787,7 +841,7 @@ let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (reque
                 deps
                 GitBusyOperation.PushingToRemote
                 (fun () -> deps.gitPush { Remote = None; Branch = None })
-    | Sync -> return! runSyncAttemptAsync deps state
+    | PrimarySave prepared -> return! runPrimarySaveAttemptAsync deps state prepared
     | Clone(request, _) -> return! runCloneAttemptAsync deps request
     | CommitSelection prepared -> return! runCommitAttemptAsync deps prepared
     | CommitAll prepared -> return! runCommitAttemptAsync deps prepared
@@ -805,6 +859,9 @@ let private missingRepositoryModel (model: GitState) = {
         Status = GitState.Empty.Status
         ChangedFiles = [||]
         BranchOptions = [||]
+        PendingConfirmation = None
+        PendingRemoteAction = GitPendingRemoteAction.None
+        PendingPostMergePush = false
         LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
         DownloadLargeFiles = GitState.Empty.DownloadLargeFiles
         RepositoryAvailability = GitRepositoryAvailability.MissingRepository
@@ -1069,10 +1126,21 @@ let update
                     MergeResolutionPendingPath = None
                     SelectedChangePath = outcome.NextConflictedPath
                     ErrorNotice = None
-                    WarningNotice = None
+                    WarningNotice = state.WarningNotice
             }
 
-        nextModel, applyPageChangeCmd setPageState outcome.PageChange
+        if
+            nextModel.PendingPostMergePush
+            && not outcome.UpdatedStatus.IsMergeInProgress
+            && outcome.UpdatedStatus.Conflicted.Length = 0
+        then
+            { nextModel with PendingPostMergePush = false },
+            Cmd.batch [
+                applyPageChangeCmd setPageState outcome.PageChange
+                Cmd.ofMsg (WriteRequested Push)
+            ]
+        else
+            nextModel, applyPageChangeCmd setPageState outcome.PageChange
     | SaveDownloadLargeFilesRequested downloadLargeFiles when model.CurrentArcPath.IsNone ->
         {
             model with
@@ -1102,11 +1170,99 @@ let update
     | FetchRequested -> model, Cmd.ofMsg (WriteRequested Fetch)
     | PullRequested -> model, Cmd.ofMsg (WriteRequested Pull)
     | PushRequested -> model, Cmd.ofMsg (WriteRequested Push)
-    | SyncRequested -> model, Cmd.ofMsg (WriteRequested Sync)
+    | UpdateFromOnlineRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
+    | UpdateFromOnlineRequested ->
+        let nextModel =
+            model
+            |> withBusyOperation (Some GitBusyOperation.FetchingFromRemote)
+            |> fun state -> {
+                state with
+                    ErrorNotice = None
+                    WarningNotice = None
+            }
+
+        let cmd =
+            Cmd.OfPromise.either
+                deps.previewGitPull
+                { Remote = None; Branch = None }
+                (fun result -> UpdatePreflightCompleted(model.ArcSessionId, result))
+                (fun err -> UpdatePreflightCompleted(model.ArcSessionId, Error(string err)))
+
+        nextModel, cmd
+    | UpdatePreflightCompleted(sessionId, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
+    | UpdatePreflightCompleted(_, Ok { Status = GitPullPreflightStatus.SafeToPull }) ->
+        model |> withBusyOperation None, Cmd.ofMsg (WriteRequested Pull)
+    | UpdatePreflightCompleted(_, Ok { Status = GitPullPreflightStatus.WouldRequireMergeResolution; Message = message }) ->
+        {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                PendingConfirmation =
+                    Some {
+                        Title = "Merge resolution required"
+                        Message = defaultArg message "Updating from online will require merge resolution. Continue?"
+                        ConfirmLabel = "Open Merge Resolution"
+                        CancelLabel = "Cancel"
+                    }
+                PendingRemoteAction = GitPendingRemoteAction.UpdateFromOnline
+        },
+        Cmd.none
+    | UpdatePreflightCompleted(_, Ok { Status = GitPullPreflightStatus.Indeterminate; Message = message }) ->
+        {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                PendingConfirmation =
+                    Some {
+                        Title = "Update could not be previewed"
+                        Message = indeterminateUpdateMessage message
+                        ConfirmLabel = "Continue"
+                        CancelLabel = "Cancel"
+                    }
+                PendingRemoteAction = GitPendingRemoteAction.UpdateFromOnline
+        },
+        Cmd.none
+    | UpdatePreflightCompleted(_, Error message) ->
+        {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                ErrorNotice = Some message
+        },
+        Cmd.none
     | CloneRequested(request, reply) -> model, Cmd.ofMsg (WriteRequested(Clone(request, reply)))
+    | PrimarySaveSelectionRequested request ->
+        model, Cmd.ofMsg (WriteRequested(PrimarySave(prepareCommitSelection model request)))
+    | PrimarySaveAllRequested message -> model, Cmd.ofMsg (WriteRequested(PrimarySave(prepareCommitAll model message)))
     | CommitSelectionRequested request ->
         model, Cmd.ofMsg (WriteRequested(CommitSelection(prepareCommitSelection model request)))
     | CommitAllRequested message -> model, Cmd.ofMsg (WriteRequested(CommitAll(prepareCommitAll model message)))
+    | ConfirmPendingRemoteActionRequested ->
+        match model.PendingRemoteAction with
+        | GitPendingRemoteAction.UpdateFromOnline ->
+            {
+                model with
+                    PendingConfirmation = None
+                    PendingRemoteAction = GitPendingRemoteAction.None
+            },
+            Cmd.ofMsg (WriteRequested Pull)
+        | GitPendingRemoteAction.CompletePrimarySavePush ->
+            {
+                model with
+                    PendingConfirmation = None
+                    PendingRemoteAction = GitPendingRemoteAction.None
+                    PendingPostMergePush = true
+            },
+            Cmd.ofMsg (WriteRequested Pull)
+        | GitPendingRemoteAction.None -> model, Cmd.none
+    | CancelPendingRemoteActionRequested ->
+        {
+            model with
+                PendingConfirmation = None
+                PendingRemoteAction = GitPendingRemoteAction.None
+                PendingPostMergePush = false
+        },
+        Cmd.none
     | CreateBranchRequested request ->
         model,
         Cmd.ofMsg (
@@ -1123,7 +1279,27 @@ let update
         if String.IsNullOrWhiteSpace normalizedBranchName then
             model, Cmd.none
         else
-            model, Cmd.ofMsg (WriteRequested(SwitchBranch { Name = normalizedBranchName }))
+            let selectedBranch =
+                model.BranchOptions
+                |> Array.tryFind (fun b -> String.Equals(b.RefName, normalizedBranchName, StringComparison.Ordinal))
+
+            let startPoint, localName =
+                match selectedBranch with
+                | Some branch when branch.Kind = GitSidebarBranchKind.Remote ->
+                    let remotePrefix =
+                        let slashIndex = branch.RefName.IndexOf('/')
+                        if slashIndex > 0 then branch.RefName.[..slashIndex] else "origin/"
+
+                    let derivedLocalName =
+                        if normalizedBranchName.StartsWith(remotePrefix, StringComparison.Ordinal) then
+                            normalizedBranchName.[remotePrefix.Length..]
+                        else
+                            normalizedBranchName
+
+                    Some branch.RefName, derivedLocalName
+                | _ -> None, normalizedBranchName
+
+            model, Cmd.ofMsg (WriteRequested(SwitchBranch { Name = localName; StartPoint = startPoint }))
     | WriteRequested request when requiresArcForWriteRequest request && model.CurrentArcPath.IsNone -> model, Cmd.none
     | WriteRequested request ->
         let nextModel =
@@ -1237,6 +1413,74 @@ let update
                 (fun err -> WriteCompleted(sessionId, request, Error(string err)))
 
         nextModel, cmd
+    | WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteConfirmation(success, dialog, pendingRemoteAction))) ->
+        let baseModel, pageChange, warningMessage =
+            match success with
+            | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->
+                let refreshedModel = applyRefreshResult refreshResult model
+
+                let selectionAdjustedModel =
+                    match selectedChangePathOverride with
+                    | Some selectedChangePath -> {
+                        refreshedModel with
+                            SelectedChangePath = selectedChangePath
+                      }
+                    | None -> refreshedModel
+
+                selectionAdjustedModel, pageChange, warningMessage
+            | CloneSuccess _ -> model, GitPageChange.NoChange, None
+
+        let nextModel = {
+            baseModel with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+                WarningNotice = warningMessage
+                PendingConfirmation = Some dialog
+                PendingRemoteAction = pendingRemoteAction
+                PendingPostMergePush = false
+        }
+
+        nextModel, applyPageChangeCmd setPageState pageChange
+    | WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteFailure(success, message))) ->
+        let baseModel, pageChange, warningMessage =
+            match success with
+            | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->
+                let refreshedModel = applyRefreshResult refreshResult model
+
+                let selectionAdjustedModel =
+                    match selectedChangePathOverride with
+                    | Some selectedChangePath -> {
+                        refreshedModel with
+                            SelectedChangePath = selectedChangePath
+                      }
+                    | None -> refreshedModel
+
+                selectionAdjustedModel, pageChange, warningMessage
+            | CloneSuccess _ -> model, GitPageChange.NoChange, None
+
+        let nextModel = {
+            baseModel with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = Some message
+                WarningNotice = warningMessage
+                PendingConfirmation = None
+                PendingRemoteAction = GitPendingRemoteAction.None
+                PendingPostMergePush = false
+        }
+
+        nextModel, applyPageChangeCmd setPageState pageChange
+    | WriteCompleted(_, request, Ok(CompletedWithPendingRemoteConfirmation(_, _, _))) ->
+        let message = "Git operation produced an invalid pending remote confirmation."
+        let nextModel = writeErrorModel message model
+        nextModel, resolveCloneReplyCmd request (Error message)
+    | WriteCompleted(_, request, Ok(CompletedWithPendingRemoteFailure(_, _))) ->
+        let message = "Git operation produced an invalid pending remote failure."
+        let nextModel = writeErrorModel message model
+        nextModel, resolveCloneReplyCmd request (Error message)
     | WriteCompleted(_, request, Ok(Completed success)) ->
         let baseModel, pageChange, warningMessage =
             match success with
@@ -1273,9 +1517,10 @@ let subscribe (_model: GitState) : Sub<Msg> = [
     [ "gitProgress" ],
     fun dispatch ->
         let dispose =
-            Renderer.MainUpdateRendererBridge.subscribeGitProgressUpdate (fun progress ->
-                dispatch (SetCurrentProgress(Some(mapProgress progress)))
-            )
+            Renderer.IpcReceiver.subscribeProxyReceiver<IGitProgressRendererApi> {
+                gitProgressUpdate =
+                    fun progress -> dispatch (SetCurrentProgress(Some(mapProgress progress)))
+            }
 
         { new System.IDisposable with
             member _.Dispose() = dispose ()

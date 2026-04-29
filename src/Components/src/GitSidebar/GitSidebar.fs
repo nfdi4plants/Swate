@@ -3,6 +3,7 @@ namespace Swate.Components
 open System
 open Browser.Types
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 
 open Swate.Components.GitSidebarTypes
@@ -33,7 +34,11 @@ module private GitSidebarInternal =
 
         if change.IsConflicted then
             GitChangeKind.Conflict
-        elif change.OriginalPath.IsSome || indexCode.StartsWith("R", StringComparison.Ordinal) || worktreeCode.StartsWith("R", StringComparison.Ordinal) then
+        elif
+            change.OriginalPath.IsSome
+            || indexCode.StartsWith("R", StringComparison.Ordinal)
+            || worktreeCode.StartsWith("R", StringComparison.Ordinal)
+        then
             GitChangeKind.Renamed
         elif indexCode = "?" || worktreeCode = "?" then
             GitChangeKind.Untracked
@@ -46,12 +51,9 @@ module private GitSidebarInternal =
 
     let changePresentation (change: GitSidebarChange) =
         match classifyChange change with
-        | GitChangeKind.Added ->
-            "Added", "swt:badge swt:badge-success swt:badge-sm", "swt:fluent--add-24-regular"
-        | GitChangeKind.Modified ->
-            "Modified", "swt:badge swt:badge-info swt:badge-sm", "swt:fluent--edit-24-regular"
-        | GitChangeKind.Deleted ->
-            "Deleted", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--delete-24-regular"
+        | GitChangeKind.Added -> "Added", "swt:badge swt:badge-success swt:badge-sm", "swt:fluent--add-24-regular"
+        | GitChangeKind.Modified -> "Modified", "swt:badge swt:badge-info swt:badge-sm", "swt:fluent--edit-24-regular"
+        | GitChangeKind.Deleted -> "Deleted", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--delete-24-regular"
         | GitChangeKind.Renamed ->
             "Renamed", "swt:badge swt:badge-warning swt:badge-sm", "swt:fluent--arrow-swap-24-regular"
         | GitChangeKind.Untracked ->
@@ -74,6 +76,19 @@ module private GitSidebarInternal =
         |> String.concat " | "
 
     let formatThresholdInput (thresholdMb: int) = string thresholdMb
+
+    let tryRangeBetween (orderedPaths: string[]) (anchorPath: string) (clickedPath: string) =
+        match
+            orderedPaths
+            |> Array.tryFindIndex (fun path -> String.Equals(path, anchorPath, StringComparison.Ordinal)),
+            orderedPaths
+            |> Array.tryFindIndex (fun path -> String.Equals(path, clickedPath, StringComparison.Ordinal))
+        with
+        | Some anchorIndex, Some clickedIndex ->
+            let lower = min anchorIndex clickedIndex
+            let upper = max anchorIndex clickedIndex
+            Some orderedPaths.[lower..upper]
+        | _ -> None
 
 [<RequireQualifiedAccess>]
 type private ActiveDialog =
@@ -104,7 +119,9 @@ type private AdvancedActionsProps = {
     RemoteActionsEnabled: bool
     RemoteActionsWarning: string option
     SubmitDownloadLargeFiles: bool -> unit
-    SubmitSync: unit -> unit
+    SubmitUpdateFromOnline: unit -> unit
+    HasMarkedFiles: bool
+    CanRunPrimarySave: bool
     IsAdvancedActionsOpen: bool
     ToggleAdvancedActions: unit -> unit
     SubmitFetch: unit -> unit
@@ -122,45 +139,35 @@ type private CommitSectionProps = {
     CanEditCommit: bool
     CommitMessage: string
     SetCommitMessage: string -> unit
-    SelectedCommitCount: int
-    CanSubmitCommitSelection: bool
-    CanSubmitCommitAll: bool
-    ActiveAction: string option
-    SubmitCommitSelection: unit -> unit
-    SubmitCommitAll: unit -> unit
+    MarkedCount: int
+    HasMarkedFiles: bool
+    CanRunPrimarySave: bool
+    SubmitPrimarySave: unit -> unit
+    SubmitLocalCommit: unit -> unit
 }
 
 type private ChangedFilesListProps = {
     ChangedFiles: GitSidebarChange[]
     SelectedFile: string option
-    SelectedCommitPaths: Set<string>
+    MarkedPaths: Set<string>
     IsBusy: bool
-    CanEditCommit: bool
-    ToggleCommitSelection: string -> unit
+    UpdateMarkedSelection: GitSidebarChange -> bool -> bool -> unit
     OpenChange: GitSidebarChange -> unit
-}
-
-type private ChangeStatusBadgeProps = {
-    Change: GitSidebarChange
 }
 
 type private ChangedFileRowProps = {
     Change: GitSidebarChange
     Index: int
     IsSelected: bool
-    IsSelectedForCommit: bool
+    IsMarked: bool
     IsBusy: bool
-    CanEditCommit: bool
-    ToggleCommitSelection: string -> unit
+    UpdateMarkedSelection: GitSidebarChange -> bool -> bool -> unit
     OpenChange: GitSidebarChange -> unit
     VirtualStart: int
     MeasureElementRef: VirtualMeasureElementRef
 }
 
-type private ChangedFileVirtualItem = {
-    Index: int
-    Start: int
-}
+type private ChangedFileVirtualItem = { Index: int; Start: int }
 
 type private ModalsProps = {
     IsCreateBranchModalOpen: bool
@@ -174,11 +181,20 @@ type private ModalsProps = {
     SubmitCreateBranch: unit -> unit
     IsSwitchBranchModalOpen: bool
     SetSwitchBranchModalOpen: bool -> unit
-    LocalBranchOptionsForSwitch: GitSidebarBranchOption[]
+    BranchOptionsForSwitch: GitSidebarBranchOption[]
     SelectedSwitchBranch: string option
     SetSelectedSwitchBranch: string option -> unit
     SubmitSwitchBranch: unit -> unit
+    IsMissingMessageModalOpen: bool
+    SetMissingMessageModalOpen: bool -> unit
     CloseDialog: unit -> unit
+}
+
+[<NoEquality; NoComparison>]
+type private PendingRemoteActionDialogProps = {
+    PendingConfirmation: GitSidebarConfirmationDialog option
+    ConfirmPendingRemoteAction: unit -> unit
+    CancelPendingRemoteAction: unit -> unit
 }
 
 [<Erase; Mangle(false)>]
@@ -561,23 +577,12 @@ type GitSidebar =
             Html.div [
                 prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3"
                 prop.children [
-                    Html.label [
-                        prop.className "swt:col-span-2"
-                        prop.children [
-                            GitSidebar.DownloadLargeFilesToggle(
-                                props.DownloadLargeFilesInput,
-                                props.IsBusy,
-                                props.SubmitDownloadLargeFiles,
-                                testId = "GitSidebarDownloadLargeFilesCheckbox"
-                            )
-                        ]
-                    ]
                     GitSidebar.ActionButton(
-                        "Synchronize Changes",
+                        "Update ARC from Online",
                         "swt:fluent--arrow-sync-24-regular",
                         props.IsBusy || not props.RemoteActionsEnabled,
-                        props.SubmitSync,
-                        testId = "GitSidebarSyncButton"
+                        props.SubmitUpdateFromOnline,
+                        testId = "GitSidebarUpdateArcButton"
                     )
                     GitSidebar.ActionButton(
                         "More Git Actions",
@@ -660,6 +665,17 @@ type GitSidebar =
                                 )
                             ]
                         ]
+                        Html.div [
+                            prop.className "swt:mt-3"
+                            prop.children [
+                                GitSidebar.DownloadLargeFilesToggle(
+                                    props.DownloadLargeFilesInput,
+                                    props.IsBusy,
+                                    props.SubmitDownloadLargeFiles,
+                                    testId = "GitSidebarDownloadLargeFilesCheckbox"
+                                )
+                            ]
+                        ]
                         GitSidebar.LfsSettingsSection(props.LfsSettings)
                     ]
                 ]
@@ -668,99 +684,175 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
+    static member private SaveOptionsHelpPopover() =
+        Popover.Popover(
+            debug = "GitSidebarSaveOptionsHelp",
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.span "?",
+                        className = "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-6 swt:w-6 swt:px-0 swt:text-xs swt:font-bold",
+                        props = [ prop.testId "GitSidebarSaveOptionsHelpButton" ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:max-w-72 swt:flex-col swt:gap-2 swt:text-sm"
+                                prop.children [
+                                    Popover.Heading(Html.text "Save options")
+                                    Html.p [
+                                        prop.text
+                                            "Save changes commits locally, then updates and uploads online when the repository can sync safely."
+                                    ]
+                                    Html.p [
+                                        prop.text
+                                            "Add and commit changes only writes the local Git commit. Online sync stays pending until you update or upload later."
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
+        )
+
+    [<ReactComponent>]
     static member private CommitSection(props: CommitSectionProps) =
+        let isSaveMenuOpen, setSaveMenuOpen = React.useState false
+        let saveMenuRef = React.useElementRef ()
+
+        React.useListener.onClickAway (saveMenuRef, fun _ -> setSaveMenuOpen false)
+
+        let primarySaveLabel =
+            if props.HasMarkedFiles then
+                "Save Selected Changes"
+            else
+                "Save All Changes"
+
+        let localCommitLabel =
+            if props.HasMarkedFiles then
+                "Add and commit selected Changes"
+            else
+                "Add and commit all Changes"
+
         React.Fragment [
-            GitSidebar.SectionHeader("Save", None)
+            Html.div [
+                prop.className
+                    "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
+                prop.children [ Html.span "Save" ]
+            ]
 
             Html.div [
-                prop.className "swt:px-3"
+                prop.testId "GitSidebarCommitSection"
+                prop.className "swt:px-3 swt:pb-3"
                 prop.children [
-                    Html.div [
-                        prop.className "swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3"
+                    Html.label [
+                        prop.className "swt:flex swt:flex-col swt:gap-2"
                         prop.children [
-                            Html.label [
-                                prop.className "swt:flex swt:flex-col swt:gap-2"
-                                prop.children [
-                                    Html.span [
-                                        prop.className "swt:text-sm swt:font-medium"
-                                        prop.text "Save message"
-                                    ]
-                                    Html.textarea [
-                                        prop.testId "GitSidebarCommitMessageInput"
-                                        prop.className
-                                            "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
-                                        prop.disabled (not props.CanEditCommit)
-                                        prop.value props.CommitMessage
-                                        prop.placeholder (
-                                            if props.HasConflicts then
-                                                "Resolve merge conflicts before saving."
-                                            elif props.Status.IsClean then
-                                                "No changes to save."
-                                            else
-                                                "Describe your changes"
-                                        )
-                                        prop.onChange props.SetCommitMessage
-                                    ]
-                                ]
-                            ]
-                            Html.div [
-                                prop.className
-                                    "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
-                                prop.children [
-                                    Html.span (
-                                        if props.SelectedCommitCount = 1 then
-                                            "1 file selected to save"
-                                        else
-                                            $"{props.SelectedCommitCount} files selected to save"
-                                    )
-                                    if not props.CanEditCommit && props.HasConflicts then
-                                        Html.span "Saving selected files is disabled while conflicts remain."
-                                    elif not props.CanEditCommit && props.Status.IsClean then
-                                        Html.span "No changes available to save."
+                            Html.textarea [
+                                prop.testId "GitSidebarCommitMessageInput"
+                                prop.className "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
+                                prop.disabled (not props.CanEditCommit)
+                                prop.value props.CommitMessage
+                                prop.placeholder (
+                                    if props.HasConflicts then
+                                        "Resolve merge conflicts before saving."
+                                    elif props.Status.IsClean then
+                                        "No changes to save."
                                     else
-                                        Html.none
+                                        "Describe your changes"
+                                )
+                                prop.onChange props.SetCommitMessage
+                            ]
+                        ]
+                    ]
+                    Html.div [
+                        prop.className
+                            "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
+                        prop.children [
+                            Html.span (
+                                if props.MarkedCount = 1 then
+                                    "1 file marked to save"
+                                else
+                                    $"{props.MarkedCount} files marked to save"
+                            )
+                            if not props.CanEditCommit && props.HasConflicts then
+                                Html.span "Saving files is disabled while conflicts remain."
+                            elif not props.CanEditCommit && props.Status.IsClean then
+                                Html.span "No changes available to save."
+                            else
+                                Html.none
+                        ]
+                    ]
+                    Html.div [
+                        prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2"
+                        prop.children [
+                            Html.div [
+                                prop.ref saveMenuRef
+                                prop.className "swt:relative swt:inline-flex"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:join"
+                                        prop.children [
+                                            Html.button [
+                                                prop.testId "GitSidebarPrimarySaveButton"
+                                                prop.className "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:gap-2 swt:normal-case"
+                                                prop.disabled (not props.CanRunPrimarySave)
+                                                prop.onClick (fun _ -> props.SubmitPrimarySave())
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className
+                                                            "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
+                                                    ]
+                                                    Html.span primarySaveLabel
+                                                ]
+                                            ]
+                                            Html.button [
+                                                prop.testId "GitSidebarSaveOptionsButton"
+                                                prop.className
+                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:min-w-0 swt:px-2"
+                                                prop.disabled (not props.CanRunPrimarySave)
+                                                prop.onClick (fun _ -> setSaveMenuOpen (not isSaveMenuOpen))
+                                                prop.children [
+                                                    Html.span [
+                                                        prop.className "swt:iconify swt:fluent--chevron-down-24-regular swt:size-4"
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
+                                    ]
+                                    if isSaveMenuOpen then
+                                        Html.ul [
+                                            prop.testId "GitSidebarSaveOptionsMenu"
+                                            prop.tabIndex 0
+                                            prop.className
+                                                "swt:menu swt:absolute swt:left-0 swt:top-full swt:z-99 swt:mt-1 swt:w-full swt:min-w-0 swt:rounded-box swt:bg-base-200 swt:p-2 swt:shadow-sm"
+                                            prop.onClick (fun _ -> setSaveMenuOpen false)
+                                            prop.children [
+                                                Html.li [
+                                                    prop.children [
+                                                        Html.button [
+                                                            prop.testId "GitSidebarLocalCommitButton"
+                                                            prop.className "swt:items-start swt:gap-2 swt:whitespace-normal swt:text-left"
+                                                            prop.onClick (fun _ -> props.SubmitLocalCommit())
+                                                            prop.children [
+                                                                Html.span [
+                                                                    prop.className
+                                                                        "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
+                                                                ]
+                                                                Html.span [
+                                                                    prop.className "swt:min-w-0 swt:break-words"
+                                                                    prop.text localCommitLabel
+                                                                ]
+                                                            ]
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                        ]
                                 ]
                             ]
                             Html.div [
-                                prop.className "swt:mt-3 swt:grid swt:grid-cols-2 swt:gap-2"
-                                prop.children [
-                                    Html.button [
-                                        prop.testId "GitSidebarCommitSelectionButton"
-                                        prop.className "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:normal-case"
-                                        prop.disabled (not props.CanSubmitCommitSelection)
-                                        prop.onClick (fun _ -> props.SubmitCommitSelection())
-                                        prop.children [
-                                            Html.span [
-                                                prop.className
-                                                    "swt:iconify swt:fluent--checkbox-checked-24-regular swt:size-4"
-                                            ]
-                                            Html.span (
-                                                if props.ActiveAction = Some "Commit Selection" then
-                                                    "Committing..."
-                                                else
-                                                    "Save Selected Changes"
-                                            )
-                                        ]
-                                    ]
-                                    Html.button [
-                                        prop.testId "GitSidebarCommitAllButton"
-                                        prop.className "swt:btn swt:btn-sm swt:btn-secondary swt:gap-2 swt:normal-case"
-                                        prop.disabled (not props.CanSubmitCommitAll)
-                                        prop.onClick (fun _ -> props.SubmitCommitAll())
-                                        prop.children [
-                                            Html.span [
-                                                prop.className
-                                                    "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
-                                            ]
-                                            Html.span (
-                                                if props.ActiveAction = Some "Commit All" then
-                                                    "Committing..."
-                                                else
-                                                    "Save All Changes"
-                                            )
-                                        ]
-                                    ]
-                                ]
+                                prop.className "swt:ml-auto"
+                                prop.children [ GitSidebar.SaveOptionsHelpPopover() ]
                             ]
                         ]
                     ]
@@ -769,29 +861,61 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
-    static member private ChangeStatusBadge(props: ChangeStatusBadgeProps) =
-        let badgeLabel, badgeClass, iconClass = GitSidebarInternal.changePresentation props.Change
+    static member private ChangeStatusPopover(index: int, change: GitSidebarChange) =
+        let label, _, iconClass = GitSidebarInternal.changePresentation change
+        let gitReturn = GitSidebarInternal.describeChange change
+        let stopRowActivation (event: Event) = event.stopPropagation ()
 
-        Html.span [
-            prop.className [ badgeClass; "swt:gap-1" ]
-            prop.children [
-                Html.span [
-                    prop.className $"swt:iconify {iconClass} swt:size-3.5"
-                ]
-                Html.span [
-                    prop.text badgeLabel
-                ]
+        let triggerInteractionProps =
+            createObj [
+                "onClick" ==> stopRowActivation
+                "onMouseDown" ==> stopRowActivation
+                "onKeyDown" ==> stopRowActivation
             ]
-        ]
+
+        Popover.Popover(
+            debug = $"git_change_status_{index}",
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.span [ prop.className $"swt:iconify {iconClass} swt:size-4" ],
+                        className = "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-7 swt:w-7 swt:px-0",
+                        interactionProps = triggerInteractionProps,
+                        props = [ prop.testId $"GitSidebarChangeStatusButton-{index}" ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    Popover.Heading(Html.text "File status")
+                                    Html.p [
+                                        prop.className "swt:text-sm"
+                                        prop.text $"This file was {label.ToLowerInvariant()}."
+                                    ]
+                                    Html.p [
+                                        prop.className "swt:text-sm swt:font-mono"
+                                        prop.text $"Git return: {gitReturn}"
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
+        )
 
     [<ReactComponent>]
     static member private ChangedFileRow(props: ChangedFileRowProps) =
         let change = props.Change
 
+        let activateRow ctrlKey shiftKey =
+            if not props.IsBusy then
+                props.UpdateMarkedSelection change ctrlKey shiftKey
+                props.OpenChange change
+
         Html.div [
             prop.role "listitem"
             prop.custom ("data-index", props.Index)
-            prop.ref (fun element -> props.MeasureElementRef (Option.ofObj element))
+            prop.ref (fun element -> props.MeasureElementRef(Option.ofObj element))
             prop.className "swt:absolute swt:left-0 swt:w-full"
             prop.style [
                 style.top 0
@@ -800,61 +924,61 @@ type GitSidebar =
                 style.custom ("transform", $"translateY({props.VirtualStart}px)")
             ]
             prop.children [
-                Html.button [
+                Html.div [
                     prop.testId $"GitSidebarChangeRow-{props.Index}"
                     prop.custom ("data-index", props.Index)
-                    prop.disabled props.IsBusy
+                    prop.role "button"
+                    prop.tabIndex (if props.IsBusy then -1 else 0)
+                    prop.custom ("aria-disabled", if props.IsBusy then "true" else "false")
                     prop.className [
-                        "swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors"
+                        "swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors swt:select-none"
+                        if props.IsBusy then
+                            "swt:cursor-not-allowed swt:opacity-60"
+                        else
+                            "swt:cursor-pointer"
                         if change.IsConflicted then
                             "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
                         elif props.IsSelected then
                             "swt:border-primary/40 swt:bg-primary/5 hover:swt:bg-primary/10"
+                        elif props.IsMarked then
+                            "swt:border-success/40 swt:bg-success/10 hover:swt:bg-success/15"
                         else
                             "swt:border-base-content/10 swt:bg-base-100 hover:swt:bg-base-200/80"
                     ]
-                    prop.onClick (fun _ -> props.OpenChange change)
+                    prop.onClick (fun (event: MouseEvent) ->
+                        activateRow (event.ctrlKey || event.metaKey) event.shiftKey
+                    )
+                    prop.onKeyDown (fun (event: KeyboardEvent) ->
+                        if event.key = "Enter" || event.key = " " then
+                            event.preventDefault ()
+                            activateRow (event.ctrlKey || event.metaKey) event.shiftKey
+                    )
                     prop.children [
-                        Html.input [
-                            prop.testId ("GitSidebarCommitSelectionCheckbox-" + change.Path)
-                            prop.className "swt:checkbox swt:checkbox-sm swt:mt-0.5 swt:shrink-0"
-                            prop.type'.checkbox
-                            prop.disabled (not props.CanEditCommit || change.IsConflicted)
-                            prop.isChecked props.IsSelectedForCommit
-                            prop.onClick (fun event -> event.stopPropagation ())
-                            prop.onChange (fun (_: bool) -> props.ToggleCommitSelection change.Path)
-                        ]
-                        Html.span [
-                            prop.className [
-                                "swt:mt-0.5 swt:font-mono swt:text-[0.7rem]"
-                                if change.IsConflicted then
-                                    "swt:text-error"
-                                else
-                                    "swt:text-base-content/60"
-                            ]
-                            prop.text (GitSidebarInternal.describeChange change)
-                        ]
                         Html.div [
                             prop.className "swt:min-w-0 swt:flex-1"
                             prop.children [
                                 Html.div [
-                                    prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1.5"
+                                    prop.className "swt:min-w-0"
                                     prop.children [
                                         Html.span [
-                                            prop.className "swt:truncate swt:text-sm swt:font-medium"
+                                            prop.className "swt:block swt:break-words swt:text-sm swt:font-medium"
                                             prop.text change.Path
                                         ]
-                                        GitSidebar.ChangeStatusBadge({ Change = change })
+                                        match change.OriginalPath with
+                                        | Some originalPath ->
+                                            Html.div [
+                                                prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
+                                                prop.text $"Renamed from {originalPath}"
+                                            ]
+                                        | None -> Html.none
                                     ]
                                 ]
-                                match change.OriginalPath with
-                                | Some originalPath ->
-                                    Html.div [
-                                        prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
-                                        prop.text $"Renamed from {originalPath}"
-                                    ]
-                                | None -> Html.none
                             ]
+                        ]
+                        Html.div [
+                            prop.testId $"GitSidebarChangeStatusSlot-{props.Index}"
+                            prop.className "swt:ml-auto swt:shrink-0 swt:self-start"
+                            prop.children [ GitSidebar.ChangeStatusPopover(props.Index, change) ]
                         ]
                     ]
                 ]
@@ -930,7 +1054,9 @@ type GitSidebar =
                             prop.testId "GitSidebarChangedFilesVirtualContent"
                             prop.role "list"
                             prop.className "swt:relative swt:mt-1"
-                            prop.style [ style.height (changedFileListVirtualizer.getTotalSize ()) ]
+                            prop.style [
+                                style.height (changedFileListVirtualizer.getTotalSize ())
+                            ]
                             prop.children [
                                 for virtualItem in virtualItems do
                                     let change = props.ChangedFiles.[virtualItem.Index]
@@ -941,7 +1067,7 @@ type GitSidebar =
                                             String.Equals(selected, change.Path, StringComparison.Ordinal)
                                         )
 
-                                    let isSelectedForCommit = Set.contains change.Path props.SelectedCommitPaths
+                                    let isMarked = Set.contains change.Path props.MarkedPaths
 
                                     React.KeyedFragment(
                                         change.Path,
@@ -951,10 +1077,9 @@ type GitSidebar =
                                                     Change = change
                                                     Index = virtualItem.Index
                                                     IsSelected = isSelected
-                                                    IsSelectedForCommit = isSelectedForCommit
+                                                    IsMarked = isMarked
                                                     IsBusy = props.IsBusy
-                                                    CanEditCommit = props.CanEditCommit
-                                                    ToggleCommitSelection = props.ToggleCommitSelection
+                                                    UpdateMarkedSelection = props.UpdateMarkedSelection
                                                     OpenChange = props.OpenChange
                                                     VirtualStart = virtualItem.Start
                                                     MeasureElementRef = changedFileListVirtualizer.measureElement
@@ -1055,7 +1180,7 @@ type GitSidebar =
                 isOpen = props.IsSwitchBranchModalOpen,
                 setIsOpen = props.SetSwitchBranchModalOpen,
                 header = Html.text "Switch Branch",
-                description = Html.text "Switch to an existing local branch.",
+                description = Html.text "Switch to an existing branch.",
                 debug = "GitSidebarSwitchBranchModal",
                 children =
                     Html.div [
@@ -1080,11 +1205,11 @@ type GitSidebar =
                                                 props.SetSelectedSwitchBranch(Some nextValue)
                                         )
                                         prop.children [
-                                            for branch in props.LocalBranchOptionsForSwitch do
+                                            for branch in props.BranchOptionsForSwitch do
                                                 Html.option [
                                                     prop.key branch.RefName
                                                     prop.value branch.RefName
-                                                    prop.text branch.DisplayLabel
+                                                    prop.text $"{branch.DisplayLabel} ({GitSidebarInternal.branchKindLabel branch.Kind})"
                                                 ]
                                         ]
                                     ]
@@ -1103,7 +1228,7 @@ type GitSidebar =
                         Html.button [
                             prop.testId "GitSidebarSwitchBranchSubmit"
                             prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                            prop.disabled (props.ActiveAction.IsSome || props.LocalBranchOptionsForSwitch.Length = 0)
+                            prop.disabled (props.ActiveAction.IsSome || props.BranchOptionsForSwitch.Length = 0)
                             prop.text (
                                 if props.ActiveAction = Some "Switch Branch" then
                                     "Switching..."
@@ -1114,7 +1239,60 @@ type GitSidebar =
                         ]
                     ]
             )
+
+            BaseModal.Modal(
+                isOpen = props.IsMissingMessageModalOpen,
+                setIsOpen = props.SetMissingMessageModalOpen,
+                header = Html.text "Missing save message",
+                children = Html.p [ prop.text "Please add a description." ],
+                footer =
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                        prop.text "OK"
+                        prop.onClick (fun _ -> props.SetMissingMessageModalOpen false)
+                    ],
+                debug = "GitSidebarMissingMessage"
+            )
         ]
+
+    [<ReactComponent>]
+    static member private PendingRemoteActionDialog(props: PendingRemoteActionDialogProps) =
+        BaseModal.Modal(
+            isOpen = props.PendingConfirmation.IsSome,
+            setIsOpen =
+                (fun isOpen ->
+                    if not isOpen then
+                        props.CancelPendingRemoteAction()
+                ),
+            header = Html.text (props.PendingConfirmation |> Option.map _.Title |> Option.defaultValue "Confirm"),
+            children =
+                Html.p [
+                    prop.className "swt:whitespace-pre-wrap"
+                    prop.text (props.PendingConfirmation |> Option.map _.Message |> Option.defaultValue "")
+                ],
+            footer =
+                React.Fragment [
+                    Html.button [
+                        prop.className "swt:btn"
+                        prop.text (
+                            props.PendingConfirmation
+                            |> Option.map _.CancelLabel
+                            |> Option.defaultValue "Cancel"
+                        )
+                        prop.onClick (fun _ -> props.CancelPendingRemoteAction())
+                    ]
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                        prop.text (
+                            props.PendingConfirmation
+                            |> Option.map _.ConfirmLabel
+                            |> Option.defaultValue "Continue"
+                        )
+                        prop.onClick (fun _ -> props.ConfirmPendingRemoteAction())
+                    ]
+                ],
+            debug = "GitSidebarPendingRemoteAction"
+        )
 
     [<ReactComponent>]
     static member Main
@@ -1129,6 +1307,7 @@ type GitSidebar =
             ?selectedFile: string,
             ?errorNotice: string,
             ?warningNotice: string,
+            ?pendingConfirmation: GitSidebarConfirmationDialog,
             ?remoteActionsEnabled: bool,
             ?remoteActionsWarning: string
         ) =
@@ -1136,6 +1315,7 @@ type GitSidebar =
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
         let errorNotice = errorNotice
         let warningNotice = warningNotice
+        let pendingConfirmation = pendingConfirmation
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
         let selectedFile = selectedFile
@@ -1143,9 +1323,13 @@ type GitSidebar =
         let onFetch = callbacks.OnFetch
         let onPull = callbacks.OnPull
         let onPush = callbacks.OnPush
-        let onSync = callbacks.OnSync
+        let onUpdateFromOnline = callbacks.OnUpdateFromOnline
+        let onPrimarySaveSelection = callbacks.OnPrimarySaveSelection
+        let onPrimarySaveAll = callbacks.OnPrimarySaveAll
         let onCommitSelection = callbacks.OnCommitSelection
         let onCommitAll = callbacks.OnCommitAll
+        let onConfirmPendingRemoteAction = callbacks.OnConfirmPendingRemoteAction
+        let onCancelPendingRemoteAction = callbacks.OnCancelPendingRemoteAction
         let onSaveDownloadLargeFiles = callbacks.OnSaveDownloadLargeFiles
         let onSaveLfsAutoTrackThreshold = callbacks.OnSaveLfsAutoTrackThreshold
         let onCreateBranch = callbacks.OnCreateBranch
@@ -1157,6 +1341,7 @@ type GitSidebar =
         let activeDialog, setActiveDialog = React.useState ActiveDialog.None
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
+        let isMissingMessageModalOpen, setMissingMessageModalOpen = React.useState false
 
         let downloadLargeFilesInput, setDownloadLargeFilesInput =
             React.useState downloadLargeFiles
@@ -1164,8 +1349,10 @@ type GitSidebar =
         let lfsThresholdInput, setLfsThresholdInput =
             React.useState (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)
 
-        let selectedCommitPaths, setSelectedCommitPaths =
-            React.useStateWithUpdater Set.empty<string>
+        let markedPaths, setMarkedPaths = React.useStateWithUpdater Set.empty<string>
+
+        let selectionAnchorPath, setSelectionAnchorPath =
+            React.useStateWithUpdater (None: string option)
 
         let selectedStartPoint, setSelectedStartPoint = React.useState (None: string option)
 
@@ -1201,16 +1388,16 @@ type GitSidebar =
 
         let visibleError = errorNotice |> Option.orElse localError
 
-        // Sync selectedCommitPaths with changedFiles: remove paths that are no longer in the changed
+        // Sync marked paths with changedFiles: remove paths that are no longer in the changed
         // files list (e.g., after a commit or discard operation updates the server-side file list).
         React.useEffect (
             (fun () ->
-                setSelectedCommitPaths (fun current ->
-                    current
-                    |> Set.filter (fun path ->
-                        changedFiles
-                        |> Array.exists (fun change -> String.Equals(change.Path, path, StringComparison.Ordinal))
-                    )
+                let changedPathSet = changedFiles |> Array.map _.Path |> Set.ofArray
+
+                setMarkedPaths (fun current -> current |> Set.filter (fun path -> Set.contains path changedPathSet))
+
+                setSelectionAnchorPath (fun current ->
+                    current |> Option.filter (fun path -> Set.contains path changedPathSet)
                 )
             ),
             [| box changedFiles |]
@@ -1255,9 +1442,11 @@ type GitSidebar =
                     )
                 )
 
-        let localBranchOptionsForSwitch =
+        let branchOptionsForSwitch =
             branchOptions
-            |> Array.filter (fun branch -> branch.Kind = GitSidebarBranchKind.Local && not branch.IsCurrent)
+            |> Array.filter (fun branch -> not branch.IsCurrent)
+
+        let canSwitchBranch = branchOptionsForSwitch.Length > 0
 
         let runSelectChangeAction (change: GitSidebarChange) =
             promise {
@@ -1292,47 +1481,75 @@ type GitSidebar =
             setLocalError None
 
             let defaultBranch =
-                localBranchOptionsForSwitch |> Array.tryHead |> Option.map _.RefName
+                branchOptionsForSwitch |> Array.tryHead |> Option.map _.RefName
 
             setSelectedSwitchBranch defaultBranch
             setActiveDialog ActiveDialog.SwitchBranch
 
-        let toggleCommitSelection (path: string) =
-            setSelectedCommitPaths (fun current ->
-                if Set.contains path current then
-                    Set.remove path current
-                else
-                    Set.add path current
-            )
+        let updateMarkedSelection (change: GitSidebarChange) (ctrlKey: bool) (shiftKey: bool) =
+            let orderedPaths = changedFiles |> Array.map _.Path
+            let anchorPath = selectionAnchorPath |> Option.defaultValue change.Path
 
-        let submitCommitSelection () =
+            let rangePaths =
+                GitSidebarInternal.tryRangeBetween orderedPaths anchorPath change.Path
+                |> Option.defaultValue [| change.Path |]
+                |> Set.ofArray
+
+            let nextMarkedPaths =
+                match ctrlKey, shiftKey with
+                | false, false ->
+                    if Set.contains change.Path markedPaths then
+                        Set.remove change.Path markedPaths
+                    else
+                        Set.singleton change.Path
+                | true, false ->
+                    if Set.contains change.Path markedPaths then
+                        Set.remove change.Path markedPaths
+                    else
+                        Set.add change.Path markedPaths
+                | false, true -> rangePaths
+                | true, true -> Set.union markedPaths rangePaths
+
+            setMarkedPaths (fun _ -> nextMarkedPaths)
+            setSelectionAnchorPath (fun _ -> Some change.Path)
+
+        let submitPrimarySave () =
             let normalizedCommitMessage = commitMessage.Trim()
-            let selectedPaths = selectedCommitPaths |> Set.toArray |> Array.sort
+            let hasMarkedFiles = (Set.count markedPaths) > 0
 
             if String.IsNullOrWhiteSpace normalizedCommitMessage then
-                setLocalError (Some "Save message must not be empty.")
-            elif selectedPaths.Length = 0 then
-                setLocalError (Some "Select at least one file to save.")
+                setMissingMessageModalOpen true
+            elif hasMarkedFiles then
+                setLocalError None
+
+                onPrimarySaveSelection {
+                    Message = normalizedCommitMessage
+                    Paths = markedPaths |> Set.toArray |> Array.sort
+                }
+
+                setCommitMessage ""
+                setMarkedPaths (fun _ -> Set.empty)
             else
+                setLocalError None
+                onPrimarySaveAll normalizedCommitMessage
+                setCommitMessage ""
+
+        let submitLocalCommit () =
+            let normalizedCommitMessage = commitMessage.Trim()
+            let hasMarkedFiles = (Set.count markedPaths) > 0
+
+            if String.IsNullOrWhiteSpace normalizedCommitMessage then
+                setMissingMessageModalOpen true
+            elif hasMarkedFiles then
                 setLocalError None
 
                 onCommitSelection {
                     Message = normalizedCommitMessage
-                    Paths = selectedPaths
+                    Paths = markedPaths |> Set.toArray |> Array.sort
                 }
-
-                setCommitMessage ""
-                setSelectedCommitPaths (fun _ -> Set.empty)
-
-        let submitCommitAll () =
-            let normalizedCommitMessage = commitMessage.Trim()
-
-            if String.IsNullOrWhiteSpace normalizedCommitMessage then
-                setLocalError (Some "Save message must not be empty.")
             else
                 setLocalError None
                 onCommitAll normalizedCommitMessage
-                setCommitMessage ""
 
         let submitLfsThreshold () =
             let normalizedInput = lfsThresholdInput.Trim()
@@ -1384,15 +1601,9 @@ type GitSidebar =
 
         let hasConflicts = GitSidebarInternal.hasConflicts status changedFiles
         let canEditCommit = not status.IsClean && not hasConflicts && not isBusy
-        let selectedCommitCount = Set.count selectedCommitPaths
-
-        let canSubmitCommitSelection =
-            canEditCommit
-            && selectedCommitCount > 0
-            && not (String.IsNullOrWhiteSpace(commitMessage.Trim()))
-
-        let canSubmitCommitAll =
-            canEditCommit && not (String.IsNullOrWhiteSpace(commitMessage.Trim()))
+        let markedCount = Set.count markedPaths
+        let hasMarkedFiles = markedCount > 0
+        let canRunPrimarySave = canEditCommit
 
         let normalizedLfsThresholdInput = lfsThresholdInput.Trim()
 
@@ -1430,10 +1641,12 @@ type GitSidebar =
                         RemoteActionsEnabled = remoteActionsEnabled
                         RemoteActionsWarning = remoteActionsWarning
                         SubmitDownloadLargeFiles = submitDownloadLargeFiles
-                        SubmitSync =
+                        SubmitUpdateFromOnline =
                             fun () ->
                                 setLocalError None
-                                onSync ()
+                                onUpdateFromOnline ()
+                        HasMarkedFiles = hasMarkedFiles
+                        CanRunPrimarySave = canRunPrimarySave
                         IsAdvancedActionsOpen = isAdvancedActionsOpen
                         ToggleAdvancedActions =
                             fun () ->
@@ -1457,7 +1670,7 @@ type GitSidebar =
                                 onPush ()
                         OpenCreateBranchModal = openCreateBranchModal
                         OpenSwitchBranchModal = openSwitchBranchModal
-                        CanSwitchBranch = localBranchOptionsForSwitch.Length > 0
+                        CanSwitchBranch = canSwitchBranch
                         LfsSettings = {
                             IsBusy = isBusy
                             LfsThresholdInput = lfsThresholdInput
@@ -1476,12 +1689,11 @@ type GitSidebar =
                         CanEditCommit = canEditCommit
                         CommitMessage = commitMessage
                         SetCommitMessage = setCommitMessage
-                        SelectedCommitCount = selectedCommitCount
-                        CanSubmitCommitSelection = canSubmitCommitSelection
-                        CanSubmitCommitAll = canSubmitCommitAll
-                        ActiveAction = activeAction
-                        SubmitCommitSelection = submitCommitSelection
-                        SubmitCommitAll = submitCommitAll
+                        MarkedCount = markedCount
+                        HasMarkedFiles = hasMarkedFiles
+                        CanRunPrimarySave = canRunPrimarySave
+                        SubmitPrimarySave = submitPrimarySave
+                        SubmitLocalCommit = submitLocalCommit
                     }
                 )
 
@@ -1514,10 +1726,9 @@ type GitSidebar =
                     {
                         ChangedFiles = changedFiles
                         SelectedFile = selectedFile
-                        SelectedCommitPaths = selectedCommitPaths
+                        MarkedPaths = markedPaths
                         IsBusy = isBusy
-                        CanEditCommit = canEditCommit
-                        ToggleCommitSelection = toggleCommitSelection
+                        UpdateMarkedSelection = updateMarkedSelection
                         OpenChange = fun change -> runSelectChangeAction change
                     }
                 )
@@ -1535,11 +1746,21 @@ type GitSidebar =
                         SubmitCreateBranch = submitCreateBranch
                         IsSwitchBranchModalOpen = isSwitchBranchModalOpen
                         SetSwitchBranchModalOpen = setSwitchBranchModalOpen
-                        LocalBranchOptionsForSwitch = localBranchOptionsForSwitch
+                        BranchOptionsForSwitch = branchOptionsForSwitch
                         SelectedSwitchBranch = selectedSwitchBranch
                         SetSelectedSwitchBranch = setSelectedSwitchBranch
                         SubmitSwitchBranch = submitSwitchBranch
+                        IsMissingMessageModalOpen = isMissingMessageModalOpen
+                        SetMissingMessageModalOpen = setMissingMessageModalOpen
                         CloseDialog = fun () -> setActiveDialog ActiveDialog.None
+                    }
+                )
+
+                GitSidebar.PendingRemoteActionDialog(
+                    {
+                        PendingConfirmation = pendingConfirmation
+                        ConfirmPendingRemoteAction = onConfirmPendingRemoteAction
+                        CancelPendingRemoteAction = onCancelPendingRemoteAction
                     }
                 )
             ]

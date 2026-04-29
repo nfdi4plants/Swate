@@ -1,7 +1,9 @@
 module Main.IPC.IGitApi
 
 open System
+open System.Text.RegularExpressions
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.GitTypes
 open Fable.Core
 open Fable.Electron
@@ -9,6 +11,37 @@ open Fable.Electron.Main
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Git
+open Main.Git.GitLfsAdapter
+
+let private versionPattern = Regex(@"(\d+)\.(\d+)(?:\.(\d+))?")
+
+let private isAtLeast (major, minor, patch) (minMajor, minMinor, minPatch) =
+    major > minMajor
+    || (major = minMajor && minor > minMinor)
+    || (major = minMajor && minor = minMinor && patch >= minPatch)
+
+let private hasMinVersion minimum (output: string option) =
+    let m = versionPattern.Match(defaultArg output "")
+
+    if m.Success then
+        isAtLeast
+            (Int32.Parse m.Groups.[1].Value,
+             Int32.Parse m.Groups.[2].Value,
+             if m.Groups.[3].Success then Int32.Parse m.Groups.[3].Value else 0)
+            minimum
+    else
+        false
+
+let private checkGitVersions () = promise {
+    let! gitVersion = tryExecGitText None 5000 [| "--version" |]
+    let! gitLfsVersion = tryExecGitText None 5000 [| "lfs"; "--version" |]
+
+    return
+        if hasMinVersion (2, 32, 0) gitVersion && hasMinVersion (3, 7, 0) gitLfsVersion then
+            Ok()
+        else
+            Error(exn "Swate requires Git 2.32.0+ and Git LFS 3.7.0+ (`git lfs --version`).")
+}
 
 let private toGitOperationResult
     (successMessage: 'T -> string option)
@@ -56,9 +89,9 @@ let private toGitPageLoadResultDto
 
 let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgressCallback =
     let rendererApi =
-        Remoting.init
+        Remoting.createIpc ()
         |> Remoting.withWindow vault.window
-        |> Remoting.buildClient<IMainUpdateRendererApi>
+        |> Remoting.buildProxySender<IGitProgressRendererApi>
 
     fun progressEvent ->
         rendererApi.gitProgressUpdate {
@@ -69,9 +102,10 @@ let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgress
             Total = Some progressEvent.total
         }
 
-let api: IGitApi = {
+let api (event: IpcMainInvokeEvent) : IGitApi = {
+    checkGitVersions = fun () -> checkGitVersions ()
     getGitStatus =
-        fun (event: IpcMainEvent) -> promise {
+        fun () -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -82,7 +116,7 @@ let api: IGitApi = {
                 | Error failure -> return Error(exn $"git status failed ({failure.Kind}): {failure.Message}")
         }
     getGitBranches =
-        fun (event: IpcMainEvent) -> promise {
+        fun () -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -93,7 +127,7 @@ let api: IGitApi = {
                 | Error failure -> return Error(exn $"git branch list failed ({failure.Kind}): {failure.Message}")
         }
     getGitLfsSettings =
-        fun (event: IpcMainEvent) -> promise {
+        fun () -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -103,8 +137,20 @@ let api: IGitApi = {
                 | Ok settings -> return Ok settings
                 | Error failure -> return Error(exn $"git lfs settings failed ({failure.Kind}): {failure.Message}")
         }
+    previewGitPull =
+        fun (request: GitRemoteOperationRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+                let! result = GitService.previewPull arcPath request.Remote request.Branch (Some progressReporter)
+
+                match result with
+                | Ok preview -> return Ok preview
+                | Error failure -> return Error(exn $"git pull preview failed ({failure.Kind}): {failure.Message}")
+        }
     getGitDiffSummary =
-        fun (event: IpcMainEvent) -> promise {
+        fun () -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -115,7 +161,7 @@ let api: IGitApi = {
                 | Error failure -> return Error(exn $"git diff summary failed ({failure.Kind}): {failure.Message}")
         }
     getGitWordDiff =
-        fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
+        fun (request: GitPathspecRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -126,7 +172,7 @@ let api: IGitApi = {
                 | Error failure -> return Error(exn $"git word diff failed ({failure.Kind}): {failure.Message}")
         }
     getGitDiffViewData =
-        fun (event: IpcMainEvent) (requestedPath: string) -> promise {
+        fun (requestedPath: string) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -134,7 +180,7 @@ let api: IGitApi = {
                 return toGitPageLoadResultDto requestedPath "git diff view" result
         }
     getGitMergeConflictViewData =
-        fun (event: IpcMainEvent) (requestedPath: string) -> promise {
+        fun (requestedPath: string) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -142,7 +188,7 @@ let api: IGitApi = {
                 return toGitPageLoadResultDto requestedPath "git merge conflict view" result
         }
     installGitLfs =
-        fun (_event: IpcMainEvent) -> promise {
+        fun () -> promise {
             let! result = GitLfsService.installSystem ()
 
             return
@@ -167,7 +213,7 @@ let api: IGitApi = {
                     }
         }
     gitFetch =
-        fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
+        fun (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -177,7 +223,7 @@ let api: IGitApi = {
                 return toGitOperationResult (fun () -> Some "Fetch completed.") None None result
         }
     gitPull =
-        fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
+        fun (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -198,7 +244,7 @@ let api: IGitApi = {
                         })
         }
     gitPush =
-        fun (event: IpcMainEvent) (request: GitRemoteOperationRequest) -> promise {
+        fun (request: GitRemoteOperationRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -208,7 +254,7 @@ let api: IGitApi = {
                 return toGitOperationResult (fun () -> Some "Push completed.") None None result
         }
     gitInitRepository =
-        fun (_event: IpcMainEvent) (targetPath: string) -> promise {
+        fun (targetPath: string) -> promise {
             // Init provisioning is path-driven only; no vault/window context is required.
             let! result = GitProvisioningService.initRepository targetPath
 
@@ -220,7 +266,7 @@ let api: IGitApi = {
                     result
         }
     gitAddRemote =
-        fun (event: IpcMainEvent) (request: GitRemoteConfigRequest) -> promise {
+        fun (request: GitRemoteConfigRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -234,7 +280,7 @@ let api: IGitApi = {
                         result
         }
     gitCloneRepository =
-        fun (event: IpcMainEvent) (request: GitCloneRepositoryRequest) -> promise {
+        fun (request: GitCloneRepositoryRequest) -> promise {
             let progressReporter =
                 ARC_VAULTS.TryGetVault(windowIdFromIpcEvent event)
                 |> Option.map createGitProgressReporter
@@ -255,7 +301,7 @@ let api: IGitApi = {
                     result
         }
     gitStagePaths =
-        fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
+        fun (request: GitPathspecRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -270,7 +316,7 @@ let api: IGitApi = {
                         })
         }
     gitUnstagePaths =
-        fun (event: IpcMainEvent) (request: GitPathspecRequest) -> promise {
+        fun (request: GitPathspecRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -283,7 +329,7 @@ let api: IGitApi = {
                         })
         }
     gitCommit =
-        fun (event: IpcMainEvent) (request: GitCommitRequest) -> promise {
+        fun (request: GitCommitRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -302,7 +348,7 @@ let api: IGitApi = {
                         })
         }
     setGitLfsSettings =
-        fun (event: IpcMainEvent) (settings: GitLfsSettingsDto) -> promise {
+        fun (settings: GitLfsSettingsDto) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(_, arcPath) ->
@@ -317,7 +363,7 @@ let api: IGitApi = {
                 return toGitOperationResult (fun () -> Some "Git LFS settings updated.") None None result
         }
     createBranch =
-        fun (event: IpcMainEvent) (request: GitCreateBranchRequest) -> promise {
+        fun (request: GitCreateBranchRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -333,7 +379,7 @@ let api: IGitApi = {
                         })
         }
     checkoutBranch =
-        fun (event: IpcMainEvent) (request: GitCheckoutBranchRequest) -> promise {
+        fun (request: GitCheckoutBranchRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -341,7 +387,7 @@ let api: IGitApi = {
                     withBusyWriting
                         vault
                         (fun () -> promise {
-                            let! result = GitService.checkoutBranch arcPath request.Name
+                            let! result = GitService.checkoutBranch arcPath request
                             do! vault.RefreshFileTree()
 
                             return
@@ -353,7 +399,7 @@ let api: IGitApi = {
                         })
         }
     confirmGitMergeResolution =
-        fun (event: IpcMainEvent) (request: GitConfirmMergeResolutionRequest) -> promise {
+        fun (request: GitConfirmMergeResolutionRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->

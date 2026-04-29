@@ -1,8 +1,9 @@
-namespace Swate.Components
+namespace Swate.Components.Widgets
 
 open ARCtrl
 open Fable.Core
 open Feliz
+open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
 open Swate.Components.AnnotationTable.Context
@@ -306,10 +307,10 @@ type BuildingBlockWidget =
         else
             Html.none
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
-        =
+        // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\ARCFileEditor\ArcFileEditor.fs` as well!
+        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
 
         let state, setState = React.useState (BuildingBlockWidgetState.Model.init ())
 
@@ -403,8 +404,7 @@ type BuildingBlockWidget =
                     | None -> table.ColumnCount
 
                 table.AddColumn(header, cells, insertionIndex, true)
-                setArcFile (WidgetArcFile.refreshRef arcFile)
-                widgetCtx.closeWidget WidgetType.BuildingBlock
+                setArcFile (ArcFiles.refreshRef arcFile)
 
             let header = BuildingBlockWidgetState.createCompositeHeaderFromState state
             let isValid = BuildingBlockWidgetState.isValidColumn header

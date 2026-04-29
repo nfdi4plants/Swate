@@ -3,7 +3,6 @@ module Renderer.Components.CloseWindowController
 
 open Feliz
 open Fable.Core
-open Fable.Electron.Remoting.Renderer
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
@@ -44,7 +43,7 @@ type CloseWindowController =
         }
 
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =
-            Api.ipcArcVaultApi.resolveCloseRequest (unbox null) decision
+            Api.ipcArcVaultApi.resolveCloseRequest decision
             |> Promise.map (
                 function
                 | Ok _ -> ()
@@ -83,7 +82,10 @@ type CloseWindowController =
             requestSaveBeforeQuit = fun () -> setModalIsOpen true
         }
 
-        React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler saveBeforeQuitHandler)
+        Renderer.IpcReceiver.useProxyReceiver<IMainSaveBeforeQuitApi> (
+            (fun () -> saveBeforeQuitHandler),
+            [||]
+        )
 
         BaseModal.Modal(
             isOpen = modalIsOpen,
