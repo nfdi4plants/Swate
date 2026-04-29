@@ -51,6 +51,15 @@ let viewLoadResultOfDto (data: FileContentDTO) =
         PreviewState = stateOfRendererPageState pageState
     }
 
+let viewLoadResultOfArcFile (arcFile: ArcFiles) =
+    let pageState = Renderer.Types.PageState.ArcFilePage arcFile
+
+    {
+        RendererPageState = pageState
+        ArcFileState = Some arcFile
+        PreviewState = Some(Swate.Components.Shared.PageState.ArcFilePage arcFile)
+    }
+
 let applyLoadedView
     (setPageState: Renderer.Types.PageState option -> unit)
     (setArcFileState: ArcFiles option -> unit)
