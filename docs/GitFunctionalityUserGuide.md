@@ -41,6 +41,7 @@ createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, st
 checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitUnstagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
 gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, string>>
 setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, string>>
 confirmGitMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, string>>
@@ -211,7 +212,7 @@ promise {
 - Status and refs: `getStatus`, `getBranches`
 - Diff and page data: `getDiffSummary`, `getDiff`, `getWordDiff`, `getDiffViewData`, `getMergeConflictViewData`
 - Remote sync: `fetch`, `previewPull`, `pull`, `push`
-- Local writes: `stagePaths`, `unstagePaths`, `commit`, `createBranch`, `checkoutBranch`, `addRemote`
+- Local writes: `stagePaths`, `unstagePaths`, `discardPaths`, `commit`, `createBranch`, `checkoutBranch`, `addRemote`
 - LFS settings: `getLfsSettings`, `setLfsSettings`
 - Merge resolution: `confirmMergeResolution`
 
@@ -331,6 +332,7 @@ Operations wrapped in `withBusyWriting`:
 - `gitPull`
 - `gitStagePaths`
 - `gitUnstagePaths`
+- `gitDiscardPaths`
 - `gitCommit`
 - `createBranch`
 - `checkoutBranch`

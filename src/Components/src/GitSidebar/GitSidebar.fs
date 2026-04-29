@@ -153,6 +153,7 @@ type private ChangedFilesListProps = {
     IsBusy: bool
     UpdateMarkedSelection: GitSidebarChange -> bool -> bool -> unit
     OpenChange: GitSidebarChange -> unit
+    DiscardChanges: string[] -> unit
 }
 
 type private ChangedFileRowProps = {
@@ -927,6 +928,7 @@ type GitSidebar =
                 Html.div [
                     prop.testId $"GitSidebarChangeRow-{props.Index}"
                     prop.custom ("data-index", props.Index)
+                    prop.custom ("data-git-change-path", change.Path)
                     prop.role "button"
                     prop.tabIndex (if props.IsBusy then -1 else 0)
                     prop.custom ("aria-disabled", if props.IsBusy then "true" else "false")
@@ -991,6 +993,59 @@ type GitSidebar =
         let itemSize = 64
         let itemGap = 4
         let overscan = 8
+
+        let contextMenuItemsForChange (change: GitSidebarChange) =
+            if props.IsBusy then
+                []
+            else
+                let targetPaths =
+                    if Set.contains change.Path props.MarkedPaths && not (Set.isEmpty props.MarkedPaths) then
+                        props.MarkedPaths |> Set.toArray |> Array.sort
+                    else
+                        [| change.Path |]
+
+                let label =
+                    if targetPaths.Length = 1 then
+                        "Discard Change"
+                    else
+                        "Discard Selected Changes"
+
+                [
+                    ContextMenuItem(
+                        text = Html.span label,
+                        icon =
+                            Html.span [
+                                prop.className "swt:iconify swt:fluent--arrow-undo-24-regular swt:size-4"
+                            ],
+                        onClick = fun _ -> props.DiscardChanges targetPaths
+                    )
+                ]
+
+        let contextMenu =
+            ContextMenu.ContextMenu(
+                (fun data ->
+                    data
+                    |> unbox<GitSidebarChange>
+                    |> contextMenuItemsForChange
+                ),
+                ref = scrollContainerRef,
+                onSpawn =
+                    (fun event ->
+                        if props.IsBusy then
+                            None
+                        else
+                            let target = event.target :?> HTMLElement
+
+                            match target.closest("[data-git-change-path]"), scrollContainerRef.current with
+                            | Some trigger, Some container when container.contains trigger ->
+                                let trigger = trigger :?> HTMLElement
+                                let path: string = !!trigger?dataset?gitChangePath
+
+                                props.ChangedFiles
+                                |> Array.tryFind (fun change -> String.Equals(change.Path, path, StringComparison.Ordinal))
+                                |> Option.map box
+                            | _ -> None)
+            )
 
         let changedFileListVirtualizer =
             Virtual.useVirtualizer (
@@ -1091,6 +1146,7 @@ type GitSidebar =
                         ]
                 ]
             ]
+            contextMenu
         ]
 
     [<ReactComponent>]
@@ -1328,6 +1384,7 @@ type GitSidebar =
         let onPrimarySaveAll = callbacks.OnPrimarySaveAll
         let onCommitSelection = callbacks.OnCommitSelection
         let onCommitAll = callbacks.OnCommitAll
+        let onDiscardSelection = callbacks.OnDiscardSelection
         let onConfirmPendingRemoteAction = callbacks.OnConfirmPendingRemoteAction
         let onCancelPendingRemoteAction = callbacks.OnCancelPendingRemoteAction
         let onSaveDownloadLargeFiles = callbacks.OnSaveDownloadLargeFiles
@@ -1551,6 +1608,22 @@ type GitSidebar =
                 setLocalError None
                 onCommitAll normalizedCommitMessage
 
+        let submitDiscardSelection (paths: string[]) =
+            let normalizedPaths =
+                paths
+                |> Array.map _.Trim()
+                |> Array.filter (String.IsNullOrWhiteSpace >> not)
+                |> Array.distinct
+                |> Array.sort
+
+            if normalizedPaths.Length = 0 then
+                setLocalError (Some "No selected changes to discard.")
+            else
+                setLocalError None
+                onDiscardSelection normalizedPaths
+                setMarkedPaths (fun _ -> Set.empty)
+                setSelectionAnchorPath (fun _ -> None)
+
         let submitLfsThreshold () =
             let normalizedInput = lfsThresholdInput.Trim()
 
@@ -1730,6 +1803,7 @@ type GitSidebar =
                         IsBusy = isBusy
                         UpdateMarkedSelection = updateMarkedSelection
                         OpenChange = fun change -> runSelectChangeAction change
+                        DiscardChanges = submitDiscardSelection
                     }
                 )
 
