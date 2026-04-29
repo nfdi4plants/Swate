@@ -3,7 +3,8 @@ module Renderer.Components.MainContent.DataHubBrowserTarget
 open System
 open Feliz
 open Swate.Components
-open Swate.Components.DataHubTypes
+open Swate.Components.DataHub
+open Swate.Components.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Types.Actionbar
 open Swate.Electron.Shared.GitTypes

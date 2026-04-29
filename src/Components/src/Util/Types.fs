@@ -25,6 +25,7 @@ type DaisyuiSize =
     | SM
     | MD
     | LG
+    | XL
 
 [<RequireQualifiedAccess>]
 type DaisyuiColors =

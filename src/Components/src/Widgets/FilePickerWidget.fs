@@ -1,8 +1,9 @@
-namespace Swate.Components
+namespace Swate.Components.Widgets
 
 open ARCtrl
 open Fable.Core
 open Feliz
+open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
 open Swate.Components.AnnotationTable.Context
@@ -86,12 +87,8 @@ type FilePickerWidget =
 
     [<ReactComponent>]
     static member private ActionButtons
-        (
-            clearPaths: unit -> unit,
-            insertPaths: unit -> unit,
-            canInsert: bool,
-            widgetCtx: WidgetControllerContext
-        ) =
+        (clearPaths: unit -> unit, insertPaths: unit -> unit, canInsert: bool, widgetCtx: WidgetControllerContext)
+        =
         Html.div [
             prop.className "swt:flex swt:gap-2"
             prop.children [
@@ -237,7 +234,7 @@ type FilePickerWidget =
                     setStatusMessage (Some "Could not write into the selected column.")
                 else
                     table.SetCellsAt cellsToInsert
-                    setArcFile (WidgetArcFile.refreshRef arcFile)
+                    setArcFile (ArcFiles.refreshRef arcFile)
                     setPathEntries (fun _ -> [])
                     setStatusMessage None
                     widgetCtx.closeWidget WidgetType.FilePicker

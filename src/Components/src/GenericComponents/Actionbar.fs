@@ -37,6 +37,7 @@ type Actionbar =
             | DaisyuiSize.SM -> "swt:btn-sm"
             | DaisyuiSize.MD -> "swt:btn-md"
             | DaisyuiSize.LG -> "swt:btn-lg"
+            | DaisyuiSize.XL -> "swt:btn-xl"
 
         let Button =
             Html.button [

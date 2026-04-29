@@ -1,10 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.Widgets
 
 open Feliz
 open Browser.Types
-open WidgetsLocalStorage
 open Swate
 open Swate.Components
+open Swate.Components.Widgets.LocalStorage
 open Swate.Components.Widgets.Context
 
 module InitExtensions =
@@ -119,14 +119,12 @@ module ResizeEventListener =
             FsReact.createDisposable (fun () -> Browser.Dom.window.removeEventListener ("resize", onResize))
         )
 
-type WidgetBlock =
-    {
-        prefix: string
-        content: ReactElement
-    }
+type WidgetBlock = {
+    prefix: string
+    content: ReactElement
+} with
 
-    static member CreateWidgetBlock prefix content : WidgetBlock =
-        { prefix = prefix; content = content }
+    static member CreateWidgetBlock prefix content : WidgetBlock = { prefix = prefix; content = content }
 
 [<RequireQualifiedAccess>]
 [<Erase; Mangle(false)>]
@@ -289,16 +287,12 @@ type Widget =
 
     [<ReactComponent>]
     static member WidgetController
-        (
-            widgets: Map<WidgetType, WidgetDefinition>,
-            ?children: ReactElement list,
-            ?closeAllWhen: bool
-        ) =
+        (widgets: Map<WidgetType, WidgetDefinition>, children: ReactElement, ?closeAllWhen: bool)
+        =
 
         let activeWidgets, setActiveWidgets =
             React.useStateWithUpdater<WidgetType list> ([])
 
-        let children = defaultArg children []
         let closeAllWhen = defaultArg closeAllWhen false
 
         React.useEffect (
@@ -309,50 +303,87 @@ type Widget =
             [| box closeAllWhen |]
         )
 
-        let closeWidget (widgetType: WidgetType) =
-            setActiveWidgets (fun widgets -> widgets |> List.filter (fun widget -> widget <> widgetType))
-
-        let focusWidget (widgetType: WidgetType) =
-            setActiveWidgets (fun widgets ->
-                if widgets |> List.contains widgetType then
-                    widgets
-                    |> List.filter (fun widget -> widget <> widgetType)
-                    |> fun nextWidgets -> nextWidgets @ [ widgetType ]
-                else
-                    widgets
+        let closeWidget =
+            React.useCallback (
+                (fun (widgetType: WidgetType) ->
+                    setActiveWidgets (fun widgets -> widgets |> List.filter (fun widget -> widget <> widgetType))
+                ),
+                [| box setActiveWidgets |]
             )
 
-        let openWidget (widgetType: WidgetType) =
-            setActiveWidgets (fun widgets ->
-                if widgets |> List.contains widgetType then
-                    widgets
-                    |> List.filter (fun widget -> widget <> widgetType)
-                    |> fun nextWidgets -> nextWidgets @ [ widgetType ]
-                else
-                    widgets @ [ widgetType ]
+        let focusWidget =
+            React.useCallback (
+                (fun (widgetType: WidgetType) ->
+                    setActiveWidgets (fun widgets ->
+                        if widgets |> List.contains widgetType then
+                            widgets
+                            |> List.filter (fun widget -> widget <> widgetType)
+                            |> fun nextWidgets -> nextWidgets @ [ widgetType ]
+                        else
+                            widgets
+                    )
+                ),
+                [| box setActiveWidgets |]
             )
 
-        let toggleWidget (widgetType: WidgetType) =
-            setActiveWidgets (fun widgets ->
-                if widgets |> List.contains widgetType then
-                    widgets |> List.filter (fun widget -> widget <> widgetType)
-                else
-                    widgets @ [ widgetType ]
+        let openWidget =
+            React.useCallback (
+                (fun (widgetType: WidgetType) ->
+                    setActiveWidgets (fun widgets ->
+                        if widgets |> List.contains widgetType then
+                            widgets
+                            |> List.filter (fun widget -> widget <> widgetType)
+                            |> fun nextWidgets -> nextWidgets @ [ widgetType ]
+                        else
+                            widgets @ [ widgetType ]
+                    )
+                ),
+                [| box setActiveWidgets |]
             )
 
-        let widgetContext: WidgetControllerContext = {
-            activeWidgets = activeWidgets
-            isActive = fun widgetType -> activeWidgets |> List.contains widgetType
-            openWidget = openWidget
-            closeWidget = closeWidget
-            toggleWidget = toggleWidget
-            focusWidget = focusWidget
-        }
+        let toggleWidget =
+            React.useCallback (
+                (fun (widgetType: WidgetType) ->
+                    setActiveWidgets (fun widgets ->
+                        if widgets |> List.contains widgetType then
+                            widgets |> List.filter (fun widget -> widget <> widgetType)
+                        else
+                            widgets @ [ widgetType ]
+                    )
+                ),
+                [| box setActiveWidgets |]
+            )
+
+        let isActive =
+            React.useCallback (
+                (fun (widgetType: WidgetType) -> activeWidgets |> List.contains widgetType),
+                [| box activeWidgets |]
+            )
+
+        let widgetContext: Context.WidgetControllerContext =
+            React.useMemo (
+                (fun () -> {
+                    activeWidgets = activeWidgets
+                    isActive = isActive
+                    openWidget = openWidget
+                    closeWidget = closeWidget
+                    toggleWidget = toggleWidget
+                    focusWidget = focusWidget
+                }),
+                [|
+                    box activeWidgets
+                    box isActive
+                    box openWidget
+                    box closeWidget
+                    box toggleWidget
+                    box focusWidget
+                |]
+            )
 
         WidgetControllerCtx.Provider(
             widgetContext,
             [
-                yield! children
+                children
 
                 for index, widgetType in activeWidgets |> List.indexed do
                     match widgets.TryFind widgetType with
@@ -569,4 +600,4 @@ type Widget =
             ]
             |> Map.ofList
 
-        Widget.WidgetController(widgets, children = [ Widget.EntryControls(widgetTypes) ])
+        Widget.WidgetController(widgets, children = Widget.EntryControls(widgetTypes))

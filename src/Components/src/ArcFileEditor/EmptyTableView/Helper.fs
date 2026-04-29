@@ -18,7 +18,7 @@ let createMinimalTable (arcFile: ArcFiles) (activeTableIndex: int option) (setAr
 
         activeTable.AddColumns(newColumns)
         activeTable.AddRowsEmpty(3)
-        setArcFile (WidgetArcFile.refreshRef arcFile)
+        setArcFile (ArcFiles.refreshRef arcFile)
     | None -> ()
 
 let getOutputTables (arcFile: ArcFiles) =
@@ -52,7 +52,7 @@ let importSelectedPreviousOutput
 
                 activeTable.AddColumn(CompositeHeader.Input ioType, outputColumn.Cells)
 
-                setArcFile (WidgetArcFile.refreshRef arcFile)
+                setArcFile (ArcFiles.refreshRef arcFile)
                 true
             | None -> false
         | None -> false
