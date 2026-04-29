@@ -3,8 +3,7 @@ module ElectronRenderer.NoteSearchInteropTests
 open System
 open ARCtrl
 open ARCtrl.Json
-open Renderer.Components.MainContent.NoteSearchInterop
-open Swate.Electron.Shared.NoteSearchDto
+open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Vitest
 
 let private buildNoteDto (tags: string[] option) : NoteSearchDto = {
@@ -39,7 +38,7 @@ Vitest.describe("NoteSearchInterop.toDomainNote", fun () ->
                     |]
             )
 
-        let note = toDomainNote dto
+        let note = NoteSearchNoteDto.toNote dto
 
         match note.Tags with
         | Some tags ->
@@ -61,7 +60,7 @@ Vitest.describe("NoteSearchInterop.toDomainNote", fun () ->
                     |]
             )
 
-        let note = toDomainNote dto
+        let note = NoteSearchNoteDto.toNote dto
 
         match note.Tags with
         | Some tags ->
@@ -73,16 +72,16 @@ Vitest.describe("NoteSearchInterop.toDomainNote", fun () ->
 
     Vitest.test("preserves None for missing tags", fun () ->
         let dto = buildNoteDto None
-        let note = toDomainNote dto
+        let note = NoteSearchNoteDto.toNote dto
         Vitest.expect(note.Tags.IsNone).toBe(true))
 
     Vitest.test("preserves Some [] when all serialized tags are invalid", fun () ->
         let dto = buildNoteDto (Some [| ""; "   "; "invalid-json" |])
-        let note = toDomainNote dto
+        let note = NoteSearchNoteDto.toNote dto
         expectTagsCount 0 note)
 
     Vitest.test("preserves Some [] for empty tag arrays", fun () ->
         let dto = buildNoteDto (Some [||])
-        let note = toDomainNote dto
+        let note = NoteSearchNoteDto.toNote dto
         expectTagsCount 0 note)
 )

@@ -6,7 +6,7 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Compile Include="NoteSearchDto.fs" />
+    <Compile Include="DTOs\NoteSearchDto.fs" />
     <Compile Include="ARCtrlJsonObject.fs" />
     <Compile Include="FileIOTypes.fs" />
     <Compile Include="AuthTypes.fs" />

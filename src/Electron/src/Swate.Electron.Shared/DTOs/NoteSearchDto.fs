@@ -1,4 +1,4 @@
-module Swate.Electron.Shared.NoteSearchDto
+module Swate.Electron.Shared.DTOs.NoteSearchDto
 
 open ARCtrl
 open ARCtrl.Json

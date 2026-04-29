@@ -14,8 +14,7 @@ open Fable.Core.JsInterop
 open Main
 open Node.Api
 open ARCtrl
-open ARCtrl.Json
-open Swate.Electron.Shared.NoteSearchDto
+open Swate.Electron.Shared.DTOs.NoteSearchDto
 
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
