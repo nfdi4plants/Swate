@@ -16,8 +16,8 @@ type private Model = {
     PageState: PageState option
     DetailsSidebarIsOpen: bool
     LeftSidebarTarget: LeftSidebarPage
-}
-with
+} with
+
     static member Empty = {
         AppState = None
         PageState = None
@@ -38,8 +38,7 @@ let private createGetOpenPathCmd () : Cmd<Msg> =
         SetArcRootPath
         (fun _ -> SetArcRootPath None)
 
-let private init () : Model * Cmd<Msg> =
-    Model.Empty, createGetOpenPathCmd ()
+let private init () : Model * Cmd<Msg> = Model.Empty, createGetOpenPathCmd ()
 
 let private msgName =
     function
@@ -58,11 +57,7 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
     | SetArcRootPath appState ->
         let nextModel =
             match appState with
-            | Some path ->
-                {
-                    model with
-                        AppState = Some path
-                }
+            | Some path -> { model with AppState = Some path }
             | None -> Model.Empty
 
         nextModel, Cmd.none
@@ -147,7 +142,8 @@ let Main () =
         Renderer.MainUpdateRendererBridge.subscribePathChange (fun pathOption ->
             console.log ("[Swate] CHANGE PATH!")
             dispatch (SetArcRootPath pathOption)
-        ))
+        )
+    )
 
     let children =
         Renderer.Components.MainContent.Main.Main(model.AppState, model.PageState, model.LeftSidebarTarget)
@@ -157,11 +153,13 @@ let Main () =
 
     let detailsSidebar =
         match model.AppState, model.LeftSidebarTarget with
-        | Some _, LeftSidebarPage.ArcObjectExplorer -> Some(Renderer.Components.DetailsSidebar.ArcObjectDetailsSidebar.Main())
+        | Some _, LeftSidebarPage.ArcObjectExplorer ->
+            Some(Renderer.Components.DetailsSidebar.ArcObjectDetailsSidebar.Main())
         | _ -> None
 
     let showDetailsSidebarToggle =
-        model.AppState.IsSome && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectExplorer
+        model.AppState.IsSome
+        && model.LeftSidebarTarget = LeftSidebarPage.ArcObjectExplorer
 
     Context.AppStateContext.AppStateCtx.Provider(
         appCtx,
@@ -172,25 +170,34 @@ let Main () =
                     ErrorModalProvider.ErrorModalProvider(
                         Renderer.Context.AuthStateContext.Provider(
                             Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider.AnnotationTableContextProvider(
-                                    Layout.Main(
-                                        children =
-                                            React.Fragment [|
-                                                children
-                                                CloseWindowController.CloseWindowController.Subscription()
-                                            |],
-                                        navbar = Renderer.Components.Navbar.Main(showDetailsSidebarToggle = showDetailsSidebarToggle),
-                                        leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
-                                        ?rightSidebar = detailsSidebar,
-                                        leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget),
-                                        rightSidebarState = {
-                                            isOpen = model.DetailsSidebarIsOpen
-                                            setIsOpen = fun isOpen -> dispatch (SetDetailsSidebarIsOpen isOpen)
-                                            sidebarType = model.LeftSidebarTarget
-                                            setSidebarType = fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)
-                                        }
+                                AnnotationTable
+                                    .AnnotationTableContextProvider
+                                    .AnnotationTableContextProvider(
+                                        Layout.Main(
+                                            children =
+                                                React.Fragment [|
+                                                    children
+                                                    CloseWindowController.CloseWindowController.Subscription()
+                                                |],
+                                            navbar =
+                                                Renderer.Components.Navbar.Main(
+                                                    showDetailsSidebarToggle = showDetailsSidebarToggle
+                                                ),
+                                            leftSidebar =
+                                                Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
+                                            ?rightSidebar = detailsSidebar,
+                                            leftActions =
+                                                LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget),
+                                            rightSidebarState = {
+                                                isOpen = model.DetailsSidebarIsOpen
+                                                setIsOpen = fun isOpen -> dispatch (SetDetailsSidebarIsOpen isOpen)
+                                                sidebarType = model.LeftSidebarTarget
+                                                setSidebarType =
+                                                    fun leftSidebarTarget ->
+                                                        dispatch (SetLeftSidebarTarget leftSidebarTarget)
+                                            }
+                                        )
                                     )
-                                )
                             )
                         )
                     )

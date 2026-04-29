@@ -23,6 +23,9 @@ let private callIpcWith
         return mapExnResult result
     }
 
+let checkGitVersions () =
+    callIpc (fun () -> gitApi.checkGitVersions (unbox null))
+
 let getGitStatus () =
     callIpc (fun () -> gitApi.getGitStatus (unbox null))
 
@@ -46,6 +49,9 @@ let gitFetch (request: GitRemoteOperationRequest) =
 
 let gitPull (request: GitRemoteOperationRequest) =
     callIpcWith request (gitApi.gitPull (unbox null))
+
+let previewGitPull (request: GitRemoteOperationRequest) =
+    callIpcWith request (gitApi.previewGitPull (unbox null))
 
 let gitPush (request: GitRemoteOperationRequest) =
     callIpcWith request (gitApi.gitPush (unbox null))

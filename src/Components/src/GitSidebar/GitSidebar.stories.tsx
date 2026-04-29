@@ -21,9 +21,13 @@ const baseCallbacks = {
   OnFetch: noop,
   OnPull: noop,
   OnPush: noop,
-  OnSync: noop,
+  OnUpdateFromOnline: noop,
+  OnPrimarySaveSelection: noopWithSelection,
+  OnPrimarySaveAll: noopWithMessage,
   OnCommitSelection: noopWithSelection,
   OnCommitAll: noopWithMessage,
+  OnConfirmPendingRemoteAction: noop,
+  OnCancelPendingRemoteAction: noop,
   OnSaveDownloadLargeFiles: noopWithDownloadPreference,
   OnSaveLfsAutoTrackThreshold: noopWithThreshold,
   OnCreateBranch: noopWithArg,
@@ -229,14 +233,26 @@ export const AdvancedActions: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox")).toBeChecked();
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveTextContent("Update ARC from Online");
+    await expect(canvas.queryByTestId("GitSidebarSyncButton")).toBeNull();
+    await expect(canvas.queryByTestId("GitSidebarLocalCommitButton")).toBeNull();
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
-    await expect(canvas.getByTestId("GitSidebarLfsThresholdInput")).toHaveValue(1);
+    const downloadLargeFilesCheckbox = canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox");
+    const lfsThresholdInput = canvas.getByTestId("GitSidebarLfsThresholdInput");
+
+    await expect(downloadLargeFilesCheckbox).toBeChecked();
+    await expect(lfsThresholdInput).toHaveValue(1);
+    await expect(
+      Boolean(
+        downloadLargeFilesCheckbox.compareDocumentPosition(lfsThresholdInput) &
+          Node.DOCUMENT_POSITION_FOLLOWING,
+      ),
+    ).toBe(true);
   },
 };
 
@@ -263,7 +279,7 @@ export const ConflictsPresent: Story = {
       "Resolve all conflicted files before pushing.",
     );
     await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(4);
-    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("Conflict");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusButton-0")).toBeInTheDocument();
   },
 };
 
@@ -318,8 +334,35 @@ export const DeletedFile: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("Deleted");
-    await expect(canvas.getByTestId("GitSidebar")).toHaveTextContent("git: D.");
+    const modal = within(document.body);
+    await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("git: D.");
+    await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("Deleted");
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeStatusButton-0"));
+    await expect(await modal.findByTestId("popover_content_git_change_status_0")).toHaveTextContent("Git return: git: D.");
+  },
+};
+
+export const LongWrappedFile: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: [
+      {
+        Path: "src/very/long/path/that/wraps/in/the/sidebar/and/needs/a/fixed/status/icon.txt",
+        OriginalPath: undefined,
+        IndexStatus: "M",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+    ],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:ml-auto");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:shrink-0");
   },
 };
 
@@ -407,6 +450,9 @@ export const SwitchBranchModal: Story = {
     await expect(modal.getByTestId("GitSidebarSwitchBranchSelect")).toHaveTextContent(
       "main",
     );
+    await expect(modal.getByTestId("GitSidebarSwitchBranchSelect")).toHaveTextContent(
+      "origin/main",
+    );
     await userEvent.click(modal.getByTestId("GitSidebarSwitchBranchSubmit"));
   },
 };
@@ -422,13 +468,36 @@ export const CommitComposer: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const commitMessageInput = canvas.getByTestId("GitSidebarCommitMessageInput");
-    await userEvent.type(commitMessageInput, "Add sidebar commit action");
-    await userEvent.click(
-      canvas.getByTestId("GitSidebarCommitSelectionCheckbox-README.md"),
+    const modal = within(document.body);
+    const legacyCard = canvas.getByTestId("GitSidebarCommitSection").firstElementChild as HTMLElement;
+    await expect(legacyCard).not.toHaveClass("swt:rounded-box");
+    await expect(legacyCard).not.toHaveClass("swt:border");
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save Selected Changes");
+    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
+    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
+      "Add and commit selected Changes",
     );
-    await userEvent.click(canvas.getByTestId("GitSidebarCommitSelectionButton"));
-    await expect(canvas.getByTestId("GitSidebarCommitMessageInput")).toHaveValue("");
+    const sidebarBounds = canvas.getByTestId("GitSidebar").getBoundingClientRect();
+    const menuBounds = canvas.getByTestId("GitSidebarSaveOptionsMenu").getBoundingClientRect();
+    expect(menuBounds.left).toBeGreaterThanOrEqual(sidebarBounds.left);
+    expect(menuBounds.right).toBeLessThanOrEqual(sidebarBounds.right);
+    await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
+    await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
+    // Click again to deselect – button text should switch back to "Save All Changes"
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes");
+    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
+    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
+      "Add and commit all Changes",
+    );
+    await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsHelpButton"));
+    await expect(await modal.findByTestId("popover_content_GitSidebarSaveOptionsHelp")).toHaveTextContent(
+      "Save changes commits locally",
+    );
+    await expect(modal.getByTestId("popover_content_GitSidebarSaveOptionsHelp")).toHaveTextContent(
+      "Add and commit changes only writes the local Git commit",
+    );
   },
 };
 
@@ -442,15 +511,15 @@ export const RemoteActionsDisabled: Story = {
     lfsAutoTrackThresholdMb: 1,
     remoteActionsEnabled: false,
     remoteActionsWarning:
-      "Sign in to a DataHub account to use fetch, pull, push, or sync.",
+      "Sign in to a DataHub account to use fetch, pull, push, or update.",
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebarSyncButton")).toBeDisabled();
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toBeDisabled();
     await expect(
       canvas.getByTestId("GitSidebarRemoteAuthWarning"),
     ).toHaveTextContent(
-      "Sign in to a DataHub account to use fetch, pull, push, or sync.",
+      "Sign in to a DataHub account to use fetch, pull, push, or update.",
     );
   },
 };

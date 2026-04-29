@@ -5,7 +5,7 @@ open Fable.Core
 open Fable.Electron
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Authentication.Types
-open Swate.Components.DataHubTypes
+open Swate.Components.DataHub.DataHubTypes
 open Swate.Components.Shared
 open AuthTypes
 open FileIOTypes
@@ -57,9 +57,11 @@ type IGitLfsApi = {
 
 /// Two Way Bridge: Renderer <-> Main
 type IGitApi = {
+    checkGitVersions: IpcMainEvent -> JS.Promise<Result<unit, exn>>
     getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
     getGitBranches: IpcMainEvent -> JS.Promise<Result<GitBranchRefDto[], exn>>
     getGitLfsSettings: IpcMainEvent -> JS.Promise<Result<GitLfsSettingsDto, exn>>
+    previewGitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
     getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
     getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
     getGitDiffViewData: IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>
