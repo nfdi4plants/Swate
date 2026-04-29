@@ -3,6 +3,7 @@ module Swate.Components.ArcFileEditor.Types
 open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
+open Swate.Components.Widgets
 
 type AddRowsTarget =
     | Table of ArcTable
@@ -46,8 +47,11 @@ type ActiveView =
         else ActiveView.Metadata
 
     member this.TryGetActiveTable(arcFile: ArcFiles) =
+
         match this with
-        | Table i when i >= 0 && i < arcFile.Tables().Count -> Some(arcFile.Tables().[i])
+        | Table i when i >= 0 && i < arcFile.Tables().Count ->
+            let table = arcFile.Tables().[i]
+            Some table
         | _ -> None
 
 type ArcFileEditorHeaderProps = {

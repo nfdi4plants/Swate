@@ -1,27 +1,40 @@
-namespace Protocol
+namespace Swate.Components.Template
 
-open Model
-
-open Feliz
 open ARCtrl
+open Fable.Core
+open Feliz
+open Swate.Components
 
-module private TemplatesAux =
+module TemplateHelper = Swate.Components.Template.Helper
+
+module private TemplatesDisplayHelper =
 
     [<Literal>]
     let ColCount = 5
 
-type Templates =
+[<Erase; Mangle(false)>]
+type TemplatesDisplay =
 
     [<ReactComponent>]
-    static member private TemplateItem
-        (
-            template: Template,
-            show: bool,
-            setShow: bool -> unit,
-            isSelected: bool,
-            toggleIsSelected: unit -> unit,
-            ?key: obj
-        ) =
+    static member private TemplateRefreshButton(isRefreshing: bool, onRefresh: unit -> unit) =
+        Html.button [
+            prop.className "swt:btn swt:btn-neutral swt:btn-square"
+            prop.title "Refresh templates"
+            prop.disabled isRefreshing
+            prop.onClick (fun e ->
+                e.preventDefault ()
+                e.stopPropagation ()
+                onRefresh ()
+            )
+            prop.children [ Icons.ArrowsRotate() ]
+        ]
+
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
+    static member private TemplateTableItem
+        (template: Template, isSelected: bool, toggleIsSelected: unit -> unit, ?key: obj)
+        =
+
+        let showDetails, setShowDetails = React.useState false
 
         let authorStr =
             template.Authors
@@ -50,8 +63,8 @@ type Templates =
                         sharedClasses
                         if isSelected then
                             isSelectedClass
-                        if show then
-                            "swt:!border-transparent" // removes bottom border to indicate relation to details row
+                        if showDetails then
+                            "swt:border-transparent!" // removes bottom border to indicate relation to details row
                     ]
                     prop.key "generic"
                     prop.children [
@@ -88,20 +101,21 @@ type Templates =
                         Html.td [
                             Html.p [
                                 prop.title authorStr
-                                prop.className "swt:flex swt:items-center swt:text-xs swt:opacity-60 swt:!line-clamp-3"
+                                prop.className "swt:flex swt:items-center swt:text-xs swt:opacity-60 swt:line-clamp-3!"
                                 prop.text authorStr
                             ]
                         ]
                         Html.td [
                             Swate.Components.Components.CollapseButton(
-                                show,
-                                (fun _ -> setShow (not show)),
-                                classes = "swt:btn-sm"
+                                showDetails,
+                                setShowDetails,
+                                classes = "swt:btn-sm",
+                                classFn = (fun isCollapsed -> if isCollapsed then "swt:btn-primary" else "")
                             )
                         ]
                     ]
                 ]
-                if show then
+                if showDetails then
                     Html.tr [
                         prop.className [
                             sharedClasses
@@ -113,7 +127,7 @@ type Templates =
                         prop.children [
                             Html.td [
                                 prop.className "swt:pt-0"
-                                prop.colSpan TemplatesAux.ColCount
+                                prop.colSpan TemplatesDisplayHelper.ColCount
                                 prop.children [
                                     Html.div [
                                         prop.className "swt:py-2 swt:text-xs"
@@ -142,29 +156,34 @@ type Templates =
         )
 
     [<ReactComponent>]
-    static member private RefreshButton (model: Model) dispatch =
-        Html.button [
-            prop.className "swt:btn swt:btn-sm swt:btn-square"
-            prop.onClick (fun _ ->
-                Messages.Protocol.GetAllProtocolsForceRequest
-                |> Messages.ProtocolMsg
-                |> dispatch
-            )
-            prop.children [ Swate.Components.Icons.ArrowsRotate() ]
-        ]
-
-    [<ReactComponent>]
-    static member private DisplayTemplates(templates: Template[], model: Model, dispatch, ?maxheight: Styles.ICssUnit) =
+    static member TemplatesDisplay
+        (
+            templates: Template[],
+            selectedTemplateIds: Set<System.Guid>,
+            toggleTemplateSelection: System.Guid -> unit,
+            isLoading: bool,
+            refreshTemplates: unit -> unit,
+            ?maxheight: Styles.ICssUnit
+        ) =
+        // static member private DisplayTemplates(templates: Template[], model: Model, dispatch, ?maxheight: Styles.ICssUnit) =
         let maxheight = defaultArg maxheight (length.px 600)
-        let (showIds: int list), setShowIds = React.useStateWithUpdater ([])
 
         Html.div [
             prop.style [ style.maxHeight maxheight ]
-            prop.className "swt:shrink swt:overflow-y-auto swt:grow swt:h-fit"
+            prop.className "swt:shrink swt:grow swt:h-fit swt:w-full"
             prop.children [
                 Html.table [
-                    prop.className "swt:table swt:table-pin-cols"
+                    prop.className "swt:table swt:table-fixed swt:w-full"
                     prop.children [
+
+                        Html.colgroup [
+                            Html.col [ prop.className "swt:w-14" ] // select btn: fixed size
+                            Html.col [ prop.className "swt:w-[35%]" ] // Name: limited
+                            Html.col [ prop.className "swt:w-[20%]" ] // Details: limited
+                            Html.col [ prop.className "swt:w-[30%]" ] // authors: limited
+                            Html.col [ prop.className "swt:w-18" ] // actions: fixed size
+                        ]
+
                         Html.thead [
                             Html.tr [
                                 Html.th [
@@ -179,21 +198,20 @@ type Templates =
                                 Html.th "Template Name"
                                 Html.th "Details"
                                 Html.th "Authors"
-                                Html.th [ Templates.RefreshButton model dispatch ]
+                                Html.th [
+                                    TemplatesDisplay.TemplateRefreshButton(isLoading, refreshTemplates)
+                                ]
                             ]
                         ]
                         Html.tbody [
-                            match model.ProtocolState.Loading with
+                            match isLoading with
                             | true ->
                                 Html.tr [
                                     Html.td [
-                                        prop.colSpan TemplatesAux.ColCount
+                                        prop.colSpan TemplatesDisplayHelper.ColCount
                                         prop.style [ style.textAlign.center ]
                                         prop.children [
-                                            Swate.Components.Components.LoadingSpinner(
-                                                "Loading templates...",
-                                                size = Swate.Components.Types.DaisyuiSize.XL
-                                            )
+                                            Components.LoadingSpinner("Loading templates...", size = DaisyuiSize.XL)
                                         ]
                                     ]
                                 ]
@@ -202,7 +220,7 @@ type Templates =
                                 | [||] ->
                                     Html.tr [
                                         Html.td [
-                                            prop.colSpan TemplatesAux.ColCount
+                                            prop.colSpan TemplatesDisplayHelper.ColCount
                                             prop.children [
                                                 Html.div [
                                                     prop.className
@@ -215,122 +233,19 @@ type Templates =
                                 | _ ->
                                     for i in 0 .. templates.Length - 1 do
                                         let template = templates.[i]
-                                        let isShown = showIds |> List.contains i
 
-                                        let setIsShown (show: bool) =
-                                            if show then
-                                                setShowIds (fun current -> i :: current)
-                                            else
-                                                setShowIds (fun current -> current |> List.except [ i ])
+                                        let isSelected = selectedTemplateIds |> Set.exists (fun t -> t = template.Id)
 
-                                        let isSelected =
-                                            model.ProtocolState.TemplatesSelected
-                                            |> List.exists (fun t -> t.Id = template.Id)
+                                        let toggleIsSelected = fun _ -> toggleTemplateSelection template.Id
 
-                                        let toggleIsSelected =
-                                            fun _ ->
-                                                Messages.Protocol.ToggleSelectProtocol template
-                                                |> Messages.ProtocolMsg
-                                                |> dispatch
-
-                                        Templates.TemplateItem(
+                                        TemplatesDisplay.TemplateTableItem(
                                             template,
-                                            isShown,
-                                            setIsShown,
                                             isSelected,
-                                            toggleIsSelected
+                                            toggleIsSelected,
+                                            key = template.Id
                                         )
                         ]
                     ]
                 ]
             ]
-        ]
-
-    [<ReactComponent>]
-    static member private ImportTemplatesBtn(model, dispatch) =
-        let emptySelected = model.ProtocolState.TemplatesSelected.Length = 0
-
-        Html.div [
-            prop.className "swt:flex swt:gap-2"
-            prop.children [
-                match model.ProtocolState with
-                | { ShowImportModal = true } ->
-                    Modals.SelectiveImportModal.Templates(
-                        model,
-                        dispatch,
-                        rmv =
-                            (fun _ ->
-                                Messages.Protocol.Msg.SetShowImportModal false
-                                |> Messages.ProtocolMsg
-                                |> dispatch
-                            )
-                    )
-                | _ -> ()
-
-                Html.button [
-                    prop.className [ "swt:btn swt:btn-primary swt:grow" ]
-                    prop.disabled emptySelected
-                    prop.textf "Import Templates"
-                    prop.onClick (fun _ ->
-                        if not model.ProtocolState.TemplatesSelected.IsEmpty then
-                            Messages.Protocol.ImportProtocols |> Messages.ProtocolMsg |> dispatch
-                    )
-                ]
-                if not emptySelected then
-                    Html.button [
-                        prop.title "Reset template selection"
-                        prop.className "swt:btn swt:btn-neutral swt:btn-square"
-                        prop.onClick (fun _ ->
-                            Messages.Protocol.Msg.RemoveSelectedProtocols
-                            |> Messages.ProtocolMsg
-                            |> dispatch
-                        )
-                        prop.children [ Swate.Components.Icons.Delete() ]
-                    ]
-            ]
-        ]
-
-    [<ReactComponent>]
-    static member TemplateSelect(model: Model, dispatch: Messages.Msg -> unit) =
-
-        React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
-
-        Swate.Components.TemplateFilter.TemplateFilterProvider(
-            React.Fragment [
-
-                Templates.ImportTemplatesBtn(model, dispatch)
-
-                Swate.Components.TemplateFilter.TemplateFilter(
-                    model.ProtocolState.Templates,
-                    templateSearchClassName = "swt:grow"
-                )
-
-                Swate.Components.TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
-                    Templates.DisplayTemplates(filteredTemplates, model, dispatch, ?maxheight = Some(length.px 600))
-                )
-            ]
-        )
-
-    [<ReactComponent>]
-    static member Main(model: Model, dispatch) =
-        SidebarComponents.SidebarLayout.Container [
-            SidebarComponents.SidebarLayout.Header "Templates"
-
-            SidebarComponents.SidebarLayout.Description(
-                React.Fragment [
-                    Html.p [
-                        Html.b "Search the database for templates."
-                        Html.text " Not sure where to begin? Take the "
-                        Html.a [
-                            prop.href "https://nfdi4plants.github.io/nfdi4plants.knowledgebase/resources/metadata-quiz/"
-                            prop.target "_blank"
-                            prop.text "Metadata Quiz"
-                            prop.className "swt:text-blue-600 swt:hover:underline swt:cursor-pointer"
-                        ]
-                        Html.text " to find the swate template best suited to your data."
-                    ]
-                ]
-            )
-
-            SidebarComponents.SidebarLayout.LogicContainer [ Templates.TemplateSelect(model, dispatch) ]
         ]

@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Fable.Electron
 open Swate.Electron.Shared.IPCTypes
-open Swate.Components.DataHubTypes
+open Swate.Components.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Authentication.Helper
 open Main.Auth

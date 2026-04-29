@@ -142,7 +142,8 @@ module ARCtrlHelper =
             | ArcFiles.Assay assay -> ARCtrl.Helper.Identifier.Assay.fileNameFromIdentifier assay.Identifier |> Some
             | ArcFiles.Run run -> ARCtrl.Helper.Identifier.Run.fileNameFromIdentifier run.Identifier |> Some
             | ArcFiles.Workflow workflow ->
-                ARCtrl.Helper.Identifier.Workflow.fileNameFromIdentifier workflow.Identifier |> Some
+                ARCtrl.Helper.Identifier.Workflow.fileNameFromIdentifier workflow.Identifier
+                |> Some
             | ArcFiles.DataMap(Some parentInfo, _) -> DatamapParentInfo.toPath parentInfo |> Some
             | ArcFiles.DataMap(None, _)
             | ArcFiles.Template _ -> None
@@ -154,7 +155,7 @@ module ARCtrlHelper =
             | ArcFiles.Run _ -> true
             | _ -> false
 
-        member this.TryGetActiveTable (activeTableIndex: int option) =
+        member this.TryGetActiveTable(activeTableIndex: int option) =
             match activeTableIndex with
             | Some tableIndex when tableIndex >= 0 && tableIndex < this.Tables().Count ->
                 Some(tableIndex, this.Tables().[tableIndex])
@@ -169,8 +170,18 @@ module ARCtrlHelper =
             | ArcFiles.DataMap(_, dataMap) -> Some dataMap
             | _ -> None
 
-        member this.CanRenderDataMapView() =
-            this.TryGetDataMap() |> Option.isSome
+        member this.CanRenderDataMapView() = this.TryGetDataMap() |> Option.isSome
+
+        /// React only refreshes if the reference changes, but when we update the ArcFile, we usually mutate the existing object. This function creates a new reference with the same content, which can be used to force React to re-render.
+        static member refreshRef(arcFile: ArcFiles) : ArcFiles =
+            match arcFile with
+            | ArcFiles.Investigation investigation -> ArcFiles.Investigation <| investigation.Copy()
+            | ArcFiles.Study(study, _) -> ArcFiles.Study(study.Copy(), [])
+            | ArcFiles.Assay assay -> ArcFiles.Assay <| assay.Copy()
+            | ArcFiles.Run run -> ArcFiles.Run <| run.Copy()
+            | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
+            | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
+            | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
 
     [<RequireQualifiedAccess>]
     type JsonExportFormat =
@@ -351,7 +362,8 @@ module Json =
                 | Assay aa, JsonExportFormat.ISA -> nameFromId aa.Identifier, ArcAssay.toISAJsonString 0 aa
                 | Assay aa, JsonExportFormat.ROCrate -> nameFromId aa.Identifier, ArcAssay.toROCrateJsonString () aa
 
-                | Template t, JsonExportFormat.ARCtrl -> nameFromId (t.Name.Replace(" ", "_") + ".xlsx"), Template.toJsonString 0 t
+                | Template t, JsonExportFormat.ARCtrl ->
+                    nameFromId (t.Name.Replace(" ", "_") + ".xlsx"), Template.toJsonString 0 t
                 | Template t, JsonExportFormat.ARCtrlCompressed ->
                     nameFromId (t.Name.Replace(" ", "_") + ".xlsx"), Template.toCompressedJsonString 0 t
                 | Template _, anyElse ->
