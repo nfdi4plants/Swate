@@ -14,5 +14,6 @@ let example_tests = testList "example" [
 let shared = testList "Shared" [
     example_tests
     LandingTests.tests
+    NotesConversionTests.tests
     PathHelpersTests.tests
 ]

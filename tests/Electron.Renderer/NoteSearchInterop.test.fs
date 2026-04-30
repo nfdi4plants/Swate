@@ -3,6 +3,7 @@ module ElectronRenderer.NoteSearchInteropTests
 open System
 open ARCtrl
 open ARCtrl.Json
+open Swate.Components.NoteTypes
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Vitest
 
@@ -31,11 +32,10 @@ Vitest.describe("NoteSearchInterop.toDomainNote", fun () ->
     Vitest.test("deserializes valid serialized ontology tags", fun () ->
         let dto =
             buildNoteDto (
-                Some
-                    [|
-                        OntologyAnnotation.create(name = "Planning", tsr = "SWATE", tan = "SWATE:0001") |> serializeTag
-                        OntologyAnnotation.create(name = "Execution", tsr = "MS", tan = "MS:1000121") |> serializeTag
-                    |]
+                Some [|
+                    OntologyAnnotation.create(name = "Planning", tsr = "SWATE", tan = "SWATE:0001") |> serializeTag
+                    OntologyAnnotation.create(name = "Execution", tsr = "MS", tan = "MS:1000121") |> serializeTag
+                |]
             )
 
         let note = NoteSearchNoteDto.toNote dto
@@ -50,14 +50,13 @@ Vitest.describe("NoteSearchInterop.toDomainNote", fun () ->
     Vitest.test("drops undecodable serialized tags while preserving decodable order", fun () ->
         let dto =
             buildNoteDto (
-                Some
-                    [|
-                        OntologyAnnotation.create(name = "Planning", tsr = "SRC1", tan = "ACC1") |> serializeTag
-                        "{ \"annotationValue\": 42 }"
-                        ""
-                        "not-json"
-                        OntologyAnnotation.create(name = "Review", tsr = "SRC2", tan = "ACC2") |> serializeTag
-                    |]
+                Some [|
+                    OntologyAnnotation.create(name = "Planning", tsr = "SRC1", tan = "ACC1") |> serializeTag
+                    "{ \"annotationValue\": 42 }"
+                    ""
+                    "not-json"
+                    OntologyAnnotation.create(name = "Review", tsr = "SRC2", tan = "ACC2") |> serializeTag
+                |]
             )
 
         let note = NoteSearchNoteDto.toNote dto
@@ -84,4 +83,50 @@ Vitest.describe("NoteSearchInterop.toDomainNote", fun () ->
         let dto = buildNoteDto (Some [||])
         let note = NoteSearchNoteDto.toNote dto
         expectTagsCount 0 note)
+)
+
+Vitest.describe("NoteSearchInterop.fromDomainNote", fun () ->
+    Vitest.test("round-trips note DTO metadata and ontology tags", fun () ->
+        let note: Note = {
+            RelativePath = "notes/27_04_2026/test-note.md"
+            Title = "Test note"
+            Date = DateTime(2026, 4, 27)
+            Tags =
+                Some(
+                    ResizeArray [
+                        OntologyAnnotation.create(name = "Planning", tsr = "SWATE", tan = "SWATE:0001")
+                        OntologyAnnotation.create(name = "Review", tsr = "SWATE", tan = "SWATE:0002")
+                    ]
+                )
+            Content = "Body"
+        }
+
+        let dto = NoteSearchNoteDto.ofNote note
+
+        Vitest.expect(dto.RelativePath).toBe(note.RelativePath)
+        Vitest.expect(dto.Title).toBe(note.Title)
+        Vitest.expect(dto.Date.Year).toBe(2026)
+        Vitest.expect(dto.Date.Month).toBe(4)
+        Vitest.expect(dto.Date.Day).toBe(27)
+        Vitest.expect(dto.Content).toBe(note.Content)
+
+        match dto.Tags with
+        | Some tags -> Vitest.expect(tags.Length).toBe(2)
+        | None -> failwith "Expected DTO tags to be present."
+
+        let roundTripped = NoteSearchNoteDto.toNote dto
+
+        Vitest.expect(roundTripped.RelativePath).toBe(note.RelativePath)
+        Vitest.expect(roundTripped.Title).toBe(note.Title)
+        Vitest.expect(roundTripped.Date.Year).toBe(2026)
+        Vitest.expect(roundTripped.Date.Month).toBe(4)
+        Vitest.expect(roundTripped.Date.Day).toBe(27)
+        Vitest.expect(roundTripped.Content).toBe(note.Content)
+
+        match roundTripped.Tags with
+        | Some tags ->
+            Vitest.expect(tags.Count).toBe(2)
+            expectTag tags.[0] "Planning" (Some "SWATE") (Some "SWATE:0001")
+            expectTag tags.[1] "Review" (Some "SWATE") (Some "SWATE:0002")
+        | None -> failwith "Expected note tags to be present.")
 )
