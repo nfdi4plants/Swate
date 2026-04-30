@@ -359,53 +359,92 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
+    static member private Tooltip
+        (label: string, children: ReactElement, ?placementClassName: string, ?testId: string, ?className: string)
+        =
+        Html.div [
+            if testId.IsSome then
+                prop.testId testId.Value
+
+            prop.className [
+                "swt:tooltip"
+                placementClassName |> Option.defaultValue "swt:tooltip-left"
+                yield! Option.toList className
+            ]
+            prop.ariaLabel label
+            prop.children [
+                Html.div [
+                    prop.className "swt:tooltip-content swt:max-w-64 swt:text-xs"
+                    prop.text label
+                ]
+                children
+            ]
+        ]
+
+    [<ReactComponent>]
     static member private ActionButton
         (label: string, iconClassName: string, isBusy: bool, onClick: unit -> unit, ?isActive: bool, ?testId: string)
         =
         let isActive = defaultArg isActive false
 
-        Html.button [
-            if testId.IsSome then
-                prop.testId testId.Value
-            prop.className [
-                "swt:btn swt:btn-sm swt:justify-start swt:gap-2 swt:normal-case"
-                if isActive then
-                    "swt:btn-primary"
-                else
-                    "swt:bg-base-100 swt:border-base-300"
-            ]
-            prop.disabled isBusy
-            prop.onClick (fun _ -> onClick ())
-            prop.children [
-                Html.span [
-                    prop.className [ "swt:iconify"; iconClassName; "swt:size-4" ]
+        let button =
+            Html.button [
+                if testId.IsSome then
+                    prop.testId testId.Value
+
+                prop.className [
+                    "swt:btn swt:btn-sm swt:w-full swt:min-w-0 swt:justify-start swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case"
+                    "swt:@max-2xs/gitSidebar:gap-1 swt:@max-3xs/gitSidebar:justify-center swt:@max-3xs/gitSidebar:gap-0 swt:@max-3xs/gitSidebar:px-0"
+                    if isActive then
+                        "swt:btn-primary"
+                    else
+                        "swt:bg-base-100 swt:border-base-300"
                 ]
-                Html.span label
+                prop.disabled isBusy
+                prop.ariaLabel label
+                prop.title label
+                prop.onClick (fun _ -> onClick ())
+                prop.children [
+                    Html.span [
+                        prop.className [ "swt:iconify"; iconClassName; "swt:size-4 swt:shrink-0" ]
+                    ]
+                    Html.span [
+                        if testId.IsSome then
+                            prop.testId (testId.Value + "Label")
+
+                        prop.className
+                            "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left swt:@max-3xs/gitSidebar:sr-only"
+                        prop.text label
+                    ]
+                ]
             ]
-        ]
+
+        let tooltipTestId = testId |> Option.map (fun value -> value + "Tooltip")
+
+        GitSidebar.Tooltip(label, button, ?testId = tooltipTestId)
 
     [<ReactComponent>]
     static member private BranchHeader(props: BranchHeaderProps) =
         React.Fragment [
             Html.div [
                 prop.className
-                    "swt:flex swt:items-center swt:justify-between swt:border-b swt:border-base-content/10 swt:px-3 swt:py-3"
+                    "swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2 swt:border-b swt:border-base-content/10 swt:px-3 swt:py-3 swt:@max-xs:px-2"
                 prop.children [
                     Html.div [
-                        prop.className "swt:flex swt:items-center swt:gap-2"
+                        prop.className "swt:flex swt:min-w-0 swt:items-center swt:gap-2"
                         prop.children [
                             Html.span [
-                                prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5"
+                                prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5 swt:shrink-0"
                             ]
                             Html.div [
-                                prop.className "swt:flex swt:flex-col"
+                                prop.className "swt:flex swt:min-w-0 swt:flex-col"
                                 prop.children [
                                     Html.span [
-                                        prop.className "swt:text-sm swt:font-semibold"
+                                        prop.className "swt:truncate swt:text-sm swt:font-semibold"
                                         prop.text "Source Control"
                                     ]
                                     Html.span [
-                                        prop.className "swt:text-xs swt:text-base-content/60"
+                                        prop.className "swt:truncate swt:text-xs swt:text-base-content/60"
                                         prop.text (
                                             match props.Status.CurrentBranch with
                                             | Some branch -> branch
@@ -1693,7 +1732,8 @@ type GitSidebar =
 
         Html.div [
             prop.testId "GitSidebar"
-            prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col swt:bg-base-100"
+            prop.className
+                "swt:@container/gitSidebar swt:flex swt:h-full swt:min-h-0 swt:min-w-0 swt:flex-col swt:overflow-x-hidden swt:bg-base-100"
             prop.children [
                 GitSidebar.BranchHeader(
                     {

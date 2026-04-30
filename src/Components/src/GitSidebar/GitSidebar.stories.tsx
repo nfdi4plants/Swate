@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fireEvent, userEvent, within } from "storybook/test";
+import { expect, fireEvent, fn, userEvent, within } from "storybook/test";
 import { Main as GitSidebarComponent } from "./GitSidebar.fs.js";
 import {
   FSharpResult$2_Ok,
@@ -255,6 +255,36 @@ export const AdvancedActions: Story = {
           Node.DOCUMENT_POSITION_FOLLOWING,
       ),
     ).toBe(true);
+  },
+};
+
+export const ActionTooltipsAndResponsiveLabels: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonTooltip")).toHaveClass("swt:tooltip");
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(
+      "swt:@max-3xs/gitSidebar:sr-only",
+    );
+
+    await userEvent.hover(canvas.getByTestId("GitSidebarUpdateArcButton"));
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonTooltip")).toHaveTextContent(
+      "Update ARC from Online",
+    );
+
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
+    await expect(canvas.getByTestId("GitSidebarFetchButtonTooltip")).toHaveClass("swt:tooltip");
+    await expect(canvas.getByTestId("GitSidebarPullButtonTooltip")).toHaveClass("swt:tooltip");
+    await expect(canvas.getByTestId("GitSidebarPushButtonTooltip")).toHaveClass("swt:tooltip");
   },
 };
 
