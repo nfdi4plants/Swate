@@ -241,17 +241,19 @@ type GitSidebar =
             match runStatus with
             | GitSidebarRunStatus.Progress progress ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             if busyTestId.IsSome then
                                 prop.testId busyTestId.Value
-                            prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-info swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
                                     prop.text (
                                         GitSidebarInternal.progressText progress
                                         |> function
@@ -265,17 +267,21 @@ type GitSidebar =
                 ]
             | GitSidebarRunStatus.Busy notice ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             if busyTestId.IsSome then
                                 prop.testId busyTestId.Value
-                            prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-info swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span notice
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text notice
+                                ]
                             ]
                         ]
                     ]
@@ -285,17 +291,21 @@ type GitSidebar =
             match errorNotice with
             | Some message ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             if errorTestId.IsSome then
                                 prop.testId errorTestId.Value
-                            prop.className "swt:alert swt:alert-error swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-error swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span message
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text message
+                                ]
                             ]
                         ]
                     ]
@@ -305,17 +315,21 @@ type GitSidebar =
             match warningNotice with
             | Some message ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             if warningTestId.IsSome then
                                 prop.testId warningTestId.Value
-                            prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-warning swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span message
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text message
+                                ]
                             ]
                         ]
                     ]
@@ -335,7 +349,7 @@ type GitSidebar =
         ) =
         Html.label [
             prop.className
-                "swt:flex swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3"
+                "swt:flex swt:min-w-0 swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3 swt:@max-xs:px-2"
             prop.children [
                 Html.input [
                     if testId.IsSome then
@@ -350,13 +364,13 @@ type GitSidebar =
                     prop.className "swt:flex swt:min-w-0 swt:flex-col"
                     prop.children [
                         Html.span [
-                            prop.className "swt:text-sm swt:font-medium"
+                            prop.className "swt:min-w-0 swt:break-words swt:text-sm swt:font-medium swt:[overflow-wrap:anywhere]"
                             prop.text (defaultArg label "Download Large Files")
                         ]
                         match description with
                         | Some text ->
                             Html.span [
-                                prop.className "swt:text-xs swt:text-base-content/70"
+                                prop.className "swt:min-w-0 swt:break-words swt:text-xs swt:text-base-content/70 swt:[overflow-wrap:anywhere]"
                                 prop.text text
                             ]
                         | None -> Html.none
@@ -369,13 +383,16 @@ type GitSidebar =
     static member private SectionHeader(title: string, countText: string option) =
         Html.div [
             prop.className
-                "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
+                "swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60 swt:@max-xs:px-2 swt:@max-xs:tracking-[0.12em]"
             prop.children [
-                Html.span title
+                Html.span [
+                    prop.className "swt:min-w-0 swt:truncate"
+                    prop.text title
+                ]
                 match countText with
                 | Some value ->
                     Html.span [
-                        prop.className "swt:text-[0.65rem] swt:text-base-content/50"
+                        prop.className "swt:shrink-0 swt:text-[0.65rem] swt:text-base-content/50"
                         prop.text value
                     ]
                 | None -> Html.none
@@ -481,7 +498,7 @@ type GitSidebar =
                     ]
                     Html.button [
                         prop.testId "GitSidebarRefreshButton"
-                        prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm"
+                        prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm swt:shrink-0"
                         prop.disabled props.IsBusy
                         prop.title "Refresh git status"
                         prop.onClick (fun _ -> props.OnRefresh())
@@ -494,11 +511,11 @@ type GitSidebar =
                 ]
             ]
             Html.div [
-                prop.className "swt:px-3 swt:pt-3"
+                prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                 prop.children [
                     Html.div [
                         prop.className
-                            "swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-200/60 swt:p-3"
+                            "swt:min-w-0 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-200/60 swt:p-3 swt:@max-xs:p-2"
                         prop.children [
                             Html.div [
                                 prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
@@ -532,12 +549,15 @@ type GitSidebar =
                             | Some trackingBranch ->
                                 Html.div [
                                     prop.className
-                                        "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
+                                        "swt:mt-2 swt:flex swt:min-w-0 swt:items-start swt:gap-2 swt:text-xs swt:text-base-content/70"
                                     prop.children [
                                         Html.span [
-                                            prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4"
+                                            prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
                                         ]
-                                        Html.span $"Tracking {trackingBranch}"
+                                        Html.span [
+                                            prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                            prop.text $"Tracking {trackingBranch}"
+                                        ]
                                     ]
                                 ]
                             | None ->
@@ -545,14 +565,17 @@ type GitSidebar =
                                 | Some currentBranch ->
                                     Html.div [
                                         prop.className
-                                            "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
+                                            "swt:mt-2 swt:flex swt:min-w-0 swt:items-start swt:gap-2 swt:text-xs swt:text-base-content/70"
                                         prop.children [
                                             Html.span [
                                                 prop.className
-                                                    "swt:iconify swt:fluent--branch-request-20-regular swt:size-4"
+                                                    "swt:iconify swt:fluent--branch-request-20-regular swt:size-4 swt:shrink-0"
                                             ]
-                                            Html.span
-                                                $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                            Html.span [
+                                                prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                                prop.text
+                                                    $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                            ]
                                         ]
                                     ]
                                 | None -> Html.none
@@ -565,22 +588,23 @@ type GitSidebar =
     [<ReactComponent>]
     static member private LfsSettingsSection(props: LfsSettingsSectionProps) =
         Html.div [
-            prop.className "swt:mt-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3"
+            prop.className
+                "swt:mt-3 swt:min-w-0 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3 swt:@max-xs:p-2"
             prop.children [
                 Html.div [
-                    prop.className "swt:flex swt:items-center swt:gap-2"
+                    prop.className "swt:flex swt:min-w-0 swt:items-center swt:gap-2"
                     prop.children [
                         Html.span [
-                            prop.className "swt:iconify swt:fluent--document-arrow-right-24-regular swt:size-4"
+                            prop.className "swt:iconify swt:fluent--document-arrow-right-24-regular swt:size-4 swt:shrink-0"
                         ]
                         Html.span [
-                            prop.className "swt:text-sm swt:font-medium"
+                            prop.className "swt:min-w-0 swt:truncate swt:text-sm swt:font-medium"
                             prop.text "Git LFS auto-track threshold"
                         ]
                     ]
                 ]
                 Html.p [
-                    prop.className "swt:mt-2 swt:text-xs swt:text-base-content/70"
+                    prop.className "swt:mt-2 swt:break-words swt:text-xs swt:text-base-content/70 swt:[overflow-wrap:anywhere]"
                     prop.text
                         "Files larger than this limit are automatically re-staged through Git LFS during save operations."
                 ]
@@ -588,7 +612,8 @@ type GitSidebar =
                     prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"
                     prop.children [
                         Html.label [
-                            prop.className "swt:flex swt:min-w-[10rem] swt:flex-1 swt:flex-col swt:gap-2"
+                            prop.className
+                                "swt:flex swt:min-w-[10rem] swt:flex-1 swt:flex-col swt:gap-2 swt:@max-xs:min-w-0"
                             prop.children [
                                 Html.span [
                                     prop.className "swt:text-xs swt:font-medium swt:text-base-content/70"
@@ -596,7 +621,7 @@ type GitSidebar =
                                 ]
                                 Html.input [
                                     prop.testId "GitSidebarLfsThresholdInput"
-                                    prop.className "swt:input swt:input-bordered swt:w-full"
+                                    prop.className "swt:input swt:input-bordered swt:w-full swt:min-w-0"
                                     prop.type'.number
                                     prop.custom ("step", "1")
                                     prop.custom ("min", "1")
@@ -609,20 +634,25 @@ type GitSidebar =
                         ]
                         Html.button [
                             prop.testId "GitSidebarLfsThresholdSaveButton"
-                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:normal-case"
+                            prop.className
+                                "swt:btn swt:btn-sm swt:btn-outline swt:min-w-0 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case swt:@max-xs:justify-center swt:@max-xs:gap-0"
                             prop.disabled (not props.CanSaveLfsThreshold)
+                            prop.title "Save Threshold"
                             prop.onClick (fun _ -> props.SubmitLfsThreshold())
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span "Save Threshold"
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:truncate swt:@max-xs:sr-only"
+                                    prop.text "Save Threshold"
+                                ]
                             ]
                         ]
                     ]
                 ]
                 Html.div [
-                    prop.className "swt:mt-2 swt:text-xs swt:text-base-content/60"
+                    prop.className "swt:mt-2 swt:break-words swt:text-xs swt:text-base-content/60 swt:[overflow-wrap:anywhere]"
                     prop.text "Threshold setting: 1-100 MB. This does not cap LFS-tracked file size."
                 ]
             ]
@@ -634,7 +664,7 @@ type GitSidebar =
             GitSidebar.SectionHeader("Actions", None)
 
             Html.div [
-                prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3"
+                prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3 swt:@max-xs:gap-1 swt:@max-xs:px-2"
                 prop.children [
                     GitSidebar.ActionButton(
                         "Update ARC from Online",
@@ -660,16 +690,19 @@ type GitSidebar =
             match props.RemoteActionsWarning with
             | Some warning when not props.RemoteActionsEnabled ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             prop.testId "GitSidebarRemoteAuthWarning"
-                            prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className "swt:alert swt:alert-warning swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span warning
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text warning
+                                ]
                             ]
                         ]
                     ]
@@ -678,14 +711,14 @@ type GitSidebar =
 
             if props.IsAdvancedActionsOpen then
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             prop.testId "GitSidebarAdvancedActionsDivider"
                             prop.className "swt:mb-3 swt:border-t swt:border-base-content/10"
                         ]
                         Html.div [
-                            prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
+                            prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:@max-xs:gap-1"
                             prop.children [
                                 GitSidebar.ActionButton(
                                     "Check for Changes",
@@ -793,22 +826,19 @@ type GitSidebar =
                 "Add and commit all Changes"
 
         React.Fragment [
-            Html.div [
-                prop.className
-                    "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
-                prop.children [ Html.span "Save" ]
-            ]
+            GitSidebar.SectionHeader("Save", None)
 
             Html.div [
                 prop.testId "GitSidebarCommitSection"
-                prop.className "swt:px-3 swt:pb-3"
+                prop.className "swt:px-3 swt:pb-3 swt:@max-xs:px-2"
                 prop.children [
                     Html.label [
                         prop.className "swt:flex swt:flex-col swt:gap-2"
                         prop.children [
                             Html.textarea [
                                 prop.testId "GitSidebarCommitMessageInput"
-                                prop.className "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
+                                prop.className
+                                    "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:min-w-0 swt:resize-y swt:@max-xs:text-sm"
                                 prop.disabled (not props.CanEditCommit)
                                 prop.value props.CommitMessage
                                 prop.placeholder (
@@ -825,54 +855,70 @@ type GitSidebar =
                     ]
                     Html.div [
                         prop.className
-                            "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
+                            "swt:mt-2 swt:flex swt:min-w-0 swt:flex-wrap swt:items-center swt:justify-between swt:gap-2 swt:text-xs swt:text-base-content/60"
                         prop.children [
-                            Html.span (
-                                if props.MarkedCount = 1 then
-                                    "1 file marked to save"
-                                else
-                                    $"{props.MarkedCount} files marked to save"
-                            )
+                            Html.span [
+                                prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                prop.text (
+                                    if props.MarkedCount = 1 then
+                                        "1 file marked to save"
+                                    else
+                                        $"{props.MarkedCount} files marked to save"
+                                )
+                            ]
                             if not props.CanEditCommit && props.HasConflicts then
-                                Html.span "Saving files is disabled while conflicts remain."
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text "Saving files is disabled while conflicts remain."
+                                ]
                             elif not props.CanEditCommit && props.Status.IsClean then
-                                Html.span "No changes available to save."
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text "No changes available to save."
+                                ]
                             else
                                 Html.none
                         ]
                     ]
                     Html.div [
-                        prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2"
+                        prop.className "swt:mt-3 swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2"
                         prop.children [
                             Html.div [
                                 prop.ref saveMenuRef
-                                prop.className "swt:relative swt:inline-flex"
+                                prop.className "swt:relative swt:inline-flex swt:min-w-0 swt:flex-1"
                                 prop.children [
                                     Html.div [
-                                        prop.className "swt:join"
+                                        prop.className "swt:join swt:flex swt:min-w-0 swt:flex-1"
                                         prop.children [
                                             Html.button [
                                                 prop.testId "GitSidebarPrimarySaveButton"
-                                                prop.className "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:gap-2 swt:normal-case"
+                                                prop.className
+                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:min-w-0 swt:flex-1 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case swt:@max-xs:justify-center swt:@max-xs:gap-0"
                                                 prop.disabled (not props.CanRunPrimarySave)
+                                                prop.title primarySaveLabel
                                                 prop.onClick (fun _ -> props.SubmitPrimarySave())
                                                 prop.children [
                                                     Html.span [
                                                         prop.className
-                                                            "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
+                                                            "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4 swt:shrink-0"
                                                     ]
-                                                    Html.span primarySaveLabel
+                                                    Html.span [
+                                                        prop.className "swt:min-w-0 swt:truncate swt:@max-xs:sr-only"
+                                                        prop.text primarySaveLabel
+                                                    ]
                                                 ]
                                             ]
                                             Html.button [
                                                 prop.testId "GitSidebarSaveOptionsButton"
                                                 prop.className
-                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:min-w-0 swt:px-2"
+                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:shrink-0 swt:px-2"
                                                 prop.disabled (not props.CanRunPrimarySave)
+                                                prop.title "Save options"
                                                 prop.onClick (fun _ -> setSaveMenuOpen (not isSaveMenuOpen))
                                                 prop.children [
                                                     Html.span [
-                                                        prop.className "swt:iconify swt:fluent--chevron-down-24-regular swt:size-4"
+                                                        prop.className
+                                                            "swt:iconify swt:fluent--chevron-down-24-regular swt:size-4 swt:shrink-0"
                                                     ]
                                                 ]
                                             ]
@@ -898,7 +944,7 @@ type GitSidebar =
                                                                         "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
                                                                 ]
                                                                 Html.span [
-                                                                    prop.className "swt:min-w-0 swt:break-words"
+                                                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
                                                                     prop.text localCommitLabel
                                                                 ]
                                                             ]
@@ -910,7 +956,7 @@ type GitSidebar =
                                 ]
                             ]
                             Html.div [
-                                prop.className "swt:ml-auto"
+                                prop.className "swt:shrink-0"
                                 prop.children [ GitSidebar.SaveOptionsHelpPopover() ]
                             ]
                         ]
@@ -1128,19 +1174,20 @@ type GitSidebar =
                 prop.role "region"
                 prop.ariaLabel "Changed files"
                 prop.ref scrollContainerRef
-                prop.className "swt:min-h-0 swt:flex-1 swt:overflow-y-auto swt:px-2 swt:pb-2"
+                prop.className
+                    "swt:min-h-0 swt:min-w-0 swt:flex-1 swt:overflow-y-auto swt:overflow-x-hidden swt:px-2 swt:pb-2 swt:@max-xs:px-1"
                 prop.children [
                     if props.ChangedFiles.Length = 0 then
                         Html.div [
                             prop.className
-                                "swt:mt-2 swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60"
+                                "swt:mt-2 swt:min-w-0 swt:break-words swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60 swt:[overflow-wrap:anywhere] swt:@max-xs:px-2"
                             prop.text "No changed files. Your repository is in sync."
                         ]
                     else
                         Html.div [
                             prop.testId "GitSidebarChangedFilesVirtualContent"
                             prop.role "list"
-                            prop.className "swt:relative swt:mt-1"
+                            prop.className "swt:relative swt:mt-1 swt:min-w-0"
                             prop.style [
                                 style.height (changedFileListVirtualizer.getTotalSize ())
                             ]
@@ -1788,16 +1835,21 @@ type GitSidebar =
 
                 if hasConflicts then
                     Html.div [
-                        prop.className "swt:px-3 swt:pt-3"
+                        prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                         prop.children [
                             Html.div [
                                 prop.testId "GitSidebarMergeBanner"
-                                prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                                prop.className
+                                    "swt:alert swt:alert-warning swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                                 prop.children [
                                     Html.span [
-                                        prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                        prop.className
+                                            "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                     ]
-                                    Html.span "Resolve all conflicted files before pushing."
+                                    Html.span [
+                                        prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                        prop.text "Resolve all conflicted files before pushing."
+                                    ]
                                 ]
                             ]
                         ]
