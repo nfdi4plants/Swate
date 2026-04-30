@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fireEvent, fn, userEvent, within } from "storybook/test";
+import { expect, fireEvent, fn, userEvent, waitFor, within } from "storybook/test";
 import { Main as GitSidebarComponent } from "./GitSidebar.fs.js";
 import {
   FSharpResult$2_Ok,
@@ -660,11 +660,16 @@ export const CommitComposer: Story = {
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
     // Ctrl+click to deselect – button text should switch back to "Save All Changes"
+    fireEvent.mouseDown(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
     fireEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
-    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes");
+    await waitFor(() =>
+      expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes"),
+    );
     await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
-    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
-      "Add and commit all Changes",
+    await waitFor(() =>
+      expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
+        "Add and commit all Changes",
+      ),
     );
     await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsHelpButton"));
     await expect(await modal.findByTestId("popover_content_GitSidebarSaveOptionsHelp")).toHaveTextContent(

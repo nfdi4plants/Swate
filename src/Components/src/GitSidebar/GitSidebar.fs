@@ -993,6 +993,7 @@ type GitSidebar =
         let presentation = GitSidebarInternal.changePresentation change
         let gitReturn = GitSidebarInternal.describeChange change
         let tooltipText = $"{presentation.Label}:\n- {gitReturn}"
+        let stopRowActivation (event: MouseEvent) = event.stopPropagation ()
 
         Html.span [
             prop.testId $"GitSidebarChangeStatusIcon-{index}"
@@ -1003,6 +1004,8 @@ type GitSidebar =
             ]
             prop.title tooltipText
             prop.ariaLabel tooltipText
+            prop.onMouseDown stopRowActivation
+            prop.onClick stopRowActivation
         ]
 
     [<ReactComponent>]
