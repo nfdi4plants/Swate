@@ -41,7 +41,7 @@ let Main () =
                 prop.testId "left-sidebar-file-explorer-tree"
                 prop.className
                     "swt:flex-1 swt:min-h-0 swt:overflow-y-auto swt:overflow-x-auto swt:[scrollbar-gutter:stable]"
-                prop.children [ Renderer.Components.FileExplorer.FileTree() ]
+                prop.children [ Renderer.Components.FileExplorer.FileExplorer.FileTree() ]
             ]
         ]
     ]

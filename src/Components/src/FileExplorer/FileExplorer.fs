@@ -18,6 +18,8 @@ type FileExplorer =
             ?initialItems: FileItem list,
             ?onItemClick: FileItem -> unit,
             ?onContextMenu: FileItem -> Swate.Components.FileExplorerTypes.ContextMenuItem list,
+            ?canCreateItem: FileItem -> bool,
+            ?onCreateItem: FileItem -> unit,
             ?selectedItemId: string option,
             ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
@@ -32,6 +34,7 @@ type FileExplorer =
         let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
         let showBreadcrumbs = defaultArg showBreadcrumbs true
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
+        let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
 
@@ -63,6 +66,11 @@ type FileExplorer =
             let willExpand = not isExpanded
             dispatch (FileExplorerLogic.ToggleExpanded item.Id)
             onDirectoryArrowToggle |> Option.iter (fun fn -> fn item willExpand)
+
+        let handleCreateItem (item: FileItem) (ev: Browser.Types.MouseEvent) =
+            ev.preventDefault ()
+            ev.stopPropagation ()
+            onCreateItem |> Option.iter (fun fn -> fn item)
 
         let copyPathToClipboard (path: string) =
             promise {
@@ -124,6 +132,24 @@ type FileExplorer =
                 yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
                 yield! getItemIconClass item |> Option.toList
             ]
+
+        let renderCreateItemButton (item: FileItem) =
+            if item.IsDirectory && canCreateItem item && onCreateItem.IsSome then
+                Html.button [
+                    prop.type'.button
+                    prop.className
+                        "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
+                    prop.ariaLabel $"Create new item in {item.Name}"
+                    prop.title $"Create new item in {item.Name}"
+                    prop.onClick (handleCreateItem item)
+                    prop.children [
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--add-24-regular swt:size-4"
+                        ]
+                    ]
+                ]
+            else
+                Html.none
 
         let renderLfsStatusPill (item: FileItem) =
             let isDownloaded = item.Downloaded = Some true
@@ -269,6 +295,7 @@ type FileExplorer =
                 match item.Children with
                 | Some children -> not (List.isEmpty children)
                 | None -> true
+            let canCreateFromDirectory = canCreateItem item && onCreateItem.IsSome
 
             if item.IsDirectory then
                 let directoryNameClick = handleDirectorySelection item
@@ -313,10 +340,12 @@ type FileExplorer =
                                             ]
                                         ]
 
-                                        if item.IsLFS = Some true || canExpandDirectory then
+                                        if item.IsLFS = Some true || canExpandDirectory || canCreateFromDirectory then
                                             Html.div [
                                                 prop.className "swt:ml-auto swt:shrink-0 swt:flex swt:items-center swt:gap-2"
                                                 prop.children [
+                                                    renderCreateItemButton item
+
                                                     // LFS badge and size if applicable
                                                     if item.IsLFS = Some true then
                                                         Html.div [
