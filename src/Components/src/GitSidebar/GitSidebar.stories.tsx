@@ -311,7 +311,7 @@ export const ConflictsPresent: Story = {
       "Resolve all conflicted files before pushing.",
     );
     await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(4);
-    await expect(canvas.getByTestId("GitSidebarChangeStatusButton-0")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toBeInTheDocument();
   },
 };
 
@@ -366,11 +366,62 @@ export const DeletedFile: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const modal = within(document.body);
     await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("git: D.");
     await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("Deleted");
-    await userEvent.click(canvas.getByTestId("GitSidebarChangeStatusButton-0"));
-    await expect(await modal.findByTestId("popover_content_git_change_status_0")).toHaveTextContent("Git return: git: D.");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveClass("swt:text-error");
+
+    await userEvent.hover(canvas.getByTestId("GitSidebarChangeStatusIcon-0"));
+    await expect(canvas.getByTestId("GitSidebarChangeStatusTooltip-0")).toHaveTextContent("Deleted");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusTooltip-0")).toHaveTextContent("Git return: git: D.");
+  },
+};
+
+export const ChangeStatusIconColors: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: [
+      {
+        Path: "new-file.md",
+        OriginalPath: undefined,
+        IndexStatus: "A",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+      {
+        Path: "changed-file.md",
+        OriginalPath: undefined,
+        IndexStatus: "M",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+      {
+        Path: "deleted-file.md",
+        OriginalPath: undefined,
+        IndexStatus: "D",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+    ],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveClass("swt:text-success");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveClass(
+      "swt:fluent--add-24-regular",
+    );
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-1")).toHaveClass("swt:text-warning");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-1")).toHaveClass(
+      "swt:fluent--edit-24-regular",
+    );
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-2")).toHaveClass("swt:text-error");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-2")).toHaveClass(
+      "swt:fluent--delete-24-regular",
+    );
   },
 };
 

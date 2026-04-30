@@ -18,6 +18,12 @@ module private GitSidebarInternal =
         | Untracked
         | Conflict
 
+    type ChangePresentation = {
+        Label: string
+        IconClassName: string
+        ToneClassName: string
+    }
+
     let hasConflicts (status: GitSidebarStatus) (changedFiles: GitSidebarChange[]) =
         status.IsMergeInProgress || (changedFiles |> Array.exists _.IsConflicted)
 
@@ -51,15 +57,36 @@ module private GitSidebarInternal =
 
     let changePresentation (change: GitSidebarChange) =
         match classifyChange change with
-        | GitChangeKind.Added -> "Added", "swt:badge swt:badge-success swt:badge-sm", "swt:fluent--add-24-regular"
-        | GitChangeKind.Modified -> "Modified", "swt:badge swt:badge-info swt:badge-sm", "swt:fluent--edit-24-regular"
-        | GitChangeKind.Deleted -> "Deleted", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--delete-24-regular"
-        | GitChangeKind.Renamed ->
-            "Renamed", "swt:badge swt:badge-warning swt:badge-sm", "swt:fluent--arrow-swap-24-regular"
-        | GitChangeKind.Untracked ->
-            "Untracked", "swt:badge swt:badge-neutral swt:badge-sm", "swt:fluent--document-24-regular"
-        | GitChangeKind.Conflict ->
-            "Conflict", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--warning-24-regular"
+        | GitChangeKind.Added -> {
+            Label = "Added"
+            IconClassName = "swt:fluent--add-24-regular"
+            ToneClassName = "swt:text-success"
+          }
+        | GitChangeKind.Modified -> {
+            Label = "Modified"
+            IconClassName = "swt:fluent--edit-24-regular"
+            ToneClassName = "swt:text-warning"
+          }
+        | GitChangeKind.Deleted -> {
+            Label = "Deleted"
+            IconClassName = "swt:fluent--delete-24-regular"
+            ToneClassName = "swt:text-error"
+          }
+        | GitChangeKind.Renamed -> {
+            Label = "Renamed"
+            IconClassName = "swt:fluent--arrow-swap-24-regular"
+            ToneClassName = "swt:text-info"
+          }
+        | GitChangeKind.Untracked -> {
+            Label = "Untracked"
+            IconClassName = "swt:fluent--add-24-regular"
+            ToneClassName = "swt:text-success"
+          }
+        | GitChangeKind.Conflict -> {
+            Label = "Conflict"
+            IconClassName = "swt:fluent--warning-24-regular"
+            ToneClassName = "swt:text-error"
+          }
 
     let branchKindLabel (kind: GitSidebarBranchKind) =
         match kind with
@@ -901,47 +928,38 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
-    static member private ChangeStatusPopover(index: int, change: GitSidebarChange) =
-        let label, _, iconClass = GitSidebarInternal.changePresentation change
+    static member private ChangeStatusTooltip(index: int, change: GitSidebarChange) =
+        let presentation = GitSidebarInternal.changePresentation change
         let gitReturn = GitSidebarInternal.describeChange change
-        let stopRowActivation (event: Event) = event.stopPropagation ()
+        let tooltipText = $"{presentation.Label}. Git return: {gitReturn}"
+        let isTooltipVisible, setIsTooltipVisible = React.useState false
 
-        let triggerInteractionProps =
-            createObj [
-                "onClick" ==> stopRowActivation
-                "onMouseDown" ==> stopRowActivation
-                "onKeyDown" ==> stopRowActivation
-            ]
-
-        Popover.Popover(
-            debug = $"git_change_status_{index}",
-            children =
-                React.Fragment [
-                    Popover.Trigger(
-                        Html.span [ prop.className $"swt:iconify {iconClass} swt:size-4" ],
-                        className = "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-7 swt:w-7 swt:px-0",
-                        interactionProps = triggerInteractionProps,
-                        props = [ prop.testId $"GitSidebarChangeStatusButton-{index}" ]
-                    )
-                    Popover.Content(
-                        children =
-                            Html.div [
-                                prop.className "swt:flex swt:flex-col swt:gap-2"
-                                prop.children [
-                                    Popover.Heading(Html.text "File status")
-                                    Html.p [
-                                        prop.className "swt:text-sm"
-                                        prop.text $"This file was {label.ToLowerInvariant()}."
-                                    ]
-                                    Html.p [
-                                        prop.className "swt:text-sm swt:font-mono"
-                                        prop.text $"Git return: {gitReturn}"
-                                    ]
-                                ]
-                            ]
-                    )
+        Html.div [
+            prop.testId $"GitSidebarChangeStatusTooltip-{index}"
+            prop.className "swt:tooltip swt:tooltip-left swt:inline-flex swt:items-center"
+            prop.ariaLabel tooltipText
+            prop.onMouseEnter (fun _ -> setIsTooltipVisible true)
+            prop.onMouseLeave (fun _ -> setIsTooltipVisible false)
+            prop.onFocus (fun _ -> setIsTooltipVisible true)
+            prop.onBlur (fun _ -> setIsTooltipVisible false)
+            prop.children [
+                if isTooltipVisible then
+                    Html.div [
+                        prop.className "swt:tooltip-content swt:max-w-64 swt:text-xs"
+                        prop.text tooltipText
+                    ]
+                Html.span [
+                    prop.testId $"GitSidebarChangeStatusIcon-{index}"
+                    prop.className [
+                        "swt:iconify swt:size-4 swt:shrink-0"
+                        presentation.IconClassName
+                        presentation.ToneClassName
+                    ]
+                    prop.ariaLabel tooltipText
+                    prop.title tooltipText
                 ]
-        )
+            ]
+        ]
 
     [<ReactComponent>]
     static member private ChangedFileRow(props: ChangedFileRowProps) =
@@ -1019,7 +1037,7 @@ type GitSidebar =
                         Html.div [
                             prop.testId $"GitSidebarChangeStatusSlot-{props.Index}"
                             prop.className "swt:ml-auto swt:shrink-0 swt:self-start"
-                            prop.children [ GitSidebar.ChangeStatusPopover(props.Index, change) ]
+                            prop.children [ GitSidebar.ChangeStatusTooltip(props.Index, change) ]
                         ]
                     ]
                 ]
