@@ -1077,8 +1077,6 @@ type GitSidebar =
                             prop.className
                                 "swt:ml-auto swt:flex swt:shrink-0 swt:items-center swt:gap-1 swt:self-center"
                             prop.children [
-                                GitSidebar.ChangeStatusTooltip(props.Index, change)
-
                                 let discardLabel =
                                     if props.DiscardPaths.Length = 1 then
                                         "Discard change"
@@ -1105,6 +1103,8 @@ type GitSidebar =
                                         ]
                                     ]
                                 ]
+
+                                GitSidebar.ChangeStatusTooltip(props.Index, change)
                             ]
                         ]
                     ]
