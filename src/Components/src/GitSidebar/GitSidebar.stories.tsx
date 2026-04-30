@@ -320,21 +320,28 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonTooltip")).toHaveClass("swt:tooltip");
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveAttribute(
+      "title",
+      "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin",
+    );
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
     await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(
       "swt:@max-3xs/gitSidebar:sr-only",
     );
 
-    await userEvent.hover(canvas.getByTestId("GitSidebarUpdateArcButton"));
-    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonTooltip")).toHaveTextContent(
-      "Update ARC from Online",
-    );
-
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
-    await expect(canvas.getByTestId("GitSidebarFetchButtonTooltip")).toHaveClass("swt:tooltip");
-    await expect(canvas.getByTestId("GitSidebarPullButtonTooltip")).toHaveClass("swt:tooltip");
-    await expect(canvas.getByTestId("GitSidebarPushButtonTooltip")).toHaveClass("swt:tooltip");
+    await expect(canvas.getByTestId("GitSidebarFetchButton")).toHaveAttribute(
+      "title",
+      "Check for Changes:\n- git fetch origin",
+    );
+    await expect(canvas.getByTestId("GitSidebarPullButton")).toHaveAttribute(
+      "title",
+      "Download Changes:\n- git pull origin",
+    );
+    await expect(canvas.getByTestId("GitSidebarPushButton")).toHaveAttribute(
+      "title",
+      "Upload Changes:\n- git push origin",
+    );
   },
 };
 
@@ -419,10 +426,10 @@ export const DeletedFile: Story = {
     await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("git: D.");
     await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("Deleted");
     await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveClass("swt:text-error");
-
-    await userEvent.hover(canvas.getByTestId("GitSidebarChangeStatusIcon-0"));
-    await expect(canvas.getByTestId("GitSidebarChangeStatusTooltip-0")).toHaveTextContent("Deleted");
-    await expect(canvas.getByTestId("GitSidebarChangeStatusTooltip-0")).toHaveTextContent("Git return: git: D.");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveAttribute(
+      "title",
+      "Deleted:\n- git: D.",
+    );
   },
 };
 
