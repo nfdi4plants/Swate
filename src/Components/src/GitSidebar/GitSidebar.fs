@@ -3,7 +3,6 @@ namespace Swate.Components
 open System
 open Browser.Types
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 
 open Swate.Components.GitSidebarTypes
@@ -189,6 +188,8 @@ type private ChangedFileRowProps = {
     IsSelected: bool
     IsMarked: bool
     IsBusy: bool
+    DiscardPaths: string[]
+    DiscardChanges: string[] -> unit
     UpdateMarkedSelection: GitSidebarChange -> bool -> bool -> unit
     OpenChange: GitSidebarChange -> unit
     VirtualStart: int
@@ -966,9 +967,8 @@ type GitSidebar =
         let change = props.Change
 
         let activateRow ctrlKey shiftKey =
-            if not props.IsBusy then
-                props.UpdateMarkedSelection change ctrlKey shiftKey
-                props.OpenChange change
+            props.UpdateMarkedSelection change ctrlKey shiftKey
+            props.OpenChange change
 
         Html.div [
             prop.role "listitem"
@@ -985,16 +985,11 @@ type GitSidebar =
                 Html.div [
                     prop.testId $"GitSidebarChangeRow-{props.Index}"
                     prop.custom ("data-index", props.Index)
-                    prop.custom ("data-git-change-path", change.Path)
                     prop.role "button"
-                    prop.tabIndex (if props.IsBusy then -1 else 0)
-                    prop.custom ("aria-disabled", if props.IsBusy then "true" else "false")
+                    prop.tabIndex 0
                     prop.className [
-                        "swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors swt:select-none"
-                        if props.IsBusy then
-                            "swt:cursor-not-allowed swt:opacity-60"
-                        else
-                            "swt:cursor-pointer"
+                        "swt:group swt:flex swt:min-h-9 swt:w-full swt:min-w-0 swt:items-center swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1 swt:text-left swt:transition-colors swt:select-none swt:@max-xs:gap-1.5"
+                        "swt:cursor-pointer"
                         if change.IsConflicted then
                             "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
                         elif props.IsSelected then
@@ -1020,13 +1015,16 @@ type GitSidebar =
                                     prop.className "swt:min-w-0"
                                     prop.children [
                                         Html.span [
-                                            prop.className "swt:block swt:break-words swt:text-sm swt:font-medium"
+                                            prop.className
+                                                "swt:block swt:min-w-0 swt:truncate swt:text-sm swt:font-medium swt:@max-xs:text-xs"
+                                            prop.title change.Path
                                             prop.text change.Path
                                         ]
                                         match change.OriginalPath with
                                         | Some originalPath ->
                                             Html.div [
-                                                prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
+                                                prop.className "swt:mt-0.5 swt:truncate swt:text-xs swt:text-base-content/60"
+                                                prop.title $"Renamed from {originalPath}"
                                                 prop.text $"Renamed from {originalPath}"
                                             ]
                                         | None -> Html.none
@@ -1036,8 +1034,43 @@ type GitSidebar =
                         ]
                         Html.div [
                             prop.testId $"GitSidebarChangeStatusSlot-{props.Index}"
-                            prop.className "swt:ml-auto swt:shrink-0 swt:self-start"
-                            prop.children [ GitSidebar.ChangeStatusTooltip(props.Index, change) ]
+                            prop.className "swt:ml-auto swt:flex swt:shrink-0 swt:items-center swt:gap-1 swt:self-center"
+                            prop.children [
+                                GitSidebar.ChangeStatusTooltip(props.Index, change)
+
+                                let discardLabel =
+                                    if props.DiscardPaths.Length = 1 then
+                                        "Discard change"
+                                    else
+                                        $"Discard {props.DiscardPaths.Length} selected changes"
+
+                                GitSidebar.Tooltip(
+                                    discardLabel,
+                                    Html.button [
+                                        prop.testId $"GitSidebarDiscardChangeButton-{props.Index}"
+                                        prop.type'.button
+                                        prop.className
+                                            "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
+                                        prop.ariaLabel discardLabel
+                                        prop.title discardLabel
+                                        prop.disabled props.IsBusy
+                                        prop.onClick (fun (event: MouseEvent) ->
+                                            event.preventDefault ()
+                                            event.stopPropagation ()
+                                            props.DiscardChanges props.DiscardPaths
+                                        )
+                                        prop.children [
+                                            Html.span [
+                                                prop.className
+                                                    "swt:iconify swt:fluent--arrow-undo-24-regular swt:size-4 swt:text-error"
+                                            ]
+                                        ]
+                                    ],
+                                    placementClassName = "swt:tooltip-left",
+                                    testId = $"GitSidebarDiscardChangeTooltip-{props.Index}",
+                                    className = "swt:inline-flex swt:items-center"
+                                )
+                            ]
                         ]
                     ]
                 ]
@@ -1047,62 +1080,15 @@ type GitSidebar =
     [<ReactComponent>]
     static member private ChangedFilesList(props: ChangedFilesListProps) =
         let scrollContainerRef: IRefValue<HTMLElement option> = React.useElementRef ()
-        let itemSize = 64
+        let itemSize = 40
         let itemGap = 4
         let overscan = 8
 
-        let contextMenuItemsForChange (change: GitSidebarChange) =
-            if props.IsBusy then
-                []
+        let discardPathsForChange (change: GitSidebarChange) =
+            if Set.contains change.Path props.MarkedPaths && not (Set.isEmpty props.MarkedPaths) then
+                props.MarkedPaths |> Set.toArray |> Array.sort
             else
-                let targetPaths =
-                    if Set.contains change.Path props.MarkedPaths && not (Set.isEmpty props.MarkedPaths) then
-                        props.MarkedPaths |> Set.toArray |> Array.sort
-                    else
-                        [| change.Path |]
-
-                let label =
-                    if targetPaths.Length = 1 then
-                        "Discard Change"
-                    else
-                        "Discard Selected Changes"
-
-                [
-                    ContextMenuItem(
-                        text = Html.span label,
-                        icon =
-                            Html.span [
-                                prop.className "swt:iconify swt:fluent--arrow-undo-24-regular swt:size-4"
-                            ],
-                        onClick = fun _ -> props.DiscardChanges targetPaths
-                    )
-                ]
-
-        let contextMenu =
-            ContextMenu.ContextMenu(
-                (fun data ->
-                    data
-                    |> unbox<GitSidebarChange>
-                    |> contextMenuItemsForChange
-                ),
-                ref = scrollContainerRef,
-                onSpawn =
-                    (fun event ->
-                        if props.IsBusy then
-                            None
-                        else
-                            let target = event.target :?> HTMLElement
-
-                            match target.closest("[data-git-change-path]"), scrollContainerRef.current with
-                            | Some trigger, Some container when container.contains trigger ->
-                                let trigger = trigger :?> HTMLElement
-                                let path: string = !!trigger?dataset?gitChangePath
-
-                                props.ChangedFiles
-                                |> Array.tryFind (fun change -> String.Equals(change.Path, path, StringComparison.Ordinal))
-                                |> Option.map box
-                            | _ -> None)
-            )
+                [| change.Path |]
 
         let changedFileListVirtualizer =
             Virtual.useVirtualizer (
@@ -1180,6 +1166,7 @@ type GitSidebar =
                                         )
 
                                     let isMarked = Set.contains change.Path props.MarkedPaths
+                                    let discardPaths = discardPathsForChange change
 
                                     React.KeyedFragment(
                                         change.Path,
@@ -1191,6 +1178,8 @@ type GitSidebar =
                                                     IsSelected = isSelected
                                                     IsMarked = isMarked
                                                     IsBusy = props.IsBusy
+                                                    DiscardPaths = discardPaths
+                                                    DiscardChanges = props.DiscardChanges
                                                     UpdateMarkedSelection = props.UpdateMarkedSelection
                                                     OpenChange = props.OpenChange
                                                     VirtualStart = virtualItem.Start
@@ -1203,7 +1192,6 @@ type GitSidebar =
                         ]
                 ]
             ]
-            contextMenu
         ]
 
     [<ReactComponent>]

@@ -444,8 +444,42 @@ export const LongWrappedFile: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:ml-auto");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toHaveClass("swt:items-center");
     await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:shrink-0");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:self-center");
+  },
+};
+
+const discardSelectionSpy = fn();
+
+export const HoverDiscardChange: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks({
+      OnDiscardSelection: discardSelectionSpy,
+    }),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    discardSelectionSpy.mockClear();
+    const canvas = within(canvasElement);
+
+    const row = canvas.getByTestId("GitSidebarChangeRow-0");
+    await expect(row).toHaveClass("swt:items-center");
+    await expect(row).toHaveClass("swt:py-1");
+
+    await userEvent.hover(row);
+    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-0")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-0")).toHaveClass("swt:opacity-0");
+    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-0")).toHaveClass(
+      "swt:group-hover:opacity-100",
+    );
+
+    await userEvent.click(canvas.getByTestId("GitSidebarDiscardChangeButton-0"));
+    await expect(discardSelectionSpy).toHaveBeenCalledWith(["README.md"]);
   },
 };
 
