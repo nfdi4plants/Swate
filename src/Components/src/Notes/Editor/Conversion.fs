@@ -62,7 +62,7 @@ module NoteConversion =
     let private frontmatterEncoder (frontmatter: NoteFrontmatter) =
         [
             "title", YAMLicious.Encode.string frontmatter.Title
-            "date", YAMLicious.Encode.datetime frontmatter.Date
+            "date", YAMLicious.Encode.string (frontmatter.Date.ToString("yyyy-MM-dd"))
             match frontmatter.Tags with
             | Some tags when tags.Count > 0 -> "tags", YAMLicious.Encode.resizearray ontologyAnnotationEncoder tags
             | _ -> "tags", YAMLicious.Encode.nil
@@ -157,7 +157,7 @@ module NoteConversion =
         let title =
             Validation.toOptionalString draft.Title |> Option.defaultValue "Untitled"
 
-        let dateCreated = draft.DateCreated |> Option.defaultValue DateTime.Today
+        let dateCreated = (draft.DateCreated |> Option.defaultValue DateTime.Today).Date
 
         let body = Validation.toOptionalString draft.MainText |> Option.defaultValue ""
 

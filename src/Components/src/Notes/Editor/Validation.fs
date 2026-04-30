@@ -36,14 +36,12 @@ module Validation =
                     let year = int dateTimeLocal.Groups.[1].Value
                     let month = int dateTimeLocal.Groups.[2].Value
                     let day = int dateTimeLocal.Groups.[3].Value
-                    let hour = int dateTimeLocal.Groups.[4].Value
-                    let minute = int dateTimeLocal.Groups.[5].Value
-                    Some(DateTime(year, month, day, hour, minute, 0))
+                    Some(DateTime(year, month, day))
                 with _ ->
                     None
             else
                 match DateTime.TryParse trimmed with
-                | true, parsed -> Some parsed
+                | true, parsed -> Some parsed.Date
                 | false, _ -> None
 
     let private sanitizeProtocolNameCandidate (candidate: string) =

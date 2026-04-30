@@ -16,9 +16,10 @@ type NotesDraft = {
     MainText: string
     SelectedExistingTarget: ExistingTargetRef option
 } with
+
     static member init = {
         Title = ""
-        DateCreated = None
+        DateCreated = Some System.DateTime.Today
         Tags = ResizeArray()
         MainText = ""
         SelectedExistingTarget = None
@@ -29,6 +30,7 @@ type NotesUiState = {
     IsSubmitting: bool
     ShowExistingTargetSelector: bool
 } with
+
     static member init = {
         Error = None
         IsSubmitting = false
