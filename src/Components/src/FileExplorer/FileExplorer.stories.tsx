@@ -58,8 +58,10 @@ export const Default: Story = {
     expect(within(lfsFolderStatusBadge!).getByText("LFS")).toBeTruthy();
     const lfsFolderPill = lfsFolderStatusBadge!.parentElement as HTMLElement | null;
     expect(lfsFolderPill).toBeTruthy();
-    expect(lfsFolderStatusBadge!.className).toContain("swt:badge-info");
-    expect(lfsFolderSizeBadge.className).toContain("swt:bg-base-200");
+    expect(lfsFolderStatusBadge!.className).toContain("swt:bg-info");
+    expect(lfsFolderStatusBadge!.className).toContain("swt:text-info-content");
+    expect(lfsFolderSizeBadge.className).toContain("swt:bg-info");
+    expect(lfsFolderSizeBadge.className).toContain("swt:text-info-content");
     expect(lfsFolderPill!.className).toContain("swt:rounded-full");
     expect(lfsFolderPill!.className).toContain("swt:overflow-hidden");
     const lfsFolderStatusIcon = lfsFolderStatusBadge!.querySelector("i");
@@ -171,7 +173,10 @@ export const CompactSidebar: Story = {
     expect(within(myFilesRowContainer!).getByText("LFS")).toBeTruthy();
     const lfsFolderSizeBadge = within(myFilesRowContainer!).getByText("2 KB");
     expect(lfsFolderSizeBadge).toBeTruthy();
-    expect(lfsNotDownloadedStatusBadge!.className).toContain("swt:badge-info");
+    expect(lfsNotDownloadedStatusBadge!.className).toContain("swt:bg-info");
+    expect(lfsNotDownloadedStatusBadge!.className).toContain("swt:text-info-content");
+    expect(lfsFolderSizeBadge.className).toContain("swt:bg-info");
+    expect(lfsFolderSizeBadge.className).toContain("swt:text-info-content");
 
     const lfsNotDownloadedIcon = lfsNotDownloadedStatusBadge!.querySelector("i");
     expect(lfsNotDownloadedIcon).toBeTruthy();

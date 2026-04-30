@@ -140,7 +140,7 @@ type FileExplorer =
                 if isDownloaded then
                     "swt:badge-success"
                 else
-                    "swt:badge-info"
+                    "swt:badge-info swt:text-info-content"
             let statusIconClassName =
                 if isDownloaded then
                     "swt:fluent--checkmark-circle-24-regular"
@@ -154,7 +154,7 @@ type FileExplorer =
             let statusBadge =
                 Html.span [
                     prop.className
-                        $"swt:badge swt:badge-sm swt:cursor-default {statusClassName} {statusShapeClass}"
+                        $"swt:badge swt:badge-sm swt:cursor-default swt:gap-0.5 {statusClassName} {statusShapeClass}"
                     prop.custom (
                         "data-lfs-download-status",
                         if isDownloaded then
@@ -167,7 +167,6 @@ type FileExplorer =
                             prop.className $"swt:iconify {statusIconClassName} swt:size-3"
                         ]
                         Html.span [
-                            prop.className "swt:ml-1"
                             prop.text statusLabel
                         ]
                     ]
@@ -179,7 +178,7 @@ type FileExplorer =
                     | Some size, false ->
                         Html.span [
                             prop.className
-                                "swt:badge swt:badge-sm swt:rounded-none swt:border-0 swt:cursor-default swt:bg-base-200 swt:text-base-content"
+                                "swt:badge swt:badge-sm swt:rounded-none swt:border-0 swt:cursor-default swt:bg-base-200 swt:text-info-content"
                             prop.text size
                         ]
                     | _ -> ()

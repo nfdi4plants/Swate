@@ -117,6 +117,45 @@ test.describe('Swate Electron App', () => {
     await expect(fileExplorer.locator('li').first()).toBeVisible({ timeout: 30000 });
   });
 
+  test('uses the File explorer button to collapse and reopen the sidebar', async () => {
+    await mockOpenDialogSelection(electronApp, tempArcParentDir);
+
+    const arcIdentifier = `${ARC_IDENTIFIER}-left-sidebar-toggle`;
+    const arcPath = await createArc(window, arcIdentifier);
+    expect(arcPath).toBe(path.join(tempArcParentDir, arcIdentifier));
+
+    const homeButton = window.locator('[aria-label="Home"] button');
+    await expect(homeButton).toBeVisible({ timeout: 30000 });
+    await homeButton.click();
+
+    const navbarLeftSidebarToggle = window.getByRole('button', { name: 'Toggle left sidebar' });
+    await expect(navbarLeftSidebarToggle).toHaveCount(0);
+
+    const fileExplorerButton = window.locator('[aria-label="File explorer"] button');
+    await expect(fileExplorerButton).toBeVisible({ timeout: 30000 });
+
+    const leftSidebar = window.getByTestId('layout-main-left-sidebar');
+    const fileExplorer = window.getByTestId('file-explorer-container');
+
+    const readLeftSidebarWidth = () =>
+      leftSidebar.evaluate((element: HTMLElement) => element.getBoundingClientRect().width);
+
+    if ((await readLeftSidebarWidth()) <= 1) {
+      await fileExplorerButton.click();
+    }
+
+    await expect.poll(readLeftSidebarWidth, { timeout: 30000 }).toBeGreaterThan(1);
+    await expect(fileExplorer).toBeVisible({ timeout: 30000 });
+
+    await fileExplorerButton.click();
+    await expect.poll(readLeftSidebarWidth, { timeout: 30000 }).toBeLessThanOrEqual(1);
+
+    await fileExplorerButton.click();
+    await expect.poll(readLeftSidebarWidth, { timeout: 30000 }).toBeGreaterThan(1);
+    await expect(fileExplorer).toBeVisible({ timeout: 30000 });
+    await expect(fileExplorer.locator('li').first()).toBeVisible({ timeout: 30000 });
+  });
+
   test('hides arrows for empty folders and lazy-loads non-empty folders in the normal filetree explorer', async () => {
     await mockOpenDialogSelection(electronApp, tempArcParentDir);
 
