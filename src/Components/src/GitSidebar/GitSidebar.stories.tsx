@@ -245,7 +245,8 @@ export const MarkedSelectionWithoutLastClickedHighlight: Story = {
     await expect(canvas.getByTestId("GitSidebarChangeRow-1")).toHaveClass("swt:border-success/40");
     await expect(canvas.getByTestId("GitSidebarChangeRow-1")).toHaveClass("swt:bg-success/10");
 
-    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-1"));
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toHaveClass("swt:border-success/40");
     await expect(canvas.getByTestId("GitSidebarChangeRow-1")).not.toHaveClass("swt:border-success/40");
     await expect(canvas.getByTestId("GitSidebarChangeRow-1")).not.toHaveClass("swt:bg-success/10");
   },

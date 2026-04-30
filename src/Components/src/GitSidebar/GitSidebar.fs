@@ -1611,11 +1611,7 @@ type GitSidebar =
 
             let nextMarkedPaths =
                 match ctrlKey, shiftKey with
-                | false, false ->
-                    if Set.contains change.Path markedPaths then
-                        Set.remove change.Path markedPaths
-                    else
-                        Set.singleton change.Path
+                | false, false -> Set.singleton change.Path
                 | true, false ->
                     if Set.contains change.Path markedPaths then
                         Set.remove change.Path markedPaths
