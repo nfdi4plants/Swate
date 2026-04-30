@@ -659,8 +659,8 @@ export const CommitComposer: Story = {
     expect(menuBounds.right).toBeLessThanOrEqual(sidebarBounds.right);
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
-    // Click again to deselect – button text should switch back to "Save All Changes"
-    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    // Ctrl+click to deselect – button text should switch back to "Save All Changes"
+    fireEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
     await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes");
     await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
     await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
