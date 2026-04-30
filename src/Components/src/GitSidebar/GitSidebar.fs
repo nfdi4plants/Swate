@@ -1031,7 +1031,7 @@ type GitSidebar =
                     prop.role "button"
                     prop.tabIndex 0
                     prop.className [
-                        "swt:group swt:flex swt:min-h-9 swt:w-full swt:min-w-0 swt:items-center swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1 swt:text-left swt:transition-colors swt:select-none swt:@max-xs:gap-1.5"
+                        "swt:group swt:flex swt:min-h-6 swt:w-full swt:min-w-0 swt:items-center swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:text-left swt:transition-colors swt:select-none swt:@max-xs:gap-1.5"
                         "swt:cursor-pointer"
                         if change.IsConflicted then
                             "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
@@ -1115,7 +1115,7 @@ type GitSidebar =
     [<ReactComponent>]
     static member private ChangedFilesList(props: ChangedFilesListProps) =
         let scrollContainerRef: IRefValue<HTMLElement option> = React.useElementRef ()
-        let itemSize = 40
+        let itemSize = 28
         let itemGap = 4
         let overscan = 8
 

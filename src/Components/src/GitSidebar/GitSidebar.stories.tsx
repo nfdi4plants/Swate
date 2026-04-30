@@ -526,7 +526,7 @@ export const HoverDiscardChange: Story = {
 
     const row = canvas.getByTestId("GitSidebarChangeRow-0");
     await expect(row).toHaveClass("swt:items-center");
-    await expect(row).toHaveClass("swt:py-1");
+    await expect(row).toHaveClass("swt:min-h-6");
 
     await userEvent.hover(row);
     await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-0")).toBeInTheDocument();
