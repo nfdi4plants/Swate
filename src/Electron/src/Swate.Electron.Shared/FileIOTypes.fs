@@ -7,6 +7,9 @@ type FileEntry = {
     isDirectory: bool
     path: string
     isLfs: bool option
+    isLfsPointer: bool option
+    downloaded: bool option
+    lfsSizeBytes: float option
 }
 
 [<AutoOpen>]
@@ -19,11 +22,25 @@ module FileEntryExtensions =
 
     type FileEntry with
 
-        static member create(name: string, path: string, isDirectory: bool, ?isLfs: bool option) : FileEntry = {
+        static member create
+            (
+                name: string,
+                path: string,
+                isDirectory: bool,
+                ?isLfs: bool option,
+                ?isLfsPointer: bool option,
+                ?downloaded: bool option,
+                ?lfsSizeBytes: float option
+            )
+            : FileEntry =
+            {
             name = name
             path = path
             isDirectory = isDirectory
             isLfs = defaultArg isLfs None
+            isLfsPointer = defaultArg isLfsPointer None
+            downloaded = defaultArg downloaded None
+            lfsSizeBytes = defaultArg lfsSizeBytes None
         }
 
 type FileTreeNode = {
@@ -31,17 +48,32 @@ type FileTreeNode = {
     isDirectory: bool
     path: string
     isLfs: bool option
+    isLfsPointer: bool option
+    downloaded: bool option
+    lfsSizeBytes: float option
     children: Dictionary<string, FileTreeNode>
 } with
 
     static member create
-        (name: string, isDirectory: bool, path: string, children: Dictionary<string, FileTreeNode>, ?isLfs: bool option)
+        (
+            name: string,
+            isDirectory: bool,
+            path: string,
+            children: Dictionary<string, FileTreeNode>,
+            ?isLfs: bool option,
+            ?isLfsPointer: bool option,
+            ?downloaded: bool option,
+            ?lfsSizeBytes: float option
+        )
         =
         {
             name = name
             isDirectory = isDirectory
             path = path
             isLfs = defaultArg isLfs None
+            isLfsPointer = defaultArg isLfsPointer None
+            downloaded = defaultArg downloaded None
+            lfsSizeBytes = defaultArg lfsSizeBytes None
             children = children
         }
 

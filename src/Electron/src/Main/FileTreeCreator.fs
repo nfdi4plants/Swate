@@ -2,6 +2,7 @@
 module Main.FileTreeCreator
 
 
+open System
 open System.Collections.Generic
 open Fable.Core.JsInterop
 open Swate.Electron.Shared.FileIOTypes
@@ -144,10 +145,142 @@ let private tryGetLfsTrackedByAttributes
                     )
     }
 
+let private lfsPointerVersionLine = "version https://git-lfs.github.com/spec/v1"
+let private lfsPointerProbeMaximumBytes = 64_000.0
+
+let private clearLfsMetadata (entry: FileEntry) =
+    {
+        entry with
+            isLfsPointer = None
+            downloaded = None
+            lfsSizeBytes = None
+    }
+
+let private tryParseLfsPointerSizeBytes (content: string) =
+    let lines =
+        content.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        |> Array.map _.Trim()
+        |> Array.filter (fun line -> not (String.IsNullOrWhiteSpace line))
+
+    if lines.Length < 3 || not (lines.[0].Equals(lfsPointerVersionLine, StringComparison.Ordinal)) then
+        None
+    else
+        let hasOidLine =
+            lines
+            |> Array.exists (fun line ->
+                let prefix = "oid sha256:"
+
+                if line.StartsWith(prefix, StringComparison.Ordinal) then
+                    let oid = line.Substring(prefix.Length)
+                    oid.Length = 64
+                    && (oid |> Seq.forall (fun c -> Char.IsDigit c || ('a' <= c && c <= 'f') || ('A' <= c && c <= 'F')))
+                else
+                    false
+            )
+
+        if not hasOidLine then
+            None
+        else
+            lines
+            |> Array.tryPick (fun line ->
+                let prefix = "size "
+
+                if line.StartsWith(prefix, StringComparison.Ordinal) then
+                    let rawSize = line.Substring(prefix.Length).Trim()
+                    let success, parsed = Int64.TryParse(rawSize)
+
+                    if success && parsed >= 0L then
+                        Some(float parsed)
+                    else
+                        None
+                else
+                    None
+            )
+
+let private tryGetOnDiskFileSizeBytes (absolutePath: string) : Fable.Core.JS.Promise<float option> =
+    promise {
+        try
+            let! stats = fs?promises?stat (absolutePath)
+            return Some(unbox<float> stats?size)
+        with _ ->
+            return None
+    }
+
+let private tryReadUtf8FileContent (absolutePath: string) : Fable.Core.JS.Promise<string option> =
+    promise {
+        try
+            let! content = fs?promises?readFile (absolutePath, "utf8") |> unbox<Fable.Core.JS.Promise<string>>
+            return Some content
+        with _ ->
+            return None
+    }
+
+let private tryGetPointerSizeBytes (absolutePath: string) (onDiskSizeBytes: float) : Fable.Core.JS.Promise<float option> =
+    promise {
+        if onDiskSizeBytes > lfsPointerProbeMaximumBytes then
+            return None
+        else
+            let! content = tryReadUtf8FileContent absolutePath
+            return content |> Option.bind tryParseLfsPointerSizeBytes
+    }
+
+let private annotateTrackedLfsEntry (entry: FileEntry) : Fable.Core.JS.Promise<FileEntry> =
+    promise {
+        let! onDiskSizeBytes = tryGetOnDiskFileSizeBytes entry.path
+
+        match onDiskSizeBytes with
+        | None -> return { clearLfsMetadata entry with isLfs = Some true }
+        | Some onDiskSizeBytes ->
+            let! pointerSizeBytes = tryGetPointerSizeBytes entry.path onDiskSizeBytes
+
+            match pointerSizeBytes with
+            | Some pointerSize ->
+                return {
+                    entry with
+                        isLfs = Some true
+                        isLfsPointer = Some true
+                        downloaded = Some false
+                        lfsSizeBytes = Some pointerSize
+                }
+            | None ->
+                return {
+                    entry with
+                        isLfs = Some true
+                        isLfsPointer = Some false
+                        downloaded = Some true
+                        lfsSizeBytes = Some onDiskSizeBytes
+                }
+    }
+
+let private annotateFileEntryLfsState (entry: FileEntry) (isTracked: bool) : Fable.Core.JS.Promise<FileEntry> =
+    if isTracked then
+        annotateTrackedLfsEntry entry
+    else
+        promise { return { clearLfsMetadata entry with isLfs = Some false } }
 
 let getFileEntry (path: string) = promise {
     let! stats = fs?promises?stat (path)
     return FileEntry.create (pathMod?basename (path), path, stats?isDirectory (), None)
+}
+
+let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
+    let normalizedRepoRoot = normalizeRootPath repoRoot
+    let! entry = getFileEntry path
+
+    if entry.isDirectory then
+        return entry
+    else
+        match tryGetRepoRelativePath normalizedRepoRoot entry.path with
+        | None -> return entry
+        | Some relativePath ->
+            let! lfsTracked = tryGetLfsTrackedByAttributes normalizedRepoRoot [| relativePath |]
+
+            let tracked =
+                match lfsTracked.TryGetValue(relativePath) with
+                | true, value -> value
+                | _ -> false
+
+            return! annotateFileEntryLfsState entry tracked
 }
 
 /// Finds all files and subfolders of the given filepath
@@ -194,8 +327,10 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
                         entries.Add(FileEntry.create (name, fullPath, false, Some false))
             )
 
+        let scannedEntries = entries.ToArray()
+
         let repoRelativeFilePaths =
-            entries.ToArray()
+            scannedEntries
             |> Array.choose (fun entry ->
                 if entry.isDirectory then
                     None
@@ -205,20 +340,22 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
 
         let! lfsTracked = tryGetLfsTrackedByAttributes repoRoot repoRelativeFilePaths
 
-        return
-            entries.ToArray()
-            |> Array.map (fun entry ->
-                if entry.isDirectory then
-                    entry
-                else
-                    match tryGetRepoRelativePath repoRoot entry.path with
-                    | None -> entry
-                    | Some relativePath ->
-                        let tracked =
-                            match lfsTracked.TryGetValue(relativePath) with
-                            | true, value -> value
-                            | _ -> false
+        let enrichedEntries = ResizeArray<FileEntry>()
 
-                        { entry with isLfs = Some tracked }
-            )
+        for entry in scannedEntries do
+            if entry.isDirectory then
+                enrichedEntries.Add entry
+            else
+                match tryGetRepoRelativePath repoRoot entry.path with
+                | None -> enrichedEntries.Add entry
+                | Some relativePath ->
+                    let tracked =
+                        match lfsTracked.TryGetValue(relativePath) with
+                        | true, value -> value
+                        | _ -> false
+
+                    let! enrichedEntry = annotateFileEntryLfsState entry tracked
+                    enrichedEntries.Add enrichedEntry
+
+        return enrichedEntries.ToArray()
 }
