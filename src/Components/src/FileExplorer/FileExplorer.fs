@@ -129,18 +129,17 @@ type FileExplorer =
             let isDownloaded = item.Downloaded = Some true
             let statusLabel = "LFS"
             let statusAccessibilityText =
-                if isDownloaded then
-                    "LFS Downloaded"
-                else
-                    match item.SizeFormatted with
-                    | Some size -> $"LFS Not Downloaded - {size}"
-                    | None -> "LFS Not Downloaded"
-            let showSizeSegment = not isDownloaded && item.SizeFormatted.IsSome
+                match item.SizeFormatted, isDownloaded with
+                | Some size, true -> $"LFS Downloaded - {size}"
+                | Some size, false -> $"LFS Not Downloaded - {size}"
+                | None, true -> "LFS Downloaded"
+                | None, false -> "LFS Not Downloaded"
+            let showSizeSegment = item.SizeFormatted.IsSome
             let statusClassName =
                 if isDownloaded then
                     "swt:badge-success"
                 else
-                    "swt:badge-info swt:text-info-content"
+                    "swt:bg-info swt:text-info-content"
             let statusIconClassName =
                 if isDownloaded then
                     "swt:fluent--checkmark-circle-24-regular"
@@ -174,11 +173,11 @@ type FileExplorer =
             let badgeSegments =
                 [
                     statusBadge
-                    match item.SizeFormatted, isDownloaded with
-                    | Some size, false ->
+                    match item.SizeFormatted with
+                    | Some size ->
                         Html.span [
                             prop.className
-                                "swt:badge swt:badge-sm swt:rounded-none swt:border-0 swt:cursor-default swt:bg-base-200 swt:text-info-content"
+                                "swt:badge swt:badge-sm swt:rounded-none swt:border-0 swt:cursor-default swt:bg-base-200 swt:text-base-content"
                             prop.text size
                         ]
                     | _ -> ()
@@ -329,7 +328,7 @@ type FileExplorer =
                                                         Html.button [
                                                             prop.type'.button
                                                             prop.className [
-                                                                "swt:flex swt:min-h-0 swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border-0 swt:bg-transparent swt:p-0 swt:cursor-default"
+                                                                "swt:flex swt:min-h-0 swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border-0 swt:bg-transparent swt:p-0 swt:cursor-pointer"
                                                                 rowHighlightClass
                                                             ]
                                                             prop.ariaLabel (
@@ -405,10 +404,16 @@ type FileExplorer =
             prop.children [
                 if showBreadcrumbs && not (List.isEmpty model.BreadcrumbPath) then
                     Breadcrumbs.Breadcrumbs(model.BreadcrumbPath, fun id -> dispatch (FileExplorerLogic.NavigateTo id))
-                Html.ul [
-                    prop.testId "file-explorer-container"
-                    prop.className "swt:w-full swt:list-none swt:m-0 swt:p-0"
-                    prop.children (model.Items |> List.map renderItem)
+                Html.div [
+                    prop.testId "file-explorer-scroll-container"
+                    prop.className "swt:w-full swt:overflow-x-auto"
+                    prop.children [
+                        Html.ul [
+                            prop.testId "file-explorer-container"
+                            prop.className "swt:w-full swt:min-w-max swt:list-none swt:m-0 swt:p-0"
+                            prop.children (model.Items |> List.map renderItem)
+                        ]
+                    ]
                 ]
                 contextMenu
             ]

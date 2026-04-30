@@ -30,7 +30,11 @@ export const Default: Story = {
     };
 
     const container = await canvas.findByTestId("file-explorer-container");
+    const scrollContainer = await canvas.findByTestId("file-explorer-scroll-container");
     expect(container).toBeTruthy();
+    expect(scrollContainer).toBeTruthy();
+    expect(scrollContainer.className).toContain("swt:overflow-x-auto");
+    expect(getComputedStyle(scrollContainer).overflowX).toBe("auto");
 
     const resume = await canvas.findByText("resume.pdf");
     expect(resume).toBeTruthy();
@@ -40,7 +44,7 @@ export const Default: Story = {
     const folderNameButton = await canvas.findByRole("button", { name: "My Files" });
     let expandFolderButton = await canvas.findByRole("button", { name: "Expand My Files" });
     expect(getComputedStyle(folderNameButton).cursor).not.toBe("pointer");
-    expect(getComputedStyle(expandFolderButton).cursor).not.toBe("pointer");
+    expect(getComputedStyle(expandFolderButton).cursor).toBe("pointer");
     expect(expandFolderButton.className).toContain("swt:h-5");
     expect(expandFolderButton.className).toContain("swt:w-5");
     expect((folderNameButton.compareDocumentPosition(expandFolderButton) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
@@ -60,8 +64,8 @@ export const Default: Story = {
     expect(lfsFolderPill).toBeTruthy();
     expect(lfsFolderStatusBadge!.className).toContain("swt:bg-info");
     expect(lfsFolderStatusBadge!.className).toContain("swt:text-info-content");
-    expect(lfsFolderSizeBadge.className).toContain("swt:bg-info");
-    expect(lfsFolderSizeBadge.className).toContain("swt:text-info-content");
+    expect(lfsFolderSizeBadge.className).toContain("swt:bg-base-200");
+    expect(lfsFolderSizeBadge.className).toContain("swt:text-base-content");
     expect(lfsFolderPill!.className).toContain("swt:rounded-full");
     expect(lfsFolderPill!.className).toContain("swt:overflow-hidden");
     const lfsFolderStatusIcon = lfsFolderStatusBadge!.querySelector("i");
@@ -107,6 +111,7 @@ export const Default: Story = {
 
     const collapseFolderButton = await canvas.findByRole("button", { name: "Collapse My Files" });
     expect(collapseFolderButton.className).toContain("swt:bg-base-300");
+    expect(getComputedStyle(collapseFolderButton).cursor).toBe("pointer");
     const collapseIcon = collapseFolderButton.querySelector("i");
     expect(collapseIcon).toBeTruthy();
     expect(collapseIcon!.className).toContain("swt:fluent--caret-down-24-filled");
@@ -119,7 +124,10 @@ export const Default: Story = {
     expect(lfsDownloadedStatusBadge).toBeTruthy();
     expect(within(lfsDownloadedStatusBadge!).getByText("LFS")).toBeTruthy();
     expect(lfsDownloadedStatusBadge!.className).toContain("swt:badge-success");
-    expect(within(nestedDownloadedFileRow!).queryByText("6 MB")).toBeNull();
+    const lfsDownloadedSizeBadge = within(nestedDownloadedFileRow!).getByText("6 MB");
+    expect(lfsDownloadedSizeBadge).toBeTruthy();
+    expect(lfsDownloadedSizeBadge.className).toContain("swt:bg-base-200");
+    expect(lfsDownloadedSizeBadge.className).toContain("swt:text-base-content");
     const lfsDownloadedPill = lfsDownloadedStatusBadge!.parentElement as HTMLElement | null;
     expect(lfsDownloadedPill).toBeTruthy();
     expect(lfsDownloadedPill!.className).toContain("swt:rounded-full");
@@ -175,8 +183,8 @@ export const CompactSidebar: Story = {
     expect(lfsFolderSizeBadge).toBeTruthy();
     expect(lfsNotDownloadedStatusBadge!.className).toContain("swt:bg-info");
     expect(lfsNotDownloadedStatusBadge!.className).toContain("swt:text-info-content");
-    expect(lfsFolderSizeBadge.className).toContain("swt:bg-info");
-    expect(lfsFolderSizeBadge.className).toContain("swt:text-info-content");
+    expect(lfsFolderSizeBadge.className).toContain("swt:bg-base-200");
+    expect(lfsFolderSizeBadge.className).toContain("swt:text-base-content");
 
     const lfsNotDownloadedIcon = lfsNotDownloadedStatusBadge!.querySelector("i");
     expect(lfsNotDownloadedIcon).toBeTruthy();
@@ -199,7 +207,10 @@ export const CompactSidebar: Story = {
 
     expect(within(nestedFileRow!).queryByText("LFS Downloaded")).toBeNull();
     expect(within(nestedFileRow!).getByText("LFS")).toBeTruthy();
-    expect(within(nestedFileRow!).queryByText("6 MB")).toBeNull();
+    const downloadedSizeBadge = within(nestedFileRow!).getByText("6 MB");
+    expect(downloadedSizeBadge).toBeTruthy();
+    expect(downloadedSizeBadge.className).toContain("swt:bg-base-200");
+    expect(downloadedSizeBadge.className).toContain("swt:text-base-content");
 
     const lfsDownloadedStatusBadge =
       nestedFileRow!.querySelector("[data-lfs-download-status='downloaded']") as HTMLElement | null;
@@ -211,7 +222,7 @@ export const CompactSidebar: Story = {
 
     const lfsDownloadedPill = lfsDownloadedStatusBadge!.parentElement as HTMLElement | null;
     expect(lfsDownloadedPill).toBeTruthy();
-    expect(lfsDownloadedPill!.getAttribute("aria-label")).toBe("LFS Downloaded");
-    expect(lfsDownloadedPill!.getAttribute("title")).toBe("LFS Downloaded");
+    expect(lfsDownloadedPill!.getAttribute("aria-label")).toBe("LFS Downloaded - 6 MB");
+    expect(lfsDownloadedPill!.getAttribute("title")).toBe("LFS Downloaded - 6 MB");
   }),
 };

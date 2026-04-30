@@ -133,7 +133,7 @@ module ArcVaultExtensions =
                                     | name when name = Chokidar.Events.Add.ToString() ->
                                         if this.path.IsSome then
                                             let newPath = pathUpdater path
-                                            let! addedFile = getFileEntry (newPath)
+                                            let! addedFile = getFileEntryWithLfsMetadata this.path.Value newPath
                                             let newFileTree = this.fileTree
                                             newFileTree.Add(addedFile.path, addedFile)
                                             this.SetFileTree(newFileTree)

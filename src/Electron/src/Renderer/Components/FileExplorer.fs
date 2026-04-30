@@ -49,6 +49,10 @@ module private FileExplorerHelper =
 
         collectSelectedDirectoryPathChain selectedTreeItemPath root rootPathSet
 
+    let private mapLfsSize (sizeBytes: float option) =
+        let size = sizeBytes |> Option.map int64
+        size, (size |> Option.map FileTree.formatSize)
+
     let rec loopPaths
         (loadedDirectoryPaths: Set<string>)
         (selectedTreeItemPath: string option)
@@ -56,6 +60,7 @@ module private FileExplorerHelper =
         =
         match parent.isDirectory with
         | true ->
+            let lfsSize, lfsSizeFormatted = mapLfsSize parent.lfsSizeBytes
             let normalizedParentPath = normalizeNodePath parent.path
             let isDirectoryLoaded = loadedDirectoryPaths.Contains normalizedParentPath
             let hasSourceChildren = parent.children.Count > 0
@@ -86,13 +91,22 @@ module private FileExplorerHelper =
                         selectedTreeItemPath
                         |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath parent.path)
                     IsLFS = parent.isLfs
+                    IsLFSPointer = parent.isLfsPointer
+                    Downloaded = parent.downloaded
+                    Size = lfsSize
+                    SizeFormatted = lfsSizeFormatted
                     Children = children
             }
         | false ->
+            let lfsSize, lfsSizeFormatted = mapLfsSize parent.lfsSizeBytes
             Some {
                 FileTree.createFile parent.name (Some parent.path) FileItemIcon.Document with
                     Id = parent.path
                     IsLFS = parent.isLfs
+                    IsLFSPointer = parent.isLfsPointer
+                    Downloaded = parent.downloaded
+                    Size = lfsSize
+                    SizeFormatted = lfsSizeFormatted
             }
 
 open FileExplorerHelper
