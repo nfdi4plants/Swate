@@ -125,38 +125,75 @@ type FileExplorer =
                 yield! getItemIconClass item |> Option.toList
             ]
 
-        let renderLfsStatusBadge (item: FileItem) =
+        let renderLfsStatusPill (item: FileItem) =
             let isDownloaded = item.Downloaded = Some true
-            let badgeText =
+            let statusLabel = "LFS"
+            let statusAccessibilityText =
                 if isDownloaded then
                     "LFS Downloaded"
                 else
-                    "LFS Not Downloaded"
-            let badgeClassName =
+                    match item.SizeFormatted with
+                    | Some size -> $"LFS Not Downloaded - {size}"
+                    | None -> "LFS Not Downloaded"
+            let showSizeSegment = not isDownloaded && item.SizeFormatted.IsSome
+            let statusClassName =
                 if isDownloaded then
-                    "swt:badge swt:badge-sm swt:badge-success swt:cursor-default"
+                    "swt:badge-success"
                 else
-                    "swt:badge swt:badge-sm swt:badge-warning swt:cursor-default"
+                    "swt:badge-info"
+            let statusIconClassName =
+                if isDownloaded then
+                    "swt:fluent--checkmark-circle-24-regular"
+                else
+                    "swt:fluent--cloud-arrow-down-24-regular"
+            let statusShapeClass =
+                if showSizeSegment then
+                    "swt:rounded-none swt:border-0"
+                else
+                    "swt:rounded-full"
+            let statusBadge =
+                Html.span [
+                    prop.className
+                        $"swt:badge swt:badge-sm swt:cursor-default {statusClassName} {statusShapeClass}"
+                    prop.custom (
+                        "data-lfs-download-status",
+                        if isDownloaded then
+                            "downloaded"
+                        else
+                            "not-downloaded"
+                    )
+                    prop.children [
+                        Html.i [
+                            prop.className $"swt:iconify {statusIconClassName} swt:size-3"
+                        ]
+                        Html.span [
+                            prop.className "swt:ml-1"
+                            prop.text statusLabel
+                        ]
+                    ]
+                ]
+            let badgeSegments =
+                [
+                    statusBadge
+                    match item.SizeFormatted, isDownloaded with
+                    | Some size, false ->
+                        Html.span [
+                            prop.className
+                                "swt:badge swt:badge-sm swt:rounded-none swt:border-0 swt:cursor-default swt:bg-base-200 swt:text-base-content"
+                            prop.text size
+                        ]
+                    | _ -> ()
+                ]
 
             Html.span [
-                prop.className "swt:flex swt:items-center swt:cursor-default"
-                prop.custom (
-                    "data-lfs-download-status",
-                    if isDownloaded then
-                        "downloaded"
-                    else
-                        "not-downloaded"
-                )
+                prop.className "swt:inline-flex swt:overflow-hidden swt:rounded-full swt:border swt:border-base-300"
+                prop.ariaLabel statusAccessibilityText
+                prop.title statusAccessibilityText
                 prop.onClick (fun e ->
                     e.preventDefault ()
                     e.stopPropagation ()
                 )
-                prop.children [
-                    Html.span [
-                        prop.className badgeClassName
-                        prop.text badgeText
-                    ]
-                ]
+                prop.children badgeSegments
             ]
 
         let toComponentMenuItem (item: Swate.Components.FileExplorerTypes.ContextMenuItem) =
@@ -285,17 +322,8 @@ type FileExplorer =
                                                     // LFS badge and size if applicable
                                                     if item.IsLFS = Some true then
                                                         Html.div [
-                                                            prop.className "swt:flex swt:gap-2 swt:items-center"
-                                                            prop.children [
-                                                                renderLfsStatusBadge item
-                                                                match item.SizeFormatted with
-                                                                | Some size ->
-                                                                    Html.span [
-                                                                        prop.className "swt:badge swt:badge-sm swt:cursor-default"
-                                                                        prop.text size
-                                                                    ]
-                                                                | None -> Html.none
-                                                            ]
+                                                            prop.className "swt:flex swt:items-center"
+                                                            prop.children [ renderLfsStatusPill item ]
                                                         ]
 
                                                     if canExpandDirectory then
@@ -364,14 +392,8 @@ type FileExplorer =
                                 // LFS badge for files
                                 if item.IsLFS = Some true then
                                     Html.div [
-                                        prop.className "swt:flex swt:gap-2 swt:items-center"
-                                        prop.children [
-                                            renderLfsStatusBadge item
-                                            match item.SizeFormatted with
-                                            | Some size ->
-                                                Html.span [ prop.className "swt:badge swt:badge-sm swt:cursor-default"; prop.text size ]
-                                            | None -> Html.none
-                                        ]
+                                        prop.className "swt:flex swt:items-center"
+                                        prop.children [ renderLfsStatusPill item ]
                                     ]
                             ]
                         ]

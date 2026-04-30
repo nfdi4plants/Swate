@@ -51,13 +51,24 @@ export const Default: Story = {
     const myFilesRowRight = myFilesRowContainer!.getBoundingClientRect().right - myFilesRowPaddingRight;
     const expandButtonRight = expandFolderButton.getBoundingClientRect().right;
     expect(Math.abs(myFilesRowRight - expandButtonRight)).toBeLessThanOrEqual(2);
-    const lfsFolderBadge = within(myFilesRowContainer!).getByText("LFS Not Downloaded");
-    expect(lfsFolderBadge.className).toContain("swt:badge-warning");
-    expect(getComputedStyle(lfsFolderBadge).cursor).not.toBe("pointer");
+    const lfsFolderStatusBadge =
+      myFilesRowContainer!.querySelector("[data-lfs-download-status='not-downloaded']") as HTMLElement | null;
     const lfsFolderSizeBadge = within(myFilesRowContainer!).getByText("2 KB");
+    expect(lfsFolderStatusBadge).toBeTruthy();
+    expect(within(lfsFolderStatusBadge!).getByText("LFS")).toBeTruthy();
+    const lfsFolderPill = lfsFolderStatusBadge!.parentElement as HTMLElement | null;
+    expect(lfsFolderPill).toBeTruthy();
+    expect(lfsFolderStatusBadge!.className).toContain("swt:badge-info");
+    expect(lfsFolderSizeBadge.className).toContain("swt:bg-base-200");
+    expect(lfsFolderPill!.className).toContain("swt:rounded-full");
+    expect(lfsFolderPill!.className).toContain("swt:overflow-hidden");
+    const lfsFolderStatusIcon = lfsFolderStatusBadge!.querySelector("i");
+    expect(lfsFolderStatusIcon).toBeTruthy();
+    expect(lfsFolderStatusIcon!.className).toContain("swt:fluent--cloud-arrow-down-24-regular");
+    expect(getComputedStyle(lfsFolderStatusBadge!).cursor).not.toBe("pointer");
     expect(getComputedStyle(lfsFolderSizeBadge).cursor).not.toBe("pointer");
-    expect((lfsFolderBadge.compareDocumentPosition(expandFolderButton) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
-    await userEvent.click(lfsFolderBadge);
+    expect((lfsFolderStatusBadge!.compareDocumentPosition(expandFolderButton) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0).toBe(true);
+    await userEvent.click(lfsFolderStatusBadge!);
     await expectBreadcrumbContains("resume.pdf");
     expect(canvas.queryByText("My Files")).toBeTruthy();
     expect(canvas.queryByRole("button", { name: "Expand Empty Folder" })).toBeNull();
@@ -98,12 +109,24 @@ export const Default: Story = {
     expect(collapseIcon).toBeTruthy();
     expect(collapseIcon!.className).toContain("swt:fluent--caret-down-24-filled");
 
-    const lfsDownloadedBadge = await canvas.findByText("LFS Downloaded");
-    expect(lfsDownloadedBadge.className).toContain("swt:badge-success");
-    expect(getComputedStyle(lfsDownloadedBadge).cursor).not.toBe("pointer");
-    const lfsDownloadedSizeBadge = await canvas.findByText("6 MB");
-    expect(getComputedStyle(lfsDownloadedSizeBadge).cursor).not.toBe("pointer");
-    await userEvent.click(lfsDownloadedBadge);
+    const nestedDownloadedFile = await canvas.findByText("Project-final.psd");
+    const nestedDownloadedFileRow = nestedDownloadedFile.closest("a[data-file-item-id]") as HTMLElement | null;
+    expect(nestedDownloadedFileRow).toBeTruthy();
+    const lfsDownloadedStatusBadge =
+      nestedDownloadedFileRow!.querySelector("[data-lfs-download-status='downloaded']") as HTMLElement | null;
+    expect(lfsDownloadedStatusBadge).toBeTruthy();
+    expect(within(lfsDownloadedStatusBadge!).getByText("LFS")).toBeTruthy();
+    expect(lfsDownloadedStatusBadge!.className).toContain("swt:badge-success");
+    expect(within(nestedDownloadedFileRow!).queryByText("6 MB")).toBeNull();
+    const lfsDownloadedPill = lfsDownloadedStatusBadge!.parentElement as HTMLElement | null;
+    expect(lfsDownloadedPill).toBeTruthy();
+    expect(lfsDownloadedPill!.className).toContain("swt:rounded-full");
+    expect(lfsDownloadedPill!.className).toContain("swt:overflow-hidden");
+    const lfsDownloadedStatusIcon = lfsDownloadedStatusBadge!.querySelector("i");
+    expect(lfsDownloadedStatusIcon).toBeTruthy();
+    expect(lfsDownloadedStatusIcon!.className).toContain("swt:fluent--checkmark-circle-24-regular");
+    expect(getComputedStyle(lfsDownloadedStatusBadge!).cursor).not.toBe("pointer");
+    await userEvent.click(lfsDownloadedStatusBadge!);
     await expectBreadcrumbContains("My Files");
     await waitFor(() => {
       const breadcrumbs = breadcrumbContainer();
@@ -125,5 +148,65 @@ export const Default: Story = {
     await userEvent.click(parentFolderCollapseToggle);
     expect(within(container).queryByText("Project-final.psd")).toBeNull();
     await expectBreadcrumbContains("Project-final.psd");
+  }),
+};
+
+export const CompactSidebar: Story = {
+  render: () => (
+    <div style={{ width: "12rem" }}>
+      <FileExplorerExample />
+    </div>
+  ),
+
+  play: (async ({ canvasElement }: { canvasElement: HTMLElement }) => {
+    const canvas = within(canvasElement);
+
+    const expandFolderButton = await canvas.findByRole("button", { name: "Expand My Files" });
+    const myFilesRowContainer = expandFolderButton.closest("div[data-file-item-id]") as HTMLElement | null;
+    expect(myFilesRowContainer).toBeTruthy();
+
+    const lfsNotDownloadedStatusBadge =
+      myFilesRowContainer!.querySelector("[data-lfs-download-status='not-downloaded']") as HTMLElement | null;
+    expect(lfsNotDownloadedStatusBadge).toBeTruthy();
+    expect(within(myFilesRowContainer!).getByText("LFS")).toBeTruthy();
+    const lfsFolderSizeBadge = within(myFilesRowContainer!).getByText("2 KB");
+    expect(lfsFolderSizeBadge).toBeTruthy();
+    expect(lfsNotDownloadedStatusBadge!.className).toContain("swt:badge-info");
+
+    const lfsNotDownloadedIcon = lfsNotDownloadedStatusBadge!.querySelector("i");
+    expect(lfsNotDownloadedIcon).toBeTruthy();
+    expect(lfsNotDownloadedIcon!.className).toContain("swt:fluent--cloud-arrow-down-24-regular");
+
+    const lfsNotDownloadedPill = lfsNotDownloadedStatusBadge!.parentElement as HTMLElement | null;
+    expect(lfsNotDownloadedPill).toBeTruthy();
+    expect(lfsNotDownloadedPill!.getAttribute("aria-label")).toBe("LFS Not Downloaded - 2 KB");
+    expect(lfsNotDownloadedPill!.getAttribute("title")).toBe("LFS Not Downloaded - 2 KB");
+
+    await userEvent.click(lfsNotDownloadedStatusBadge!);
+    expect(canvas.queryByText("Project-final.psd")).toBeNull();
+
+    await userEvent.click(expandFolderButton);
+
+    const nestedFile = await canvas.findByText("Project-final.psd");
+    expect(nestedFile).toBeTruthy();
+    const nestedFileRow = nestedFile.closest("a[data-file-item-id]") as HTMLElement | null;
+    expect(nestedFileRow).toBeTruthy();
+
+    expect(within(nestedFileRow!).queryByText("LFS Downloaded")).toBeNull();
+    expect(within(nestedFileRow!).getByText("LFS")).toBeTruthy();
+    expect(within(nestedFileRow!).queryByText("6 MB")).toBeNull();
+
+    const lfsDownloadedStatusBadge =
+      nestedFileRow!.querySelector("[data-lfs-download-status='downloaded']") as HTMLElement | null;
+    expect(lfsDownloadedStatusBadge).toBeTruthy();
+    expect(lfsDownloadedStatusBadge!.className).toContain("swt:badge-success");
+    const lfsDownloadedIcon = lfsDownloadedStatusBadge!.querySelector("i");
+    expect(lfsDownloadedIcon).toBeTruthy();
+    expect(lfsDownloadedIcon!.className).toContain("swt:fluent--checkmark-circle-24-regular");
+
+    const lfsDownloadedPill = lfsDownloadedStatusBadge!.parentElement as HTMLElement | null;
+    expect(lfsDownloadedPill).toBeTruthy();
+    expect(lfsDownloadedPill!.getAttribute("aria-label")).toBe("LFS Downloaded");
+    expect(lfsDownloadedPill!.getAttribute("title")).toBe("LFS Downloaded");
   }),
 };
