@@ -224,6 +224,56 @@ export const ChangedFiles: Story = {
   },
 };
 
+export const MarkedSelectionWithoutLastClickedHighlight: Story = {
+  render: (args) => <StatefulSidebar {...args} />,
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    selectedFile: "README.md",
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).not.toHaveClass("swt:border-primary/40");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).not.toHaveClass("swt:bg-primary/5");
+
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-1"));
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).toHaveClass("swt:border-success/40");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).toHaveClass("swt:bg-success/10");
+
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-1"));
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).not.toHaveClass("swt:border-success/40");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).not.toHaveClass("swt:bg-success/10");
+  },
+};
+
+export const SlowOpenDoesNotGreyRows: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks({
+      OnSelectChange: () =>
+        new Promise((resolve) => {
+          window.setTimeout(() => resolve(FSharpResult$2_Ok<void, string>(undefined)), 250);
+        }),
+    }),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).not.toHaveClass("swt:opacity-60");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).not.toHaveClass("swt:opacity-60");
+  },
+};
+
 export const AdvancedActions: Story = {
   args: {
     status: baseStatus,

@@ -136,7 +136,6 @@ type private LfsSettingsSectionProps = {
     SetLfsThresholdInput: string -> unit
     CanSaveLfsThreshold: bool
     SubmitLfsThreshold: unit -> unit
-    ActiveAction: string option
 }
 
 type private AdvancedActionsProps = {
@@ -174,7 +173,6 @@ type private CommitSectionProps = {
 
 type private ChangedFilesListProps = {
     ChangedFiles: GitSidebarChange[]
-    SelectedFile: string option
     MarkedPaths: Set<string>
     IsBusy: bool
     UpdateMarkedSelection: GitSidebarChange -> bool -> bool -> unit
@@ -185,7 +183,6 @@ type private ChangedFilesListProps = {
 type private ChangedFileRowProps = {
     Change: GitSidebarChange
     Index: int
-    IsSelected: bool
     IsMarked: bool
     IsBusy: bool
     DiscardPaths: string[]
@@ -206,7 +203,6 @@ type private ModalsProps = {
     BranchOptionsWithHead: (string option * string)[]
     SelectedStartPoint: string option
     SetSelectedStartPoint: string option -> unit
-    ActiveAction: string option
     SubmitCreateBranch: unit -> unit
     IsSwitchBranchModalOpen: bool
     SetSwitchBranchModalOpen: bool -> unit
@@ -620,12 +616,7 @@ type GitSidebar =
                                 Html.span [
                                     prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4"
                                 ]
-                                Html.span (
-                                    if props.ActiveAction = Some "Save Git LFS Threshold" then
-                                        "Saving..."
-                                    else
-                                        "Save Threshold"
-                                )
+                                Html.span "Save Threshold"
                             ]
                         ]
                     ]
@@ -992,8 +983,6 @@ type GitSidebar =
                         "swt:cursor-pointer"
                         if change.IsConflicted then
                             "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
-                        elif props.IsSelected then
-                            "swt:border-primary/40 swt:bg-primary/5 hover:swt:bg-primary/10"
                         elif props.IsMarked then
                             "swt:border-success/40 swt:bg-success/10 hover:swt:bg-success/15"
                         else
@@ -1159,12 +1148,6 @@ type GitSidebar =
                                 for virtualItem in virtualItems do
                                     let change = props.ChangedFiles.[virtualItem.Index]
 
-                                    let isSelected =
-                                        props.SelectedFile
-                                        |> Option.exists (fun selected ->
-                                            String.Equals(selected, change.Path, StringComparison.Ordinal)
-                                        )
-
                                     let isMarked = Set.contains change.Path props.MarkedPaths
                                     let discardPaths = discardPathsForChange change
 
@@ -1175,7 +1158,6 @@ type GitSidebar =
                                                 {
                                                     Change = change
                                                     Index = virtualItem.Index
-                                                    IsSelected = isSelected
                                                     IsMarked = isMarked
                                                     IsBusy = props.IsBusy
                                                     DiscardPaths = discardPaths
@@ -1258,20 +1240,13 @@ type GitSidebar =
                     React.Fragment [
                         Html.button [
                             prop.className "swt:btn swt:btn-ghost"
-                            prop.disabled props.ActiveAction.IsSome
                             prop.text "Cancel"
                             prop.onClick (fun _ -> props.CloseDialog())
                         ]
                         Html.button [
                             prop.testId "GitSidebarCreateBranchSubmit"
                             prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                            prop.disabled props.ActiveAction.IsSome
-                            prop.text (
-                                if props.ActiveAction = Some "Create Branch From" then
-                                    "Creating..."
-                                else
-                                    "Create Branch"
-                            )
+                            prop.text "Create Branch"
                             prop.onClick (fun _ -> props.SubmitCreateBranch())
                         ]
                     ]
@@ -1322,20 +1297,14 @@ type GitSidebar =
                     React.Fragment [
                         Html.button [
                             prop.className "swt:btn swt:btn-ghost"
-                            prop.disabled props.ActiveAction.IsSome
                             prop.text "Cancel"
                             prop.onClick (fun _ -> props.CloseDialog())
                         ]
                         Html.button [
                             prop.testId "GitSidebarSwitchBranchSubmit"
                             prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                            prop.disabled (props.ActiveAction.IsSome || props.BranchOptionsForSwitch.Length = 0)
-                            prop.text (
-                                if props.ActiveAction = Some "Switch Branch" then
-                                    "Switching..."
-                                else
-                                    "Switch Branch"
-                            )
+                            prop.disabled (props.BranchOptionsForSwitch.Length = 0)
+                            prop.text "Switch Branch"
                             prop.onClick (fun _ -> props.SubmitSwitchBranch())
                         ]
                     ]
@@ -1419,7 +1388,7 @@ type GitSidebar =
         let pendingConfirmation = pendingConfirmation
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
-        let selectedFile = selectedFile
+        let _selectedFileForCompatibility = selectedFile
         let onRefresh = callbacks.OnRefresh
         let onFetch = callbacks.OnFetch
         let onPull = callbacks.OnPull
@@ -1439,7 +1408,6 @@ type GitSidebar =
         let onSelectChange = callbacks.OnSelectChange
 
         let localError, setLocalError = React.useState (None: string option)
-        let activeAction, setActiveAction = React.useState (None: string option)
         let activeDialog, setActiveDialog = React.useState ActiveDialog.None
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
@@ -1482,11 +1450,10 @@ type GitSidebar =
             )
 
         let isBusy =
-            activeAction.IsSome
-            || match runStatus with
-               | GitSidebarRunStatus.Idle -> false
-               | GitSidebarRunStatus.Busy _
-               | GitSidebarRunStatus.Progress _ -> true
+            match runStatus with
+            | GitSidebarRunStatus.Idle -> false
+            | GitSidebarRunStatus.Busy _
+            | GitSidebarRunStatus.Progress _ -> true
 
         let visibleError = errorNotice |> Option.orElse localError
 
@@ -1553,16 +1520,12 @@ type GitSidebar =
         let runSelectChangeAction (change: GitSidebarChange) =
             promise {
                 setLocalError None
-                setActiveAction (Some $"Open {change.Path}")
 
-                try
-                    let! result = onSelectChange change
+                let! result = onSelectChange change
 
-                    match result with
-                    | Ok() -> ()
-                    | Error message -> setLocalError (Some message)
-                finally
-                    setActiveAction None
+                match result with
+                | Ok() -> ()
+                | Error message -> setLocalError (Some message)
             }
             |> Promise.start
 
@@ -1796,7 +1759,6 @@ type GitSidebar =
                             SetLfsThresholdInput = setLfsThresholdInput
                             CanSaveLfsThreshold = canSaveLfsThreshold
                             SubmitLfsThreshold = submitLfsThreshold
-                            ActiveAction = activeAction
                         }
                     }
                 )
@@ -1844,7 +1806,6 @@ type GitSidebar =
                 GitSidebar.ChangedFilesList(
                     {
                         ChangedFiles = changedFiles
-                        SelectedFile = selectedFile
                         MarkedPaths = markedPaths
                         IsBusy = isBusy
                         UpdateMarkedSelection = updateMarkedSelection
@@ -1862,7 +1823,6 @@ type GitSidebar =
                         BranchOptionsWithHead = branchOptionsWithHead
                         SelectedStartPoint = selectedStartPoint
                         SetSelectedStartPoint = setSelectedStartPoint
-                        ActiveAction = activeAction
                         SubmitCreateBranch = submitCreateBranch
                         IsSwitchBranchModalOpen = isSwitchBranchModalOpen
                         SetSwitchBranchModalOpen = setSwitchBranchModalOpen
