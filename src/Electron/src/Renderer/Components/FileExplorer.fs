@@ -327,7 +327,6 @@ type FileExplorer =
     [<ReactComponent>]
     static member FileTree() =
 
-        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
@@ -571,8 +570,8 @@ type FileExplorer =
         let arcName =
             let fromRootItem = fileItem |> Option.map (fun root -> root.Name)
 
-            let fromAppPath =
-                appStateCtx.state
+            let fromRootPath =
+                rootPath
                 |> Option.bind (fun path ->
                     let normalizedPath = normalizePath path
                     if System.String.IsNullOrWhiteSpace normalizedPath then
@@ -581,7 +580,7 @@ type FileExplorer =
                         Some(getFileName normalizedPath)
                 )
 
-            fromAppPath
+            fromRootPath
             |> Option.orElse fromRootItem
             |> Option.defaultValue "ARC"
 
