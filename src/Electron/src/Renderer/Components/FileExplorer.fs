@@ -9,6 +9,7 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Feliz
+open Fable.Core
 
 
 module private FileExplorerHelper =
@@ -87,123 +88,126 @@ module private FileExplorerHelper =
 
 open FileExplorerHelper
 
-[<ReactComponent>]
-let EmptyFileTreePlaceholder () =
-    Html.div [
-        prop.className "swt:p-4 swt:text-center swt:text-gray-500"
-        prop.text "No files found."
-    ]
+[<Erase; Mangle(false)>]
+type FileExplorer =
 
-[<ReactComponent>]
-let FileTree () =
+    [<ReactComponent>]
+    static member private EmptyFileTreePlaceholder() =
+        Html.div [
+            prop.className "swt:p-4 swt:text-center swt:text-gray-500"
+            prop.text "No files found."
+        ]
 
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-    let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let errorModal = ErrorModal.Context.useErrorModalCtx ()
-    let arcScopeId = useCurrentArcScopeId ()
+    [<ReactComponent>]
+    static member FileTree() =
 
-    let fileTree =
-        React.useMemo (
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+        let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+        let errorModal = ErrorModal.Context.useErrorModalCtx ()
+        let arcScopeId = useCurrentArcScopeId ()
+
+        let fileTree =
+            React.useMemo (
+                (fun () ->
+                    match fileStateCtx.state.FileTree with
+                    | [||] -> None
+                    | _ ->
+                        fileStateCtx.state.FileTree
+                        |> toFileTreeNode
+                        |> collapseSingleChildSameNameDirectories
+                        |> Some),
+                [| box fileStateCtx.state.FileTree |]
+            )
+
+        let requiredLoadedDirectories =
+            React.useMemo (
+                (fun () ->
+                    match fileTree with
+                    | Some tree -> requiredLoadedDirectoryPaths fileStateCtx.state.Selection.TreePath tree
+                    | None -> Set.empty),
+                [| box fileTree; box fileStateCtx.state.Selection.TreePath |]
+            )
+
+        let loadedDirectoryPaths, setLoadedDirectoryPaths =
+            React.useStateWithUpdater requiredLoadedDirectories
+
+        React.useEffect (
+            (fun () -> setLoadedDirectoryPaths (fun _ -> requiredLoadedDirectories)),
+            [| box fileTree |]
+        )
+
+        React.useEffect (
             (fun () ->
-                match fileStateCtx.state.FileTree with
-                | [||] -> None
-                | _ ->
-                    fileStateCtx.state.FileTree
-                    |> toFileTreeNode
-                    |> collapseSingleChildSameNameDirectories
-                    |> Some),
-            [| box fileStateCtx.state.FileTree |]
+                setLoadedDirectoryPaths (fun current ->
+                    let next = Set.union current requiredLoadedDirectories
+
+                    if next = current then
+                        current
+                    else
+                        next)),
+            [| box requiredLoadedDirectories |]
         )
 
-    let requiredLoadedDirectories =
-        React.useMemo (
-            (fun () ->
-                match fileTree with
-                | Some tree -> requiredLoadedDirectoryPaths fileStateCtx.state.Selection.TreePath tree
-                | None -> Set.empty),
-            [| box fileTree; box fileStateCtx.state.Selection.TreePath |]
-        )
+        let fileItem =
+            fileTree
+            |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
 
-    let loadedDirectoryPaths, setLoadedDirectoryPaths =
-        React.useStateWithUpdater requiredLoadedDirectories
+        let setError (errorMsg: string option) =
+            match errorMsg with
+            | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
+            | None -> ()
 
-    React.useEffect (
-        (fun () -> setLoadedDirectoryPaths (fun _ -> requiredLoadedDirectories)),
-        [| box fileTree |]
-    )
+        let toggleLfsMark =
+            FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
 
-    React.useEffect (
-        (fun () ->
-            setLoadedDirectoryPaths (fun current ->
-                let next = Set.union current requiredLoadedDirectories
+        let contextMenuItems (item: FileItem) =
+            FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
 
-                if next = current then
-                    current
-                else
-                    next)),
-        [| box requiredLoadedDirectories |]
-    )
+        let openPreview (item: FileItem) =
+            promise {
+                match item.Path with
+                | None ->
+                    errorModal.enqueue (
+                        ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed", ?scopeId = arcScopeId)
+                    )
+                | Some path when item.IsDirectory ->
+                    if not item.IsExpanded then
+                        setLoadedDirectoryPaths (fun current ->
+                            let normalizedPath = normalizePath path
 
-    let fileItem =
-        fileTree
-        |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
+                            if current.Contains normalizedPath then
+                                current
+                            else
+                                current.Add normalizedPath)
 
-    let setError (errorMsg: string option) =
-        match errorMsg with
-        | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
-        | None -> ()
+                    let selectedPath = normalizePath path
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                    pageStateCtx.setState None
+                | Some path ->
+                    let selectedPath = normalizePath path
+                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-    let toggleLfsMark =
-        FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
+                    let! result = Renderer.Components.ARCHelper.openView selectedPath
 
-    let contextMenuItems (item: FileItem) =
-        FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+                    match result with
+                    | Ok loaded ->
+                        console.log ("[Renderer] Received data, processing...")
 
-    let openPreview (item: FileItem) =
-        promise {
-            match item.Path with
-            | None ->
-                errorModal.enqueue (
-                    ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed", ?scopeId = arcScopeId)
-                )
-            | Some path when item.IsDirectory ->
-                if not item.IsExpanded then
-                    setLoadedDirectoryPaths (fun current ->
-                        let normalizedPath = normalizePath path
+                        Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                    | Error errorMessage ->
+                        let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
+                        console.log ($"[Renderer] Error: {fullErrorMessage}")
 
-                        if current.Contains normalizedPath then
-                            current
-                        else
-                            current.Add normalizedPath)
+                        Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
+            }
+            |> Promise.start
 
-                let selectedPath = normalizePath path
-                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-                pageStateCtx.setState None
-            | Some path ->
-                let selectedPath = normalizePath path
-                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                let! result = Renderer.Components.ARCHelper.openView selectedPath
-
-                match result with
-                | Ok loaded ->
-                    console.log ("[Renderer] Received data, processing...")
-
-                    Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
-                | Error errorMessage ->
-                    let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
-                    console.log ($"[Renderer] Error: {fullErrorMessage}")
-
-                    Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
-        }
-        |> Promise.start
-
-    match fileItem with
-    | Some fileItem ->
-        Swate.Components.FileExplorer.FileExplorer(
-            initialItems = [ fileItem ],
-            onItemClick = openPreview,
-            onContextMenu = contextMenuItems,
-            selectedItemId = fileStateCtx.state.Selection.TreePath
-        )
-    | None -> EmptyFileTreePlaceholder()
+        match fileItem with
+        | Some fileItem ->
+            Swate.Components.FileExplorer.FileExplorer(
+                initialItems = [ fileItem ],
+                onItemClick = openPreview,
+                onContextMenu = contextMenuItems,
+                selectedItemId = fileStateCtx.state.Selection.TreePath
+            )
+        | None -> FileExplorer.EmptyFileTreePlaceholder()

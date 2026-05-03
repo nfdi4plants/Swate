@@ -69,6 +69,7 @@ type GitSidebarCallbacks = {
     OnPrimarySaveAll: string -> unit
     OnCommitSelection: GitSidebarCommitSelectionRequest -> unit
     OnCommitAll: string -> unit
+    OnDiscardSelection: string[] -> unit
     OnConfirmPendingRemoteAction: unit -> unit
     OnCancelPendingRemoteAction: unit -> unit
     OnSaveDownloadLargeFiles: bool -> unit

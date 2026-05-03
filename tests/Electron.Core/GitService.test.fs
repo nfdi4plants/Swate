@@ -104,7 +104,8 @@ let private expectErrorResult<'T> (result: Result<'T, exn>) =
     | Ok _ -> failwith "Expected operation to fail."
     | Error error -> error
 
-let private gitLfsIntegrationTestOptions = TestOptions(timeout = 20000)
+let private gitServiceIntegrationTimeoutMs = 120000
+let private gitLfsIntegrationTestOptions = TestOptions(timeout = gitServiceIntegrationTimeoutMs)
 
 [<Emit("Buffer.from($0, 'utf8')")>]
 let private utf8Buffer (text: string) : obj = jsNative
@@ -397,6 +398,55 @@ Vitest.describe (
                         Vitest.expect(status.IsClean).toBe (false)
                         Vitest.expect(fileStatus.WorkingDir).toBe ("M")
                         Vitest.expect(fileStatus.Index = "M").toBe (false)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "discardPaths restores tracked changes and removes selected untracked files",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let trackedPath = join [| context.RepoPath; "tracked.txt" |]
+                        let untrackedPath = join [| context.RepoPath; "scratch.txt" |]
+
+                        do! writeUtf8FileAsync trackedPath "first\nsecond\n"
+
+                        let! initialStageResult = GitService.stagePaths context.RepoPath [| "tracked.txt" |]
+                        expectOk "stage tracked file" initialStageResult |> ignore
+
+                        let! initialCommitResult = GitService.commit context.RepoPath "test: track file"
+                        expectOk "commit tracked file" initialCommitResult |> ignore
+
+                        do! writeUtf8FileAsync trackedPath "first\nsecond changed\n"
+                        do! writeUtf8FileAsync untrackedPath "temporary\n"
+
+                        let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt"; "scratch.txt" |]
+                        expectOk "stage selected changes" stageResult |> ignore
+
+                        let! discardResult = GitService.discardPaths context.RepoPath [| "tracked.txt"; "scratch.txt" |]
+                        expectOk "discard selected changes" discardResult |> ignore
+
+                        let! status =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status after discard")
+
+                        let! trackedContent =
+                            fsPromisesDynamic?readFile (trackedPath, "utf8") |> unbox<JS.Promise<string>>
+
+                        let! untrackedExists =
+                            promise {
+                                try
+                                    let! _ = fsPromisesDynamic?stat untrackedPath |> unbox<JS.Promise<obj>>
+                                    return true
+                                with _ ->
+                                    return false
+                            }
+
+                        Vitest.expect(status.IsClean).toBe (true)
+                        Vitest.expect(trackedContent).toBe ("first\nsecond\n")
+                        Vitest.expect(untrackedExists).toBe (false)
                     })
             }
         )

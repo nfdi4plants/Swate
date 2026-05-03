@@ -3,7 +3,6 @@ module Renderer.Components.CloseWindowController
 
 open Feliz
 open Fable.Core
-open Fable.Electron.Remoting.Renderer
 open Renderer.Components.ARCHelper
 open Swate.Components
 open Swate.Components.ErrorModal
@@ -28,7 +27,7 @@ type CloseWindowController =
             errorModal.enqueue (ErrorModalRequest.create(saveError.Message, title = title, ?scopeId = arcScopeId))
 
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =
-            Api.ipcArcVaultApi.resolveCloseRequest (unbox null) decision
+            Api.ipcArcVaultApi.resolveCloseRequest decision
 
         let handleCancel () =
             promise {
@@ -74,7 +73,10 @@ type CloseWindowController =
             requestSaveBeforeQuit = fun () -> setModalIsOpen true
         }
 
-        React.useEffectOnce (fun _ -> Remoting.init |> Remoting.buildHandler saveBeforeQuitHandler)
+        Renderer.IpcReceiver.useProxyReceiver<IMainSaveBeforeQuitApi> (
+            (fun () -> saveBeforeQuitHandler),
+            [||]
+        )
 
         BaseModal.Modal(
             isOpen = modalIsOpen,

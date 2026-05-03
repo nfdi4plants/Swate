@@ -4,6 +4,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Swate.Components.NoteTypes
 
 [<ReactComponent>]
@@ -24,12 +25,12 @@ let NotesSearchTarget () =
             setError None
 
             promise {
-                let! result = Api.ipcArcVaultApi.readNotes (unbox null)
+                let! result = Api.ipcArcVaultApi.readNotes ()
 
                 if not isDisposed then
                     match result with
                     | Ok nextNotes ->
-                        setNotes (nextNotes |> Array.toList)
+                        setNotes (nextNotes |> Array.map NoteSearchNoteDto.toNote |> Array.toList)
                         setIsLoading false
                     | Result.Error exn ->
                         setNotes []
@@ -46,7 +47,7 @@ let NotesSearchTarget () =
     let openNote (relativePath: string) =
         promise {
 
-            let! result = Api.ipcArcVaultApi.openFile (unbox null) relativePath
+            let! result = Api.ipcArcVaultApi.openFile relativePath
 
             match result with
             | Ok dto ->

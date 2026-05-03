@@ -1,71 +1,50 @@
 module Main.IPC.GitLfs
 
 open Fable.Electron
-open Swate.Electron.Shared.IPCTypes
+open Fable.Electron.Main
+open Fable.Electron.Remoting.Main
 open Swate.Electron.Shared.GitTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 open Main.Git.GitLfsService
-
-
-
-// ==========================
-// IPC Integration
-// ==========================
-
-[<Literal>]
-let GitLfsRunChannel = "git-lfs:run"
-
-[<Literal>]
-let GitLfsProgressChannel = "git-lfs:progress"
-
-[<Literal>]
-let GitLfsCancelChannel = "git-lfs:cancel"
-
-
-
-
 
 // Cancellation tracking - in-memory store for cancellation flags keyed by request ID
 let cancellations = System.Collections.Generic.Dictionary<string, bool>()
 
+let private createProgressReporter (window: BrowserWindow) (requestId: string) =
+    let rendererApi =
+        Remoting.createIpc ()
+        |> Remoting.withWindow window
+        |> Remoting.buildProxySender<IGitLfsProgressRendererApi>
 
+    fun msg ->
+        rendererApi.gitLfsProgressUpdate {
+            RequestId = requestId
+            Message = msg
+        }
 
-// ==========================
-// IPC API Contract
-// ==========================
+let runChannel (window: BrowserWindow) (request: GitLfsRequest) =
+    promise {
+        cancellations.[request.RequestId] <- false
 
-/// git lfs file IPC call method :/
-let registerGitLfsIpc: IGitLfsApi =
+        try
+            let onProgress = createProgressReporter window request.RequestId
 
-    {
-        runChannel =
-            fun (event: IpcMainEvent) (request: GitLfsRequest) ->
+            let cancelCheck () =
+                match cancellations.TryGetValue(request.RequestId) with
+                | true, value -> value
+                | _ -> false
 
-                promise {
-                    cancellations.[request.RequestId] <- false
+            let! result = run request onProgress cancelCheck
+            return result
+        finally
+            cancellations.Remove(request.RequestId) |> ignore
+    }
 
-                    try
-                        let onProgress msg =
-                            event.sender.send (GitLfsProgressChannel, [| box request.RequestId; box msg |])
+let cancelChannel (requestId: string) =
+    promise {
+        if cancellations.ContainsKey requestId then
+            cancellations.[requestId] <- true
 
-                        let cancelCheck () =
-                            match cancellations.TryGetValue(request.RequestId) with
-                            | true, value -> value
-                            | _ -> false
-
-                        let! result = run request onProgress cancelCheck
-                        return result
-                    finally
-                        cancellations.Remove(request.RequestId) |> ignore
-                }
-
-        cancelChannel =
-            fun (_: IpcMainEvent) (requestId: string) ->
-
-                promise {
-                    if cancellations.ContainsKey requestId then
-                        cancellations.[requestId] <- true
-
-                    return Ok "Cancellation requested"
-                }
+        return Ok "Cancellation requested"
     }

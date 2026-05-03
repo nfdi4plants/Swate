@@ -2,15 +2,14 @@
 module Swate.Electron.Shared.IPCTypes
 
 open Fable.Core
-open Fable.Electron
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Authentication.Types
 open Swate.Components.DataHub.DataHubTypes
 open Swate.Components.Shared
+open Swate.Electron.Shared.DTOs.NoteSearchDto
 open AuthTypes
 open FileIOTypes
 open GitTypes
-open Swate.Components.NoteTypes
 
 module IPCTypesHelper =
 
@@ -25,94 +24,98 @@ open IPCTypesHelper
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
-    openARC: IpcMainEvent -> JS.Promise<Result<string, exn>>
+    openARC: unit -> JS.Promise<Result<string, exn>>
     /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
-    openARCByPath: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+    openARCByPath: string -> JS.Promise<Result<string, exn>>
     /// Create ARC via folder dialog. Main decides disposition.
-    createARC: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
-    closeARC: IpcMainEvent -> JS.Promise<Result<unit, exn>>
-    getOpenPath: IpcMainEvent -> JS.Promise<string option>
+    createARC: string -> JS.Promise<Result<string, exn>>
+    closeARC: unit -> JS.Promise<Result<unit, exn>>
+    getOpenPath: unit -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<ARCPointer[]>
     removeRecentARC: ARCPointer -> JS.Promise<Result<unit, exn>>
 
-    pickArcPaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
-    pickDirectory: IpcMainEvent -> JS.Promise<Result<string, exn>>
-    pickAbsolutePaths: IpcMainEvent -> JS.Promise<Result<string[], exn>>
-    pickExternalTextFiles: IpcMainEvent -> JS.Promise<Result<ImportedTextFile[], exn>>
-    openFile: IpcMainEvent -> string -> JS.Promise<Result<FileContentDTO, exn>>
-    readNotes: IpcMainEvent -> JS.Promise<Result<Note[], exn>>
+    pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
+    pickDirectory: unit -> JS.Promise<Result<string, exn>>
+    pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
+    pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
+    getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
+    openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
+    readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
-    saveArcFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
+    saveArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     /// Stores or clears the currently pending ARC file save draft for the active vault window.
-    setPendingArcFileSave: IpcMainEvent -> FileContentDTO option -> JS.Promise<Result<unit, exn>>
-    writeFile: IpcMainEvent -> FileContentDTO -> JS.Promise<Result<unit, exn>>
-    runGitLfs: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
-    cancelGitLfs: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
-    resolveCloseRequest: IpcMainEvent -> SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
-}
-
-type IGitLfsApi = {
-    runChannel: IpcMainEvent -> GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
-    cancelChannel: IpcMainEvent -> string -> JS.Promise<Result<string, exn>>
+    setPendingArcFileSave: FileContentDTO option -> JS.Promise<Result<unit, exn>>
+    writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
+    runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
+    cancelGitLfs: string -> JS.Promise<Result<string, exn>>
+    resolveCloseRequest: SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
 }
 
 /// Two Way Bridge: Renderer <-> Main
 type IGitApi = {
-    checkGitVersions: IpcMainEvent -> JS.Promise<Result<unit, exn>>
-    getGitStatus: IpcMainEvent -> JS.Promise<Result<GitStatusDto, exn>>
-    getGitBranches: IpcMainEvent -> JS.Promise<Result<GitBranchRefDto[], exn>>
-    getGitLfsSettings: IpcMainEvent -> JS.Promise<Result<GitLfsSettingsDto, exn>>
-    previewGitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
-    getGitDiffSummary: IpcMainEvent -> JS.Promise<Result<GitDiffSummaryDto, exn>>
-    getGitWordDiff: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<string, exn>>
-    getGitDiffViewData: IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>
-    getGitMergeConflictViewData:
-        IpcMainEvent -> string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, exn>>
-    installGitLfs: IpcMainEvent -> JS.Promise<Result<GitOperationResult, exn>>
-    gitFetch: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitPull: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitPush: IpcMainEvent -> GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitInitRepository: IpcMainEvent -> string -> JS.Promise<Result<GitOperationResult, exn>>
-    gitAddRemote: IpcMainEvent -> GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitCloneRepository: IpcMainEvent -> GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitStagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitUnstagePaths: IpcMainEvent -> GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitCommit: IpcMainEvent -> GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    setGitLfsSettings: IpcMainEvent -> GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
-    createBranch: IpcMainEvent -> GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    checkoutBranch: IpcMainEvent -> GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    checkGitVersions: unit -> JS.Promise<Result<unit, exn>>
+    getGitStatus: unit -> JS.Promise<Result<GitStatusDto, exn>>
+    getGitBranches: unit -> JS.Promise<Result<GitBranchRefDto[], exn>>
+    getGitLfsSettings: unit -> JS.Promise<Result<GitLfsSettingsDto, exn>>
+    previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
+    getGitDiffSummary: unit -> JS.Promise<Result<GitDiffSummaryDto, exn>>
+    getGitWordDiff: GitPathspecRequest -> JS.Promise<Result<string, exn>>
+    getGitDiffViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitDiffViewDataDto>, exn>>
+    getGitMergeConflictViewData: string -> JS.Promise<Result<GitPageLoadResultDto<GitMergeConflictViewDataDto>, exn>>
+    installGitLfs: unit -> JS.Promise<Result<GitOperationResult, exn>>
+    gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitInitRepository: string -> JS.Promise<Result<GitOperationResult, exn>>
+    gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitUnstagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
+    createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     confirmGitMergeResolution:
-        IpcMainEvent -> GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, exn>>
+        GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, exn>>
 }
 
 /// Two Way Bridge: Renderer <-> Main
 type IGitLabApi = {
-    loadAllRepos: IpcMainEvent -> ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
-    loadMostStarredRepos:
-        IpcMainEvent -> ExploreMostStarredQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
-    loadUserRepos: IpcMainEvent -> ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
-    loadOrganisationGroups:
-        IpcMainEvent -> ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
+    loadAllRepos: ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadMostStarredRepos: ExploreMostStarredQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadUserRepos: ExploreRepoQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    loadOrganisationGroups: ExploreGroupsQuery -> JS.Promise<Result<PagedResponse<GroupDto>, GitLabError>>
     loadOrganisationRepos:
-        IpcMainEvent -> ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
-    createProject: IpcMainEvent -> string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
+        ExploreGroupProjectsQuery -> JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>>
+    createProject: string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
 }
 
 /// One Way Bridge: Main -> Renderer
-type IMainUpdateRendererApi = {
-    pathChange: string option -> unit
-    recentARCsUpdate: ARCPointer[] -> unit
-    authAccountsUpdate: AuthStateDto -> unit
-    fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
-    gitProgressUpdate: GitProgressDto -> unit
-} with
+module MainToRendererIpc =
 
-    static member empty = {
-        pathChange = ignore
-        recentARCsUpdate = ignore
-        authAccountsUpdate = ignore
-        fileTreeUpdate = ignore
-        gitProgressUpdate = ignore
+    type IPathChangeRendererApi = {
+        pathChange: string option -> unit
+    }
+
+    type IRecentArcsRendererApi = {
+        recentARCsUpdate: ARCPointer[] -> unit
+    }
+
+    type IAuthAccountsRendererApi = {
+        authAccountsUpdate: AuthStateDto -> unit
+    }
+
+    type IFileTreeRendererApi = {
+        fileTreeUpdate: System.Collections.Generic.Dictionary<string, FileEntry> -> unit
+    }
+
+    type IGitProgressRendererApi = {
+        gitProgressUpdate: GitProgressDto -> unit
+    }
+
+    type IGitLfsProgressRendererApi = {
+        gitLfsProgressUpdate: GitLfsProgressDto -> unit
     }
 
 // TODO: What should filewatcher do when detecting changes?

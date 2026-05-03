@@ -2,13 +2,19 @@
 
 open Fable.Electron.Remoting.Preload
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
-Remoting.init |> Remoting.buildTwoWayBridge<IArcVaultsApi>
-Remoting.init |> Remoting.buildTwoWayBridge<IGitApi>
-Remoting.init |> Remoting.buildTwoWayBridge<IGitLabApi>
-Remoting.init |> Remoting.buildTwoWayBridge<IAuthApi>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<IArcVaultsApi>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitApi>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitLabApi>
+Remoting.createIpc () |> Remoting.buildTwoWayBridge<IAuthApi>
 
-Remoting.init |> Remoting.buildBridge<IMainUpdateRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IPathChangeRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IRecentArcsRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IAuthAccountsRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IFileTreeRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IGitProgressRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IGitLfsProgressRendererApi>
 
-Remoting.init |> Remoting.buildBridge<IArcFileWatcherApi>
-Remoting.init |> Remoting.buildBridge<IMainSaveBeforeQuitApi>
+Remoting.createIpc () |> Remoting.buildBridge<IArcFileWatcherApi>
+Remoting.createIpc () |> Remoting.buildBridge<IMainSaveBeforeQuitApi>

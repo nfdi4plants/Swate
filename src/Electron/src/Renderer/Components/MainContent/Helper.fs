@@ -17,8 +17,7 @@ module MainContentHelper =
         match tryCreateArcFileSaveRequest arcFile with
         | Error saveError -> return Error saveError
         | Ok request ->
-            let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
-
+            let! saveResult = Api.ipcArcVaultApi.saveArcFile request
             return saveResult
     }
 
@@ -31,7 +30,7 @@ module MainContentHelper =
         match pendingSaveRequestResult with
         | Error saveError -> return Error saveError
         | Ok pendingSaveRequest ->
-            let! result = Api.ipcArcVaultApi.setPendingArcFileSave (unbox null) pendingSaveRequest
+            let! result = Api.ipcArcVaultApi.setPendingArcFileSave pendingSaveRequest
             return result
     }
 
@@ -39,12 +38,11 @@ module MainContentHelper =
         match tryCreateArcFileSaveRequest arcFile with
         | Error saveError -> return Error saveError
         | Ok request ->
-            let! saveResult = Api.ipcArcVaultApi.saveArcFile (unbox null) request
+            let! saveResult = Api.ipcArcVaultApi.saveArcFile request
 
             match saveResult with
             | Error exn -> return Error exn
             | Ok() ->
-                let! openResult = Api.ipcArcVaultApi.openFile (unbox null) request.path
-
+                let! openResult = Api.ipcArcVaultApi.openFile request.path
                 return openResult
     }

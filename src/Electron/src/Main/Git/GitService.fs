@@ -279,6 +279,18 @@ let validatePathspecs (pathSpecs: string[]) =
             )
             (Ok [||])
 
+let private splitGitOutputLines (text: string) =
+    text.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+    |> Array.map _.Trim()
+    |> Array.filter (String.IsNullOrWhiteSpace >> not)
+
+let private withGitPathspecs (command: string[]) (pathSpecs: string[]) =
+    [|
+        yield! command
+        yield "--"
+        yield! pathSpecs
+    |]
+
 /// Validates a remote name and defaults blank input to `origin`.
 let validateRemoteName (remoteName: string) =
     let normalized =
@@ -1654,6 +1666,112 @@ let unstagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<
 
                     let! _ = git.reset ("mixed", !^resetOptions)
                     return ()
+                })
+}
+
+let private hasHeadCommit (git: ISimpleGit) = promise {
+    let! headResult = runSimpleGit (fun currentGit -> currentGit.raw [| "rev-parse"; "--verify"; "HEAD" |]) git
+    return Result.isOk headResult
+}
+
+let private headPathsForPathspecs (git: ISimpleGit) (pathSpecs: string[]) = promise {
+    let! headPathsResult =
+        runSimpleGit
+            (fun currentGit ->
+                currentGit.raw (
+                    withGitPathspecs [|
+                        "ls-tree"
+                        "-r"
+                        "--name-only"
+                        "HEAD"
+                    |] pathSpecs
+                ))
+            git
+
+    match headPathsResult with
+    | Ok output -> return splitGitOutputLines output
+    | Error failure -> return abortGitPromise failure.Message
+}
+
+let private discardPathspecsWithOriginals (arcPath: string) (status: StatusResult) (safePathSpecs: string[]) =
+    let selectedPaths = safePathSpecs |> Set.ofArray
+    let statusDto = toStatusDto arcPath status
+
+    let originalPaths =
+        statusDto.Files
+        |> Array.choose (fun file ->
+            if selectedPaths.Contains file.Path then
+                file.OriginalPath
+            else
+                None)
+        |> Array.choose (fun path ->
+            match ensureValidPathspec path with
+            | Ok safePath -> Some safePath
+            | Error _ -> None)
+
+    Array.append safePathSpecs originalPaths
+    |> Array.distinct
+
+/// Discards validated pathspecs by restoring tracked paths from HEAD and cleaning selected untracked files.
+let discardPaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {
+    match validatePathspecs pathSpecs with
+    | Error validationError -> return errorResult validationError
+    | Ok safePathSpecs ->
+        return!
+            withLocalGit
+                arcPath
+                (fun git -> promise {
+                    let! status = git.status ()
+                    let discardPathSpecs = discardPathspecsWithOriginals arcPath status safePathSpecs
+                    let! hasHead = hasHeadCommit git
+
+                    if hasHead then
+                        let! resetResult =
+                            runSimpleGit
+                                (fun currentGit -> currentGit.raw (withGitPathspecs [| "reset" |] discardPathSpecs))
+                                git
+
+                        match resetResult with
+                        | Error failure -> return abortGitPromise failure.Message
+                        | Ok _ ->
+                            let! headPaths = headPathsForPathspecs git discardPathSpecs
+
+                            if headPaths.Length > 0 then
+                                let! restoreResult =
+                                    runSimpleGit
+                                        (fun currentGit ->
+                                            currentGit.raw (withGitPathspecs [| "restore"; "--worktree" |] headPaths))
+                                        git
+
+                                match restoreResult with
+                                | Error failure -> return abortGitPromise failure.Message
+                                | Ok _ -> ()
+                    else
+                        let! rmCachedResult =
+                            runSimpleGit
+                                (fun currentGit ->
+                                    currentGit.raw (
+                                        withGitPathspecs [|
+                                            "rm"
+                                            "--cached"
+                                            "-r"
+                                            "--ignore-unmatch"
+                                        |] discardPathSpecs
+                                    ))
+                                git
+
+                        match rmCachedResult with
+                        | Error failure -> return abortGitPromise failure.Message
+                        | Ok _ -> ()
+
+                    let! cleanResult =
+                        runSimpleGit
+                            (fun currentGit -> currentGit.raw (withGitPathspecs [| "clean"; "-fd" |] discardPathSpecs))
+                            git
+
+                    match cleanResult with
+                    | Error failure -> return abortGitPromise failure.Message
+                    | Ok _ -> return ()
                 })
 }
 
