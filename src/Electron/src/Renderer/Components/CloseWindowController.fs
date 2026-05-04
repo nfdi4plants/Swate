@@ -3,7 +3,9 @@ module Renderer.Components.CloseWindowController
 
 open Feliz
 open Fable.Core
+open Renderer.Components.ARCHelper
 open Swate.Components
+open Swate.Components.ErrorModal
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
@@ -18,62 +20,51 @@ type CloseWindowController =
         ) =
 
         let modalIsOpen, setModalIsOpen = React.useState false
-        let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-        let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
+        let errorModal = ErrorModal.Context.useErrorModalCtx ()
+        let arcScopeId = useCurrentArcScopeId ()
 
-        let saveBeforeClose () : JS.Promise<Result<unit, exn>> = promise {
-            let saveTarget =
-                match arcObjectCtx.state.PendingArcFileSave with
-                | Some pendingArcFile -> Some pendingArcFile
-                | None ->
-                    match pageCtx.state with
-                    | Some(Renderer.Types.PageState.ArcFilePage arcFile) -> Some arcFile
-                    | _ -> None
-
-            match saveTarget with
-            | Some arcFile ->
-                let! saveResult = Renderer.Components.MainContent.Helper.MainContentHelper.saveArcFile arcFile
-
-                match saveResult with
-                | Ok() ->
-                    arcObjectCtx.setPendingArcFileSave None
-                    return Ok()
-                | Error exn -> return Error exn
-            | None -> return Ok()
-        }
+        let enqueueCloseError (title: string) (saveError: exn) =
+            errorModal.enqueue (ErrorModalRequest.create(saveError.Message, title = title, ?scopeId = arcScopeId))
 
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =
             Api.ipcArcVaultApi.resolveCloseRequest decision
-            |> Promise.map (
-                function
-                | Ok _ -> ()
-                | Error exn -> console.error ($"Failed to resolve close request: {exn.Message}")
-            )
 
         let handleCancel () =
-            setModalIsOpen false
-            onCancelClose |> Option.iter (fun fn -> fn ())
-            resolveCloseRequest SaveBeforeQuitDecision.CancelClose |> Promise.start
+            promise {
+                match! resolveCloseRequest SaveBeforeQuitDecision.CancelClose with
+                | Ok() ->
+                    setModalIsOpen false
+                    onCancelClose |> Option.iter (fun fn -> fn ())
+                | Error resolveError -> enqueueCloseError "Could not cancel close request" resolveError
+            }
+            |> Promise.start
 
         let handleCloseWithoutSaving () =
-            setModalIsOpen false
-            onConfirmClose |> Option.iter (fun fn -> fn ())
-            resolveCloseRequest SaveBeforeQuitDecision.CloseWithoutSaving |> Promise.start
+            promise {
+                match! resolveCloseRequest SaveBeforeQuitDecision.CloseWithoutSaving with
+                | Ok() ->
+                    setModalIsOpen false
+                    onConfirmClose |> Option.iter (fun fn -> fn ())
+                | Error resolveError -> enqueueCloseError "Could not close window" resolveError
+            }
+            |> Promise.start
+
+        let saveBeforeClose () : JS.Promise<Result<unit, exn>> =
+            if onConfirmSave.IsSome then
+                onConfirmSave.Value()
+            else
+                promise { return Ok() }
 
         let handleSaveAndClose () =
             promise {
-                let! saveResult =
-                    if onConfirmSave.IsNone then
-                        // If no custom save function is provided, we use the default one that saves the current arc file.
-                        saveBeforeClose ()
-                    else
-                        onConfirmSave.Value()
+                let! saveResult = saveBeforeClose ()
 
                 match saveResult with
                 | Ok() ->
-                    setModalIsOpen false
-                    do! resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose
-                | Error msg -> console.error ($"Save before close failed: {msg}")
+                    match! resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose with
+                    | Ok() -> setModalIsOpen false
+                    | Error resolveError -> enqueueCloseError "Could not save and close window" resolveError
+                | Error saveError -> enqueueCloseError "Save before close failed" saveError
             }
             |> Promise.start
 

@@ -86,6 +86,7 @@ type ArcVault(window: BrowserWindow) =
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, set
+    member val pendingArcFileSave: FileContentDTO option = None with get, set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
@@ -361,20 +362,29 @@ type ArcVaults() =
 
     member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
         match this.TryGetVault(windowId) with
-        | None -> swatelogfn windowId "Close request ignored. No vault found."
+        | None ->
+            let message = "Close request ignored. No vault found."
+            swatelogfn windowId "%s" message
+            return Error(exn message)
         | Some(vault: ArcVault) ->
             vault.isCloseRequestPending <- false
 
             match decision with
-            | SaveBeforeQuitDecision.CancelClose -> swatelogfn windowId "Close request cancelled by user."
+            | SaveBeforeQuitDecision.CancelClose ->
+                swatelogfn windowId "Close request cancelled by user."
+                return Ok()
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
                 swatelogfn windowId "Close request approved by user. Closing without saving."
+                vault.pendingArcFileSave <- None
                 vault.isCloseApproved <- true
                 vault.window.close ()
+                return Ok()
             | SaveBeforeQuitDecision.SaveAndClose ->
-                swatelogfn windowId "Close request approved by user. Closing after renderer save."
+                swatelogfn windowId "Close request approved by user. Closing after main save."
+                vault.pendingArcFileSave <- None
                 vault.isCloseApproved <- true
                 vault.window.close ()
+                return Ok()
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =

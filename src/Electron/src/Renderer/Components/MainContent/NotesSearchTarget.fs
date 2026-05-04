@@ -12,7 +12,6 @@ let NotesSearchTarget () =
 
     let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx()
     let fileTreeCtx = Renderer.Context.FileStateContext.useFileStateCtx()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx()
     let notes, setNotes = React.useState ([]: Note list)
 
     let isLoading, setIsLoading = React.useState true
@@ -57,20 +56,11 @@ let NotesSearchTarget () =
 
                 dto
                 |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                |> Renderer.Components.ARCHelper.applyLoadedView
-                    pageCtx.setState
-                    arcObjectCtx.setArcFileState
-                    arcObjectCtx.setPreviewState
-                    arcObjectCtx.setStatusMessage
+                |> Renderer.Components.ARCHelper.applyLoadedView pageCtx.setState
             | Result.Error exn ->
                 fileTreeCtx.setSelection (ArcSelection.clearExplorerNode fileTreeCtx.state.Selection)
 
-                Renderer.Components.ARCHelper.applyViewError
-                    pageCtx.setState
-                    arcObjectCtx.setArcFileState
-                    arcObjectCtx.setPreviewState
-                    arcObjectCtx.setStatusMessage
-                    $"Could not open note: {exn.Message}"
+                Renderer.Components.ARCHelper.applyViewError pageCtx.setState $"Could not open note: {exn.Message}"
         }
         |> Promise.start
 
