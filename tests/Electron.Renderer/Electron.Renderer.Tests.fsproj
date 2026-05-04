@@ -6,6 +6,7 @@
     <Compile Include="IpcReceiverDisposable.test.fs" />
     <Compile Include="MainSyncedState.test.fs" />
     <Compile Include="FileStateContextReload.test.fs" />
+    <Compile Include="FileExplorerArcPath.test.fs" />
     <Compile Include="GitWorkflow.test.fs" />
     <Compile Include="NoteSearchInterop.test.fs" />
   </ItemGroup>

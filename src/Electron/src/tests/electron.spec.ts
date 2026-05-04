@@ -107,6 +107,13 @@ test.describe('Swate Electron App', () => {
     const arcNameLabel = window.getByTestId('left-sidebar-file-explorer-arc-name');
     await expect(arcNameLabel).toBeVisible({ timeout: 30000 });
     await expect(arcNameLabel).toHaveText(ARC_IDENTIFIER, { timeout: 30000 });
+    await expect(arcNameLabel).toHaveAttribute('title', arcPath, { timeout: 30000 });
+
+    await arcNameLabel.click();
+    const arcPathValue = window.getByTestId('file-explorer-arc-path-value');
+    await expect(arcPathValue).toHaveText(arcPath, { timeout: 30000 });
+    await expect(window.getByTestId('file-explorer-arc-path-copy')).toBeVisible({ timeout: 30000 });
+    await expect(window.getByTestId('file-explorer-arc-path-open-folder')).toBeVisible({ timeout: 30000 });
 
     const fileExplorer = window.getByTestId('file-explorer-container');
     await expect(fileExplorer).toBeVisible({ timeout: 30000 });

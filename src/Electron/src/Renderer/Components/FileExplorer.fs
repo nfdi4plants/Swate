@@ -10,6 +10,7 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Feliz
 open Fable.Core
+open Fable.Core.JsInterop
 open ARCtrl
 
 
@@ -315,6 +316,7 @@ type FileExplorer =
     [<ReactComponent>]
     static member FileTree() =
 
+        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let errorModal = ErrorModal.Context.useErrorModalCtx ()
@@ -515,6 +517,29 @@ type FileExplorer =
         let contextMenuItems (item: FileItem) =
             Renderer.Components.FileExplorerLfs.withLfsContextMenuItems item toggleLfsMark (arcCreateContextMenuItems item)
 
+        let copyArcPathToClipboard (path: string) =
+            promise {
+                try
+                    let windowObj: obj = Browser.Dom.window
+                    do! windowObj?navigator?clipboard?writeText (path)
+                with ex ->
+                    errorModal.enqueue (
+                        ErrorModalRequest.create($"Could not copy ARC path: {ex.Message}", title = "Copy path failed", ?scopeId = arcScopeId)
+                    )
+            }
+            |> Promise.start
+
+        let openArcFolderInFileExplorer () =
+            promise {
+                match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
+                | Ok() -> ()
+                | Error exn ->
+                    errorModal.enqueue (
+                        ErrorModalRequest.create(exn.Message, title = "Open folder failed", ?scopeId = arcScopeId)
+                    )
+            }
+            |> Promise.start
+
         let activeCreateKind =
             pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
 
@@ -546,11 +571,12 @@ type FileExplorer =
                 Html.div [
                     prop.className "swt:w-full"
                     prop.children [
-                        Html.div [
-                            prop.testId "left-sidebar-file-explorer-arc-name"
-                            prop.className "swt:mb-2 swt:px-2 swt:text-sm swt:font-semibold swt:truncate"
-                            prop.text arcName
-                        ]
+                        Renderer.Components.FileExplorerArcPath.ArcPathPopover(
+                            arcName,
+                            appStateCtx,
+                            copyArcPathToClipboard,
+                            openArcFolderInFileExplorer
+                        )
                         Swate.Components.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
