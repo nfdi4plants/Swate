@@ -2,7 +2,7 @@ namespace Swate.Components.ARCObjectExplorer
 
 
 open Swate.Components.Shared
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 
 type ARCObjectFixture =
 

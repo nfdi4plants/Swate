@@ -4,7 +4,7 @@ module Renderer.Components.FileExplorer
 open Renderer.Components.ARCHelper
 open Swate.Components
 open Swate.Components.ErrorModal
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -408,7 +408,7 @@ type FileExplorer =
             | None -> ()
 
         let toggleLfsMark =
-            FileExplorerGitLfsHelper.ToggleLfsMark(setError, Renderer.Components.ARCHelper.runToggleLfsMark)
+            Swate.Components.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark setError Renderer.Components.ARCHelper.runToggleLfsMark
 
         let openPreview (item: FileItem) =
             promise {
@@ -543,7 +543,7 @@ type FileExplorer =
 
         let contextMenuItems (item: FileItem) =
             arcCreateContextMenuItems item
-            @ FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+            @ Swate.Components.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark
             |> sortContextMenuItems
 
         let activeCreateKind =
@@ -582,7 +582,7 @@ type FileExplorer =
                             prop.className "swt:mb-2 swt:px-2 swt:text-sm swt:font-semibold swt:truncate"
                             prop.text arcName
                         ]
-                        Swate.Components.FileExplorer.FileExplorer(
+                        Swate.Components.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
                             onDirectoryArrowToggle = handleDirectoryArrowToggle,

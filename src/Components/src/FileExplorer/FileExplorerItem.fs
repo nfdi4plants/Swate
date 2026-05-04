@@ -1,8 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.FileExplorer
 
 open Fable.Core
 open Feliz
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 
 [<Mangle(false); Erase>]
 type FileExplorerItem =

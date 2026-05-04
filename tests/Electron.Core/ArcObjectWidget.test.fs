@@ -3,7 +3,7 @@ module ElectronCore.ArcObjectWidgetTests
 open Swate.Components
 open Swate.Components.ARCObjectExplorer
 open Swate.Components.ARCObjectExplorer.Types
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer
 open Vitest
 
 let private folder id name itemType selectable children =

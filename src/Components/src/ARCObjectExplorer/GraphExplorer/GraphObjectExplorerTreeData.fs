@@ -4,7 +4,7 @@ open System
 open Swate.Components.ARCObjectExplorer
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 open Swate.Components.Shared
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 
 
 let private groupItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Group

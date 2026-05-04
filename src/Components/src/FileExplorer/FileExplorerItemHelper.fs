@@ -1,8 +1,8 @@
-module Swate.Components.FileExplorerItemHelper
+module Swate.Components.FileExplorer.FileExplorerItemHelper
 
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 
-let handleItemClick (item: FileItem, onItemClick: (FileItem -> unit) option, dispatch: FileExplorerLogic.Msg -> unit) =
+let handleItemClick (item: FileItem) (onItemClick: (FileItem -> unit) option) (dispatch: FileExplorerLogic.Msg -> unit) =
     dispatch (FileExplorerLogic.SelectItem item.Id)
     onItemClick |> Option.iter (fun fn -> fn item)
 

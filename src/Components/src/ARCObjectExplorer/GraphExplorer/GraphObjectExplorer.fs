@@ -6,7 +6,7 @@ open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer
 open Swate.Components.ARCObjectExplorer.Model
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 
 module private GraphObjectExplorerHelper =
 
@@ -212,7 +212,7 @@ type GraphObjectExplorer =
             )
 
         let treePane =
-            Swate.Components.FileExplorer.FileExplorer(
+            Swate.Components.FileExplorer.FileExplorer.FileExplorer(
                 initialItems = treePaneItems,
                 ?selectedItemId = Some(selectedItemId viewModel),
                 onItemClick =

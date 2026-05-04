@@ -2,7 +2,7 @@ namespace Swate.Components.ARCObjectExplorer
 
 open Browser.Dom
 open Swate.Components.Shared
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 open Feliz
 
 //Replace with ARCtrl
@@ -177,10 +177,10 @@ module ARCExplorer =
         let selectedItemId = getSelectedItemId nodes selection
 
         let toggleLfsMark =
-            FileExplorerGitLfsHelper.ToggleLfsMark(services.setStatusMessage, services.runToggleLfsMark rootRepoPath)
+            Swate.Components.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark services.setStatusMessage (services.runToggleLfsMark rootRepoPath)
 
         let contextMenuItems (item: FileItem) =
-            FileExplorerGitLfsHelper.ContextMenuItems(item, toggleLfsMark)
+            Swate.Components.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark
 
         let openView item = promise { createOpenPreviewHandler setSelection services item |> Promise.start } |> Promise.start
 
@@ -190,7 +190,7 @@ module ARCExplorer =
             let items = toFileItems nodes
 
             (
-                Swate.Components.FileExplorer.FileExplorer(
+                Swate.Components.FileExplorer.FileExplorer.FileExplorer(
                     initialItems = items,
                     onItemClick = openView,
                     onContextMenu = contextMenuItems,
