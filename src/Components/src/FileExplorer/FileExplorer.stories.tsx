@@ -6,7 +6,7 @@ import {
   ContextMenuItem,
   FileItemIcon_Folder,
   FileTree_createFolder,
-} from "./FileTreeDataStructures.fs.js";
+} from "./Types.fs.js";
 import { ofArray } from "../fable_modules/fable-library-ts.5.0.0-alpha.21/List.ts";
 
 const arcCreateItems = [
