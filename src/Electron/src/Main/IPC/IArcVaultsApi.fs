@@ -338,6 +338,26 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
             return vault |> Option.bind (fun v -> v.path)
         }
+    openArcFolderInFileExplorer =
+        fun () -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path with
+                    | None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath ->
+                        let! shellOpenResult = shell.openPath arcPath
+
+                        if String.IsNullOrWhiteSpace shellOpenResult then
+                            return Ok()
+                        else
+                            return Error(exn $"Could not open ARC folder in file explorer: {shellOpenResult}")
+            with e ->
+                return Error e
+        }
     getRecentARCs = fun _ -> promise { return RECENT_ARCS.Get() }
     removeRecentARC =
         fun arcpointer -> promise {
