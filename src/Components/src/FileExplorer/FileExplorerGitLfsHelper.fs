@@ -31,7 +31,7 @@ let contextMenuItems (item: FileItem) (onToggleLfsMark: FileItem -> bool -> unit
 
         [
             {
-                Label = if isMarked then "Unmark Git LFS" else "Mark as Git LFS"
+                Label = if isMarked then "Unmark Git LFS" else "Mark Git LFS"
                 Icon =
                     if isMarked then
                         "swt:fluent--document-dismiss-24-regular"

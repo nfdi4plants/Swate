@@ -80,10 +80,7 @@ let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: 
                             (if isLast then entry.isDirectory else true),
                             newPath,
                             Dictionary(),
-                            entry.isLfs,
-                            entry.isLfsPointer,
-                            entry.downloaded,
-                            entry.lfsSizeBytes
+                            entry.lfs
                         )
 
                     node.children.Add(part, newNode)
@@ -127,10 +124,7 @@ let toFileTreeNode (fileEntries: FileEntry[]) =
             rootEntry.isDirectory,
             rootPath,
             Dictionary(),
-            rootEntry.isLfs,
-            rootEntry.isLfsPointer,
-            rootEntry.downloaded,
-            rootEntry.lfsSizeBytes
+            rootEntry.lfs
         )
 
     adaptedFileEntries

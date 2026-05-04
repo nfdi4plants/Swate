@@ -50,7 +50,7 @@ let private createSnapshot () =
 
     snapshot.Add(
         "assays/assay-1/isa.assay.xlsx",
-        FileEntry.create("isa.assay.xlsx", "assays/assay-1/isa.assay.xlsx", false, Some false)
+        FileEntry.create("isa.assay.xlsx", "assays/assay-1/isa.assay.xlsx", false, None)
     )
 
     snapshot

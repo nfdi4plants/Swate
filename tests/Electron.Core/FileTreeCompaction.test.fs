@@ -95,21 +95,25 @@ Vitest.describe("FileIOHelper.collapseSingleChildSameNameDirectories", fun () ->
 )
 
 Vitest.describe("FileIOHelper.toFileTreeNode LFS metadata", fun () ->
-    Vitest.test("preserves LFS pointer/downloaded/size metadata from FileEntry to root FileTreeNode", fun () ->
+    Vitest.test("preserves Git LFS ls-files metadata from FileEntry to root FileTreeNode", fun () ->
+        let lfsInfo: GitLfsLsFileInfo = {
+            name = "arc/sample.bin"
+            size = 2048.0
+            checkout = false
+            downloaded = false
+            ``oid_type`` = "sha256"
+            oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+            version = "https://git-lfs.github.com/spec/v1"
+        }
+
         let rootEntry: FileEntry = {
             name = "arc"
             isDirectory = true
             path = "C:/arc"
-            isLfs = Some true
-            isLfsPointer = Some true
-            downloaded = Some false
-            lfsSizeBytes = Some 2048.0
+            lfs = Some lfsInfo
         }
 
         let rootNode = toFileTreeNode [| rootEntry |]
 
-        Vitest.expect(rootNode.isLfs).toEqual(Some true)
-        Vitest.expect(rootNode.isLfsPointer).toEqual(Some true)
-        Vitest.expect(rootNode.downloaded).toEqual(Some false)
-        Vitest.expect(rootNode.lfsSizeBytes).toEqual(Some 2048.0))
+        Vitest.expect(rootNode.lfs).toEqual(Some lfsInfo))
 )

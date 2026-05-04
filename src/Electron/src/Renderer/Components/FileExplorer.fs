@@ -73,10 +73,6 @@ module private FileExplorerHelper =
 
         collectSelectedDirectoryPathChain selectedTreeItemPath root rootPathSet
 
-    let private mapLfsSize (sizeBytes: float option) =
-        let size = sizeBytes |> Option.map int64
-        size, (size |> Option.map FileTree.formatSize)
-
     let rec loopPaths
         (loadedDirectoryPaths: Set<string>)
         (selectedTreeItemPath: string option)
@@ -84,7 +80,6 @@ module private FileExplorerHelper =
         =
         match parent.isDirectory with
         | true ->
-            let lfsSize, lfsSizeFormatted = mapLfsSize parent.lfsSizeBytes
             let normalizedParentPath = normalizeNodePath parent.path
             let isDirectoryLoaded = loadedDirectoryPaths.Contains normalizedParentPath
             let hasSourceChildren = parent.children.Count > 0
@@ -108,30 +103,23 @@ module private FileExplorerHelper =
                 else
                     Some []
 
-            Some {
+            {
                 FileTree.createFolder parent.name (Some parent.path) FileItemIcon.Folder with
                     Id = parent.path
                     IsExpanded =
                         selectedTreeItemPath
                         |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath parent.path)
-                    IsLFS = parent.isLfs
-                    IsLFSPointer = parent.isLfsPointer
-                    Downloaded = parent.downloaded
-                    Size = lfsSize
-                    SizeFormatted = lfsSizeFormatted
                     Children = children
             }
+            |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState parent
+            |> Some
         | false ->
-            let lfsSize, lfsSizeFormatted = mapLfsSize parent.lfsSizeBytes
-            Some {
+            {
                 FileTree.createFile parent.name (Some parent.path) FileItemIcon.Document with
                     Id = parent.path
-                    IsLFS = parent.isLfs
-                    IsLFSPointer = parent.isLfsPointer
-                    Downloaded = parent.downloaded
-                    Size = lfsSize
-                    SizeFormatted = lfsSizeFormatted
             }
+            |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState parent
+            |> Some
 
     let arcCreateKindIcon =
         function
@@ -402,13 +390,11 @@ type FileExplorer =
             fileTree
             |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
 
-        let setError (errorMsg: string option) =
-            match errorMsg with
-            | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
-            | None -> ()
-
         let toggleLfsMark =
-            Swate.Components.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark setError Renderer.Components.ARCHelper.runToggleLfsMark
+            Renderer.Components.FileExplorerLfs.createToggleLfsMark
+                errorModal.enqueue
+                arcScopeId
+                Renderer.Components.ARCHelper.runToggleLfsMark
 
         let openPreview (item: FileItem) =
             promise {
@@ -526,25 +512,8 @@ type FileExplorer =
             else
                 []
 
-        let contextMenuSortOrder (item: ContextMenuItem) =
-            match item.Label with
-            | "Add Study" -> 10
-            | "Add Assay" -> 20
-            | "Add Workflow" -> 30
-            | "Add Run" -> 40
-            | "Mark Git LFS"
-            | "Unmark Git LFS" -> 100
-            | "Git LFS: marked"
-            | "Git LFS: not marked" -> 110
-            | _ -> 1000
-
-        let sortContextMenuItems (items: ContextMenuItem list) =
-            items |> List.sortBy (fun item -> contextMenuSortOrder item, item.Label)
-
         let contextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item
-            @ Swate.Components.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark
-            |> sortContextMenuItems
+            Renderer.Components.FileExplorerLfs.withLfsContextMenuItems item toggleLfsMark (arcCreateContextMenuItems item)
 
         let activeCreateKind =
             pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study

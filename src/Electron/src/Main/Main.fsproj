@@ -12,12 +12,12 @@
     <Compile Include="Bindings\Path.fs" />
     <Compile Include="Bindings\NodeBindings.fs" />
     <Compile Include="Bindings\SimpleGit.fs" />
-    <Compile Include="FileTreeCreator.fs" />
     <Compile Include="Notes\NoteSearchReader.fs" />
     <Compile Include="SettingsStore.fs" />
     <Compile Include="RecentArcStore.fs" />
     <Compile Include="Git\GitAuthAdapter.fs" />
     <Compile Include="Git\GitlfsAdapter.fs" />
+    <Compile Include="FileTreeCreator.fs" />
     <Compile Include="Git\GitLfsService.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />
     <Compile Include="Git\GitInternals.fs" />

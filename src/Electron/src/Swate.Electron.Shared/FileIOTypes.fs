@@ -2,14 +2,21 @@ module Swate.Electron.Shared.FileIOTypes
 
 open System.Collections.Generic
 
+type GitLfsLsFileInfo = {
+    name: string
+    size: float
+    checkout: bool
+    downloaded: bool
+    ``oid_type``: string
+    oid: string
+    version: string
+}
+
 type FileEntry = {
     name: string
     isDirectory: bool
     path: string
-    isLfs: bool option
-    isLfsPointer: bool option
-    downloaded: bool option
-    lfsSizeBytes: float option
+    lfs: GitLfsLsFileInfo option
 }
 
 [<AutoOpen>]
@@ -27,30 +34,21 @@ module FileEntryExtensions =
                 name: string,
                 path: string,
                 isDirectory: bool,
-                ?isLfs: bool option,
-                ?isLfsPointer: bool option,
-                ?downloaded: bool option,
-                ?lfsSizeBytes: float option
+                ?lfs: GitLfsLsFileInfo option
             )
             : FileEntry =
             {
             name = name
             path = path
             isDirectory = isDirectory
-            isLfs = defaultArg isLfs None
-            isLfsPointer = defaultArg isLfsPointer None
-            downloaded = defaultArg downloaded None
-            lfsSizeBytes = defaultArg lfsSizeBytes None
+            lfs = defaultArg lfs None
         }
 
 type FileTreeNode = {
     name: string
     isDirectory: bool
     path: string
-    isLfs: bool option
-    isLfsPointer: bool option
-    downloaded: bool option
-    lfsSizeBytes: float option
+    lfs: GitLfsLsFileInfo option
     children: Dictionary<string, FileTreeNode>
 } with
 
@@ -60,20 +58,14 @@ type FileTreeNode = {
             isDirectory: bool,
             path: string,
             children: Dictionary<string, FileTreeNode>,
-            ?isLfs: bool option,
-            ?isLfsPointer: bool option,
-            ?downloaded: bool option,
-            ?lfsSizeBytes: float option
+            ?lfs: GitLfsLsFileInfo option
         )
         =
         {
             name = name
             isDirectory = isDirectory
             path = path
-            isLfs = defaultArg isLfs None
-            isLfsPointer = defaultArg isLfsPointer None
-            downloaded = defaultArg downloaded None
-            lfsSizeBytes = defaultArg lfsSizeBytes None
+            lfs = defaultArg lfs None
             children = children
         }
 
