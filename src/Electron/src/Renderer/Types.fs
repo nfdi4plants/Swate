@@ -10,7 +10,6 @@ open Swate.Electron.Shared.GitTypes
 [<RequireQualifiedAccess>]
 type LeftSidebarPage =
     | FileExplorer
-    | ArcObjectExplorer
     | Git
 
 type GitUnsupportedPageData = GitUnsupportedContentDto
