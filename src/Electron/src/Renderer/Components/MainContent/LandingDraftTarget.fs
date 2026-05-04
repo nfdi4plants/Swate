@@ -12,7 +12,6 @@ let LandingDraftTarget () =
 
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
     let landingDraft, setLandingDraft = React.useState LandingDraft.init
     let landingUiState, setLandingUiState = React.useState LandingUiState.init
 
@@ -26,11 +25,7 @@ let LandingDraftTarget () =
 
                 response
                 |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                |> Renderer.Components.ARCHelper.applyLoadedView
-                    pageStateCtx.setState
-                    arcObjectCtx.setArcFileState
-                    arcObjectCtx.setPreviewState
-                    arcObjectCtx.setStatusMessage
+                |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
 
                 setLandingDraft LandingDraft.init
                 setLandingUiState LandingUiState.init
@@ -58,7 +53,7 @@ let LandingDraftTarget () =
                         let request: FileContentDTO =
                             FileContentDTO.create DTOType.PlainText protocolIntent.Content protocolIntent.RelativePath
 
-                        let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
+                        let! writeResult = Api.ipcArcVaultApi.writeFile request
 
                         match writeResult with
                         | Ok() -> finishSuccess previewData

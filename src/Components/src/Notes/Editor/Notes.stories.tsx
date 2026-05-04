@@ -165,6 +165,10 @@ export const PreviewGeneratedMarkdownAndPath: Story = {
       );
     });
 
-    expect(canvas.getByTestId('notes-preview-markdown')).toHaveTextContent('# Preview from story');
+    const previewMarkdown = canvas.getByTestId('notes-preview-markdown');
+    expect(previewMarkdown).toHaveTextContent('title: Preview from story');
+    expect(previewMarkdown).toHaveTextContent('date: 2026-02-26');
+    expect(previewMarkdown).toHaveTextContent('Preview body content');
+    expect(previewMarkdown).not.toHaveTextContent('# Preview from story');
   },
 };

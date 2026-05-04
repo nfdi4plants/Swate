@@ -11,32 +11,31 @@ open Swate.Components.ErrorModal
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
     let errorModal = ErrorModal.Context.useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 
-    let isPendingSaveForCurrentArcFile =
-        match arcObjectCtx.state.PendingArcFileSave, arcFile.TryGetRelativePath() with
-        | Some pendingArcFile, Some currentRelativePath ->
-            pendingArcFile.TryGetRelativePath()
-            |> Option.exists (fun pendingRelativePath -> PathHelpers.pathsEqual pendingRelativePath currentRelativePath)
-        | _ -> false
+    let stagePendingArcFileSave (nextArcFile: ArcFiles) =
+        promise {
+            match! MainContentHelper.setPendingArcFileSave (Some nextArcFile) with
+            | Ok() -> ()
+            | Error exn ->
+                errorModal.enqueue (
+                    ErrorModalRequest.create (exn.Message, title = "Could not stage ARC file save", ?scopeId = arcScopeId)
+                )
+        }
+        |> Promise.start
 
     let setArcFile =
         fun (nextArcFile: ArcFiles) ->
             let page = Renderer.Types.PageState.ArcFilePage nextArcFile
 
             pageStateCtx.setState (Some page)
-            arcObjectCtx.setArcFileState (Some nextArcFile)
-            arcObjectCtx.setPreviewState (Some(Swate.Components.Shared.PageState.ArcFilePage nextArcFile))
-            arcObjectCtx.setPendingArcFileSave (Some nextArcFile)
-            arcObjectCtx.setStatusMessage None
+            stagePendingArcFileSave nextArcFile
 
     let onSaveArcFile =
         fun _ ->
             promise {
                 match! MainContentHelper.saveArcFile arcFile with
-                | Ok() when isPendingSaveForCurrentArcFile -> arcObjectCtx.setPendingArcFileSave None
                 | Ok() -> ()
                 | Error exn ->
                     errorModal.enqueue (

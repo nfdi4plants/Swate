@@ -9,6 +9,7 @@ open Main.Bindings
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
@@ -85,6 +86,7 @@ type ArcVault(window: BrowserWindow) =
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, set
+    member val pendingArcFileSave: FileContentDTO option = None with get, set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
@@ -200,9 +202,9 @@ module ArcVaultExtensions =
             this.fileTree <- fileTree
 
             let sendMsg =
-                Remoting.init
+                Remoting.createIpc ()
                 |> Remoting.withWindow this.window
-                |> Remoting.buildClient<IMainUpdateRendererApi>
+                |> Remoting.buildProxySender<IFileTreeRendererApi>
 
             let rendererFileTree =
                 match this.path with
@@ -210,6 +212,17 @@ module ArcVaultExtensions =
                 | None -> Dictionary<string, FileEntry>()
 
             sendMsg.fileTreeUpdate rendererFileTree
+
+        member this.GetRendererFileTreeSnapshot() = promise {
+            match this.path with
+            | None -> return Dictionary<string, FileEntry>()
+            | Some arcPath ->
+                if this.fileTree.Count = 0 then
+                    let! fileEntries = getFileEntries arcPath
+                    this.fileTree <- createFileEntryTree fileEntries
+
+                return toRendererFileTree arcPath this.fileTree.Values
+        }
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
@@ -225,9 +238,9 @@ module ArcVaultExtensions =
                 let watcher = createFileWatcher this.path.Value
 
                 let sendMsgApi =
-                    Remoting.init
+                    Remoting.createIpc ()
                     |> Remoting.withWindow this.window
-                    |> Remoting.buildClient<IArcFileWatcherApi>
+                    |> Remoting.buildProxySender<IArcFileWatcherApi>
 
                 watcher.on (Chokidar.Events.All, this._ScheduleReloadArc sendMsgApi) |> ignore
             else
@@ -245,9 +258,9 @@ module ArcVaultExtensions =
             | Some _ -> swatefailfn this.window.id "Unable to open ARC in vault bound to ARC."
             | None ->
                 let sendMsg =
-                    Remoting.init
+                    Remoting.createIpc ()
                     |> Remoting.withWindow this.window
-                    |> Remoting.buildClient<IMainUpdateRendererApi>
+                    |> Remoting.buildProxySender<IPathChangeRendererApi>
 
                 swatelogfn this.window.id "path: %s" path
                 this.path <- Some path
@@ -261,9 +274,9 @@ module ArcVaultExtensions =
             | _, Some _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to ARC."
             | None, None ->
                 let sendMsg =
-                    Remoting.init
+                    Remoting.createIpc ()
                     |> Remoting.withWindow this.window
-                    |> Remoting.buildClient<IMainUpdateRendererApi>
+                    |> Remoting.buildProxySender<IPathChangeRendererApi>
 
                 let arc = ARC(identifier)
                 this.path <- Some path
@@ -326,9 +339,9 @@ type ArcVaults() =
             if arr.Length > 0 then
                 arr
                 |> Array.iter (fun vault ->
-                    Remoting.init
+                    Remoting.createIpc ()
                     |> Remoting.withWindow vault.window
-                    |> Remoting.buildClient<Swate.Electron.Shared.IPCTypes.IMainUpdateRendererApi>
+                    |> Remoting.buildProxySender<IRecentArcsRendererApi>
                     |> fun client -> client.recentARCsUpdate recentARCs
                 )
 
@@ -349,20 +362,29 @@ type ArcVaults() =
 
     member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
         match this.TryGetVault(windowId) with
-        | None -> swatelogfn windowId "Close request ignored. No vault found."
+        | None ->
+            let message = "Close request ignored. No vault found."
+            swatelogfn windowId "%s" message
+            return Error(exn message)
         | Some(vault: ArcVault) ->
             vault.isCloseRequestPending <- false
 
             match decision with
-            | SaveBeforeQuitDecision.CancelClose -> swatelogfn windowId "Close request cancelled by user."
+            | SaveBeforeQuitDecision.CancelClose ->
+                swatelogfn windowId "Close request cancelled by user."
+                return Ok()
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
                 swatelogfn windowId "Close request approved by user. Closing without saving."
+                vault.pendingArcFileSave <- None
                 vault.isCloseApproved <- true
                 vault.window.close ()
+                return Ok()
             | SaveBeforeQuitDecision.SaveAndClose ->
-                swatelogfn windowId "Close request approved by user. Closing after renderer save."
+                swatelogfn windowId "Close request approved by user. Closing after main save."
+                vault.pendingArcFileSave <- None
                 vault.isCloseApproved <- true
                 vault.window.close ()
+                return Ok()
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
@@ -376,9 +398,9 @@ type ArcVaults() =
                     vault.isCloseRequestPending <- true
 
                     let saveBeforeQuitClient =
-                        Remoting.init
+                        Remoting.createIpc ()
                         |> Remoting.withWindow vault.window
-                        |> Remoting.buildClient<IMainSaveBeforeQuitApi>
+                        |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
 
                     saveBeforeQuitClient.requestSaveBeforeQuit ()
         )

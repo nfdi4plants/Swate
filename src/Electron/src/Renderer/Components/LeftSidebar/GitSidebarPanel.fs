@@ -128,6 +128,7 @@ let Main () =
                 OnPrimarySaveAll = gitStateCtx.primarySaveAll
                 OnCommitSelection = gitStateCtx.commitSelection
                 OnCommitAll = gitStateCtx.commitAll
+                OnDiscardSelection = gitStateCtx.discardSelection
                 OnConfirmPendingRemoteAction = gitStateCtx.confirmPendingRemoteAction
                 OnCancelPendingRemoteAction = gitStateCtx.cancelPendingRemoteAction
                 OnSaveDownloadLargeFiles = gitStateCtx.saveDownloadLargeFiles

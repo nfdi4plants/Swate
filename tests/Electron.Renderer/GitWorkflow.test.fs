@@ -164,6 +164,9 @@ let private hasOwnProperty (target: obj) (propertyName: string) : bool = jsNativ
 [<Emit("$0.firstElementChild")>]
 let private firstElementChild (target: HTMLElement) : HTMLElement = jsNative
 
+[<Emit("Array.from(document.body.querySelectorAll('button')).find((button) => button.textContent && button.textContent.includes($0))")>]
+let private findBodyButtonContaining (text: string) : HTMLButtonElement option = jsNative
+
 [<Emit("$0[$1]")>]
 let private getProperty<'T> (target: obj) (propertyName: string) : 'T = jsNative
 
@@ -244,6 +247,7 @@ let private defaultDependencies: GitDependencies = {
     checkoutBranch = fun _ -> unexpectedPromise "checkoutBranch"
     gitStagePaths = fun _ -> unexpectedPromise "gitStagePaths"
     gitUnstagePaths = fun _ -> unexpectedPromise "gitUnstagePaths"
+    gitDiscardPaths = fun _ -> unexpectedPromise "gitDiscardPaths"
     gitCommit = fun _ -> unexpectedPromise "gitCommit"
     setGitLfsSettings = fun _ -> unexpectedPromise "setGitLfsSettings"
     confirmGitMergeResolution = fun _ -> unexpectedPromise "confirmGitMergeResolution"
@@ -283,6 +287,7 @@ let private noopCallbacks: GitSidebarCallbacks = {
     OnPrimarySaveAll = fun _ -> ()
     OnCommitSelection = fun _ -> ()
     OnCommitAll = fun _ -> ()
+    OnDiscardSelection = fun _ -> ()
     OnConfirmPendingRemoteAction = fun () -> ()
     OnCancelPendingRemoteAction = fun () -> ()
     OnSaveDownloadLargeFiles = fun _ -> ()
@@ -981,6 +986,55 @@ Vitest.describe (
                 Vitest.expect(nextState.BranchOptions |> Array.map _.RefName).toEqual ([| "feature/pushed" |])
                 Vitest.expect(nextState.LfsAutoTrackThresholdMb).toBe (9)
                 Vitest.expect(nextState.DownloadLargeFiles).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "WriteRequested discards selected paths, refreshes status, and clears the open diff",
+            fun () -> promise {
+                let discardedPathspecs = ResizeArray<string[]>()
+                let clearedPages = ResizeArray<PageState option>()
+
+                let deps = {
+                    defaultDependencies with
+                        gitDiscardPaths =
+                            fun request ->
+                                discardedPathspecs.Add request.Pathspecs
+                                promise { return Ok okOperationResult }
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                        ChangedFiles = [|
+                            changedFile "README.md" "M" " " false
+                            changedFile "docs/guide.md" "M" " " false
+                        |]
+                        SelectedChangePath = Some "README.md"
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps clearedPages.Add (WriteRequested(DiscardSelection [| "README.md"; "docs/guide.md" |])) initialState
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, finishCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, DiscardSelection _, Ok(Completed(UnitSuccess(_, GitPageChange.Clear, Some None, None)))) |] ->
+                        update deps clearedPages.Add requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected discard to clear the open diff after refreshing git status."
+
+                let! followUpMessages = collectMessages finishCmd
+
+                Vitest.expect(stateAfterRequest.BusyOperation).toEqual (Some GitBusyOperation.DiscardingSelectedChanges)
+                Vitest.expect(discardedPathspecs |> Seq.toArray).toEqual ([| [| "README.md"; "docs/guide.md" |] |])
+                Vitest.expect(nextState.ChangedFiles).toEqual ([||])
+                Vitest.expect(nextState.SelectedChangePath).toEqual (None)
+                Vitest.expect(clearedPages |> Seq.toArray).toEqual ([| None |])
+                Vitest.expect(followUpMessages).toEqual ([||])
             }
         )
 
@@ -1874,6 +1928,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -1951,6 +2006,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2004,6 +2060,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2053,6 +2110,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2067,7 +2125,7 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.textContent.Contains("studies/s-study-01/protocol.md")).toBe (true)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusButton-3']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusIcon-3']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -2105,6 +2163,7 @@ Vitest.describe (
                                         OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnDiscardSelection = fun _ -> ()
                                         OnConfirmPendingRemoteAction = fun () -> ()
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2186,6 +2245,7 @@ Vitest.describe (
                                         OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnDiscardSelection = fun _ -> ()
                                         OnConfirmPendingRemoteAction = fun () -> ()
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2270,6 +2330,7 @@ Vitest.describe (
                                                         OnPrimarySaveAll = fun _ -> ()
                                                         OnCommitSelection = fun _ -> ()
                                                         OnCommitAll = fun _ -> ()
+                                                        OnDiscardSelection = fun _ -> ()
                                                         OnConfirmPendingRemoteAction = fun () -> ()
                                                         OnCancelPendingRemoteAction = fun () -> ()
                                                         OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2333,6 +2394,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2348,7 +2410,7 @@ Vitest.describe (
 
                 Vitest.expect(container.textContent.Contains("git: D.")).toBe (false)
                 Vitest.expect(container.textContent.Contains("Deleted")).toBe (false)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusButton-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusIcon-0']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -2389,6 +2451,7 @@ Vitest.describe (
                                         OnPrimarySaveAll = fun _ -> ()
                                         OnCommitSelection = fun _ -> ()
                                         OnCommitAll = fun _ -> ()
+                                        OnDiscardSelection = fun _ -> ()
                                         OnConfirmPendingRemoteAction = fun () -> ()
                                         OnCancelPendingRemoteAction = fun () -> ()
                                         OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2438,6 +2501,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2472,6 +2536,63 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "GitSidebar hover discard button discards the currently marked files",
+            fun () -> promise {
+                let mutable discardedPaths: string[] option = None
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = Some "origin/main"
+                                Ahead = 0
+                                Behind = 0
+                                IsClean = false
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = manyChangedFiles 3,
+                            branchOptions = [| sidebarLocalBranch "main" true true |],
+                            callbacks = {
+                                noopCallbacks with
+                                    OnDiscardSelection = fun paths -> discardedPaths <- Some paths
+                            },
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5
+                        )
+                    )
+
+                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+
+                row0.click ()
+                do! Promise.sleep 0
+
+                let ctrlClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
+
+                row2.dispatchEvent ctrlClick |> ignore
+                do! Promise.sleep 0
+
+                let hoverEvent =
+                    createMouseEvent "mouseenter" (createObj [ "bubbles" ==> true ])
+
+                row0.dispatchEvent hoverEvent |> ignore
+                do! Promise.sleep 0
+
+                let discardButton =
+                    container.querySelector("[data-testid='GitSidebarDiscardChangeButton-0']") :?> HTMLElement
+
+                discardButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(discardedPaths).toEqual (Some [| "src/file-000.txt"; "src/file-002.txt" |])
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
             "GitSidebar plain click clears previous marks and ctrl-click toggles a row on and back off",
             fun () -> promise {
                 let mutable capturedSelection: GitSidebarCommitSelectionRequest option = None
@@ -2499,6 +2620,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2575,6 +2697,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2651,6 +2774,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2676,7 +2800,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar plain click on a marked row deselects it and rows suppress native text selection",
+            "GitSidebar Ctrl+click on a marked row deselects it and rows suppress native text selection",
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
@@ -2704,6 +2828,7 @@ Vitest.describe (
                                 OnPrimarySaveAll = fun _ -> ()
                                 OnCommitSelection = fun _ -> ()
                                 OnCommitAll = fun _ -> ()
+                                OnDiscardSelection = fun _ -> ()
                                 OnConfirmPendingRemoteAction = fun () -> ()
                                 OnCancelPendingRemoteAction = fun () -> ()
                                 OnSaveDownloadLargeFiles = fun _ -> ()
@@ -2724,7 +2849,10 @@ Vitest.describe (
 
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
 
-                firstRow.click ()
+                let ctrlClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
+
+                firstRow.dispatchEvent ctrlClick |> ignore
                 do! Promise.sleep 0
 
                 Vitest.expect(container.textContent.Contains("Save All Changes")).toBe (true)
@@ -2737,7 +2865,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar status popover trigger does not open the changed file row",
+            "GitSidebar status icon click does not open the changed file row",
             fun () -> promise {
                 let mutable selectCalls = 0
 
@@ -2766,10 +2894,13 @@ Vitest.describe (
                         )
                     )
 
-                let statusButton =
-                    container.querySelector("[data-testid='GitSidebarChangeStatusButton-0']") :?> HTMLButtonElement
+                let statusIcon =
+                    container.querySelector("[data-testid='GitSidebarChangeStatusIcon-0']") :?> HTMLElement
 
-                statusButton.click ()
+                let clickEvent =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true ])
+
+                statusIcon.dispatchEvent clickEvent |> ignore
                 do! Promise.sleep 0
 
                 Vitest.expect(selectCalls).toBe (0)

@@ -9,8 +9,10 @@
     <Compile Include="ArcObjectWidget.test.fs" />
     <Compile Include="ArcObjectGraphExplorer.test.fs" />
     <Compile Include="JsonDTOUnwrapper.test.fs" />
-    <Compile Include="ArcObjectTreeBuilder.test.fs" />
+    <Compile Include="NoteConversion.test.fs" />
+    <Compile Include="NoteSearchReader.test.fs" />
     <Compile Include="GitService.test.fs" />
+    <Compile Include="IpcArchitectureReview.test.fs" />
     <Compile Include="GitValidation.test.fs" />
     <Compile Include="SecureAuthStore.test.fs" />
   </ItemGroup>

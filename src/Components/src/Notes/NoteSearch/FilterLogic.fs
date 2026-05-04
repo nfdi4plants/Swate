@@ -3,7 +3,6 @@ namespace Swate.Components.NoteSearch.FilterLogic
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Feliz
 open Swate.Components.NoteTypes
 open System
 

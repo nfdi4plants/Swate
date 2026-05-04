@@ -329,19 +329,31 @@ type FileExplorer =
 
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-        let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
-
-        // Holds the ARC object kind selected from the context menu; Some opens the create modal.
-        let pendingCreateKind, setPendingCreateKind =
-            React.useState<ArcExplorerNodeKind option> None
-
         let errorModal = ErrorModal.Context.useErrorModalCtx ()
         let arcScopeId = useCurrentArcScopeId ()
+        let pendingCreateKind, setPendingCreateKind = React.useState<ArcExplorerNodeKind option> None
+        let pendingArcFileSave, setPendingArcFileSave = React.useState<ArcFiles option> None
+
+        let stagePendingArcFileSave (arcFile: ArcFiles option) : JS.Promise<Result<unit, exn>> = promise {
+            let pendingSaveRequestResult =
+                match arcFile with
+                | None -> Ok None
+                | Some nextArcFile ->
+                    match FileContentDTO.fromArcFile nextArcFile with
+                    | Some request -> Ok(Some request)
+                    | None -> Error(exn "Saving this file type is not supported in Electron yet.")
+
+            match pendingSaveRequestResult with
+            | Error saveError -> return Error saveError
+            | Ok pendingSaveRequest ->
+                let! result = Api.ipcArcVaultApi.setPendingArcFileSave pendingSaveRequest
+                return result
+        }
 
         let effectiveFileTree =
             React.useMemo (
-                (fun () -> withPendingArcFileEntry fileStateCtx.state.FileTree arcObjectCtx.state.PendingArcFileSave),
-                [| box fileStateCtx.state.FileTree; box arcObjectCtx.state.PendingArcFileSave |]
+                (fun () -> withPendingArcFileEntry fileStateCtx.state.FileTree pendingArcFileSave),
+                [| box fileStateCtx.state.FileTree; box pendingArcFileSave |]
             )
 
         let fileTree =
@@ -390,8 +402,6 @@ type FileExplorer =
             fileTree
             |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
 
-        let rootPath = fileTree |> Option.map (fun tree -> tree.path)
-
         let setError (errorMsg: string option) =
             match errorMsg with
             | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
@@ -419,49 +429,25 @@ type FileExplorer =
 
                     let selectedPath = normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                    Renderer.Components.ARCHelper.clearArcObjectPreview
-                        arcObjectCtx.setArcFileState
-                        arcObjectCtx.setPreviewState
-                        arcObjectCtx.setStatusMessage
-
                     pageStateCtx.setState None
                 | Some path ->
                     let selectedPath = normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    match tryFindPendingArcFileByPath selectedPath arcObjectCtx.state.PendingArcFileSave with
+                    match tryFindPendingArcFileByPath selectedPath pendingArcFileSave with
                     | Some pendingArcFile ->
-                        pendingArcFile
-                        |> Renderer.Components.ARCHelper.viewLoadResultOfArcFile
-                        |> Renderer.Components.ARCHelper.applyLoadedView
-                            pageStateCtx.setState
-                            arcObjectCtx.setArcFileState
-                            arcObjectCtx.setPreviewState
-                            arcObjectCtx.setStatusMessage
+                        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage pendingArcFile))
                     | None ->
                         let! result = Renderer.Components.ARCHelper.openView selectedPath
 
                         match result with
                         | Ok loaded ->
                             console.log ("[Renderer] Received data, processing...")
-
-                            Renderer.Components.ARCHelper.applyLoadedView
-                                pageStateCtx.setState
-                                arcObjectCtx.setArcFileState
-                                arcObjectCtx.setPreviewState
-                                arcObjectCtx.setStatusMessage
-                                loaded
+                            Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
                         | Error errorMessage ->
                             let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
                             console.log ($"[Renderer] Error: {fullErrorMessage}")
-
-                            Renderer.Components.ARCHelper.applyViewError
-                                pageStateCtx.setState
-                                arcObjectCtx.setArcFileState
-                                arcObjectCtx.setPreviewState
-                                arcObjectCtx.setStatusMessage
-                                fullErrorMessage
+                            Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
             }
             |> Promise.start
 
@@ -484,6 +470,8 @@ type FileExplorer =
         let openCreateModal kind =
             setPendingCreateKind (Some kind)
 
+        let rootPath = fileTree |> Option.map (fun tree -> tree.path)
+
         let inlineCreateKindForItem item =
             match rootPath with
             | Some path -> tryGetInlineArcCreateKind path item
@@ -496,12 +484,7 @@ type FileExplorer =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
         let applyCreateError errorMessage =
-            Renderer.Components.ARCHelper.applyViewError
-                pageStateCtx.setState
-                arcObjectCtx.setArcFileState
-                arcObjectCtx.setPreviewState
-                arcObjectCtx.setStatusMessage
-                errorMessage
+            Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState errorMessage
 
         let createArcEntry kind (identifier: string) =
             let existingPaths =
@@ -511,16 +494,23 @@ type FileExplorer =
             | Error errorMessage -> applyCreateError errorMessage
             | Ok draft ->
                 fileStateCtx.setSelection (ArcSelection.forTreePath (Some draft.Path))
+                setPendingArcFileSave (Some draft.ArcFile)
+                pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage draft.ArcFile))
 
-                draft.ArcFile
-                |> Renderer.Components.ARCHelper.viewLoadResultOfArcFile
-                |> Renderer.Components.ARCHelper.applyLoadedView
-                    pageStateCtx.setState
-                    arcObjectCtx.setArcFileState
-                    arcObjectCtx.setPreviewState
-                    arcObjectCtx.setStatusMessage
+                promise {
+                    match! stagePendingArcFileSave (Some draft.ArcFile) with
+                    | Ok() -> ()
+                    | Error exn ->
+                        errorModal.enqueue (
+                            ErrorModalRequest.create (
+                                exn.Message,
+                                title = "Could not stage ARC file save",
+                                ?scopeId = arcScopeId
+                            )
+                        )
+                }
+                |> Promise.start
 
-                arcObjectCtx.setPendingArcFileSave (Some draft.ArcFile)
                 closeCreateModal ()
 
         let arcCreateContextMenuItems (item: FileItem) =
@@ -567,26 +557,21 @@ type FileExplorer =
                 submit = createArcEntry
             )
 
-        let arcName =
-            let fromRootItem = fileItem |> Option.map (fun root -> root.Name)
+        let arcNameFromRootItem (rootItem: FileItem) =
+            match rootItem.Path with
+            | Some path ->
+                let normalizedPath = normalizePath path
 
-            let fromRootPath =
-                rootPath
-                |> Option.bind (fun path ->
-                    let normalizedPath = normalizePath path
-                    if System.String.IsNullOrWhiteSpace normalizedPath then
-                        None
-                    else
-                        Some(getFileName normalizedPath)
-                )
-
-            fromRootPath
-            |> Option.orElse fromRootItem
-            |> Option.defaultValue "ARC"
+                if System.String.IsNullOrWhiteSpace normalizedPath then
+                    rootItem.Name
+                else
+                    getFileName normalizedPath
+            | None -> rootItem.Name
 
         match fileItem with
         | Some rootItem ->
             let visibleItems = rootItem.Children |> Option.defaultValue []
+            let arcName = arcNameFromRootItem rootItem
 
             React.Fragment [
                 Html.div [

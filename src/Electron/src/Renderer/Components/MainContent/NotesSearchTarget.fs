@@ -4,6 +4,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Swate.Components.NoteTypes
 
 [<ReactComponent>]
@@ -11,7 +12,6 @@ let NotesSearchTarget () =
 
     let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx()
     let fileTreeCtx = Renderer.Context.FileStateContext.useFileStateCtx()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx()
     let notes, setNotes = React.useState ([]: Note list)
 
     let isLoading, setIsLoading = React.useState true
@@ -25,12 +25,12 @@ let NotesSearchTarget () =
             setError None
 
             promise {
-                let! result = Api.ipcArcVaultApi.readNotes (unbox null)
+                let! result = Api.ipcArcVaultApi.readNotes ()
 
                 if not isDisposed then
                     match result with
                     | Ok nextNotes ->
-                        setNotes (nextNotes |> Array.toList)
+                        setNotes (nextNotes |> Array.map NoteSearchNoteDto.toNote |> Array.toList)
                         setIsLoading false
                     | Result.Error exn ->
                         setNotes []
@@ -47,7 +47,7 @@ let NotesSearchTarget () =
     let openNote (relativePath: string) =
         promise {
 
-            let! result = Api.ipcArcVaultApi.openFile (unbox null) relativePath
+            let! result = Api.ipcArcVaultApi.openFile relativePath
 
             match result with
             | Ok dto ->
@@ -56,20 +56,11 @@ let NotesSearchTarget () =
 
                 dto
                 |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                |> Renderer.Components.ARCHelper.applyLoadedView
-                    pageCtx.setState
-                    arcObjectCtx.setArcFileState
-                    arcObjectCtx.setPreviewState
-                    arcObjectCtx.setStatusMessage
+                |> Renderer.Components.ARCHelper.applyLoadedView pageCtx.setState
             | Result.Error exn ->
                 fileTreeCtx.setSelection (ArcSelection.clearExplorerNode fileTreeCtx.state.Selection)
 
-                Renderer.Components.ARCHelper.applyViewError
-                    pageCtx.setState
-                    arcObjectCtx.setArcFileState
-                    arcObjectCtx.setPreviewState
-                    arcObjectCtx.setStatusMessage
-                    $"Could not open note: {exn.Message}"
+                Renderer.Components.ARCHelper.applyViewError pageCtx.setState $"Could not open note: {exn.Message}"
         }
         |> Promise.start
 

@@ -21,7 +21,6 @@ let Main (leftSidebarTarget: LeftSidebarPage) =
         prop.children [|
             match leftSidebarTarget with
             | LeftSidebarPage.FileExplorer -> FileExplorerSidebar.Main()
-            | LeftSidebarPage.ArcObjectExplorer -> ArcObjectTreeSidebar.Main()
             | LeftSidebarPage.Git -> GitSidebarPanel.Main()
         |]
     ]

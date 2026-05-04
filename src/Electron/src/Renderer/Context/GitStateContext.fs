@@ -25,6 +25,7 @@ type GitStateController = {
     cloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<string, string>>
     commitSelection: GitSidebarCommitSelectionRequest -> unit
     commitAll: string -> unit
+    discardSelection: string[] -> unit
     confirmPendingRemoteAction: unit -> unit
     cancelPendingRemoteAction: unit -> unit
     saveLfsAutoTrackThreshold: int -> unit
@@ -66,7 +67,7 @@ module private Helper =
         initGitRepository = Renderer.GitApiClient.gitInitRepository
         createDataHubProject =
             fun projectName -> promise {
-                let! result = Api.ipcGitLabApi.createProject (unbox null) projectName
+                let! result = Api.ipcGitLabApi.createProject projectName
                 return result |> Result.mapError _.GitLabErrorToString
             }
         installGitLfs = Renderer.GitApiClient.installGitLfs
@@ -80,6 +81,7 @@ module private Helper =
         checkoutBranch = Renderer.GitApiClient.checkoutBranch
         gitStagePaths = Renderer.GitApiClient.gitStagePaths
         gitUnstagePaths = Renderer.GitApiClient.gitUnstagePaths
+        gitDiscardPaths = Renderer.GitApiClient.gitDiscardPaths
         gitCommit = Renderer.GitApiClient.gitCommit
         setGitLfsSettings = Renderer.GitApiClient.setGitLfsSettings
         confirmGitMergeResolution = Renderer.GitApiClient.confirmGitMergeResolution
@@ -101,6 +103,7 @@ let GitStateCtx =
             cloneRepository = fun _ -> promise { return Ok "" }
             commitSelection = fun _ -> ()
             commitAll = fun _ -> ()
+            discardSelection = fun _ -> ()
             confirmPendingRemoteAction = fun () -> ()
             cancelPendingRemoteAction = fun () -> ()
             saveLfsAutoTrackThreshold = fun _ -> ()
@@ -151,6 +154,9 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let commitAll (message: string) = dispatch (CommitAllRequested message)
 
+    let discardSelection (paths: string[]) =
+        dispatch (DiscardSelectionRequested paths)
+
     let confirmPendingRemoteAction () =
         dispatch ConfirmPendingRemoteActionRequested
 
@@ -175,7 +181,7 @@ let GitStateCtxProvider (children: ReactElement) =
     let confirmMergeResolutionAction request =
         dispatch (ConfirmMergeResolutionRequested request)
 
-    React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx.state)), [| box appStateCtx.state |])
+    React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx)), [| box appStateCtx |])
 
     let gitStateController: GitStateController =
         React.useMemo (
@@ -192,6 +198,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 cloneRepository = cloneRepository
                 commitSelection = commitSelection
                 commitAll = commitAll
+                discardSelection = discardSelection
                 confirmPendingRemoteAction = confirmPendingRemoteAction
                 cancelPendingRemoteAction = cancelPendingRemoteAction
                 saveLfsAutoTrackThreshold = saveLfsAutoTrackThreshold

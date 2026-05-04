@@ -3,7 +3,6 @@ namespace Swate.Components
 open System
 open Browser.Types
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 
 open Swate.Components.GitSidebarTypes
@@ -17,6 +16,12 @@ module private GitSidebarInternal =
         | Renamed
         | Untracked
         | Conflict
+
+    type ChangePresentation = {
+        Label: string
+        IconClassName: string
+        ToneClassName: string
+    }
 
     let hasConflicts (status: GitSidebarStatus) (changedFiles: GitSidebarChange[]) =
         status.IsMergeInProgress || (changedFiles |> Array.exists _.IsConflicted)
@@ -51,15 +56,36 @@ module private GitSidebarInternal =
 
     let changePresentation (change: GitSidebarChange) =
         match classifyChange change with
-        | GitChangeKind.Added -> "Added", "swt:badge swt:badge-success swt:badge-sm", "swt:fluent--add-24-regular"
-        | GitChangeKind.Modified -> "Modified", "swt:badge swt:badge-info swt:badge-sm", "swt:fluent--edit-24-regular"
-        | GitChangeKind.Deleted -> "Deleted", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--delete-24-regular"
-        | GitChangeKind.Renamed ->
-            "Renamed", "swt:badge swt:badge-warning swt:badge-sm", "swt:fluent--arrow-swap-24-regular"
-        | GitChangeKind.Untracked ->
-            "Untracked", "swt:badge swt:badge-neutral swt:badge-sm", "swt:fluent--document-24-regular"
-        | GitChangeKind.Conflict ->
-            "Conflict", "swt:badge swt:badge-error swt:badge-sm", "swt:fluent--warning-24-regular"
+        | GitChangeKind.Added -> {
+            Label = "Added"
+            IconClassName = "swt:fluent--add-24-regular"
+            ToneClassName = "swt:text-success"
+          }
+        | GitChangeKind.Modified -> {
+            Label = "Modified"
+            IconClassName = "swt:fluent--edit-24-regular"
+            ToneClassName = "swt:text-warning"
+          }
+        | GitChangeKind.Deleted -> {
+            Label = "Deleted"
+            IconClassName = "swt:fluent--delete-24-regular"
+            ToneClassName = "swt:text-error"
+          }
+        | GitChangeKind.Renamed -> {
+            Label = "Renamed"
+            IconClassName = "swt:fluent--arrow-swap-24-regular"
+            ToneClassName = "swt:text-info"
+          }
+        | GitChangeKind.Untracked -> {
+            Label = "Untracked"
+            IconClassName = "swt:fluent--add-24-regular"
+            ToneClassName = "swt:text-success"
+          }
+        | GitChangeKind.Conflict -> {
+            Label = "Conflict"
+            IconClassName = "swt:fluent--warning-24-regular"
+            ToneClassName = "swt:text-error"
+          }
 
     let branchKindLabel (kind: GitSidebarBranchKind) =
         match kind with
@@ -110,7 +136,6 @@ type private LfsSettingsSectionProps = {
     SetLfsThresholdInput: string -> unit
     CanSaveLfsThreshold: bool
     SubmitLfsThreshold: unit -> unit
-    ActiveAction: string option
 }
 
 type private AdvancedActionsProps = {
@@ -148,19 +173,20 @@ type private CommitSectionProps = {
 
 type private ChangedFilesListProps = {
     ChangedFiles: GitSidebarChange[]
-    SelectedFile: string option
     MarkedPaths: Set<string>
     IsBusy: bool
     UpdateMarkedSelection: GitSidebarChange -> bool -> bool -> unit
     OpenChange: GitSidebarChange -> unit
+    DiscardChanges: string[] -> unit
 }
 
 type private ChangedFileRowProps = {
     Change: GitSidebarChange
     Index: int
-    IsSelected: bool
     IsMarked: bool
     IsBusy: bool
+    DiscardPaths: string[]
+    DiscardChanges: string[] -> unit
     UpdateMarkedSelection: GitSidebarChange -> bool -> bool -> unit
     OpenChange: GitSidebarChange -> unit
     VirtualStart: int
@@ -177,7 +203,6 @@ type private ModalsProps = {
     BranchOptionsWithHead: (string option * string)[]
     SelectedStartPoint: string option
     SetSelectedStartPoint: string option -> unit
-    ActiveAction: string option
     SubmitCreateBranch: unit -> unit
     IsSwitchBranchModalOpen: bool
     SetSwitchBranchModalOpen: bool -> unit
@@ -216,17 +241,20 @@ type GitSidebar =
             match runStatus with
             | GitSidebarRunStatus.Progress progress ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             if busyTestId.IsSome then
                                 prop.testId busyTestId.Value
-                            prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-info swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4"
+                                    prop.className
+                                        "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
                                     prop.text (
                                         GitSidebarInternal.progressText progress
                                         |> function
@@ -240,17 +268,21 @@ type GitSidebar =
                 ]
             | GitSidebarRunStatus.Busy notice ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             if busyTestId.IsSome then
                                 prop.testId busyTestId.Value
-                            prop.className "swt:alert swt:alert-info swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-info swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span notice
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text notice
+                                ]
                             ]
                         ]
                     ]
@@ -260,17 +292,21 @@ type GitSidebar =
             match errorNotice with
             | Some message ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             if errorTestId.IsSome then
                                 prop.testId errorTestId.Value
-                            prop.className "swt:alert swt:alert-error swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-error swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span message
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text message
+                                ]
                             ]
                         ]
                     ]
@@ -280,17 +316,22 @@ type GitSidebar =
             match warningNotice with
             | Some message ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             if warningTestId.IsSome then
                                 prop.testId warningTestId.Value
-                            prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-warning swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                    prop.className
+                                        "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span message
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text message
+                                ]
                             ]
                         ]
                     ]
@@ -310,7 +351,7 @@ type GitSidebar =
         ) =
         Html.label [
             prop.className
-                "swt:flex swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3"
+                "swt:flex swt:min-w-0 swt:items-start swt:gap-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:px-3 swt:py-3 swt:@max-xs:px-2"
             prop.children [
                 Html.input [
                     if testId.IsSome then
@@ -325,13 +366,15 @@ type GitSidebar =
                     prop.className "swt:flex swt:min-w-0 swt:flex-col"
                     prop.children [
                         Html.span [
-                            prop.className "swt:text-sm swt:font-medium"
+                            prop.className
+                                "swt:min-w-0 swt:break-words swt:text-sm swt:font-medium swt:[overflow-wrap:anywhere]"
                             prop.text (defaultArg label "Download Large Files")
                         ]
                         match description with
                         | Some text ->
                             Html.span [
-                                prop.className "swt:text-xs swt:text-base-content/70"
+                                prop.className
+                                    "swt:min-w-0 swt:break-words swt:text-xs swt:text-base-content/70 swt:[overflow-wrap:anywhere]"
                                 prop.text text
                             ]
                         | None -> Html.none
@@ -344,13 +387,16 @@ type GitSidebar =
     static member private SectionHeader(title: string, countText: string option) =
         Html.div [
             prop.className
-                "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
+                "swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60 swt:@max-xs:px-2 swt:@max-xs:tracking-[0.12em]"
             prop.children [
-                Html.span title
+                Html.span [
+                    prop.className "swt:min-w-0 swt:truncate"
+                    prop.text title
+                ]
                 match countText with
                 | Some value ->
                     Html.span [
-                        prop.className "swt:text-[0.65rem] swt:text-base-content/50"
+                        prop.className "swt:shrink-0 swt:text-[0.65rem] swt:text-base-content/50"
                         prop.text value
                     ]
                 | None -> Html.none
@@ -358,28 +404,70 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
-    static member private ActionButton
-        (label: string, iconClassName: string, isBusy: bool, onClick: unit -> unit, ?isActive: bool, ?testId: string)
+    static member private Tooltip
+        (label: string, children: ReactElement, ?placementClassName: string, ?testId: string, ?className: string)
         =
+        Html.div [
+            if testId.IsSome then
+                prop.testId testId.Value
+
+            prop.className [
+                "swt:tooltip"
+                placementClassName |> Option.defaultValue "swt:tooltip-left"
+                yield! Option.toList className
+            ]
+            prop.ariaLabel label
+            prop.children [
+                Html.div [
+                    prop.className "swt:tooltip-content swt:max-w-64 swt:text-xs swt:text-left swt:whitespace-pre-line"
+                    prop.text label
+                ]
+                children
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private ActionButton
+        (
+            label: string,
+            iconClassName: string,
+            isBusy: bool,
+            onClick: unit -> unit,
+            ?isActive: bool,
+            ?testId: string,
+            ?tooltipText: string
+        ) =
         let isActive = defaultArg isActive false
+        let titleText = defaultArg tooltipText label
 
         Html.button [
             if testId.IsSome then
                 prop.testId testId.Value
+
             prop.className [
-                "swt:btn swt:btn-sm swt:justify-start swt:gap-2 swt:normal-case"
+                "swt:btn swt:btn-sm swt:w-full swt:min-w-0 swt:justify-start swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case"
+                "swt:@max-2xs/gitSidebar:gap-1 swt:@max-3xs/gitSidebar:justify-center swt:@max-3xs/gitSidebar:gap-0 swt:@max-3xs/gitSidebar:px-0"
                 if isActive then
                     "swt:btn-primary"
                 else
                     "swt:bg-base-100 swt:border-base-300"
             ]
             prop.disabled isBusy
+            prop.ariaLabel label
+            prop.title titleText
             prop.onClick (fun _ -> onClick ())
             prop.children [
                 Html.span [
-                    prop.className [ "swt:iconify"; iconClassName; "swt:size-4" ]
+                    prop.className [ "swt:iconify"; iconClassName; "swt:size-4 swt:shrink-0" ]
                 ]
-                Html.span label
+                Html.span [
+                    if testId.IsSome then
+                        prop.testId (testId.Value + "Label")
+
+                    prop.className
+                        "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left swt:@max-3xs/gitSidebar:sr-only"
+                    prop.text label
+                ]
             ]
         ]
 
@@ -388,23 +476,23 @@ type GitSidebar =
         React.Fragment [
             Html.div [
                 prop.className
-                    "swt:flex swt:items-center swt:justify-between swt:border-b swt:border-base-content/10 swt:px-3 swt:py-3"
+                    "swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2 swt:border-b swt:border-base-content/10 swt:px-3 swt:py-3 swt:@max-xs:px-2"
                 prop.children [
                     Html.div [
-                        prop.className "swt:flex swt:items-center swt:gap-2"
+                        prop.className "swt:flex swt:min-w-0 swt:items-center swt:gap-2"
                         prop.children [
                             Html.span [
-                                prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5"
+                                prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5 swt:shrink-0"
                             ]
                             Html.div [
-                                prop.className "swt:flex swt:flex-col"
+                                prop.className "swt:flex swt:min-w-0 swt:flex-col"
                                 prop.children [
                                     Html.span [
-                                        prop.className "swt:text-sm swt:font-semibold"
+                                        prop.className "swt:truncate swt:text-sm swt:font-semibold"
                                         prop.text "Source Control"
                                     ]
                                     Html.span [
-                                        prop.className "swt:text-xs swt:text-base-content/60"
+                                        prop.className "swt:truncate swt:text-xs swt:text-base-content/60"
                                         prop.text (
                                             match props.Status.CurrentBranch with
                                             | Some branch -> branch
@@ -417,7 +505,7 @@ type GitSidebar =
                     ]
                     Html.button [
                         prop.testId "GitSidebarRefreshButton"
-                        prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm"
+                        prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm swt:shrink-0"
                         prop.disabled props.IsBusy
                         prop.title "Refresh git status"
                         prop.onClick (fun _ -> props.OnRefresh())
@@ -430,11 +518,11 @@ type GitSidebar =
                 ]
             ]
             Html.div [
-                prop.className "swt:px-3 swt:pt-3"
+                prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                 prop.children [
                     Html.div [
                         prop.className
-                            "swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-200/60 swt:p-3"
+                            "swt:min-w-0 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-200/60 swt:p-3 swt:@max-xs:p-2"
                         prop.children [
                             Html.div [
                                 prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
@@ -468,12 +556,16 @@ type GitSidebar =
                             | Some trackingBranch ->
                                 Html.div [
                                     prop.className
-                                        "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
+                                        "swt:mt-2 swt:flex swt:min-w-0 swt:items-start swt:gap-2 swt:text-xs swt:text-base-content/70"
                                     prop.children [
                                         Html.span [
-                                            prop.className "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4"
+                                            prop.className
+                                                "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
                                         ]
-                                        Html.span $"Tracking {trackingBranch}"
+                                        Html.span [
+                                            prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                            prop.text $"Tracking {trackingBranch}"
+                                        ]
                                     ]
                                 ]
                             | None ->
@@ -481,14 +573,18 @@ type GitSidebar =
                                 | Some currentBranch ->
                                     Html.div [
                                         prop.className
-                                            "swt:mt-2 swt:flex swt:items-center swt:gap-2 swt:text-xs swt:text-base-content/70"
+                                            "swt:mt-2 swt:flex swt:min-w-0 swt:items-start swt:gap-2 swt:text-xs swt:text-base-content/70"
                                         prop.children [
                                             Html.span [
                                                 prop.className
-                                                    "swt:iconify swt:fluent--branch-request-20-regular swt:size-4"
+                                                    "swt:iconify swt:fluent--branch-request-20-regular swt:size-4 swt:shrink-0"
                                             ]
-                                            Html.span
-                                                $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                            Html.span [
+                                                prop.className
+                                                    "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                                prop.text
+                                                    $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
+                                            ]
                                         ]
                                     ]
                                 | None -> Html.none
@@ -501,22 +597,25 @@ type GitSidebar =
     [<ReactComponent>]
     static member private LfsSettingsSection(props: LfsSettingsSectionProps) =
         Html.div [
-            prop.className "swt:mt-3 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3"
+            prop.className
+                "swt:mt-3 swt:min-w-0 swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:p-3 swt:@max-xs:p-2"
             prop.children [
                 Html.div [
-                    prop.className "swt:flex swt:items-center swt:gap-2"
+                    prop.className "swt:flex swt:min-w-0 swt:items-center swt:gap-2"
                     prop.children [
                         Html.span [
-                            prop.className "swt:iconify swt:fluent--document-arrow-right-24-regular swt:size-4"
+                            prop.className
+                                "swt:iconify swt:fluent--document-arrow-right-24-regular swt:size-4 swt:shrink-0"
                         ]
                         Html.span [
-                            prop.className "swt:text-sm swt:font-medium"
+                            prop.className "swt:min-w-0 swt:truncate swt:text-sm swt:font-medium"
                             prop.text "Git LFS auto-track threshold"
                         ]
                     ]
                 ]
                 Html.p [
-                    prop.className "swt:mt-2 swt:text-xs swt:text-base-content/70"
+                    prop.className
+                        "swt:mt-2 swt:break-words swt:text-xs swt:text-base-content/70 swt:[overflow-wrap:anywhere]"
                     prop.text
                         "Files larger than this limit are automatically re-staged through Git LFS during save operations."
                 ]
@@ -524,7 +623,8 @@ type GitSidebar =
                     prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"
                     prop.children [
                         Html.label [
-                            prop.className "swt:flex swt:min-w-[10rem] swt:flex-1 swt:flex-col swt:gap-2"
+                            prop.className
+                                "swt:flex swt:min-w-[10rem] swt:flex-1 swt:flex-col swt:gap-2 swt:@max-xs:min-w-0"
                             prop.children [
                                 Html.span [
                                     prop.className "swt:text-xs swt:font-medium swt:text-base-content/70"
@@ -532,7 +632,7 @@ type GitSidebar =
                                 ]
                                 Html.input [
                                     prop.testId "GitSidebarLfsThresholdInput"
-                                    prop.className "swt:input swt:input-bordered swt:w-full"
+                                    prop.className "swt:input swt:input-bordered swt:w-full swt:min-w-0"
                                     prop.type'.number
                                     prop.custom ("step", "1")
                                     prop.custom ("min", "1")
@@ -545,25 +645,26 @@ type GitSidebar =
                         ]
                         Html.button [
                             prop.testId "GitSidebarLfsThresholdSaveButton"
-                            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:normal-case"
+                            prop.className
+                                "swt:btn swt:btn-sm swt:btn-outline swt:min-w-0 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case swt:@max-xs:justify-center swt:@max-xs:gap-0"
                             prop.disabled (not props.CanSaveLfsThreshold)
+                            prop.title "Save Threshold"
                             prop.onClick (fun _ -> props.SubmitLfsThreshold())
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4"
+                                    prop.className "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span (
-                                    if props.ActiveAction = Some "Save Git LFS Threshold" then
-                                        "Saving..."
-                                    else
-                                        "Save Threshold"
-                                )
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:truncate swt:@max-xs:sr-only"
+                                    prop.text "Save Threshold"
+                                ]
                             ]
                         ]
                     ]
                 ]
                 Html.div [
-                    prop.className "swt:mt-2 swt:text-xs swt:text-base-content/60"
+                    prop.className
+                        "swt:mt-2 swt:break-words swt:text-xs swt:text-base-content/60 swt:[overflow-wrap:anywhere]"
                     prop.text "Threshold setting: 1-100 MB. This does not cap LFS-tracked file size."
                 ]
             ]
@@ -575,14 +676,15 @@ type GitSidebar =
             GitSidebar.SectionHeader("Actions", None)
 
             Html.div [
-                prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3"
+                prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:px-3 swt:@max-xs:gap-1 swt:@max-xs:px-2"
                 prop.children [
                     GitSidebar.ActionButton(
                         "Update ARC from Online",
                         "swt:fluent--arrow-sync-24-regular",
                         props.IsBusy || not props.RemoteActionsEnabled,
                         props.SubmitUpdateFromOnline,
-                        testId = "GitSidebarUpdateArcButton"
+                        testId = "GitSidebarUpdateArcButton",
+                        tooltipText = "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin"
                     )
                     GitSidebar.ActionButton(
                         "More Git Actions",
@@ -601,16 +703,21 @@ type GitSidebar =
             match props.RemoteActionsWarning with
             | Some warning when not props.RemoteActionsEnabled ->
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             prop.testId "GitSidebarRemoteAuthWarning"
-                            prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                            prop.className
+                                "swt:alert swt:alert-warning swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                    prop.className
+                                        "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                 ]
-                                Html.span warning
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text warning
+                                ]
                             ]
                         ]
                     ]
@@ -619,49 +726,54 @@ type GitSidebar =
 
             if props.IsAdvancedActionsOpen then
                 Html.div [
-                    prop.className "swt:px-3 swt:pt-3"
+                    prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
                         Html.div [
                             prop.testId "GitSidebarAdvancedActionsDivider"
                             prop.className "swt:mb-3 swt:border-t swt:border-base-content/10"
                         ]
                         Html.div [
-                            prop.className "swt:grid swt:grid-cols-2 swt:gap-2"
+                            prop.className "swt:grid swt:grid-cols-2 swt:gap-2 swt:@max-xs:gap-1"
                             prop.children [
                                 GitSidebar.ActionButton(
                                     "Check for Changes",
                                     "swt:fluent--arrow-download-24-regular",
                                     props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitFetch,
-                                    testId = "GitSidebarFetchButton"
+                                    testId = "GitSidebarFetchButton",
+                                    tooltipText = "Check for Changes:\n- git fetch origin"
                                 )
                                 GitSidebar.ActionButton(
                                     "Download Changes",
                                     "swt:fluent--arrow-down-24-regular",
                                     props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitPull,
-                                    testId = "GitSidebarPullButton"
+                                    testId = "GitSidebarPullButton",
+                                    tooltipText = "Download Changes:\n- git pull origin"
                                 )
                                 GitSidebar.ActionButton(
                                     "Upload Changes",
                                     "swt:fluent--arrow-up-24-regular",
                                     props.IsBusy || not props.RemoteActionsEnabled,
                                     props.SubmitPush,
-                                    testId = "GitSidebarPushButton"
+                                    testId = "GitSidebarPushButton",
+                                    tooltipText = "Upload Changes:\n- git push origin"
                                 )
                                 GitSidebar.ActionButton(
                                     "Create Work Copy",
                                     "swt:fluent--branch-fork-24-regular",
                                     props.IsBusy,
                                     props.OpenCreateBranchModal,
-                                    testId = "GitSidebarCreateBranchButton"
+                                    testId = "GitSidebarCreateBranchButton",
+                                    tooltipText = "Create Work Copy:\n- git checkout -b <name>"
                                 )
                                 GitSidebar.ActionButton(
                                     "Switch To Work Copy",
                                     "swt:fluent--arrow-swap-24-regular",
                                     props.IsBusy || not props.CanSwitchBranch,
                                     props.OpenSwitchBranchModal,
-                                    testId = "GitSidebarSwitchBranchButton"
+                                    testId = "GitSidebarSwitchBranchButton",
+                                    tooltipText = "Switch To Work Copy:\n- git checkout <branch>"
                                 )
                             ]
                         ]
@@ -691,7 +803,8 @@ type GitSidebar =
                 React.Fragment [
                     Popover.Trigger(
                         Html.span "?",
-                        className = "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-6 swt:w-6 swt:px-0 swt:text-xs swt:font-bold",
+                        className =
+                            "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-6 swt:w-6 swt:px-0 swt:text-xs swt:font-bold",
                         props = [ prop.testId "GitSidebarSaveOptionsHelpButton" ]
                     )
                     Popover.Content(
@@ -734,22 +847,19 @@ type GitSidebar =
                 "Add and commit all Changes"
 
         React.Fragment [
-            Html.div [
-                prop.className
-                    "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:px-3 swt:pt-3 swt:text-xs swt:font-semibold swt:uppercase swt:tracking-[0.2em] swt:text-base-content/60"
-                prop.children [ Html.span "Save" ]
-            ]
+            GitSidebar.SectionHeader("Save", None)
 
             Html.div [
                 prop.testId "GitSidebarCommitSection"
-                prop.className "swt:px-3 swt:pb-3"
+                prop.className "swt:px-3 swt:pb-3 swt:@max-xs:px-2"
                 prop.children [
                     Html.label [
                         prop.className "swt:flex swt:flex-col swt:gap-2"
                         prop.children [
                             Html.textarea [
                                 prop.testId "GitSidebarCommitMessageInput"
-                                prop.className "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:resize-y"
+                                prop.className
+                                    "swt:textarea swt:textarea-bordered swt:min-h-24 swt:w-full swt:min-w-0 swt:resize-y swt:@max-xs:text-sm"
                                 prop.disabled (not props.CanEditCommit)
                                 prop.value props.CommitMessage
                                 prop.placeholder (
@@ -766,54 +876,70 @@ type GitSidebar =
                     ]
                     Html.div [
                         prop.className
-                            "swt:mt-2 swt:flex swt:items-center swt:justify-between swt:gap-3 swt:text-xs swt:text-base-content/60"
+                            "swt:mt-2 swt:flex swt:min-w-0 swt:flex-wrap swt:items-center swt:justify-between swt:gap-2 swt:text-xs swt:text-base-content/60"
                         prop.children [
-                            Html.span (
-                                if props.MarkedCount = 1 then
-                                    "1 file marked to save"
-                                else
-                                    $"{props.MarkedCount} files marked to save"
-                            )
+                            Html.span [
+                                prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                prop.text (
+                                    if props.MarkedCount = 1 then
+                                        "1 file marked to save"
+                                    else
+                                        $"{props.MarkedCount} files marked to save"
+                                )
+                            ]
                             if not props.CanEditCommit && props.HasConflicts then
-                                Html.span "Saving files is disabled while conflicts remain."
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text "Saving files is disabled while conflicts remain."
+                                ]
                             elif not props.CanEditCommit && props.Status.IsClean then
-                                Html.span "No changes available to save."
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.text "No changes available to save."
+                                ]
                             else
                                 Html.none
                         ]
                     ]
                     Html.div [
-                        prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2"
+                        prop.className "swt:mt-3 swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2"
                         prop.children [
                             Html.div [
                                 prop.ref saveMenuRef
-                                prop.className "swt:relative swt:inline-flex"
+                                prop.className "swt:relative swt:inline-flex swt:min-w-0 swt:flex-1"
                                 prop.children [
                                     Html.div [
-                                        prop.className "swt:join"
+                                        prop.className "swt:join swt:flex swt:min-w-0 swt:flex-1"
                                         prop.children [
                                             Html.button [
                                                 prop.testId "GitSidebarPrimarySaveButton"
-                                                prop.className "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:gap-2 swt:normal-case"
+                                                prop.className
+                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:min-w-0 swt:flex-1 swt:gap-2 swt:overflow-hidden swt:px-2 swt:normal-case swt:@max-xs:justify-center swt:@max-xs:gap-0"
                                                 prop.disabled (not props.CanRunPrimarySave)
+                                                prop.title primarySaveLabel
                                                 prop.onClick (fun _ -> props.SubmitPrimarySave())
                                                 prop.children [
                                                     Html.span [
                                                         prop.className
-                                                            "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4"
+                                                            "swt:iconify swt:fluent--checkmark-circle-24-regular swt:size-4 swt:shrink-0"
                                                     ]
-                                                    Html.span primarySaveLabel
+                                                    Html.span [
+                                                        prop.className "swt:min-w-0 swt:truncate swt:@max-xs:sr-only"
+                                                        prop.text primarySaveLabel
+                                                    ]
                                                 ]
                                             ]
                                             Html.button [
                                                 prop.testId "GitSidebarSaveOptionsButton"
                                                 prop.className
-                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:min-w-0 swt:px-2"
+                                                    "swt:btn swt:join-item swt:btn-sm swt:btn-success swt:shrink-0 swt:px-2"
                                                 prop.disabled (not props.CanRunPrimarySave)
+                                                prop.title "Save options"
                                                 prop.onClick (fun _ -> setSaveMenuOpen (not isSaveMenuOpen))
                                                 prop.children [
                                                     Html.span [
-                                                        prop.className "swt:iconify swt:fluent--chevron-down-24-regular swt:size-4"
+                                                        prop.className
+                                                            "swt:iconify swt:fluent--chevron-down-24-regular swt:size-4 swt:shrink-0"
                                                     ]
                                                 ]
                                             ]
@@ -831,7 +957,8 @@ type GitSidebar =
                                                     prop.children [
                                                         Html.button [
                                                             prop.testId "GitSidebarLocalCommitButton"
-                                                            prop.className "swt:items-start swt:gap-2 swt:whitespace-normal swt:text-left"
+                                                            prop.className
+                                                                "swt:items-start swt:gap-2 swt:whitespace-normal swt:text-left"
                                                             prop.onClick (fun _ -> props.SubmitLocalCommit())
                                                             prop.children [
                                                                 Html.span [
@@ -839,7 +966,8 @@ type GitSidebar =
                                                                         "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
                                                                 ]
                                                                 Html.span [
-                                                                    prop.className "swt:min-w-0 swt:break-words"
+                                                                    prop.className
+                                                                        "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
                                                                     prop.text localCommitLabel
                                                                 ]
                                                             ]
@@ -851,7 +979,7 @@ type GitSidebar =
                                 ]
                             ]
                             Html.div [
-                                prop.className "swt:ml-auto"
+                                prop.className "swt:shrink-0"
                                 prop.children [ GitSidebar.SaveOptionsHelpPopover() ]
                             ]
                         ]
@@ -861,56 +989,32 @@ type GitSidebar =
         ]
 
     [<ReactComponent>]
-    static member private ChangeStatusPopover(index: int, change: GitSidebarChange) =
-        let label, _, iconClass = GitSidebarInternal.changePresentation change
+    static member private ChangeStatusTooltip(index: int, change: GitSidebarChange) =
+        let presentation = GitSidebarInternal.changePresentation change
         let gitReturn = GitSidebarInternal.describeChange change
-        let stopRowActivation (event: Event) = event.stopPropagation ()
+        let tooltipText = $"{presentation.Label}:\n- {gitReturn}"
+        let stopRowActivation (event: MouseEvent) = event.stopPropagation ()
 
-        let triggerInteractionProps =
-            createObj [
-                "onClick" ==> stopRowActivation
-                "onMouseDown" ==> stopRowActivation
-                "onKeyDown" ==> stopRowActivation
+        Html.span [
+            prop.testId $"GitSidebarChangeStatusIcon-{index}"
+            prop.className [
+                "swt:iconify swt:size-4 swt:shrink-0"
+                presentation.IconClassName
+                presentation.ToneClassName
             ]
-
-        Popover.Popover(
-            debug = $"git_change_status_{index}",
-            children =
-                React.Fragment [
-                    Popover.Trigger(
-                        Html.span [ prop.className $"swt:iconify {iconClass} swt:size-4" ],
-                        className = "swt:btn swt:btn-ghost swt:btn-xs swt:min-h-0 swt:h-7 swt:w-7 swt:px-0",
-                        interactionProps = triggerInteractionProps,
-                        props = [ prop.testId $"GitSidebarChangeStatusButton-{index}" ]
-                    )
-                    Popover.Content(
-                        children =
-                            Html.div [
-                                prop.className "swt:flex swt:flex-col swt:gap-2"
-                                prop.children [
-                                    Popover.Heading(Html.text "File status")
-                                    Html.p [
-                                        prop.className "swt:text-sm"
-                                        prop.text $"This file was {label.ToLowerInvariant()}."
-                                    ]
-                                    Html.p [
-                                        prop.className "swt:text-sm swt:font-mono"
-                                        prop.text $"Git return: {gitReturn}"
-                                    ]
-                                ]
-                            ]
-                    )
-                ]
-        )
+            prop.title tooltipText
+            prop.ariaLabel tooltipText
+            prop.onMouseDown stopRowActivation
+            prop.onClick stopRowActivation
+        ]
 
     [<ReactComponent>]
     static member private ChangedFileRow(props: ChangedFileRowProps) =
         let change = props.Change
 
         let activateRow ctrlKey shiftKey =
-            if not props.IsBusy then
-                props.UpdateMarkedSelection change ctrlKey shiftKey
-                props.OpenChange change
+            props.UpdateMarkedSelection change ctrlKey shiftKey
+            props.OpenChange change
 
         Html.div [
             prop.role "listitem"
@@ -928,18 +1032,12 @@ type GitSidebar =
                     prop.testId $"GitSidebarChangeRow-{props.Index}"
                     prop.custom ("data-index", props.Index)
                     prop.role "button"
-                    prop.tabIndex (if props.IsBusy then -1 else 0)
-                    prop.custom ("aria-disabled", if props.IsBusy then "true" else "false")
+                    prop.tabIndex 0
                     prop.className [
-                        "swt:flex swt:w-full swt:items-start swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:py-1.5 swt:text-left swt:transition-colors swt:select-none"
-                        if props.IsBusy then
-                            "swt:cursor-not-allowed swt:opacity-60"
-                        else
-                            "swt:cursor-pointer"
+                        "swt:group swt:flex swt:min-h-6 swt:w-full swt:min-w-0 swt:items-center swt:gap-2 swt:rounded-box swt:border swt:px-2 swt:text-left swt:transition-colors swt:select-none swt:@max-xs:gap-1.5"
+                        "swt:cursor-pointer"
                         if change.IsConflicted then
                             "swt:border-error/40 swt:bg-error/5 hover:swt:bg-error/10"
-                        elif props.IsSelected then
-                            "swt:border-primary/40 swt:bg-primary/5 hover:swt:bg-primary/10"
                         elif props.IsMarked then
                             "swt:border-success/40 swt:bg-success/10 hover:swt:bg-success/15"
                         else
@@ -961,13 +1059,15 @@ type GitSidebar =
                                     prop.className "swt:min-w-0"
                                     prop.children [
                                         Html.span [
-                                            prop.className "swt:block swt:break-words swt:text-sm swt:font-medium"
+                                            prop.className
+                                                "swt:block swt:min-w-0 swt:truncate swt:text-sm swt:font-medium swt:@max-xs:text-xs"
                                             prop.text change.Path
                                         ]
                                         match change.OriginalPath with
                                         | Some originalPath ->
                                             Html.div [
-                                                prop.className "swt:mt-0.5 swt:text-xs swt:text-base-content/60"
+                                                prop.className
+                                                    "swt:mt-0.5 swt:truncate swt:text-xs swt:text-base-content/60"
                                                 prop.text $"Renamed from {originalPath}"
                                             ]
                                         | None -> Html.none
@@ -977,8 +1077,38 @@ type GitSidebar =
                         ]
                         Html.div [
                             prop.testId $"GitSidebarChangeStatusSlot-{props.Index}"
-                            prop.className "swt:ml-auto swt:shrink-0 swt:self-start"
-                            prop.children [ GitSidebar.ChangeStatusPopover(props.Index, change) ]
+                            prop.className
+                                "swt:ml-auto swt:flex swt:shrink-0 swt:items-center swt:gap-1 swt:self-center"
+                            prop.children [
+                                let discardLabel =
+                                    if props.DiscardPaths.Length = 1 then
+                                        "Discard change"
+                                    else
+                                        $"Discard {props.DiscardPaths.Length} selected changes"
+
+                                Html.button [
+                                    prop.testId $"GitSidebarDiscardChangeButton-{props.Index}"
+                                    prop.type'.button
+                                    prop.className
+                                        "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
+                                    prop.ariaLabel discardLabel
+                                    prop.title discardLabel
+                                    prop.disabled props.IsBusy
+                                    prop.onClick (fun (event: MouseEvent) ->
+                                        event.preventDefault ()
+                                        event.stopPropagation ()
+                                        props.DiscardChanges props.DiscardPaths
+                                    )
+                                    prop.children [
+                                        Html.span [
+                                            prop.className
+                                                "swt:iconify swt:fluent--arrow-undo-24-regular swt:size-4 swt:text-error"
+                                        ]
+                                    ]
+                                ]
+
+                                GitSidebar.ChangeStatusTooltip(props.Index, change)
+                            ]
                         ]
                     ]
                 ]
@@ -988,9 +1118,18 @@ type GitSidebar =
     [<ReactComponent>]
     static member private ChangedFilesList(props: ChangedFilesListProps) =
         let scrollContainerRef: IRefValue<HTMLElement option> = React.useElementRef ()
-        let itemSize = 64
+        let itemSize = 28
         let itemGap = 4
         let overscan = 8
+
+        let discardPathsForChange (change: GitSidebarChange) =
+            if
+                Set.contains change.Path props.MarkedPaths
+                && not (Set.isEmpty props.MarkedPaths)
+            then
+                props.MarkedPaths |> Set.toArray |> Array.sort
+            else
+                [| change.Path |]
 
         let changedFileListVirtualizer =
             Virtual.useVirtualizer (
@@ -1041,19 +1180,20 @@ type GitSidebar =
                 prop.role "region"
                 prop.ariaLabel "Changed files"
                 prop.ref scrollContainerRef
-                prop.className "swt:min-h-0 swt:flex-1 swt:overflow-y-auto swt:px-2 swt:pb-2"
+                prop.className
+                    "swt:min-h-0 swt:min-w-0 swt:flex-1 swt:overflow-y-auto swt:overflow-x-hidden swt:px-2 swt:pb-2 swt:@max-xs:px-1"
                 prop.children [
                     if props.ChangedFiles.Length = 0 then
                         Html.div [
                             prop.className
-                                "swt:mt-2 swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60"
+                                "swt:mt-2 swt:min-w-0 swt:break-words swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60 swt:[overflow-wrap:anywhere] swt:@max-xs:px-2"
                             prop.text "No changed files. Your repository is in sync."
                         ]
                     else
                         Html.div [
                             prop.testId "GitSidebarChangedFilesVirtualContent"
                             prop.role "list"
-                            prop.className "swt:relative swt:mt-1"
+                            prop.className "swt:relative swt:mt-1 swt:min-w-0"
                             prop.style [
                                 style.height (changedFileListVirtualizer.getTotalSize ())
                             ]
@@ -1061,13 +1201,8 @@ type GitSidebar =
                                 for virtualItem in virtualItems do
                                     let change = props.ChangedFiles.[virtualItem.Index]
 
-                                    let isSelected =
-                                        props.SelectedFile
-                                        |> Option.exists (fun selected ->
-                                            String.Equals(selected, change.Path, StringComparison.Ordinal)
-                                        )
-
                                     let isMarked = Set.contains change.Path props.MarkedPaths
+                                    let discardPaths = discardPathsForChange change
 
                                     React.KeyedFragment(
                                         change.Path,
@@ -1076,9 +1211,10 @@ type GitSidebar =
                                                 {
                                                     Change = change
                                                     Index = virtualItem.Index
-                                                    IsSelected = isSelected
                                                     IsMarked = isMarked
                                                     IsBusy = props.IsBusy
+                                                    DiscardPaths = discardPaths
+                                                    DiscardChanges = props.DiscardChanges
                                                     UpdateMarkedSelection = props.UpdateMarkedSelection
                                                     OpenChange = props.OpenChange
                                                     VirtualStart = virtualItem.Start
@@ -1157,20 +1293,13 @@ type GitSidebar =
                     React.Fragment [
                         Html.button [
                             prop.className "swt:btn swt:btn-ghost"
-                            prop.disabled props.ActiveAction.IsSome
                             prop.text "Cancel"
                             prop.onClick (fun _ -> props.CloseDialog())
                         ]
                         Html.button [
                             prop.testId "GitSidebarCreateBranchSubmit"
                             prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                            prop.disabled props.ActiveAction.IsSome
-                            prop.text (
-                                if props.ActiveAction = Some "Create Branch From" then
-                                    "Creating..."
-                                else
-                                    "Create Branch"
-                            )
+                            prop.text "Create Branch"
                             prop.onClick (fun _ -> props.SubmitCreateBranch())
                         ]
                     ]
@@ -1209,7 +1338,8 @@ type GitSidebar =
                                                 Html.option [
                                                     prop.key branch.RefName
                                                     prop.value branch.RefName
-                                                    prop.text $"{branch.DisplayLabel} ({GitSidebarInternal.branchKindLabel branch.Kind})"
+                                                    prop.text
+                                                        $"{branch.DisplayLabel} ({GitSidebarInternal.branchKindLabel branch.Kind})"
                                                 ]
                                         ]
                                     ]
@@ -1221,20 +1351,14 @@ type GitSidebar =
                     React.Fragment [
                         Html.button [
                             prop.className "swt:btn swt:btn-ghost"
-                            prop.disabled props.ActiveAction.IsSome
                             prop.text "Cancel"
                             prop.onClick (fun _ -> props.CloseDialog())
                         ]
                         Html.button [
                             prop.testId "GitSidebarSwitchBranchSubmit"
                             prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                            prop.disabled (props.ActiveAction.IsSome || props.BranchOptionsForSwitch.Length = 0)
-                            prop.text (
-                                if props.ActiveAction = Some "Switch Branch" then
-                                    "Switching..."
-                                else
-                                    "Switch Branch"
-                            )
+                            prop.disabled (props.BranchOptionsForSwitch.Length = 0)
+                            prop.text "Switch Branch"
                             prop.onClick (fun _ -> props.SubmitSwitchBranch())
                         ]
                     ]
@@ -1318,7 +1442,7 @@ type GitSidebar =
         let pendingConfirmation = pendingConfirmation
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
-        let selectedFile = selectedFile
+        let _selectedFileForCompatibility = selectedFile
         let onRefresh = callbacks.OnRefresh
         let onFetch = callbacks.OnFetch
         let onPull = callbacks.OnPull
@@ -1328,6 +1452,7 @@ type GitSidebar =
         let onPrimarySaveAll = callbacks.OnPrimarySaveAll
         let onCommitSelection = callbacks.OnCommitSelection
         let onCommitAll = callbacks.OnCommitAll
+        let onDiscardSelection = callbacks.OnDiscardSelection
         let onConfirmPendingRemoteAction = callbacks.OnConfirmPendingRemoteAction
         let onCancelPendingRemoteAction = callbacks.OnCancelPendingRemoteAction
         let onSaveDownloadLargeFiles = callbacks.OnSaveDownloadLargeFiles
@@ -1337,7 +1462,6 @@ type GitSidebar =
         let onSelectChange = callbacks.OnSelectChange
 
         let localError, setLocalError = React.useState (None: string option)
-        let activeAction, setActiveAction = React.useState (None: string option)
         let activeDialog, setActiveDialog = React.useState ActiveDialog.None
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
@@ -1380,11 +1504,10 @@ type GitSidebar =
             )
 
         let isBusy =
-            activeAction.IsSome
-            || match runStatus with
-               | GitSidebarRunStatus.Idle -> false
-               | GitSidebarRunStatus.Busy _
-               | GitSidebarRunStatus.Progress _ -> true
+            match runStatus with
+            | GitSidebarRunStatus.Idle -> false
+            | GitSidebarRunStatus.Busy _
+            | GitSidebarRunStatus.Progress _ -> true
 
         let visibleError = errorNotice |> Option.orElse localError
 
@@ -1443,24 +1566,19 @@ type GitSidebar =
                 )
 
         let branchOptionsForSwitch =
-            branchOptions
-            |> Array.filter (fun branch -> not branch.IsCurrent)
+            branchOptions |> Array.filter (fun branch -> not branch.IsCurrent)
 
         let canSwitchBranch = branchOptionsForSwitch.Length > 0
 
         let runSelectChangeAction (change: GitSidebarChange) =
             promise {
                 setLocalError None
-                setActiveAction (Some $"Open {change.Path}")
 
-                try
-                    let! result = onSelectChange change
+                let! result = onSelectChange change
 
-                    match result with
-                    | Ok() -> ()
-                    | Error message -> setLocalError (Some message)
-                finally
-                    setActiveAction None
+                match result with
+                | Ok() -> ()
+                | Error message -> setLocalError (Some message)
             }
             |> Promise.start
 
@@ -1480,8 +1598,7 @@ type GitSidebar =
         let openSwitchBranchModal () =
             setLocalError None
 
-            let defaultBranch =
-                branchOptionsForSwitch |> Array.tryHead |> Option.map _.RefName
+            let defaultBranch = branchOptionsForSwitch |> Array.tryHead |> Option.map _.RefName
 
             setSelectedSwitchBranch defaultBranch
             setActiveDialog ActiveDialog.SwitchBranch
@@ -1497,11 +1614,7 @@ type GitSidebar =
 
             let nextMarkedPaths =
                 match ctrlKey, shiftKey with
-                | false, false ->
-                    if Set.contains change.Path markedPaths then
-                        Set.remove change.Path markedPaths
-                    else
-                        Set.singleton change.Path
+                | false, false -> Set.singleton change.Path
                 | true, false ->
                     if Set.contains change.Path markedPaths then
                         Set.remove change.Path markedPaths
@@ -1550,6 +1663,22 @@ type GitSidebar =
             else
                 setLocalError None
                 onCommitAll normalizedCommitMessage
+
+        let submitDiscardSelection (paths: string[]) =
+            let normalizedPaths =
+                paths
+                |> Array.map _.Trim()
+                |> Array.filter (String.IsNullOrWhiteSpace >> not)
+                |> Array.distinct
+                |> Array.sort
+
+            if normalizedPaths.Length = 0 then
+                setLocalError (Some "No selected changes to discard.")
+            else
+                setLocalError None
+                onDiscardSelection normalizedPaths
+                setMarkedPaths (fun _ -> Set.empty)
+                setSelectionAnchorPath (fun _ -> None)
 
         let submitLfsThreshold () =
             let normalizedInput = lfsThresholdInput.Trim()
@@ -1620,7 +1749,8 @@ type GitSidebar =
 
         Html.div [
             prop.testId "GitSidebar"
-            prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col swt:bg-base-100"
+            prop.className
+                "swt:@container/gitSidebar swt:flex swt:h-full swt:min-h-0 swt:min-w-0 swt:flex-col swt:overflow-x-hidden swt:bg-base-100"
             prop.children [
                 GitSidebar.BranchHeader(
                     {
@@ -1677,7 +1807,6 @@ type GitSidebar =
                             SetLfsThresholdInput = setLfsThresholdInput
                             CanSaveLfsThreshold = canSaveLfsThreshold
                             SubmitLfsThreshold = submitLfsThreshold
-                            ActiveAction = activeAction
                         }
                     }
                 )
@@ -1707,16 +1836,21 @@ type GitSidebar =
 
                 if hasConflicts then
                     Html.div [
-                        prop.className "swt:px-3 swt:pt-3"
+                        prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                         prop.children [
                             Html.div [
                                 prop.testId "GitSidebarMergeBanner"
-                                prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                                prop.className
+                                    "swt:alert swt:alert-warning swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                                 prop.children [
                                     Html.span [
-                                        prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                        prop.className
+                                            "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                     ]
-                                    Html.span "Resolve all conflicted files before pushing."
+                                    Html.span [
+                                        prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                        prop.text "Resolve all conflicted files before pushing."
+                                    ]
                                 ]
                             ]
                         ]
@@ -1725,11 +1859,11 @@ type GitSidebar =
                 GitSidebar.ChangedFilesList(
                     {
                         ChangedFiles = changedFiles
-                        SelectedFile = selectedFile
                         MarkedPaths = markedPaths
                         IsBusy = isBusy
                         UpdateMarkedSelection = updateMarkedSelection
                         OpenChange = fun change -> runSelectChangeAction change
+                        DiscardChanges = submitDiscardSelection
                     }
                 )
 
@@ -1742,7 +1876,6 @@ type GitSidebar =
                         BranchOptionsWithHead = branchOptionsWithHead
                         SelectedStartPoint = selectedStartPoint
                         SetSelectedStartPoint = setSelectedStartPoint
-                        ActiveAction = activeAction
                         SubmitCreateBranch = submitCreateBranch
                         IsSwitchBranchModalOpen = isSwitchBranchModalOpen
                         SetSwitchBranchModalOpen = setSwitchBranchModalOpen

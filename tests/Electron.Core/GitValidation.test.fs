@@ -699,22 +699,19 @@ Vitest.describe (
                 let argumentTypes, returnType = flattenFunctionSignature installField.PropertyType
 
                 Vitest.expect(argumentTypes.Length).toBe (1)
-                Vitest.expect(argumentTypes.[0]).toEqual (typeof<IpcMainEvent>)
+                Vitest.expect(argumentTypes.[0]).toEqual (typeof<unit>)
                 Vitest.expect(returnType.FullName.Contains("GitOperationResult")).toBe (true)
         )
 
         Vitest.test (
-            "GitApiClient calls no-payload endpoints through explicit typed wrappers",
+            "GitApiClient calls no-payload endpoints without unbox null",
             fun () ->
                 let sourceText = getGitApiClientSource ()
-                expectSourceContains sourceText "gitApi.getGitStatus (unbox null)"
-                expectSourceContains sourceText "gitApi.getGitBranches (unbox null)"
-                expectSourceContains sourceText "gitApi.getGitLfsSettings (unbox null)"
-                expectSourceContains sourceText "gitApi.installGitLfs (unbox null)"
-                expectSourceNotContains sourceText "unbox gitApi.getGitStatus"
-                expectSourceNotContains sourceText "unbox gitApi.getGitBranches"
-                expectSourceNotContains sourceText "unbox gitApi.getGitLfsSettings"
-                expectSourceNotContains sourceText "unbox gitApi.installGitLfs"
+                expectSourceContains sourceText "gitApi.getGitStatus ()"
+                expectSourceContains sourceText "gitApi.getGitBranches ()"
+                expectSourceContains sourceText "gitApi.getGitLfsSettings ()"
+                expectSourceContains sourceText "gitApi.installGitLfs ()"
+                expectSourceNotContains sourceText "unbox null"
         )
 
         Vitest.test (
@@ -722,6 +719,17 @@ Vitest.describe (
             fun () ->
                 let sourceText = getGitApiClientSource ()
                 Vitest.expect(sourceText.Contains("Unsupported git content for '")).toBe (false)
+        )
+
+        Vitest.test (
+            "Git discard paths is exposed through the typed renderer client and workflow dependencies",
+            fun () ->
+                let clientSourceText = getGitApiClientSource ()
+                let stateContextSourceText = getGitStateCtxSource ()
+
+                expectSourceContains clientSourceText "let gitDiscardPaths (request: GitPathspecRequest)"
+                expectSourceContains clientSourceText "gitApi.gitDiscardPaths"
+                expectSourceContains stateContextSourceText "gitDiscardPaths = Renderer.GitApiClient.gitDiscardPaths"
         )
 
         Vitest.test (
@@ -775,25 +783,34 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "IGitApi.gitInitRepository uses target path string argument",
+            "IGitApi.gitInitRepository uses target path string argument without IpcMainEvent",
             fun () ->
                 let initField = getRecordField typeof<IGitApi> "gitInitRepository"
                 let argumentTypes, _ = flattenFunctionSignature initField.PropertyType
 
-                Vitest.expect(argumentTypes.Length).toBe (2)
-                Vitest.expect(argumentTypes.[0]).toEqual (typeof<IpcMainEvent>)
-                Vitest.expect(argumentTypes.[1]).toEqual (typeof<string>)
+                Vitest.expect(argumentTypes.Length).toBe (1)
+                Vitest.expect(argumentTypes.[0]).toEqual (typeof<string>)
         )
 
         Vitest.test (
-            "IGitApi.gitCloneRepository uses GitCloneRepositoryRequest argument",
+            "IGitApi.gitCloneRepository uses GitCloneRepositoryRequest argument without IpcMainEvent",
             fun () ->
                 let cloneField = getRecordField typeof<IGitApi> "gitCloneRepository"
                 let argumentTypes, _ = flattenFunctionSignature cloneField.PropertyType
 
-                Vitest.expect(argumentTypes.Length).toBe (2)
-                Vitest.expect(argumentTypes.[0]).toEqual (typeof<IpcMainEvent>)
-                Vitest.expect(argumentTypes.[1].FullName).toBe (typeof<GitCloneRepositoryRequest>.FullName)
+                Vitest.expect(argumentTypes.Length).toBe (1)
+                Vitest.expect(argumentTypes.[0].FullName).toBe (typeof<GitCloneRepositoryRequest>.FullName)
+        )
+
+        Vitest.test (
+            "IGitApi.gitDiscardPaths uses GitPathspecRequest without IpcMainEvent",
+            fun () ->
+                let discardField = getRecordField typeof<IGitApi> "gitDiscardPaths"
+                let argumentTypes, returnType = flattenFunctionSignature discardField.PropertyType
+
+                Vitest.expect(argumentTypes.Length).toBe (1)
+                Vitest.expect(argumentTypes.[0].FullName).toBe (typeof<GitPathspecRequest>.FullName)
+                Vitest.expect(returnType.FullName.Contains("GitOperationResult")).toBe (true)
         )
 
         Vitest.test (

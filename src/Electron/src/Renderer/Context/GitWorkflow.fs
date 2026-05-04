@@ -9,6 +9,7 @@ open Swate.Components.Api.GitLabApi
 open Swate.Components.GitSidebarTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.GitTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 [<RequireQualifiedAccess>]
 type GitRefreshState =
@@ -25,6 +26,7 @@ type GitBusyOperation =
     | CloningRepository
     | CommittingSelectedChanges
     | CommittingAllChanges
+    | DiscardingSelectedChanges
     | SavingGitLfsThreshold
     | SavingGitLfsDownloadPreference
     | CreatingBranch
@@ -151,6 +153,7 @@ type WriteRequest =
     | Clone of GitCloneRepositoryRequest * Reply<string>
     | CommitSelection of PreparedCommitOperation
     | CommitAll of PreparedCommitOperation
+    | DiscardSelection of string[]
     | SaveLfsSettings of GitBusyOperation * GitLfsSettingsDto
     | CreateBranch of GitCreateBranchRequest
     | SwitchBranch of GitCheckoutBranchRequest
@@ -197,6 +200,7 @@ type Msg =
     | PrimarySaveAllRequested of string
     | CommitSelectionRequested of GitSidebarCommitSelectionRequest
     | CommitAllRequested of string
+    | DiscardSelectionRequested of string[]
     | ConfirmPendingRemoteActionRequested
     | CancelPendingRemoteActionRequested
     | CreateBranchRequested of GitSidebarCreateBranchRequest
@@ -225,6 +229,7 @@ type GitDependencies = {
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitStagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitUnstagePaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
+    gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, string>>
     setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, string>>
     confirmGitMergeResolution:
@@ -259,6 +264,7 @@ let busyNoticeFromOperation =
     | GitBusyOperation.CloningRepository -> Some "Cloning repository"
     | GitBusyOperation.CommittingSelectedChanges -> Some "Committing selected changes"
     | GitBusyOperation.CommittingAllChanges -> Some "Committing all changes"
+    | GitBusyOperation.DiscardingSelectedChanges -> Some "Discarding selected changes"
     | GitBusyOperation.SavingGitLfsThreshold -> Some "Saving Git LFS threshold"
     | GitBusyOperation.SavingGitLfsDownloadPreference -> Some "Saving Git LFS download preference"
     | GitBusyOperation.CreatingBranch -> Some "Creating branch"
@@ -564,6 +570,7 @@ let private busyOperationForWriteRequest =
     | Clone _ -> GitBusyOperation.CloningRepository
     | CommitSelection prepared -> prepared.BusyOperation
     | CommitAll prepared -> prepared.BusyOperation
+    | DiscardSelection _ -> GitBusyOperation.DiscardingSelectedChanges
     | SaveLfsSettings(busyOperation, _) -> busyOperation
     | CreateBranch _ -> GitBusyOperation.CreatingBranch
     | SwitchBranch _ -> GitBusyOperation.SwitchingBranch
@@ -726,6 +733,21 @@ let private runCommitAttemptAsync (deps: GitDependencies) (prepared: PreparedCom
                     return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
 }
 
+let private runDiscardAttemptAsync (deps: GitDependencies) (paths: string[]) = promise {
+    let pathsToDiscard = distinctPaths paths
+
+    if pathsToDiscard.Length = 0 then
+        return Error "No selected changes to discard."
+    else
+        let! discardResult = deps.gitDiscardPaths { Pathspecs = pathsToDiscard }
+
+        match classifyWriteResult GitBusyOperation.DiscardingSelectedChanges discardResult with
+        | Error message -> return Error message
+        | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationReady operationResult) ->
+            return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.Clear (Some None)
+}
+
 let private pendingPrimarySaveWarning =
     "Changes were saved locally. Online sync is still pending."
 
@@ -844,6 +866,7 @@ let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (reque
     | Clone(request, _) -> return! runCloneAttemptAsync deps request
     | CommitSelection prepared -> return! runCommitAttemptAsync deps prepared
     | CommitAll prepared -> return! runCommitAttemptAsync deps prepared
+    | DiscardSelection paths -> return! runDiscardAttemptAsync deps paths
     | SaveLfsSettings(busyOperation, settings) -> return! runSaveLfsSettingsAttemptAsync deps busyOperation settings
     | CreateBranch request ->
         return! runSimpleWriteAttemptAsync deps GitBusyOperation.CreatingBranch (fun () -> deps.createBranch request)
@@ -1236,6 +1259,7 @@ let update
     | CommitSelectionRequested request ->
         model, Cmd.ofMsg (WriteRequested(CommitSelection(prepareCommitSelection model request)))
     | CommitAllRequested message -> model, Cmd.ofMsg (WriteRequested(CommitAll(prepareCommitAll model message)))
+    | DiscardSelectionRequested paths -> model, Cmd.ofMsg (WriteRequested(DiscardSelection paths))
     | ConfirmPendingRemoteActionRequested ->
         match model.PendingRemoteAction with
         | GitPendingRemoteAction.UpdateFromOnline ->
@@ -1516,9 +1540,10 @@ let subscribe (_model: GitState) : Sub<Msg> = [
     [ "gitProgress" ],
     fun dispatch ->
         let dispose =
-            Renderer.MainUpdateRendererBridge.subscribeGitProgressUpdate (fun progress ->
-                dispatch (SetCurrentProgress(Some(mapProgress progress)))
-            )
+            Renderer.IpcReceiver.subscribeProxyReceiver<IGitProgressRendererApi> {
+                gitProgressUpdate =
+                    fun progress -> dispatch (SetCurrentProgress(Some(mapProgress progress)))
+            }
 
         { new System.IDisposable with
             member _.Dispose() = dispose ()

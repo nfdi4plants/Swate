@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect, fireEvent, userEvent, within } from "storybook/test";
+import { expect, fireEvent, fn, userEvent, waitFor, within } from "storybook/test";
 import { Main as GitSidebarComponent } from "./GitSidebar.fs.js";
 import {
   FSharpResult$2_Ok,
@@ -10,6 +10,7 @@ const noop = () => {};
 const noopWithArg = (_arg: unknown) => {};
 const noopWithMessage = (_message: string) => {};
 const noopWithSelection = (_request: unknown) => {};
+const noopWithPaths = (_paths: string[]) => {};
 const noopWithBranch = (_branchName: string) => {};
 const noopWithThreshold = (_thresholdMb: number) => {};
 const noopWithDownloadPreference = (_downloadLargeFiles: boolean) => {};
@@ -26,6 +27,7 @@ const baseCallbacks = {
   OnPrimarySaveAll: noopWithMessage,
   OnCommitSelection: noopWithSelection,
   OnCommitAll: noopWithMessage,
+  OnDiscardSelection: noopWithPaths,
   OnConfirmPendingRemoteAction: noop,
   OnCancelPendingRemoteAction: noop,
   OnSaveDownloadLargeFiles: noopWithDownloadPreference,
@@ -222,6 +224,57 @@ export const ChangedFiles: Story = {
   },
 };
 
+export const MarkedSelectionWithoutLastClickedHighlight: Story = {
+  render: (args) => <StatefulSidebar {...args} />,
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    selectedFile: "README.md",
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).not.toHaveClass("swt:border-primary/40");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).not.toHaveClass("swt:bg-primary/5");
+
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-1"));
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).toHaveClass("swt:border-success/40");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).toHaveClass("swt:bg-success/10");
+
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toHaveClass("swt:border-success/40");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).not.toHaveClass("swt:border-success/40");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).not.toHaveClass("swt:bg-success/10");
+  },
+};
+
+export const SlowOpenDoesNotGreyRows: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks({
+      OnSelectChange: () =>
+        new Promise((resolve) => {
+          window.setTimeout(() => resolve(FSharpResult$2_Ok<void, string>(undefined)), 250);
+        }),
+    }),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).not.toHaveClass("swt:opacity-60");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-1")).not.toHaveClass("swt:opacity-60");
+  },
+};
+
 export const AdvancedActions: Story = {
   args: {
     status: baseStatus,
@@ -256,6 +309,43 @@ export const AdvancedActions: Story = {
   },
 };
 
+export const ActionTooltipsAndResponsiveLabels: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toHaveAttribute(
+      "title",
+      "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin",
+    );
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass("swt:truncate");
+    await expect(canvas.getByTestId("GitSidebarUpdateArcButtonLabel")).toHaveClass(
+      "swt:@max-3xs/gitSidebar:sr-only",
+    );
+
+    await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
+    await expect(canvas.getByTestId("GitSidebarFetchButton")).toHaveAttribute(
+      "title",
+      "Check for Changes:\n- git fetch origin",
+    );
+    await expect(canvas.getByTestId("GitSidebarPullButton")).toHaveAttribute(
+      "title",
+      "Download Changes:\n- git pull origin",
+    );
+    await expect(canvas.getByTestId("GitSidebarPushButton")).toHaveAttribute(
+      "title",
+      "Upload Changes:\n- git push origin",
+    );
+  },
+};
+
 export const ConflictsPresent: Story = {
   args: {
     status: {
@@ -279,7 +369,7 @@ export const ConflictsPresent: Story = {
       "Resolve all conflicted files before pushing.",
     );
     await expect(canvasElement.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")).toHaveLength(4);
-    await expect(canvas.getByTestId("GitSidebarChangeStatusButton-0")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toBeInTheDocument();
   },
 };
 
@@ -334,11 +424,62 @@ export const DeletedFile: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const modal = within(document.body);
     await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("git: D.");
     await expect(canvas.getByTestId("GitSidebar")).not.toHaveTextContent("Deleted");
-    await userEvent.click(canvas.getByTestId("GitSidebarChangeStatusButton-0"));
-    await expect(await modal.findByTestId("popover_content_git_change_status_0")).toHaveTextContent("Git return: git: D.");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveClass("swt:text-error");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveAttribute(
+      "title",
+      "Deleted:\n- git: D.",
+    );
+  },
+};
+
+export const ChangeStatusIconColors: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: [
+      {
+        Path: "new-file.md",
+        OriginalPath: undefined,
+        IndexStatus: "A",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+      {
+        Path: "changed-file.md",
+        OriginalPath: undefined,
+        IndexStatus: "M",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+      {
+        Path: "deleted-file.md",
+        OriginalPath: undefined,
+        IndexStatus: "D",
+        WorkingTreeStatus: " ",
+        IsConflicted: false,
+      },
+    ],
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveClass("swt:text-success");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-0")).toHaveClass(
+      "swt:fluent--add-24-regular",
+    );
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-1")).toHaveClass("swt:text-warning");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-1")).toHaveClass(
+      "swt:fluent--edit-24-regular",
+    );
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-2")).toHaveClass("swt:text-error");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusIcon-2")).toHaveClass(
+      "swt:fluent--delete-24-regular",
+    );
   },
 };
 
@@ -361,8 +502,42 @@ export const LongWrappedFile: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:ml-auto");
+    await expect(canvas.getByTestId("GitSidebarChangeRow-0")).toHaveClass("swt:items-center");
     await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:shrink-0");
+    await expect(canvas.getByTestId("GitSidebarChangeStatusSlot-0")).toHaveClass("swt:self-center");
+  },
+};
+
+const discardSelectionSpy = fn();
+
+export const HoverDiscardChange: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks({
+      OnDiscardSelection: discardSelectionSpy,
+    }),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    discardSelectionSpy.mockClear();
+    const canvas = within(canvasElement);
+
+    const row = canvas.getByTestId("GitSidebarChangeRow-0");
+    await expect(row).toHaveClass("swt:items-center");
+    await expect(row).toHaveClass("swt:min-h-6");
+
+    await userEvent.hover(row);
+    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-0")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-0")).toHaveClass("swt:opacity-0");
+    await expect(canvas.getByTestId("GitSidebarDiscardChangeButton-0")).toHaveClass(
+      "swt:group-hover:opacity-100",
+    );
+
+    await userEvent.click(canvas.getByTestId("GitSidebarDiscardChangeButton-0"));
+    await expect(discardSelectionSpy).toHaveBeenCalledWith(["README.md"]);
   },
 };
 
@@ -484,12 +659,17 @@ export const CommitComposer: Story = {
     expect(menuBounds.right).toBeLessThanOrEqual(sidebarBounds.right);
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionButton")).toBeNull();
     await expect(canvas.queryByTestId("GitSidebarCommitSelectionCheckbox-README.md")).toBeNull();
-    // Click again to deselect – button text should switch back to "Save All Changes"
-    await userEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"));
-    await expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes");
+    // Ctrl+click to deselect – button text should switch back to "Save All Changes"
+    fireEvent.mouseDown(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
+    fireEvent.click(canvas.getByTestId("GitSidebarChangeRow-0"), { ctrlKey: true });
+    await waitFor(() =>
+      expect(canvas.getByTestId("GitSidebarPrimarySaveButton")).toHaveTextContent("Save All Changes"),
+    );
     await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsButton"));
-    await expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
-      "Add and commit all Changes",
+    await waitFor(() =>
+      expect(canvas.getByTestId("GitSidebarLocalCommitButton")).toHaveTextContent(
+        "Add and commit all Changes",
+      ),
     );
     await userEvent.click(canvas.getByTestId("GitSidebarSaveOptionsHelpButton"));
     await expect(await modal.findByTestId("popover_content_GitSidebarSaveOptionsHelp")).toHaveTextContent(

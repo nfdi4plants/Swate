@@ -35,19 +35,19 @@ let DataHubBrowserTarget () =
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
 
     let loadAllRepos (query: ExploreRepoQuery) =
-        Api.ipcGitLabApi.loadAllRepos (unbox null) query
+        Api.ipcGitLabApi.loadAllRepos query
 
     let loadMostStarredRepos (query: ExploreMostStarredQuery) =
-        Api.ipcGitLabApi.loadMostStarredRepos (unbox null) query
+        Api.ipcGitLabApi.loadMostStarredRepos query
 
     let loadUserRepos (query: ExploreRepoQuery) =
-        Api.ipcGitLabApi.loadUserRepos (unbox null) query
+        Api.ipcGitLabApi.loadUserRepos query
 
     let loadOrganisationGroups (query: ExploreGroupsQuery) =
-        Api.ipcGitLabApi.loadOrganisationGroups (unbox null) query
+        Api.ipcGitLabApi.loadOrganisationGroups query
 
     let loadOrganisationRepos (query: ExploreGroupProjectsQuery) =
-        Api.ipcGitLabApi.loadOrganisationRepos (unbox null) query
+        Api.ipcGitLabApi.loadOrganisationRepos query
 
     let loaders: ExploreLoaders = {
         LoadAllRepos = loadAllRepos
@@ -64,7 +64,7 @@ let DataHubBrowserTarget () =
 
     let cloneAndOpenRepo (projectInfo: ExploreProjectDto) =
         promise {
-            let! destinationResult = Api.ipcArcVaultApi.pickDirectory (unbox null)
+            let! destinationResult = Api.ipcArcVaultApi.pickDirectory ()
 
             match destinationResult with
             | Error error when DataHubBrowserHelper.isCancelError error -> ()
@@ -85,7 +85,7 @@ let DataHubBrowserTarget () =
                 match! gitStateCtx.cloneRepository cloneRequest with
                 | Error _ -> ()
                 | Ok clonedPath ->
-                    match! Api.ipcArcVaultApi.openARCByPath (unbox null) clonedPath with
+                    match! Api.ipcArcVaultApi.openARCByPath clonedPath with
                     | Ok _ -> closeBrowser ()
                     | Error error -> Browser.Dom.console.error ($"[Swate] Could not open cloned ARC: {error.Message}")
         }

@@ -4,7 +4,6 @@ open Feliz
 open Renderer.Types
 open Swate.Electron.Shared
 open Renderer.Components.MainContent.ArcFilePreviewTarget
-open Renderer.Components.MainContent.ArcObjectExplorerTarget
 open Renderer.Components.MainContent.DataHubBrowserTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
 open Renderer.Components.MainContent.ErrorViewTarget
@@ -36,8 +35,8 @@ module private MainHelper =
             )
 
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
-[<ReactComponent>]
-let Main (appRootPath: ArcRootPath, pageState: PageState option, leftSidebarTarget: LeftSidebarPage) =
+[<ReactMemoComponent>]
+let Main (appRootPath: ArcRootPath, pageState: PageState option) =
     Swate.Components.Template.TemplateCacheProvider.TemplateCacheProvider(
         loadTemplates = MainHelper.loadTemplates,
         children =
@@ -52,8 +51,6 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option, leftSidebarTarg
                                 "swt:flex-1 swt:min-w-0 swt:min-h-0 swt:flex swt:justify-center swt:items-center"
                             prop.children [ Renderer.Components.InitState.InitState() ]
                         ]
-                    | Some _, _ when leftSidebarTarget = LeftSidebarPage.ArcObjectExplorer ->
-                        ArcObjectExplorerTarget.Main()
                     | Some _, Some(PageState.ArcFilePage arcFile) -> ArcFilePreviewTarget arcFile
                     | Some _, Some(PageState.TextPage content) -> TextPreviewTarget content
                     | Some _, Some PageState.UnknownPage -> UnknownPreviewTarget()

@@ -17,7 +17,6 @@ let NotesDraftTarget () =
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let arcObjectCtx = Renderer.Context.ArcObjectExplorerContext.useArcObjectExplorerCtx ()
 
     let availableNotesTargets =
         React.useMemo (
@@ -37,7 +36,7 @@ let NotesDraftTarget () =
                 let request: FileContentDTO =
                     FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
 
-                let! writeResult = Api.ipcArcVaultApi.writeFile (unbox null) request
+                let! writeResult = Api.ipcArcVaultApi.writeFile request
 
                 match writeResult with
                 | Result.Error exn ->
@@ -53,25 +52,17 @@ let NotesDraftTarget () =
                     setNotesDraft NotesDraft.init
                     setNotesUiState NotesUiState.init
 
-                    let! previewResult = Api.ipcArcVaultApi.openFile (unbox null) payload.Intent.RelativePath
+                    let! previewResult = Api.ipcArcVaultApi.openFile payload.Intent.RelativePath
 
                     match previewResult with
                     | Ok previewData ->
                         previewData
                         |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView
-                            pageStateCtx.setState
-                            arcObjectCtx.setArcFileState
-                            arcObjectCtx.setPreviewState
-                            arcObjectCtx.setStatusMessage
+                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
                     | Result.Error _ ->
                         FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
                         |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView
-                            pageStateCtx.setState
-                            arcObjectCtx.setArcFileState
-                            arcObjectCtx.setPreviewState
-                            arcObjectCtx.setStatusMessage
+                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
             }
             |> Promise.start
 
