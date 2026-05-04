@@ -8,6 +8,7 @@ open Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
 open Swate.Components.ARCObjectExplorer.GraphExplorer.GraphExplorerNodes
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 open Swate.Components.FileExplorer
+open Swate.Components.FileExplorer.Types
 open Vitest
 
 type private EndpointValue =

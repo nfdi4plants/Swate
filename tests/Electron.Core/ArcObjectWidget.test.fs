@@ -4,6 +4,7 @@ open Swate.Components
 open Swate.Components.ARCObjectExplorer
 open Swate.Components.ARCObjectExplorer.Types
 open Swate.Components.FileExplorer
+open Swate.Components.FileExplorer.Types
 open Vitest
 
 let private folder id name itemType selectable children =
