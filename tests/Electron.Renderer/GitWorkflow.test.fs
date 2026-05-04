@@ -2125,7 +2125,7 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.textContent.Contains("studies/s-study-01/protocol.md")).toBe (true)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusButton-3']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusIcon-3']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -2410,7 +2410,7 @@ Vitest.describe (
 
                 Vitest.expect(container.textContent.Contains("git: D.")).toBe (false)
                 Vitest.expect(container.textContent.Contains("Deleted")).toBe (false)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusButton-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusIcon-0']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -2536,7 +2536,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar right-click menu discards the currently marked files",
+            "GitSidebar hover discard button discards the currently marked files",
             fun () -> promise {
                 let mutable discardedPaths: string[] option = None
 
@@ -2574,17 +2574,14 @@ Vitest.describe (
                 row2.dispatchEvent ctrlClick |> ignore
                 do! Promise.sleep 0
 
-                let contextMenuEvent =
-                    createMouseEvent
-                        "contextmenu"
-                        (createObj [ "bubbles" ==> true; "clientX" ==> 32; "clientY" ==> 32; "button" ==> 2 ])
+                let hoverEvent =
+                    createMouseEvent "mouseenter" (createObj [ "bubbles" ==> true ])
 
-                row0.dispatchEvent contextMenuEvent |> ignore
+                row0.dispatchEvent hoverEvent |> ignore
                 do! Promise.sleep 0
 
                 let discardButton =
-                    findBodyButtonContaining "Discard Selected Changes"
-                    |> Option.defaultWith (fun () -> failwith "Expected discard context menu action.")
+                    container.querySelector("[data-testid='GitSidebarDiscardChangeButton-0']") :?> HTMLElement
 
                 discardButton.click ()
                 do! Promise.sleep 0
@@ -2803,7 +2800,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar plain click on a marked row deselects it and rows suppress native text selection",
+            "GitSidebar Ctrl+click on a marked row deselects it and rows suppress native text selection",
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
@@ -2852,7 +2849,10 @@ Vitest.describe (
 
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
 
-                firstRow.click ()
+                let ctrlClick =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true; "ctrlKey" ==> true ])
+
+                firstRow.dispatchEvent ctrlClick |> ignore
                 do! Promise.sleep 0
 
                 Vitest.expect(container.textContent.Contains("Save All Changes")).toBe (true)
@@ -2865,7 +2865,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "GitSidebar status popover trigger does not open the changed file row",
+            "GitSidebar status icon click does not open the changed file row",
             fun () -> promise {
                 let mutable selectCalls = 0
 
@@ -2894,10 +2894,13 @@ Vitest.describe (
                         )
                     )
 
-                let statusButton =
-                    container.querySelector("[data-testid='GitSidebarChangeStatusButton-0']") :?> HTMLButtonElement
+                let statusIcon =
+                    container.querySelector("[data-testid='GitSidebarChangeStatusIcon-0']") :?> HTMLElement
 
-                statusButton.click ()
+                let clickEvent =
+                    createMouseEvent "click" (createObj [ "bubbles" ==> true ])
+
+                statusIcon.dispatchEvent clickEvent |> ignore
                 do! Promise.sleep 0
 
                 Vitest.expect(selectCalls).toBe (0)
