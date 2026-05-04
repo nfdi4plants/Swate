@@ -3,8 +3,7 @@ module Main.NoteSearchReader
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open ARCtrl
-open Swate.Components.Shared
+open Swate.Components.Notes.Editor
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Components.NoteTypes
 
@@ -27,128 +26,21 @@ let private isNoteMarkdownPath (relativePath: string) =
     let lowered = normalizedPath.ToLowerInvariant()
     lowered.StartsWith("notes/") && lowered.EndsWith(".md")
 
-let private tryParseDateText (value: string) =
-    let parts = value.Trim().Split('_', StringSplitOptions.RemoveEmptyEntries)
-
-    if parts.Length <> 3 then
-        None
-    else
-        match Int32.TryParse(parts.[0]), Int32.TryParse(parts.[1]), Int32.TryParse(parts.[2]) with
-        | (true, day), (true, month), (true, year) ->
-            try
-                Some(DateTime(year, month, day))
-            with _ ->
-                None
-        | _ -> None
-
-let private tryParseDateFromPath (relativePath: string) =
-    (normalizePath relativePath).Split('/', StringSplitOptions.RemoveEmptyEntries)
-    |> Array.tryPick tryParseDateText
-
-let private tryGetHeaderValue (prefix: string) (lines: string[]) =
-    lines
-    |> Array.tryPick (fun line ->
-        if line.StartsWith(prefix) then
-            Some(line.Substring(prefix.Length).Trim())
-        else
-            None
-    )
-
-let private fallbackTitleFromPath (relativePath: string) =
-    let fileName = pathDynamic?basename (relativePath, ".md") |> unbox<string>
-    fileName.Replace("_", " ").Trim()
-
-let private parseTags (value: string option) =
-    value
-    |> Option.bind (fun tagText ->
-        tagText.Split([| ',' |], StringSplitOptions.RemoveEmptyEntries)
-        |> Array.map (fun tag -> tag.Trim())
-        |> Array.filter (String.IsNullOrWhiteSpace >> not)
-        |> Array.map (fun tag -> OntologyAnnotation(tag, ""))
-        |> ResizeArray
-        |> fun tags -> if tags.Count = 0 then None else Some tags
-    )
-
-let private normalizeNewlines (content: string) = content.Replace("\r\n", "\n").Replace("\r", "\n")
-
 let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
     fsPromisesDynamic?readFile (absolutePath, "utf8") |> unbox<JS.Promise<string>>
 
-let private unixEpoch = DateTime(1970, 1, 1, 0, 0, 0)
-
-let private tryGetFileModifiedDate (absolutePath: string) : JS.Promise<DateTime option> = promise {
-    let! stats = fsPromisesDynamic?stat (absolutePath) |> unbox<JS.Promise<obj>>
-    let mtimeMs = stats?mtimeMs |> unbox<float>
-
-    if Double.IsNaN mtimeMs || Double.IsInfinity mtimeMs then
-        return None
-    else
-        return Some(unixEpoch.AddMilliseconds(mtimeMs))
-}
-
-let private parseNote (relativePath: string) (content: string) (modifiedAt: DateTime option) =
-    let normalizedContent = normalizeNewlines content
-    let lines = normalizedContent.Split('\n')
-
-    let separatorIndex =
-        lines
-        |> Array.tryFindIndex (fun line -> line.Trim() = "---")
-
-    let headerLines, bodyLines =
-        match separatorIndex with
-        | Some index ->
-            let headerLines =
-                if index > 0 then
-                    lines.[0 .. index - 1]
-                else
-                    [||]
-
-            let bodyLines =
-                if index + 1 < lines.Length then
-                    lines.[index + 1 ..]
-                else
-                    [||]
-
-            headerLines, bodyLines
-        | None -> lines, lines
-
-    let title =
-        headerLines
-        |> Array.tryPick (fun line ->
-            if line.StartsWith("# ") then
-                Some(line.Substring(2).Trim())
-            else
-                None
-        )
-        |> Option.defaultValue (fallbackTitleFromPath relativePath)
-
-    let date =
-        match tryGetHeaderValue "Date Created:" headerLines |> Option.bind tryParseDateText with
-        | Some parsedDate -> parsedDate
-        | None ->
-            match tryParseDateFromPath relativePath with
-            | Some parsedDate -> parsedDate
-            | None -> defaultArg modifiedAt DateTime.MinValue
-
-    let tags = headerLines |> tryGetHeaderValue "Tags:" |> parseTags
-
-    let body =
-        bodyLines
-        |> String.concat "\n"
-        |> fun text -> text.Trim()
-        |> fun text ->
-            if String.IsNullOrWhiteSpace text && separatorIndex.IsNone then
-                normalizedContent.Trim()
-            else
-                text
-
-    {
-        RelativePath = relativePath
-        Title = title
-        Date = date
-        Tags = tags
-        Content = body
-    }
+let private parseNote (relativePath: string) (content: string) =
+    match NoteConversion.tryDecodeMarkdownFrontmatter content with
+    | Some(frontmatter, bodyText) ->
+        {
+            RelativePath = relativePath
+            Title = frontmatter.Title
+            Date = frontmatter.Date
+            Tags = frontmatter.Tags
+            Content = bodyText.Trim()
+        }
+    | None ->
+        failwith $"Note file '{relativePath}' does not contain YAML frontmatter."
 
 let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<Note[]> = promise {
     let noteEntries =
@@ -166,11 +58,10 @@ let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<Note[]> 
         |> Array.map (fun (absolutePath, relativePath) ->
             promise {
                 try
-                    let! modifiedAt = tryGetFileModifiedDate absolutePath
                     let! content = readUtf8FileAsync absolutePath
-                    return Some(parseNote relativePath content modifiedAt)
+                    return Some(parseNote relativePath content)
                 with _ ->
-                    // Match previous behavior: silently skip files that fail to read/parse
+                    // Keep malformed or unreadable files isolated from the rest of the search index.
                     return None
             }
         )

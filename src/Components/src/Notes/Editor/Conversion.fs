@@ -9,6 +9,115 @@ open Swate.Components.Landing
 module NoteConversion =
 
     let private notesRootFolder = "notes"
+    let private frontmatterDelimiter = "---"
+
+    type NoteFrontmatter = {
+        Title: string
+        Date: DateTime
+        Tags: ResizeArray<OntologyAnnotation> option
+    }
+
+    let private normalizeNewlines (content: string) =
+        content.Replace("\r\n", "\n").Replace("\r", "\n")
+
+    let private trimTrailingNewlines (content: string) = content.TrimEnd([| '\r'; '\n' |])
+
+    let private commentEncoder (comment: Comment) =
+        [
+            YAMLicious.Encode.tryInclude "name" YAMLicious.Encode.string comment.Name
+            YAMLicious.Encode.tryInclude "value" YAMLicious.Encode.string comment.Value
+        ]
+        |> YAMLicious.Encode.choose
+        |> YAMLicious.Encode.object
+
+    let private commentDecoder =
+        YAMLicious.Decode.object (fun get ->
+            Comment(
+                ?name = get.Optional.Field "name" YAMLicious.Decode.string,
+                ?value = get.Optional.Field "value" YAMLicious.Decode.string
+            )
+        )
+
+    let private ontologyAnnotationEncoder (tag: OntologyAnnotation) =
+        [
+            YAMLicious.Encode.tryInclude "annotationValue" YAMLicious.Encode.string tag.Name
+            YAMLicious.Encode.tryInclude "termSource" YAMLicious.Encode.string tag.TermSourceREF
+            YAMLicious.Encode.tryInclude "termAccession" YAMLicious.Encode.string tag.TermAccessionNumber
+            if tag.Comments.Count > 0 then
+                "comments", YAMLicious.Encode.resizearray commentEncoder tag.Comments
+        ]
+        |> YAMLicious.Encode.choose
+        |> YAMLicious.Encode.object
+
+    let private ontologyAnnotationDecoder =
+        YAMLicious.Decode.object (fun get ->
+            OntologyAnnotation.create (
+                ?name = get.Optional.Field "annotationValue" YAMLicious.Decode.string,
+                ?tsr = get.Optional.Field "termSource" YAMLicious.Decode.string,
+                ?tan = get.Optional.Field "termAccession" YAMLicious.Decode.string,
+                ?comments = get.Optional.Field "comments" (YAMLicious.Decode.resizearray commentDecoder)
+            )
+        )
+
+    let private frontmatterEncoder (frontmatter: NoteFrontmatter) =
+        [
+            "title", YAMLicious.Encode.string frontmatter.Title
+            "date", YAMLicious.Encode.string (frontmatter.Date.ToString("yyyy-MM-dd"))
+            match frontmatter.Tags with
+            | Some tags when tags.Count > 0 -> "tags", YAMLicious.Encode.resizearray ontologyAnnotationEncoder tags
+            | _ -> "tags", YAMLicious.Encode.nil
+        ]
+        |> YAMLicious.Encode.choose
+        |> YAMLicious.Encode.object
+
+    let private frontmatterDecoder =
+        YAMLicious.Decode.object (fun get -> {
+            Title = get.Required.Field "title" YAMLicious.Decode.string
+            Date = get.Required.Field "date" YAMLicious.Decode.datetime
+            Tags = get.Optional.Field "tags" (YAMLicious.Decode.resizearray ontologyAnnotationDecoder)
+        })
+
+    let encodeFrontmatter (frontmatter: NoteFrontmatter) =
+        frontmatter |> frontmatterEncoder |> YAMLicious.Encode.write 2
+
+    let private trySplitMarkdownFrontmatterEnvelope (content: string) =
+        // YAMLicious decodes the YAML document after it is isolated; the Markdown body must stay raw text.
+        let normalizedContent = normalizeNewlines content
+        let lines = normalizedContent.Split('\n')
+
+        if lines.Length = 0 || lines.[0].Trim() <> frontmatterDelimiter then
+            None
+        else
+            lines
+            |> Array.skip 1
+            |> Array.tryFindIndex (fun line -> line.Trim() = frontmatterDelimiter)
+            |> Option.map (fun closingIndexAfterOpening ->
+                let closingIndex = closingIndexAfterOpening + 1
+
+                let yamlLines =
+                    if closingIndex > 1 then
+                        lines.[1 .. closingIndex - 1]
+                    else
+                        [||]
+
+                let bodyLines =
+                    if closingIndex + 1 < lines.Length then
+                        lines.[closingIndex + 1 ..]
+                    else
+                        [||]
+
+                String.concat "\n" yamlLines, String.concat "\n" bodyLines
+            )
+
+    let tryDecodeMarkdownFrontmatter (content: string) =
+        match trySplitMarkdownFrontmatterEnvelope content with
+        | Some(yaml, body) when not (String.IsNullOrWhiteSpace yaml) ->
+            try
+                let frontmatter = yaml |> YAMLicious.Decode.read |> frontmatterDecoder
+                Some(frontmatter, body)
+            with _ ->
+                None
+        | _ -> None
 
     let formatDateFolder (dateCreated: DateTime) =
         sprintf "%02d_%02d_%04d" dateCreated.Day dateCreated.Month dateCreated.Year
@@ -24,7 +133,11 @@ module NoteConversion =
 
         let dateFolder = formatDateFolder dateCreated
 
-        if Conversion.isSafePathSegment dateFolder && Conversion.isSafePathSegment targetRef.Name && Conversion.isSafePathSegment protocolName then
+        if
+            Conversion.isSafePathSegment dateFolder
+            && Conversion.isSafePathSegment targetRef.Name
+            && Conversion.isSafePathSegment protocolName
+        then
             Some $"{notesRootFolder}/{folder}/{targetRef.Name}/{dateFolder}/{protocolName}.md"
         else
             None
@@ -32,64 +145,32 @@ module NoteConversion =
     let mkNewRootNoteRelativePath (dateCreated: DateTime) (protocolName: string) =
         let dateFolder = formatDateFolder dateCreated
 
-        if Conversion.isSafePathSegment dateFolder && Conversion.isSafePathSegment protocolName then
+        if
+            Conversion.isSafePathSegment dateFolder
+            && Conversion.isSafePathSegment protocolName
+        then
             Some $"{notesRootFolder}/{dateFolder}/{protocolName}.md"
         else
             None
 
-    let private tryTagPart (value: string option) =
-        match value with
-        | Some v when not (String.IsNullOrWhiteSpace v) -> Some v
-        | _ -> None
-
-    let private tagToText (tag: OntologyAnnotation) =
-        let parts =
-            [
-                tryTagPart tag.Name
-                tryTagPart tag.TermSourceREF
-                tryTagPart tag.TermAccessionNumber
-            ]
-            |> List.choose id
-
-        if parts.IsEmpty then "Tag" else String.concat " | " parts
-
     let formatMarkdown (draft: NotesDraft) =
-        let title = Validation.toOptionalString draft.Title |> Option.defaultValue "Untitled"
+        let title =
+            Validation.toOptionalString draft.Title |> Option.defaultValue "Untitled"
 
-        let dateCreated =
-            draft.DateCreated
-            |> Option.map formatDateFolder
-            |> Option.defaultValue ""
-
-        let tagsText =
-            draft.Tags
-            |> Seq.map tagToText
-            |> Seq.toList
-
-        let tagsLine =
-            if tagsText.IsEmpty then
-                None
-            else
-                let joinedTags = String.concat ", " tagsText
-                Some $"Tags: {joinedTags}"
+        let dateCreated = (draft.DateCreated |> Option.defaultValue DateTime.Today).Date
 
         let body = Validation.toOptionalString draft.MainText |> Option.defaultValue ""
 
-        let headerLines =
-            [
-                Some $"# {title}"
-                Some ""
-                Some $"Date Created: {dateCreated}"
-                tagsLine
-                Some ""
-                Some "---"
-                Some ""
-            ]
-            |> List.choose id
+        let frontmatter = {
+            Title = title
+            Date = dateCreated
+            Tags = if draft.Tags.Count = 0 then None else Some draft.Tags
+        }
 
-        let header = String.concat "\n" headerLines
+        let yaml = frontmatter |> encodeFrontmatter |> trimTrailingNewlines
+        let header = $"{frontmatterDelimiter}\n{yaml}\n{frontmatterDelimiter}"
 
         if String.IsNullOrWhiteSpace body then
             $"{header}\n"
         else
-            $"{header}\n{body}\n"
+            $"{header}\n\n{body}\n"
