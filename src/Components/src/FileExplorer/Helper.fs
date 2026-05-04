@@ -1,4 +1,4 @@
-module Swate.Components.FileExplorer.FileExplorerItemHelper
+module Swate.Components.FileExplorer.Helper
 
 open Swate.Components.FileExplorer.Types
 
@@ -6,7 +6,7 @@ let handleItemClick (item: FileItem) (onItemClick: (FileItem -> unit) option) (d
     dispatch (FileExplorerLogic.SelectItem item.Id)
     onItemClick |> Option.iter (fun fn -> fn item)
 
-let iconClassName (baseClasses: string list, item: FileItem, getItemIconClass: FileItem -> string option) =
+let iconClassName (baseClasses: string list) (item: FileItem) (getItemIconClass: FileItem -> string option) =
     [
         yield! baseClasses
         yield item.Icon |> FileItemIcon.className

@@ -97,7 +97,7 @@
     <Compile Include="Layout\Layout.fs" />
     <Compile Include="FileExplorer\Types.fs" />
     <Compile Include="FileExplorer\FileExplorerGitLfsHelper.fs" />
-    <Compile Include="FileExplorer\FileExplorerItemHelper.fs" />
+    <Compile Include="FileExplorer\Helper.fs" />
     <Compile Include="FileExplorer\FileExplorerItem.fs" />
     <Compile Include="FileExplorer\FileExplorer.fs" />
     <Compile Include="GitComparison\GitTextComparison.Core.fs" />

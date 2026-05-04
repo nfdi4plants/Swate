@@ -35,7 +35,7 @@ module private FileExplorerHelper =
                 {
                     Label = "Open"
                     Icon = "swt:fluent--open-24-regular"
-                    OnClick = fun () -> FileExplorerItemHelper.handleItemClick item onItemClick dispatch
+                    OnClick = fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch
                     Disabled = None
                 }
 
@@ -146,7 +146,7 @@ type FileExplorer =
         let handleDirectorySelection (item: FileItem) (ev: Browser.Types.MouseEvent) =
             ev.preventDefault ()
             ev.stopPropagation ()
-            FileExplorerItemHelper.handleItemClick item onItemClick dispatch
+            Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch
 
         let handleDirectoryArrowToggle (item: FileItem) (isExpanded: bool) =
             let willExpand = not isExpanded
@@ -254,7 +254,7 @@ type FileExplorer =
                     rowHighlightClass,
                     selectedNameClass,
                     getItemIconClass,
-                    (fun () -> FileExplorerItemHelper.handleItemClick item onItemClick dispatch)
+                    (fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch)
                 )
 
         Html.div [

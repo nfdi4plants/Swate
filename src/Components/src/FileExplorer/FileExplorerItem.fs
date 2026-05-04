@@ -163,11 +163,10 @@ type FileExplorerItem =
                                     prop.children [
                                         Html.i [
                                             prop.className (
-                                                FileExplorerItemHelper.iconClassName (
-                                                    [ "swt:iconify"; "swt:shrink-0" ],
-                                                    item,
+                                                Swate.Components.FileExplorer.Helper.iconClassName
+                                                    [ "swt:iconify"; "swt:shrink-0" ]
+                                                    item
                                                     getItemIconClass
-                                                )
                                             )
                                         ]
                                         Html.span [
@@ -259,11 +258,10 @@ type FileExplorerItem =
                             prop.children [
                                 Html.i [
                                     prop.className (
-                                        FileExplorerItemHelper.iconClassName (
-                                            [ "swt:iconify" ],
-                                            item,
+                                        Swate.Components.FileExplorer.Helper.iconClassName
+                                            [ "swt:iconify" ]
+                                            item
                                             getItemIconClass
-                                        )
                                     )
                                 ]
                                 Html.span [
