@@ -43,8 +43,8 @@ type IArcVaultsApi = {
     readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
     saveArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
-    /// Stores or clears the currently pending ARC file save draft for the active vault window.
-    setPendingArcFileSave: FileContentDTO option -> JS.Promise<Result<unit, exn>>
+    /// Applies ARC file changes to the active vault's in-memory ARC without writing to disk.
+    setArcFileInMemory: FileContentDTO -> JS.Promise<Result<unit, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: string -> JS.Promise<Result<string, exn>>

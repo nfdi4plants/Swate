@@ -21,16 +21,11 @@ module MainContentHelper =
             return saveResult
     }
 
-    let setPendingArcFileSave (arcFile: ArcFiles option) : JS.Promise<Result<unit, exn>> = promise {
-        let pendingSaveRequestResult =
-            match arcFile with
-            | None -> Ok None
-            | Some nextArcFile -> tryCreateArcFileSaveRequest nextArcFile |> Result.map Some
-
-        match pendingSaveRequestResult with
+    let setArcFileInMemory (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> = promise {
+        match tryCreateArcFileSaveRequest arcFile with
         | Error saveError -> return Error saveError
-        | Ok pendingSaveRequest ->
-            let! result = Api.ipcArcVaultApi.setPendingArcFileSave pendingSaveRequest
+        | Ok request ->
+            let! result = Api.ipcArcVaultApi.setArcFileInMemory request
             return result
     }
 

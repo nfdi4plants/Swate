@@ -6,6 +6,7 @@ open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Bindings
+open Main.ArcFileMutationHelper
 open Swate.Components
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
@@ -86,7 +87,7 @@ type ArcVault(window: BrowserWindow) =
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, set
-    member val pendingArcFileSave: FileContentDTO option = None with get, set
+    member val hasUnsavedArcChanges: bool = false with get, set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
@@ -107,7 +108,9 @@ module ArcVaultExtensions =
             fun (eventName: string) (path: string) ->
                 // Clear any existing timeout
                 match this.fileWatcherReloadArcTimeout with
-                | Some timeoutId -> Fable.Core.JS.clearTimeout timeoutId
+                | Some timeoutId ->
+                    Fable.Core.JS.clearTimeout timeoutId
+                    this.fileWatcherReloadArcTimeout <- None
                 | None ->
                     if this.isBusyWriting then
                         sendMsgApi.IsLoadingChanges true
@@ -175,6 +178,8 @@ module ArcVaultExtensions =
                                             let! fileEntries = getFileEntries this.path.Value
                                             let fileTree = createFileEntryTree fileEntries
                                             this.SetFileTree(fileTree)
+
+                                    this.fileWatcherReloadArcTimeout <- None
                                 }
                                 |> Promise.start
                             )
@@ -182,20 +187,46 @@ module ArcVaultExtensions =
 
                     this.fileWatcherReloadArcTimeout <- Some timeoutId
 
-        /// This function is used to propagate updates to the in-memory ARC instance to the file system
-        member this.SetArc(arc: ARC) = promise {
+        /// This function mutably sets the active ARC in memory without persisting to disk.
+        member this.SetArcInMemory(arc: ARC) =
             this.arc <- Some arc
             this.window.title <- arc.Identifier
-            this.isBusyWriting <- true
-            let! result = this.arc.Value.TryUpdateAsync(this.path.Value)
-            this.isBusyWriting <- false
 
-            return
-                match result with
-                | Ok _ -> Ok()
-                | Error e ->
-                    let e2 = e |> String.concat "\n\n" |> exn
-                    Error e2
+        /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty when a real change was made.
+        /// Returns true when a mutation was applied and false for no-op updates.
+        member this.ApplyArcFileInMemory(request: FileContentDTO) : Result<bool, exn> =
+            match this.arc with
+            | None -> Error(exn "ARC is not loaded.")
+            | Some arc ->
+                let normalizedRequest = normalizeArcFileRequestPath request
+
+                match hasArcFileHashChangedByPath arc normalizedRequest with
+                | Error saveError -> Error saveError
+                | Ok false -> Ok false
+                | Ok true ->
+                    match updateARCByFileContentDTO arc normalizedRequest with
+                    | Error saveError -> Error saveError
+                    | Ok newArc ->
+                        this.SetArcInMemory(newArc)
+                        this.hasUnsavedArcChanges <- true
+                        Ok true
+
+        /// Persists the active in-memory ARC using ARCtrl UpdateAsync.
+        member this.PersistArcToDisk() : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
+            match this.path, this.arc with
+            | Some arcPath, Some arc ->
+                this.isBusyWriting <- true
+
+                try
+                    try
+                        do! arc.UpdateAsync(arcPath)
+                        this.hasUnsavedArcChanges <- false
+                        return Ok()
+                    with e ->
+                        return Error(exn $"Failed to persist ARC to disk: {e.Message}")
+                finally
+                    this.isBusyWriting <- false
+            | _ -> return Error(exn "ARC is not loaded.")
         }
 
         member private this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
@@ -228,7 +259,9 @@ module ArcVaultExtensions =
             if this.path.IsSome then
                 match! ARC.tryLoadAsync (this.path.Value) with
                 | Error e -> swatefailfn this.window.id $"Unable to load ARC: {e}"
-                | Ok arc -> this.arc <- Some arc
+                | Ok arc ->
+                    this.arc <- Some arc
+                    this.hasUnsavedArcChanges <- false
             else
                 swatefailfn this.window.id $"No path set for StartFileWatcher."
         }
@@ -281,6 +314,7 @@ module ArcVaultExtensions =
                 let arc = ARC(identifier)
                 this.path <- Some path
                 this.arc <- Some arc
+                this.hasUnsavedArcChanges <- false
                 this.isBusyWriting <- true
 
                 try
@@ -292,7 +326,9 @@ module ArcVaultExtensions =
                 sendMsg.pathChange (Some path)
         }
 
-        member this.SyncArc newArc = this.arc <- newArc
+        member this.SyncArc newArc =
+            this.arc <- newArc
+            this.hasUnsavedArcChanges <- false
 
         /// Load file entries from disk and push the file tree to the renderer.
         member this.RefreshFileTree() = promise {
@@ -375,34 +411,45 @@ type ArcVaults() =
                 return Ok()
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
                 swatelogfn windowId "Close request approved by user. Closing without saving."
-                vault.pendingArcFileSave <- None
+                vault.hasUnsavedArcChanges <- false
                 vault.isCloseApproved <- true
                 vault.window.close ()
                 return Ok()
             | SaveBeforeQuitDecision.SaveAndClose ->
                 swatelogfn windowId "Close request approved by user. Closing after main save."
-                vault.pendingArcFileSave <- None
-                vault.isCloseApproved <- true
-                vault.window.close ()
-                return Ok()
+                if vault.hasUnsavedArcChanges then
+                    let! persistResult = vault.PersistArcToDisk()
+
+                    match persistResult with
+                    | Error saveError -> return Error saveError
+                    | Ok() ->
+                        vault.isCloseApproved <- true
+                        vault.window.close ()
+                        return Ok()
+                else
+                    vault.isCloseApproved <- true
+                    vault.window.close ()
+                    return Ok()
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
 
         window.onClose (fun closeEvent ->
             if not vault.isCloseApproved then
+                if vault.hasUnsavedArcChanges then
+                    closeEvent.preventDefault ()
 
-                closeEvent.preventDefault ()
+                    if not vault.isCloseRequestPending then
+                        vault.isCloseRequestPending <- true
 
-                if not vault.isCloseRequestPending then
-                    vault.isCloseRequestPending <- true
+                        let saveBeforeQuitClient =
+                            Remoting.createIpc ()
+                            |> Remoting.withWindow vault.window
+                            |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
 
-                    let saveBeforeQuitClient =
-                        Remoting.createIpc ()
-                        |> Remoting.withWindow vault.window
-                        |> Remoting.buildProxySender<IMainSaveBeforeQuitApi>
-
-                    saveBeforeQuitClient.requestSaveBeforeQuit ()
+                        saveBeforeQuitClient.requestSaveBeforeQuit ()
+                else
+                    swatelogfn id "Closing window directly because no unsaved ARC changes are present."
         )
 
         window.onClosed (fun () ->
