@@ -14,13 +14,13 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let errorModal = ErrorModal.Context.useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 
-    let stagePendingArcFileSave (nextArcFile: ArcFiles) =
+    let setArcFileInMemory (nextArcFile: ArcFiles) =
         promise {
-            match! MainContentHelper.setPendingArcFileSave (Some nextArcFile) with
+            match! MainContentHelper.setArcFileInMemory nextArcFile with
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (
-                    ErrorModalRequest.create (exn.Message, title = "Could not stage ARC file save", ?scopeId = arcScopeId)
+                    ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory", ?scopeId = arcScopeId)
                 )
         }
         |> Promise.start
@@ -30,7 +30,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             let page = Renderer.Types.PageState.ArcFilePage nextArcFile
 
             pageStateCtx.setState (Some page)
-            stagePendingArcFileSave nextArcFile
+            setArcFileInMemory nextArcFile
 
     let onSaveArcFile =
         fun _ ->

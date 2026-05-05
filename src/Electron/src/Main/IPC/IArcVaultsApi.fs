@@ -114,150 +114,20 @@ let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
 
 open ARCtrl.Contract
 
-/// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO. It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
-let setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: DataMap) : Result<unit, exn> =
-    try
-        match dmpi.Parent with
-        | DataMapParent.Study ->
-            arc.TryGetStudy dmpi.ParentId
-            |> Option.iter (fun study ->
-                if study.DataMap.IsSome then
-                    dm.StaticHash <- study.DataMap.Value.StaticHash
+let private withLoadedArcVault<'T>
+    (event: IpcMainInvokeEvent)
+    (operation: ArcVault -> JS.Promise<Result<'T, exn>>)
+    : JS.Promise<Result<'T, exn>> =
+    promise {
+        let windowId = windowIdFromIpcEvent event
 
-                study.DataMap <- Some dm
-            )
-
-            Ok()
-        | DataMapParent.Assay ->
-            arc.TryGetAssay dmpi.ParentId
-            |> Option.iter (fun assay ->
-                if assay.DataMap.IsSome then
-                    dm.StaticHash <- assay.DataMap.Value.StaticHash
-
-                assay.DataMap <- Some dm
-            )
-
-            Ok()
-        | DataMapParent.Workflow ->
-            arc.TryGetWorkflow dmpi.ParentId
-            |> Option.iter (fun workflow ->
-                if workflow.DataMap.IsSome then
-                    dm.StaticHash <- workflow.DataMap.Value.StaticHash
-
-                workflow.DataMap <- Some dm
-            )
-
-            Ok()
-        | DataMapParent.Run ->
-            arc.TryGetRun dmpi.ParentId
-            |> Option.iter (fun run ->
-                if run.DataMap.IsSome then
-                    dm.StaticHash <- run.DataMap.Value.StaticHash
-
-                run.DataMap <- Some dm
-            )
-
-            Ok()
-    with e ->
-        Error(exn $"Failed to set datamap on ARC: {e.Message}")
-
-/// This function should only be used for partial updated to an ARC based on a file content DTO.
-let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, exn> =
-    let arcfile = FileContentDTO.toArcFile dto
-
-    match arcfile with
-    | None -> Error(exn $"Unsupported file type for saving: {dto.fileType}")
-    | Some arcfile ->
-        match arcfile with
-        // if we get a investigation we are only interested in updating the investigation part of the ARC, so we can avoid deserializing and reserializing the whole ARC which is costly for large ARCs.
-        // This only works under the assumption, that we did not in fact do any changes to assay, study, ... . These reused from the existing Investigation
-        | ArcFiles.Investigation newInvestigation ->
-            newInvestigation.Assays <- oldArc.Assays
-            newInvestigation.Studies <- oldArc.Studies
-            newInvestigation.Runs <- oldArc.Runs
-            newInvestigation.Workflows <- oldArc.Workflows
-
-            let newArc =
-                ARC.fromArcInvestigation (newInvestigation, oldArc.FileSystem, ?license = oldArc.License)
-
-            newArc.StaticHash <- oldArc.StaticHash
-            Ok newArc
-        | ArcFiles.DataMap(dmpiOpt, dm) ->
-            match dmpiOpt with
-            | None -> Error(exn "DataMap file must include datamap parent info in its path for saving.")
-            | Some dmpi ->
-                match setDataMapByParentInfo oldArc dmpi dm with
-                | Ok() -> Ok oldArc
-                | Error e -> Error e
-        | ArcFiles.Assay newAssay ->
-            let oldAssayOpt = oldArc.TryGetAssay newAssay.Identifier
-
-            match oldAssayOpt with
-            | Some oldAssay ->
-                newAssay.StaticHash <- oldAssay.StaticHash
-                oldArc.SetAssay(newAssay.Identifier, newAssay)
-                Ok oldArc
-            | None ->
-                oldArc.AddAssay(newAssay)
-                Ok oldArc
-        | ArcFiles.Study(newStudy, _) ->
-            let oldStudyOpt = oldArc.TryGetStudy newStudy.Identifier
-
-            match oldStudyOpt with
-            | Some oldStudy ->
-                newStudy.StaticHash <- oldStudy.StaticHash
-                oldArc.SetStudy(newStudy.Identifier, newStudy)
-                Ok oldArc
-            | None ->
-                oldArc.AddStudy(newStudy)
-                Ok oldArc
-        | ArcFiles.Workflow newWorkflow ->
-            let oldWorkflowOpt = oldArc.TryGetWorkflow newWorkflow.Identifier
-
-            match oldWorkflowOpt with
-            | Some oldWorkflow ->
-                newWorkflow.StaticHash <- oldWorkflow.StaticHash
-                oldArc.SetWorkflow(newWorkflow.Identifier, newWorkflow)
-                Ok oldArc
-            | None ->
-                oldArc.AddWorkflow(newWorkflow)
-                Ok oldArc
-        | ArcFiles.Run newRun ->
-            let oldRunOpt = oldArc.TryGetRun newRun.Identifier
-
-            match oldRunOpt with
-            | Some oldRun ->
-                newRun.StaticHash <- oldRun.StaticHash
-                oldArc.SetRun(newRun.Identifier, newRun)
-                Ok oldArc
-            | None ->
-                oldArc.AddRun(newRun)
-                Ok oldArc
-        | ArcFiles.Template _ -> Error(exn "Saving of template files is not supported.")
-
-
-let private pathsEqualForComparison (leftPath: string) (rightPath: string) =
-    let normalize = FileIOHelper.normalizePath >> ArcPathValidation.normalizePathForComparison
-    normalize leftPath = normalize rightPath
-
-let private tryPersistPendingArcFileSave (vault: ArcVault) : JS.Promise<Result<unit, exn>> = promise {
-    match vault.pendingArcFileSave with
-    | None -> return Ok()
-    | Some pendingArcFileSave ->
-        match vault.path, vault.arc with
-        | Some _, Some arc ->
-            match updateARCByFileContentDTO arc pendingArcFileSave with
-            | Error saveError -> return Error saveError
-            | Ok newArc ->
-                let! saveResult = vault.SetArc newArc
-
-                match saveResult with
-                | Ok() ->
-                    vault.pendingArcFileSave <- None
-                    return Ok()
-                | Error saveError -> return Error saveError
-        | _ -> return Error(exn "ARC is not loaded.")
-}
+        match ARC_VAULTS.TryGetVault(windowId) with
+        | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+        | Some vault ->
+            match vault.path, vault.arc with
+            | Some _, Some _ -> return! operation vault
+            | _ -> return Error(exn "ARC is not loaded.")
+    }
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
@@ -492,43 +362,23 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     saveArcFile =
-        fun (request: FileContentDTO) -> promise {
+        fun () -> promise {
             try
-                let windowId = windowIdFromIpcEvent event
-
-                match ARC_VAULTS.TryGetVault(windowId) with
-                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-                | Some vault ->
-                    match vault.path, vault.arc with
-                    | Some arcPath, Some arc ->
-                        match updateARCByFileContentDTO arc request with
-                        | Error saveError -> return Error saveError
-                        | Ok newArc ->
-                            let! saveResult = vault.SetArc newArc
-
-                            match saveResult with
-                            | Ok() ->
-                                match vault.pendingArcFileSave with
-                                | Some pendingSave when pathsEqualForComparison pendingSave.path request.path ->
-                                    vault.pendingArcFileSave <- None
-                                | _ -> ()
-
-                                return Ok()
-                            | Error saveError -> return Error saveError
-                    | _ -> return Error(exn "ARC is not loaded.")
+                return! withLoadedArcVault event (fun vault -> vault.WriteArc())
             with e ->
                 return Error e
         }
-    setPendingArcFileSave =
-        fun (pendingArcFileSave: FileContentDTO option) -> promise {
+    setArcFileInMemory =
+        fun (request: FileContentDTO) -> promise {
             try
-                let windowId = windowIdFromIpcEvent event
-
-                match ARC_VAULTS.TryGetVault(windowId) with
-                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-                | Some vault ->
-                    vault.pendingArcFileSave <- pendingArcFileSave
-                    return Ok()
+                return!
+                    withLoadedArcVault event (fun vault ->
+                        promise {
+                            match vault.UpdateArcBy request with
+                            | Error saveError -> return Error saveError
+                            | Ok() -> return Ok()
+                        }
+                    )
             with e ->
                 return Error e
         }
@@ -627,18 +477,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
             try
                 let windowId = windowIdFromIpcEvent event
-
-                match decision with
-                | IPCTypesHelper.SaveBeforeQuitDecision.SaveAndClose ->
-                    match ARC_VAULTS.TryGetVault(windowId) with
-                    | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-                    | Some vault ->
-                        let! saveResult = tryPersistPendingArcFileSave vault
-
-                        match saveResult with
-                        | Error saveError -> return Error saveError
-                        | Ok() -> return! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
-                | _ -> return! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
+                return! ARC_VAULTS.ResolveCloseRequest(windowId, decision)
             with e ->
                 return Error e
         }
