@@ -1,4 +1,4 @@
-module Main.ArcVault.Helper
+module Main.ArcVaultHelper
 
 
 open Swate.Components.Shared

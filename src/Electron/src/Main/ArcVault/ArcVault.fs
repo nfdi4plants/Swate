@@ -6,7 +6,7 @@ open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Bindings
-open Main.ArcVault.Helper
+open Main.ArcVaultHelper
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc

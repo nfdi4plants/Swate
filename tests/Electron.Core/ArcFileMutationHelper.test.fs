@@ -1,7 +1,7 @@
 module ElectronCore.ArcFileMutationHelperTests
 
 open ARCtrl
-open Main.ArcVault.Helper
+open Main.ArcVaultHelper
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open ARCtrl.Contract
