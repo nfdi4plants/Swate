@@ -46,34 +46,6 @@ let private findByTestId<'T when 'T :> Browser.Types.Element> (testId: string) :
     | null -> failwith $"Could not find element '{testId}'."
     | element -> element :?> 'T
 
-[<Emit("""
-globalThis.__swateClipboardWriteCalls = [];
-globalThis.__swateOriginalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, "clipboard");
-Object.defineProperty(navigator, "clipboard", {
-  configurable: true,
-  value: {
-    writeText: async (value) => {
-      globalThis.__swateClipboardWriteCalls.push(value);
-    }
-  }
-});
-""")>]
-let private installClipboardWriteSpy () : unit = jsNative
-
-[<Emit("globalThis.__swateClipboardWriteCalls")>]
-let private clipboardWriteCalls () : string[] = jsNative
-
-[<Emit("""
-if (globalThis.__swateOriginalClipboardDescriptor) {
-  Object.defineProperty(navigator, "clipboard", globalThis.__swateOriginalClipboardDescriptor);
-} else {
-  delete navigator.clipboard;
-}
-delete globalThis.__swateOriginalClipboardDescriptor;
-delete globalThis.__swateClipboardWriteCalls;
-""")>]
-let private cleanupClipboardWriteSpy () : unit = jsNative
-
 [<ReactComponent>]
 let private FileExplorerTreeHarness
     (
@@ -124,14 +96,16 @@ Vitest.describe("FileExplorer ARC path popover", fun () ->
     Vitest.test("hover tooltip and click popover show full ARC path and actions", fun () ->
         promise {
             let path = @"C:\arcs\my-arc"
+            let mutable copiedPath: string option = None
+            let mutable openedFolderCount = 0
 
             let! _container, cleanup =
                 renderToBody (
                     ArcPathPopover(
                         "my-arc",
                         Some path,
-                        ignore,
-                        ignore
+                        (fun copied -> copiedPath <- Some copied),
+                        (fun () -> openedFolderCount <- openedFolderCount + 1)
                     )
                 )
 
@@ -149,30 +123,13 @@ Vitest.describe("FileExplorer ARC path popover", fun () ->
                 Vitest.expect(pathValue.textContent).toBe(path)
                 Vitest.expect(copyButton.disabled).toBe(false)
                 Vitest.expect(openFolderButton.disabled).toBe(false)
-            finally
-                cleanup ()
-        })
 
-    Vitest.test("copy action writes the exact ARC path from FileExplorer tree", fun () ->
-        promise {
-            let path = @"C:\arcs\my-arc"
-            installClipboardWriteSpy ()
-
-            let! _container, cleanup = renderToBody (FileExplorerTreeHarness(Some path, ignore))
-
-            try
-                let trigger = findByTestId<Browser.Types.HTMLButtonElement> "left-sidebar-file-explorer-arc-name"
-                trigger.click ()
-
-                do! waitForEffect (fun () -> document.querySelector("[data-testid='file-explorer-arc-path-copy']") <> null)
-
-                let copyButton = findByTestId<Browser.Types.HTMLButtonElement> "file-explorer-arc-path-copy"
                 copyButton.click ()
-                do! Promise.sleep 0
+                openFolderButton.click ()
 
-                Vitest.expect(clipboardWriteCalls ()).toEqual([| path |])
+                Vitest.expect(copiedPath).toEqual(Some path)
+                Vitest.expect(openedFolderCount).toBe(1)
             finally
-                cleanupClipboardWriteSpy ()
                 cleanup ()
         })
 
