@@ -26,7 +26,7 @@
     <Compile Include="Auth\SecureAuthStore.fs" />
     <Compile Include="Auth\GitLabApi.fs" />
     <Compile Include="Auth\AuthService.fs" />
-    <Compile Include="ArcVault\Helper.fs" />
+    <Compile Include="ArcVault\Test.fs" />
     <Compile Include="ArcVault\ArcVault.fs" />
     <Compile Include="IPC\GitLfs.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
