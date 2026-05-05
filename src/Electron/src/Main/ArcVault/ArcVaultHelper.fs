@@ -11,15 +11,6 @@ open Main
 open Main.Bindings
 open Node.Api
 
-let normalizeArcFileRequestPath (request: FileContentDTO) : FileContentDTO =
-    let normalizedPath = normalizePath request.path
-
-    if normalizedPath = request.path then
-        request
-    else
-        {| request with
-            path = normalizedPath
-        |}
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.

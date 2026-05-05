@@ -362,20 +362,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     saveArcFile =
-        fun (request: FileContentDTO) -> promise {
+        fun () -> promise {
             try
-                return!
-                    withLoadedArcVault event (fun vault ->
-                        promise {
-                            match vault.UpdateArcBy request with
-                            | Error saveError -> return Error saveError
-                            | Ok() ->
-                                if vault.hasUnsavedArcChanges then
-                                    return! vault.WriteArc()
-                                else
-                                    return Ok()
-                        }
-                    )
+                return! withLoadedArcVault event (fun vault -> vault.WriteArc())
             with e ->
                 return Error e
         }

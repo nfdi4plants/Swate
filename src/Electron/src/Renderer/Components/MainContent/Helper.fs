@@ -24,7 +24,15 @@ module MainContentHelper =
         }
 
     let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
-        withArcFileRequest arcFile Api.ipcArcVaultApi.saveArcFile
+        withArcFileRequest arcFile (fun request ->
+            promise {
+                let! setResult = Api.ipcArcVaultApi.setArcFileInMemory request
+
+                match setResult with
+                | Error exn -> return Error exn
+                | Ok() -> return! Api.ipcArcVaultApi.saveArcFile ()
+            }
+        )
 
     let setArcFileInMemory (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
         withArcFileRequest arcFile Api.ipcArcVaultApi.setArcFileInMemory
@@ -32,12 +40,17 @@ module MainContentHelper =
     let saveArcFileAndOpen (arcFile: ArcFiles) =
         withArcFileRequest arcFile (fun request ->
             promise {
-                let! saveResult = Api.ipcArcVaultApi.saveArcFile request
+                let! setResult = Api.ipcArcVaultApi.setArcFileInMemory request
 
-                match saveResult with
+                match setResult with
                 | Error exn -> return Error exn
                 | Ok() ->
-                    let! openResult = Api.ipcArcVaultApi.openFile request.path
-                    return openResult
+                    let! saveResult = Api.ipcArcVaultApi.saveArcFile ()
+
+                    match saveResult with
+                    | Error exn -> return Error exn
+                    | Ok() ->
+                        let! openResult = Api.ipcArcVaultApi.openFile request.path
+                        return openResult
             }
         )
