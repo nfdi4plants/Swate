@@ -22,7 +22,7 @@ Vitest.describe("ArcFileMutationHelper", fun () ->
         let request =
             FileContentDTO.create DTOType.ISA_Assay """{"dummy":"value"}""" @"assays\assay_1\isa.assay.xlsx\"
 
-        let normalized = normalizeArcFileRequestPath request
+        let normalized = Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
         Vitest.expect(normalized.path).toBe("assays/assay_1/isa.assay.xlsx"))
 
     Vitest.test("updateARCByFileContentDTO updates an existing ISA assay while preserving static hash", fun () ->
