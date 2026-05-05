@@ -13,7 +13,6 @@ open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
-
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
@@ -139,7 +138,7 @@ module ArcVaultExtensions =
             match this.arc with
             | None -> Error(exn "ARC is not loaded.")
             | Some arc ->
-                let normalizedRequest = normalizeArcFileRequestPath request
+                let normalizedRequest = Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
                 match updateARCByFileContentDTO arc normalizedRequest with
                 | Error saveError -> Error saveError
