@@ -298,7 +298,7 @@ type FileTree =
                 Html.div [
                     prop.className "swt:w-full"
                     prop.children [
-                        Renderer.Components.FileExplorerArcPath.ArcPathPopover(
+                        Swate.Components.ArcVaultActions.ArcVaultActions.ArcVaultActions(
                             arcName,
                             appStateCtx,
                             copyArcPathToClipboard,
