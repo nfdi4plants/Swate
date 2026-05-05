@@ -367,11 +367,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return!
                     withLoadedArcVault event (fun vault ->
                         promise {
-                            match vault.ApplyArcFileInMemory request with
+                            match vault.UpdateArcBy request with
                             | Error saveError -> return Error saveError
-                            | Ok _ ->
+                            | Ok() ->
                                 if vault.hasUnsavedArcChanges then
-                                    return! vault.PersistArcToDisk()
+                                    return! vault.WriteArc()
                                 else
                                     return Ok()
                         }
@@ -385,9 +385,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return!
                     withLoadedArcVault event (fun vault ->
                         promise {
-                            match vault.ApplyArcFileInMemory request with
+                            match vault.UpdateArcBy request with
                             | Error saveError -> return Error saveError
-                            | Ok _ -> return Ok()
+                            | Ok() -> return Ok()
                         }
                     )
             with e ->

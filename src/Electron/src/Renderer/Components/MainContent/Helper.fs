@@ -13,31 +13,31 @@ module MainContentHelper =
         | Some request -> Ok request
         | None -> Error(exn "Saving this file type is not supported in Electron yet.")
 
-    let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> = promise {
-        match tryCreateArcFileSaveRequest arcFile with
-        | Error saveError -> return Error saveError
-        | Ok request ->
-            let! saveResult = Api.ipcArcVaultApi.saveArcFile request
-            return saveResult
-    }
+    let private withArcFileRequest
+        (arcFile: ArcFiles)
+        (execute: FileContentDTO -> JS.Promise<Result<'T, exn>>)
+        : JS.Promise<Result<'T, exn>> =
+        promise {
+            match tryCreateArcFileSaveRequest arcFile with
+            | Error saveError -> return Error saveError
+            | Ok request -> return! execute request
+        }
 
-    let setArcFileInMemory (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> = promise {
-        match tryCreateArcFileSaveRequest arcFile with
-        | Error saveError -> return Error saveError
-        | Ok request ->
-            let! result = Api.ipcArcVaultApi.setArcFileInMemory request
-            return result
-    }
+    let saveArcFile (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
+        withArcFileRequest arcFile Api.ipcArcVaultApi.saveArcFile
 
-    let saveArcFileAndOpen (arcFile: ArcFiles) = promise {
-        match tryCreateArcFileSaveRequest arcFile with
-        | Error saveError -> return Error saveError
-        | Ok request ->
-            let! saveResult = Api.ipcArcVaultApi.saveArcFile request
+    let setArcFileInMemory (arcFile: ArcFiles) : JS.Promise<Result<unit, exn>> =
+        withArcFileRequest arcFile Api.ipcArcVaultApi.setArcFileInMemory
 
-            match saveResult with
-            | Error exn -> return Error exn
-            | Ok() ->
-                let! openResult = Api.ipcArcVaultApi.openFile request.path
-                return openResult
-    }
+    let saveArcFileAndOpen (arcFile: ArcFiles) =
+        withArcFileRequest arcFile (fun request ->
+            promise {
+                let! saveResult = Api.ipcArcVaultApi.saveArcFile request
+
+                match saveResult with
+                | Error exn -> return Error exn
+                | Ok() ->
+                    let! openResult = Api.ipcArcVaultApi.openFile request.path
+                    return openResult
+            }
+        )

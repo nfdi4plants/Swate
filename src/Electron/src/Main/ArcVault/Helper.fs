@@ -1,10 +1,15 @@
-module Main.ArcFileMutationHelper
+module Main.ArcVault.Helper
+
 
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
-
+open Fable.Electron
+open Fable.Core.JsInterop
+open Main
+open Main.Bindings
+open Node.Api
 
 let normalizeArcFileRequestPath (request: FileContentDTO) : FileContentDTO =
     let normalizedPath = normalizePath request.path
@@ -138,22 +143,59 @@ let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, 
                 Ok oldArc
         | ArcFiles.Template _ -> Error(exn "Saving of template files is not supported.")
 
-let private tryGetArcFileHashCodeByPath (arc: ARC) (relativePath: string) =
-    FileContentDTO.fromArcByPath relativePath arc
-    |> Option.bind FileContentDTO.toArcFile
-    |> Option.map (fun arcFile -> arcFile.GetHashCode())
+let swatelogfn id fmt =
+    Printf.kprintf (fun s -> Browser.Dom.console.log ("[Swate-" + string id + "] " + s)) fmt
 
-/// Computes whether an incoming request would produce a real in-memory ARC mutation.
-/// Path comparison is normalized before hash comparison to avoid false-positive diffs.
-let hasArcFileHashChangedByPath (arc: ARC) (request: FileContentDTO) : Result<bool, exn> =
-    let normalizedRequest = normalizeArcFileRequestPath request
+let swatefailfn id fmt =
+    Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
 
-    match FileContentDTO.toArcFile normalizedRequest with
-    | None -> Error(exn $"Unsupported file type for saving: {normalizedRequest.fileType}")
-    | Some incomingArcFile ->
-        let incomingHash = incomingArcFile.GetHashCode()
-        let currentHashOpt = tryGetArcFileHashCodeByPath arc normalizedRequest.path
+let createWindow () = promise {
+    printfn "[Swate] Creating new window"
+    let screenSize = screen.getPrimaryDisplay().workAreaSize
 
-        match currentHashOpt with
-        | Some currentHash when currentHash = incomingHash -> Ok false
-        | _ -> Ok true
+    let mainWindowOptions =
+        BrowserWindowConstructorOptions(
+            width = int screenSize.width,
+            height = int screenSize.height,
+            webPreferences = WebPreferences(preload = path.join (__dirname, "preload.fs.js"))
+        )
+
+    let window = BrowserWindow(mainWindowOptions)
+
+    if isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL then
+        do! window.loadFile (path.join (__dirname, $"../renderer/{MAIN_WINDOW_VITE_NAME}/index.html"))
+    else
+        window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
+        do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
+
+    return window
+}
+
+let createFileWatcher (path: string) =
+
+    let ignoreFn =
+        fun (path: string) ->
+            let normalizedPath = path.Replace("\\", "/")
+
+            let segments =
+                normalizedPath.Trim('/').Split('/', System.StringSplitOptions.RemoveEmptyEntries)
+
+            let tempXlsxPattern = """\.~\$.*\.xlsx$"""
+
+            // skip temporary Excel files (created when editing an xlsx file)
+            if System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern) then
+                true
+            // skip git folder itself (and its contents) to avoid expensive scans
+            elif segments |> Array.exists (fun segment -> segment = ".git") then
+                true
+            else
+                false
+
+    let watcher =
+        Chokidar.Chokidar.watch (
+            path,
+            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
+        )
+
+    watcher
+

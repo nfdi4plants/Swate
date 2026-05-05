@@ -6,77 +6,13 @@ open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Bindings
-open Main.ArcFileMutationHelper
-open Swate.Components
+open Main.ArcVault.Helper
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 
-
-module ArcVaultHelper =
-
-    open Fable.Core.JsInterop
-    open Node.Api
-
-    let swatelogfn id fmt =
-        Printf.kprintf (fun s -> Browser.Dom.console.log ("[Swate-" + string id + "] " + s)) fmt
-
-    let swatefailfn id fmt =
-        Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
-
-    let createWindow () = promise {
-        printfn "[Swate] Creating new window"
-        let screenSize = screen.getPrimaryDisplay().workAreaSize
-
-        let mainWindowOptions =
-            BrowserWindowConstructorOptions(
-                width = int screenSize.width,
-                height = int screenSize.height,
-                webPreferences = WebPreferences(preload = path.join (__dirname, "preload.fs.js"))
-            )
-
-        let window = BrowserWindow(mainWindowOptions)
-
-        if isNullOrUndefined MAIN_WINDOW_VITE_DEV_SERVER_URL then
-            do! window.loadFile (path.join (__dirname, $"../renderer/{MAIN_WINDOW_VITE_NAME}/index.html"))
-        else
-            window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
-            do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
-
-        return window
-    }
-
-    let createFileWatcher (path: string) =
-
-        let ignoreFn =
-            fun (path: string) ->
-                let normalizedPath = path.Replace("\\", "/")
-
-                let segments =
-                    normalizedPath.Trim('/').Split('/', System.StringSplitOptions.RemoveEmptyEntries)
-
-                let tempXlsxPattern = """\.~\$.*\.xlsx$"""
-
-                // skip temporary Excel files (created when editing an xlsx file)
-                if System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern) then
-                    true
-                // skip git folder itself (and its contents) to avoid expensive scans
-                elif segments |> Array.exists (fun segment -> segment = ".git") then
-                    true
-                else
-                    false
-
-        let watcher =
-            Chokidar.Chokidar.watch (
-                path,
-                Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
-            )
-
-        watcher
-
-open ArcVaultHelper
 
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
@@ -87,6 +23,12 @@ type ArcVault(window: BrowserWindow) =
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, set
+    /// Dirty marker for unsaved in-memory ARC mutations.
+    /// This flag is intentionally coarse and can remain true even if later edits restore the previous logical state.
+    ///Good workaround, for a missing member 👍 Might even be more performant, than calculating a isDirty flag. On the other hand, it is unable to detect if changes are removed again. For example:
+    ///Add Assay 1 -> Set hasUnsavedArcChanges <- true
+    ///Remove Assay 1 -> Still true, even tough changes were removed again and it is in its original state.
+    ///I am not sure if performance of calculating changes or precision should be more important. Lets see in the future. Maybe you can add this comment as /// comment on this member?
     member val hasUnsavedArcChanges: bool = false with get, set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
@@ -188,31 +130,26 @@ module ArcVaultExtensions =
                     this.fileWatcherReloadArcTimeout <- Some timeoutId
 
         /// This function mutably sets the active ARC in memory without persisting to disk.
-        member this.SetArcInMemory(arc: ARC) =
+        member this.SetArc(arc: ARC) =
             this.arc <- Some arc
             this.window.title <- arc.Identifier
 
-        /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty when a real change was made.
-        /// Returns true when a mutation was applied and false for no-op updates.
-        member this.ApplyArcFileInMemory(request: FileContentDTO) : Result<bool, exn> =
+        /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
+        member this.UpdateArcBy(request: FileContentDTO) : Result<unit, exn> =
             match this.arc with
             | None -> Error(exn "ARC is not loaded.")
             | Some arc ->
                 let normalizedRequest = normalizeArcFileRequestPath request
 
-                match hasArcFileHashChangedByPath arc normalizedRequest with
+                match updateARCByFileContentDTO arc normalizedRequest with
                 | Error saveError -> Error saveError
-                | Ok false -> Ok false
-                | Ok true ->
-                    match updateARCByFileContentDTO arc normalizedRequest with
-                    | Error saveError -> Error saveError
-                    | Ok newArc ->
-                        this.SetArcInMemory(newArc)
-                        this.hasUnsavedArcChanges <- true
-                        Ok true
+                | Ok newArc ->
+                    this.SetArc(newArc)
+                    this.hasUnsavedArcChanges <- true
+                    Ok()
 
-        /// Persists the active in-memory ARC using ARCtrl UpdateAsync.
-        member this.PersistArcToDisk() : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
+        /// Writes the active in-memory ARC scaffold to disk using ARCtrl UpdateAsync.
+        member this.WriteArc() : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
             | Some arcPath, Some arc ->
                 this.isBusyWriting <- true
@@ -326,10 +263,6 @@ module ArcVaultExtensions =
                 sendMsg.pathChange (Some path)
         }
 
-        member this.SyncArc newArc =
-            this.arc <- newArc
-            this.hasUnsavedArcChanges <- false
-
         /// Load file entries from disk and push the file tree to the renderer.
         member this.RefreshFileTree() = promise {
             match this.path with
@@ -418,7 +351,7 @@ type ArcVaults() =
             | SaveBeforeQuitDecision.SaveAndClose ->
                 swatelogfn windowId "Close request approved by user. Closing after main save."
                 if vault.hasUnsavedArcChanges then
-                    let! persistResult = vault.PersistArcToDisk()
+                    let! persistResult = vault.WriteArc()
 
                     match persistResult with
                     | Error saveError -> return Error saveError
@@ -459,7 +392,7 @@ type ArcVaults() =
         )
 
     member this.RegisterVault() : Fable.Core.JS.Promise<int> = promise {
-        let! window = ArcVaultHelper.createWindow ()
+        let! window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
@@ -473,7 +406,7 @@ type ArcVaults() =
     }
 
     member this.RegisterVaultWithArc(path: string) = promise {
-        let! window = ArcVaultHelper.createWindow ()
+        let! window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
@@ -488,7 +421,7 @@ type ArcVaults() =
     }
 
     member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
-        let! window = ArcVaultHelper.createWindow ()
+        let! window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)

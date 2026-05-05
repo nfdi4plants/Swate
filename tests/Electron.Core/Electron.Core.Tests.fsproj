@@ -4,6 +4,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Compile Include="FileTreeCompaction.test.fs" />
+    <Compile Include="ArcFileMutationHelper.test.fs" />
     <Compile Include="ArcObjectWidget.test.fs" />
     <Compile Include="ArcObjectGraphExplorer.test.fs" />
     <Compile Include="JsonDTOUnwrapper.test.fs" />
