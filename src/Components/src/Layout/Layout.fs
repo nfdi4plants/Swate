@@ -108,7 +108,7 @@ type Layout =
         ]
 
     [<ReactComponent>]
-    static member LeftSidebarToggleBtn(?activeBorderStyle: bool) =
+    static member LeftSidebarToggleBtn() =
         let ctx = useLeftSidebarCtx ()
 
         Layout.LayoutBtn(
@@ -123,7 +123,7 @@ type Layout =
         )
 
     [<ReactComponent>]
-    static member RightSidebarToggleBtn(?activeBorderStyle: bool) =
+    static member RightSidebarToggleBtn() =
         let ctx = useRightSidebarCtx ()
 
         Layout.LayoutBtn(
