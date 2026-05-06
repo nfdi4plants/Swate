@@ -13,7 +13,6 @@ open Fable.Core.JsInterop
 open ARCtrl
 open Types
 
-let private normalizeNodePath (path: string) = normalizePath path
 
 let tryGetArcFileRelativePath (arcFile: ArcFiles) =
     arcFile.TryGetRelativePath() |> Option.map normalizePath
@@ -44,7 +43,7 @@ let rec private collectSelectedDirectoryPathChain
     (node: FileTreeNode)
     (loadedPaths: Set<string>)
     =
-    let normalizedNodePath = normalizeNodePath node.path
+    let normalizedNodePath = normalizePath node.path
 
     let isInSelectedPathChain =
         selectedTreeItemPath
@@ -67,7 +66,7 @@ let rec private collectSelectedDirectoryPathChain
 let requiredLoadedDirectoryPaths (selectedTreeItemPath: string option) (root: FileTreeNode) =
     let rootPathSet =
         if root.isDirectory then
-            Set.singleton (normalizeNodePath root.path)
+            Set.singleton (normalizePath root.path)
         else
             Set.empty
 
@@ -76,7 +75,7 @@ let requiredLoadedDirectoryPaths (selectedTreeItemPath: string option) (root: Fi
 let rec loopPaths (loadedDirectoryPaths: Set<string>) (selectedTreeItemPath: string option) (parent: FileTreeNode) =
     match parent.isDirectory with
     | true ->
-        let normalizedParentPath = normalizeNodePath parent.path
+        let normalizedParentPath = normalizePath parent.path
         let isDirectoryLoaded = loadedDirectoryPaths.Contains normalizedParentPath
         let hasSourceChildren = parent.children.Count > 0
 

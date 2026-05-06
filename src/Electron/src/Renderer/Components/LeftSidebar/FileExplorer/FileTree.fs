@@ -259,7 +259,7 @@ type FileTree =
             pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
 
         let arcCreateModal =
-            ArcCreateModal.Main(
+            CreateArcFileModal.Main(
                 isOpen = pendingCreateKind.IsSome,
                 kind = activeCreateKind,
                 close = closeCreateModal,

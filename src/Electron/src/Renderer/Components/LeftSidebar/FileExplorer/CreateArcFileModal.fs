@@ -14,7 +14,7 @@ open ARCtrl
 open Helper
 
 [<Erase; Mangle(false)>]
-type private ArcCreateModal =
+type CreateArcFileModal =
 
     [<ReactComponent>]
     static member Main
