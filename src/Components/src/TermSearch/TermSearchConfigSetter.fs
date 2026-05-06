@@ -11,6 +11,7 @@ open Swate.Components.TermSearch.TermSearchActiveKeysContext
 [<Erase; Mangle(false)>]
 type TermSearchConfigSetter =
 
+    [<ReactComponent>]
     static member private TriggerRender(activeKeys: string[]) =
         Html.button [
             prop.testId "term-search-config-setter-tib-trigger"
@@ -46,7 +47,7 @@ type TermSearchConfigSetter =
 
         let activeKeysState =
             if isNullOrUndefined (box activeKeysCtx.state) then
-                TermSearchConfigLocalStorageActiveKeysContext.init ()
+                TermSearchActiveKeysContext.init (Set.empty)
             else
                 activeKeysCtx.state
 
@@ -65,10 +66,10 @@ type TermSearchConfigSetter =
             fun selectedIndices ->
                 let nextActiveKeys = selectedIndices |> Seq.map (fun i -> allKeysCtx |> Seq.item i)
 
-                activeKeysCtx.setState {
+                activeKeysCtx.setState {|
                     activeKeysState with
                         activeKeys = Array.ofSeq nextActiveKeys
-                }
+                |}
 
         let defaultSearchActive = not activeKeysState.disableDefault
 
@@ -98,10 +99,10 @@ type TermSearchConfigSetter =
                         prop.type'.checkbox
                         prop.isChecked defaultSearchActive
                         prop.onChange (fun (b: bool) ->
-                            activeKeysCtx.setState {
+                            activeKeysCtx.setState {|
                                 activeKeysState with
                                     disableDefault = not b
-                            }
+                            |}
                         )
                     ]
                 description = Html.p "When you deactivate this, the default search will not be used."

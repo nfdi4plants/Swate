@@ -11,88 +11,11 @@ open Swate.Components.TermSearch.TermSearchActiveKeysContext
 
 module private TermSearchConfigProviderHelper =
 
-    [<Emit("Array.isArray($0)")>]
-    let isJsArray (value: obj) : bool = jsNative
-
     [<Literal>]
     let TIB_PREFIX = "TIB_"
 
     [<Literal>]
     let TIB_DATAPLANT_COLLECTION_KEY = "DataPLANT"
-
-    let sanitizeStringArray (arr: string[]) =
-        if isNullOrUndefined (box arr) || not (isJsArray (box arr)) then
-            [||]
-        else
-            arr
-            |> Array.choose (fun item ->
-                if isNullOrUndefined (box item) then
-                    None
-                else
-                    let value = string item
-
-                    if System.String.IsNullOrWhiteSpace value then
-                        None
-                    else
-                        Some value
-            )
-
-    let sanitizeQueryList<'T> (queries: ResizeArray<string * 'T>) =
-        if isNullOrUndefined (box queries) || not (isJsArray (box queries)) then
-            ResizeArray()
-        else
-            queries
-            |> Seq.choose (fun entry ->
-                if isNullOrUndefined (box entry) || not (isJsArray (box entry)) then
-                    None
-                else
-                    let key, value = entry
-
-                    if isNullOrUndefined (box key) || isNullOrUndefined (box value) then
-                        None
-                    else
-                        let key = string key
-
-                        if System.String.IsNullOrWhiteSpace key then
-                            None
-                        else
-                            Some(key, value)
-            )
-            |> ResizeArray
-
-    let sanitizeActiveKeysState
-        (fallbackState: TermSearchConfigLocalStorageActiveKeysContext)
-        (state: TermSearchConfigLocalStorageActiveKeysContext)
-        : TermSearchConfigLocalStorageActiveKeysContext * bool =
-        if isNullOrUndefined (box state) then
-            fallbackState, true
-        else
-            let hasDisableDefault = not (isNullOrUndefined (box state.disableDefault))
-
-            let disableDefault =
-                if hasDisableDefault then
-                    state.disableDefault
-                else
-                    fallbackState.disableDefault
-
-            let activeKeysRaw = state.activeKeys
-
-            let hasActiveKeys =
-                not (isNullOrUndefined (box activeKeysRaw)) && isJsArray (box activeKeysRaw)
-
-            let activeKeys =
-                if hasActiveKeys then
-                    sanitizeStringArray activeKeysRaw
-                else
-                    fallbackState.activeKeys
-
-            let wasFiltered = hasActiveKeys && activeKeys.Length <> activeKeysRaw.Length
-
-            {
-                disableDefault = disableDefault
-                activeKeys = activeKeys
-            },
-            (not hasDisableDefault || not hasActiveKeys || wasFiltered)
 
     let mkTIBQueries (collections: Set<string>) = {|
         TermSearch =
@@ -150,10 +73,11 @@ type TermSearchConfigProvider =
             (fun _ -> // get all currently supported catalogues
                 promise {
                     try
-                        let! collections = Api.TIBApi.TIBApi.getCollections ()
+                        let! collections =
+                            Api.TIBApi.TIBApi.getCollections ()
+                            |> Promise.catch (fun ex -> console.error "Error fetching TIB collections:" ex)
 
-                        let collectionSet =
-                            collections.content |> Option.ofObj |> Option.defaultValue [||] |> Set.ofArray
+                        let collectionSet = Set.ofArray collections.content
 
                         let tibQueries = TermSearchConfigProviderHelper.mkTIBQueries collectionSet
                         setAllTermSearchQueries (ResizeArray tibQueries.TermSearch)
@@ -187,39 +111,10 @@ type TermSearchConfigProvider =
             ?localStorageKey: string
         ) =
         let localStorageKey = defaultArg localStorageKey "swate-termsearchconfig-ctx"
+        let defaultActive = defaultArg defaultActive Set.empty
 
-        let (activeKeys: TermSearchConfigLocalStorageActiveKeysContext), setActiveKeys =
-            React.useLocalStorage (
-                localStorageKey,
-                TermSearchConfigLocalStorageActiveKeysContext.init (?defaultActive = defaultActive)
-            )
-
-        let defaultActiveKeysState =
-            TermSearchConfigLocalStorageActiveKeysContext.init (?defaultActive = defaultActive)
-
-        let sanitizedActiveKeys, shouldRepairActiveKeysState =
-            TermSearchConfigProviderHelper.sanitizeActiveKeysState defaultActiveKeysState activeKeys
-
-        React.useEffect (
-            (fun () ->
-                if shouldRepairActiveKeysState then
-                    setActiveKeys sanitizedActiveKeys
-            ),
-            [|
-                box shouldRepairActiveKeysState
-                box sanitizedActiveKeys.disableDefault
-                box (sanitizedActiveKeys.activeKeys |> String.concat ";")
-            |]
-        )
-
-        let allTermSearchQueries =
-            TermSearchConfigProviderHelper.sanitizeQueryList allTermSearchQueries
-
-        let allParentSearchQueries =
-            TermSearchConfigProviderHelper.sanitizeQueryList allParentSearchQueries
-
-        let allAllChildrenSearchQueries =
-            TermSearchConfigProviderHelper.sanitizeQueryList allAllChildrenSearchQueries
+        let (activeKeys: TermSearchActiveKeysContext), setActiveKeys =
+            React.useLocalStorage (localStorageKey, TermSearchActiveKeysContext.init (defaultActive))
 
         let allKeys =
             React.useMemo (
@@ -243,34 +138,34 @@ type TermSearchConfigProvider =
             )
 
         /// This is used for memoization
-        let activeKeysString =
-            match sanitizedActiveKeys.activeKeys with
-            | [||] -> ""
-            | keys -> keys |> Array.sort |> String.concat "; "
+        let activeKeysString = activeKeys.activeKeys |> Array.sort |> String.concat "; "
 
         let queries =
             React.useMemo (
                 (fun () ->
-                    let activeKeysSet = sanitizedActiveKeys.activeKeys |> Set.ofSeq
 
                     let termSearchQueries =
                         allTermSearchQueries
-                        |> Seq.filter (fun (key, _) -> activeKeysSet |> Set.contains key)
+                        |> Seq.filter (fun (key, _) ->
+                            let isActive = activeKeys.activeKeys |> Set.ofSeq |> Set.contains key
+
+                            isActive
+                        )
                         |> ResizeArray
 
                     let parentSearchQueries =
                         allParentSearchQueries
-                        |> Seq.filter (fun (key, _) -> activeKeysSet |> Set.contains key)
+                        |> Seq.filter (fun (key, _) -> activeKeys.activeKeys |> Set.ofSeq |> Set.contains key)
                         |> ResizeArray
 
                     let allChildrenSearchQueries =
                         allAllChildrenSearchQueries
-                        |> Seq.filter (fun (key, _) -> activeKeysSet |> Set.contains key)
+                        |> Seq.filter (fun (key, _) -> activeKeys.activeKeys |> Set.ofSeq |> Set.contains key)
                         |> ResizeArray
 
                     {
                         hasProvider = true
-                        disableDefault = sanitizedActiveKeys.disableDefault
+                        disableDefault = activeKeys.disableDefault
                         termSearchQueries = termSearchQueries
                         parentSearchQueries = parentSearchQueries
                         allChildrenSearchQueries = allChildrenSearchQueries
@@ -278,7 +173,7 @@ type TermSearchConfigProvider =
                 ),
                 [|
                     activeKeysString
-                    sanitizedActiveKeys.disableDefault
+                    activeKeys.disableDefault
                     allTermSearchQueries
                     allParentSearchQueries
                     allAllChildrenSearchQueries
@@ -287,7 +182,7 @@ type TermSearchConfigProvider =
 
         TermSearchActiveKeysContext.TermSearchActiveKeysCtx.Provider(
             {
-                state = sanitizedActiveKeys
+                state = activeKeys
                 setState = setActiveKeys
             },
             TermSearchConfigCtx.Provider(queries, TermSearchAllKeysCtx.Provider(allKeys, children))
