@@ -25,7 +25,9 @@ type ArcVaultActions =
         )
 
     [<ReactMemoComponent>]
-    static member private Content(pathValue: string, onCopyPath: string -> unit, onOpenArcFolder: unit -> unit) =
+    static member private Content
+        (arcName: string, arcRootPath: string, onCopyPath: string -> unit, onOpenArcFolder: unit -> unit)
+        =
         Popover.Content(
             className = "swt:w-96 swt:max-w-[calc(100vw-3rem)]",
             children =
@@ -37,12 +39,12 @@ type ArcVaultActions =
                             prop.children [
                                 Html.h3 [
                                     prop.className "swt:text-sm swt:font-semibold"
-                                    prop.text "ARC local path"
+                                    prop.text arcName
                                 ]
                                 Html.p [
                                     prop.testId "arc-vault-actions-path-value"
                                     prop.className "swt:break-all swt:text-xs swt:opacity-90"
-                                    prop.text pathValue
+                                    prop.text arcRootPath
                                 ]
                             ]
                         ]
@@ -52,7 +54,7 @@ type ArcVaultActions =
                                 Html.button [
                                     prop.testId "arc-vault-actions-path-copy"
                                     prop.className "swt:btn swt:btn-sm"
-                                    prop.onClick (fun _ -> onCopyPath pathValue)
+                                    prop.onClick (fun _ -> onCopyPath arcRootPath)
                                     prop.children [
                                         Html.i [ prop.className "swt:iconify swt:fluent--copy-24-regular" ]
                                         Html.span [ prop.text "Copy path" ]
@@ -92,7 +94,7 @@ type ArcVaultActions =
             children =
                 React.Fragment [
                     ArcVaultActions.Trigger(arcName, arcRootPath)
-                    ArcVaultActions.Content(arcRootPath, onCopyPathCallback, onOpenArcFolderCallback)
+                    ArcVaultActions.Content(arcName, arcRootPath, onCopyPathCallback, onOpenArcFolderCallback)
                 ]
         )
 

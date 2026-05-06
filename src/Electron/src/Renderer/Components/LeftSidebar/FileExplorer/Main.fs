@@ -31,9 +31,75 @@ type Main =
     [<ReactComponent>]
     static member private NoArcOpenPlaceholder() =
         Html.div [
-            prop.className "swt:p-4 swt:text-sm swt:text-center swt:text-muted-foreground"
+            prop.testId "left-sidebar-file-explorer-empty"
+            prop.className "swt:flex swt:h-full swt:min-h-0 swt:items-center swt:justify-center swt:p-1"
             prop.children [
-                Html.text "No ARC open. Please open an ARC to explore files."
+                Html.div [
+                    prop.className
+                        "swt:w-full swt:rounded-box swt:border swt:border-base-content/10 swt:bg-base-100 swt:shadow-sm"
+                    prop.children [
+                        Html.div [
+                            prop.className
+                                "swt:flex swt:flex-col swt:items-center swt:gap-2 swt:border-b swt:border-base-content/10 swt:px-2 swt:py-3 swt:text-center"
+                            prop.children [
+                                Html.div [
+                                    prop.className
+                                        "swt:flex swt:size-8 swt:shrink-0 swt:items-center swt:justify-center swt:rounded-full swt:bg-base-200 swt:text-primary"
+                                    prop.children [
+                                        Html.i [
+                                            prop.className "swt:iconify swt:fluent--folder-open-24-regular swt:size-4"
+                                        ]
+                                    ]
+                                ]
+                                Html.div [
+                                    prop.className "swt:min-w-0"
+                                    prop.children [
+                                        Html.h3 [
+                                            prop.className "swt:text-sm swt:font-semibold"
+                                            prop.text "No ARC open"
+                                        ]
+                                        Html.p [
+                                            prop.className "swt:mt-1 swt:text-xs swt:text-base-content/70"
+                                            prop.text
+                                                "Open or create an ARC to browse files and manage notes from this sidebar."
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                        Html.div [
+                            prop.className "swt:px-2 swt:py-2"
+                            prop.children [
+                                Html.ul [
+                                    prop.className "swt:space-y-1.5 swt:text-xs swt:text-base-content/80"
+                                    prop.children [
+                                        Html.li [
+                                            prop.className "swt:flex swt:items-start swt:gap-2"
+                                            prop.children [
+                                                Html.i [
+                                                    prop.className
+                                                        "swt:iconify swt:fluent--arrow-right-24-regular swt:mt-0.5 swt:size-3 swt:text-primary"
+                                                ]
+                                                Html.span "Use the top toolbar to open an ARC from your machine."
+                                            ]
+                                        ]
+                                        Html.li [
+                                            prop.className "swt:flex swt:items-start swt:gap-2"
+                                            prop.children [
+                                                Html.i [
+                                                    prop.className
+                                                        "swt:iconify swt:fluent--arrow-right-24-regular swt:mt-0.5 swt:size-3 swt:text-primary"
+                                                ]
+                                                Html.span
+                                                    "After opening, your ARC file tree and quick actions will appear here."
+                                            ]
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                ]
             ]
         ]
 
@@ -71,11 +137,11 @@ type Main =
         | Some path ->
             Html.div [
                 prop.testId "left-sidebar-file-explorer"
-                prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col"
+                prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col swt:gap-4"
                 prop.children [
                     Html.div [
                         prop.testId "left-sidebar-file-explorer-toolbar"
-                        prop.className "swt:mb-2 swt:flex swt:shrink-0 swt:justify-center swt:bg-base-100"
+                        prop.className "swt:flex swt:shrink-0 swt:justify-center swt:bg-base-100"
                         prop.children [
                             Swate.Components.Actionbar.Main(
                                 [|
