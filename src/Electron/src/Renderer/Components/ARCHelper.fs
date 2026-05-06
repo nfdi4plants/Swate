@@ -13,13 +13,9 @@ let useCurrentArcScopeId () =
 
     appStateCtx
     |> Option.map normalizePath
-    |> Option.bind (fun path ->
-        if String.IsNullOrWhiteSpace path then
-            None
-        else
-            Some path
-    )
+    |> Option.bind (fun path -> if String.IsNullOrWhiteSpace path then None else Some path)
 
+/// TODO: Check if this type is necessary. Looks like it just is an additonal wrapper around PageState? Not sure why we need this + helper boilerplate below.
 type ViewLoadResult = {
     RendererPageState: Renderer.Types.PageState
 }
@@ -29,23 +25,21 @@ let viewLoadResultOfDto (data: FileContentDTO) =
 
     { RendererPageState = pageState }
 
-let applyLoadedView
-    (setPageState: Renderer.Types.PageState option -> unit)
-    (loaded: ViewLoadResult)
-    =
+let applyLoadedView (setPageState: Renderer.Types.PageState option -> unit) (loaded: ViewLoadResult) =
     setPageState (Some loaded.RendererPageState)
 
-let applyViewError
-    (setPageState: Renderer.Types.PageState option -> unit)
-    (errorMessage: string)
-    =
+let applyViewError (setPageState: Renderer.Types.PageState option -> unit) (errorMessage: string) =
     setPageState (Some(Renderer.Types.PageState.ErrorPage errorMessage))
 
 let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
     let request: GitLfsRequest = {
         RequestId = Guid.NewGuid().ToString()
         RepoPath = ""
-        Command = if markAsLfs then GitLfsCommand.Track else GitLfsCommand.Untrack
+        Command =
+            if markAsLfs then
+                GitLfsCommand.Track
+            else
+                GitLfsCommand.Untrack
         FilePath = Some relativePath
         TimeoutMs = Some 10000
     }

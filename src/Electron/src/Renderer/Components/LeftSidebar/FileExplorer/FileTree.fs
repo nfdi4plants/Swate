@@ -14,6 +14,40 @@ open ARCtrl
 open Types
 open Helper
 
+module private FileTreeHelper =
+    let stagePendingArcFileSave (arcFile: ArcFiles option) : JS.Promise<Result<unit, exn>> = promise {
+        let pendingSaveRequestResult =
+            match arcFile with
+            | None -> Ok None
+            | Some nextArcFile ->
+                match FileContentDTO.fromArcFile nextArcFile with
+                | Some request -> Ok(Some request)
+                | None -> Error(exn "Saving this file type is not supported in Electron yet.")
+
+        match pendingSaveRequestResult with
+        | Error saveError -> return Error saveError
+        | Ok pendingSaveRequest ->
+            let! result = Api.ipcArcVaultApi.setPendingArcFileSave pendingSaveRequest
+            return result
+    }
+
+    let copyArcPathToClipboard (onError: exn -> unit) =
+        fun (path: string) -> promise {
+            try
+                do! navigator.clipboard.writeText path
+            with ex ->
+                onError ex
+        }
+
+    let openArcFolderInFileExplorer (onError: exn -> unit) =
+        fun () -> promise {
+            match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
+            | Ok() -> ()
+            | Error exn -> onError exn
+        }
+
+open FileTreeHelper
+
 [<Erase; Mangle(false)>]
 type FileTree =
 
@@ -37,22 +71,6 @@ type FileTree =
             React.useState<ArcExplorerNodeKind option> None
 
         let pendingArcFileSave, setPendingArcFileSave = React.useState<ArcFiles option> None
-
-        let stagePendingArcFileSave (arcFile: ArcFiles option) : JS.Promise<Result<unit, exn>> = promise {
-            let pendingSaveRequestResult =
-                match arcFile with
-                | None -> Ok None
-                | Some nextArcFile ->
-                    match FileContentDTO.fromArcFile nextArcFile with
-                    | Some request -> Ok(Some request)
-                    | None -> Error(exn "Saving this file type is not supported in Electron yet.")
-
-            match pendingSaveRequestResult with
-            | Error saveError -> return Error saveError
-            | Ok pendingSaveRequest ->
-                let! result = Api.ipcArcVaultApi.setPendingArcFileSave pendingSaveRequest
-                return result
-        }
 
         let effectiveFileTree =
             React.useMemo (
@@ -229,37 +247,13 @@ type FileTree =
             else
                 []
 
-        let contextMenuItems =
+        let createContextMenuItems =
             Renderer.Components.FileExplorerLfs.createContextMenuItems
                 errorModal.enqueue
                 arcScopeId
                 arcCreateContextMenuItems
 
-        let copyArcPathToClipboard (path: string) =
-            promise {
-                try
-                    do! navigator.clipboard.writeText path
-                with ex ->
-                    errorModal.enqueue (
-                        ErrorModalRequest.create (
-                            $"Could not copy ARC path: {ex.Message}",
-                            title = "Copy path failed",
-                            ?scopeId = arcScopeId
-                        )
-                    )
-            }
-            |> Promise.start
 
-        let openArcFolderInFileExplorer () =
-            promise {
-                match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
-                | Ok() -> ()
-                | Error exn ->
-                    errorModal.enqueue (
-                        ErrorModalRequest.create (exn.Message, title = "Open folder failed", ?scopeId = arcScopeId)
-                    )
-            }
-            |> Promise.start
 
         let activeCreateKind =
             pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
@@ -283,6 +277,30 @@ type FileTree =
                     getFileName normalizedPath
             | None -> rootItem.Name
 
+        let copyArcPathToClipboard =
+            copyArcPathToClipboard (fun ex ->
+                errorModal.enqueue (
+                    ErrorModalRequest.create (
+                        $"Failed to copy path: {ex.Message}",
+                        title = "Copy path failed",
+                        ?scopeId = arcScopeId
+                    )
+                )
+            )
+            >> Promise.start
+
+        let openArcFolderInFileExplorer =
+            openArcFolderInFileExplorer (fun ex ->
+                errorModal.enqueue (
+                    ErrorModalRequest.create (
+                        $"Failed to open folder: {ex.Message}",
+                        title = "Open folder failed",
+                        ?scopeId = arcScopeId
+                    )
+                )
+            )
+            >> Promise.start
+
         match fileItem with
         | Some rootItem ->
             let visibleItems = rootItem.Children |> Option.defaultValue []
@@ -302,7 +320,7 @@ type FileTree =
                             initialItems = visibleItems,
                             onItemClick = openPreview,
                             onDirectoryArrowToggle = handleDirectoryArrowToggle,
-                            onContextMenu = contextMenuItems,
+                            onContextMenu = createContextMenuItems,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,

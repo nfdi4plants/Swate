@@ -83,6 +83,11 @@ type ArcVaultActions =
         let pathValue = arcRootPath |> Option.defaultValue "Path unavailable."
         let disabled = arcRootPath.IsNone
 
+        let onCopyPathCallback = React.useCallback (onCopyPath, [| onCopyPath |])
+
+        let onOpenArcFolderCallback =
+            React.useCallback (onOpenArcFolder, [| onOpenArcFolder |])
+
         Popover.Popover(
             debug = "ArcVaultActions",
             placement = FloatingUI.Placement.BottomStart,
