@@ -31,21 +31,6 @@ module private FileTreeHelper =
             return result
     }
 
-    let copyArcPathToClipboard (onError: exn -> unit) =
-        fun (path: string) -> promise {
-            try
-                do! navigator.clipboard.writeText path
-            with ex ->
-                onError ex
-        }
-
-    let openArcFolderInFileExplorer (onError: exn -> unit) =
-        fun () -> promise {
-            match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
-            | Ok() -> ()
-            | Error exn -> onError exn
-        }
-
 open FileTreeHelper
 
 [<Erase; Mangle(false)>]
@@ -61,7 +46,6 @@ type FileTree =
     [<ReactComponent>]
     static member FileTree() =
 
-        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let errorModal = ErrorModal.Context.useErrorModalCtx ()
@@ -253,8 +237,6 @@ type FileTree =
                 arcScopeId
                 arcCreateContextMenuItems
 
-
-
         let activeCreateKind =
             pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
 
@@ -266,56 +248,14 @@ type FileTree =
                 submit = createArcEntry
             )
 
-        let arcNameFromRootItem (rootItem: FileItem) =
-            match rootItem.Path with
-            | Some path ->
-                let normalizedPath = normalizePath path
-
-                if System.String.IsNullOrWhiteSpace normalizedPath then
-                    rootItem.Name
-                else
-                    getFileName normalizedPath
-            | None -> rootItem.Name
-
-        let copyArcPathToClipboard =
-            copyArcPathToClipboard (fun ex ->
-                errorModal.enqueue (
-                    ErrorModalRequest.create (
-                        $"Failed to copy path: {ex.Message}",
-                        title = "Copy path failed",
-                        ?scopeId = arcScopeId
-                    )
-                )
-            )
-            >> Promise.start
-
-        let openArcFolderInFileExplorer =
-            openArcFolderInFileExplorer (fun ex ->
-                errorModal.enqueue (
-                    ErrorModalRequest.create (
-                        $"Failed to open folder: {ex.Message}",
-                        title = "Open folder failed",
-                        ?scopeId = arcScopeId
-                    )
-                )
-            )
-            >> Promise.start
-
         match fileItem with
         | Some rootItem ->
             let visibleItems = rootItem.Children |> Option.defaultValue []
-            let arcName = arcNameFromRootItem rootItem
 
             React.Fragment [
                 Html.div [
                     prop.className "swt:w-full"
                     prop.children [
-                        Swate.Components.ArcVaultActions.ArcVaultActions.ArcVaultActions(
-                            arcName,
-                            appStateCtx,
-                            copyArcPathToClipboard,
-                            openArcFolderInFileExplorer
-                        )
                         Swate.Components.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,

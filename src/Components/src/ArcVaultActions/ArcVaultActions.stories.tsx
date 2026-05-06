@@ -43,17 +43,6 @@ export const Default: Story = {
   }
 };
 
-export const NoPath: Story = {
-  args: {
-    emptyPath: true,
-  },
-  play: async ({ canvasElement }) => {
-    const toggle = await screen.findByTestId(ArcVaultActionsBtn)
-    expect(toggle).toBeInTheDocument()
-    expect(toggle).toBeDisabled()
-  }
-}
-
 export const CallsOnCopyPath: Story = {
   args: {
     onCopyPath: fn(),

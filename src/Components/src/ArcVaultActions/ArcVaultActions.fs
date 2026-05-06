@@ -3,23 +3,23 @@ namespace Swate.Components.ArcVaultActions
 open Fable.Core
 open Feliz
 open Swate.Components
-
+open ARCtrl
 
 [<Erase; Mangle(false)>]
 type ArcVaultActions =
 
     [<ReactMemoComponent>]
-    static member private Trigger(arcName: string, pathValue: string, ?disabled: bool) =
+    static member private Trigger(arcName: string, arcRootPath: string, ?disabled: bool) =
         Popover.Trigger(
             Html.span [
-                prop.className "swt:block swt:w-full swt:truncate swt:tracking-wide swt:uppercase swt:opacity-90"
+                prop.className "swt:block swt:truncate swt:tracking-wide"
                 prop.text arcName
             ],
             className =
-                "swt:mb-2 swt:w-full swt:min-h-0 swt:h-auto swt:justify-start swt:px-2 swt:py-1 swt:text-sm swt:font-semibold swt:normal-case swt:btn-ghost swt:btn-xl swt:max-w-md",
+                "swt:min-h-0 swt:h-auto swt:justify-start swt:px-2 swt:font-semibold swt:normal-case swt:btn-lg swt:max-w-md swt:btn-secondary",
             props = [
                 prop.testId "arc-vault-actions-btn"
-                prop.title pathValue
+                prop.title arcRootPath
                 prop.disabled (defaultArg disabled false)
             ]
         )
@@ -77,11 +77,9 @@ type ArcVaultActions =
 
     /// This component displays the ARC vault name and provides actions related to the ARC vault, such as copying the local path or opening the folder in the file explorer.
     [<ReactComponent>]
-    static member ArcVaultActions
-        (arcName: string, arcRootPath: string option, onCopyPath: string -> unit, onOpenArcFolder: unit -> unit)
-        =
-        let pathValue = arcRootPath |> Option.defaultValue "Path unavailable."
-        let disabled = arcRootPath.IsNone
+    static member ArcVaultActions(arcRootPath: string, onCopyPath: string -> unit, onOpenArcFolder: unit -> unit) =
+        let arcName = arcRootPath |> ArcIO.getArcRootPath
+
 
         let onCopyPathCallback = React.useCallback (onCopyPath, [| onCopyPath |])
 
@@ -93,27 +91,22 @@ type ArcVaultActions =
             placement = FloatingUI.Placement.BottomStart,
             children =
                 React.Fragment [
-                    ArcVaultActions.Trigger(arcName, pathValue, disabled)
-                    if not disabled then
-                        ArcVaultActions.Content(pathValue, onCopyPath, onOpenArcFolder)
+                    ArcVaultActions.Trigger(arcName, arcRootPath)
+                    ArcVaultActions.Content(arcRootPath, onCopyPathCallback, onOpenArcFolderCallback)
                 ]
         )
 
     [<ReactComponent>]
-    static member Entry(?emptyPath: bool, ?onCopyPath, ?onOpenArcFolder) =
+    static member Entry(?onCopyPath, ?onOpenArcFolder) =
         let onCopyPath =
             defaultArg onCopyPath (fun path -> Browser.Dom.window.alert ($"Copying path: {path}"))
 
         let onOpenArcFolder =
             defaultArg onOpenArcFolder (fun () -> Browser.Dom.window.alert ("Opening ARC folder"))
 
-        let arcPath =
-            match emptyPath with
-            | Some true -> None
-            | _ -> Some "C:\\Users\\User\\ArcVault"
+        let arcPath = "C:\\Users\\User\\ArcVault"
 
         ArcVaultActions.ArcVaultActions(
-            arcName = "Example ARC Vault",
             arcRootPath = arcPath,
             onCopyPath = onCopyPath,
             onOpenArcFolder = onOpenArcFolder
