@@ -130,13 +130,14 @@ type Popover =
         | Some ctx ->
             let resolvedDebug = debug |> Option.orElse ctx.debug
 
-            Html.button [
-                prop.type'.button
+            Html.div [
+                prop.role.button
+                prop.tabIndex 0
                 prop.ref ctx.floating.refs.setReference
                 prop.custom ("data-state", PopoverHelper.dataState ctx.isOpen)
                 if resolvedDebug.IsSome then
                     prop.testId ("popover_trigger_" + resolvedDebug.Value)
-                prop.className [ "swt:btn"; yield! Option.toList className ]
+                prop.className [ yield! Option.toList className ]
                 yield! Option.defaultValue [] props
                 yield!
                     prop.spread
@@ -211,7 +212,7 @@ type Popover =
                                         prop.testId ("popover_content_" + resolvedDebug.Value)
                                     prop.className [
                                         "swt:z-[9999] swt:min-w-56 swt:max-w-[min(28rem,calc(100vw-2rem))]"
-                                        "swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100"
+                                        "swt:rounded-md swt:border swt:border-base-content swt:bg-base-100"
                                         "swt:p-4 swt:shadow-md swt:outline-hidden"
                                         yield! Option.toList className
                                     ]

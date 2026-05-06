@@ -137,7 +137,7 @@ type Main =
         | Some path ->
             Html.div [
                 prop.testId "left-sidebar-file-explorer"
-                prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col swt:gap-4"
+                prop.className "swt:flex swt:h-full swt:min-h-0 swt:flex-col swt:gap-2"
                 prop.children [
                     Html.div [
                         prop.testId "left-sidebar-file-explorer-toolbar"
