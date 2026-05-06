@@ -100,8 +100,7 @@ type private Selector =
                 dependencies = [||]
             }
 
-        let selectorControlRef =
-            React.useRef ({ toggle = ignore }: SelectorRef)
+        let selectorControlRef = React.useRef ({ toggle = ignore }: SelectorRef)
 
         let onOpen =
             fun (isOpen: bool) ->
@@ -207,7 +206,7 @@ type Navbar =
                 prop.children [
                     Authentication.UserAvatar()
                     Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                    Layout.LeftSidebarToggleBtn(activeBorderStyle = false)
+                    Layout.LeftSidebarToggleBtn()
                 ]
             ]
 
