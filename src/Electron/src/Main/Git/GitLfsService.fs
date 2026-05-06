@@ -1,8 +1,11 @@
 module Main.Git.GitLfsService
 
 open System
+open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
+open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.Node
 open Main.Bindings.SimpleGit
@@ -21,6 +24,64 @@ type OutboundPushPlan =
 
 let private maxLfsPointerProbeBytes = 1024L
 let mutable private cachedSystemInstalled = false
+
+[<Literal>]
+let private lfsLsFilesTimeoutMs = 15000
+
+type private GitLfsLsFileInfoDto = {
+    name: string option
+    size: float option
+    checkout: bool option
+    downloaded: bool option
+    ``oid_type``: string option
+    oid: string option
+    version: string option
+}
+
+type private GitLfsLsFilesResponseDto = { files: GitLfsLsFileInfoDto[] option }
+
+let private tryDecodeGitLfsLsFileInfo (entry: GitLfsLsFileInfoDto) : GitLfsLsFileInfo option =
+    match
+        entry.name,
+        entry.size,
+        entry.checkout,
+        entry.downloaded,
+        entry.``oid_type``,
+        entry.oid,
+        entry.version
+    with
+    | Some name, Some size, Some checkout, Some downloaded, Some oidType, Some oid, Some version ->
+        Some {
+            name = normalizeSeparators name
+            size = size
+            checkout = checkout
+            downloaded = downloaded
+            ``oid_type`` = oidType
+            oid = oid
+            version = version
+        }
+    | _ ->
+        None
+
+let private parseLsFilesByRelativePath (stdoutText: string) : Dictionary<string, GitLfsLsFileInfo> =
+    let filesByRelativePath = Dictionary<string, GitLfsLsFileInfo>()
+
+    try
+        let parsed = Fable.Core.JS.JSON.parse stdoutText |> unbox<GitLfsLsFilesResponseDto>
+
+        parsed.files
+        |> Option.defaultValue [||]
+        |> Array.iter (fun fileEntry ->
+            match tryDecodeGitLfsLsFileInfo fileEntry with
+            | Some info when not (String.IsNullOrWhiteSpace info.name) ->
+                let relativePath = normalizeSeparators info.name
+                filesByRelativePath.[relativePath] <- { info with name = relativePath }
+            | _ -> ()
+        )
+    with _ ->
+        ()
+
+    filesByRelativePath
 
 /// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
@@ -137,6 +198,66 @@ let isSystemInstalled () : JS.Promise<bool> =
 /// Checks whether `.gitattributes` marks a path for Git LFS.
 let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
     gitLfs.IsTrackedByAttributes repoRoot relativePath
+
+/// Tries to read `git lfs ls-files -j` metadata keyed by repository-relative path.
+/// Fail-open behavior: command or parse failures yield an empty dictionary.
+let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<string, GitLfsLsFileInfo>> =
+    promise {
+        let normalizedRepoRoot = normalizePath repoRoot
+
+        try
+            let! commandResult =
+                runGitCaptured {
+                    WorkingDirectory = Some normalizedRepoRoot
+                    Arguments = [| "lfs"; "ls-files"; "-j" |]
+                    Environment = None
+                    StandardInput = None
+                    TimeoutMs = Some lfsLsFilesTimeoutMs
+                }
+
+            if commandResult.ExitCode <> 0 || commandResult.TimedOut then
+                return Dictionary<string, GitLfsLsFileInfo>()
+            else
+                let stdoutText =
+                    commandResult.StdoutText
+                    |> Option.ofObj
+                    |> Option.defaultValue String.Empty
+                    |> _.Trim()
+
+                if String.IsNullOrWhiteSpace stdoutText then
+                    return Dictionary<string, GitLfsLsFileInfo>()
+                else
+                    return parseLsFilesByRelativePath stdoutText
+        with _ ->
+            return Dictionary<string, GitLfsLsFileInfo>()
+    }
+
+/// Enriches a single file entry with Git LFS metadata from `git lfs ls-files -j`.
+let withFileEntryLfsMetadata
+    (repoRoot: string)
+    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (entry: FileEntry)
+    : FileEntry =
+    if entry.isDirectory then
+        entry
+    else
+        match tryGetRepoRelativePath repoRoot entry.path with
+        | Some relativePath ->
+            let normalizedRelativePath = normalizeSeparators relativePath
+
+            match lfsFilesByRelativePath.TryGetValue(normalizedRelativePath) with
+            | true, lfsInfo -> { entry with lfs = Some lfsInfo }
+            | _ -> { entry with lfs = None }
+        | None ->
+            { entry with lfs = None }
+
+/// Enriches file entries with Git LFS metadata from `git lfs ls-files -j`.
+let withFileEntriesLfsMetadata
+    (repoRoot: string)
+    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (entries: FileEntry[])
+    : FileEntry[] =
+    entries |> Array.map (withFileEntryLfsMetadata repoRoot lfsFilesByRelativePath)
 
 let private formatDiagnosticsSection (title: string) (content: string option) =
     match content |> Option.map _.Trim() with

@@ -4,25 +4,14 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components.Notes.Editor
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Components.NoteTypes
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private pathDynamic: obj = importAll "path"
-
-let private normalizePath (path: string) = path.Replace("\\", "/")
-
-let private tryGetRepoRelativePath (repoRoot: string) (absolutePath: string) =
-    let relativePath =
-        pathDynamic?relative (repoRoot, absolutePath) |> unbox<string> |> normalizePath
-
-    if String.IsNullOrWhiteSpace relativePath || relativePath = "." then
-        None
-    else
-        Some relativePath
 
 let private isNoteMarkdownPath (relativePath: string) =
-    let normalizedPath = normalizePath relativePath
+    let normalizedPath = normalizeSeparators relativePath
     let lowered = normalizedPath.ToLowerInvariant()
     lowered.StartsWith("notes/") && lowered.EndsWith(".md")
 

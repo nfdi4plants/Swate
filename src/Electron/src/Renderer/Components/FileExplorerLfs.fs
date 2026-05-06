@@ -60,3 +60,13 @@ let withLfsContextMenuItems
     : ContextMenuItem list =
     baseItems
     @ Swate.Components.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark
+
+let createContextMenuItems
+    (enqueueErrorModal: ErrorModalRequest -> unit)
+    (arcScopeId: string option)
+    (baseItems: FileItem -> ContextMenuItem list)
+    : FileItem -> ContextMenuItem list =
+    let toggleLfsMark =
+        createToggleLfsMark enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runToggleLfsMark
+
+    fun item -> withLfsContextMenuItems item toggleLfsMark (baseItems item)

@@ -110,12 +110,6 @@ type FileTree =
             fileTree
             |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
 
-        let toggleLfsMark =
-            Renderer.Components.FileExplorerLfs.createToggleLfsMark
-                errorModal.enqueue
-                arcScopeId
-                Renderer.Components.ARCHelper.runToggleLfsMark
-
         let openPreview (item: FileItem) =
             promise {
                 match item.Path with
@@ -235,11 +229,11 @@ type FileTree =
             else
                 []
 
-        let contextMenuItems (item: FileItem) =
-            Renderer.Components.FileExplorerLfs.withLfsContextMenuItems
-                item
-                toggleLfsMark
-                (arcCreateContextMenuItems item)
+        let contextMenuItems =
+            Renderer.Components.FileExplorerLfs.createContextMenuItems
+                errorModal.enqueue
+                arcScopeId
+                arcCreateContextMenuItems
 
         let copyArcPathToClipboard (path: string) =
             promise {

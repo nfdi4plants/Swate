@@ -38,6 +38,42 @@ let isSameOrDescendantPath (path: string) (ancestorPath: string) =
     || normalizedPath = normalizedAncestorPath
     || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.OrdinalIgnoreCase)
 
+let private containsTraversalSegments (path: string) =
+    path.Split('/') |> Array.exists (fun segment -> segment = "." || segment = "..")
+
+let private tryGetRepoRelativePathCore (repoRoot: string) (absolutePath: string) (allowRoot: bool) =
+    let normalizedRoot = normalizePath repoRoot
+    let normalizedAbsolutePath = normalizePath absolutePath
+
+    if String.IsNullOrWhiteSpace normalizedRoot || String.IsNullOrWhiteSpace normalizedAbsolutePath then
+        None
+    elif pathsEqual normalizedAbsolutePath normalizedRoot then
+        if allowRoot then Some "" else None
+    elif isSameOrDescendantPath normalizedAbsolutePath normalizedRoot then
+        let prefix = normalizedRoot + "/"
+
+        if normalizedAbsolutePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
+            let relativePath = normalizedAbsolutePath.Substring(prefix.Length)
+
+            if String.IsNullOrWhiteSpace relativePath || containsTraversalSegments relativePath then
+                None
+            else
+                Some relativePath
+        else
+            None
+    else
+        None
+
+/// Tries to convert an absolute repository path to a repository-relative path.
+/// Returns None for the repository root and unsafe traversal-like paths.
+let tryGetRepoRelativePath (repoRoot: string) (absolutePath: string) =
+    tryGetRepoRelativePathCore repoRoot absolutePath false
+
+/// Tries to convert an absolute repository path to a repository-relative path.
+/// Returns Some "" for the repository root and None for unsafe traversal-like paths.
+let tryGetRepoRelativePathOrRoot (repoRoot: string) (absolutePath: string) =
+    tryGetRepoRelativePathCore repoRoot absolutePath true
+
 let tryGetPathSegmentAfterFolder (folderName: string) (path: string) =
     let segments = getNonEmptyPathParts path
 
