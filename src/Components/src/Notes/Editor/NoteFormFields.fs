@@ -4,7 +4,6 @@ open System
 open ARCtrl
 open Feliz
 open Swate.Components
-open Swate.Components.Metadata
 open Swate.Components.MarkdownText
 
 [<RequireQualifiedAccess>]
@@ -58,7 +57,8 @@ module NoteFormFields =
         let addTagFromKeyboardEvent (keyboardEvent: Browser.Types.KeyboardEvent) =
             let termFromInput =
                 match keyboardEvent.target with
-                | :? Browser.Types.HTMLInputElement as inputElement when not (String.IsNullOrWhiteSpace inputElement.value)
+                | :? Browser.Types.HTMLInputElement as inputElement when
+                    not (String.IsNullOrWhiteSpace inputElement.value)
                     ->
                     Some(Term(inputElement.value.Trim()))
                 | _ -> None
@@ -93,7 +93,7 @@ module NoteFormFields =
                 prop.testId "notes-title-field"
                 prop.className "swt:fieldset swt:grow"
                 prop.children [
-                    Generic.FieldTitle "Title (Required)"
+                    LayoutComponents.FieldTitle "Title (Required)"
                     Html.input [
                         prop.className "swt:input swt:input-bordered swt:w-full"
                         prop.type'.text
@@ -107,14 +107,15 @@ module NoteFormFields =
                 prop.testId "notes-date-field"
                 prop.className "swt:fieldset swt:w-full swt:max-w-[9rem]"
                 prop.children [
-                    Generic.FieldTitle "Date Created (Required)"
+                    LayoutComponents.FieldTitle "Date Created (Required)"
                     Html.input [
                         prop.className "swt:input swt:input-bordered swt:w-full"
                         prop.type'.date
                         prop.valueOrDefault dateInputValue
                         prop.onChange (fun value ->
                             let parsedDate = Validation.tryParseDateCreated value
-                            setDraft { draft with DateCreated = parsedDate })
+                            setDraft { draft with DateCreated = parsedDate }
+                        )
                     ]
                 ]
             ]
@@ -122,7 +123,7 @@ module NoteFormFields =
                 prop.testId "notes-tags-field"
                 prop.className "swt:fieldset swt:space-y-2"
                 prop.children [
-                    Generic.FieldTitle "Tags (Optional)"
+                    LayoutComponents.FieldTitle "Tags (Optional)"
                     Html.div [
                         prop.className "swt:w-full swt:relative"
                         prop.children [
@@ -153,7 +154,8 @@ module NoteFormFields =
                                 for index, tag in draft.Tags |> Seq.indexed do
                                     Html.li [
                                         prop.key $"note-tag-{tagKey tag}"
-                                        prop.className "swt:flex swt:items-center swt:gap-2 swt:rounded-box swt:border swt:border-base-300 swt:px-2 swt:py-1"
+                                        prop.className
+                                            "swt:flex swt:items-center swt:gap-2 swt:rounded-box swt:border swt:border-base-300 swt:px-2 swt:py-1"
                                         prop.children [
                                             Html.span [
                                                 prop.className "swt:grow swt:text-sm swt:break-all"

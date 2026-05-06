@@ -19,21 +19,24 @@ type AsyncState<'T> =
 
 module Helper =
 
-    let addButton (clickEvent: MouseEvent -> unit) =
+    [<ReactComponent>]
+    let AddButton (clickEvent: MouseEvent -> unit) =
         Html.button [
             prop.className "swt:btn swt:btn-info"
             prop.text "+"
             prop.onClick clickEvent
         ]
 
-    let deleteButton (clickEvent: MouseEvent -> unit) =
+    [<ReactComponent>]
+    let DeleteButton (clickEvent: MouseEvent -> unit) =
         Html.button [
             prop.className "swt:btn swt:btn-error swt:grow-0"
             prop.text "Delete"
             prop.onClick clickEvent
         ]
 
-    let cardFormGroup (content: ReactElement list) =
+    [<ReactComponent>]
+    let CardFormGroup (content: ReactElement list) =
         Html.div [
             prop.className "swt:grid swt:@md/main:grid-cols-2 swt:@xl/main:grid-flow-col swt:gap-4 not-prose"
             prop.children content
@@ -130,7 +133,7 @@ type FormComponents =
             prop.children [
                 BaseModal.ErrorModalObsolete(error.IsSome, (fun _ -> setError None), error |> Option.defaultValue "")
                 if label.IsSome then
-                    Generic.FieldTitle label.Value
+                    LayoutComponents.FieldTitle label.Value
                 if extendedElements.IsSome then
                     extendedElements.Value
                 DndKit.DndContext(
@@ -171,7 +174,7 @@ type FormComponents =
                 Html.div [
                     prop.className "swt:flex swt:justify-center swt:w-full swt:mt-2"
                     prop.children [
-                        Helper.addButton (fun _ ->
+                        Helper.AddButton(fun _ ->
                             inputs.Add(constructor ())
                             validateSetter inputs
                         )
@@ -249,7 +252,7 @@ type FormComponents =
             prop.className "swt:space-y-2 swt:grow"
             prop.children [
                 if label.IsSome then
-                    Generic.FieldTitle label.Value
+                    LayoutComponents.FieldTitle label.Value
                 Html.div [
                     prop.className "swt:w-full swt:flex swt:gap-2 swt:relative"
                     prop.children [
@@ -260,7 +263,7 @@ type FormComponents =
                             classNames = TermSearchStyle(Fable.Core.U2.Case1 "swt:w-full")
                         )
                         if rmv.IsSome then
-                            Helper.deleteButton rmv.Value
+                            Helper.DeleteButton rmv.Value
                     ]
                 ]
             ]
@@ -332,10 +335,10 @@ type FormComponents =
             let filled = fields |> List.choose id |> List.length
             $"{filled}/{total}"
 
-        Generic.Collapse [
-            Generic.CollapseTitle(nameText, orcid, countFilledFieldsString input)
+        LayoutComponents.Collapse [
+            LayoutComponents.CollapseTitle(nameText, orcid, countFilledFieldsString input)
         ] [
-            Helper.cardFormGroup [
+            Helper.CardFormGroup [
                 createPersonFieldTextInput (
                     input.FirstName,
                     "First Name",
@@ -343,7 +346,7 @@ type FormComponents =
                 )
                 createPersonFieldTextInput (input.LastName, "Last Name", fun person value -> person.LastName <- value)
             ]
-            Helper.cardFormGroup [
+            Helper.CardFormGroup [
                 createPersonFieldTextInput (
                     input.MidInitials,
                     "Mid Initials",
@@ -351,7 +354,7 @@ type FormComponents =
                 )
                 createPersonFieldTextInput (input.ORCID, "ORCID", fun person value -> person.ORCID <- value)
             ]
-            Helper.cardFormGroup [
+            Helper.CardFormGroup [
                 createPersonFieldTextInput (
                     input.Affiliation,
                     "Affiliation",
@@ -360,7 +363,7 @@ type FormComponents =
                 createPersonFieldTextInput (input.Address, "Address", fun person value -> person.Address <- value)
             ]
             createPersonFieldTextInput (input.EMail, "Email", fun person value -> person.EMail <- value)
-            Helper.cardFormGroup [
+            Helper.CardFormGroup [
                 createPersonFieldTextInput (input.Phone, "Phone", fun person value -> person.Phone <- value)
                 createPersonFieldTextInput (input.Fax, "Fax", fun person value -> person.Fax <- value)
             ]
@@ -374,7 +377,7 @@ type FormComponents =
                 parent = TermCollection.PersonRoleWithinExperiment
             )
             if rmv.IsSome then
-                Helper.deleteButton rmv.Value
+                Helper.DeleteButton rmv.Value
         ]
 
     [<ReactComponent>]
@@ -464,7 +467,7 @@ type FormComponents =
             prop.className "swt:grow"
             prop.children [
                 if label.IsSome then
-                    Generic.FieldTitle label.Value
+                    LayoutComponents.FieldTitle label.Value
                 Html.input [
                     prop.className "swt:input"
                     prop.type'.dateTimeLocal
@@ -516,7 +519,7 @@ type FormComponents =
                             placeholder = "comment"
                         )
                         if rmv.IsSome then
-                            Helper.deleteButton rmv.Value
+                            Helper.DeleteButton rmv.Value
                     ]
                 ]
             ]
@@ -581,11 +584,11 @@ type FormComponents =
             let filled = fields |> List.choose id |> List.length
             $"{filled}/{total}"
 
-        Generic.Collapse [
-            Generic.CollapseTitle(title, doi, countFilledFieldsString ())
+        LayoutComponents.Collapse [
+            LayoutComponents.CollapseTitle(title, doi, countFilledFieldsString ())
         ] [
             createFieldTextInput (publication.Title, "Title", fun value -> publication.Title <- value)
-            Helper.cardFormGroup [
+            Helper.CardFormGroup [
                 createFieldTextInput (publication.PubMedID, "PubMed ID", fun value -> publication.PubMedID <- value)
                 createFieldTextInput (publication.DOI, "DOI", fun value -> publication.DOI <- value)
             ]
@@ -608,7 +611,7 @@ type FormComponents =
                 "Comments"
             )
             if rmv.IsSome then
-                Helper.deleteButton rmv.Value
+                Helper.DeleteButton rmv.Value
         ]
 
     static member PublicationsInput
@@ -655,11 +658,11 @@ type FormComponents =
             let filled = fields |> List.choose id |> List.length
             $"{filled}/{total}"
 
-        Generic.Collapse [
-            Generic.CollapseTitle(name, version, countFilledFieldsString ())
+        LayoutComponents.Collapse [
+            LayoutComponents.CollapseTitle(name, version, countFilledFieldsString ())
         ] [
             createFieldTextInput (input.Name, "Name", fun value -> input.Name <- value)
-            Helper.cardFormGroup [
+            Helper.CardFormGroup [
                 createFieldTextInput (input.Version, "Version", fun value -> input.Version <- value)
                 createFieldTextInput (input.File, "File", fun value -> input.File <- value)
             ]
@@ -681,7 +684,7 @@ type FormComponents =
                 "Comments"
             )
             if deleteButton.IsSome then
-                Helper.deleteButton deleteButton.Value
+                Helper.DeleteButton deleteButton.Value
         ]
 
     static member OntologySourceReferencesInput

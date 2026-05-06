@@ -110,14 +110,13 @@ type Layout =
     [<ReactComponent>]
     static member LeftSidebarToggleBtn(?activeBorderStyle: bool) =
         let ctx = useLeftSidebarCtx ()
-        let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.state)
 
         Layout.LayoutBtn(
             iconClassName =
                 (if ctx.state then
-                     "swt:fluent--panel-right-48-filled"
+                     "swt:fluent--panel-left-48-filled"
                  else
-                     "swt:fluent--panel-right-48-regular"),
+                     "swt:fluent--panel-left-48-regular"),
             tooltip = "Toggle left sidebar",
             tooltipClassName = "swt:tooltip-left",
             onClick = (fun () -> ctx.setState (not ctx.state))
@@ -126,14 +125,13 @@ type Layout =
     [<ReactComponent>]
     static member RightSidebarToggleBtn(?activeBorderStyle: bool) =
         let ctx = useRightSidebarCtx ()
-        let showIsActive = activeBorderStyle |> Option.map (fun _ -> ctx.isOpen)
 
         Layout.LayoutBtn(
             iconClassName =
                 (if ctx.isOpen then
-                     "swt:fluent--panel-left-48-filled"
+                     "swt:fluent--panel-right-48-filled"
                  else
-                     "swt:fluent--panel-left-48-regular"),
+                     "swt:fluent--panel-right-48-regular"),
             tooltip = "Toggle right sidebar",
             tooltipClassName = "swt:tooltip-left",
             onClick = fun () -> ctx.setIsOpen (not ctx.isOpen)

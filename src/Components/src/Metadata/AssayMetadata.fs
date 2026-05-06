@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Feliz
 open ARCtrl
+open Swate.Components
 open Swate.Components.Metadata
 
 [<Erase; Mangle(false)>]
@@ -13,8 +14,8 @@ type AssayMetadata =
     static member AssayMetadata
         // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\Metadata\ArcFileMetadata.fs` as well!
         (assay: ArcAssay, setAssay: ArcAssay -> unit) =
-        Generic.Section [
-            Generic.BoxedField(
+        LayoutComponents.Section [
+            LayoutComponents.BoxedField(
                 "Assay Metadata",
                 content = [
                     FormComponents.TextInput(assay.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)

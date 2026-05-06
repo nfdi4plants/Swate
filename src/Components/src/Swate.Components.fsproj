@@ -79,6 +79,7 @@
     <Compile Include="Api\TIBApi.fs" />
     <Compile Include="GenericComponents\Icons.fs" />
     <Compile Include="GenericComponents\GenericComponents.fs" />
+    <Compile Include="GenericComponents\LayoutComponents.fs" />
     <Compile Include="GenericComponents\Popover\Context.fs" />
     <Compile Include="GenericComponents\Popover\Popover.fs" />
     <Compile Include="GenericComponents\ContextMenu.fs" />
@@ -106,8 +107,9 @@
     <Compile Include="GitComparison\GitMergeConflictViewer.fs" />
     <Compile Include="GitSidebar\Types.fs" />
     <Compile Include="GitSidebar\GitSidebar.fs" />
-    <Compile Include="ThemeProvider\Context.fs" />
-    <Compile Include="ThemeProvider\ThemeProvider.fs" />
+    <Compile Include="Theme\Context.fs" />
+    <Compile Include="Theme\ThemeProvider.fs" />
+    <Compile Include="Theme\ThemeSelector.fs" />
     <Compile Include="QuickAccessButton\QuickAccessButton.fs" />
     <Compile Include="TermSearch\TermSearchActiveKeysContext.fs" />
     <Compile Include="TermSearch\TermSearchConfigContext.fs" />
@@ -115,7 +117,6 @@
     <Compile Include="TermSearch\TermSearchConfigProvider.fs" />
     <Compile Include="TermSearch\TermSearchConfigSetter.fs" />
     <Compile Include="TermSearch\TermSearch.fs" />
-    <Compile Include="Metadata\Generic.fs" />
     <Compile Include="Metadata\TextInput.fs" />
     <Compile Include="Metadata\Forms.fs" />
     <Compile Include="Metadata\InvestigationMetadata.fs" />
@@ -229,8 +230,8 @@
     <Compile Include="DataHub\GenericComponents.fs" />
     <Compile Include="DataHub\DataHubBrowserModel.fs" />
     <Compile Include="DataHub\DataHubBrowser.fs" />
+    <Compile Include="PageComponents\SettingsPage\SettingsPage.fs" />
     <Compile Include="Style.fs" />
-    <None Include="GitSidebar\GitSidebar.stories.tsx" />
   </ItemGroup>
 
   <PropertyGroup>

@@ -7,7 +7,6 @@ open Fable.Core.JsInterop
 open Feliz
 
 open Swate.Components
-open Swate.Components.Metadata
 open Swate.Components.MarkdownText.JsBindings
 open Swate.Components.MarkdownText.Plugins
 
@@ -16,21 +15,35 @@ module private MarkdownCommands =
 
     let private bold: ICommand = ReactMDEditor.commands?bold |> unbox<ICommand>
     let private italic: ICommand = ReactMDEditor.commands?italic |> unbox<ICommand>
-    let private strikethrough: ICommand = ReactMDEditor.commands?strikethrough |> unbox<ICommand>
+
+    let private strikethrough: ICommand =
+        ReactMDEditor.commands?strikethrough |> unbox<ICommand>
+
     let private link: ICommand = ReactMDEditor.commands?link |> unbox<ICommand>
     let private quote: ICommand = ReactMDEditor.commands?quote |> unbox<ICommand>
     let private code: ICommand = ReactMDEditor.commands?code |> unbox<ICommand>
-    let private codeBlock: ICommand = ReactMDEditor.commands?codeBlock |> unbox<ICommand>
-    let private unorderedListCommand: ICommand = ReactMDEditor.commands?unorderedListCommand |> unbox<ICommand>
-    let private orderedListCommand: ICommand = ReactMDEditor.commands?orderedListCommand |> unbox<ICommand>
-    let private checkedListCommand: ICommand = ReactMDEditor.commands?checkedListCommand |> unbox<ICommand>
 
-    let defaultToolbarGroups: ICommand[][] =
+    let private codeBlock: ICommand =
+        ReactMDEditor.commands?codeBlock |> unbox<ICommand>
+
+    let private unorderedListCommand: ICommand =
+        ReactMDEditor.commands?unorderedListCommand |> unbox<ICommand>
+
+    let private orderedListCommand: ICommand =
+        ReactMDEditor.commands?orderedListCommand |> unbox<ICommand>
+
+    let private checkedListCommand: ICommand =
+        ReactMDEditor.commands?checkedListCommand |> unbox<ICommand>
+
+    let defaultToolbarGroups: ICommand[][] = [|
+        [| bold; italic; strikethrough |]
+        [| link; quote; code; codeBlock |]
         [|
-            [| bold; italic; strikethrough |]
-            [| link; quote; code; codeBlock |]
-            [| unorderedListCommand; orderedListCommand; checkedListCommand |]
+            unorderedListCommand
+            orderedListCommand
+            checkedListCommand
         |]
+    |]
 
     let toolbarGroupsWithPlugins (pluginCommands: ICommand[]) =
         if pluginCommands.Length = 0 then
@@ -38,7 +51,8 @@ module private MarkdownCommands =
         else
             Array.append defaultToolbarGroups [| pluginCommands |]
 
-    let shortcutCommands (pluginCommands: ICommand[]) = toolbarGroupsWithPlugins pluginCommands |> Array.concat
+    let shortcutCommands (pluginCommands: ICommand[]) =
+        toolbarGroupsWithPlugins pluginCommands |> Array.concat
 
 [<Erase; Mangle(false)>]
 type TextInputWithMarkdown =
@@ -64,26 +78,31 @@ type TextInputWithMarkdown =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
 
-        let options =
-            {
-                MarkdownOptions.defaults with
-                    Height = defaultArg height MarkdownOptions.defaults.Height
-                    Mode = defaultArg mode MarkdownOptions.defaults.Mode
-                    PreviewClassName =
-                        match previewClassName with
-                        | Some value -> Some value
-                        | None -> MarkdownOptions.defaults.PreviewClassName
-            }
+        let options = {
+            MarkdownOptions.defaults with
+                Height = defaultArg height MarkdownOptions.defaults.Height
+                Mode = defaultArg mode MarkdownOptions.defaults.Mode
+                PreviewClassName =
+                    match previewClassName with
+                    | Some value -> Some value
+                    | None -> MarkdownOptions.defaults.PreviewClassName
+        }
 
         let startedChange = React.useRef false
         let tempValue, setTempValue = React.useState value
         let activeMode, setActiveMode = React.useState options.Mode
         let debouncedValue = React.useDebounce (tempValue, 300)
         let validationError, setValidationError = React.useState (None: string option)
-        let activePrompt, setActivePrompt = React.useState (None: MarkdownPromptPlugin option)
+
+        let activePrompt, setActivePrompt =
+            React.useState (None: MarkdownPromptPlugin option)
+
         let promptInput, setPromptInput = React.useState ""
         let promptError, setPromptError = React.useState (None: string option)
-        let promptFiles, setPromptFiles = React.useStateWithUpdater ([]: MarkdownPromptFile list)
+
+        let promptFiles, setPromptFiles =
+            React.useStateWithUpdater ([]: MarkdownPromptFile list)
+
         let promptFileDropActive, setPromptFileDropActive = React.useState false
 
         let textareaRef = React.useElementRef ()
@@ -113,7 +132,8 @@ type TextInputWithMarkdown =
                         setValidationError None
                         setValue debouncedValue
 
-                    startedChange.current <- false),
+                    startedChange.current <- false
+            ),
             [| box debouncedValue |]
         )
 
@@ -123,7 +143,8 @@ type TextInputWithMarkdown =
             (fun () ->
                 match mode with
                 | Some value -> setActiveMode value
-                | None -> ()),
+                | None -> ()
+            ),
             [| box mode |]
         )
 
@@ -136,7 +157,8 @@ type TextInputWithMarkdown =
                         textarea.focus ()
                         textarea?setSelectionRange (startIndex, endIndex)
                         promptSelectionRef.current <- None
-                    | _ -> ()),
+                    | _ -> ()
+            ),
             [| box activePrompt; box tempValue |]
         )
 
@@ -146,7 +168,7 @@ type TextInputWithMarkdown =
 
         let ensureCommandOrchestrator () =
             match commandOrchestratorRef.current, tryGetTextarea () with
-            | Some orchestrator, Some textarea when obj.ReferenceEquals (orchestrator.textArea, textarea) ->
+            | Some orchestrator, Some textarea when obj.ReferenceEquals(orchestrator.textArea, textarea) ->
                 Some orchestrator
             | _, Some textarea ->
                 let orchestrator = TextAreaCommandOrchestrator(textarea)
@@ -177,6 +199,7 @@ type TextInputWithMarkdown =
                     let combined = currentFiles @ files
                     PluginTextInputHelpers.normalizePromptFiles activePrompt combined
                 )
+
                 if promptError.IsSome then
                     setPromptError None
 
@@ -194,12 +217,7 @@ type TextInputWithMarkdown =
             setPromptFiles (fun currentFiles ->
                 currentFiles
                 |> List.indexed
-                |> List.choose (fun (index, file) ->
-                    if index = indexToRemove then
-                        None
-                    else
-                        Some file
-                )
+                |> List.choose (fun (index, file) -> if index = indexToRemove then None else Some file)
             )
 
         let triggerPromptFileSelection () =
@@ -211,8 +229,7 @@ type TextInputWithMarkdown =
                     applyPickedPromptFiles files
                 | None ->
                     // Built-in fallback: standard browser file input dialog.
-                    promptFileInputRef.current
-                    |> Option.iter (fun input -> input.click ())
+                    promptFileInputRef.current |> Option.iter (fun input -> input.click ())
             }
             |> Promise.catch (fun err ->
                 if isMountedRef.current then
@@ -226,8 +243,7 @@ type TextInputWithMarkdown =
                 applyPickedPromptFiles selected
 
                 // Reset the input value so selecting the same file triggers onChange.
-                promptFileInputRef.current
-                |> Option.iter (fun input -> input.value <- "")
+                promptFileInputRef.current |> Option.iter (fun input -> input.value <- "")
 
         let handlePromptDrop =
             fun (e: DragEvent) ->
@@ -287,22 +303,19 @@ type TextInputWithMarkdown =
                             | Some(startIndex, endIndex) -> startIndex, endIndex
                             | None -> getSelectionOrEnd ()
 
-                        let nextValue, selection =
-                            prompt.Apply tempValue startIndex endIndex promptInput
+                        let nextValue, selection = prompt.Apply tempValue startIndex endIndex promptInput
 
                         applyPromptResult nextValue selection
 
                 | MarkdownPromptInputMode.File ->
                     let selectedFiles =
-                        promptFiles
-                        |> PluginTextInputHelpers.normalizePromptFiles activePrompt
+                        promptFiles |> PluginTextInputHelpers.normalizePromptFiles activePrompt
 
                     if List.isEmpty selectedFiles then
                         setPromptError (Some "Select at least one file.")
                     else
                         match prompt.ApplyFiles with
-                        | None ->
-                            setPromptError (Some "This plugin does not support file input.")
+                        | None -> setPromptError (Some "This plugin does not support file input.")
                         | Some applyFiles ->
                             promise {
                                 let mutable resolvedFiles: (MarkdownPromptFile * string) list = []
@@ -310,6 +323,7 @@ type TextInputWithMarkdown =
                                 for file in selectedFiles do
                                     let! resolvedPath =
                                         PluginTextInputHelpers.resolvePromptFilePath filePickerAdapter file
+
                                     resolvedFiles <- (file, resolvedPath) :: resolvedFiles
 
                                 return List.rev resolvedFiles
@@ -321,8 +335,7 @@ type TextInputWithMarkdown =
                                         | Some(startIndex, endIndex) -> startIndex, endIndex
                                         | None -> getSelectionOrEnd ()
 
-                                    let nextValue, selection =
-                                        applyFiles tempValue startIndex endIndex resolvedFiles
+                                    let nextValue, selection = applyFiles tempValue startIndex endIndex resolvedFiles
 
                                     applyPromptResult nextValue selection
                             )
@@ -355,7 +368,11 @@ type TextInputWithMarkdown =
                 fallback
             else
                 let ariaLabel: obj = command.buttonProps?``aria-label``
-                if isNullOrUndefined ariaLabel then fallback else string ariaLabel
+
+                if isNullOrUndefined ariaLabel then
+                    fallback
+                else
+                    string ariaLabel
 
         let runEditorCommand (command: ICommand) =
             ensureCommandOrchestrator ()
@@ -422,6 +439,7 @@ type TextInputWithMarkdown =
         let handlePromptInputChange =
             fun (text: string) ->
                 setPromptInput text
+
                 if promptError.IsSome then
                     setPromptError None
 
@@ -434,7 +452,7 @@ type TextInputWithMarkdown =
             )
             prop.children [
                 if label.IsSome && not isJoin then
-                    Generic.FieldTitle label.Value
+                    LayoutComponents.FieldTitle label.Value
 
                 Html.div [
                     prop.className "swt:flex swt:gap-2 swt:items-start swt:w-full"
@@ -598,9 +616,4 @@ flowchart TD
 
         let value, setValue = React.useState entryInitialValue
 
-        TextInputWithMarkdown.TextInputWithMarkdown(
-            value,
-            setValue,
-            placeholder = "Write markdown...",
-            height = 440
-        )
+        TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...", height = 440)

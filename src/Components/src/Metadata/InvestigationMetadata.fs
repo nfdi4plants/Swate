@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Feliz
 open ARCtrl
-open Swate.Components.Metadata
+open Swate.Components
 
 [<Erase; Mangle(false)>]
 type InvestigationMetadata =
@@ -13,8 +13,8 @@ type InvestigationMetadata =
     static member InvestigationMetadata
         // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\Metadata\ArcFileMetadata.fs` as well!
         (investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit) =
-        Generic.Section [
-            Generic.BoxedField(
+        LayoutComponents.Section [
+            LayoutComponents.BoxedField(
                 "Investigation Metadata",
                 content = [
                     FormComponents.TextInput(

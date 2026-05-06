@@ -9,7 +9,7 @@ open Messages
 open Feliz
 
 open Swate.Components
-open Swate.Components.ThemeProvider.Context
+open Swate.Components.Theme.Context
 
 type Settings =
 

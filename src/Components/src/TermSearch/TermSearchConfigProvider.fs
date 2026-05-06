@@ -140,7 +140,10 @@ type TermSearchConfigProvider =
             )
 
         /// This is used for memoization
-        let activeKeysString = activeKeys.activeKeys |> Array.sort |> String.concat "; "
+        let activeKeysString =
+            match activeKeys.activeKeys with
+            | [||] -> ""
+            | keys -> keys |> Array.sort |> String.concat "; "
 
         let queries =
             React.useMemo (
@@ -187,8 +190,5 @@ type TermSearchConfigProvider =
                 state = activeKeys
                 setState = setActiveKeys
             },
-            TermSearchConfigCtx.Provider(
-                queries,
-                TermSearchAllKeysCtx.Provider(allKeys, children)
-            )
+            TermSearchConfigCtx.Provider(queries, TermSearchAllKeysCtx.Provider(allKeys, children))
         )
