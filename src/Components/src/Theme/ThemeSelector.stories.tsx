@@ -5,7 +5,7 @@ import { Entry as ThemeSelector } from './ThemeSelector.fs.js';
 
 
 const meta = {
-  title: 'CompositeComponents/ThemeSelector',
+  title: 'Composite Components/ThemeSelector',
   tags: ['autodocs'],
   parameters: {
     layout: 'centered',

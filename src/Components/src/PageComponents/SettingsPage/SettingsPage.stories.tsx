@@ -5,7 +5,7 @@ import { Entry as SettingsPage } from './SettingsPage.fs.js';
 
 
 const meta = {
-  title: 'PageComponents/SettingsPage',
+  title: 'Page Components/SettingsPage',
   tags: ['autodocs'],
   parameters: {
     layout: 'fullscreen',
