@@ -11,16 +11,16 @@ open Swate.Components
 open Swate.Components.JsBindings
 
 [<RequireQualifiedAccess>]
-type AsyncState<'T> =
+type private AsyncState<'T> =
     | Idle
     | Loading
     | Ok of 'T
     | Error of exn
 
-module Helper =
+type FormComponents =
 
     [<ReactComponent>]
-    let AddButton (clickEvent: MouseEvent -> unit) =
+    static member private AddButton(clickEvent: MouseEvent -> unit) =
         Html.button [
             prop.className "swt:btn swt:btn-info"
             prop.text "+"
@@ -28,7 +28,7 @@ module Helper =
         ]
 
     [<ReactComponent>]
-    let DeleteButton (clickEvent: MouseEvent -> unit) =
+    static member private DeleteButton(clickEvent: MouseEvent -> unit) =
         Html.button [
             prop.className "swt:btn swt:btn-error swt:grow-0"
             prop.text "Delete"
@@ -36,13 +36,12 @@ module Helper =
         ]
 
     [<ReactComponent>]
-    let CardFormGroup (content: ReactElement list) =
+    static member private CardFormGroup(content: ReactElement list) =
         Html.div [
             prop.className "swt:grid swt:@md/main:grid-cols-2 swt:@xl/main:grid-flow-col swt:gap-4 not-prose"
             prop.children content
         ]
 
-type FormComponents =
 
     [<ReactComponent>]
     static member InputSequenceElement(key: string, id: string, listComponent: ReactElement) =
@@ -174,7 +173,7 @@ type FormComponents =
                 Html.div [
                     prop.className "swt:flex swt:justify-center swt:w-full swt:mt-2"
                     prop.children [
-                        Helper.AddButton(fun _ ->
+                        FormComponents.AddButton(fun _ ->
                             inputs.Add(constructor ())
                             validateSetter inputs
                         )
@@ -263,7 +262,7 @@ type FormComponents =
                             classNames = TermSearchStyle(Fable.Core.U2.Case1 "swt:w-full")
                         )
                         if rmv.IsSome then
-                            Helper.DeleteButton rmv.Value
+                            FormComponents.DeleteButton rmv.Value
                     ]
                 ]
             ]
@@ -338,7 +337,7 @@ type FormComponents =
         LayoutComponents.Collapse [
             LayoutComponents.CollapseTitle(nameText, orcid, countFilledFieldsString input)
         ] [
-            Helper.CardFormGroup [
+            FormComponents.CardFormGroup [
                 createPersonFieldTextInput (
                     input.FirstName,
                     "First Name",
@@ -346,7 +345,7 @@ type FormComponents =
                 )
                 createPersonFieldTextInput (input.LastName, "Last Name", fun person value -> person.LastName <- value)
             ]
-            Helper.CardFormGroup [
+            FormComponents.CardFormGroup [
                 createPersonFieldTextInput (
                     input.MidInitials,
                     "Mid Initials",
@@ -354,7 +353,7 @@ type FormComponents =
                 )
                 createPersonFieldTextInput (input.ORCID, "ORCID", fun person value -> person.ORCID <- value)
             ]
-            Helper.CardFormGroup [
+            FormComponents.CardFormGroup [
                 createPersonFieldTextInput (
                     input.Affiliation,
                     "Affiliation",
@@ -363,7 +362,7 @@ type FormComponents =
                 createPersonFieldTextInput (input.Address, "Address", fun person value -> person.Address <- value)
             ]
             createPersonFieldTextInput (input.EMail, "Email", fun person value -> person.EMail <- value)
-            Helper.CardFormGroup [
+            FormComponents.CardFormGroup [
                 createPersonFieldTextInput (input.Phone, "Phone", fun person value -> person.Phone <- value)
                 createPersonFieldTextInput (input.Fax, "Fax", fun person value -> person.Fax <- value)
             ]
@@ -377,7 +376,7 @@ type FormComponents =
                 parent = TermCollection.PersonRoleWithinExperiment
             )
             if rmv.IsSome then
-                Helper.DeleteButton rmv.Value
+                FormComponents.DeleteButton rmv.Value
         ]
 
     [<ReactComponent>]
@@ -519,7 +518,7 @@ type FormComponents =
                             placeholder = "comment"
                         )
                         if rmv.IsSome then
-                            Helper.DeleteButton rmv.Value
+                            FormComponents.DeleteButton rmv.Value
                     ]
                 ]
             ]
@@ -588,7 +587,7 @@ type FormComponents =
             LayoutComponents.CollapseTitle(title, doi, countFilledFieldsString ())
         ] [
             createFieldTextInput (publication.Title, "Title", fun value -> publication.Title <- value)
-            Helper.CardFormGroup [
+            FormComponents.CardFormGroup [
                 createFieldTextInput (publication.PubMedID, "PubMed ID", fun value -> publication.PubMedID <- value)
                 createFieldTextInput (publication.DOI, "DOI", fun value -> publication.DOI <- value)
             ]
@@ -611,7 +610,7 @@ type FormComponents =
                 "Comments"
             )
             if rmv.IsSome then
-                Helper.DeleteButton rmv.Value
+                FormComponents.DeleteButton rmv.Value
         ]
 
     static member PublicationsInput
@@ -662,7 +661,7 @@ type FormComponents =
             LayoutComponents.CollapseTitle(name, version, countFilledFieldsString ())
         ] [
             createFieldTextInput (input.Name, "Name", fun value -> input.Name <- value)
-            Helper.CardFormGroup [
+            FormComponents.CardFormGroup [
                 createFieldTextInput (input.Version, "Version", fun value -> input.Version <- value)
                 createFieldTextInput (input.File, "File", fun value -> input.File <- value)
             ]
@@ -684,7 +683,7 @@ type FormComponents =
                 "Comments"
             )
             if deleteButton.IsSome then
-                Helper.DeleteButton deleteButton.Value
+                FormComponents.DeleteButton deleteButton.Value
         ]
 
     static member OntologySourceReferencesInput

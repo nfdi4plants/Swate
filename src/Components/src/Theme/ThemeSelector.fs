@@ -95,9 +95,9 @@ type ThemeSelector =
         Html.label [
             prop.className "swt:select"
             prop.children [
-                Html.label [ prop.className "swt:label"; prop.ref iconRef ]
+                Html.span [ prop.className "swt:label"; prop.ref iconRef ]
                 Html.select [
-                    prop.defaultValue (Swate.Components.Types.Theme.toString themeCtx.state)
+                    prop.value (Swate.Components.Types.Theme.toString themeCtx.state)
                     prop.onChange (fun (e: string) -> themeCtx.setState (Swate.Components.Types.Theme.fromString e))
                     prop.children [
                         ThemeSelector.SelectItem Swate.Components.Types.Theme.Sunrise

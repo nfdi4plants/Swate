@@ -62,6 +62,7 @@ type SettingsPage =
             ]
         )
 
+    [<ReactComponent>]
     static member SettingsPage() =
         LayoutComponents.Section [
             SettingsPage.General()
