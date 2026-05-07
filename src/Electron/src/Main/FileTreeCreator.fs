@@ -34,6 +34,22 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
+/// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
+let removePathAndDescendants (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
+    let normalizedTargetPath = normalizePath targetPath
+    let nextTree = Dictionary<string, FileEntry>(fileTree)
+
+    if String.IsNullOrWhiteSpace normalizedTargetPath then
+        nextTree
+    else
+        let keysToRemove =
+            nextTree.Keys
+            |> Seq.filter (fun path -> isSameOrDescendantPath path normalizedTargetPath)
+            |> Seq.toArray
+
+        keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+        nextTree
+
 let getFileEntry (path: string) = promise {
     let! stats = fs?promises?stat (path)
     return FileEntry.create (pathMod?basename (path), path, stats?isDirectory (), None)

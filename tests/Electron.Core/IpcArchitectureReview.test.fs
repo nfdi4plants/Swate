@@ -4,6 +4,10 @@ open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Path
+open Main.IPC.ArcVaultsApi
+open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOHelper
+open ARCtrl
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -66,4 +70,59 @@ Vitest.describe("IPC architecture review fixes", fun () ->
             expectSourceContains preloadSource "Remoting.buildBridge<IGitLfsProgressRendererApi>"
             expectSourceContains gitLfsSource "Remoting.buildProxySender<IGitLfsProgressRendererApi>"
         })
+
+    Vitest.test("Arc vault IPC contract and implementation expose deletePath", fun () ->
+        promise {
+            let! ipcTypesSource = sourcePath [| "Swate.Electron.Shared"; "IPCTypes.fs" |] |> readUtf8FileAsync
+            let! arcVaultApiSource = sourcePath [| "Main"; "IPC"; "IArcVaultsApi.fs" |] |> readUtf8FileAsync
+
+            expectSourceContains ipcTypesSource "deletePath: string -> JS.Promise<Result<unit, exn>>"
+            expectSourceContains arcVaultApiSource "deletePath ="
+            expectSourceContains arcVaultApiSource "ArcDeleteHelper.isDeletePathAllowed"
+            expectSourceContains arcVaultApiSource "removePathAndDescendants"
+        })
+)
+
+Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
+    Vitest.test("ArcPathValidation.isWithinRootPath rejects out-of-root paths", fun () ->
+        Vitest.expect(ArcPathValidation.isWithinRootPath "C:/arc" "C:/arc/assays/a.txt").toBe(true)
+        Vitest.expect(ArcPathValidation.isWithinRootPath "C:/arc" "C:/other/place.txt").toBe(false)
+    )
+
+    Vitest.test("isDeletePathAllowed only permits add-zone descendants", fun () ->
+        Vitest.expect(ArcDeleteHelper.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe(true)
+        Vitest.expect(ArcDeleteHelper.isDeletePathAllowed "studies").toBe(false)
+        Vitest.expect(ArcDeleteHelper.isDeletePathAllowed "README.md").toBe(false)
+        Vitest.expect(ArcDeleteHelper.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
+    )
+
+    Vitest.test("mergeReloadedArcAfterDelete preserves unrelated pending drafts in memory", fun () ->
+        let loadedArc = ARC("MergeArc")
+        let assay = ArcAssay.init "AssayMergeA"
+        let pendingDto = ArcFiles.Assay assay |> FileContentDTO.fromArcFile |> Option.get
+
+        let result =
+            ArcDeleteHelper.mergeReloadedArcAfterDelete "studies/StudyA/isa.study.xlsx" loadedArc (Some pendingDto)
+
+        match result with
+        | Error error -> failwith error.Message
+        | Ok mergeResult ->
+            Vitest.expect(mergeResult.PendingArcFileSave.IsSome).toBe(true)
+            Vitest.expect(mergeResult.Arc.TryGetAssay "AssayMergeA" |> Option.isSome).toBe(true)
+    )
+
+    Vitest.test("mergeReloadedArcAfterDelete drops pending drafts affected by deletion targets", fun () ->
+        let loadedArc = ARC("MergeArc")
+        let assay = ArcAssay.init "AssayMergeB"
+        let pendingDto = ArcFiles.Assay assay |> FileContentDTO.fromArcFile |> Option.get
+
+        let result =
+            ArcDeleteHelper.mergeReloadedArcAfterDelete "assays/AssayMergeB" loadedArc (Some pendingDto)
+
+        match result with
+        | Error error -> failwith error.Message
+        | Ok mergeResult ->
+            Vitest.expect(mergeResult.PendingArcFileSave).toEqual(None)
+            Vitest.expect(mergeResult.Arc.TryGetAssay "AssayMergeB" |> Option.isSome).toBe(false)
+    )
 )

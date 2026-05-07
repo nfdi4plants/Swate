@@ -39,6 +39,7 @@ let contextMenuItems (item: FileItem) (onToggleLfsMark: FileItem -> bool -> unit
                         "swt:fluent--document-add-24-regular"
                 OnClick = fun () -> onToggleLfsMark item (not isMarked)
                 Disabled = None
+                Tone = None
             }
             {
                 Label =
@@ -49,5 +50,6 @@ let contextMenuItems (item: FileItem) (onToggleLfsMark: FileItem -> bool -> unit
                 Icon = "swt:fluent--tag-24-regular"
                 OnClick = fun () -> ()
                 Disabled = Some true
+                Tone = None
             }
         ]

@@ -1,7 +1,9 @@
 module Renderer.Components.FileExplorer
 
 
+open System
 open Renderer.Components.ARCHelper
+open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
 open Swate.Components.ErrorModal
 open Swate.Components.FileExplorer.Types
@@ -22,6 +24,9 @@ module private FileExplorerHelper =
     let tryGetArcFileRelativePath (arcFile: ArcFiles) =
         arcFile.TryGetRelativePath() |> Option.map normalizePath
 
+    let tryGetArcFilePendingPath (pendingArcFile: ArcFiles option) =
+        pendingArcFile |> Option.bind tryGetArcFileRelativePath
+
     let tryPendingArcFileEntry (arcFile: ArcFiles) =
         tryGetArcFileRelativePath arcFile
         |> Option.map (fun path -> FileEntry.create (getFileName path, path, false))
@@ -38,6 +43,15 @@ module private FileExplorerHelper =
             tryGetArcFileRelativePath arcFile
             |> Option.exists (fun pendingPath -> PathHelpers.pathsEqual pendingPath path)
         )
+
+    let tryGetItemRelativePath (item: FileItem) =
+        item.Path
+        |> Option.map PathHelpers.normalizeRelativePath
+        |> Option.map normalizePath
+
+    let canDeleteItem (item: FileItem) =
+        tryGetItemRelativePath item
+        |> Option.exists FileExplorerDeleteHelper.isDeletePathAllowed
 
     let rec private collectSelectedDirectoryPathChain
         (selectedTreeItemPath: string option)
@@ -303,6 +317,60 @@ type private ArcCreateModal =
         )
 
 [<Erase; Mangle(false)>]
+type private DeleteConfirmModal =
+
+    [<ReactComponent>]
+    static member Dialog
+        (
+            isOpen: bool,
+            itemName: string option,
+            close: unit -> unit,
+            submit: unit -> unit,
+            ?isDeleting: bool
+        ) =
+
+        let setIsOpen isOpen =
+            if not isOpen then
+                close ()
+
+        let displayName = itemName |> Option.defaultValue "this item"
+        let isDeleting = defaultArg isDeleting false
+
+        let footer =
+            Html.div [
+                prop.className "swt:flex swt:gap-2 swt:justify-end swt:w-full"
+                prop.children [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-ghost"
+                        prop.disabled isDeleting
+                        prop.onClick (fun _ -> close ())
+                        prop.text "Cancel"
+                    ]
+                    Html.button [
+                        prop.className "swt:btn swt:btn-error"
+                        prop.disabled isDeleting
+                        prop.onClick (fun _ -> submit ())
+                        prop.children [
+                            if isDeleting then
+                                Html.span [ prop.text "Deleting..." ]
+                            else
+                                Html.span [ prop.text "Delete" ]
+                        ]
+                    ]
+                ]
+            ]
+
+        BaseModal.Modal(
+            isOpen = isOpen,
+            setIsOpen = setIsOpen,
+            header = Html.text "Delete Item",
+            description = Html.text $"Permanently delete '{displayName}'?",
+            children = Html.none,
+            footer = footer,
+            debug = "arc-delete"
+        )
+
+[<Erase; Mangle(false)>]
 type FileExplorer =
 
     [<ReactComponent>]
@@ -321,6 +389,8 @@ type FileExplorer =
         let arcScopeId = useCurrentArcScopeId ()
         let pendingCreateKind, setPendingCreateKind = React.useState<ArcExplorerNodeKind option> None
         let pendingArcFileSave, setPendingArcFileSave = React.useState<ArcFiles option> None
+        let pendingDeleteItem, setPendingDeleteItem = React.useState<FileItem option> None
+        let isDeleting, setIsDeleting = React.useState false
 
         let stagePendingArcFileSave (arcFile: ArcFiles option) : JS.Promise<Result<unit, exn>> = promise {
             let pendingSaveRequestResult =
@@ -343,6 +413,20 @@ type FileExplorer =
                 (fun () -> withPendingArcFileEntry fileStateCtx.state.FileTree pendingArcFileSave),
                 [| box fileStateCtx.state.FileTree; box pendingArcFileSave |]
             )
+
+        React.useEffect (
+            (fun () ->
+                let filePaths =
+                    effectiveFileTree
+                    |> Array.map (fun entry -> entry.path)
+
+                if FileExplorerDeleteHelper.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath then
+                    fileStateCtx.setSelection ArcSelection.empty
+
+                    if FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval pageStateCtx.state then
+                        pageStateCtx.setState None),
+            [| box effectiveFileTree; box fileStateCtx.state.Selection.TreePath; box pageStateCtx.state |]
+        )
 
         let fileTree =
             React.useMemo (
@@ -450,6 +534,13 @@ type FileExplorer =
         let openCreateModal kind =
             setPendingCreateKind (Some kind)
 
+        let closeDeleteModal () =
+            setPendingDeleteItem None
+
+        let requestDeleteItem (item: FileItem) =
+            if canDeleteItem item then
+                setPendingDeleteItem (Some item)
+
         let rootPath = fileTree |> Option.map (fun tree -> tree.path)
 
         let inlineCreateKindForItem item =
@@ -463,8 +554,48 @@ type FileExplorer =
         let createFromItem item =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
+        let applyDeleteError (errorMessage: string) =
+            errorModal.enqueue (
+                ErrorModalRequest.create (
+                    errorMessage,
+                    title = "Could not delete item",
+                    ?scopeId = arcScopeId
+                )
+            )
+
         let applyCreateError errorMessage =
             Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState errorMessage
+
+        let confirmDeleteItem () =
+            match pendingDeleteItem |> Option.bind tryGetItemRelativePath with
+            | None -> closeDeleteModal ()
+            | Some deletePath when FileExplorerDeleteHelper.isDeletePathAllowed deletePath |> not ->
+                closeDeleteModal ()
+            | Some deletePath ->
+                setIsDeleting true
+
+                promise {
+                    let pendingPath = tryGetArcFilePendingPath pendingArcFileSave
+                    let shouldClearPendingDraft =
+                        FileExplorerDeleteHelper.isPendingPathAffectedByDelete deletePath pendingPath
+
+                    let! deleteResult = Api.ipcArcVaultApi.deletePath deletePath
+
+                    match deleteResult with
+                    | Ok() ->
+                        if shouldClearPendingDraft then
+                            setPendingArcFileSave None
+
+                            match! stagePendingArcFileSave None with
+                            | Ok() -> ()
+                            | Error exn -> applyDeleteError exn.Message
+
+                        closeDeleteModal ()
+                    | Error exn -> applyDeleteError exn.Message
+
+                    setIsDeleting false
+                }
+                |> Promise.start
 
         let createArcEntry kind (identifier: string) =
             let existingPaths =
@@ -502,12 +633,30 @@ type FileExplorer =
                     Icon = arcCreateKindIcon kind
                     OnClick = fun () -> openCreateModal kind
                     Disabled = None
+                    Tone = None
                 })
             else
                 []
 
+        let deleteContextMenuItems (item: FileItem) =
+            if canDeleteItem item then
+                [
+                    {
+                        Label = "Delete"
+                        Icon = "swt:fluent--delete-24-regular"
+                        OnClick = fun () -> requestDeleteItem item
+                        Disabled = None
+                        Tone = Some ContextMenuItemTone.Destructive
+                    }
+                ]
+            else
+                []
+
+        let baseContextMenuItems (item: FileItem) =
+            arcCreateContextMenuItems item @ deleteContextMenuItems item
+
         let contextMenuItems =
-            Renderer.Components.FileExplorerLfs.createContextMenuItems errorModal.enqueue arcScopeId arcCreateContextMenuItems
+            Renderer.Components.FileExplorerLfs.createContextMenuItems errorModal.enqueue arcScopeId baseContextMenuItems
 
         let activeCreateKind =
             pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
@@ -518,6 +667,15 @@ type FileExplorer =
                 kind = activeCreateKind,
                 close = closeCreateModal,
                 submit = createArcEntry
+            )
+
+        let deleteConfirmModal =
+            DeleteConfirmModal.Dialog(
+                isOpen = pendingDeleteItem.IsSome,
+                itemName = (pendingDeleteItem |> Option.map _.Name),
+                close = closeDeleteModal,
+                submit = confirmDeleteItem,
+                isDeleting = isDeleting
             )
 
         let arcNameFromRootItem (rootItem: FileItem) =
@@ -552,15 +710,19 @@ type FileExplorer =
                             onContextMenu = contextMenuItems,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
+                            canDeleteItem = canDeleteItem,
+                            onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             showBreadcrumbs = false
                         )
                     ]
                 ]
                 arcCreateModal
+                deleteConfirmModal
             ]
         | None ->
             React.Fragment [
                 FileExplorer.EmptyFileTreePlaceholder()
                 arcCreateModal
+                deleteConfirmModal
             ]

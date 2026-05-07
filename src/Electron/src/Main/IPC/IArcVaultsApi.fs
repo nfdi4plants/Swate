@@ -240,6 +240,73 @@ let private pathsEqualForComparison (leftPath: string) (rightPath: string) =
     let normalize = FileIOHelper.normalizePath >> ArcPathValidation.normalizePathForComparison
     normalize leftPath = normalize rightPath
 
+let private isSameOrDescendantPathForComparison (path: string) (ancestorPath: string) =
+    let normalize = FileIOHelper.normalizePath >> ArcPathValidation.normalizePathForComparison
+    let normalizedPath = normalize path
+    let normalizedAncestorPath = normalize ancestorPath
+
+    not (String.IsNullOrWhiteSpace normalizedPath)
+    && not (String.IsNullOrWhiteSpace normalizedAncestorPath)
+    && (normalizedPath = normalizedAncestorPath || normalizedPath.StartsWith(normalizedAncestorPath + "/"))
+
+[<RequireQualifiedAccess>]
+module ArcDeleteHelper =
+
+    let private addZoneRoots =
+        set [ "studies"; "assays"; "workflows"; "runs" ]
+
+    let isDeletePathAllowed (relativePath: string) =
+        let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
+
+        if String.IsNullOrWhiteSpace normalizedRelativePath then
+            false
+        else
+            let segments =
+                normalizedRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries)
+
+            segments.Length >= 2
+            && (segments.[0].ToLowerInvariant() |> addZoneRoots.Contains)
+
+    let isPendingPathAffectedByDelete (deletedPath: string) (pendingArcFileSave: FileContentDTO option) =
+        pendingArcFileSave
+        |> Option.exists (fun pendingArcFileSave ->
+            isSameOrDescendantPathForComparison pendingArcFileSave.path deletedPath
+        )
+
+    type MergeResult = {
+        Arc: ARC
+        PendingArcFileSave: FileContentDTO option
+    }
+
+    let mergeReloadedArcAfterDelete
+        (deletedPath: string)
+        (reloadedArc: ARC)
+        (pendingArcFileSave: FileContentDTO option)
+        : Result<MergeResult, exn> =
+        let shouldDropPendingArcFileSave =
+            isPendingPathAffectedByDelete deletedPath pendingArcFileSave
+
+        if shouldDropPendingArcFileSave then
+            Ok {
+                Arc = reloadedArc
+                PendingArcFileSave = None
+            }
+        else
+            match pendingArcFileSave with
+            | None ->
+                Ok {
+                    Arc = reloadedArc
+                    PendingArcFileSave = None
+                }
+            | Some pendingArcFileSave ->
+                match updateARCByFileContentDTO reloadedArc pendingArcFileSave with
+                | Error mergeError -> Error mergeError
+                | Ok mergedArc ->
+                    Ok {
+                        Arc = mergedArc
+                        PendingArcFileSave = Some pendingArcFileSave
+                    }
+
 let private tryPersistPendingArcFileSave (vault: ArcVault) : JS.Promise<Result<unit, exn>> = promise {
     match vault.pendingArcFileSave with
     | None -> return Ok()
@@ -529,6 +596,65 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 | Some vault ->
                     vault.pendingArcFileSave <- pendingArcFileSave
                     return Ok()
+            with e ->
+                return Error e
+        }
+    deletePath =
+        fun (relativePath: string) -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    match vault.path with
+                    | None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath ->
+                        let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
+
+                        if ArcDeleteHelper.isDeletePathAllowed normalizedRelativePath |> not then
+                            return
+                                Error(
+                                    exn
+                                        "Deletion is only allowed for descendants under studies/, assays/, workflows/, or runs/."
+                                )
+                        else
+                            match tryResolveArcRelativePath arcPath normalizedRelativePath with
+                            | Error pathError -> return Error pathError
+                            | Ok absolutePath ->
+                                vault.isBusyWriting <- true
+
+                                try
+                                    let! _ =
+                                        fsPromisesDynamic?rm (
+                                            absolutePath,
+                                            createObj [ "recursive" ==> true; "force" ==> false ]
+                                        )
+                                        |> unbox<JS.Promise<obj>>
+
+                                    let nextFileTree =
+                                        removePathAndDescendants absolutePath vault.fileTree
+
+                                    vault.SetFileTree nextFileTree
+
+                                    match! ARC.tryLoadAsync arcPath with
+                                    | Error loadError ->
+                                        return Error(exn $"Unable to reload ARC after deleting '{normalizedRelativePath}': {loadError}")
+                                    | Ok reloadedArc ->
+                                        match
+                                            ArcDeleteHelper.mergeReloadedArcAfterDelete
+                                                normalizedRelativePath
+                                                reloadedArc
+                                                vault.pendingArcFileSave
+                                        with
+                                        | Error mergeError -> return Error mergeError
+                                        | Ok mergeResult ->
+                                            vault.arc <- Some mergeResult.Arc
+                                            vault.pendingArcFileSave <- mergeResult.PendingArcFileSave
+                                            vault.window.title <- mergeResult.Arc.Identifier
+                                            return Ok()
+                                finally
+                                    vault.isBusyWriting <- false
             with e ->
                 return Error e
         }
