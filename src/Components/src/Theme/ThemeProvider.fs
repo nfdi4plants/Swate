@@ -1,4 +1,4 @@
-namespace Swate.Components.ThemeProvider
+namespace Swate.Components.Theme
 
 open Feliz
 open Fable.Core
@@ -11,13 +11,8 @@ type ThemeProvider =
 
     [<ReactComponent(true)>]
     static member ThemeProvider
-        (
-            reactContext: ReactContext<StateContext<Theme>>,
-            children: ReactElement,
-            ?dataAttribute: string,
-            ?localStorageKey: string,
-            ?enforceTheme: Theme
-        ) =
+        (children: ReactElement, ?dataAttribute: string, ?localStorageKey: string, ?enforceTheme: Theme)
+        =
         let localStorageKey = defaultArg localStorageKey "swate-theme-ctx"
         let dataAttribute = defaultArg dataAttribute "data-theme"
         let (theme, setTheme) = React.useLocalStorage (localStorageKey, Theme.Auto)
@@ -43,4 +38,4 @@ type ThemeProvider =
             [| box enforceTheme |]
         )
 
-        reactContext.Provider({ state = theme; setState = setTheme }, children)
+        Context.ThemeCtx.Provider({ state = theme; setState = setTheme }, children)

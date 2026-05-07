@@ -7,6 +7,7 @@ open Swate.Components.GenericComponents.SelectContext
 [<Erase; Mangle(false)>]
 type Select =
 
+    [<ReactComponent>]
     static member private InnerBaseOptionRender
         (label: string, isSelected: bool, ?ref: IRefValue<option<Browser.Types.HTMLInputElement>>)
         =
@@ -29,6 +30,7 @@ type Select =
             Html.div label
         ]
 
+    [<ReactComponent>]
     static member private OuterBaseOptionRender
         (
             isActive: bool,
