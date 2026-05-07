@@ -10,11 +10,58 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Feliz
 open Fable.Core
+open System
 
 
 module private FileExplorerHelper =
 
     let private normalizeNodePath (path: string) = normalizePath path
+
+    let private pathSegments (path: string) = path |> normalizeNodePath |> getNonEmptyPathParts
+
+    let private lowerInvariant (value: string) = value.ToLowerInvariant()
+
+    let private iconForArcCollectionFolder =
+        function
+        | "studies" -> Some FileItemIcon.Study
+        | "assays" -> Some FileItemIcon.Assay
+        | "workflows" -> Some FileItemIcon.Workflow
+        | "runs" -> Some FileItemIcon.Run
+        | "notes" -> Some FileItemIcon.Notebook
+        | _ -> None
+
+    let private iconForArcWorkbookFile =
+        function
+        | "isa.study.xlsx" -> Some FileItemIcon.Study
+        | "isa.assay.xlsx" -> Some FileItemIcon.Assay
+        | "isa.workflow.xlsx" -> Some FileItemIcon.Workflow
+        | "isa.run.xlsx" -> Some FileItemIcon.Run
+        | _ -> None
+
+    let private folderIcon (path: string) =
+        let segments = pathSegments path
+
+        match segments |> Array.tryHead |> Option.map lowerInvariant, segments.Length with
+        | Some rootSegment, 1 -> iconForArcCollectionFolder rootSegment |> Option.defaultValue FileItemIcon.Folder
+        | Some "studies", 2 -> FileItemIcon.Study
+        | Some "assays", 2 -> FileItemIcon.Assay
+        | Some "workflows", 2 -> FileItemIcon.Workflow
+        | Some "runs", 2 -> FileItemIcon.Run
+        | _ -> FileItemIcon.Folder
+
+    let private fileIcon (path: string) =
+        let normalizedPath = normalizeNodePath path
+        let segments = pathSegments normalizedPath
+        let fileName = getFileName normalizedPath |> lowerInvariant
+
+        match iconForArcWorkbookFile fileName with
+        | Some icon -> icon
+        | None when DatamapParentInfo.tryFromPath normalizedPath |> Option.isSome -> FileItemIcon.Table
+        | None when (segments |> Array.tryHead |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
+                     && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ->
+            FileItemIcon.Note
+        | None when fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) -> FileItemIcon.Table
+        | None -> FileItemIcon.Document
 
     let rec private collectSelectedDirectoryPathChain
         (selectedTreeItemPath: string option)
@@ -71,7 +118,7 @@ module private FileExplorerHelper =
                     []
 
             Some {
-                FileTree.createFolder parent.name (Some parent.path) FileItemIcon.Folder with
+                FileTree.createFolder parent.name (Some parent.path) (folderIcon parent.path) with
                     Id = parent.path
                     IsExpanded =
                         selectedTreeItemPath
@@ -81,7 +128,7 @@ module private FileExplorerHelper =
             }
         | false ->
             Some {
-                FileTree.createFile parent.name (Some parent.path) FileItemIcon.Document with
+                FileTree.createFile parent.name (Some parent.path) (fileIcon parent.path) with
                     Id = parent.path
                     IsLFS = parent.isLfs
             }
