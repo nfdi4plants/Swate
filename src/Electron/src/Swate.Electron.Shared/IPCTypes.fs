@@ -40,6 +40,7 @@ type IArcVaultsApi = {
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
+    openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>
     readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
     /// This IPC call is used to set changes to an ARC based on a smaller ArcFiles object. It can be used to trigger UpdateContract changes and write these changes to disc.
     saveArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>

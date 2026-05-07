@@ -92,6 +92,7 @@
     <Compile Include="GenericComponents\Actionbar.fs" />
     <Compile Include="GenericComponents\Navbar.fs" />
     <Compile Include="ARCSelector\Selector.fs" />
+    <Compile Include="ArcVaultActions\ArcVaultActions.fs" />
     <Compile Include="Layout\LeftSidebarContext.fs" />
     <Compile Include="Layout\RightSidebarContext.fs" />
     <Compile Include="Layout\Layout.fs" />
