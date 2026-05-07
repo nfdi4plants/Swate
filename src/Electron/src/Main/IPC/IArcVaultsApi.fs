@@ -12,6 +12,7 @@ open Fable.Electron
 open Fable.Electron.Main
 open Fable.Core.JsInterop
 open Main
+open Main.ArcMerge
 open Node.Api
 open ARCtrl
 open Swate.Electron.Shared.DTOs.NoteSearchDto
@@ -282,34 +283,119 @@ module ArcDeleteHelper =
         PendingArcFileSave: FileContentDTO option
     }
 
+    let private normalizeRelativePathForMerge (path: string) =
+        path
+        |> PathHelpers.normalizeRelativePath
+        |> PathHelpers.normalizePath
+
+    let private deduplicateEventPaths (paths: string seq) =
+        paths
+        |> Seq.distinctBy ArcPathValidation.normalizePathForComparison
+        |> Seq.toList
+
+    let private buildPrimaryUnlinkEventPaths (deletedPath: string) (preDeleteFileRelativePaths: string seq) =
+        let normalizedDeletedPath = normalizeRelativePathForMerge deletedPath
+
+        preDeleteFileRelativePaths
+        |> Seq.map normalizeRelativePathForMerge
+        |> Seq.filter (fun relativePath -> isSameOrDescendantPathForComparison relativePath normalizedDeletedPath)
+        |> deduplicateEventPaths
+
+    let private tryBuildKnownTargetFallbackPath (deletedPath: string) =
+        let normalizedDeletedPath = normalizeRelativePathForMerge deletedPath
+
+        match ArcEntityRef.fromPath normalizedDeletedPath with
+        | ArcEntityRef.Unknown _ -> None
+        | _ -> Some normalizedDeletedPath
+
+    let private tryBuildZoneFallbackPaths (deletedPath: string) =
+        let normalizedDeletedPath = normalizeRelativePathForMerge deletedPath
+        let segments = normalizedDeletedPath.Split('/', StringSplitOptions.RemoveEmptyEntries)
+
+        if segments.Length = 2 && PathHelpers.pathMatchesAny addZoneRoots segments.[0] then
+            let zoneRoot = segments.[0]
+            let entityId = segments.[1]
+
+            let entityFileNameOpt =
+                match zoneRoot.ToLowerInvariant() with
+                | "assays" -> Some ARCtrl.ArcPathHelper.AssayFileName
+                | "studies" -> Some ARCtrl.ArcPathHelper.StudyFileName
+                | "workflows" -> Some ARCtrl.ArcPathHelper.WorkflowFileName
+                | "runs" -> Some ARCtrl.ArcPathHelper.RunFileName
+                | _ -> None
+
+            match entityFileNameOpt with
+            | None -> []
+            | Some entityFileName ->
+                [
+                    $"{zoneRoot}/{entityId}/{entityFileName}"
+                    $"{zoneRoot}/{entityId}/{ARCtrl.ArcPathHelper.DataMapFileName}"
+                ]
+        else
+            []
+
+    let buildDeleteUnlinkEvents (deletedPath: string) (preDeleteFileRelativePaths: string seq) : FileEvent list =
+        let primaryPaths = buildPrimaryUnlinkEventPaths deletedPath preDeleteFileRelativePaths
+
+        let effectivePaths =
+            if primaryPaths.Length > 0 then
+                primaryPaths
+            else
+                [
+                    yield! tryBuildKnownTargetFallbackPath deletedPath |> Option.toList
+                    yield! tryBuildZoneFallbackPaths deletedPath
+                ]
+                |> deduplicateEventPaths
+
+        effectivePaths
+        |> List.map (fun path -> {
+            EventName = EventName.Unlink
+            Path = path
+        })
+
+    let getPreDeleteFileRelativePaths (arcPath: string) (fileEntries: seq<FileEntry>) =
+        fileEntries
+        |> Seq.choose (fun fileEntry ->
+            if fileEntry.isDirectory then
+                None
+            else
+                tryGetRepoRelativePath arcPath fileEntry.path |> Option.map normalizeRelativePathForMerge
+        )
+        |> Seq.toList
+
     let mergeReloadedArcAfterDelete
         (deletedPath: string)
+        (preDeleteFileRelativePaths: string seq)
+        (arcLocal: ARC)
         (reloadedArc: ARC)
         (pendingArcFileSave: FileContentDTO option)
         : Result<MergeResult, exn> =
         let shouldDropPendingArcFileSave =
             isPendingPathAffectedByDelete deletedPath pendingArcFileSave
 
-        if shouldDropPendingArcFileSave then
+        let pendingForMerge =
+            if shouldDropPendingArcFileSave then
+                None
+            else
+                pendingArcFileSave
+
+        let arcLocalForMerge = arcLocal.Copy()
+
+        let arcLocalForMergeResult =
+            match pendingForMerge with
+            | None -> Ok arcLocalForMerge
+            | Some pendingArcFileSave -> updateARCByFileContentDTO arcLocalForMerge pendingArcFileSave
+
+        match arcLocalForMergeResult with
+        | Error mergeError -> Error mergeError
+        | Ok arcLocalForMerge ->
+            let unlinkEvents = buildDeleteUnlinkEvents deletedPath preDeleteFileRelativePaths
+            let mergedArc = ARC.merge arcLocalForMerge reloadedArc unlinkEvents
+
             Ok {
-                Arc = reloadedArc
-                PendingArcFileSave = None
+                Arc = mergedArc
+                PendingArcFileSave = pendingForMerge
             }
-        else
-            match pendingArcFileSave with
-            | None ->
-                Ok {
-                    Arc = reloadedArc
-                    PendingArcFileSave = None
-                }
-            | Some pendingArcFileSave ->
-                match updateARCByFileContentDTO reloadedArc pendingArcFileSave with
-                | Error mergeError -> Error mergeError
-                | Ok mergedArc ->
-                    Ok {
-                        Arc = mergedArc
-                        PendingArcFileSave = Some pendingArcFileSave
-                    }
 
 let private tryPersistPendingArcFileSave (vault: ArcVault) : JS.Promise<Result<unit, exn>> = promise {
     match vault.pendingArcFileSave with
@@ -611,10 +697,13 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 match ARC_VAULTS.TryGetVault(windowId) with
                 | None -> return Error(exn $"The ARC for window id {windowId} should exist")
                 | Some vault ->
-                    match vault.path with
-                    | None -> return Error(exn "ARC is not loaded.")
-                    | Some arcPath ->
+                    match vault.path, vault.arc with
+                    | None, _
+                    | _, None -> return Error(exn "ARC is not loaded.")
+                    | Some arcPath, Some arcLocal ->
                         let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
+                        let preDeleteFileRelativePaths =
+                            ArcDeleteHelper.getPreDeleteFileRelativePaths arcPath vault.fileTree.Values
 
                         if ArcDeleteHelper.isDeletePathAllowed normalizedRelativePath |> not then
                             return
@@ -645,6 +734,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         match
                                             ArcDeleteHelper.mergeReloadedArcAfterDelete
                                                 normalizedRelativePath
+                                                preDeleteFileRelativePaths
+                                                arcLocal
                                                 reloadedArc
                                                 vault.pendingArcFileSave
                                         with

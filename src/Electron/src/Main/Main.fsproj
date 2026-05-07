@@ -19,6 +19,10 @@
     <Compile Include="Git\GitlfsAdapter.fs" />
     <Compile Include="Git\GitLfsService.fs" />
     <Compile Include="FileTreeCreator.fs" />
+    <Compile Include="ArcMerge\Types.fs" />
+    <Compile Include="ArcMerge\Extensions.fs" />
+    <Compile Include="ArcMerge\ArcEntityRefHelper.fs" />
+    <Compile Include="ArcMerge\ArcMergeLibraryExtensions.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />
     <Compile Include="Git\GitInternals.fs" />
     <Compile Include="Git\GitService.fs" />
