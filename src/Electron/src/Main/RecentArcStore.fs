@@ -18,7 +18,7 @@ module private Helpers =
     let sanitize (arcs: ARCPointer[]) =
         arcs
         |> Array.filter (fun arc -> not (String.IsNullOrWhiteSpace arc.path))
-        |> Array.distinctBy (fun arc -> normalizePath arc.path)
+        |> Array.distinctBy (fun arc -> PathHelpers.normalizePath arc.path)
         |> fun xs ->
             if xs.Length > maxNumberRecentArcs then
                 Array.take maxNumberRecentArcs xs
@@ -47,7 +47,7 @@ module private Helpers =
 
                 let name =
                     if String.IsNullOrWhiteSpace nameValue then
-                        Swate.Electron.Shared.FileIOHelper.getFileName path
+                        PathHelpers.getFileName path
                     else
                         nameValue
 
@@ -93,7 +93,7 @@ type RecentARCStore() =
             this.RecentArcsState
         else
             let arc =
-                Helpers.toPointer (Swate.Electron.Shared.FileIOHelper.getFileName path) path true
+                Helpers.toPointer (PathHelpers.getFileName path) path true
 
             let remainingArcs =
                 this.RecentArcsState |> Array.filter (fun arc -> not (pathsEqual arc.path path))

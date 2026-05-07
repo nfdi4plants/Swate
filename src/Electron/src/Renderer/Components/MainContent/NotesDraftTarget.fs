@@ -46,7 +46,7 @@ let NotesDraftTarget () =
                             Error = Some $"Failed to write note: {exn.Message}"
                     }
                 | Ok() ->
-                    let selectedPath = normalizePath payload.Intent.RelativePath
+                    let selectedPath = PathHelpers.normalizePath payload.Intent.RelativePath
 
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
                     setNotesDraft NotesDraft.init

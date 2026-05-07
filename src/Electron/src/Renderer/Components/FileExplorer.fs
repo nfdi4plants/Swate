@@ -1,7 +1,6 @@
 module Renderer.Components.FileExplorer
 
 
-open System
 open Renderer.Components.ARCHelper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
@@ -19,17 +18,17 @@ module private FileExplorerHelper =
 
     type ArcCreateDraft = { ArcFile: ArcFiles; Path: string }
 
-    let private normalizeNodePath (path: string) = normalizePath path
+    let private normalizeNodePath (path: string) = PathHelpers.normalizePath path
 
     let tryGetArcFileRelativePath (arcFile: ArcFiles) =
-        arcFile.TryGetRelativePath() |> Option.map normalizePath
+        arcFile.TryGetRelativePath() |> Option.map PathHelpers.normalizePath
 
     let tryGetArcFilePendingPath (pendingArcFile: ArcFiles option) =
         pendingArcFile |> Option.bind tryGetArcFileRelativePath
 
     let tryPendingArcFileEntry (arcFile: ArcFiles) =
         tryGetArcFileRelativePath arcFile
-        |> Option.map (fun path -> FileEntry.create (getFileName path, path, false))
+        |> Option.map (fun path -> FileEntry.create (PathHelpers.getFileName path, path, false))
 
     let withPendingArcFileEntry (fileTree: FileEntry[]) (pendingArcFile: ArcFiles option) =
         match pendingArcFile |> Option.bind tryPendingArcFileEntry with
@@ -47,7 +46,7 @@ module private FileExplorerHelper =
     let tryGetItemRelativePath (item: FileItem) =
         item.Path
         |> Option.map PathHelpers.normalizeRelativePath
-        |> Option.map normalizePath
+        |> Option.map PathHelpers.normalizePath
 
     let canDeleteItem (item: FileItem) =
         tryGetItemRelativePath item
@@ -219,11 +218,11 @@ module private FileExplorerHelper =
                 match FileContentDTO.fromArcFile arcFile with
                 | None -> Error $"Creating {label} files is not supported in Electron yet."
                 | Some request ->
-                    let requestedPath = normalizePath request.path
+                    let requestedPath = PathHelpers.normalizePath request.path
 
                     let alreadyExists =
                         existingPaths
-                        |> Seq.exists (fun path -> PathHelpers.pathsEqual (normalizePath path) requestedPath)
+                        |> Seq.exists (fun path -> PathHelpers.pathsEqual (PathHelpers.normalizePath path) requestedPath)
 
                     if alreadyExists then
                         Error $"{label} '{identifier}' already exists."
@@ -484,18 +483,18 @@ type FileExplorer =
                 | Some path when item.IsDirectory ->
                     if not item.IsExpanded then
                         setLoadedDirectoryPaths (fun current ->
-                            let normalizedPath = normalizePath path
+                            let normalizedPath = PathHelpers.normalizePath path
 
                             if current.Contains normalizedPath then
                                 current
                             else
                                 current.Add normalizedPath)
 
-                    let selectedPath = normalizePath path
+                    let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
                     pageStateCtx.setState None
                 | Some path ->
-                    let selectedPath = normalizePath path
+                    let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                     match tryFindPendingArcFileByPath selectedPath pendingArcFileSave with
@@ -520,7 +519,7 @@ type FileExplorer =
                 match item.Path with
                 | Some path ->
                     setLoadedDirectoryPaths (fun current ->
-                        let normalizedPath = normalizePath path
+                        let normalizedPath = PathHelpers.normalizePath path
 
                         if current.Contains normalizedPath then
                             current
@@ -681,12 +680,12 @@ type FileExplorer =
         let arcNameFromRootItem (rootItem: FileItem) =
             match rootItem.Path with
             | Some path ->
-                let normalizedPath = normalizePath path
+                let normalizedPath = PathHelpers.normalizePath path
 
                 if System.String.IsNullOrWhiteSpace normalizedPath then
                     rootItem.Name
                 else
-                    getFileName normalizedPath
+                    PathHelpers.getFileName normalizedPath
             | None -> rootItem.Name
 
         match fileItem with

@@ -6,34 +6,20 @@ open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 
-/// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
-let normalizeSeparators (path: string) =
-    Swate.Components.Shared.PathHelpers.normalizeSeparators path
-
-/// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
-let normalizePath (path: string) =
-    Swate.Components.Shared.PathHelpers.normalizePath path
-
-/// normalizes the path and splits it into parts
-let getPathParts (path: string) =
-    normalizePath path |> (fun p -> p.Split("/"))
 
 let getNonEmptyPathParts (path: string) =
-    normalizePath path
+    PathHelpers.normalizePath path
     |> fun p -> p.Split('/', StringSplitOptions.RemoveEmptyEntries)
 
 let getPathDepth (path: string) =
     path |> getNonEmptyPathParts |> Array.length
 
-let getFileName (path: string) = path |> getPathParts |> Array.last
-
 let pathsEqual (left: string) (right: string) =
-    normalizePath left = normalizePath right
+    PathHelpers.normalizePath left = PathHelpers.normalizePath right
 
 let isSameOrDescendantPath (path: string) (ancestorPath: string) =
-    let normalizedPath = normalizePath path
-    let normalizedAncestorPath = normalizePath ancestorPath
-
+    let normalizedPath = PathHelpers.normalizePath path
+    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
     String.IsNullOrWhiteSpace normalizedAncestorPath
     || normalizedPath = normalizedAncestorPath
     || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.OrdinalIgnoreCase)
@@ -42,8 +28,8 @@ let private containsTraversalSegments (path: string) =
     path.Split('/') |> Array.exists (fun segment -> segment = "." || segment = "..")
 
 let private tryGetRepoRelativePathCore (repoRoot: string) (absolutePath: string) (allowRoot: bool) =
-    let normalizedRoot = normalizePath repoRoot
-    let normalizedAbsolutePath = normalizePath absolutePath
+    let normalizedRoot = PathHelpers.normalizePath repoRoot
+    let normalizedAbsolutePath = PathHelpers.normalizePath absolutePath
 
     if String.IsNullOrWhiteSpace normalizedRoot || String.IsNullOrWhiteSpace normalizedAbsolutePath then
         None
@@ -133,7 +119,7 @@ let toFileTreeNode (fileEntries: FileEntry[]) =
         failwith "toFileTreeNode requires at least one file entry to determine the root path."
 
     let normalizedPaths =
-        fileEntries |> Array.map (fun fileEntry -> normalizePath fileEntry.path)
+        fileEntries |> Array.map (fun fileEntry -> PathHelpers.normalizePath fileEntry.path)
 
     let rootPath =
         normalizedPaths
@@ -143,17 +129,17 @@ let toFileTreeNode (fileEntries: FileEntry[]) =
 
     let adaptedFileEntries =
         fileEntries
-        |> Array.filter (fun fileEntry -> normalizePath fileEntry.path <> rootPath)
+        |> Array.filter (fun fileEntry -> PathHelpers.normalizePath fileEntry.path <> rootPath)
         // Deterministic order avoids creating parents from file entries before their directory entries.
         |> Array.sortBy (fun fileEntry ->
             let depth = getPathDepth fileEntry.path
-            depth, (if fileEntry.isDirectory then 0 else 1), normalizePath fileEntry.path
+            depth, (if fileEntry.isDirectory then 0 else 1), PathHelpers.normalizePath fileEntry.path
         )
 
     let rootElement =
         let rootEntry =
             fileEntries
-            |> Array.find (fun fileEntry -> normalizePath fileEntry.path = rootPath)
+            |> Array.find (fun fileEntry -> PathHelpers.normalizePath fileEntry.path = rootPath)
 
         FileTreeNode.create (
             rootEntry.name,
@@ -223,7 +209,7 @@ let combineMany = ARCtrl.ArcPathHelper.combineMany
 
 let tryGetArcFilePath (arcRootPath: ArcRootPath) (arcFile: ArcFiles) =
     let arcRootPath = defaultArg arcRootPath ""
-    let root = normalizePath arcRootPath
+    let root = PathHelpers.normalizePath arcRootPath
 
     arcFile.TryGetRelativePath() |> Option.map (fun p -> combineMany [| root; p |])
 

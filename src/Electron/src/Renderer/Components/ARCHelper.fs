@@ -5,6 +5,7 @@ open Feliz
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
+open Swate.Components.Shared
 
 
 [<Hook>]
@@ -12,7 +13,7 @@ let useCurrentArcScopeId () =
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
     appStateCtx
-    |> Option.map normalizePath
+    |> Option.map PathHelpers.normalizePath
     |> Option.bind (fun path ->
         if String.IsNullOrWhiteSpace path then
             None
@@ -70,7 +71,7 @@ let private loadViewResult (previewPath: string) = promise {
 let openView (path: string) = promise {
     let previewPath = resolveArcPreviewPath path
 
-    if previewPath <> normalizePath path then
+    if previewPath <> PathHelpers.normalizePath path then
         console.log ($"[Renderer] Redirecting Datamap click to file: {previewPath}")
     else
         console.log ($"[Renderer] Opening file: {previewPath}")

@@ -31,7 +31,7 @@ module ArcPathValidation =
         |> Array.exists (fun segment -> segment = "." || segment = "..")
 
     let isSafeRelativePathCandidate (pathValue: string) =
-        let normalizedPath = FileIOHelper.normalizePath pathValue
+        let normalizedPath = PathHelpers.normalizePath pathValue
 
         not (String.IsNullOrWhiteSpace normalizedPath)
         && normalizedPath <> "."
@@ -59,7 +59,7 @@ let private tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: stri
     let relativePath =
         pathDynamic?relative (arcRoot, absolutePath)
         |> unbox<string>
-        |> FileIOHelper.normalizePath
+        |> PathHelpers.normalizePath
 
     if String.IsNullOrWhiteSpace relativePath || relativePath = "." then
         Ok ""
@@ -72,7 +72,7 @@ let private tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: stri
 
 /// This function resolves a given relative path against the ARC root path and ensures that the resolved absolute path is within the ARC root directory to prevent unauthorized file system access.
 let private tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) =
-    let relativePath = FileIOHelper.normalizePath requestedRelativePath
+    let relativePath = PathHelpers.normalizePath requestedRelativePath
 
     if String.IsNullOrWhiteSpace relativePath then
         Error(exn "RelativePath must not be empty.")
@@ -237,11 +237,11 @@ let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, 
 
 
 let private pathsEqualForComparison (leftPath: string) (rightPath: string) =
-    let normalize = FileIOHelper.normalizePath >> ArcPathValidation.normalizePathForComparison
+    let normalize = PathHelpers.normalizePath >> ArcPathValidation.normalizePathForComparison
     normalize leftPath = normalize rightPath
 
 let private isSameOrDescendantPathForComparison (path: string) (ancestorPath: string) =
-    let normalize = FileIOHelper.normalizePath >> ArcPathValidation.normalizePathForComparison
+    let normalize = PathHelpers.normalizePath >> ArcPathValidation.normalizePathForComparison
     let normalizedPath = normalize path
     let normalizedAncestorPath = normalize ancestorPath
 
@@ -252,8 +252,11 @@ let private isSameOrDescendantPathForComparison (path: string) (ancestorPath: st
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-    let private addZoneRoots =
-        set [ "studies"; "assays"; "workflows"; "runs" ]
+    let private addZoneRoots = [ "studies"; "assays"; "workflows"; "runs" ]
+
+    let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
+
+    
 
     let isDeletePathAllowed (relativePath: string) =
         let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
@@ -265,7 +268,8 @@ module ArcDeleteHelper =
                 normalizedRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries)
 
             segments.Length >= 2
-            && (segments.[0].ToLowerInvariant() |> addZoneRoots.Contains)
+            && PathHelpers.pathMatchesAny addZoneRoots segments.[0]
+            && not (PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath)
 
     let isPendingPathAffectedByDelete (deletedPath: string) (pendingArcFileSave: FileContentDTO option) =
         pendingArcFileSave

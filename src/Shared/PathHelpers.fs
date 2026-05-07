@@ -2,11 +2,14 @@ namespace Swate.Components.Shared
 
 open System
 
+
 [<RequireQualifiedAccess>]
 module PathHelpers =
 
+    /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
     let normalizeSeparators (path: string) = path.Replace("\\", "/")
 
+    /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
     let normalizePath (path: string) =
         normalizeSeparators path |> fun normalized -> normalized.Trim().TrimEnd('/')
 
@@ -19,6 +22,9 @@ module PathHelpers =
 
     let pathsEqual (left: string) (right: string) =
         normalizeForComparison left = normalizeForComparison right
+
+    let pathMatchesAny (candidates: string seq) (path: string) =
+        candidates |> Seq.exists (fun candidate -> pathsEqual candidate path)
 
     let getNameFromPath (path: string) =
         normalizePath path
@@ -60,3 +66,15 @@ module PathHelpers =
         ]
         |> List.tryPick id
         |> Option.defaultValue normalizedPath
+
+    /// normalizes the path and splits it into parts
+    let getPathParts (path: string) =
+        normalizePath path
+        |> fun p -> p.Split('/')
+
+    let getFileName (path: string) = path |> getPathParts |> Array.last
+
+    let isProtectedDeleteTarget protectedDeleteTargetNames (normalizedRelativePath: string) =
+        normalizedRelativePath
+        |> getFileName
+        |> pathMatchesAny protectedDeleteTargetNames

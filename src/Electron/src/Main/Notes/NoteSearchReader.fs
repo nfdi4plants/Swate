@@ -7,11 +7,12 @@ open Swate.Components.Notes.Editor
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Components.NoteTypes
+open Swate.Components.Shared
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 
 let private isNoteMarkdownPath (relativePath: string) =
-    let normalizedPath = normalizeSeparators relativePath
+    let normalizedPath = PathHelpers.normalizeSeparators relativePath
     let lowered = normalizedPath.ToLowerInvariant()
     lowered.StartsWith("notes/") && lowered.EndsWith(".md")
 

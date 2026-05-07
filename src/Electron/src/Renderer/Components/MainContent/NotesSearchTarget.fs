@@ -51,7 +51,7 @@ let NotesSearchTarget () =
 
             match result with
             | Ok dto ->
-                let selectedPath = normalizePath relativePath
+                let selectedPath = PathHelpers.normalizePath relativePath
                 fileTreeCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                 dto

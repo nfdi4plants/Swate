@@ -10,10 +10,16 @@ module FileExplorerDeleteHelper =
     let private normalizeRelativePath (path: string) =
         path
         |> PathHelpers.normalizeRelativePath
-        |> normalizePath
+        |> PathHelpers.normalizePath
 
-    let private addZoneRoots =
-        set [ "studies"; "assays"; "workflows"; "runs" ]
+    let private addZoneRoots = [ "studies"; "assays"; "workflows"; "runs" ]
+
+    let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
+
+    let private isProtectedDeleteTarget (normalizedPath: string) =
+        normalizedPath
+        |> PathHelpers.getFileName
+        |> PathHelpers.pathMatchesAny protectedDeleteTargetNames
 
     let isDeletePathAllowed (relativePath: string) =
         let normalizedPath = normalizeRelativePath relativePath
@@ -25,17 +31,18 @@ module FileExplorerDeleteHelper =
                 normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries)
 
             segments.Length >= 2
-            && (segments.[0].ToLowerInvariant() |> addZoneRoots.Contains)
+            && PathHelpers.pathMatchesAny addZoneRoots segments.[0]
+            && not (isProtectedDeleteTarget normalizedPath)
 
     let containsPath (paths: string seq) (relativePath: string) =
-        let normalizedTargetPath = normalizePath relativePath
+        let normalizedTargetPath = PathHelpers.normalizePath relativePath
 
         paths
-        |> Seq.exists (fun path -> PathHelpers.pathsEqual (normalizePath path) normalizedTargetPath)
+        |> Seq.exists (fun path -> PathHelpers.pathsEqual (PathHelpers.normalizePath path) normalizedTargetPath)
 
     let isSelectionMissing (paths: string seq) (selectionPath: string option) =
         selectionPath
-        |> Option.map normalizePath
+        |> Option.map PathHelpers.normalizePath
         |> Option.exists (fun selectedPath -> containsPath paths selectedPath |> not)
 
     let shouldResetPageStateAfterSelectionRemoval (pageState: Renderer.Types.PageState option) =
