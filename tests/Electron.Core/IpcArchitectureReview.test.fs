@@ -87,7 +87,7 @@ Vitest.describe("IPC architecture review fixes", fun () ->
 
             expectSourceContains ipcTypesSource "deletePath: string -> JS.Promise<Result<unit, exn>>"
             expectSourceContains arcVaultApiSource "deletePath ="
-            expectSourceContains arcVaultApiSource "ArcDeleteHelper.isDeletePathAllowed"
+            expectSourceContains arcVaultApiSource "ArcDeletePathRules.isDeletePathAllowed"
             expectSourceContains arcVaultApiSource "do! vault.RefreshFileTree()"
             expectSourceContains arcVaultApiSource "ArcDeleteHelper.mergeReloadedArcAfterDelete"
             expectSourceContains arcVaultApiSource "ARC.merge"
@@ -109,10 +109,10 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
     )
 
     Vitest.test("isDeletePathAllowed only permits add-zone descendants", fun () ->
-        Vitest.expect(ArcDeleteHelper.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe(true)
-        Vitest.expect(ArcDeleteHelper.isDeletePathAllowed "studies").toBe(false)
-        Vitest.expect(ArcDeleteHelper.isDeletePathAllowed "README.md").toBe(false)
-        Vitest.expect(ArcDeleteHelper.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
+        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe(true)
+        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies").toBe(false)
+        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "README.md").toBe(false)
+        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
     )
 
     Vitest.test("mergeReloadedArcAfterDelete preserves unrelated pending drafts and applies them", fun () ->
