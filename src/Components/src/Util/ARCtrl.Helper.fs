@@ -8,6 +8,14 @@ open ARCtrl.Spreadsheet
 
 open Database
 
+module ArcIO =
+
+    open Swate.Components.Shared
+
+    let getArcRootPath (rootPath: string) =
+        let normalizedPath = PathHelpers.normalizePath rootPath
+
+        ARCtrl.ArcPathHelper.getFileName normalizedPath
 
 module TermCollection =
 
@@ -733,4 +741,3 @@ module Extensions =
             | CompositeHeader.Output _ -> CompositeHeaderDiscriminate.Output
             | CompositeHeader.Comment _ -> CompositeHeaderDiscriminate.Comment
             | CompositeHeader.FreeText _ -> CompositeHeaderDiscriminate.Freetext
-

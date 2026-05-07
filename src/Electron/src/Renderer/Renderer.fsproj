@@ -22,8 +22,11 @@
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
-    <Compile Include="Components\FileExplorer.fs" />
-    <Compile Include="Components\LeftSidebar\ExplorerSidebar.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\CreateArcFileModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\FileTree.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Main.fs" />
     <Compile Include="Components\LeftSidebar\GitSidebarEmptyState.fs" />
     <Compile Include="Components\LeftSidebar\GitSidebarPanel.fs" />
     <Compile Include="Components\LeftSidebar\Main.fs" />
