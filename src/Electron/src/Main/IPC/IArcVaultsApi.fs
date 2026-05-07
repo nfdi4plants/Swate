@@ -13,7 +13,6 @@ open Fable.Electron.Main
 open Fable.Core.JsInterop
 open Main
 open Node.Api
-open ARCtrl
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 
 
