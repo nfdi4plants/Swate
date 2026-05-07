@@ -350,7 +350,6 @@ type FileTree =
                     Icon = arcCreateKindIcon kind
                     OnClick = fun () -> openCreateModal kind
                     Disabled = None
-                    Tone = None
                 })
             else
                 []
@@ -363,7 +362,6 @@ type FileTree =
                         Icon = "swt:fluent--delete-24-regular"
                         OnClick = fun () -> requestDeleteItem item
                         Disabled = None
-                        Tone = Some ContextMenuItemTone.Destructive
                     }
                 ]
             else

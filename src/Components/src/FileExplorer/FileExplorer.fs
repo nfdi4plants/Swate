@@ -37,7 +37,6 @@ module private FileExplorerHelper =
                     Icon = "swt:fluent--open-24-regular"
                     OnClick = fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch
                     Disabled = None
-                    Tone = None
                 }
 
             match item.Path with
@@ -47,7 +46,6 @@ module private FileExplorerHelper =
                     Icon = "swt:fluent--copy-24-regular"
                     OnClick = fun () -> copyPathToClipboard path
                     Disabled = None
-                    Tone = None
                 }
             | None -> ()
 
@@ -63,7 +61,6 @@ module private FileExplorerHelper =
                             "swt:fluent--folder-24-regular"
                     OnClick = fun () -> dispatch (FileExplorerLogic.ToggleExpanded item.Id)
                     Disabled = None
-                    Tone = None
                 }
         ]
 
@@ -81,20 +78,11 @@ module private FileExplorerHelper =
 
     let toComponentMenuItem (item: Swate.Components.FileExplorer.Types.ContextMenuItem) =
         let isDisabled = defaultArg item.Disabled false
-        let toneClass =
-            item.Tone
-            |> Option.map ContextMenuItemTone.className
-            |> Option.filter (System.String.IsNullOrWhiteSpace >> not)
-
         let className =
-            [
-                if isDisabled then
-                    Some "swt:opacity-50"
-
-                toneClass
-            ]
-            |> List.choose id
-            |> String.concat " "
+            if isDisabled then
+                "swt:opacity-50"
+            else
+                ""
 
         Swate.Components.ContextMenuItem(
             text = Html.span [ prop.className className; prop.text item.Label ],
@@ -360,14 +348,12 @@ module FileExplorerExample =
                 Icon = "swt:fluent--rename-24-regular"
                 OnClick = fun () -> Browser.Dom.console.log ("Rename", item.Name)
                 Disabled = None
-                Tone = None
             }
             {
                 Label = "Delete"
                 Icon = "swt:fluent--delete-24-regular"
                 OnClick = fun () -> Browser.Dom.console.log ("Delete", item.Name)
                 Disabled = None
-                Tone = Some ContextMenuItemTone.Destructive
             }
         ]
 

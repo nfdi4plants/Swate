@@ -307,25 +307,11 @@ module FileTree =
         Path = None
     }
 
-[<RequireQualifiedAccess>]
-type ContextMenuItemTone =
-    | Default
-    | Destructive
-
-[<RequireQualifiedAccess>]
-module ContextMenuItemTone =
-
-    let className =
-        function
-        | ContextMenuItemTone.Default -> ""
-        | ContextMenuItemTone.Destructive -> "swt:text-error"
-
 type ContextMenuItem = {
     Label: string
     Icon: string
     OnClick: unit -> unit
     Disabled: bool option
-    Tone: ContextMenuItemTone option
 }
 
 module FileExplorerLogic =
