@@ -136,7 +136,7 @@ let tests =
             let fallbackPaths =
                 ArcDeletePathRules.buildFallbackUnlinkPaths "runs/MyRun"
 
-            Expect.sequenceEqual
+            Expect.equal
                 fallbackPaths
                 [
                     "runs/MyRun/isa.run.xlsx"
@@ -148,7 +148,7 @@ let tests =
             let fallbackPaths =
                 ArcDeletePathRules.buildFallbackUnlinkPaths "workflows/MyFlow/isa.datamap.xlsx"
 
-            Expect.sequenceEqual
+            Expect.equal
                 fallbackPaths
                 [ "workflows/MyFlow/isa.datamap.xlsx" ]
                 "Canonical file fallback should return the normalized target path."
