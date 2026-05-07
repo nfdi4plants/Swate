@@ -121,7 +121,10 @@ Vitest.describe("FileIOHelper.toFileTreeNode LFS metadata", fun () ->
 
 Vitest.describe("FileTreeCreator.removePathAndDescendants", fun () ->
     let createFileEntry path isDirectory = {
-        name = path |> normalizePath |> getFileName
+        name =
+            path
+            |> Swate.Components.Shared.PathHelpers.normalizePath
+            |> Swate.Components.Shared.PathHelpers.getFileName
         isDirectory = isDirectory
         path = path
         lfs = None

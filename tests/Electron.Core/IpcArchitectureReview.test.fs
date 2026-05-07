@@ -27,6 +27,14 @@ let private expectSourceContains (sourceText: string) (snippet: string) =
 let private expectSourceNotContains (sourceText: string) (snippet: string) =
     Vitest.expect(sourceText.Contains(snippet), $"Expected source not to contain: {snippet}").toBe(false)
 
+let private expectSourceContainsInOrder (sourceText: string) (snippets: string[]) =
+    let mutable searchStartIndex = 0
+
+    for snippet in snippets do
+        let snippetIndex = sourceText.IndexOf(snippet, searchStartIndex)
+        Vitest.expect(snippetIndex >= 0, $"Expected source to contain (in order): {snippet}").toBe(true)
+        searchStartIndex <- snippetIndex + snippet.Length
+
 Vitest.describe("IPC architecture review fixes", fun () ->
     Vitest.test("Arc vault dialogs consistently use a centralized IPC dialog parent helper", fun () ->
         promise {
@@ -79,7 +87,15 @@ Vitest.describe("IPC architecture review fixes", fun () ->
             expectSourceContains ipcTypesSource "deletePath: string -> JS.Promise<Result<unit, exn>>"
             expectSourceContains arcVaultApiSource "deletePath ="
             expectSourceContains arcVaultApiSource "ArcDeleteHelper.isDeletePathAllowed"
-            expectSourceContains arcVaultApiSource "removePathAndDescendants"
+            expectSourceContains arcVaultApiSource "do! vault.RefreshFileTree()"
+            expectSourceContains arcVaultApiSource "ArcDeleteHelper.mergeReloadedArcAfterDelete"
+            expectSourceContainsInOrder
+                arcVaultApiSource
+                [|
+                    "fsPromisesDynamic?rm"
+                    "do! vault.RefreshFileTree()"
+                    "ArcDeleteHelper.mergeReloadedArcAfterDelete"
+                |]
         })
 )
 

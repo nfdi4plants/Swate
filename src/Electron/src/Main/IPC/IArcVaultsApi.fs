@@ -636,10 +636,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         )
                                         |> unbox<JS.Promise<obj>>
 
-                                    let nextFileTree =
-                                        removePathAndDescendants absolutePath vault.fileTree
-
-                                    vault.SetFileTree nextFileTree
+                                    do! vault.RefreshFileTree()
 
                                     match! ARC.tryLoadAsync arcPath with
                                     | Error loadError ->
