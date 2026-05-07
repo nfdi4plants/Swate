@@ -4,7 +4,6 @@ import { screen, within, expect, userEvent, waitFor, fireEvent } from "storybook
 import { FileExplorer, FileExplorerExample_Example as FileExplorerExample } from "./FileExplorer.fs.js";
 import {
   ContextMenuItem,
-  ContextMenuItemTone_Destructive,
   FileItemIcon_Document$,
   FileItemIcon_Folder,
   FileTree_createFile,
@@ -101,7 +100,6 @@ const DestructiveContextMenuFileExplorer = () => {
               "swt:fluent--delete-24-regular",
               () => setClickCount((count) => count + 1),
               undefined,
-              ContextMenuItemTone_Destructive(),
             ),
           ])
         }
@@ -197,7 +195,7 @@ export const InlineDeleteDispatchesForFileAndDirectory: StoryObj<typeof DeleteAc
   },
 };
 
-export const DestructiveContextMenuItemUsesErrorTone: StoryObj<typeof DestructiveContextMenuFileExplorer> = {
+export const ContextMenuItemDispatchesAction: StoryObj<typeof DestructiveContextMenuFileExplorer> = {
   render: () => <DestructiveContextMenuFileExplorer />,
 
   play: async ({ canvasElement }) => {
@@ -213,6 +211,9 @@ export const DestructiveContextMenuItemUsesErrorTone: StoryObj<typeof Destructiv
 
     fireEvent.contextMenu(fileItem, { clientX: 30, clientY: 30, bubbles: true });
     const deleteMenuItem = await screen.findByText("Delete Item");
-    expect(deleteMenuItem).toHaveClass("swt:text-error");
+    await userEvent.click(deleteMenuItem);
+    await waitFor(() =>
+      expect(canvas.getByTestId("context-click-count")).toHaveTextContent("Context clicks: 1"),
+    );
   },
 };
