@@ -30,12 +30,29 @@ module private FileExplorerHelper =
         | "notes" -> Some FileItemIcon.Notebook
         | _ -> None
 
+    let private iconToneForArcCollectionFolder =
+        function
+        | "studies" -> Some FileItemIconTone.Secondary
+        | "assays" -> Some FileItemIconTone.Success
+        | "workflows" -> Some FileItemIconTone.Primary
+        | "runs" -> Some FileItemIconTone.Warning
+        | "notes" -> Some FileItemIconTone.Error
+        | _ -> None
+
     let private iconForArcWorkbookFile =
         function
         | "isa.study.xlsx" -> Some FileItemIcon.Study
         | "isa.assay.xlsx" -> Some FileItemIcon.Assay
         | "isa.workflow.xlsx" -> Some FileItemIcon.Workflow
         | "isa.run.xlsx" -> Some FileItemIcon.Run
+        | _ -> None
+
+    let private iconToneForArcWorkbookFile =
+        function
+        | "isa.study.xlsx" -> Some FileItemIconTone.Secondary
+        | "isa.assay.xlsx" -> Some FileItemIconTone.Success
+        | "isa.workflow.xlsx" -> Some FileItemIconTone.Primary
+        | "isa.run.xlsx" -> Some FileItemIconTone.Warning
         | _ -> None
 
     let private folderIcon (path: string) =
@@ -48,6 +65,17 @@ module private FileExplorerHelper =
         | Some "workflows", 2 -> FileItemIcon.Workflow
         | Some "runs", 2 -> FileItemIcon.Run
         | _ -> FileItemIcon.Folder
+
+    let private folderIconTone (path: string) =
+        let segments = pathSegments path
+
+        match segments |> Array.tryHead |> Option.map lowerInvariant, segments.Length with
+        | Some rootSegment, 1 -> iconToneForArcCollectionFolder rootSegment
+        | Some "studies", 2 -> Some FileItemIconTone.Secondary
+        | Some "assays", 2 -> Some FileItemIconTone.Success
+        | Some "workflows", 2 -> Some FileItemIconTone.Primary
+        | Some "runs", 2 -> Some FileItemIconTone.Warning
+        | _ -> None
 
     let private fileIcon (path: string) =
         let normalizedPath = normalizeNodePath path
@@ -62,6 +90,20 @@ module private FileExplorerHelper =
             FileItemIcon.Note
         | None when fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) -> FileItemIcon.Table
         | None -> FileItemIcon.Document
+
+    let private fileIconTone (path: string) =
+        let normalizedPath = normalizeNodePath path
+        let segments = pathSegments normalizedPath
+        let fileName = getFileName normalizedPath |> lowerInvariant
+
+        match iconToneForArcWorkbookFile fileName with
+        | Some tone -> Some tone
+        | None when DatamapParentInfo.tryFromPath normalizedPath |> Option.isSome -> Some FileItemIconTone.Info
+        | None when (segments |> Array.tryHead |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
+                     && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ->
+            Some FileItemIconTone.Error
+        | None when fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) -> Some FileItemIconTone.Info
+        | None -> None
 
     let rec private collectSelectedDirectoryPathChain
         (selectedTreeItemPath: string option)
@@ -120,6 +162,7 @@ module private FileExplorerHelper =
             Some {
                 FileTree.createFolder parent.name (Some parent.path) (folderIcon parent.path) with
                     Id = parent.path
+                    IconTone = folderIconTone parent.path
                     IsExpanded =
                         selectedTreeItemPath
                         |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath parent.path)
@@ -130,6 +173,7 @@ module private FileExplorerHelper =
             Some {
                 FileTree.createFile parent.name (Some parent.path) (fileIcon parent.path) with
                     Id = parent.path
+                    IconTone = fileIconTone parent.path
                     IsLFS = parent.isLfs
             }
 
