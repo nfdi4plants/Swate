@@ -78,3 +78,167 @@ module PathHelpers =
         normalizedRelativePath
         |> getFileName
         |> pathMatchesAny protectedDeleteTargetNames
+
+[<RequireQualifiedAccess>]
+module ArcDeletePathRules =
+
+    type AddZone =
+        | Studies
+        | Assays
+        | Workflows
+        | Runs
+
+    type CanonicalArcFileTarget =
+        | InvestigationFile
+        | EntityFile of zone: AddZone * identifier: string
+        | DataMapFile of zone: AddZone * identifier: string
+
+    type DeletePathClassification =
+        | ProtectedTarget of normalizedRelativePath: string
+        | CanonicalFileTarget of target: CanonicalArcFileTarget * normalizedRelativePath: string
+        | EntityFolderTarget of zone: AddZone * identifier: string * normalizedRelativePath: string
+        | AddZoneDescendantTarget of zone: AddZone * normalizedRelativePath: string
+        | DisallowedTarget of normalizedRelativePath: string
+
+    let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
+
+    let private normalizeRelativePath (path: string) =
+        path
+        |> PathHelpers.normalizeRelativePath
+        |> PathHelpers.normalizePath
+
+    let private splitPathSegments (path: string) =
+        path.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
+
+    let private zoneFolderName =
+        function
+        | AddZone.Studies -> ARCtrl.ArcPathHelper.StudiesFolderName
+        | AddZone.Assays -> ARCtrl.ArcPathHelper.AssaysFolderName
+        | AddZone.Workflows -> ARCtrl.ArcPathHelper.WorkflowsFolderName
+        | AddZone.Runs -> ARCtrl.ArcPathHelper.RunsFolderName
+
+    let private zoneEntityFileName =
+        function
+        | AddZone.Studies -> ARCtrl.ArcPathHelper.StudyFileName
+        | AddZone.Assays -> ARCtrl.ArcPathHelper.AssayFileName
+        | AddZone.Workflows -> ARCtrl.ArcPathHelper.WorkflowFileName
+        | AddZone.Runs -> ARCtrl.ArcPathHelper.RunFileName
+
+    let private tryParseZone (segment: string) =
+        if PathHelpers.pathsEqual segment ARCtrl.ArcPathHelper.StudiesFolderName then
+            Some AddZone.Studies
+        elif PathHelpers.pathsEqual segment ARCtrl.ArcPathHelper.AssaysFolderName then
+            Some AddZone.Assays
+        elif PathHelpers.pathsEqual segment ARCtrl.ArcPathHelper.WorkflowsFolderName then
+            Some AddZone.Workflows
+        elif PathHelpers.pathsEqual segment ARCtrl.ArcPathHelper.RunsFolderName then
+            Some AddZone.Runs
+        else
+            None
+
+    let private tryParseCanonicalArcFileTargetFromSegments (segments: string[]) =
+        if segments.Length = 0 then
+            None
+        elif PathHelpers.pathsEqual segments.[segments.Length - 1] ARCtrl.ArcPathHelper.InvestigationFileName then
+            Some CanonicalArcFileTarget.InvestigationFile
+        elif segments.Length >= 3 then
+            let fileName = segments.[segments.Length - 1]
+            let identifier = segments.[segments.Length - 2]
+            let folder = segments.[segments.Length - 3]
+
+            match tryParseZone folder with
+            | None -> None
+            | Some zone when PathHelpers.pathsEqual fileName (zoneEntityFileName zone) ->
+                Some(CanonicalArcFileTarget.EntityFile(zone, identifier))
+            | Some zone when PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.DataMapFileName ->
+                Some(CanonicalArcFileTarget.DataMapFile(zone, identifier))
+            | Some _ -> None
+        else
+            None
+
+    /// Parses canonical ARC file targets from the tail of a path and supports absolute paths.
+    let tryParseCanonicalArcFileTarget (path: string) =
+        path
+        |> PathHelpers.normalizePath
+        |> splitPathSegments
+        |> tryParseCanonicalArcFileTargetFromSegments
+
+    let classifyDeleteTarget (relativePath: string) =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+
+        if String.IsNullOrWhiteSpace normalizedRelativePath then
+            DeletePathClassification.DisallowedTarget normalizedRelativePath
+        elif PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath then
+            DeletePathClassification.ProtectedTarget normalizedRelativePath
+        else
+            let segments = normalizedRelativePath |> splitPathSegments
+
+            match segments with
+            | [| zoneSegment; identifier |] ->
+                match tryParseZone zoneSegment with
+                | Some zone -> DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath)
+                | None -> DeletePathClassification.DisallowedTarget normalizedRelativePath
+            | [| zoneSegment; identifier; fileName |] ->
+                match tryParseZone zoneSegment with
+                | Some zone when PathHelpers.pathsEqual fileName (zoneEntityFileName zone) ->
+                    DeletePathClassification.CanonicalFileTarget(
+                        CanonicalArcFileTarget.EntityFile(zone, identifier),
+                        normalizedRelativePath
+                    )
+                | Some zone when PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.DataMapFileName ->
+                    DeletePathClassification.CanonicalFileTarget(
+                        CanonicalArcFileTarget.DataMapFile(zone, identifier),
+                        normalizedRelativePath
+                    )
+                | Some zone -> DeletePathClassification.AddZoneDescendantTarget(zone, normalizedRelativePath)
+                | None ->
+                    if PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.InvestigationFileName then
+                        DeletePathClassification.CanonicalFileTarget(
+                            CanonicalArcFileTarget.InvestigationFile,
+                            normalizedRelativePath
+                        )
+                    else
+                        DeletePathClassification.DisallowedTarget normalizedRelativePath
+            | _ ->
+                if segments.Length >= 2 then
+                    match tryParseZone segments.[0] with
+                    | Some zone -> DeletePathClassification.AddZoneDescendantTarget(zone, normalizedRelativePath)
+                    | None -> DeletePathClassification.DisallowedTarget normalizedRelativePath
+                else
+                    match tryParseCanonicalArcFileTargetFromSegments segments with
+                    | Some target -> DeletePathClassification.CanonicalFileTarget(target, normalizedRelativePath)
+                    | None -> DeletePathClassification.DisallowedTarget normalizedRelativePath
+
+    let isDeletePathAllowed (relativePath: string) =
+        match classifyDeleteTarget relativePath with
+        | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, _)
+        | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.DataMapFile _, _)
+        | DeletePathClassification.EntityFolderTarget _
+        | DeletePathClassification.AddZoneDescendantTarget _ -> true
+        | _ -> false
+
+    let private canonicalEntityFilePath zone identifier =
+        let zoneFolder = zoneFolderName zone
+        let entityFileName = zoneEntityFileName zone
+        $"{zoneFolder}/{identifier}/{entityFileName}"
+
+    let private canonicalDataMapFilePath zone identifier =
+        let zoneFolder = zoneFolderName zone
+        $"{zoneFolder}/{identifier}/{ARCtrl.ArcPathHelper.DataMapFileName}"
+
+    let buildFallbackUnlinkPaths (relativePath: string) =
+        let fallbackPaths =
+            match classifyDeleteTarget relativePath with
+            | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, normalizedRelativePath)
+            | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.DataMapFile _, normalizedRelativePath) ->
+                [ normalizedRelativePath ]
+            | DeletePathClassification.EntityFolderTarget(zone, identifier, _) ->
+                [
+                    canonicalEntityFilePath zone identifier
+                    canonicalDataMapFilePath zone identifier
+                ]
+            | _ -> []
+
+        fallbackPaths
+        |> Seq.distinctBy PathHelpers.normalizeForComparison
+        |> Seq.toList

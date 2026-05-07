@@ -253,24 +253,6 @@ let private isSameOrDescendantPathForComparison (path: string) (ancestorPath: st
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-    let private addZoneRoots = [ "studies"; "assays"; "workflows"; "runs" ]
-
-    let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
-
-    
-
-    let isDeletePathAllowed (relativePath: string) =
-        let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
-
-        if String.IsNullOrWhiteSpace normalizedRelativePath then
-            false
-        else
-            let segments =
-                normalizedRelativePath.Split('/', StringSplitOptions.RemoveEmptyEntries)
-
-            segments.Length >= 2
-            && PathHelpers.pathMatchesAny addZoneRoots segments.[0]
-            && not (PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath)
 
     let isPendingPathAffectedByDelete (deletedPath: string) (pendingArcFileSave: FileContentDTO option) =
         pendingArcFileSave
@@ -301,39 +283,6 @@ module ArcDeleteHelper =
         |> Seq.filter (fun relativePath -> isSameOrDescendantPathForComparison relativePath normalizedDeletedPath)
         |> deduplicateEventPaths
 
-    let private tryBuildKnownTargetFallbackPath (deletedPath: string) =
-        let normalizedDeletedPath = normalizeRelativePathForMerge deletedPath
-
-        match ArcEntityRef.fromPath normalizedDeletedPath with
-        | ArcEntityRef.Unknown _ -> None
-        | _ -> Some normalizedDeletedPath
-
-    let private tryBuildZoneFallbackPaths (deletedPath: string) =
-        let normalizedDeletedPath = normalizeRelativePathForMerge deletedPath
-        let segments = normalizedDeletedPath.Split('/', StringSplitOptions.RemoveEmptyEntries)
-
-        if segments.Length = 2 && PathHelpers.pathMatchesAny addZoneRoots segments.[0] then
-            let zoneRoot = segments.[0]
-            let entityId = segments.[1]
-
-            let entityFileNameOpt =
-                match zoneRoot.ToLowerInvariant() with
-                | "assays" -> Some ARCtrl.ArcPathHelper.AssayFileName
-                | "studies" -> Some ARCtrl.ArcPathHelper.StudyFileName
-                | "workflows" -> Some ARCtrl.ArcPathHelper.WorkflowFileName
-                | "runs" -> Some ARCtrl.ArcPathHelper.RunFileName
-                | _ -> None
-
-            match entityFileNameOpt with
-            | None -> []
-            | Some entityFileName ->
-                [
-                    $"{zoneRoot}/{entityId}/{entityFileName}"
-                    $"{zoneRoot}/{entityId}/{ARCtrl.ArcPathHelper.DataMapFileName}"
-                ]
-        else
-            []
-
     let buildDeleteUnlinkEvents (deletedPath: string) (preDeleteFileRelativePaths: string seq) : FileEvent list =
         let primaryPaths = buildPrimaryUnlinkEventPaths deletedPath preDeleteFileRelativePaths
 
@@ -341,10 +290,7 @@ module ArcDeleteHelper =
             if primaryPaths.Length > 0 then
                 primaryPaths
             else
-                [
-                    yield! tryBuildKnownTargetFallbackPath deletedPath |> Option.toList
-                    yield! tryBuildZoneFallbackPaths deletedPath
-                ]
+                ArcDeletePathRules.buildFallbackUnlinkPaths deletedPath
                 |> deduplicateEventPaths
 
         effectivePaths
@@ -705,7 +651,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         let preDeleteFileRelativePaths =
                             ArcDeleteHelper.getPreDeleteFileRelativePaths arcPath vault.fileTree.Values
 
-                        if ArcDeleteHelper.isDeletePathAllowed normalizedRelativePath |> not then
+                        if ArcDeletePathRules.isDeletePathAllowed normalizedRelativePath |> not then
                             return
                                 Error(
                                     exn

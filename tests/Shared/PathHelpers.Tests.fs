@@ -98,4 +98,58 @@ let tests =
                 (PathHelpers.resolveArcViewPath "backup/assays/archive/isa.datamap.xlsx")
                 "backup/assays/archive/isa.datamap.xlsx"
                 "Folder-name matches outside the canonical ARC root should not be redirected."
+
+        testCase "classifyDeleteTarget identifies canonical entity files" <| fun _ ->
+            let classification =
+                ArcDeletePathRules.classifyDeleteTarget "assays/MyAssay/isa.assay.xlsx"
+
+            match classification with
+            | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
+                ArcDeletePathRules.CanonicalArcFileTarget.EntityFile(ArcDeletePathRules.AddZone.Assays, "MyAssay"),
+                _
+              ) -> ()
+            | _ -> failwith "Expected canonical assay entity file classification."
+
+        testCase "classifyDeleteTarget identifies entity folders" <| fun _ ->
+            let classification =
+                ArcDeletePathRules.classifyDeleteTarget "studies/MyStudy"
+
+            match classification with
+            | ArcDeletePathRules.DeletePathClassification.EntityFolderTarget(
+                ArcDeletePathRules.AddZone.Studies,
+                "MyStudy",
+                _
+              ) -> ()
+            | _ -> failwith "Expected study entity folder classification."
+
+        testCase "isDeletePathAllowed keeps broad add-zone descendants" <| fun _ ->
+            Expect.isTrue
+                (ArcDeletePathRules.isDeletePathAllowed "assays/MyAssay/notes/custom.txt")
+                "Any descendant under add zones should remain deletable."
+
+        testCase "isDeletePathAllowed rejects protected targets" <| fun _ ->
+            Expect.isFalse
+                (ArcDeletePathRules.isDeletePathAllowed "workflows/MyWorkflow/readme.md")
+                "Protected files should remain non-deletable."
+
+        testCase "buildFallbackUnlinkPaths maps entity folder to canonical files" <| fun _ ->
+            let fallbackPaths =
+                ArcDeletePathRules.buildFallbackUnlinkPaths "runs/MyRun"
+
+            Expect.sequenceEqual
+                fallbackPaths
+                [
+                    "runs/MyRun/isa.run.xlsx"
+                    "runs/MyRun/isa.datamap.xlsx"
+                ]
+                "Entity-folder fallback should synthesize canonical entity + datamap unlink paths."
+
+        testCase "buildFallbackUnlinkPaths keeps canonical file targets as-is" <| fun _ ->
+            let fallbackPaths =
+                ArcDeletePathRules.buildFallbackUnlinkPaths "workflows/MyFlow/isa.datamap.xlsx"
+
+            Expect.sequenceEqual
+                fallbackPaths
+                [ "workflows/MyFlow/isa.datamap.xlsx" ]
+                "Canonical file fallback should return the normalized target path."
     ]

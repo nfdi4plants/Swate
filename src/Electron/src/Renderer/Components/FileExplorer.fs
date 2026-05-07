@@ -50,7 +50,7 @@ module private FileExplorerHelper =
 
     let canDeleteItem (item: FileItem) =
         tryGetItemRelativePath item
-        |> Option.exists FileExplorerDeleteHelper.isDeletePathAllowed
+        |> Option.exists ArcDeletePathRules.isDeletePathAllowed
 
     let rec private collectSelectedDirectoryPathChain
         (selectedTreeItemPath: string option)
@@ -568,7 +568,7 @@ type FileExplorer =
         let confirmDeleteItem () =
             match pendingDeleteItem |> Option.bind tryGetItemRelativePath with
             | None -> closeDeleteModal ()
-            | Some deletePath when FileExplorerDeleteHelper.isDeletePathAllowed deletePath |> not ->
+            | Some deletePath when ArcDeletePathRules.isDeletePathAllowed deletePath |> not ->
                 closeDeleteModal ()
             | Some deletePath ->
                 setIsDeleting true

@@ -91,6 +91,7 @@ Vitest.describe("IPC architecture review fixes", fun () ->
             expectSourceContains arcVaultApiSource "do! vault.RefreshFileTree()"
             expectSourceContains arcVaultApiSource "ArcDeleteHelper.mergeReloadedArcAfterDelete"
             expectSourceContains arcVaultApiSource "ARC.merge"
+            expectSourceContains arcVaultApiSource "ArcDeletePathRules.buildFallbackUnlinkPaths"
             expectSourceContainsInOrder
                 arcVaultApiSource
                 [|
@@ -231,5 +232,16 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
         Vitest.expect(events.Length).toBe(1)
         Vitest.expect(events.[0].EventName).toEqual(EventName.Unlink)
         Vitest.expect(events.[0].Path).toBe("assays/My Assay/isa.assay.xlsx")
+    )
+
+    Vitest.test("delete fallback unlink paths are sourced from shared rules", fun () ->
+        let sharedFallbackPaths =
+            ArcDeletePathRules.buildFallbackUnlinkPaths "workflows/MyWorkflow"
+
+        let helperFallbackPaths =
+            ArcDeleteHelper.buildDeleteUnlinkEvents "workflows/MyWorkflow" []
+            |> List.map _.Path
+
+        Vitest.expect(helperFallbackPaths).toEqual(sharedFallbackPaths)
     )
 )

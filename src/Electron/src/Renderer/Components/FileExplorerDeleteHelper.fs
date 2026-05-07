@@ -1,6 +1,5 @@
 module Renderer.Components.FileExplorerDeleteHelper
 
-open System
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 
@@ -12,27 +11,6 @@ module FileExplorerDeleteHelper =
         |> PathHelpers.normalizeRelativePath
         |> PathHelpers.normalizePath
 
-    let private addZoneRoots = [ "studies"; "assays"; "workflows"; "runs" ]
-
-    let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
-
-    let private isProtectedDeleteTarget (normalizedPath: string) =
-        normalizedPath
-        |> PathHelpers.getFileName
-        |> PathHelpers.pathMatchesAny protectedDeleteTargetNames
-
-    let isDeletePathAllowed (relativePath: string) =
-        let normalizedPath = normalizeRelativePath relativePath
-
-        if String.IsNullOrWhiteSpace normalizedPath then
-            false
-        else
-            let segments =
-                normalizedPath.Split('/', StringSplitOptions.RemoveEmptyEntries)
-
-            segments.Length >= 2
-            && PathHelpers.pathMatchesAny addZoneRoots segments.[0]
-            && not (isProtectedDeleteTarget normalizedPath)
 
     let containsPath (paths: string seq) (relativePath: string) =
         let normalizedTargetPath = PathHelpers.normalizePath relativePath
