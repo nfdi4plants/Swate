@@ -32,7 +32,7 @@ module private FileExplorerHelper =
 
     let private iconToneForArcCollectionFolder =
         function
-        | "studies" -> Some FileItemIconTone.Secondary
+        | "studies" -> Some FileItemIconTone.Accent
         | "assays" -> Some FileItemIconTone.Success
         | "workflows" -> Some FileItemIconTone.Primary
         | "runs" -> Some FileItemIconTone.Warning
@@ -49,7 +49,7 @@ module private FileExplorerHelper =
 
     let private iconToneForArcWorkbookFile =
         function
-        | "isa.study.xlsx" -> Some FileItemIconTone.Secondary
+        | "isa.study.xlsx" -> Some FileItemIconTone.Accent
         | "isa.assay.xlsx" -> Some FileItemIconTone.Success
         | "isa.workflow.xlsx" -> Some FileItemIconTone.Primary
         | "isa.run.xlsx" -> Some FileItemIconTone.Warning
@@ -71,7 +71,7 @@ module private FileExplorerHelper =
 
         match segments |> Array.tryHead |> Option.map lowerInvariant, segments.Length with
         | Some rootSegment, 1 -> iconToneForArcCollectionFolder rootSegment
-        | Some "studies", 2 -> Some FileItemIconTone.Secondary
+        | Some "studies", 2 -> Some FileItemIconTone.Accent
         | Some "assays", 2 -> Some FileItemIconTone.Success
         | Some "workflows", 2 -> Some FileItemIconTone.Primary
         | Some "runs", 2 -> Some FileItemIconTone.Warning
