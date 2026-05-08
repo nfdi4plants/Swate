@@ -687,8 +687,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     | _, None -> return Error(exn "ARC is not loaded.")
                     | Some arcPath, Some arcLocal ->
                         let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
-                        let preDeleteFileRelativePaths =
-                            ArcDeleteHelper.getPreDeleteFileRelativePaths arcPath vault.fileTree.Values
 
                         if ArcDeletePathRules.isDeletePathAllowed normalizedRelativePath |> not then
                             return
@@ -700,6 +698,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             match tryResolveArcRelativePath arcPath normalizedRelativePath with
                             | Error pathError -> return Error pathError
                             | Ok absolutePath ->
+                                let preDeleteFileRelativePaths =
+                                    ArcDeleteHelper.getPreDeleteFileRelativePaths arcPath vault.fileTree.Values
+
                                 vault.isBusyWriting <- true
 
                                 try

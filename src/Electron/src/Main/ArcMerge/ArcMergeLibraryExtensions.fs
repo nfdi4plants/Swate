@@ -5,6 +5,12 @@ open Main.ArcMerge.ArcMergeExtensions
 
 module ArcMergeHelper =
 
+    type ParsedFileEvent = {
+        EventName: EventName
+        Path: string
+        EntityRef: ArcEntityRef
+    }
+
     type DataMapEventIndex = {
         Assays: Set<string>
         Studies: Set<string>
@@ -22,11 +28,19 @@ module ArcMergeHelper =
     let private cloneDataMapOption (dataMap: DataMap option) : DataMap option =
         dataMap |> Option.map (fun dm -> dm.Copy())
 
-    let internal buildDataMapEventIndex (events: FileEvent list) : DataMapEventIndex =
+    let internal parseFileEvents (events: FileEvent list) : ParsedFileEvent list =
+        events
+        |> List.map (fun event -> {
+            EventName = event.EventName
+            Path = event.Path
+            EntityRef = ArcEntityRef.fromPath event.Path
+        })
+
+    let internal buildDataMapEventIndex (events: ParsedFileEvent list) : DataMapEventIndex =
         events
         |> List.fold
             (fun state event ->
-                match ArcEntityRef.fromPath event.Path with
+                match event.EntityRef with
                 | ArcEntityRef.AssayDataMap id -> {
                     state with
                         Assays = Set.add id state.Assays
@@ -191,14 +205,15 @@ module ArcMergeLibraryExtensions =
                 arcLocal.Copy()
             else
                 let mergedArc = arcLocal.Copy()
-                let dataMapEvents = ArcMergeHelper.buildDataMapEventIndex events
+                let parsedEvents = ArcMergeHelper.parseFileEvents events
+                let dataMapEvents = ArcMergeHelper.buildDataMapEventIndex parsedEvents
 
-                for event in events do
+                for event in parsedEvents do
                     ArcMergeHelper.applyEntityEvent
                         mergedArc
                         arcRemote
                         dataMapEvents
-                        (ArcEntityRef.fromPath event.Path)
+                        event.EntityRef
                         event.EventName
 
                 mergedArc

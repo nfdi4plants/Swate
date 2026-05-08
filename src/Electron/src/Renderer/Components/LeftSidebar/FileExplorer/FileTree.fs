@@ -310,9 +310,9 @@ type FileTree =
 
                         closeDeleteModal ()
                     | Error exn -> applyDeleteError exn.Message
-
-                    setIsDeleting false
                 }
+                |> Promise.catch (fun exn -> applyDeleteError exn.Message)
+                |> Promise.map (fun _ -> setIsDeleting false)
                 |> Promise.start
 
         let createArcEntry kind (identifier: string) =
