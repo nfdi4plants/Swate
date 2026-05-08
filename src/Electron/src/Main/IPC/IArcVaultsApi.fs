@@ -260,6 +260,25 @@ module ArcDeleteHelper =
             isSameOrDescendantPathForComparison pendingArcFileSave.path deletedPath
         )
 
+    let private tryGetNodeErrorCode (error: exn) : string option =
+        try
+            error?code |> unbox<string> |> Option.ofObj
+        with _ ->
+            None
+
+    let shouldIgnoreMissingDiskDeleteError
+        (deletedPath: string)
+        (pendingArcFileSave: FileContentDTO option)
+        (deleteError: exn)
+        =
+        let isMissingPathError =
+            match tryGetNodeErrorCode deleteError with
+            | Some "ENOENT" -> true
+            | _ -> false
+
+        isMissingPathError
+        && isPendingPathAffectedByDelete deletedPath pendingArcFileSave
+
     type MergeResult = {
         Arc: ARC
         PendingArcFileSave: FileContentDTO option
@@ -684,33 +703,54 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 vault.isBusyWriting <- true
 
                                 try
-                                    let! _ =
-                                        fsPromisesDynamic?rm (
-                                            absolutePath,
-                                            createObj [ "recursive" ==> true; "force" ==> false ]
-                                        )
-                                        |> unbox<JS.Promise<obj>>
+                                    let pendingArcFileSave = vault.pendingArcFileSave
 
-                                    do! vault.RefreshFileTree()
+                                    let! deleteResult =
+                                        promise {
+                                            try
+                                                let! _ =
+                                                    fsPromisesDynamic?rm (
+                                                        absolutePath,
+                                                        createObj [ "recursive" ==> true; "force" ==> false ]
+                                                    )
+                                                    |> unbox<JS.Promise<obj>>
 
-                                    match! ARC.tryLoadAsync arcPath with
-                                    | Error loadError ->
-                                        return Error(exn $"Unable to reload ARC after deleting '{normalizedRelativePath}': {loadError}")
-                                    | Ok reloadedArc ->
-                                        match
-                                            ArcDeleteHelper.mergeReloadedArcAfterDelete
-                                                normalizedRelativePath
-                                                preDeleteFileRelativePaths
-                                                arcLocal
-                                                reloadedArc
-                                                vault.pendingArcFileSave
-                                        with
-                                        | Error mergeError -> return Error mergeError
-                                        | Ok mergeResult ->
-                                            vault.arc <- Some mergeResult.Arc
-                                            vault.pendingArcFileSave <- mergeResult.PendingArcFileSave
-                                            vault.window.title <- mergeResult.Arc.Identifier
-                                            return Ok()
+                                                return Ok()
+                                            with deleteError ->
+                                                if
+                                                    ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
+                                                        normalizedRelativePath
+                                                        pendingArcFileSave
+                                                        deleteError
+                                                then
+                                                    return Ok()
+                                                else
+                                                    return Error deleteError
+                                        }
+
+                                    match deleteResult with
+                                    | Error deleteError -> return Error deleteError
+                                    | Ok() ->
+                                        do! vault.RefreshFileTree()
+
+                                        match! ARC.tryLoadAsync arcPath with
+                                        | Error loadError ->
+                                            return Error(exn $"Unable to reload ARC after deleting '{normalizedRelativePath}': {loadError}")
+                                        | Ok reloadedArc ->
+                                            match
+                                                ArcDeleteHelper.mergeReloadedArcAfterDelete
+                                                    normalizedRelativePath
+                                                    preDeleteFileRelativePaths
+                                                    arcLocal
+                                                    reloadedArc
+                                                    pendingArcFileSave
+                                            with
+                                            | Error mergeError -> return Error mergeError
+                                            | Ok mergeResult ->
+                                                vault.arc <- Some mergeResult.Arc
+                                                vault.pendingArcFileSave <- mergeResult.PendingArcFileSave
+                                                vault.window.title <- mergeResult.Arc.Identifier
+                                                return Ok()
                                 finally
                                     vault.isBusyWriting <- false
             with e ->

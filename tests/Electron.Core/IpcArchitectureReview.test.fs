@@ -36,6 +36,13 @@ let private expectSourceContainsInOrder (sourceText: string) (snippets: string[]
         Vitest.expect(snippetIndex >= 0, $"Expected source to contain (in order): {snippet}").toBe(true)
         searchStartIndex <- snippetIndex + snippet.Length
 
+let private createNodeLikeError (code: string) (message: string) : exn =
+    createObj [
+        "message" ==> message
+        "code" ==> code
+    ]
+    |> unbox<exn>
+
 Vitest.describe("IPC architecture review fixes", fun () ->
     Vitest.test("Arc vault dialogs consistently use a centralized IPC dialog parent helper", fun () ->
         promise {
@@ -113,6 +120,48 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies").toBe(false)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "README.md").toBe(false)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
+    )
+
+    Vitest.test("ignore missing disk delete error when target is an affected pending draft", fun () ->
+        let pendingAssay = ArcAssay.init "PendingAssay"
+        let pendingDto = ArcFiles.Assay pendingAssay |> FileContentDTO.fromArcFile |> Option.get
+        let missingPathError = createNodeLikeError "ENOENT" "missing path"
+
+        let shouldIgnore =
+            ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
+                "assays/PendingAssay/isa.assay.xlsx"
+                (Some pendingDto)
+                missingPathError
+
+        Vitest.expect(shouldIgnore).toBe(true)
+    )
+
+    Vitest.test("do not ignore missing disk delete error when pending draft is unrelated", fun () ->
+        let pendingAssay = ArcAssay.init "PendingAssay"
+        let pendingDto = ArcFiles.Assay pendingAssay |> FileContentDTO.fromArcFile |> Option.get
+        let missingPathError = createNodeLikeError "ENOENT" "missing path"
+
+        let shouldIgnore =
+            ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
+                "assays/OtherAssay/isa.assay.xlsx"
+                (Some pendingDto)
+                missingPathError
+
+        Vitest.expect(shouldIgnore).toBe(false)
+    )
+
+    Vitest.test("do not ignore non-ENOENT delete errors even when pending draft is affected", fun () ->
+        let pendingAssay = ArcAssay.init "PendingAssay"
+        let pendingDto = ArcFiles.Assay pendingAssay |> FileContentDTO.fromArcFile |> Option.get
+        let accessError = createNodeLikeError "EACCES" "permission denied"
+
+        let shouldIgnore =
+            ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
+                "assays/PendingAssay/isa.assay.xlsx"
+                (Some pendingDto)
+                accessError
+
+        Vitest.expect(shouldIgnore).toBe(false)
     )
 
     Vitest.test("mergeReloadedArcAfterDelete preserves unrelated pending drafts and applies them", fun () ->
