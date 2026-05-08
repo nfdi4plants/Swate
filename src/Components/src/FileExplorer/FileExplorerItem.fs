@@ -289,16 +289,19 @@ type FileExplorerItem =
             prop.key item.Id
             prop.custom ("data-file-item-id", item.Id)
             prop.children [
-                Html.a [
+                Html.div [
                     prop.custom ("data-file-item-id", item.Id)
                     prop.className [
                         "swt:group swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between swt:cursor-default"
                         rowHighlightClass
                     ]
-                    prop.onClick (fun _ -> onSelect ())
                     prop.children [
-                        Html.div [
-                            prop.className "swt:flex swt:items-center swt:gap-2"
+                        Html.button [
+                            prop.type'.button
+                            prop.custom ("data-file-item-id", item.Id)
+                            prop.className
+                                "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:bg-transparent swt:border-0 swt:p-0 swt:text-left swt:cursor-default"
+                            prop.onClick (fun _ -> onSelect ())
                             prop.children [
                                 Html.i [
                                     prop.className (

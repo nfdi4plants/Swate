@@ -74,6 +74,68 @@ module ArcMergeHelper =
         arcLocal.Remarks <- remoteSnapshot.Remarks
         arcLocal.License <- remoteSnapshot.License
 
+    let private tryFindEntityIndex id getIdentifier entities =
+        entities
+        |> Seq.tryFindIndex (fun entity -> getIdentifier entity = id)
+
+    let private applyEntityAddOrChange
+        (id: string)
+        (hasDataMapEvent: bool)
+        (tryGetRemote: string -> 'entity option)
+        (tryFindLocalIndex: string -> int option)
+        (getLocal: int -> 'entity)
+        (setLocal: int -> 'entity -> unit)
+        (addLocal: 'entity -> unit)
+        (copyEntity: 'entity -> 'entity)
+        (getDataMap: 'entity -> DataMap option)
+        (setDataMap: 'entity -> DataMap option -> unit)
+        =
+        match tryGetRemote id with
+        | None -> ()
+        | Some remoteEntity ->
+            match tryFindLocalIndex id with
+            | None -> addLocal (copyEntity remoteEntity)
+            | Some idx ->
+                let discCopy = copyEntity remoteEntity
+
+                if not hasDataMapEvent then
+                    let preservedDataMap =
+                        getLocal idx
+                        |> getDataMap
+                        |> cloneDataMapOption
+
+                    setDataMap discCopy preservedDataMap
+
+                setLocal idx discCopy
+
+    let private applyEntityUnlink (id: string) (containsLocal: string -> bool) (removeLocal: string -> unit) =
+        if containsLocal id then
+            removeLocal id
+
+    let private applyDataMapAddOrChange
+        (id: string)
+        (tryGetLocal: string -> 'entity option)
+        (tryGetRemote: string -> 'entity option)
+        (getDataMap: 'entity -> DataMap option)
+        (setDataMap: 'entity -> DataMap option -> unit)
+        =
+        match tryGetLocal id, tryGetRemote id with
+        | Some localEntity, Some remoteEntity ->
+            remoteEntity
+            |> getDataMap
+            |> cloneDataMapOption
+            |> setDataMap localEntity
+        | _ -> ()
+
+    let private applyDataMapUnlink
+        (id: string)
+        (tryGetLocal: string -> 'entity option)
+        (setDataMap: 'entity -> DataMap option -> unit)
+        =
+        match tryGetLocal id with
+        | None -> ()
+        | Some localEntity -> setDataMap localEntity None
+
     let internal applyEntityEvent
         (arcLocal: ARC)
         (arcRemote: ARC)
@@ -85,113 +147,109 @@ module ArcMergeHelper =
         | ArcEntityRef.Investigation, (EventName.Add | EventName.Change) -> copyInvestigationFields arcLocal arcRemote
         | ArcEntityRef.Investigation, EventName.Unlink -> ()
         | ArcEntityRef.Assay id, (EventName.Add | EventName.Change) ->
-            match arcRemote.TryGetAssay(id) with
-            | None -> ()
-            | Some remoteAssay ->
-                match arcLocal.Assays |> Seq.tryFindIndex (fun assay -> assay.Identifier = id) with
-                | None -> arcLocal.AddAssay(remoteAssay.Copy())
-                | Some idx ->
-                    let discCopy = remoteAssay.Copy()
-
-                    if not (Set.contains id dataMapEvents.Assays) then
-                        discCopy.DataMap <- cloneDataMapOption arcLocal.Assays.[idx].DataMap
-
-                    arcLocal.Assays.[idx] <- discCopy
+            applyEntityAddOrChange
+                id
+                (Set.contains id dataMapEvents.Assays)
+                (fun id -> arcRemote.TryGetAssay(id))
+                (fun id -> arcLocal.Assays |> tryFindEntityIndex id (fun (assay: ArcAssay) -> assay.Identifier))
+                (fun idx -> arcLocal.Assays.[idx])
+                (fun idx assay -> arcLocal.Assays.[idx] <- assay)
+                (fun assay -> arcLocal.AddAssay(assay))
+                (fun (assay: ArcAssay) -> assay.Copy())
+                (fun (assay: ArcAssay) -> assay.DataMap)
+                (fun (assay: ArcAssay) dataMap -> assay.DataMap <- dataMap)
         | ArcEntityRef.Assay id, EventName.Unlink ->
-            if arcLocal.ContainsAssay(id) then
-                arcLocal.RemoveAssay(id)
+            applyEntityUnlink id (fun id -> arcLocal.ContainsAssay(id)) (fun id -> arcLocal.RemoveAssay(id))
         | ArcEntityRef.AssayDataMap id, (EventName.Add | EventName.Change) ->
-            match arcLocal.TryGetAssay(id) with
-            | None -> ()
-            | Some localAssay ->
-                match arcRemote.TryGetAssay(id) with
-                | None -> ()
-                | Some remoteAssay -> localAssay.DataMap <- cloneDataMapOption remoteAssay.DataMap
+            applyDataMapAddOrChange
+                id
+                (fun id -> arcLocal.TryGetAssay(id))
+                (fun id -> arcRemote.TryGetAssay(id))
+                (fun (assay: ArcAssay) -> assay.DataMap)
+                (fun (assay: ArcAssay) dataMap -> assay.DataMap <- dataMap)
         | ArcEntityRef.AssayDataMap id, EventName.Unlink ->
-            match arcLocal.TryGetAssay(id) with
-            | None -> ()
-            | Some localAssay -> localAssay.DataMap <- None
+            applyDataMapUnlink
+                id
+                (fun id -> arcLocal.TryGetAssay(id))
+                (fun (assay: ArcAssay) dataMap -> assay.DataMap <- dataMap)
         | ArcEntityRef.Study id, (EventName.Add | EventName.Change) ->
-            match arcRemote.TryGetStudy(id) with
-            | None -> ()
-            | Some remoteStudy ->
-                match arcLocal.Studies |> Seq.tryFindIndex (fun study -> study.Identifier = id) with
-                | None -> arcLocal.AddStudy(remoteStudy.Copy())
-                | Some idx ->
-                    let discCopy = remoteStudy.Copy()
-
-                    if not (Set.contains id dataMapEvents.Studies) then
-                        discCopy.DataMap <- cloneDataMapOption arcLocal.Studies.[idx].DataMap
-
-                    arcLocal.Studies.[idx] <- discCopy
+            applyEntityAddOrChange
+                id
+                (Set.contains id dataMapEvents.Studies)
+                (fun id -> arcRemote.TryGetStudy(id))
+                (fun id -> arcLocal.Studies |> tryFindEntityIndex id (fun (study: ArcStudy) -> study.Identifier))
+                (fun idx -> arcLocal.Studies.[idx])
+                (fun idx study -> arcLocal.Studies.[idx] <- study)
+                (fun study -> arcLocal.AddStudy(study))
+                (fun (study: ArcStudy) -> study.Copy())
+                (fun (study: ArcStudy) -> study.DataMap)
+                (fun (study: ArcStudy) dataMap -> study.DataMap <- dataMap)
         | ArcEntityRef.Study id, EventName.Unlink ->
-            if arcLocal.ContainsStudy(id) then
-                arcLocal.RemoveStudy(id)
+            applyEntityUnlink id (fun id -> arcLocal.ContainsStudy(id)) (fun id -> arcLocal.RemoveStudy(id))
         | ArcEntityRef.StudyDataMap id, (EventName.Add | EventName.Change) ->
-            match arcLocal.TryGetStudy(id) with
-            | None -> ()
-            | Some localStudy ->
-                match arcRemote.TryGetStudy(id) with
-                | None -> ()
-                | Some remoteStudy -> localStudy.DataMap <- cloneDataMapOption remoteStudy.DataMap
+            applyDataMapAddOrChange
+                id
+                (fun id -> arcLocal.TryGetStudy(id))
+                (fun id -> arcRemote.TryGetStudy(id))
+                (fun (study: ArcStudy) -> study.DataMap)
+                (fun (study: ArcStudy) dataMap -> study.DataMap <- dataMap)
         | ArcEntityRef.StudyDataMap id, EventName.Unlink ->
-            match arcLocal.TryGetStudy(id) with
-            | None -> ()
-            | Some localStudy -> localStudy.DataMap <- None
+            applyDataMapUnlink
+                id
+                (fun id -> arcLocal.TryGetStudy(id))
+                (fun (study: ArcStudy) dataMap -> study.DataMap <- dataMap)
         | ArcEntityRef.Run id, (EventName.Add | EventName.Change) ->
-            match arcRemote.TryGetRun(id) with
-            | None -> ()
-            | Some remoteRun ->
-                match arcLocal.Runs |> Seq.tryFindIndex (fun run -> run.Identifier = id) with
-                | None -> arcLocal.AddRun(remoteRun.Copy())
-                | Some idx ->
-                    let discCopy = remoteRun.Copy()
-
-                    if not (Set.contains id dataMapEvents.Runs) then
-                        discCopy.DataMap <- cloneDataMapOption arcLocal.Runs.[idx].DataMap
-
-                    arcLocal.Runs.[idx] <- discCopy
+            applyEntityAddOrChange
+                id
+                (Set.contains id dataMapEvents.Runs)
+                (fun id -> arcRemote.TryGetRun(id))
+                (fun id -> arcLocal.Runs |> tryFindEntityIndex id (fun (run: ArcRun) -> run.Identifier))
+                (fun idx -> arcLocal.Runs.[idx])
+                (fun idx run -> arcLocal.Runs.[idx] <- run)
+                (fun run -> arcLocal.AddRun(run))
+                (fun (run: ArcRun) -> run.Copy())
+                (fun (run: ArcRun) -> run.DataMap)
+                (fun (run: ArcRun) dataMap -> run.DataMap <- dataMap)
         | ArcEntityRef.Run id, EventName.Unlink ->
-            if arcLocal.ContainsRun(id) then
-                arcLocal.DeleteRun(id)
+            applyEntityUnlink id (fun id -> arcLocal.ContainsRun(id)) (fun id -> arcLocal.DeleteRun(id))
         | ArcEntityRef.RunDataMap id, (EventName.Add | EventName.Change) ->
-            match arcLocal.TryGetRun(id) with
-            | None -> ()
-            | Some localRun ->
-                match arcRemote.TryGetRun(id) with
-                | None -> ()
-                | Some remoteRun -> localRun.DataMap <- cloneDataMapOption remoteRun.DataMap
+            applyDataMapAddOrChange
+                id
+                (fun id -> arcLocal.TryGetRun(id))
+                (fun id -> arcRemote.TryGetRun(id))
+                (fun (run: ArcRun) -> run.DataMap)
+                (fun (run: ArcRun) dataMap -> run.DataMap <- dataMap)
         | ArcEntityRef.RunDataMap id, EventName.Unlink ->
-            match arcLocal.TryGetRun(id) with
-            | None -> ()
-            | Some localRun -> localRun.DataMap <- None
+            applyDataMapUnlink
+                id
+                (fun id -> arcLocal.TryGetRun(id))
+                (fun (run: ArcRun) dataMap -> run.DataMap <- dataMap)
         | ArcEntityRef.Workflow id, (EventName.Add | EventName.Change) ->
-            match arcRemote.TryGetWorkflow(id) with
-            | None -> ()
-            | Some remoteWorkflow ->
-                match arcLocal.Workflows |> Seq.tryFindIndex (fun workflow -> workflow.Identifier = id) with
-                | None -> arcLocal.AddWorkflow(remoteWorkflow.Copy())
-                | Some idx ->
-                    let discCopy = remoteWorkflow.Copy()
-
-                    if not (Set.contains id dataMapEvents.Workflows) then
-                        discCopy.DataMap <- cloneDataMapOption arcLocal.Workflows.[idx].DataMap
-
-                    arcLocal.Workflows.[idx] <- discCopy
+            applyEntityAddOrChange
+                id
+                (Set.contains id dataMapEvents.Workflows)
+                (fun id -> arcRemote.TryGetWorkflow(id))
+                (fun id -> arcLocal.Workflows |> tryFindEntityIndex id (fun (workflow: ArcWorkflow) -> workflow.Identifier))
+                (fun idx -> arcLocal.Workflows.[idx])
+                (fun idx workflow -> arcLocal.Workflows.[idx] <- workflow)
+                (fun workflow -> arcLocal.AddWorkflow(workflow))
+                (fun (workflow: ArcWorkflow) -> workflow.Copy())
+                (fun (workflow: ArcWorkflow) -> workflow.DataMap)
+                (fun (workflow: ArcWorkflow) dataMap -> workflow.DataMap <- dataMap)
         | ArcEntityRef.Workflow id, EventName.Unlink ->
-            if arcLocal.ContainsWorkflow(id) then
-                arcLocal.DeleteWorkflow(id)
+            applyEntityUnlink id (fun id -> arcLocal.ContainsWorkflow(id)) (fun id -> arcLocal.DeleteWorkflow(id))
         | ArcEntityRef.WorkflowDataMap id, (EventName.Add | EventName.Change) ->
-            match arcLocal.TryGetWorkflow(id) with
-            | None -> ()
-            | Some localWorkflow ->
-                match arcRemote.TryGetWorkflow(id) with
-                | None -> ()
-                | Some remoteWorkflow -> localWorkflow.DataMap <- cloneDataMapOption remoteWorkflow.DataMap
+            applyDataMapAddOrChange
+                id
+                (fun id -> arcLocal.TryGetWorkflow(id))
+                (fun id -> arcRemote.TryGetWorkflow(id))
+                (fun (workflow: ArcWorkflow) -> workflow.DataMap)
+                (fun (workflow: ArcWorkflow) dataMap -> workflow.DataMap <- dataMap)
         | ArcEntityRef.WorkflowDataMap id, EventName.Unlink ->
-            match arcLocal.TryGetWorkflow(id) with
-            | None -> ()
-            | Some localWorkflow -> localWorkflow.DataMap <- None
+            applyDataMapUnlink
+                id
+                (fun id -> arcLocal.TryGetWorkflow(id))
+                (fun (workflow: ArcWorkflow) dataMap -> workflow.DataMap <- dataMap)
         | ArcEntityRef.Unknown _, _ -> ()
 
 [<AutoOpen>]
