@@ -43,10 +43,10 @@
     "office-addin-dev-certs": "^2.0.3",
     "office-addin-mock": "^2.4.6",
     "playwright": "^1.49.1",
-    "storybook": "^10.1.4",
+    "storybook": "^10.3.6",
     "tailwindcss": "^4.1.17",
     "typescript": "^5.6.3",
-    "vite": "^6.3.5",
+    "vite": "^6.4.2",
     "vite-plugin-dts": "^4.5.0",
     "vite-plugin-node-polyfills": "^0.23.0",
     "vitest": "^4.0.15"
