@@ -16,20 +16,17 @@ open Types
 open Helper
 
 module private FileTreeHelper =
-    let stagePendingArcFileSave (arcFile: ArcFiles option) : JS.Promise<Result<unit, exn>> = promise {
-        let pendingSaveRequestResult =
-            match arcFile with
-            | None -> Ok None
-            | Some nextArcFile ->
-                match FileContentDTO.fromArcFile nextArcFile with
-                | Some request -> Ok(Some request)
-                | None -> Error(exn "Saving this file type is not supported in Electron yet.")
 
-        match pendingSaveRequestResult with
-        | Error saveError -> return Error saveError
-        | Ok pendingSaveRequest ->
-            let! result = Api.ipcArcVaultApi.setPendingArcFileSave pendingSaveRequest
-            return result
+    let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
+        match FileContentDTO.fromArcFile arcFile with
+        | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
+        | Some request ->
+            match! Api.ipcArcVaultApi.setArcFileInMemory request with
+            | Error setError -> return Error setError
+            | Ok() ->
+                match! Api.ipcArcVaultApi.saveArcFile() with
+                | Error saveError -> return Error saveError
+                | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
     }
 
 open FileTreeHelper
@@ -55,18 +52,11 @@ type FileTree =
         let pendingCreateKind, setPendingCreateKind =
             React.useState<ArcExplorerNodeKind option> None
 
-        let pendingArcFileSave, setPendingArcFileSave = React.useState<ArcFiles option> None
         let pendingDeleteItem, setPendingDeleteItem = React.useState<FileItem option> None
         let isDeleting, setIsDeleting = React.useState false
 
         let effectiveFileTree =
-            React.useMemo (
-                (fun () -> withPendingArcFileEntry fileStateCtx.state.FileTree pendingArcFileSave),
-                [|
-                    box fileStateCtx.state.FileTree
-                    box pendingArcFileSave
-                |]
-            )
+            React.useMemo ((fun () -> fileStateCtx.state.FileTree), [| box fileStateCtx.state.FileTree |])
 
         React.useEffect (
             (fun () ->
@@ -162,21 +152,16 @@ type FileTree =
                 | Some path ->
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                    let! result = Renderer.Components.ARCHelper.openView selectedPath
 
-                    match tryFindPendingArcFileByPath selectedPath pendingArcFileSave with
-                    | Some pendingArcFile ->
-                        pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage pendingArcFile))
-                    | None ->
-                        let! result = Renderer.Components.ARCHelper.openView selectedPath
-
-                        match result with
-                        | Ok loaded ->
-                            console.log ("[Renderer] Received data, processing...")
-                            Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
-                        | Error errorMessage ->
-                            let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
-                            console.log ($"[Renderer] Error: {fullErrorMessage}")
-                            Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
+                    match result with
+                    | Ok loaded ->
+                        console.log ("[Renderer] Received data, processing...")
+                        Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                    | Error errorMessage ->
+                        let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
+                        console.log ($"[Renderer] Error: {fullErrorMessage}")
+                        Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
             }
             |> Promise.start
 
@@ -218,16 +203,13 @@ type FileTree =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
         let applyCreateError errorMessage =
-            Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState errorMessage
+            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file", ?scopeId = arcScopeId))
 
         let confirmDeleteItem () =
             FileTreeDeleteWorkflow.confirmDeleteItem {
                 pendingDeleteItem = pendingDeleteItem
-                pendingArcFileSave = pendingArcFileSave
                 closeDeleteModal = closeDeleteModal
                 setIsDeleting = setIsDeleting
-                setPendingArcFileSave = setPendingArcFileSave
-                stagePendingArcFileSave = stagePendingArcFileSave
                 enqueueError = errorModal.enqueue
                 arcScopeId = arcScopeId
             }
@@ -238,25 +220,23 @@ type FileTree =
             match tryBuildArcCreateDraft kind identifier existingPaths with
             | Error errorMessage -> applyCreateError errorMessage
             | Ok draft ->
-                fileStateCtx.setSelection (ArcSelection.forTreePath (Some draft.Path))
-                setPendingArcFileSave (Some draft.ArcFile)
-                pageStateCtx.setState (Some(Renderer.Types.PageState.ArcFilePage draft.ArcFile))
-
                 promise {
-                    match! stagePendingArcFileSave (Some draft.ArcFile) with
-                    | Ok() -> ()
-                    | Error exn ->
-                        errorModal.enqueue (
-                            ErrorModalRequest.create (
-                                exn.Message,
-                                title = "Could not stage ARC file save",
-                                ?scopeId = arcScopeId
-                            )
-                        )
-                }
-                |> Promise.start
+                    let! createResult = saveArcFileAndOpen draft.ArcFile
 
-                closeCreateModal ()
+                    match createResult with
+                    | Error exn -> applyCreateError exn.Message
+                    | Ok createdArcFileDto ->
+                        let selectedPath = PathHelpers.normalizePath createdArcFileDto.path
+                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                        createdArcFileDto
+                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+
+                        closeCreateModal ()
+                }
+                |> Promise.catch (fun exn -> applyCreateError exn.Message)
+                |> Promise.start
 
         let arcCreateContextMenuItems (item: FileItem) =
             if item.IsDirectory then

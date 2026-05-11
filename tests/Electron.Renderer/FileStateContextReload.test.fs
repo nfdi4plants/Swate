@@ -140,9 +140,4 @@ Vitest.describe("FileExplorer delete helpers", fun () ->
         Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval None).toBe(false)
     )
 
-    Vitest.test("isPendingPathAffectedByDelete only clears pending drafts inside deleted targets", fun () ->
-        Vitest.expect(FileExplorerDeleteHelper.isPendingPathAffectedByDelete "assays/AssayA" (Some "assays/AssayA/isa.assay.xlsx")).toBe(true)
-        Vitest.expect(FileExplorerDeleteHelper.isPendingPathAffectedByDelete "assays/AssayA" (Some "assays/AssayB/isa.assay.xlsx")).toBe(false)
-        Vitest.expect(FileExplorerDeleteHelper.isPendingPathAffectedByDelete "assays/AssayA" None).toBe(false)
-    )
 )

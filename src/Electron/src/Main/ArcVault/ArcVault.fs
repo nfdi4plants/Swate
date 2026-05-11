@@ -22,8 +22,6 @@ type ArcVault(window: BrowserWindow) =
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, set
-    /// Optional staged ARC file draft used by file-explorer pending-save/delete flows.
-    member val pendingArcFileSave: FileContentDTO option = None with get, set
     /// Dirty marker for unsaved in-memory ARC mutations.
     /// This flag is intentionally coarse and can remain true even if later edits restore the previous logical state.
     ///Good workaround, for a missing member 👍 Might even be more performant, than calculating a isDirty flag. On the other hand, it is unable to detect if changes are removed again. For example:

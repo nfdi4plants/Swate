@@ -122,55 +122,64 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
     )
 
-    Vitest.test("ignore missing disk delete error when target is an affected pending draft", fun () ->
-        let pendingAssay = ArcAssay.init "PendingAssay"
-        let pendingDto = ArcFiles.Assay pendingAssay |> FileContentDTO.fromArcFile |> Option.get
+    Vitest.test("maps ENOENT to explicit memory-only delete error for canonical targets present in memory", fun () ->
+        let arcLocal = ARC("MemoryOnlyArc")
+        arcLocal.InitAssay("PendingAssay") |> ignore
+
         let missingPathError = createNodeLikeError "ENOENT" "missing path"
 
-        let shouldIgnore =
-            ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
+        let memoryOnlyError =
+            ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
                 "assays/PendingAssay/isa.assay.xlsx"
-                (Some pendingDto)
+                arcLocal
                 missingPathError
 
-        Vitest.expect(shouldIgnore).toBe(true)
+        Vitest.expect(memoryOnlyError.IsSome).toBe(true)
+        Vitest.expect(memoryOnlyError.Value.Message.Contains("exists only in memory and is not written to disk yet.")).toBe(true)
     )
 
-    Vitest.test("do not ignore missing disk delete error when pending draft is unrelated", fun () ->
-        let pendingAssay = ArcAssay.init "PendingAssay"
-        let pendingDto = ArcFiles.Assay pendingAssay |> FileContentDTO.fromArcFile |> Option.get
+    Vitest.test("does not map ENOENT to memory-only error when canonical target is not present in memory", fun () ->
+        let arcLocal = ARC("MemoryOnlyArc")
         let missingPathError = createNodeLikeError "ENOENT" "missing path"
 
-        let shouldIgnore =
-            ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
-                "assays/OtherAssay/isa.assay.xlsx"
-                (Some pendingDto)
+        let memoryOnlyError =
+            ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
+                "assays/PendingAssay/isa.assay.xlsx"
+                arcLocal
                 missingPathError
 
-        Vitest.expect(shouldIgnore).toBe(false)
+        Vitest.expect(memoryOnlyError).toEqual(None)
     )
 
-    Vitest.test("do not ignore non-ENOENT delete errors even when pending draft is affected", fun () ->
-        let pendingAssay = ArcAssay.init "PendingAssay"
-        let pendingDto = ArcFiles.Assay pendingAssay |> FileContentDTO.fromArcFile |> Option.get
+    Vitest.test("does not map non-canonical or non-ENOENT delete errors to memory-only error", fun () ->
+        let arcLocal = ARC("MemoryOnlyArc")
+        arcLocal.InitAssay("PendingAssay") |> ignore
+
+        let missingPathError = createNodeLikeError "ENOENT" "missing path"
         let accessError = createNodeLikeError "EACCES" "permission denied"
 
-        let shouldIgnore =
-            ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
+        let canonicalWithNonEnoent =
+            ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
                 "assays/PendingAssay/isa.assay.xlsx"
-                (Some pendingDto)
+                arcLocal
                 accessError
 
-        Vitest.expect(shouldIgnore).toBe(false)
+        let nonCanonicalWithEnoent =
+            ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
+                "assays/PendingAssay/readme.md"
+                arcLocal
+                missingPathError
+
+        Vitest.expect(canonicalWithNonEnoent).toEqual(None)
+        Vitest.expect(nonCanonicalWithEnoent).toEqual(None)
     )
 
-    Vitest.test("mergeReloadedArcAfterDelete preserves unrelated pending drafts and applies them", fun () ->
+    Vitest.test("mergeReloadedArcAfterDelete preserves unrelated local in-memory entities", fun () ->
         let localArc = ARC("MergeArc")
         localArc.Title <- Some "Dirty local title"
+        localArc.InitAssay("AssayMergeA") |> ignore
 
         let reloadedArc = ARC("MergeArc")
-        let pendingAssay = ArcAssay.init "AssayMergeA"
-        let pendingDto = ArcFiles.Assay pendingAssay |> FileContentDTO.fromArcFile |> Option.get
 
         let result =
             ArcDeleteHelper.mergeReloadedArcAfterDelete
@@ -178,36 +187,11 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
                 [ "studies/StudyA/isa.study.xlsx" ]
                 localArc
                 reloadedArc
-                (Some pendingDto)
 
         match result with
         | Error error -> failwith error.Message
         | Ok mergeResult ->
-            Vitest.expect(mergeResult.PendingArcFileSave.IsSome).toBe(true)
             Vitest.expect(mergeResult.Arc.TryGetAssay "AssayMergeA" |> Option.isSome).toBe(true)
-    )
-
-    Vitest.test("mergeReloadedArcAfterDelete drops pending drafts affected by deletion targets", fun () ->
-        let localArc = ARC("MergeArc")
-        localArc.Title <- Some "Dirty local title"
-
-        let reloadedArc = ARC("MergeArc")
-        let pendingAssay = ArcAssay.init "AssayMergeB"
-        let pendingDto = ArcFiles.Assay pendingAssay |> FileContentDTO.fromArcFile |> Option.get
-
-        let result =
-            ArcDeleteHelper.mergeReloadedArcAfterDelete
-                "assays/AssayMergeB"
-                [ "assays/AssayMergeB/isa.assay.xlsx" ]
-                localArc
-                reloadedArc
-                (Some pendingDto)
-
-        match result with
-        | Error error -> failwith error.Message
-        | Ok mergeResult ->
-            Vitest.expect(mergeResult.PendingArcFileSave).toEqual(None)
-            Vitest.expect(mergeResult.Arc.TryGetAssay "AssayMergeB" |> Option.isSome).toBe(false)
     )
 
     Vitest.test("entity unlink event removes the targeted entity", fun () ->
@@ -222,7 +206,6 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
                 [ "assays/My Assay/isa.assay.xlsx" ]
                 localArc
                 reloadedArc
-                None
 
         match result with
         | Error error -> failwith error.Message
@@ -246,7 +229,6 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
                 [ "assays/My Assay/isa.datamap.xlsx" ]
                 localArc
                 reloadedArc
-                None
 
         match result with
         | Error error -> failwith error.Message
@@ -264,7 +246,7 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
         let reloadedArc = localArc.Copy()
 
         let result =
-            ArcDeleteHelper.mergeReloadedArcAfterDelete "assays/My Assay" [] localArc reloadedArc None
+            ArcDeleteHelper.mergeReloadedArcAfterDelete "assays/My Assay" [] localArc reloadedArc
 
         match result with
         | Error error -> failwith error.Message
