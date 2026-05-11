@@ -63,7 +63,7 @@ let private lsFilesResponseDecoder : Decoder<GitLfsLsFileInfo[]> =
 let private parseLsFiles (stdoutText: string) : GitLfsLsFileInfo[] =
     ARCtrl.Json.Decode.fromJsonString lsFilesResponseDecoder stdoutText
 
-let private indexByRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<string, GitLfsLsFileInfo> =
+let private indexUsingRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<string, GitLfsLsFileInfo> =
     let filesByRelativePath = Dictionary<string, GitLfsLsFileInfo>()
 
     files
