@@ -22,6 +22,33 @@ let private shouldIgnorePath (path: string) =
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
 
+/// Enriches a single file entry with Git LFS metadata from `git lfs ls-files -j`.
+let private withFileEntryLfsMetadata
+    (repoRoot: string)
+    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (entry: FileEntry)
+    : FileEntry =
+    if entry.isDirectory then
+        entry
+    else
+        match tryGetRepoRelativePath repoRoot entry.path with
+        | Some relativePath ->
+            let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
+
+            match lfsFilesByRelativePath.TryGetValue(normalizedRelativePath) with
+            | true, lfsInfo -> { entry with lfs = Some lfsInfo }
+            | _ -> { entry with lfs = None }
+        | None ->
+            { entry with lfs = None }
+
+/// Enriches file entries with Git LFS metadata from `git lfs ls-files -j`.
+let private withFileEntriesLfsMetadata
+    (repoRoot: string)
+    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (entries: FileEntry[])
+    : FileEntry[] =
+    entries |> Array.map (withFileEntryLfsMetadata repoRoot lfsFilesByRelativePath)
+
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
     let rendererFileTree = Dictionary<string, FileEntry>()

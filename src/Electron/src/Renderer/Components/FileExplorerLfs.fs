@@ -23,7 +23,7 @@ let getFileTreeNodeLfsState (node: FileTreeNode) : FileTreeNodeLfsState =
     {
         IsLFS = node.lfs |> Option.map (fun _ -> true)
         IsLFSPointer = node.lfs |> Option.map (fun info -> not info.checkout)
-        Downloaded = node.lfs |> Option.map _.checkout
+        Downloaded = node.lfs |> Option.map _.downloaded
         Size = lfsSize
         SizeFormatted = lfsSizeFormatted
     }
