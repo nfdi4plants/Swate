@@ -27,7 +27,7 @@ let mutable private cachedSystemInstalled = false
 [<Literal>]
 let private lfsLsFilesTimeoutMs = 15000
 
-let private parseLsFiles (stdoutText: string) : GitLfsLsFileInfo[] =
+let parseLsFiles (stdoutText: string) : GitLfsLsFileInfo[] =
     try
         ARCtrl.Json.Decode.fromJsonString JsonDecoder.lsFilesResponseDecoder stdoutText
     with ex ->

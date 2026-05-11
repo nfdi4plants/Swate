@@ -2,10 +2,10 @@ module ElectronCore.GitServiceTests
 
 open System
 open Fable.Core
-open Fable.Core.JS
 open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.Bindings.SimpleGit
+open Main.Git.GitLfsService
 open Swate.Electron.Shared.GitTypes
 open Vitest
 
@@ -20,7 +20,7 @@ module JsonDecoder = Main.Git.JsonDecoder
 Vitest.describe("Git LFS JSON decoding", fun () ->
     let assertParseFailure (json: string) (expectedReason: string option) =
         try
-            JsonDecoder.parseLsFiles json |> ignore
+            parseLsFiles json |> ignore
             failwith "Expected parseLsFiles to fail for incomplete or malformed Git LFS JSON."
         with ex ->
             Vitest.expect(ex.Message.Contains("Failed to parse git lfs ls-files JSON")).toBe(true)
@@ -45,7 +45,7 @@ Vitest.describe("Git LFS JSON decoding", fun () ->
   ]
 }"""
 
-        let files = JsonDecoder.parseLsFiles json
+        let files = parseLsFiles json
         Vitest.expect(files.Length).toBe(1)
 
         let file = files.[0]
@@ -122,8 +122,8 @@ Vitest.describe("Git LFS JSON decoding", fun () ->
         let withNullFiles = """{ "files": null }"""
         let withMissingFiles = """{}"""
 
-        let nullFiles = JsonDecoder.parseLsFiles withNullFiles
-        let missingFiles = JsonDecoder.parseLsFiles withMissingFiles
+        let nullFiles = parseLsFiles withNullFiles
+        let missingFiles = parseLsFiles withMissingFiles
 
         Vitest.expect(nullFiles.Length).toBe(0)
         Vitest.expect(missingFiles.Length).toBe(0))
