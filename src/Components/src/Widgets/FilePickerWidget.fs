@@ -250,7 +250,7 @@ type FilePickerWidget =
         ]
 
     [<ReactComponent>]
-    static member private PathViewer(paths: string[], setPaths: (string[] -> string[]) -> unit) =
+    static member private FilePathViewer(paths: string[], setPaths: (string[] -> string[]) -> unit) =
 
         let movePathById = FilePickerWidgetHelper.movePathById setPaths
         let removePathById = FilePickerWidgetHelper.removePathById setPaths
@@ -332,7 +332,7 @@ type FilePickerWidget =
         ]
 
     [<ReactComponent>]
-    static member PickFilesButtons(onPickPaths: unit -> unit) =
+    static member PickFilePathsButtons(onPickPaths: unit -> unit) =
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:gap-2"
             prop.children [
@@ -403,10 +403,10 @@ type FilePickerWidget =
                 else if hasPaths then
                     let canInsert = hasActiveTableView && selectedCells.IsSome && hasPaths
 
-                    FilePickerWidget.PathViewer(paths, setPaths)
+                    FilePickerWidget.FilePathViewer(paths, setPaths)
 
                     FilePickerWidget.ActionButtons(clearPaths, insertPaths, canInsert)
                 else
-                    FilePickerWidget.PickFilesButtons(pickPaths)
+                    FilePickerWidget.PickFilePathsButtons(pickPaths)
             ]
         ]
