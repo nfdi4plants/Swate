@@ -20,11 +20,7 @@ module private FilePickerWidgetHelper =
             if paths.Length > 0 then
                 setPaths (fun existingPaths ->
 
-                    let currentSet = Set existingPaths
-                    let newPathsSet = Set paths
-                    let combinedSet = Set.union currentSet newPathsSet
-
-                    combinedSet |> Set.toArray
+                    Array.append existingPaths paths |> Array.distinct
                 )
 
     let clearPaths (setPaths: (string[] -> string[]) -> unit) = fun () -> setPaths (fun _ -> [||])
@@ -117,7 +113,7 @@ type FilePickerWidget =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private SortableTableRow
-        (index: int, path: string, movePath: int -> int -> unit, removePath: int -> unit)
+        (index: int, path: string, movePath: int -> int -> unit, removePath: int -> unit, ?key: string)
         =
         let sortable = DndKit.useSortable ({| id = path |})
 
@@ -128,7 +124,6 @@ type FilePickerWidget =
 
         Html.tr [
             prop.key path
-            prop.id path
             prop.ref sortable.setNodeRef
             prop.style style
             prop.children [
@@ -144,9 +139,8 @@ type FilePickerWidget =
                         ]
                     ]
                 ]
-                Html.td [ prop.className "swt:w-12 swt:font-mono"; prop.text index ]
                 Html.td [
-                    prop.className "swt:max-w-md swt:truncate"
+                    prop.className "swt:max-w-md swt:truncate swt:font-mono"
                     prop.title path
                     prop.text path
                 ]
@@ -208,7 +202,7 @@ type FilePickerWidget =
                             for index in 0 .. paths.Length - 1 do
                                 let path = paths.[index]
 
-                                FilePickerWidget.SortableTableRow(index, path, movePath, removePath)
+                                FilePickerWidget.SortableTableRow(index, path, movePath, removePath, key = path)
                         ]
                     ]
                 ]
