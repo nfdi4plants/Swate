@@ -27,6 +27,31 @@ let mutable private cachedSystemInstalled = false
 [<Literal>]
 let private lfsLsFilesTimeoutMs = 15000
 
+let private parseLsFiles (stdoutText: string) : GitLfsLsFileInfo[] =
+    try
+        ARCtrl.Json.Decode.fromJsonString JsonDecoder.lsFilesResponseDecoder stdoutText
+    with ex ->
+        let detail =
+            if String.IsNullOrWhiteSpace ex.Message then
+                "Unknown decoding error."
+            else
+                ex.Message
+
+        raise (Exception($"Failed to parse git lfs ls-files JSON: {detail}", ex))
+
+let private indexUsingRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<string, GitLfsLsFileInfo> =
+    let filesByRelativePath = Dictionary<string, GitLfsLsFileInfo>()
+
+    files
+    |> Array.iter (fun info ->
+        if not (String.IsNullOrWhiteSpace info.name) then
+            let relativePath = PathHelpers.normalizeSeparators info.name
+            filesByRelativePath.[relativePath] <- { info with name = relativePath }
+    )
+
+    filesByRelativePath
+
+
 /// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
     let errorText = result.Error |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
@@ -172,7 +197,7 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
                     return Dictionary<string, GitLfsLsFileInfo>()
                 else
                     try
-                        return stdoutText |> JsonDecoder.parseLsFiles |> JsonDecoder.indexUsingRelativePath
+                        return stdoutText |> parseLsFiles |> indexUsingRelativePath
                     with parseError ->
                         let reason =
                             if String.IsNullOrWhiteSpace parseError.Message then
