@@ -2,11 +2,21 @@ module Swate.Electron.Shared.FileIOTypes
 
 open System.Collections.Generic
 
+type GitLfsLsFileInfo = {
+    name: string
+    size: float
+    checkout: bool
+    downloaded: bool
+    ``oid_type``: string
+    oid: string
+    version: string
+}
+
 type FileEntry = {
     name: string
     isDirectory: bool
     path: string
-    isLfs: bool option
+    lfs: GitLfsLsFileInfo option
 }
 
 [<AutoOpen>]
@@ -19,29 +29,43 @@ module FileEntryExtensions =
 
     type FileEntry with
 
-        static member create(name: string, path: string, isDirectory: bool, ?isLfs: bool option) : FileEntry = {
+        static member create
+            (
+                name: string,
+                path: string,
+                isDirectory: bool,
+                ?lfs: GitLfsLsFileInfo option
+            )
+            : FileEntry =
+            {
             name = name
             path = path
             isDirectory = isDirectory
-            isLfs = defaultArg isLfs None
+            lfs = defaultArg lfs None
         }
 
 type FileTreeNode = {
     name: string
     isDirectory: bool
     path: string
-    isLfs: bool option
+    lfs: GitLfsLsFileInfo option
     children: Dictionary<string, FileTreeNode>
 } with
 
     static member create
-        (name: string, isDirectory: bool, path: string, children: Dictionary<string, FileTreeNode>, ?isLfs: bool option)
+        (
+            name: string,
+            isDirectory: bool,
+            path: string,
+            children: Dictionary<string, FileTreeNode>,
+            ?lfs: GitLfsLsFileInfo option
+        )
         =
         {
             name = name
             isDirectory = isDirectory
             path = path
-            isLfs = defaultArg isLfs None
+            lfs = defaultArg lfs None
             children = children
         }
 

@@ -2,7 +2,13 @@
 module Test
 
 open ProjectInfo
-open System
+open System.IO
+
+let private cleanGeneratedOutput (testProjectPath: string) =
+    let outputPath = Path.Combine(testProjectPath, "output")
+
+    if Directory.Exists outputPath then
+        Directory.Delete(outputPath, true)
 
 let buildSharedTests () =
     run "dotnet" [ "build" ] ProjectPaths.sharedTestsPath
@@ -12,6 +18,10 @@ let disableUserData () =
     run "npx" [ "office-addin-usage-data"; "off" ] __SOURCE_DIRECTORY__
 
 let Watch () =
+    cleanGeneratedOutput ProjectPaths.clientTestsPath
+    cleanGeneratedOutput ProjectPaths.electronCoreTestsPath
+    cleanGeneratedOutput ProjectPaths.electronRendererTestsPath
+
     [
         runAsync "server" "dotnet" [ "watch"; "run" ] ProjectPaths.serverTestsPath
         // This below will start web ui for tests, but cannot execute due to office-addin-mock
@@ -67,6 +77,10 @@ let Watch () =
     |> runParallel
 
 let WatchJs () =
+    cleanGeneratedOutput ProjectPaths.clientTestsPath
+    cleanGeneratedOutput ProjectPaths.electronCoreTestsPath
+    cleanGeneratedOutput ProjectPaths.electronRendererTestsPath
+
     [
         runAsync
             "client"
@@ -123,6 +137,8 @@ module Run =
     let server = runAsync "server" "dotnet" [ "run" ] ProjectPaths.serverTestsPath
 
     let client =
+        cleanGeneratedOutput ProjectPaths.clientTestsPath
+
         runAsync
             "client"
             "dotnet"
@@ -140,6 +156,8 @@ module Run =
             ProjectPaths.clientTestsPath
 
     let electronCore =
+        cleanGeneratedOutput ProjectPaths.electronCoreTestsPath
+
         runAsync
             "electron-core"
             "dotnet"
@@ -157,6 +175,8 @@ module Run =
             ProjectPaths.electronCoreTestsPath
 
     let electronRenderer =
+        cleanGeneratedOutput ProjectPaths.electronRendererTestsPath
+
         runAsync
             "electron-renderer"
             "dotnet"

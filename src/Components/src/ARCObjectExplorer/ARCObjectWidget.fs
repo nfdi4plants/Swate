@@ -3,7 +3,7 @@ namespace Swate.Components.ARCObjectExplorer
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 open Swate.Components.ARCObjectExplorer.Types
 
 module private ARCObjectWidgetHelper =

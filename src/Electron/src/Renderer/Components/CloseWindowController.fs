@@ -21,10 +21,10 @@ type CloseWindowController =
 
         let modalIsOpen, setModalIsOpen = React.useState false
         let errorModal = ErrorModal.Context.useErrorModalCtx ()
-        let arcScopeId = useCurrentArcScopeId ()
+        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
         let enqueueCloseError (title: string) (saveError: exn) =
-            errorModal.enqueue (ErrorModalRequest.create(saveError.Message, title = title, ?scopeId = arcScopeId))
+            errorModal.enqueue (ErrorModalRequest.create (saveError.Message, title = title, ?scopeId = appStateCtx))
 
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =
             Api.ipcArcVaultApi.resolveCloseRequest decision
@@ -73,10 +73,7 @@ type CloseWindowController =
             requestSaveBeforeQuit = fun () -> setModalIsOpen true
         }
 
-        Renderer.IpcReceiver.useProxyReceiver<IMainSaveBeforeQuitApi> (
-            (fun () -> saveBeforeQuitHandler),
-            [||]
-        )
+        Renderer.IpcReceiver.useProxyReceiver<IMainSaveBeforeQuitApi> ((fun () -> saveBeforeQuitHandler), [||])
 
         BaseModal.Modal(
             isOpen = modalIsOpen,

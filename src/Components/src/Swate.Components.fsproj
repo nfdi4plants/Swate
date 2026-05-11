@@ -93,12 +93,14 @@
     <Compile Include="GenericComponents\Actionbar.fs" />
     <Compile Include="GenericComponents\Navbar.fs" />
     <Compile Include="ARCSelector\Selector.fs" />
+    <Compile Include="ArcVaultActions\ArcVaultActions.fs" />
     <Compile Include="Layout\LeftSidebarContext.fs" />
     <Compile Include="Layout\RightSidebarContext.fs" />
     <Compile Include="Layout\Layout.fs" />
-    <Compile Include="FileExplorer\FileTreeDataStructures.fs" />
+    <Compile Include="FileExplorer\Types.fs" />
     <Compile Include="FileExplorer\FileExplorerGitLfsHelper.fs" />
-    <Compile Include="FileExplorer\FileExplorerBreadcrumbs.fs" />
+    <Compile Include="FileExplorer\Helper.fs" />
+    <Compile Include="FileExplorer\FileExplorerItem.fs" />
     <Compile Include="FileExplorer\FileExplorer.fs" />
     <Compile Include="GitComparison\GitTextComparison.Core.fs" />
     <Compile Include="GitComparison\GitTextComparison.fs" />

@@ -40,11 +40,15 @@ type IArcVaultsApi = {
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
+    openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>
     readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
     /// Persists the active in-memory ARC scaffold to disk.
     saveArcFile: unit -> JS.Promise<Result<unit, exn>>
     /// Applies ARC file changes to the active vault's in-memory ARC without writing to disk.
     setArcFileInMemory: FileContentDTO -> JS.Promise<Result<unit, exn>>
+    /// Stores or clears the currently pending ARC file save draft for the active vault window.
+    setPendingArcFileSave: FileContentDTO option -> JS.Promise<Result<unit, exn>>
+    deletePath: string -> JS.Promise<Result<unit, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: string -> JS.Promise<Result<string, exn>>
