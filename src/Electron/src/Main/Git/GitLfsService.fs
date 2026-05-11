@@ -64,7 +64,7 @@ let private tryDecodeGitLfsLsFileInfo (entry: GitLfsLsFileInfoDto) : GitLfsLsFil
     | _ ->
         None
 
-let private parseLsFilesByRelativePath (stdoutText: string) : Dictionary<string, GitLfsLsFileInfo> =
+let private parseLsFiles (stdoutText: string) : Dictionary<string, GitLfsLsFileInfo> =
     let filesByRelativePath = Dictionary<string, GitLfsLsFileInfo>()
 
     try
@@ -228,7 +228,7 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
                 if String.IsNullOrWhiteSpace stdoutText then
                     return Dictionary<string, GitLfsLsFileInfo>()
                 else
-                    return parseLsFilesByRelativePath stdoutText
+                    return parseLsFiles stdoutText
         with _ ->
             return Dictionary<string, GitLfsLsFileInfo>()
     }
