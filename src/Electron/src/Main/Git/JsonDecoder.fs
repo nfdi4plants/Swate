@@ -1,7 +1,6 @@
 module Main.Git.JsonDecoder
 
 open System
-open System.Collections.Generic
 open Thoth.Json.Core
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
