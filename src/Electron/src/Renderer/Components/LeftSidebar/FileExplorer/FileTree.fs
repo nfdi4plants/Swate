@@ -35,60 +35,6 @@ module private FileTreeHelper =
 open FileTreeHelper
 
 [<Erase; Mangle(false)>]
-type private DeleteConfirmModal =
-
-    [<ReactComponent>]
-    static member Dialog
-        (
-            isOpen: bool,
-            itemName: string option,
-            close: unit -> unit,
-            submit: unit -> unit,
-            ?isDeleting: bool
-        ) =
-
-        let setIsOpen isOpen =
-            if not isOpen then
-                close ()
-
-        let displayName = itemName |> Option.defaultValue "this item"
-        let isDeleting = defaultArg isDeleting false
-
-        let footer =
-            Html.div [
-                prop.className "swt:flex swt:gap-2 swt:justify-end swt:w-full"
-                prop.children [
-                    Html.button [
-                        prop.className "swt:btn swt:btn-ghost"
-                        prop.disabled isDeleting
-                        prop.onClick (fun _ -> close ())
-                        prop.text "Cancel"
-                    ]
-                    Html.button [
-                        prop.className "swt:btn swt:btn-error"
-                        prop.disabled isDeleting
-                        prop.onClick (fun _ -> submit ())
-                        prop.children [
-                            if isDeleting then
-                                Html.span [ prop.text "Deleting..." ]
-                            else
-                                Html.span [ prop.text "Delete" ]
-                        ]
-                    ]
-                ]
-            ]
-
-        BaseModal.Modal(
-            isOpen = isOpen,
-            setIsOpen = setIsOpen,
-            header = Html.text "Delete Item",
-            description = Html.text $"Permanently delete '{displayName}'?",
-            children = Html.none,
-            footer = footer,
-            debug = "arc-delete"
-        )
-
-[<Erase; Mangle(false)>]
 type FileTree =
 
     [<ReactComponent>]
@@ -255,9 +201,8 @@ type FileTree =
         let closeDeleteModal () =
             setPendingDeleteItem None
 
-        let requestDeleteItem (item: FileItem) =
-            if canDeleteItem item then
-                setPendingDeleteItem (Some item)
+        let requestDeleteItem =
+            FileTreeDeleteWorkflow.requestDeleteItem setPendingDeleteItem
 
         let rootPath = fileTree |> Option.map (fun tree -> tree.path)
 
@@ -272,48 +217,20 @@ type FileTree =
         let createFromItem item =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
-        let applyDeleteError (errorMessage: string) =
-            errorModal.enqueue (
-                ErrorModalRequest.create (
-                    errorMessage,
-                    title = "Could not delete item",
-                    ?scopeId = arcScopeId
-                )
-            )
-
         let applyCreateError errorMessage =
             Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState errorMessage
 
         let confirmDeleteItem () =
-            match pendingDeleteItem |> Option.bind tryGetItemRelativePath with
-            | None -> closeDeleteModal ()
-            | Some deletePath when ArcDeletePathRules.isDeletePathAllowed deletePath |> not ->
-                closeDeleteModal ()
-            | Some deletePath ->
-                setIsDeleting true
-
-                promise {
-                    let pendingPath = tryGetArcFilePendingPath pendingArcFileSave
-                    let shouldClearPendingDraft =
-                        FileExplorerDeleteHelper.isPendingPathAffectedByDelete deletePath pendingPath
-
-                    let! deleteResult = Api.ipcArcVaultApi.deletePath deletePath
-
-                    match deleteResult with
-                    | Ok() ->
-                        if shouldClearPendingDraft then
-                            setPendingArcFileSave None
-
-                            match! stagePendingArcFileSave None with
-                            | Ok() -> ()
-                            | Error exn -> applyDeleteError exn.Message
-
-                        closeDeleteModal ()
-                    | Error exn -> applyDeleteError exn.Message
-                }
-                |> Promise.catch (fun exn -> applyDeleteError exn.Message)
-                |> Promise.map (fun _ -> setIsDeleting false)
-                |> Promise.start
+            FileTreeDeleteWorkflow.confirmDeleteItem {
+                pendingDeleteItem = pendingDeleteItem
+                pendingArcFileSave = pendingArcFileSave
+                closeDeleteModal = closeDeleteModal
+                setIsDeleting = setIsDeleting
+                setPendingArcFileSave = setPendingArcFileSave
+                stagePendingArcFileSave = stagePendingArcFileSave
+                enqueueError = errorModal.enqueue
+                arcScopeId = arcScopeId
+            }
 
         let createArcEntry kind (identifier: string) =
             let existingPaths = effectiveFileTree |> Array.map (fun entry -> entry.path)
@@ -354,18 +271,8 @@ type FileTree =
             else
                 []
 
-        let deleteContextMenuItems (item: FileItem) =
-            if canDeleteItem item then
-                [
-                    {
-                        Label = "Delete"
-                        Icon = "swt:fluent--delete-24-regular"
-                        OnClick = fun () -> requestDeleteItem item
-                        Disabled = None
-                    }
-                ]
-            else
-                []
+        let deleteContextMenuItems =
+            FileTreeDeleteWorkflow.deleteContextMenuItems requestDeleteItem
 
         let baseContextMenuItems (item: FileItem) =
             arcCreateContextMenuItems item @ deleteContextMenuItems item
@@ -388,7 +295,7 @@ type FileTree =
             )
 
         let deleteConfirmModal =
-            DeleteConfirmModal.Dialog(
+            FileTreeDelete.ConfirmModal(
                 isOpen = pendingDeleteItem.IsSome,
                 itemName = (pendingDeleteItem |> Option.map _.Name),
                 close = closeDeleteModal,
