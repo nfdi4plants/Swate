@@ -3,7 +3,6 @@ module Main.Git.GitLfsService
 open System
 open System.Collections.Generic
 open Fable.Core
-open Thoth.Json.Core
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
@@ -27,53 +26,6 @@ let mutable private cachedSystemInstalled = false
 
 [<Literal>]
 let private lfsLsFilesTimeoutMs = 15000
-
-let private gitLfsLsFileInfoDecoder : Decoder<GitLfsLsFileInfo option> =
-    Decode.object (fun get ->
-        let name = get.Optional.Field "name" Decode.string
-        let size = get.Optional.Field "size" Decode.float
-        let checkout = get.Optional.Field "checkout" Decode.bool
-        let downloaded = get.Optional.Field "downloaded" Decode.bool
-        let oidType = get.Optional.Field "oid_type" Decode.string
-        let oid = get.Optional.Field "oid" Decode.string
-        let version = get.Optional.Field "version" Decode.string
-
-        match name, size, checkout, downloaded, oidType, oid, version with
-        | Some name, Some size, Some checkout, Some downloaded, Some oidType, Some oid, Some version ->
-            Some {
-                name = PathHelpers.normalizeSeparators name
-                size = size
-                checkout = checkout
-                downloaded = downloaded
-                ``oid_type`` = oidType
-                oid = oid
-                version = version
-            }
-        | _ ->
-            None
-    )
-
-let private lsFilesResponseDecoder : Decoder<GitLfsLsFileInfo[]> =
-    Decode.object (fun get ->
-        get.Optional.Field "files" (Decode.array gitLfsLsFileInfoDecoder)
-        |> Option.defaultValue [||]
-        |> Array.choose id
-    )
-
-let private parseLsFiles (stdoutText: string) : GitLfsLsFileInfo[] =
-    ARCtrl.Json.Decode.fromJsonString lsFilesResponseDecoder stdoutText
-
-let private indexUsingRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<string, GitLfsLsFileInfo> =
-    let filesByRelativePath = Dictionary<string, GitLfsLsFileInfo>()
-
-    files
-    |> Array.iter (fun info ->
-        if not (String.IsNullOrWhiteSpace info.name) then
-            let relativePath = PathHelpers.normalizeSeparators info.name
-            filesByRelativePath.[relativePath] <- { info with name = relativePath }
-    )
-
-    filesByRelativePath
 
 /// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
@@ -219,7 +171,7 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
                 if String.IsNullOrWhiteSpace stdoutText then
                     return Dictionary<string, GitLfsLsFileInfo>()
                 else
-                    return stdoutText |> parseLsFiles |> indexByRelativePath
+                    return stdoutText |> JsonDecoder.parseLsFiles |> JsonDecoder.indexUsingRelativePath
         with _ ->
             return Dictionary<string, GitLfsLsFileInfo>()
     }

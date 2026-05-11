@@ -15,6 +15,7 @@
     <Compile Include="Notes\NoteSearchReader.fs" />
     <Compile Include="SettingsStore.fs" />
     <Compile Include="RecentArcStore.fs" />
+    <Compile Include="Git\JsonDecoder.fs" />
     <Compile Include="Git\GitAuthAdapter.fs" />
     <Compile Include="Git\GitlfsAdapter.fs" />
     <Compile Include="Git\GitLfsService.fs" />
