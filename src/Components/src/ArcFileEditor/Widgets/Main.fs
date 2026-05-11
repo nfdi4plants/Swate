@@ -115,7 +115,13 @@ type Main =
         ]
 
     [<ReactComponent>]
-    static member Widgets(children: ReactElement, buildingBlockWidget: ReactElement, templateWidget: ReactElement) =
+    static member Widgets
+        (
+            children: ReactElement,
+            buildingBlockWidget: ReactElement,
+            templateWidget: ReactElement,
+            filePickerWidget: ReactElement
+        ) =
         let widgets: Map<WidgetType, WidgetDefinition> =
             React.useMemo (
                 (fun () ->
@@ -130,10 +136,19 @@ type Main =
                             prefix = "ADD_TEMPLATE"
                             content = templateWidget
                         |}
+                        WidgetType.FilePicker,
+                        {|
+                            prefix = "FILEPICKER"
+                            content = filePickerWidget
+                        |}
                     ]
                     |> Map.ofList
                 ),
-                [| box buildingBlockWidget; box templateWidget |]
+                [|
+                    box buildingBlockWidget
+                    box templateWidget
+                    box filePickerWidget
+                |]
             )
 
         Widget.WidgetController(widgets, children = children)

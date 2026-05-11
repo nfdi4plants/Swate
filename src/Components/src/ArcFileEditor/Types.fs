@@ -60,6 +60,6 @@ type ArcFileEditorHeaderProps = {
 }
 
 type ArcFileEditorWidgetServices = {
-    filePickerServices: FilePickerWidgetServices
+    filePickerServices: unit -> Fable.Core.JS.Promise<string[]>
     dataAnnotatorServices: DataAnnotatorWidgetServices
 }

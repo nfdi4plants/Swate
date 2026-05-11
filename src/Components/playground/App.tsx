@@ -227,7 +227,7 @@ function ArcFileEditorContainer() {
 
 const App = () => {
     return (
-        <SettingsPage />
+        <ArcFileEditorContainer />
         // <ArcFileEditorContainer />
         // <AuthButtonContainer />
         // <div className="swt:container swt:mx-auto swt:flex swt:flex-col swt:p-2 swt:gap-8 swt:mb-12">

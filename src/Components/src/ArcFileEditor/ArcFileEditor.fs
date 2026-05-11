@@ -22,21 +22,44 @@ type private LazyComponents =
 
     [<ReactLazyComponent>]
     static member LazyDataMap(datamap: DataMap, setDatamap: DataMap -> unit) =
-        DataMapTable.DataMapTable(datamap, setDatamap)
+        DataMapTable.DataMapTable(datamap = datamap, setDatamap = setDatamap)
 
     [<ReactLazyComponent>]
     static member LazyBuildingBlockWidget
         (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
         =
-        Widgets.BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFile)
+        Widgets.BuildingBlockWidget.Main(
+            arcFile = arcFile,
+            activeTableIndex = activeTableIndex,
+            setArcFile = setArcFile
+        )
 
     [<ReactLazyComponent>]
     static member LazyTemplateWidget(arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
-        Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFile)
+        Widgets.TemplateWidget.TemplateWidget(
+            arcFile = arcFile,
+            activeTableIndex = activeTableIndex,
+            setArcFile = setArcFile
+        )
 
     [<ReactLazyComponent>]
-    static member LazyArcFileMetadata(arcFile, setArcFile) =
-        Metadata.ArcFileMetadata.ArcFileMetadata(arcFile, setArcFile)
+    static member LazyFilePickerWidget
+        (
+            arcFile: ArcFiles,
+            activeTableIndex: int option,
+            setArcFile: ArcFiles -> unit,
+            onPickPaths: unit -> Fable.Core.JS.Promise<string[]>
+        ) =
+        Widgets.FilePickerWidget.Main(
+            arcFile = arcFile,
+            activeTableIndex = activeTableIndex,
+            setArcFile = setArcFile,
+            onPickPaths = onPickPaths
+        )
+
+    [<ReactLazyComponent>]
+    static member LazyArcFileMetadata(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
+        Metadata.ArcFileMetadata.ArcFileMetadata(arcFile = arcFile, setArcFile = setArcFile)
 
 [<Erase; Mangle(false)>]
 type Main =
@@ -48,43 +71,8 @@ type Main =
             prop.text text
         ]
 
-    [<ReactComponent>]
-    static member private LazyDataMapView(datamap: DataMap, setDatamap: DataMap -> unit) =
-        React.Suspense(
-            [ LazyComponents.LazyDataMap(datamap, setDatamap) ],
-            fallback = Main.LazyFallback("Loading DataMap view...")
-        )
-
-    [<ReactComponent>]
-    static member private LazyBuildingBlockWidget
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
-        =
-        React.Suspense(
-            [
-                LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile)
-            ],
-            fallback = Main.LazyFallback("Loading building block widget...")
-        )
-
-    [<ReactComponent>]
-    static member private LazyTemplateWidget
-        (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
-        =
-        React.Suspense(
-            [
-                LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile)
-            ],
-            fallback = Main.LazyFallback("Loading template widget...")
-        )
-
-    [<ReactComponent>]
-    static member private LazyArcFileMetadata(arcFileState, setArcFileState) =
-        React.Suspense(
-            [
-                LazyComponents.LazyArcFileMetadata(arcFileState, setArcFileState)
-            ],
-            fallback = Main.LazyFallback("Loading metadata view...")
-        )
+    static member LazyLoaderWithMessage(lazyComponent: ReactElement, message: string) =
+        React.Suspense([ lazyComponent ], fallback = Main.LazyFallback(message))
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private AddRowsFooterView(props: AddRowsFooterViewProps) =
@@ -130,7 +118,11 @@ type Main =
         (activeView: ActiveView, arcFileState: ArcFiles, setArcFileState: ArcFiles -> unit)
         =
         match activeView with
-        | ActiveView.Metadata -> Main.LazyArcFileMetadata(arcFileState, setArcFileState)
+        | ActiveView.Metadata ->
+            Main.LazyLoaderWithMessage(
+                LazyComponents.LazyArcFileMetadata(arcFileState, setArcFileState),
+                "Loading metadata..."
+            )
         | ActiveView.Table index ->
             let tables = arcFileState.Tables()
 
@@ -161,30 +153,42 @@ type Main =
                     assay.DataMap <- Some nextDatamap
                     setArcFileState (ArcFiles.refreshRef arcFileState)
 
-                Main.LazyDataMapView(assay.DataMap.Value, setDatamap)
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyDataMap(assay.DataMap.Value, setDatamap),
+                    "Loading DataMap..."
+                )
             | ArcFiles.Study(study, assays) when study.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     study.DataMap <- Some nextDatamap
                     setArcFileState (ArcFiles.refreshRef (ArcFiles.Study(study, assays)))
 
-                Main.LazyDataMapView(study.DataMap.Value, setDatamap)
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyDataMap(study.DataMap.Value, setDatamap),
+                    "Loading DataMap..."
+                )
             | ArcFiles.Run run when run.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     run.DataMap <- Some nextDatamap
                     setArcFileState (ArcFiles.refreshRef arcFileState)
 
-                Main.LazyDataMapView(run.DataMap.Value, setDatamap)
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyDataMap(run.DataMap.Value, setDatamap),
+                    "Loading DataMap..."
+                )
             | ArcFiles.Workflow workflow when workflow.DataMap.IsSome ->
                 let setDatamap (nextDatamap: DataMap) =
                     workflow.DataMap <- Some nextDatamap
                     setArcFileState (ArcFiles.refreshRef arcFileState)
 
-                Main.LazyDataMapView(workflow.DataMap.Value, setDatamap)
+                Main.LazyLoaderWithMessage(
+                    LazyComponents.LazyDataMap(workflow.DataMap.Value, setDatamap),
+                    "Loading DataMap..."
+                )
             | ArcFiles.DataMap(parent, datamap) ->
                 let setDatamap (nextDatamap: DataMap) =
                     setArcFileState (ArcFiles.DataMap(parent, nextDatamap))
 
-                Main.LazyDataMapView(datamap, setDatamap)
+                Main.LazyLoaderWithMessage(LazyComponents.LazyDataMap(datamap, setDatamap), "Loading DataMap...")
             | _ ->
                 Html.div [
                     prop.className "swt:p-4 swt:text-error"
@@ -244,6 +248,7 @@ type Main =
         (
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
+            pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView
         ) =
@@ -303,8 +308,21 @@ type Main =
         let widgetElements =
             React.useMemo (
                 (fun () -> {|
-                    buildingBlock = Main.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile)
-                    template = Main.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile)
+                    buildingBlock =
+                        Main.LazyLoaderWithMessage(
+                            LazyComponents.LazyBuildingBlockWidget(arcFile, activeTableIndex, setArcFile),
+                            "Loading Building Block Widget..."
+                        )
+                    template =
+                        Main.LazyLoaderWithMessage(
+                            LazyComponents.LazyTemplateWidget(arcFile, activeTableIndex, setArcFile),
+                            "Loading Template Widget..."
+                        )
+                    filePicker =
+                        Main.LazyLoaderWithMessage(
+                            LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, setArcFile, pickPaths),
+                            "Loading File Picker Widget..."
+                        )
                 |}),
                 [| box arcFile; box activeTableIndex; box setArcFile |]
             )
@@ -354,7 +372,8 @@ type Main =
             Swate.Components.ArcFileEditor.Widgets.Main.Widgets(
                 content,
                 widgetElements.buildingBlock,
-                widgetElements.template
+                widgetElements.template,
+                widgetElements.filePicker
             )
         )
 
@@ -441,11 +460,19 @@ type Main =
                 prop.text ("Column count: " + firstTableColumnCount)
             ]
 
+        let pickPathsMockFn () = promise {
+            return [|
+                yield "myImage.png"
+                yield "README.md"
+                for i in 0..40 -> (sprintf "Path %d" i)
+            |]
+        }
+
 
         Template.TemplateCacheProvider.TemplateCacheProvider(
             loadTemplates,
             React.Fragment [
                 ColumnCountTestDisplay()
-                Main.ArcFileEditor(arcFile, setArcFile, startingActiveView = ActiveView.Table 0)
+                Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
             ]
         )
