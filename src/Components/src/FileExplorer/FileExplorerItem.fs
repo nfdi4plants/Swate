@@ -34,6 +34,32 @@ type FileExplorerItem =
             Html.none
 
     [<ReactComponent>]
+    static member private DeleteItemButton
+        (item: FileItem, onDeleteItem: (FileItem -> unit) option, canDeleteItem: FileItem -> bool)
+        =
+        let handleDeleteItem (ev: Browser.Types.MouseEvent) =
+            ev.preventDefault ()
+            ev.stopPropagation ()
+            onDeleteItem |> Option.iter (fun fn -> fn item)
+
+        if canDeleteItem item && onDeleteItem.IsSome then
+            Html.button [
+                prop.type'.button
+                prop.className
+                    "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:text-error swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
+                prop.ariaLabel $"Delete {item.Name}"
+                prop.title $"Delete {item.Name}"
+                prop.onClick handleDeleteItem
+                prop.children [
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--delete-24-regular swt:size-4"
+                    ]
+                ]
+            ]
+        else
+            Html.none
+
+    [<ReactComponent>]
     static member private LFSStatusPill (item: FileItem) =
         let isDownloaded = item.Downloaded = Some true
 
@@ -124,10 +150,14 @@ type FileExplorerItem =
             onDirectoryArrowToggle: Browser.Types.MouseEvent -> unit,
             ?onCreateItem: FileItem -> unit,
             ?canCreateItem: FileItem -> bool,
+            ?onDeleteItem: FileItem -> unit,
+            ?canDeleteItem: FileItem -> bool,
             ?children: ReactElement
         ) =
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
+        let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let canCreateFromDirectory = canCreateItem item && onCreateItem.IsSome
+        let canDeleteFromDirectory = canDeleteItem item && onDeleteItem.IsSome
 
         let directoryToggleIconClass =
             if isExpanded then
@@ -179,7 +209,10 @@ type FileExplorerItem =
                                     ]
                                 ]
 
-                                if item.IsLFS = Some true || canExpandDirectory || canCreateFromDirectory then
+                                if item.IsLFS = Some true
+                                   || canExpandDirectory
+                                   || canCreateFromDirectory
+                                   || canDeleteFromDirectory then
                                     Html.div [
                                         prop.className "swt:ml-auto swt:shrink-0 swt:flex swt:items-center swt:gap-2"
                                         prop.children [
@@ -187,6 +220,12 @@ type FileExplorerItem =
                                                 item,
                                                 onCreateItem,
                                                 canCreateItem
+                                            )
+
+                                            FileExplorerItem.DeleteItemButton (
+                                                item,
+                                                onDeleteItem,
+                                                canDeleteItem
                                             )
 
                                             if item.IsLFS = Some true then
@@ -239,22 +278,30 @@ type FileExplorerItem =
             rowHighlightClass: string,
             selectedNameClass: string,
             getItemIconClass: FileItem -> string option,
-            onSelect: unit -> unit
+            onSelect: unit -> unit,
+            ?onDeleteItem: FileItem -> unit,
+            ?canDeleteItem: FileItem -> bool
         ) =
+        let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
+        let canDeleteFromFile = canDeleteItem item && onDeleteItem.IsSome
+
         Html.li [
             prop.key item.Id
             prop.custom ("data-file-item-id", item.Id)
             prop.children [
-                Html.a [
+                Html.div [
                     prop.custom ("data-file-item-id", item.Id)
                     prop.className [
                         "swt:group swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between swt:cursor-default"
                         rowHighlightClass
                     ]
-                    prop.onClick (fun _ -> onSelect ())
                     prop.children [
-                        Html.div [
-                            prop.className "swt:flex swt:items-center swt:gap-2"
+                        Html.button [
+                            prop.type'.button
+                            prop.custom ("data-file-item-id", item.Id)
+                            prop.className
+                                "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:bg-transparent swt:border-0 swt:p-0 swt:text-left swt:cursor-default"
+                            prop.onClick (fun _ -> onSelect ())
                             prop.children [
                                 Html.i [
                                     prop.className (
@@ -271,10 +318,19 @@ type FileExplorerItem =
                             ]
                         ]
 
-                        if item.IsLFS = Some true then
+                        if item.IsLFS = Some true || canDeleteFromFile then
                             Html.div [
-                                prop.className "swt:flex swt:items-center"
-                                prop.children [ FileExplorerItem.LFSStatusPill item ]
+                                prop.className "swt:flex swt:items-center swt:gap-2"
+                                prop.children [
+                                    FileExplorerItem.DeleteItemButton (
+                                        item,
+                                        onDeleteItem,
+                                        canDeleteItem
+                                    )
+
+                                    if item.IsLFS = Some true then
+                                        FileExplorerItem.LFSStatusPill item
+                                ]
                             ]
                     ]
                 ]

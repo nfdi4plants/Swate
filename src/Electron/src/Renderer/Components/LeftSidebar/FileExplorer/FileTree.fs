@@ -1,6 +1,7 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.ARCHelper
+open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
 open Swate.Components.ErrorModal
 open Swate.Components.FileExplorer.Types
@@ -55,6 +56,8 @@ type FileTree =
             React.useState<ArcExplorerNodeKind option> None
 
         let pendingArcFileSave, setPendingArcFileSave = React.useState<ArcFiles option> None
+        let pendingDeleteItem, setPendingDeleteItem = React.useState<FileItem option> None
+        let isDeleting, setIsDeleting = React.useState false
 
         let effectiveFileTree =
             React.useMemo (
@@ -64,6 +67,25 @@ type FileTree =
                     box pendingArcFileSave
                 |]
             )
+
+        React.useEffect (
+            (fun () ->
+                let filePaths =
+                    effectiveFileTree
+                    |> Array.map (fun entry -> entry.path)
+
+                if FileExplorerDeleteHelper.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath then
+                    fileStateCtx.setSelection ArcSelection.empty
+
+                    if FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval pageStateCtx.state then
+                        pageStateCtx.setState None
+            ),
+            [|
+                box effectiveFileTree
+                box fileStateCtx.state.Selection.TreePath
+                box pageStateCtx.state
+            |]
+        )
 
         let fileTree =
             React.useMemo (
@@ -126,7 +148,7 @@ type FileTree =
                 | Some path when item.IsDirectory ->
                     if not item.IsExpanded then
                         setLoadedDirectoryPaths (fun current ->
-                            let normalizedPath = normalizePath path
+                            let normalizedPath = PathHelpers.normalizePath path
 
                             if current.Contains normalizedPath then
                                 current
@@ -134,11 +156,11 @@ type FileTree =
                                 current.Add normalizedPath
                         )
 
-                    let selectedPath = normalizePath path
+                    let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
                     pageStateCtx.setState None
                 | Some path ->
-                    let selectedPath = normalizePath path
+                    let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                     match tryFindPendingArcFileByPath selectedPath pendingArcFileSave with
@@ -163,7 +185,7 @@ type FileTree =
                 match item.Path with
                 | Some path ->
                     setLoadedDirectoryPaths (fun current ->
-                        let normalizedPath = normalizePath path
+                        let normalizedPath = PathHelpers.normalizePath path
 
                         if current.Contains normalizedPath then
                             current
@@ -175,6 +197,12 @@ type FileTree =
         let closeCreateModal () = setPendingCreateKind None
 
         let openCreateModal kind = setPendingCreateKind (Some kind)
+
+        let closeDeleteModal () =
+            setPendingDeleteItem None
+
+        let requestDeleteItem =
+            FileTreeDeleteWorkflow.requestDeleteItem setPendingDeleteItem
 
         let rootPath = fileTree |> Option.map (fun tree -> tree.path)
 
@@ -191,6 +219,18 @@ type FileTree =
 
         let applyCreateError errorMessage =
             Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState errorMessage
+
+        let confirmDeleteItem () =
+            FileTreeDeleteWorkflow.confirmDeleteItem {
+                pendingDeleteItem = pendingDeleteItem
+                pendingArcFileSave = pendingArcFileSave
+                closeDeleteModal = closeDeleteModal
+                setIsDeleting = setIsDeleting
+                setPendingArcFileSave = setPendingArcFileSave
+                stagePendingArcFileSave = stagePendingArcFileSave
+                enqueueError = errorModal.enqueue
+                arcScopeId = arcScopeId
+            }
 
         let createArcEntry kind (identifier: string) =
             let existingPaths = effectiveFileTree |> Array.map (fun entry -> entry.path)
@@ -231,11 +271,17 @@ type FileTree =
             else
                 []
 
+        let deleteContextMenuItems =
+            FileTreeDeleteWorkflow.deleteContextMenuItems requestDeleteItem
+
+        let baseContextMenuItems (item: FileItem) =
+            arcCreateContextMenuItems item @ deleteContextMenuItems item
+
         let createContextMenuItems =
             Renderer.Components.FileExplorerLfs.createContextMenuItems
                 errorModal.enqueue
                 arcScopeId
-                arcCreateContextMenuItems
+                baseContextMenuItems
 
         let activeCreateKind =
             pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
@@ -246,6 +292,15 @@ type FileTree =
                 kind = activeCreateKind,
                 close = closeCreateModal,
                 submit = createArcEntry
+            )
+
+        let deleteConfirmModal =
+            FileTreeDelete.ConfirmModal(
+                isOpen = pendingDeleteItem.IsSome,
+                itemName = (pendingDeleteItem |> Option.map _.Name),
+                close = closeDeleteModal,
+                submit = confirmDeleteItem,
+                isDeleting = isDeleting
             )
 
         match fileItem with
@@ -263,11 +318,19 @@ type FileTree =
                             onContextMenu = createContextMenuItems,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
+                            canDeleteItem = canDeleteItem,
+                            onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             showBreadcrumbs = false
                         )
                     ]
                 ]
                 arcCreateModal
+                deleteConfirmModal
             ]
-        | None -> React.Fragment [ FileTree.EmptyFileTreePlaceholder(); arcCreateModal ]
+        | None ->
+            React.Fragment [
+                FileTree.EmptyFileTreePlaceholder()
+                arcCreateModal
+                deleteConfirmModal
+            ]

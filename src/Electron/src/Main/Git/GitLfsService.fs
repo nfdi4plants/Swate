@@ -4,6 +4,7 @@ open System
 open System.Collections.Generic
 open Fable.Core
 open Fable.Core.JsInterop
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
@@ -52,7 +53,7 @@ let private tryDecodeGitLfsLsFileInfo (entry: GitLfsLsFileInfoDto) : GitLfsLsFil
     with
     | Some name, Some size, Some checkout, Some downloaded, Some oidType, Some oid, Some version ->
         Some {
-            name = normalizeSeparators name
+            name = PathHelpers.normalizeSeparators name
             size = size
             checkout = checkout
             downloaded = downloaded
@@ -74,7 +75,7 @@ let private parseLsFilesByRelativePath (stdoutText: string) : Dictionary<string,
         |> Array.iter (fun fileEntry ->
             match tryDecodeGitLfsLsFileInfo fileEntry with
             | Some info when not (String.IsNullOrWhiteSpace info.name) ->
-                let relativePath = normalizeSeparators info.name
+                let relativePath = PathHelpers.normalizeSeparators info.name
                 filesByRelativePath.[relativePath] <- { info with name = relativePath }
             | _ -> ()
         )
@@ -203,7 +204,7 @@ let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
 /// Fail-open behavior: command or parse failures yield an empty dictionary.
 let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<string, GitLfsLsFileInfo>> =
     promise {
-        let normalizedRepoRoot = normalizePath repoRoot
+        let normalizedRepoRoot = PathHelpers.normalizePath repoRoot
 
         try
             let! commandResult =
@@ -243,7 +244,7 @@ let withFileEntryLfsMetadata
     else
         match tryGetRepoRelativePath repoRoot entry.path with
         | Some relativePath ->
-            let normalizedRelativePath = normalizeSeparators relativePath
+            let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
 
             match lfsFilesByRelativePath.TryGetValue(normalizedRelativePath) with
             | true, lfsInfo -> { entry with lfs = Some lfsInfo }

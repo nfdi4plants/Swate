@@ -1,25 +1,23 @@
 module Renderer.Components.LeftSidebar.FileExplorer.Helper
 
-open Renderer.Components.ARCHelper
 open Swate.Components
-open Swate.Components.ErrorModal
 open Swate.Components.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
-open Feliz
-open Fable.Core
-open Fable.Core.JsInterop
 open ARCtrl
 open Types
 
 
 let tryGetArcFileRelativePath (arcFile: ArcFiles) =
-    arcFile.TryGetRelativePath() |> Option.map normalizePath
+    arcFile.TryGetRelativePath() |> Option.map PathHelpers.normalizePath
+
+let tryGetArcFilePendingPath (pendingArcFile: ArcFiles option) =
+    pendingArcFile |> Option.bind tryGetArcFileRelativePath
 
 let tryPendingArcFileEntry (arcFile: ArcFiles) =
     tryGetArcFileRelativePath arcFile
-    |> Option.map (fun path -> FileEntry.create (getFileName path, path, false))
+    |> Option.map (fun path -> FileEntry.create (PathHelpers.getFileName path, path, false))
 
 let withPendingArcFileEntry (fileTree: FileEntry[]) (pendingArcFile: ArcFiles option) =
     match pendingArcFile |> Option.bind tryPendingArcFileEntry with
@@ -38,12 +36,21 @@ let tryFindPendingArcFileByPath (path: string) (pendingArcFile: ArcFiles option)
         |> Option.exists (fun pendingPath -> PathHelpers.pathsEqual pendingPath path)
     )
 
+let tryGetItemRelativePath (item: FileItem) =
+    item.Path
+    |> Option.map PathHelpers.normalizeRelativePath
+    |> Option.map PathHelpers.normalizePath
+
+let canDeleteItem (item: FileItem) =
+    tryGetItemRelativePath item
+    |> Option.exists ArcDeletePathRules.isDeletePathAllowed
+
 let rec private collectSelectedDirectoryPathChain
     (selectedTreeItemPath: string option)
     (node: FileTreeNode)
     (loadedPaths: Set<string>)
     =
-    let normalizedNodePath = normalizePath node.path
+    let normalizedNodePath = PathHelpers.normalizePath node.path
 
     let isInSelectedPathChain =
         selectedTreeItemPath
@@ -66,7 +73,7 @@ let rec private collectSelectedDirectoryPathChain
 let requiredLoadedDirectoryPaths (selectedTreeItemPath: string option) (root: FileTreeNode) =
     let rootPathSet =
         if root.isDirectory then
-            Set.singleton (normalizePath root.path)
+            Set.singleton (PathHelpers.normalizePath root.path)
         else
             Set.empty
 
@@ -75,7 +82,7 @@ let requiredLoadedDirectoryPaths (selectedTreeItemPath: string option) (root: Fi
 let rec loopPaths (loadedDirectoryPaths: Set<string>) (selectedTreeItemPath: string option) (parent: FileTreeNode) =
     match parent.isDirectory with
     | true ->
-        let normalizedParentPath = normalizePath parent.path
+        let normalizedParentPath = PathHelpers.normalizePath parent.path
         let isDirectoryLoaded = loadedDirectoryPaths.Contains normalizedParentPath
         let hasSourceChildren = parent.children.Count > 0
 
@@ -197,11 +204,11 @@ let tryBuildArcCreateDraft kind (identifier: string) (existingPaths: string seq)
             match FileContentDTO.fromArcFile arcFile with
             | None -> Error $"Creating {label} files is not supported in Electron yet."
             | Some request ->
-                let requestedPath = normalizePath request.path
+                let requestedPath = PathHelpers.normalizePath request.path
 
                 let alreadyExists =
                     existingPaths
-                    |> Seq.exists (fun path -> PathHelpers.pathsEqual (normalizePath path) requestedPath)
+                    |> Seq.exists (fun path -> PathHelpers.pathsEqual (PathHelpers.normalizePath path) requestedPath)
 
                 if alreadyExists then
                     Error $"{label} '{identifier}' already exists."

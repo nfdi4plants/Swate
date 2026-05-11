@@ -1,6 +1,7 @@
 module ElectronCore.FileTreeCompactionTests
 
 open System.Collections.Generic
+module FileTreeCreator = Main.FileTreeCreator
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
@@ -116,4 +117,33 @@ Vitest.describe("FileIOHelper.toFileTreeNode LFS metadata", fun () ->
         let rootNode = toFileTreeNode [| rootEntry |]
 
         Vitest.expect(rootNode.lfs).toEqual(Some lfsInfo))
+)
+
+Vitest.describe("FileTreeCreator.removePathAndDescendants", fun () ->
+    let createFileEntry path isDirectory = {
+        name =
+            path
+            |> Swate.Components.Shared.PathHelpers.normalizePath
+            |> Swate.Components.Shared.PathHelpers.getFileName
+        isDirectory = isDirectory
+        path = path
+        lfs = None
+    }
+
+    Vitest.test("removes only the target path and descendants", fun () ->
+        let tree = Dictionary<string, FileEntry>()
+        tree.Add("C:/arc", createFileEntry "C:/arc" true)
+        tree.Add("C:/arc/assays", createFileEntry "C:/arc/assays" true)
+        tree.Add("C:/arc/assays/A", createFileEntry "C:/arc/assays/A" true)
+        tree.Add("C:/arc/assays/A/isa.assay.xlsx", createFileEntry "C:/arc/assays/A/isa.assay.xlsx" false)
+        tree.Add("C:/arc/assays/AB", createFileEntry "C:/arc/assays/AB" true)
+        tree.Add("C:/arc/assays/AB/isa.assay.xlsx", createFileEntry "C:/arc/assays/AB/isa.assay.xlsx" false)
+
+        let updatedTree = FileTreeCreator.removePathAndDescendants "C:/arc/assays/A" tree
+
+        Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A")).toBe(false)
+        Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/A/isa.assay.xlsx")).toBe(false)
+        Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB")).toBe(true)
+        Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe(true)
+    )
 )

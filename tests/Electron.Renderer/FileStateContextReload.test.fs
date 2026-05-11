@@ -5,7 +5,10 @@ open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Renderer.Components.FileExplorerDeleteHelper
 open Renderer.Context.FileStateContext
+open Renderer.Types
+open ARCtrl
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
@@ -114,4 +117,32 @@ Vitest.describe("FileStateContext reload hydration", fun () ->
                 container.remove ()
                 clearBridgeProperty name
         })
+)
+
+Vitest.describe("FileExplorer delete helpers", fun () ->
+    Vitest.test("isSelectionMissing detects removed selections after file-tree updates", fun () ->
+        let remainingPaths = [| ""; "assays"; "assays/assay-a/isa.assay.xlsx" |]
+
+        Vitest.expect(FileExplorerDeleteHelper.isSelectionMissing remainingPaths (Some "assays/assay-b/isa.assay.xlsx")).toBe(true)
+        Vitest.expect(FileExplorerDeleteHelper.isSelectionMissing remainingPaths (Some "assays/assay-a/isa.assay.xlsx")).toBe(false)
+    )
+
+    Vitest.test("shouldResetPageStateAfterSelectionRemoval only resets file-preview states", fun () ->
+        let workflowArcFile =
+            ArcWorkflow.init "DeletePreviewWorkflow"
+            |> Swate.Components.Shared.ARCtrlHelper.ArcFiles.Workflow
+
+        Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some(PageState.ArcFilePage workflowArcFile))).toBe(true)
+        Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some(PageState.TextPage "txt"))).toBe(true)
+        Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some PageState.UnknownPage)).toBe(true)
+        Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some(PageState.ErrorPage "err"))).toBe(true)
+        Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some PageState.NotesDraftPage)).toBe(false)
+        Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval None).toBe(false)
+    )
+
+    Vitest.test("isPendingPathAffectedByDelete only clears pending drafts inside deleted targets", fun () ->
+        Vitest.expect(FileExplorerDeleteHelper.isPendingPathAffectedByDelete "assays/AssayA" (Some "assays/AssayA/isa.assay.xlsx")).toBe(true)
+        Vitest.expect(FileExplorerDeleteHelper.isPendingPathAffectedByDelete "assays/AssayA" (Some "assays/AssayB/isa.assay.xlsx")).toBe(false)
+        Vitest.expect(FileExplorerDeleteHelper.isPendingPathAffectedByDelete "assays/AssayA" None).toBe(false)
+    )
 )

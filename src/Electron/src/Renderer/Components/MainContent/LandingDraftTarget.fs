@@ -19,7 +19,7 @@ let LandingDraftTarget () =
         fun (payload: SubmitPayload) ->
 
             let finishSuccess (response: FileContentDTO) =
-                let selectedPath = normalizePath response.path
+                let selectedPath = PathHelpers.normalizePath response.path
 
                 fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 

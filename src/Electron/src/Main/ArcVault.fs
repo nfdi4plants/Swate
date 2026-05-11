@@ -149,27 +149,15 @@ module ArcVaultExtensions =
                                     | name when name = Chokidar.Events.Unlink.ToString() ->
                                         let newPath = pathUpdater path
 
-                                        if this.path.IsSome && this.fileTree.ContainsKey(newPath) then
-                                            let newFileTree = this.fileTree
-                                            newFileTree.Remove(newPath) |> ignore
-                                            this.SetFileTree(newFileTree)
+                                        if this.path.IsSome then
+                                            let nextFileTree = removePathAndDescendants newPath this.fileTree
+                                            this.SetFileTree(nextFileTree)
                                     | name when name = Chokidar.Events.UnlinkDir.ToString() ->
                                         let newPath = pathUpdater path
 
-                                        if this.path.IsSome && this.fileTree.ContainsKey(newPath) then
-                                            let newFileTree = this.fileTree
-
-                                            let affectedPaths =
-                                                this.fileTree.Keys
-                                                |> Array.ofSeq
-                                                |> Array.filter (fun path -> path.Contains(newPath))
-
-                                            newFileTree.Remove(newPath) |> ignore
-
-                                            affectedPaths
-                                            |> Array.iter (fun path -> newFileTree.Remove(path) |> ignore)
-
-                                            this.SetFileTree(newFileTree)
+                                        if this.path.IsSome then
+                                            let nextFileTree = removePathAndDescendants newPath this.fileTree
+                                            this.SetFileTree(nextFileTree)
                                     | _ ->
                                         if this.path.IsSome then
                                             let! fileEntries = getFileEntries this.path.Value
@@ -198,7 +186,7 @@ module ArcVaultExtensions =
                     Error e2
         }
 
-        member private this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
+        member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <- fileTree
 
             let sendMsg =

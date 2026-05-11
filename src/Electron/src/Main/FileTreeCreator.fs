@@ -5,6 +5,7 @@ open System
 open System.Collections.Generic
 open Fable.Core.JsInterop
 open Main.Git.GitLfsService
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 
@@ -12,12 +13,12 @@ let fs: obj = importAll "fs"
 let pathMod: obj = importAll "path"
 
 let normalizeRootPath (path: string) =
-    pathMod?resolve (path) |> unbox<string> |> normalizePath
+    pathMod?resolve (path) |> unbox<string> |> PathHelpers.normalizePath
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
 let private shouldIgnorePath (path: string) =
-    let normalizedPath = normalizeSeparators path
+    let normalizedPath = PathHelpers.normalizeSeparators path
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
 
@@ -33,6 +34,22 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
     )
 
     rendererFileTree
+
+/// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
+let removePathAndDescendants (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
+    let normalizedTargetPath = PathHelpers.normalizePath targetPath
+    let nextTree = Dictionary<string, FileEntry>(fileTree)
+
+    if String.IsNullOrWhiteSpace normalizedTargetPath then
+        nextTree
+    else
+        let keysToRemove =
+            nextTree.Keys
+            |> Seq.filter (fun path -> isSameOrDescendantPath path normalizedTargetPath)
+            |> Seq.toArray
+
+        keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+        nextTree
 
 let getFileEntry (path: string) = promise {
     let! stats = fs?promises?stat (path)
@@ -84,11 +101,11 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
 
                 if isDir then
                     if not (shouldIgnoreDirName name) then
-                        let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> normalizeSeparators
+                        let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> PathHelpers.normalizeSeparators
                         entries.Add(FileEntry.create (name, fullPath, true, None))
                         stack.Add(fullPath)
                 else
-                    let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> normalizeSeparators
+                    let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> PathHelpers.normalizeSeparators
 
                     if not (shouldIgnorePath fullPath) then
                         entries.Add(FileEntry.create (name, fullPath, false, None))

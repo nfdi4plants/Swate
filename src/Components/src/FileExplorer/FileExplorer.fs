@@ -78,7 +78,11 @@ module private FileExplorerHelper =
 
     let toComponentMenuItem (item: Swate.Components.FileExplorer.Types.ContextMenuItem) =
         let isDisabled = defaultArg item.Disabled false
-        let className = if isDisabled then "swt:opacity-50" else ""
+        let className =
+            if isDisabled then
+                "swt:opacity-50"
+            else
+                ""
 
         Swate.Components.ContextMenuItem(
             text = Html.span [ prop.className className; prop.text item.Label ],
@@ -110,6 +114,8 @@ type FileExplorer =
             ?onContextMenu: FileItem -> Swate.Components.FileExplorer.Types.ContextMenuItem list,
             ?canCreateItem: FileItem -> bool,
             ?onCreateItem: FileItem -> unit,
+            ?canDeleteItem: FileItem -> bool,
+            ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
             ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
@@ -125,6 +131,7 @@ type FileExplorer =
         let showBreadcrumbs = defaultArg showBreadcrumbs true
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
+        let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
 
@@ -246,6 +253,8 @@ type FileExplorer =
                     ),
                     ?onCreateItem = onCreateItem,
                     canCreateItem = canCreateItem,
+                    ?onDeleteItem = onDeleteItem,
+                    canDeleteItem = canDeleteItem,
                     ?children = childrenTree
                 )
             else
@@ -254,7 +263,9 @@ type FileExplorer =
                     rowHighlightClass,
                     selectedNameClass,
                     getItemIconClass,
-                    (fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch)
+                    (fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch),
+                    ?onDeleteItem = onDeleteItem,
+                    canDeleteItem = canDeleteItem
                 )
 
         Html.div [
@@ -334,13 +345,13 @@ module FileExplorerExample =
         let handleContextMenu (item: FileItem) = [
             {
                 Label = "Rename"
-                Icon = "edit"
+                Icon = "swt:fluent--rename-24-regular"
                 OnClick = fun () -> Browser.Dom.console.log ("Rename", item.Name)
                 Disabled = None
             }
             {
                 Label = "Delete"
-                Icon = "delete"
+                Icon = "swt:fluent--delete-24-regular"
                 OnClick = fun () -> Browser.Dom.console.log ("Delete", item.Name)
                 Disabled = None
             }
