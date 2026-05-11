@@ -326,14 +326,21 @@ type FilePickerWidget =
         )
 
     [<ReactComponent>]
-    static member private ActionButtons(clearPaths: unit -> unit, insertPaths: unit -> unit, canInsert: bool) =
+    static member private ActionButtons
+        (pickPaths, clearPaths: unit -> unit, insertPaths: unit -> unit, canInsert: bool)
+        =
         Html.div [
-            prop.className "swt:flex swt:gap-2"
+            prop.className "swt:flex swt:gap-2 swt:w-full"
             prop.children [
                 Html.button [
                     prop.className "swt:btn swt:btn-outline"
                     prop.text "Cancel"
                     prop.onClick (fun _ -> clearPaths ())
+                ]
+                Html.button [
+                    prop.className "swt:btn swt:btn-neutral"
+                    prop.text "Pick more files"
+                    prop.onClick (fun _ -> pickPaths ())
                 ]
                 Html.button [
                     prop.className "swt:btn swt:btn-primary swt:ml-auto"
@@ -409,7 +416,7 @@ type FilePickerWidget =
             FilePickerWidgetHelper.insertPaths arcFile setArcFile activeTableIndex paths selectedCells
 
         Html.div [
-            prop.className "swt:flex swt:flex-col swt:gap-2"
+            prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-sm"
             prop.children [
                 if isLoading then
                     Components.LoadingSpinner("Loading Paths...", DaisyuiSize.LG)
@@ -418,8 +425,14 @@ type FilePickerWidget =
 
                     FilePickerWidget.FilePathViewer(paths, setPaths)
 
-                    FilePickerWidget.ActionButtons(clearPaths, insertPaths, canInsert)
+                    FilePickerWidget.ActionButtons(pickPaths, clearPaths, insertPaths, canInsert)
                 else
+                    Html.span [
+                        prop.className "swt:text-sm swt:opacity-70 swt:p-4 swt:text-center"
+                        prop.text
+                            "No file paths selected. Click the button below to pick files and insert their paths into your table."
+                    ]
+
                     FilePickerWidget.PickFilePathsButtons(pickPaths)
             ]
         ]
