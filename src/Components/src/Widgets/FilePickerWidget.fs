@@ -115,7 +115,7 @@ type FilePickerWidget =
             ]
         ]
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private SortableTableRow
         (index: int, path: string, movePath: int -> int -> unit, removePath: int -> unit)
         =
@@ -185,11 +185,17 @@ type FilePickerWidget =
         ]
 
     /// TODO: Virtualize paths
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member Table(paths: string[], setPaths: (string[] -> string[]) -> unit) =
 
-        let movePath = FilePickerWidgetHelper.movePath setPaths
-        let removePath = FilePickerWidgetHelper.removePath setPaths
+        let movePath =
+            React.useCallback (
+                (fun current next -> FilePickerWidgetHelper.movePath setPaths current next),
+                [| box setPaths |]
+            )
+
+        let removePath =
+            React.useCallback ((fun id -> FilePickerWidgetHelper.removePath setPaths id), [| box setPaths |])
 
         Html.div [
             prop.className
@@ -226,7 +232,7 @@ type FilePickerWidget =
             prop.children [ Icons.Delete(); Html.span "Drop row here to remove" ]
         ]
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member SortPathsButtons(setPaths: (string[] -> string[]) -> unit) =
 
         let sortAscending = FilePickerWidgetHelper.sortAscending setPaths
@@ -252,8 +258,15 @@ type FilePickerWidget =
     [<ReactComponent>]
     static member private FilePathViewer(paths: string[], setPaths: (string[] -> string[]) -> unit) =
 
-        let movePathById = FilePickerWidgetHelper.movePathById setPaths
-        let removePathById = FilePickerWidgetHelper.removePathById setPaths
+        let movePathById =
+            React.useCallback (
+                (fun current next -> FilePickerWidgetHelper.movePathById setPaths current next),
+                [| box setPaths |]
+            )
+
+        let removePathById =
+            React.useCallback ((fun id -> FilePickerWidgetHelper.removePathById setPaths id), [| box setPaths |])
+
         let isDragging, setIsDragging = React.useState false
 
         let pointerSensor =
@@ -285,7 +298,7 @@ type FilePickerWidget =
                 elif activeId <> overId then
                     movePathById activeId overId
 
-        let itemIds = ResizeArray paths
+        let itemIds = React.useMemo ((fun () -> ResizeArray paths), [| box paths |])
 
         DndKit.DndContext(
             sensors = sensors,
