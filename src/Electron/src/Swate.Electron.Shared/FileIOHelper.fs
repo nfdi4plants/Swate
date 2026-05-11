@@ -250,7 +250,6 @@ module DTOType =
 [<RequireQualifiedAccess>]
 module FileContentDTO =
 
-    open FileIOTypes
     open ARCtrl.Helper
     open ARCtrl.Contract
     open ARCtrl.ArcPathHelper
@@ -262,6 +261,16 @@ module FileContentDTO =
         content = content
         path = path
     |}
+
+    let normalizeArcFileRequestPath (request: FileContentDTO) : FileContentDTO =
+        let normalizedPath = PathHelpers.normalizePath request.path
+
+        if normalizedPath = request.path then
+            request
+        else
+            {| request with
+                path = normalizedPath
+            |}
 
     let toArcFile (dto: FileContentDTO) : ArcFiles option =
 
@@ -292,8 +301,6 @@ module FileContentDTO =
 
     let fromArcFile (arcFile: ArcFiles) : FileContentDTO option =
         let exportFormat = JsonExportFormat.ARCtrl
-
-        let path = tryGetArcFilePath (None) arcFile
 
         let dtoTypeOpt =
             match arcFile with
