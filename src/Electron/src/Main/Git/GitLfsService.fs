@@ -171,7 +171,17 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
                 if String.IsNullOrWhiteSpace stdoutText then
                     return Dictionary<string, GitLfsLsFileInfo>()
                 else
-                    return stdoutText |> JsonDecoder.parseLsFiles |> JsonDecoder.indexUsingRelativePath
+                    try
+                        return stdoutText |> JsonDecoder.parseLsFiles |> JsonDecoder.indexUsingRelativePath
+                    with parseError ->
+                        let reason =
+                            if String.IsNullOrWhiteSpace parseError.Message then
+                                "Unknown decoding error."
+                            else
+                                parseError.Message
+
+                        Browser.Dom.console.warn $"Git LFS ls-files parse warning: {reason}"
+                        return Dictionary<string, GitLfsLsFileInfo>()
         with _ ->
             return Dictionary<string, GitLfsLsFileInfo>()
     }
