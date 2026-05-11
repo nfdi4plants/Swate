@@ -12,7 +12,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       # add PR to project if it is a depdendabot PR
-      - uses: actions/add-to-project@v1.0.2
+      - uses: actions/add-to-project@v2.0.0
         if: ${{ contains(github.event.pull_request.labels.*.name, 'dependencies') }}
         with:
           # You can target a project in a different organization
