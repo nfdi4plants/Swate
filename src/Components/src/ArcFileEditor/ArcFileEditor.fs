@@ -324,7 +324,12 @@ type Main =
                             "Loading File Picker Widget..."
                         )
                 |}),
-                [| box arcFile; box activeTableIndex; box setArcFile |]
+                [|
+                    box arcFile
+                    box activeTableIndex
+                    box setArcFile
+                    pickPaths
+                |]
             )
 
         /// ArcFiles type is too complex for react. Therefore we check hashcode instead and compare that.

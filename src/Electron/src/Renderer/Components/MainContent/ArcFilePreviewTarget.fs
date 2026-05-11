@@ -49,16 +49,20 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             |> Promise.start
 
     let pickFilePaths =
-        fun () -> promise {
-            match! Api.ipcArcVaultApi.pickArcPaths () with
-            | Ok paths -> return paths
-            | Error exn ->
-                errorModal.enqueue (
-                    ErrorModalRequest.create (exn.Message, title = "Could not pick files", ?scopeId = arcScopeId)
-                )
+        React.useCallback (
+            (fun () -> promise {
+                match! Api.ipcArcVaultApi.pickArcPaths () with
+                | Ok paths -> return paths
+                | Error exn ->
+                    errorModal.enqueue (
+                        ErrorModalRequest.create (exn.Message, title = "Could not pick files", ?scopeId = arcScopeId)
+                    )
 
-                return [||]
-        }
+                    return [||]
+            }),
+            [| errorModal |]
+
+        )
 
     let renderTrailingNavbarElements _ =
         QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveArcFile)
