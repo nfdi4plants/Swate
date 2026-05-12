@@ -53,13 +53,27 @@ let createToggleLfsMark
 
     Swate.Components.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark setError runToggle
 
+let createFreeLocalLfsCopy
+    (enqueueErrorModal: ErrorModalRequest -> unit)
+    (arcScopeId: string option)
+    (runCleanup: string -> JS.Promise<Result<unit, string>>)
+    : (FileItem -> unit) =
+    let setError (errorMsg: string option) =
+        match errorMsg with
+        | Some msg ->
+            enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS cleanup failed", ?scopeId = arcScopeId))
+        | None -> ()
+
+    Swate.Components.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy setError runCleanup
+
 let withLfsContextMenuItems
     (item: FileItem)
     (toggleLfsMark: FileItem -> bool -> unit)
+    (freeLocalLfsCopy: FileItem -> unit)
     (baseItems: ContextMenuItem list)
     : ContextMenuItem list =
     baseItems
-    @ Swate.Components.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark
+    @ Swate.Components.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark (Some freeLocalLfsCopy)
 
 let createContextMenuItems
     (enqueueErrorModal: ErrorModalRequest -> unit)
@@ -69,4 +83,7 @@ let createContextMenuItems
     let toggleLfsMark =
         createToggleLfsMark enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runToggleLfsMark
 
-    fun item -> withLfsContextMenuItems item toggleLfsMark (baseItems item)
+    let freeLocalLfsCopy =
+        createFreeLocalLfsCopy enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runFreeLocalLfsCopy
+
+    fun item -> withLfsContextMenuItems item toggleLfsMark freeLocalLfsCopy (baseItems item)
