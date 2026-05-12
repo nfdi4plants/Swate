@@ -325,6 +325,37 @@ let private withTempRepository (testBody: TempRepositoryContext -> JS.Promise<un
         return raise error
 }
 
+let private setupCommittedPushedLfsFile
+    (context: TempRepositoryContext)
+    (fileName: string)
+    (content: string)
+    : JS.Promise<string> =
+    promise {
+        let remotePath = join [| context.RootPath; "remote-lfs.git" |]
+        let filePath = join [| context.RepoPath; fileName |]
+
+        let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+        let! _ = context.Git.raw [| "remote"; "add"; "origin"; remotePath |]
+        let! _ = context.Git.raw [| "lfs"; "install"; "--local" |]
+        let! _ = context.Git.raw [| "lfs"; "track"; "*.bin" |]
+
+        do!
+            writeUtf8FileAsync
+                (join [| context.RepoPath; ".gitattributes" |])
+                "*.bin filter=lfs diff=lfs merge=lfs -text\n"
+
+        do! writeUtf8FileAsync filePath content
+
+        let! _ = context.Git.raw [| "add"; ".gitattributes"; fileName |]
+        let! _ = context.Git.raw [| "commit"; "-m"; "test: add lfs file" |]
+
+        let! currentBranch = context.Git.raw [| "branch"; "--show-current" |]
+        let branchName = currentBranch.Trim()
+        let! _ = context.Git.raw [| "push"; "-u"; "origin"; branchName |]
+
+        return remotePath
+    }
+
 let private commitWorkflowFilePath = "notes/workflow.txt"
 let private featureBranchName = "feature/local-workflow"
 let private initialCommitMessage = "test: initial commit"
@@ -2060,6 +2091,204 @@ Vitest.describe (
                         | Error _ -> ()
                     })
             }
+        )
+
+        Vitest.describe ("GitService.freeLocalLfsCopy", fun () ->
+            Vitest.test (
+                "freeLocalLfsCopy replaces a clean checked-out LFS file with a pointer",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
+
+                            let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                            expectOk "free local lfs copy" result |> ignore
+
+                            let! statusAfterCleanup =
+                                unwrapResultAsync
+                                    (GitService.getStatus context.RepoPath)
+                                    (expectOk "git status after lfs cleanup")
+
+                            Vitest.expect(statusAfterCleanup.Files.Length).toBe(0)
+
+                            let! listing =
+                                context.Git.raw [| "lfs"; "ls-files"; "-l"; "--size"; "--json"; "--include=data.bin" |]
+
+                            Vitest.expect(listing.Contains("\"checkout\": false")).toBe(true)
+                        })
+                }
+            )
+
+            Vitest.test (
+                "freeLocalLfsCopy rejects dirty files and keeps the full local file",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let filePath = join [| context.RepoPath; "data.bin" |]
+                            let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
+
+                            do! writeUtf8FileAsync filePath "changed locally\n"
+
+                            let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                            let failure = expectError result
+                            Vitest.expect(failure.Message.Contains("local changes")).toBe(true)
+
+                            let! statusAfterFailure =
+                                unwrapResultAsync
+                                    (GitService.getStatus context.RepoPath)
+                                    (expectOk "git status after failed lfs cleanup")
+
+                            Vitest.expect(statusAfterFailure.Files.Length).toBeGreaterThan(0)
+                        })
+                }
+            )
+
+            Vitest.test (
+                "freeLocalLfsCopy rejects staged changes and keeps the staged file content",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let filePath = join [| context.RepoPath; "data.bin" |]
+                            let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
+
+                            do! writeUtf8FileAsync filePath "staged change\n"
+                            let! _ = context.Git.raw [| "add"; "data.bin" |]
+
+                            let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                            let failure = expectError result
+                            Vitest.expect(failure.Message.Contains("local changes")).toBe(true)
+
+                            let! contentAfter =
+                                fsPromisesDynamic?readFile (filePath, "utf8")
+                                |> unbox<JS.Promise<string>>
+
+                            Vitest.expect(contentAfter).toBe("staged change\n")
+                        })
+                }
+            )
+
+            Vitest.test (
+                "freeLocalLfsCopy rejects an invalid path traversal request",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let! result = GitService.freeLocalLfsCopy context.RepoPath "../outside.bin"
+                            let failure = expectError result
+                            Vitest.expect(failure.Message.Contains("traversal")).toBe(true)
+                        })
+                }
+            )
+
+            Vitest.test (
+                "freeLocalLfsCopy rejects a file that is not tracked by LFS",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            let plainPath = join [| context.RepoPath; "plain.txt" |]
+                            do! writeUtf8FileAsync plainPath "plain text\n"
+                            let! _ = context.Git.raw [| "add"; "plain.txt" |]
+                            let! _ = context.Git.raw [| "commit"; "-m"; "test: add plain file" |]
+
+                            let! result = GitService.freeLocalLfsCopy context.RepoPath "plain.txt"
+                            let failure = expectError result
+                            Vitest.expect(failure.Message.Contains("not tracked")).toBe(true)
+                        })
+                }
+            )
+        )
+
+        Vitest.describe ("GitService LFS storage maintenance", fun () ->
+            Vitest.test (
+                "pruneLfsCache rejects a dirty working tree",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            do! writeUtf8FileAsync (join [| context.RepoPath; "untracked.txt" |]) "dirty\n"
+
+                            let! result = GitService.pruneLfsCache context.RepoPath
+                            let failure = expectError result
+                            Vitest.expect(failure.Message.Contains("clean working tree")).toBe(true)
+                        })
+                }
+            )
+
+            Vitest.test (
+                "pruneLfsCache rejects repositories with custom lfs.storage",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
+                            let! _ = context.Git.raw [| "add"; "file.txt" |]
+                            let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
+                            let! _ = context.Git.raw [| "config"; "lfs.storage"; "custom-lfs" |]
+
+                            let! result = GitService.pruneLfsCache context.RepoPath
+                            let failure = expectError result
+                            Vitest.expect(failure.Message.Contains("lfs.storage")).toBe(true)
+                        })
+                }
+            )
+
+            Vitest.test (
+                "pruneLfsCache reports origin verification failures",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
+                            let! _ = context.Git.raw [| "add"; "file.txt" |]
+                            let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
+
+                            let! result = GitService.pruneLfsCache context.RepoPath
+                            let failure = expectError result
+                            Vitest.expect(failure.Message.Contains("Remote URL is empty.")).toBe(true)
+                        })
+                }
+            )
+
+            Vitest.test (
+                "dedupLfsStorage rejects a dirty working tree",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            do! writeUtf8FileAsync (join [| context.RepoPath; "untracked.txt" |]) "dirty\n"
+
+                            let! result = GitService.dedupLfsStorage context.RepoPath
+                            let failure = expectError result
+                            Vitest.expect(failure.Message.Contains("clean working tree")).toBe(true)
+                        })
+                }
+            )
+
+            Vitest.test (
+                "dedupLfsStorage returns either success or an Unknown failure with a message",
+                gitLfsIntegrationTestOptions,
+                fun () -> promise {
+                    do!
+                        withTempRepository (fun context -> promise {
+                            do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
+                            let! _ = context.Git.raw [| "add"; "file.txt" |]
+                            let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
+                            let! _ = context.Git.raw [| "lfs"; "install"; "--local" |]
+
+                            let! result = GitService.dedupLfsStorage context.RepoPath
+
+                            match result with
+                            | Ok _ -> Vitest.expect(true).toBe(true)
+                            | Error failure ->
+                                Vitest.expect(failure.Kind).toEqual(GitFailureKind.Unknown)
+                                Vitest.expect(String.IsNullOrWhiteSpace(failure.Message)).toBe(false)
+                        })
+                }
+            )
         )
 
         Vitest.test (
