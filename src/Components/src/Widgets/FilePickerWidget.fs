@@ -11,10 +11,6 @@ open Swate.Components.AnnotationTable.Context
 open Swate.Components.Widgets.Context
 
 module private FilePickerWidgetHelper =
-
-    [<Literal>]
-    let RemoveDropId = "__file_picker_remove_target__"
-
     let appendPickedPaths (setPaths: (string[] -> string[]) -> unit) =
         fun (paths: string[]) ->
             if paths.Length > 0 then
@@ -62,9 +58,6 @@ module private FilePickerWidgetHelper =
                 | _ -> current
             )
 
-    let removePathById (setPaths: (string[] -> string[]) -> unit) =
-        fun (pathId: string) -> setPaths (fun current -> current |> Array.filter (fun path -> path <> pathId))
-
     let insertPaths
         (arcFile: ArcFiles)
         setArcFile
@@ -101,15 +94,6 @@ module private FilePickerWidgetHelper =
 [<Erase; Mangle(false)>]
 type FilePickerWidget =
 
-    [<ReactComponent>]
-    static member DisabledStateMessage(message: string) =
-        Html.div [
-            Html.h3 [ prop.className "swt:font-bold"; prop.text "File Picker" ]
-            Html.span [
-                prop.className "swt:text-xs swt:opacity-70"
-                prop.text message
-            ]
-        ]
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private SortableTableRow
@@ -180,7 +164,7 @@ type FilePickerWidget =
 
     /// TODO: Virtualize paths
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member Table(paths: string[], setPaths: (string[] -> string[]) -> unit) =
+    static member private Table(paths: string[], setPaths: (string[] -> string[]) -> unit) =
 
         let movePath =
             React.useCallback (
@@ -209,25 +193,8 @@ type FilePickerWidget =
             ]
         ]
 
-    [<ReactComponent>]
-    static member private RemoveDropZone(isDragging: bool) =
-        let droppable =
-            DndKit.useDroppable (
-                {|
-                    id = FilePickerWidgetHelper.RemoveDropId
-                |}
-            )
-
-        Html.button [
-            prop.ref droppable.setNodeRef
-            prop.type'.button
-            prop.disabled (not isDragging)
-            prop.className [ "swt:btn swt:btn-sm swt:btn-error"; "swt:btn-dash" ]
-            prop.children [ Icons.Delete(); Html.span "Drop row here to remove" ]
-        ]
-
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
-    static member SortPathsButtons(setPaths: (string[] -> string[]) -> unit) =
+    static member private SortPathsButtons(setPaths: (string[] -> string[]) -> unit) =
 
         let sortAscending = FilePickerWidgetHelper.sortAscending setPaths
 
@@ -258,11 +225,6 @@ type FilePickerWidget =
                 [| box setPaths |]
             )
 
-        let removePathById =
-            React.useCallback ((fun id -> FilePickerWidgetHelper.removePathById setPaths id), [| box setPaths |])
-
-        let isDragging, setIsDragging = React.useState false
-
         let pointerSensor =
             DndKit.useSensor (
                 DndKit.PointerSensor,
@@ -273,12 +235,7 @@ type FilePickerWidget =
 
         let sensors = DndKit.useSensors [| pointerSensor |]
 
-        let handleDragStart (_: DndKit.IDndKitEvent) = setIsDragging true
-
-        let handleDragCancel (_: DndKit.IDndKitEvent) = setIsDragging false
-
         let handleDragEnd (event: DndKit.IDndKitEvent) =
-            setIsDragging false
 
             let active = event.active
             let over = event.over
@@ -287,35 +244,20 @@ type FilePickerWidget =
                 let activeId = string active.id
                 let overId = string over.id
 
-                if overId = FilePickerWidgetHelper.RemoveDropId then
-                    removePathById activeId
-                elif activeId <> overId then
+                if activeId <> overId then
                     movePathById activeId overId
 
         let itemIds = React.useMemo ((fun () -> ResizeArray paths), [| box paths |])
 
         DndKit.DndContext(
             sensors = sensors,
-            onDragStart = handleDragStart,
-            onDragCancel = handleDragCancel,
             onDragEnd = handleDragEnd,
             collisionDetection = DndKit.pointerWithin,
             children =
                 DndKit.SortableContext(
                     items = itemIds,
                     strategy = DndKit.verticalListSortingStrategy,
-                    children =
-                        React.Fragment [
-                            Html.div [
-                                prop.className "swt:flex swt:flex-row swt:items-center swt:justify-between"
-                                prop.children [
-                                    FilePickerWidget.SortPathsButtons(setPaths)
-                                    FilePickerWidget.RemoveDropZone(isDragging)
-                                ]
-                            ]
-
-                            FilePickerWidget.Table(paths, setPaths)
-                        ]
+                    children = FilePickerWidget.Table(paths, setPaths)
                 )
         )
 
@@ -346,7 +288,7 @@ type FilePickerWidget =
         ]
 
     [<ReactComponent>]
-    static member PickFilePathsButtons(onPickPaths: unit -> unit) =
+    static member private PickFilePathsButtons(onPickPaths: unit -> unit) =
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:gap-2"
             prop.children [
@@ -416,6 +358,8 @@ type FilePickerWidget =
                     Components.LoadingSpinner("Loading Paths...", DaisyuiSize.LG)
                 else if hasPaths then
                     let canInsert = hasActiveTableView && selectedCells.IsSome && hasPaths
+
+                    FilePickerWidget.SortPathsButtons(setPaths)
 
                     FilePickerWidget.FilePathViewer(paths, setPaths)
 
