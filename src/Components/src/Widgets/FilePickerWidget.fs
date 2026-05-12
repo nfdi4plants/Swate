@@ -27,26 +27,11 @@ module private FilePickerWidgetHelper =
     let sortDescending (setPaths: (string[] -> string[]) -> unit) =
         fun () -> setPaths (fun current -> current |> Array.sortByDescending id)
 
-    let movePath (setPaths: (string[] -> string[]) -> unit) =
-        fun (currentIndex: int) (newIndex: int) ->
-            setPaths (fun current ->
-                if currentIndex < 0 || currentIndex >= current.Length then
-                    failwithf
-                        "[movePath] Current index %d is out of bounds for paths array of length %d"
-                        currentIndex
-                        current.Length
-                elif newIndex < 0 || newIndex >= current.Length then
-                    failwithf
-                        "[movePath] New index %d is out of bounds for paths array of length %d"
-                        newIndex
-                        current.Length
-                else
-                    let pathToMove = current.[currentIndex]
-                    let pathsWithout = current |> Array.removeAt currentIndex
-                    pathsWithout |> Array.insertAt newIndex pathToMove
-            )
+    let movePathByIndex (setPaths: (string[] -> string[]) -> unit) =
+        fun (oldIndex: int) (newIndex: int) ->
+            setPaths (fun current -> DndKit.arrayMove (ResizeArray current, oldIndex, newIndex) |> Seq.toArray)
 
-    let removePath (setPaths: (string[] -> string[]) -> unit) =
+    let removePathAt (setPaths: (string[] -> string[]) -> unit) =
         fun (index: int) -> setPaths (fun current -> current |> Array.removeAt index)
 
     let movePathById (setPaths: (string[] -> string[]) -> unit) =
@@ -61,7 +46,7 @@ module private FilePickerWidgetHelper =
                 | _ -> current
             )
 
-    let insertPaths
+    let insertPathsIntoSelectedTableCells
         (arcFile: ArcFiles)
         setArcFile
         (activeTableIndex: int option)
@@ -171,12 +156,12 @@ type FilePickerWidget =
 
         let movePath =
             React.useCallback (
-                (fun current next -> FilePickerWidgetHelper.movePath setPaths current next),
+                (fun current next -> FilePickerWidgetHelper.movePathByIndex setPaths current next),
                 [| box setPaths |]
             )
 
         let removePath =
-            React.useCallback ((fun id -> FilePickerWidgetHelper.removePath setPaths id), [| box setPaths |])
+            React.useCallback ((fun id -> FilePickerWidgetHelper.removePathAt setPaths id), [| box setPaths |])
 
         Html.div [
             prop.className
@@ -352,7 +337,12 @@ type FilePickerWidget =
         let clearPaths = FilePickerWidgetHelper.clearPaths setPaths
 
         let insertPaths =
-            FilePickerWidgetHelper.insertPaths arcFile setArcFile activeTableIndex paths selectedCells
+            FilePickerWidgetHelper.insertPathsIntoSelectedTableCells
+                arcFile
+                setArcFile
+                activeTableIndex
+                paths
+                selectedCells
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-sm"
