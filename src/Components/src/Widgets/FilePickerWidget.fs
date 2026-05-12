@@ -30,13 +30,16 @@ module private FilePickerWidgetHelper =
     let movePath (setPaths: (string[] -> string[]) -> unit) =
         fun (currentIndex: int) (newIndex: int) ->
             setPaths (fun current ->
-                if
-                    currentIndex < 0
-                    || currentIndex >= current.Length
-                    || newIndex < 0
-                    || newIndex >= current.Length
-                then
-                    current
+                if currentIndex < 0 || currentIndex >= current.Length then
+                    failwithf
+                        "[movePath] Current index %d is out of bounds for paths array of length %d"
+                        currentIndex
+                        current.Length
+                elif newIndex < 0 || newIndex >= current.Length then
+                    failwithf
+                        "[movePath] New index %d is out of bounds for paths array of length %d"
+                        newIndex
+                        current.Length
                 else
                     let pathToMove = current.[currentIndex]
                     let pathsWithout = current |> Array.removeAt currentIndex
