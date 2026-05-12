@@ -2,7 +2,7 @@ module Swate.Components.ARCObjectExplorer.Model
 
 open System
 open Swate.Components.Shared
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 open Swate.Components.ARCObjectExplorer.KindFilter
 
 type ResolvedSelection = {

@@ -1,6 +1,6 @@
 module Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
 
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
 
 module private GraphObjectFixtureHelper =

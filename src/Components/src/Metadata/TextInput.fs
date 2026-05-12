@@ -74,7 +74,7 @@ type TextInput =
             )
             prop.children [
                 if label.IsSome && not isJoin then
-                    Generic.FieldTitle label.Value
+                    LayoutComponents.FieldTitle label.Value
                 if isArea then
                     Html.textarea [
                         prop.className [

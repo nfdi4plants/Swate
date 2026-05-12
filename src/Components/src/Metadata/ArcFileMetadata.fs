@@ -12,30 +12,31 @@ type private LazyComponents =
     static member LazyInvestigationMetadata
         (investigation: ArcInvestigation, setInvestigation: ArcInvestigation -> unit)
         =
-        InvestigationMetadata.InvestigationMetadata(investigation, setInvestigation)
+        InvestigationMetadata.InvestigationMetadata(investigation = investigation, setInvestigation = setInvestigation)
 
     [<ReactLazyComponent>]
     static member LazyStudyMetadata(study: ArcStudy, setStudy: ArcStudy -> unit) =
-        StudyMetadata.StudyMetadata(study, setStudy)
+        StudyMetadata.StudyMetadata(study = study, setStudy = setStudy)
 
     [<ReactLazyComponent>]
     static member LazyAssayMetadata(assay: ArcAssay, setAssay: ArcAssay -> unit) =
-        AssayMetadata.AssayMetadata(assay, setAssay)
+        AssayMetadata.AssayMetadata(assay = assay, setAssay = setAssay)
 
     [<ReactLazyComponent>]
-    static member LazyRunMetadata(run: ArcRun, setRun: ArcRun -> unit) = RunMetadata.RunMetadata(run, setRun)
+    static member LazyRunMetadata(run: ArcRun, setRun: ArcRun -> unit) =
+        RunMetadata.RunMetadata(run = run, setRun = setRun)
 
     [<ReactLazyComponent>]
     static member LazyWorkflowMetadata(workflow: ArcWorkflow, setWorkflow: ArcWorkflow -> unit) =
-        WorkflowMetadata.WorkflowMetadata(workflow, setWorkflow)
+        WorkflowMetadata.WorkflowMetadata(workflow = workflow, setWorkflow = setWorkflow)
 
     [<ReactLazyComponent>]
     static member LazyDataMapMetadata(datamap: DataMap) =
-        DataMapMetadata.DataMapMetadata(datamap)
+        DataMapMetadata.DataMapMetadata(datamap = datamap)
 
     [<ReactLazyComponent>]
     static member LazyTemplateMetadata(template: ARCtrl.Template, setTemplate: ARCtrl.Template -> unit) =
-        TemplateMetadata.TemplateMetadata(template, setTemplate)
+        TemplateMetadata.TemplateMetadata(template = template, setTemplate = setTemplate)
 
 open Fable.Core
 

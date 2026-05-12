@@ -15,6 +15,16 @@ type Rect = {
 
 open Fable.SimpleJson
 
+let private tryLoadRect (key: string) =
+    match Browser.WebStorage.localStorage.getItem key with
+    | null -> None
+    | item ->
+        try
+            Json.parseAs<Rect> item |> Some
+        with _ ->
+            Browser.WebStorage.localStorage.removeItem key
+            None
+
 [<RequireQualifiedAccess>]
 module WidgetLiterals =
 
@@ -47,13 +57,7 @@ module Position =
 
     let load (modalName: string) =
         let key = Key_Prefix + modalName
-
-        try
-            WebStorage.localStorage.getItem (key) |> Json.parseAs<Rect> |> Some
-        with _ ->
-            WebStorage.localStorage.removeItem (key)
-            printfn "Could not find %s" key
-            None
+        tryLoadRect key
 
 
 [<RequireQualifiedAccess>]
@@ -69,10 +73,4 @@ module Size =
 
     let load (modalName: string) =
         let key = Key_Prefix + modalName
-
-        try
-            WebStorage.localStorage.getItem (key) |> Json.parseAs<Rect> |> Some
-        with _ ->
-            WebStorage.localStorage.removeItem (key)
-            printfn "Could not find %s" key
-            None
+        tryLoadRect key

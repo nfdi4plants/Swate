@@ -2,10 +2,10 @@ module ElectronCore.GitServiceTests
 
 open System
 open Fable.Core
-open Fable.Core.JS
 open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.Bindings.SimpleGit
+open Main.Git.GitLfsService
 open Swate.Electron.Shared.GitTypes
 open Vitest
 
@@ -15,6 +15,119 @@ module GitAuthAdapter = Main.Git.GitAuthAdapter
 module GitLfsAdapter = Main.Git.GitLfsAdapter
 module GitLfsService = Main.Git.GitLfsService
 module GitTokenProvider = Main.Git.GitTokenProvider
+module JsonDecoder = Main.Git.JsonDecoder
+
+Vitest.describe("Git LFS JSON decoding", fun () ->
+    let assertParseFailure (json: string) (expectedReason: string option) =
+        try
+            parseLsFiles json |> ignore
+            failwith "Expected parseLsFiles to fail for incomplete or malformed Git LFS JSON."
+        with ex ->
+            Vitest.expect(ex.Message.Contains("Failed to parse git lfs ls-files JSON")).toBe(true)
+
+            match expectedReason with
+            | Some reason -> Vitest.expect(ex.Message.Contains(reason)).toBe(true)
+            | None -> ()
+
+    Vitest.test("parseLsFiles decodes complete records unchanged", fun () ->
+        let json =
+            """{
+  "files": [
+    {
+      "name": "folder/file.psd",
+      "size": 42,
+      "checkout": true,
+      "downloaded": true,
+      "oid_type": "sha256",
+      "oid": "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef",
+      "version": "https://git-lfs.github.com/spec/v1"
+    }
+  ]
+}"""
+
+        let files = parseLsFiles json
+        Vitest.expect(files.Length).toBe(1)
+
+        let file = files.[0]
+        Vitest.expect(file.name).toBe("folder/file.psd")
+        Vitest.expect(file.size).toBe(42)
+        Vitest.expect(file.checkout).toBe(true)
+        Vitest.expect(file.downloaded).toBe(true)
+        Vitest.expect(file.``oid_type``).toBe("sha256")
+        Vitest.expect(file.oid).toBe("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+        Vitest.expect(file.version).toBe("https://git-lfs.github.com/spec/v1"))
+
+    Vitest.test("parseLsFiles throws when required fields are missing", fun () ->
+        let json =
+            """{
+  "files": [
+    {
+      "name": "nested/asset.psd",
+      "size": 42,
+      "checkout": true,
+      "oid_type": "sha256",
+      "oid": "abc",
+      "version": "v1"
+    }
+  ]
+}"""
+
+        assertParseFailure json (Some "downloaded"))
+
+    Vitest.test("parseLsFiles throws when name is blank or whitespace", fun () ->
+        let json =
+            """{
+  "files": [
+    {
+      "name": "   ",
+      "size": 42,
+      "checkout": true,
+      "downloaded": true,
+      "oid_type": "sha256",
+      "oid": "abc",
+      "version": "v1"
+    }
+  ]
+}"""
+
+        assertParseFailure json (Some "non-empty"))
+
+    Vitest.test("parseLsFiles throws when mixed arrays contain invalid entries", fun () ->
+        let json =
+            """{
+  "files": [
+    {
+      "name": "valid/file.psd",
+      "size": 1,
+      "checkout": false,
+      "downloaded": true,
+      "oid_type": "sha256",
+      "oid": "valid-oid",
+      "version": "v1"
+    },
+    {
+      "name": "invalid/file.psd",
+      "size": 2,
+      "checkout": false,
+      "oid_type": "sha256",
+      "oid": "invalid-oid",
+      "version": "v1"
+    }
+  ]
+}"""
+
+        assertParseFailure json (Some "downloaded"))
+
+    Vitest.test("parseLsFiles accepts null or missing files containers as empty output", fun () ->
+        let withNullFiles = """{ "files": null }"""
+        let withMissingFiles = """{}"""
+
+        let nullFiles = parseLsFiles withNullFiles
+        let missingFiles = parseLsFiles withMissingFiles
+
+        Vitest.expect(nullFiles.Length).toBe(0)
+        Vitest.expect(missingFiles.Length).toBe(0))
+)
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private osDynamic: obj = importAll "os"

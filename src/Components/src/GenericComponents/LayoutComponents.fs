@@ -1,10 +1,10 @@
-namespace Swate.Components.Metadata
+namespace Swate.Components
 
 open Feliz
 open Swate.Components
 
 [<RequireQualifiedAccess>]
-type Generic =
+type LayoutComponents =
 
     [<ReactComponent>]
     static member FieldTitle(title: string) =

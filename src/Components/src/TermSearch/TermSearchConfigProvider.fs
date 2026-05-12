@@ -2,6 +2,7 @@ namespace Swate.Components.TermSearch
 
 open Swate.Components
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.TermSearch.TermSearchConfigContext
 open Swate.Components.TermSearch.TermSearchAllKeysContext
@@ -71,20 +72,19 @@ type TermSearchConfigProvider =
         React.useEffect (
             (fun _ -> // get all currently supported catalogues
                 promise {
+                    try
+                        let! collections =
+                            Api.TIBApi.TIBApi.getCollections ()
+                            |> Promise.catch (fun ex -> console.error "Error fetching TIB collections:" ex)
 
-                    let! collections =
-                        Api.TIBApi.TIBApi.getCollections ()
-                        |> Promise.catch (fun ex -> console.error "Error fetching TIB collections:" ex)
+                        let collectionSet = Set.ofArray collections.content
 
-                    let collectionSet = Set.ofArray collections.content
-                    let tibQueries = TermSearchConfigProviderHelper.mkTIBQueries collectionSet
-                    setAllTermSearchQueries (ResizeArray(Seq.append allTermSearchQueries tibQueries.TermSearch))
-
-                    setAllParentSearchQueries (ResizeArray(Seq.append allParentSearchQueries tibQueries.ParentSearch))
-
-                    setAllAllChildrenSearchQueries (
-                        ResizeArray(Seq.append allAllChildrenSearchQueries tibQueries.AllChildrenSearch)
-                    )
+                        let tibQueries = TermSearchConfigProviderHelper.mkTIBQueries collectionSet
+                        setAllTermSearchQueries (ResizeArray tibQueries.TermSearch)
+                        setAllParentSearchQueries (ResizeArray tibQueries.ParentSearch)
+                        setAllAllChildrenSearchQueries (ResizeArray tibQueries.AllChildrenSearch)
+                    with ex ->
+                        console.error ("Error fetching TIB collections:", ex)
                 }
                 |> Promise.start
             ),
@@ -111,12 +111,10 @@ type TermSearchConfigProvider =
             ?localStorageKey: string
         ) =
         let localStorageKey = defaultArg localStorageKey "swate-termsearchconfig-ctx"
+        let defaultActive = defaultArg defaultActive Set.empty
 
-        let (activeKeys: TermSearchConfigLocalStorageActiveKeysContext), setActiveKeys =
-            React.useLocalStorage (
-                localStorageKey,
-                TermSearchConfigLocalStorageActiveKeysContext.init (?defaultActive = defaultActive)
-            )
+        let (activeKeys: TermSearchActiveKeysContext), setActiveKeys =
+            React.useLocalStorage (localStorageKey, TermSearchActiveKeysContext.init (defaultActive))
 
         let allKeys =
             React.useMemo (
@@ -187,8 +185,5 @@ type TermSearchConfigProvider =
                 state = activeKeys
                 setState = setActiveKeys
             },
-            TermSearchConfigCtx.Provider(
-                queries,
-                TermSearchAllKeysCtx.Provider(allKeys, children)
-            )
+            TermSearchConfigCtx.Provider(queries, TermSearchAllKeysCtx.Provider(allKeys, children))
         )

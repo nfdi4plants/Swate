@@ -1,4 +1,4 @@
-namespace Swate.Components.FileExplorerTypes
+module Swate.Components.FileExplorer.Types
 
 open System
 

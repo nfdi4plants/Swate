@@ -4,7 +4,7 @@ open System
 open Fable.Core
 open Feliz
 open ARCtrl
-open Swate.Components.Metadata
+open Swate.Components
 
 [<Erase; Mangle(false)>]
 type WorkflowMetadata =
@@ -13,8 +13,8 @@ type WorkflowMetadata =
     static member WorkflowMetadata
         // 👀 If you rename these variables, ensure that the names are forwarded for lazy loading in `src\Components\src\Metadata\ArcFileMetadata.fs` as well!
         (workflow: ArcWorkflow, setWorkflow: ArcWorkflow -> unit) =
-        Generic.Section [
-            Generic.BoxedField(
+        LayoutComponents.Section [
+            LayoutComponents.BoxedField(
                 "Workflow Metadata",
                 content = [
                     FormComponents.TextInput(workflow.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)

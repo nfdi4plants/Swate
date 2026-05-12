@@ -3,7 +3,8 @@ module Swate.Components.ARCObjectExplorer.GraphExplorer.GraphExplorerNodes
 open System
 open Swate.Components.Shared
 open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
-open Swate.Components.FileExplorerTypes
+open Swate.Components.FileExplorer.Types
+
 
 type private ProcessEndpointValue =
     | MaterialEndpoint of materialRole: string * material: Material

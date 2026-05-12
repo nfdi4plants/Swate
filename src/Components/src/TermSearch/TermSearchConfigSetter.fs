@@ -2,6 +2,7 @@ namespace Swate.Components.TermSearch
 
 open Swate.Components
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.TermSearch.TermSearchAllKeysContext
 open Swate.Components.TermSearch.TermSearchActiveKeysContext
@@ -10,6 +11,7 @@ open Swate.Components.TermSearch.TermSearchActiveKeysContext
 [<Erase; Mangle(false)>]
 type TermSearchConfigSetter =
 
+    [<ReactComponent>]
     static member private TriggerRender(activeKeys: string[]) =
         Html.button [
             prop.testId "term-search-config-setter-tib-trigger"
@@ -43,8 +45,17 @@ type TermSearchConfigSetter =
         let activeKeysCtx = useTermSearchActiveKeysCtx ()
         let allKeysCtx = useTermSearchAllKeysCtx ()
 
+        let activeKeysState =
+            if isNullOrUndefined (box activeKeysCtx.state) then
+                TermSearchActiveKeysContext.init (Set.empty)
+            else
+                activeKeysCtx.state
+
+        let activeKeys =
+            activeKeysState.activeKeys |> Option.ofObj |> Option.defaultValue [||]
+
         let selectedIndices =
-            activeKeysCtx.state.activeKeys
+            activeKeys
             |> Array.choose (fun key -> allKeysCtx |> Seq.tryFindIndex (fun activeKey -> activeKey = key))
             |> Set
 
@@ -55,15 +66,14 @@ type TermSearchConfigSetter =
             fun selectedIndices ->
                 let nextActiveKeys = selectedIndices |> Seq.map (fun i -> allKeysCtx |> Seq.item i)
 
-                activeKeysCtx.setState {
-                    activeKeysCtx.state with
+                activeKeysCtx.setState {|
+                    activeKeysState with
                         activeKeys = Array.ofSeq nextActiveKeys
-                }
+                |}
 
-        let defaultSearchActive = not activeKeysCtx.state.disableDefault
+        let defaultSearchActive = not activeKeysState.disableDefault
 
-        let TriggerRender =
-            fun _ -> TermSearchConfigSetter.TriggerRender(activeKeysCtx.state.activeKeys)
+        let TriggerRender = fun _ -> TermSearchConfigSetter.TriggerRender(activeKeys)
 
         React.Fragment [
 
@@ -72,9 +82,9 @@ type TermSearchConfigSetter =
                 prop.className "swt:hidden"
                 prop.ariaHidden true
                 prop.testId "term-search-config-setter"
-                prop.custom ("data-activekeyscount", activeKeysCtx.state.activeKeys.Length)
-                prop.custom ("data-defaultdisables", activeKeysCtx.state.disableDefault)
-                prop.custom ("data-activekeys", activeKeysCtx.state.activeKeys |> Array.sort |> String.concat "; ")
+                prop.custom ("data-activekeyscount", activeKeys.Length)
+                prop.custom ("data-defaultdisables", activeKeysState.disableDefault)
+                prop.custom ("data-activekeys", activeKeys |> Array.sort |> String.concat "; ")
             ]
 
             renderer {|
@@ -89,10 +99,10 @@ type TermSearchConfigSetter =
                         prop.type'.checkbox
                         prop.isChecked defaultSearchActive
                         prop.onChange (fun (b: bool) ->
-                            activeKeysCtx.setState {
-                                activeKeysCtx.state with
+                            activeKeysCtx.setState {|
+                                activeKeysState with
                                     disableDefault = not b
-                            }
+                            |}
                         )
                     ]
                 description = Html.p "When you deactivate this, the default search will not be used."

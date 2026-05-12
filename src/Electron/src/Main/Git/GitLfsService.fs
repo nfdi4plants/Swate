@@ -1,8 +1,10 @@
 module Main.Git.GitLfsService
 
 open System
+open System.Collections.Generic
 open Fable.Core
-open Fable.Core.JsInterop
+open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.Node
 open Main.Bindings.SimpleGit
@@ -21,6 +23,34 @@ type OutboundPushPlan =
 
 let private maxLfsPointerProbeBytes = 1024L
 let mutable private cachedSystemInstalled = false
+
+[<Literal>]
+let private lfsLsFilesTimeoutMs = 15000
+
+let parseLsFiles (stdoutText: string) : GitLfsLsFileInfo[] =
+    try
+        ARCtrl.Json.Decode.fromJsonString JsonDecoder.lsFilesResponseDecoder stdoutText
+    with ex ->
+        let detail =
+            if String.IsNullOrWhiteSpace ex.Message then
+                "Unknown decoding error."
+            else
+                ex.Message
+
+        raise (Exception($"Failed to parse git lfs ls-files JSON: {detail}", ex))
+
+let private indexUsingRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<string, GitLfsLsFileInfo> =
+    let filesByRelativePath = Dictionary<string, GitLfsLsFileInfo>()
+
+    files
+    |> Array.iter (fun info ->
+        if not (String.IsNullOrWhiteSpace info.name) then
+            let relativePath = PathHelpers.normalizeSeparators info.name
+            filesByRelativePath.[relativePath] <- { info with name = relativePath }
+    )
+
+    filesByRelativePath
+
 
 /// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
@@ -137,6 +167,49 @@ let isSystemInstalled () : JS.Promise<bool> =
 /// Checks whether `.gitattributes` marks a path for Git LFS.
 let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
     gitLfs.IsTrackedByAttributes repoRoot relativePath
+
+/// Tries to read `git lfs ls-files -j` metadata keyed by repository-relative path.
+/// Fail-open behavior: command or parse failures yield an empty dictionary.
+let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<string, GitLfsLsFileInfo>> =
+    promise {
+        let normalizedRepoRoot = PathHelpers.normalizePath repoRoot
+
+        try
+            let! commandResult =
+                runGitCaptured {
+                    WorkingDirectory = Some normalizedRepoRoot
+                    Arguments = [| "lfs"; "ls-files"; "-j" |]
+                    Environment = None
+                    StandardInput = None
+                    TimeoutMs = Some lfsLsFilesTimeoutMs
+                }
+
+            if commandResult.ExitCode <> 0 || commandResult.TimedOut then
+                return Dictionary<string, GitLfsLsFileInfo>()
+            else
+                let stdoutText =
+                    commandResult.StdoutText
+                    |> Option.ofObj
+                    |> Option.defaultValue String.Empty
+                    |> _.Trim()
+
+                if String.IsNullOrWhiteSpace stdoutText then
+                    return Dictionary<string, GitLfsLsFileInfo>()
+                else
+                    try
+                        return stdoutText |> parseLsFiles |> indexUsingRelativePath
+                    with parseError ->
+                        let reason =
+                            if String.IsNullOrWhiteSpace parseError.Message then
+                                "Unknown decoding error."
+                            else
+                                parseError.Message
+
+                        Browser.Dom.console.warn $"Git LFS ls-files parse warning: {reason}"
+                        return Dictionary<string, GitLfsLsFileInfo>()
+        with _ ->
+            return Dictionary<string, GitLfsLsFileInfo>()
+    }
 
 let private formatDiagnosticsSection (title: string) (content: string option) =
     match content |> Option.map _.Trim() with

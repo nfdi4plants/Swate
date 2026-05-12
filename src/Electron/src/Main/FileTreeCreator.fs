@@ -1,48 +1,53 @@
 [<AutoOpen>]
 module Main.FileTreeCreator
 
-
+open System
 open System.Collections.Generic
 open Fable.Core.JsInterop
+open Main.Git.GitLfsService
+open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 
 let fs: obj = importAll "fs"
 let pathMod: obj = importAll "path"
-let childProcessDynamic: obj = importAll "node:child_process"
-
-let private normalizePath (path: string) = path.Replace("\\", "/")
 
 let normalizeRootPath (path: string) =
-    pathMod?resolve (path) |> unbox<string> |> normalizePath
-
-let private containsTraversalSegments (path: string) =
-    path.Split('/') |> Array.exists (fun segment -> segment = "." || segment = "..")
+    pathMod?resolve (path) |> unbox<string> |> PathHelpers.normalizePath
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
 let private shouldIgnorePath (path: string) =
-    let normalizedPath = normalizePath path
+    let normalizedPath = PathHelpers.normalizeSeparators path
     let tempXlsxPattern = """\.~\$.*\.xlsx$"""
     System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
 
-let private tryGetRepoRelativePathCore (repoRoot: string) (absolutePath: string) (allowRoot: bool) =
-    let relativePath =
-        pathMod?relative (normalizeRootPath repoRoot, normalizeRootPath absolutePath)
-        |> unbox<string>
-        |> normalizePath
-
-    if System.String.IsNullOrWhiteSpace relativePath || relativePath = "." then
-        if allowRoot then Some "" else None
-    elif containsTraversalSegments relativePath then
-        None
+/// Enriches a single file entry with Git LFS metadata from `git lfs ls-files -j`.
+let private withFileEntryLfsMetadata
+    (repoRoot: string)
+    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (entry: FileEntry)
+    : FileEntry =
+    if entry.isDirectory then
+        entry
     else
-        Some relativePath
+        match tryGetRepoRelativePath repoRoot entry.path with
+        | Some relativePath ->
+            let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
 
-let tryGetRepoRelativePath (repoRoot: string) (absolutePath: string) =
-    tryGetRepoRelativePathCore repoRoot absolutePath false
+            match lfsFilesByRelativePath.TryGetValue(normalizedRelativePath) with
+            | true, lfsInfo -> { entry with lfs = Some lfsInfo }
+            | _ -> { entry with lfs = None }
+        | None ->
+            { entry with lfs = None }
 
-let tryGetRepoRelativePathOrRoot (repoRoot: string) (absolutePath: string) =
-    tryGetRepoRelativePathCore repoRoot absolutePath true
+/// Enriches file entries with Git LFS metadata from `git lfs ls-files -j`.
+let private withFileEntriesLfsMetadata
+    (repoRoot: string)
+    (lfsFilesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
+    (entries: FileEntry[])
+    : FileEntry[] =
+    entries |> Array.map (withFileEntryLfsMetadata repoRoot lfsFilesByRelativePath)
 
 /// Build the renderer snapshot using ARC-relative dictionary keys and FileEntry paths.
 let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary<string, FileEntry> =
@@ -57,97 +62,36 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
 
     rendererFileTree
 
-let private tryGetLfsTrackedByAttributes
-    (repoRoot: string)
-    (repoRelativePaths: string[])
-    : Fable.Core.JS.Promise<Dictionary<string, bool>> =
-    promise {
-        let results = Dictionary<string, bool>()
+/// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
+let removePathAndDescendants (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
+    let normalizedTargetPath = PathHelpers.normalizePath targetPath
+    let nextTree = Dictionary<string, FileEntry>(fileTree)
 
-        if repoRelativePaths.Length = 0 then
-            return results
-        else
-            let gitDir = pathMod?join (repoRoot, ".git") |> unbox<string>
+    if String.IsNullOrWhiteSpace normalizedTargetPath then
+        nextTree
+    else
+        let keysToRemove =
+            nextTree.Keys
+            |> Seq.filter (fun path -> isSameOrDescendantPath path normalizedTargetPath)
+            |> Seq.toArray
 
-            let isGitRepo =
-                try
-                    fs?existsSync (gitDir) |> unbox<bool>
-                with _ ->
-                    false
-
-            if not isGitRepo then
-                return results
-            else
-                return!
-                    Fable.Core.JS.Constructors.Promise.Create(fun resolve _reject ->
-                        try
-                            let proc: obj =
-                                childProcessDynamic?spawn (
-                                    "git",
-                                    [| "check-attr"; "-z"; "filter"; "--stdin" |],
-                                    createObj [
-                                        "cwd" ==> repoRoot
-                                        "shell" ==> false
-                                        "windowsHide" ==> true
-                                    ]
-                                )
-
-                            let stdoutChunks = ResizeArray<string>()
-
-                            proc?stdout?on (
-                                "data",
-                                fun d ->
-                                    let msg = d?toString ("utf8") |> unbox<string>
-                                    stdoutChunks.Add(msg)
-                            )
-                            |> ignore
-
-                            proc?on (
-                                "close",
-                                fun code ->
-                                    let success = if isNull code then false else (unbox<float> code) = 0.
-
-                                    if success then
-                                        let stdout = System.String.Concat(stdoutChunks.ToArray())
-                                        let segments = stdout.Split('\u0000')
-
-                                        let lastIndex =
-                                            if segments.Length > 0 && segments.[segments.Length - 1] = "" then
-                                                segments.Length - 1
-                                            else
-                                                segments.Length
-
-                                        let mutable i = 0
-
-                                        while i + 2 < lastIndex do
-                                            let path = segments.[i]
-                                            let attr = segments.[i + 1]
-                                            let value = segments.[i + 2]
-
-                                            if attr = "filter" then
-                                                results.[path] <- value = "lfs"
-
-                                            i <- i + 3
-
-                                    resolve results
-                            )
-                            |> ignore
-
-                            proc?on ("error", fun _ -> resolve results) |> ignore
-
-                            repoRelativePaths
-                            |> Array.iter (fun relativePath -> proc?stdin?write (relativePath + "\u0000") |> ignore)
-
-                            proc?stdin?``end`` () |> ignore
-                        with _ ->
-                            resolve results
-                    )
-    }
-
+        keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)
+        nextTree
 
 let getFileEntry (path: string) = promise {
     let! stats = fs?promises?stat (path)
     return FileEntry.create (pathMod?basename (path), path, stats?isDirectory (), None)
+}
+
+let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
+    let normalizedRepoRoot = normalizeRootPath repoRoot
+    let! entry = getFileEntry path
+
+    if entry.isDirectory then
+        return entry
+    else
+        let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath normalizedRepoRoot
+        return withFileEntryLfsMetadata normalizedRepoRoot lfsFilesByRelativePath entry
 }
 
 /// Finds all files and subfolders of the given filepath
@@ -184,41 +128,17 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
 
                 if isDir then
                     if not (shouldIgnoreDirName name) then
-                        let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> normalizePath
+                        let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> PathHelpers.normalizeSeparators
                         entries.Add(FileEntry.create (name, fullPath, true, None))
                         stack.Add(fullPath)
                 else
-                    let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> normalizePath
+                    let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> PathHelpers.normalizeSeparators
 
                     if not (shouldIgnorePath fullPath) then
-                        entries.Add(FileEntry.create (name, fullPath, false, Some false))
+                        entries.Add(FileEntry.create (name, fullPath, false, None))
             )
 
-        let repoRelativeFilePaths =
-            entries.ToArray()
-            |> Array.choose (fun entry ->
-                if entry.isDirectory then
-                    None
-                else
-                    tryGetRepoRelativePath repoRoot entry.path
-            )
-
-        let! lfsTracked = tryGetLfsTrackedByAttributes repoRoot repoRelativeFilePaths
-
-        return
-            entries.ToArray()
-            |> Array.map (fun entry ->
-                if entry.isDirectory then
-                    entry
-                else
-                    match tryGetRepoRelativePath repoRoot entry.path with
-                    | None -> entry
-                    | Some relativePath ->
-                        let tracked =
-                            match lfsTracked.TryGetValue(relativePath) with
-                            | true, value -> value
-                            | _ -> false
-
-                        { entry with isLfs = Some tracked }
-            )
+        let scannedEntries = entries.ToArray()
+        let! lfsFilesByRelativePath = tryGetLsFilesByRelativePath repoRoot
+        return withFileEntriesLfsMetadata repoRoot lfsFilesByRelativePath scannedEntries
 }
