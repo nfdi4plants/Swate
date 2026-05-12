@@ -34,6 +34,7 @@ let private colorClassForArcCollectionFolder =
 
 let private iconForArcWorkbookFile =
     function
+    | "isa.investigation.xlsx" -> Some FileItemIcon.BookOpen
     | "isa.study.xlsx" -> Some FileItemIcon.Study
     | "isa.assay.xlsx" -> Some FileItemIcon.Assay
     | "isa.workflow.xlsx" -> Some FileItemIcon.Workflow
@@ -76,7 +77,7 @@ let private fileIcon (path: string) =
     let fileName = PathHelpers.getFileName normalizedPath |> lowerInvariant
 
     match colorClassForDatamapPath normalizedPath with
-    | Some _ -> FileItemIcon.Database
+    | Some _ -> FileItemIcon.Map
     | None ->
         match iconForArcWorkbookFile fileName with
         | Some icon -> icon

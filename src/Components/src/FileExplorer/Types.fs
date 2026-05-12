@@ -33,7 +33,9 @@ module FileItemIconTone =
 type FileItemIcon =
     | Folder
     | Document
+    | BookOpen
     | Table
+    | Map
     | Database
     | Tag
     | Block
@@ -52,7 +54,9 @@ module FileItemIcon =
         function
         | FileItemIcon.Folder -> "swt:fluent--folder-24-regular"
         | FileItemIcon.Document -> "swt:fluent--document-24-regular"
+        | FileItemIcon.BookOpen -> "swt:fluent--book-open-24-regular"
         | FileItemIcon.Table -> "swt:fluent--table-24-regular"
+        | FileItemIcon.Map -> "swt:fluent--map-16-regular"
         | FileItemIcon.Database -> "swt:fluent--database-24-regular"
         | FileItemIcon.Tag -> "swt:fluent--tag-24-regular"
         | FileItemIcon.Block -> "swt:fluent--prohibited-24-regular"
