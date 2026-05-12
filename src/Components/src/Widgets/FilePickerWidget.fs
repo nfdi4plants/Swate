@@ -328,7 +328,7 @@ type FilePickerWidget =
             prop.children [
                 Html.button [
                     prop.className "swt:btn swt:btn-outline"
-                    prop.text "Cancel"
+                    prop.text "Clear"
                     prop.onClick (fun _ -> clearPaths ())
                 ]
                 Html.button [
