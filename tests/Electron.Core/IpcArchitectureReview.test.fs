@@ -96,6 +96,7 @@ Vitest.describe("IPC architecture review fixes", fun () ->
             expectSourceContains arcVaultApiSource "deletePath ="
             expectSourceContains arcVaultApiSource "ArcDeletePathRules.isDeletePathAllowed"
             expectSourceContains arcVaultApiSource "do! vault.RefreshFileTree()"
+            expectSourceContains arcVaultApiSource "runArcDiskMutation"
             expectSourceContains arcVaultApiSource "ArcDeleteHelper.mergeReloadedArcAfterDelete"
             expectSourceContains arcVaultApiSource "ARC.merge"
             expectSourceContains arcVaultApiSource "ArcDeletePathRules.buildFallbackUnlinkPaths"
@@ -103,8 +104,15 @@ Vitest.describe("IPC architecture review fixes", fun () ->
                 arcVaultApiSource
                 [|
                     "fsPromisesDynamic?rm"
-                    "do! vault.RefreshFileTree()"
+                    "runArcDiskMutation"
                     "ArcDeleteHelper.mergeReloadedArcAfterDelete"
+                |]
+            expectSourceContainsInOrder
+                arcVaultApiSource
+                [|
+                    "let private runArcDiskMutation"
+                    "do! vault.RefreshFileTree()"
+                    "match mergeReloadedArc reloadedArc"
                 |]
         })
 
