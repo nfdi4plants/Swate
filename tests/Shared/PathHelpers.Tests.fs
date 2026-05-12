@@ -152,4 +152,47 @@ let tests =
                 fallbackPaths
                 [ "workflows/MyFlow/isa.datamap.xlsx" ]
                 "Canonical file fallback should return the normalized target path."
+
+        testCase "classifyRenameTarget maps canonical ARC file paths to dedicated rename variants" <| fun _ ->
+            let classification =
+                ArcDeletePathRules.classifyRenameTarget "assays/MyAssay/isa.assay.xlsx"
+
+            match classification with
+            | ArcDeletePathRules.RenamePathClassification.CanonicalEntityFileTarget(
+                ArcDeletePathRules.AddZone.Assays,
+                "MyAssay",
+                _
+              ) -> ()
+            | _ -> failwith "Expected canonical assay file rename classification."
+
+        testCase "resolveRenameSourcePath redirects canonical ARC files to their entity folder" <| fun _ ->
+            Expect.equal
+                (ArcDeletePathRules.resolveRenameSourcePath "runs/MyRun/isa.run.xlsx")
+                "runs/MyRun"
+                "Renaming a canonical ARC file should rename the parent entity folder."
+
+        testCase "isRenamePathAllowed blocks root and add-zone roots but allows generic descendants" <| fun _ ->
+            Expect.isFalse
+                (ArcDeletePathRules.isRenamePathAllowed "")
+                "ARC root must not be renameable."
+
+            Expect.isFalse
+                (ArcDeletePathRules.isRenamePathAllowed "studies")
+                "Add-zone roots must stay protected."
+
+            Expect.isTrue
+                (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
+                "Generic descendants under add zones should stay renameable."
+
+        testCase "buildCanonicalEntityPaths returns entity and datamap canonical files" <| fun _ ->
+            let paths =
+                ArcDeletePathRules.buildCanonicalEntityPaths ArcDeletePathRules.AddZone.Workflows "MyWorkflow"
+
+            Expect.equal
+                paths
+                [
+                    "workflows/MyWorkflow/isa.workflow.xlsx"
+                    "workflows/MyWorkflow/isa.datamap.xlsx"
+                ]
+                "Canonical rename merge paths should include entity and datamap files."
     ]

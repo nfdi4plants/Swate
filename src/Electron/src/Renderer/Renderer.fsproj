@@ -24,7 +24,9 @@
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRenameHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\CreateArcFileModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRename.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeDelete.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTree.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Main.fs" />

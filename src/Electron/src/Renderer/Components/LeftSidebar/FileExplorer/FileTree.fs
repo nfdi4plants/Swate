@@ -14,6 +14,7 @@ open Fable.Core.JsInterop
 open ARCtrl
 open Types
 open Helper
+open FileTreeRenameHelper
 
 module private FileTreeHelper =
     let stagePendingArcFileSave (arcFile: ArcFiles option) : JS.Promise<Result<unit, exn>> = promise {
@@ -49,6 +50,7 @@ type FileTree =
 
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+        let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = ErrorModal.Context.useErrorModalCtx ()
         let arcScopeId = useCurrentArcScopeId ()
 
@@ -56,6 +58,8 @@ type FileTree =
             React.useState<ArcExplorerNodeKind option> None
 
         let pendingArcFileSave, setPendingArcFileSave = React.useState<ArcFiles option> None
+        let pendingRenameDraft, setPendingRenameDraft = React.useState<ArcRenameDraft option> None
+        let isRenaming, setIsRenaming = React.useState false
         let pendingDeleteItem, setPendingDeleteItem = React.useState<FileItem option> None
         let isDeleting, setIsDeleting = React.useState false
 
@@ -201,8 +205,14 @@ type FileTree =
         let closeDeleteModal () =
             setPendingDeleteItem None
 
+        let closeRenameModal () =
+            setPendingRenameDraft None
+
         let requestDeleteItem =
             FileTreeDeleteWorkflow.requestDeleteItem setPendingDeleteItem
+
+        let requestRenameItem =
+            FileTreeRenameWorkflow.requestRenameItem setPendingRenameDraft errorModal.enqueue arcScopeId
 
         let rootPath = fileTree |> Option.map (fun tree -> tree.path)
 
@@ -216,6 +226,9 @@ type FileTree =
 
         let createFromItem item =
             inlineCreateKindForItem item |> Option.iter openCreateModal
+
+        let canRenameFromItem (item: FileItem) =
+            item.IsDirectory && FileTreeRenameHelper.canRenameItem item
 
         let applyCreateError errorMessage =
             Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState errorMessage
@@ -274,14 +287,32 @@ type FileTree =
         let deleteContextMenuItems =
             FileTreeDeleteWorkflow.deleteContextMenuItems requestDeleteItem
 
+        let renameContextMenuItems =
+            FileTreeRenameWorkflow.renameContextMenuItems requestRenameItem
+
         let baseContextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item @ deleteContextMenuItems item
+            arcCreateContextMenuItems item @ renameContextMenuItems item @ deleteContextMenuItems item
 
         let createContextMenuItems =
             Renderer.Components.FileExplorerLfs.createContextMenuItems
                 errorModal.enqueue
                 arcScopeId
                 baseContextMenuItems
+
+        let confirmRenameItem (newName: string) =
+            FileTreeRenameWorkflow.confirmRenameItem
+                {
+                    pendingRenameDraft = pendingRenameDraft
+                    selectedTreePath = fileStateCtx.state.Selection.TreePath
+                    closeRenameModal = closeRenameModal
+                    setIsRenaming = setIsRenaming
+                    setSelection = fileStateCtx.setSelection
+                    refreshGitStatus = gitStateCtx.refresh
+                    renamePath = Api.ipcArcVaultApi.renamePath
+                    enqueueError = errorModal.enqueue
+                    arcScopeId = arcScopeId
+                }
+                newName
 
         let activeCreateKind =
             pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
@@ -303,6 +334,16 @@ type FileTree =
                 isDeleting = isDeleting
             )
 
+        let renameModal =
+            FileTreeRename.RenameModal(
+                isOpen = pendingRenameDraft.IsSome,
+                itemName = (pendingRenameDraft |> Option.map (fun draft -> draft.Item.Name)),
+                initialName = (pendingRenameDraft |> Option.map _.InitialName),
+                close = closeRenameModal,
+                submit = confirmRenameItem,
+                isRenaming = isRenaming
+            )
+
         match fileItem with
         | Some rootItem ->
             let visibleItems = rootItem.Children |> Option.defaultValue []
@@ -318,6 +359,8 @@ type FileTree =
                             onContextMenu = createContextMenuItems,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
+                            canRenameItem = canRenameFromItem,
+                            onRenameItem = requestRenameItem,
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
@@ -326,11 +369,13 @@ type FileTree =
                     ]
                 ]
                 arcCreateModal
+                renameModal
                 deleteConfirmModal
             ]
         | None ->
             React.Fragment [
                 FileTree.EmptyFileTreePlaceholder()
                 arcCreateModal
+                renameModal
                 deleteConfirmModal
             ]

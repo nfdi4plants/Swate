@@ -194,16 +194,32 @@ module ArcVaultExtensions =
 
         member this.StartFileWatcher() =
             if this.path.IsSome then
-                let watcher = createFileWatcher this.path.Value
+                match this.watcher with
+                | Some _ -> ()
+                | None ->
+                    let watcher = createFileWatcher this.path.Value
 
-                let sendMsgApi =
-                    Remoting.createIpc ()
-                    |> Remoting.withWindow this.window
-                    |> Remoting.buildProxySender<IArcFileWatcherApi>
+                    let sendMsgApi =
+                        Remoting.createIpc ()
+                        |> Remoting.withWindow this.window
+                        |> Remoting.buildProxySender<IArcFileWatcherApi>
 
-                watcher.on (Chokidar.Events.All, this._ScheduleReloadArc sendMsgApi) |> ignore
+                    watcher.on (Chokidar.Events.All, this._ScheduleReloadArc sendMsgApi) |> ignore
+                    this.watcher <- Some watcher
             else
                 swatefailfn this.window.id $"No path set for StartFileWatcher."
+
+        member this.StopFileWatcher() = promise {
+            match this.watcher with
+            | None -> return ()
+            | Some watcher ->
+                try
+                    do! watcher.close ()
+                with _ ->
+                    ()
+
+                this.watcher <- None
+        }
 
         /// This functions should be called once, when an vault is first started with a path
         member this.Startup() = promise {
@@ -312,7 +328,7 @@ type ArcVaults() =
         match this.Vaults.TryGetValue(id) with
         | false, _ -> swatefailfn id $"Failed to remove vault."
         | true, vault ->
-            vault.watcher |> Option.iter (fun watcher -> watcher.close () |> Promise.start)
+            vault.StopFileWatcher() |> Promise.start
             this.Vaults.Remove(id) |> ignore
             vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
             this.BroadcastRecentARCs()

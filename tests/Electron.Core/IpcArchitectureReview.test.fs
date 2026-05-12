@@ -107,6 +107,51 @@ Vitest.describe("IPC architecture review fixes", fun () ->
                     "ArcDeleteHelper.mergeReloadedArcAfterDelete"
                 |]
         })
+
+    Vitest.test("Arc vault IPC contract and implementation expose renamePath", fun () ->
+        promise {
+            let! ipcTypesSource = sourcePath [| "Swate.Electron.Shared"; "IPCTypes.fs" |] |> readUtf8FileAsync
+            let! fileIoTypesSource = sourcePath [| "Swate.Electron.Shared"; "FileIOTypes.fs" |] |> readUtf8FileAsync
+            let! arcVaultApiSource = sourcePath [| "Main"; "IPC"; "IArcVaultsApi.fs" |] |> readUtf8FileAsync
+
+            expectSourceContains fileIoTypesSource "type RenamePathRequest = {"
+            expectSourceContains fileIoTypesSource "relativePath: string"
+            expectSourceContains fileIoTypesSource "newName: string"
+            expectSourceContains ipcTypesSource "renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>"
+            expectSourceContains arcVaultApiSource "renamePath ="
+            expectSourceContains arcVaultApiSource "runArcDiskMutation"
+            expectSourceContains arcVaultApiSource "ArcRenameHelper.mergeReloadedArcAfterRename"
+            expectSourceContains arcVaultApiSource "renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath"
+            expectSourceContains arcVaultApiSource "let private renameRetryStrategy"
+            expectSourceContains arcVaultApiSource "| Some \"EPERM\""
+            expectSourceContains arcVaultApiSource "| Some \"EACCES\""
+            expectSourceContains arcVaultApiSource "| Some \"EBUSY\""
+            expectSourceContains arcVaultApiSource "| Some \"ENOTEMPTY\""
+            expectSourceContains arcVaultApiSource "attemptIndex < renameRetryStrategy.DelaysMs.Length - 1"
+            expectSourceContainsInOrder
+                arcVaultApiSource
+                [|
+                    "renamePath ="
+                    "runArcDiskMutation"
+                    "ArcRenameHelper.mergeReloadedArcAfterRename"
+                |]
+            expectSourceNotContains arcVaultApiSource "pathExistsAsync sourceAbsolutePath"
+            expectSourceNotContains arcVaultApiSource "pathExistsAsync targetAbsolutePath"
+            expectSourceNotContains arcVaultApiSource "do! vault.StopFileWatcher()"
+            expectSourceNotContains arcVaultApiSource "vault.StartFileWatcher()"
+        })
+
+    Vitest.test("file watcher uses windows polling options in createFileWatcher", fun () ->
+        promise {
+            let! arcVaultHelperSource = sourcePath [| "Main"; "ArcVault"; "ArcVaultHelper.fs" |] |> readUtf8FileAsync
+
+            expectSourceContains arcVaultHelperSource "let private windowsWatcherProfile"
+            expectSourceContains arcVaultHelperSource "if isWindowsPlatform () then windowsWatcherProfile"
+            expectSourceContains arcVaultHelperSource "UsePolling = Some true"
+            expectSourceContains arcVaultHelperSource "Interval = Some 200"
+            expectSourceContains arcVaultHelperSource "BinaryInterval = Some 400"
+            expectSourceContains arcVaultHelperSource "awaitWriteFinish = watcherProfile.AwaitWriteFinish"
+        })
 )
 
 Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
@@ -292,5 +337,94 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
             |> List.map _.Path
 
         Vitest.expect(helperFallbackPaths).toEqual(sharedFallbackPaths)
+    )
+
+    Vitest.test("rename event synthesis emits old canonical unlink and new canonical add events", fun () ->
+        let events =
+            ArcRenameHelper.buildRenameEvents "assays/OldAssay" "assays/NewAssay"
+
+        let unlinkPaths =
+            events
+            |> List.choose (fun event ->
+                match event.EventName with
+                | EventName.Unlink -> Some event.Path
+                | _ -> None
+            )
+
+        let addPaths =
+            events
+            |> List.choose (fun event ->
+                match event.EventName with
+                | EventName.Add -> Some event.Path
+                | _ -> None
+            )
+
+        Vitest.expect(unlinkPaths).toEqual([ "assays/OldAssay/isa.assay.xlsx"; "assays/OldAssay/isa.datamap.xlsx" ])
+        Vitest.expect(addPaths).toEqual([ "assays/NewAssay/isa.assay.xlsx"; "assays/NewAssay/isa.datamap.xlsx" ])
+    )
+
+    Vitest.test("rename event synthesis stays empty for generic path renames", fun () ->
+        let events =
+            ArcRenameHelper.buildRenameEvents "assays/StudyA/notes/info.md" "assays/StudyA/notes/renamed.md"
+
+        Vitest.expect(events).toEqual([])
+    )
+
+    Vitest.test("tryBuildRenamePlan resolves canonical ARC file rename to entity folder path", fun () ->
+        let result =
+            ArcRenameHelper.tryBuildRenamePlan {
+                relativePath = "assays/OldAssay/isa.assay.xlsx"
+                newName = "NewAssay"
+            }
+
+        match result with
+        | Error error -> failwith error.Message
+        | Ok plan ->
+            Vitest.expect(plan.SourcePath).toBe("assays/OldAssay")
+            Vitest.expect(plan.TargetPath).toBe("assays/NewAssay")
+    )
+
+    Vitest.test("mapRenameDiskError maps ENOENT to source-missing message", fun () ->
+        let mappedError =
+            ArcRenameHelper.mapRenameDiskError
+                "assays/OldAssay"
+                "assays/NewAssay"
+                (createNodeLikeError "ENOENT" "rename failed")
+
+        Vitest.expect(mappedError.Message.Contains "source path no longer exists on disk").toBe(true)
+    )
+
+    Vitest.test("mapRenameDiskError maps EEXIST and ENOTEMPTY to destination-exists message", fun () ->
+        let eexistMappedError =
+            ArcRenameHelper.mapRenameDiskError
+                "assays/OldAssay"
+                "assays/NewAssay"
+                (createNodeLikeError "EEXIST" "rename failed")
+
+        let enotemptyMappedError =
+            ArcRenameHelper.mapRenameDiskError
+                "assays/OldAssay"
+                "assays/NewAssay"
+                (createNodeLikeError "ENOTEMPTY" "rename failed")
+
+        Vitest.expect(eexistMappedError.Message.Contains "destination already exists").toBe(true)
+        Vitest.expect(enotemptyMappedError.Message.Contains "destination already exists").toBe(true)
+    )
+
+    Vitest.test("mapRenameDiskError maps EPERM and EACCES to lock/permission guidance", fun () ->
+        let epermMappedError =
+            ArcRenameHelper.mapRenameDiskError
+                "assays/OldAssay"
+                "assays/NewAssay"
+                (createNodeLikeError "EPERM" "rename failed")
+
+        let eaccesMappedError =
+            ArcRenameHelper.mapRenameDiskError
+                "assays/OldAssay"
+                "assays/NewAssay"
+                (createNodeLikeError "EACCES" "rename failed")
+
+        Vitest.expect(epermMappedError.Message.Contains "permission or file-lock conflict").toBe(true)
+        Vitest.expect(eaccesMappedError.Message.Contains "permission or file-lock conflict").toBe(true)
     )
 )

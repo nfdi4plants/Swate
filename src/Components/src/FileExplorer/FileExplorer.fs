@@ -114,6 +114,8 @@ type FileExplorer =
             ?onContextMenu: FileItem -> Swate.Components.FileExplorer.Types.ContextMenuItem list,
             ?canCreateItem: FileItem -> bool,
             ?onCreateItem: FileItem -> unit,
+            ?canRenameItem: FileItem -> bool,
+            ?onRenameItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
@@ -131,6 +133,7 @@ type FileExplorer =
         let showBreadcrumbs = defaultArg showBreadcrumbs true
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
+        let canRenameItem = defaultArg canRenameItem (fun (_: FileItem) -> false)
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
@@ -253,6 +256,8 @@ type FileExplorer =
                     ),
                     ?onCreateItem = onCreateItem,
                     canCreateItem = canCreateItem,
+                    ?onRenameItem = onRenameItem,
+                    canRenameItem = canRenameItem,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
                     ?children = childrenTree
@@ -264,6 +269,8 @@ type FileExplorer =
                     selectedNameClass,
                     getItemIconClass,
                     (fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch),
+                    ?onRenameItem = onRenameItem,
+                    canRenameItem = canRenameItem,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem
                 )

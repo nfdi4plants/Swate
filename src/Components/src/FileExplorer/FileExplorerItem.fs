@@ -34,6 +34,32 @@ type FileExplorerItem =
             Html.none
 
     [<ReactComponent>]
+    static member private RenameItemButton
+        (item: FileItem, onRenameItem: (FileItem -> unit) option, canRenameItem: FileItem -> bool)
+        =
+        let handleRenameItem (ev: Browser.Types.MouseEvent) =
+            ev.preventDefault ()
+            ev.stopPropagation ()
+            onRenameItem |> Option.iter (fun fn -> fn item)
+
+        if canRenameItem item && onRenameItem.IsSome then
+            Html.button [
+                prop.type'.button
+                prop.className
+                    "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:opacity-0 swt:transition-opacity swt:group-hover:opacity-100 swt:focus:opacity-100"
+                prop.ariaLabel $"Rename {item.Name}"
+                prop.title $"Rename {item.Name}"
+                prop.onClick handleRenameItem
+                prop.children [
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--edit-24-regular swt:size-4"
+                    ]
+                ]
+            ]
+        else
+            Html.none
+
+    [<ReactComponent>]
     static member private DeleteItemButton
         (item: FileItem, onDeleteItem: (FileItem -> unit) option, canDeleteItem: FileItem -> bool)
         =
@@ -150,13 +176,17 @@ type FileExplorerItem =
             onDirectoryArrowToggle: Browser.Types.MouseEvent -> unit,
             ?onCreateItem: FileItem -> unit,
             ?canCreateItem: FileItem -> bool,
+            ?onRenameItem: FileItem -> unit,
+            ?canRenameItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool,
             ?children: ReactElement
         ) =
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
+        let canRenameItem = defaultArg canRenameItem (fun (_: FileItem) -> false)
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let canCreateFromDirectory = canCreateItem item && onCreateItem.IsSome
+        let canRenameFromDirectory = canRenameItem item && onRenameItem.IsSome
         let canDeleteFromDirectory = canDeleteItem item && onDeleteItem.IsSome
 
         let directoryToggleIconClass =
@@ -212,6 +242,7 @@ type FileExplorerItem =
                                 if item.IsLFS = Some true
                                    || canExpandDirectory
                                    || canCreateFromDirectory
+                                   || canRenameFromDirectory
                                    || canDeleteFromDirectory then
                                     Html.div [
                                         prop.className "swt:ml-auto swt:shrink-0 swt:flex swt:items-center swt:gap-2"
@@ -220,6 +251,12 @@ type FileExplorerItem =
                                                 item,
                                                 onCreateItem,
                                                 canCreateItem
+                                            )
+
+                                            FileExplorerItem.RenameItemButton (
+                                                item,
+                                                onRenameItem,
+                                                canRenameItem
                                             )
 
                                             FileExplorerItem.DeleteItemButton (
@@ -279,10 +316,14 @@ type FileExplorerItem =
             selectedNameClass: string,
             getItemIconClass: FileItem -> string option,
             onSelect: unit -> unit,
+            ?onRenameItem: FileItem -> unit,
+            ?canRenameItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool
         ) =
+        let canRenameItem = defaultArg canRenameItem (fun (_: FileItem) -> false)
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
+        let canRenameFromFile = canRenameItem item && onRenameItem.IsSome
         let canDeleteFromFile = canDeleteItem item && onDeleteItem.IsSome
 
         Html.li [
@@ -318,10 +359,16 @@ type FileExplorerItem =
                             ]
                         ]
 
-                        if item.IsLFS = Some true || canDeleteFromFile then
+                        if item.IsLFS = Some true || canRenameFromFile || canDeleteFromFile then
                             Html.div [
                                 prop.className "swt:flex swt:items-center swt:gap-2"
                                 prop.children [
+                                    FileExplorerItem.RenameItemButton (
+                                        item,
+                                        onRenameItem,
+                                        canRenameItem
+                                    )
+
                                     FileExplorerItem.DeleteItemButton (
                                         item,
                                         onDeleteItem,

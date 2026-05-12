@@ -37,5 +37,5 @@ module FileExplorerDeleteHelper =
         pendingPath
         |> Option.map normalizeRelativePath
         |> Option.exists (fun normalizedPendingPath ->
-            isSameOrDescendantPath normalizedPendingPath normalizedDeletedPath
+            PathHelpers.isSameOrDescendantPathForFsComparison normalizedPendingPath normalizedDeletedPath
         )

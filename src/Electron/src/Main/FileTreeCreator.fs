@@ -72,7 +72,7 @@ let removePathAndDescendants (targetPath: string) (fileTree: Dictionary<string, 
     else
         let keysToRemove =
             nextTree.Keys
-            |> Seq.filter (fun path -> isSameOrDescendantPath path normalizedTargetPath)
+            |> Seq.filter (fun path -> PathHelpers.isSameOrDescendantPath path normalizedTargetPath)
             |> Seq.toArray
 
         keysToRemove |> Array.iter (fun path -> nextTree.Remove(path) |> ignore)

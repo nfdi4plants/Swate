@@ -11,6 +11,43 @@ open Main
 open Main.Bindings
 open Node.Api
 
+let private processDynamic: obj = emitJsExpr () "process"
+
+let private isWindowsPlatform () =
+    try
+        let platform = processDynamic?platform |> unbox<string>
+        platform = "win32"
+    with _ ->
+        false
+
+type private FileWatcherProfile = {
+    AwaitWriteFinish: bool
+    IgnoreInitial: bool
+    UsePolling: bool option
+    Interval: int option
+    BinaryInterval: int option
+}
+
+let private defaultWatcherProfile = {
+    AwaitWriteFinish = true
+    IgnoreInitial = true
+    UsePolling = None
+    Interval = None
+    BinaryInterval = None
+}
+
+// Polling on Windows increases event reliability for external xlsx edits at the cost of more filesystem polling.
+let private windowsWatcherProfile = {
+    AwaitWriteFinish = true
+    IgnoreInitial = true
+    UsePolling = Some true
+    Interval = Some 200
+    BinaryInterval = Some 400
+}
+
+let private activeWatcherProfile () =
+    if isWindowsPlatform () then windowsWatcherProfile else defaultWatcherProfile
+
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
@@ -182,11 +219,20 @@ let createFileWatcher (path: string) =
             else
                 false
 
-    let watcher =
-        Chokidar.Chokidar.watch (
-            path,
-            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
+    let watcherProfile = activeWatcherProfile ()
+
+    let watcherOptions =
+        Chokidar.WatchOptions(
+            cwd = path,
+            awaitWriteFinish = watcherProfile.AwaitWriteFinish,
+            ignored = !^ignoreFn,
+            ignoreInitial = watcherProfile.IgnoreInitial,
+            ?usePolling = watcherProfile.UsePolling,
+            ?interval = watcherProfile.Interval,
+            ?binaryInterval = watcherProfile.BinaryInterval
         )
+
+    let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 
     watcher
 
