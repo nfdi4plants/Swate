@@ -782,14 +782,17 @@ type GitSidebar =
                                     "swt:fluent--broom-24-regular",
                                     props.IsBusy,
                                     props.SubmitPruneLfsCache,
-                                    testId = "GitSidebarLfsPruneButton"
+                                    testId = "GitSidebarLfsPruneButton",
+                                    tooltipText =
+                                        "Clean LFS Cache:\n- git lfs prune --verify-remote --verify-unreachable --when-unverified=halt"
                                 )
                                 GitSidebar.ActionButton(
                                     "Reduce LFS Storage",
                                     "swt:fluent--folder-sync-24-regular",
                                     props.IsBusy,
                                     props.SubmitDedupLfsStorage,
-                                    testId = "GitSidebarLfsDedupButton"
+                                    testId = "GitSidebarLfsDedupButton",
+                                    tooltipText = "Reduce LFS Storage:\n- git lfs dedup"
                                 )
                             ]
                         ]

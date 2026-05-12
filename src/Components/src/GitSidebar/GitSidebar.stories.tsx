@@ -347,6 +347,14 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
       "title",
       "Upload Changes:\n- git push origin",
     );
+    await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toHaveAttribute(
+      "title",
+      "Clean LFS Cache:\n- git lfs prune --verify-remote --verify-unreachable --when-unverified=halt",
+    );
+    await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toHaveAttribute(
+      "title",
+      "Reduce LFS Storage:\n- git lfs dedup",
+    );
   },
 };
 
