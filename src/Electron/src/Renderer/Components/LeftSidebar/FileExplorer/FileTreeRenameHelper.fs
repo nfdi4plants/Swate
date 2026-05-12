@@ -4,8 +4,12 @@ open Swate.Components.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.RenamePathRules
-open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
+
+let private tryGetItemRelativePath (item: FileItem) =
+    item.Path
+    |> Option.map PathHelpers.normalizeRelativePath
+    |> Option.map PathHelpers.normalizePath
 
 let private normalizeRelativePath (path: string) =
     path
