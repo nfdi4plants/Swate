@@ -17,9 +17,13 @@ module private FileExplorerHelper =
 
     let private normalizeNodePath (path: string) = normalizePath path
 
-    let private pathSegments (path: string) = path |> normalizeNodePath |> getNonEmptyPathParts
+    let private pathSegments (path: string) =
+        path |> normalizeNodePath |> getNonEmptyPathParts
 
     let private lowerInvariant (value: string) = value.ToLowerInvariant()
+
+    let private rootConceptFromPath (path: string) =
+        pathSegments path |> Array.tryHead |> Option.map lowerInvariant
 
     let private iconForArcCollectionFolder =
         function
@@ -30,15 +34,6 @@ module private FileExplorerHelper =
         | "notes" -> Some FileItemIcon.Notebook
         | _ -> None
 
-    let private iconToneForArcCollectionFolder =
-        function
-        | "studies" -> Some FileItemIconTone.Accent
-        | "assays" -> Some FileItemIconTone.Success
-        | "workflows" -> Some FileItemIconTone.Primary
-        | "runs" -> Some FileItemIconTone.Warning
-        | "notes" -> Some FileItemIconTone.Error
-        | _ -> None
-
     let private iconForArcWorkbookFile =
         function
         | "isa.study.xlsx" -> Some FileItemIcon.Study
@@ -47,35 +42,59 @@ module private FileExplorerHelper =
         | "isa.run.xlsx" -> Some FileItemIcon.Run
         | _ -> None
 
-    let private iconToneForArcWorkbookFile =
+    let private folderToneForConcept =
         function
-        | "isa.study.xlsx" -> Some FileItemIconTone.Accent
-        | "isa.assay.xlsx" -> Some FileItemIconTone.Success
-        | "isa.workflow.xlsx" -> Some FileItemIconTone.Primary
-        | "isa.run.xlsx" -> Some FileItemIconTone.Warning
+        | "studies" -> Some FileItemIconTone.StudyFolder
+        | "assays" -> Some FileItemIconTone.AssayFolder
+        | "workflows" -> Some FileItemIconTone.WorkflowFolder
+        | "runs" -> Some FileItemIconTone.RunFolder
+        | "notes" -> Some FileItemIconTone.NotesFolder
+        | _ -> None
+
+    let private workbookToneForConcept =
+        function
+        | "studies" -> Some FileItemIconTone.StudyWorkbook
+        | "assays" -> Some FileItemIconTone.AssayWorkbook
+        | "workflows" -> Some FileItemIconTone.WorkflowWorkbook
+        | "runs" -> Some FileItemIconTone.RunWorkbook
+        | "notes" -> Some FileItemIconTone.NotesWorkbook
+        | _ -> None
+
+    let private datamapToneForConcept =
+        function
+        | "studies" -> Some FileItemIconTone.StudyDatamap
+        | "assays" -> Some FileItemIconTone.AssayDatamap
+        | "workflows" -> Some FileItemIconTone.WorkflowDatamap
+        | "runs" -> Some FileItemIconTone.RunDatamap
+        | "notes" -> Some FileItemIconTone.NotesDatamap
+        | _ -> None
+
+    let private workbookToneForFileName =
+        function
+        | "isa.study.xlsx" -> Some FileItemIconTone.StudyWorkbook
+        | "isa.assay.xlsx" -> Some FileItemIconTone.AssayWorkbook
+        | "isa.workflow.xlsx" -> Some FileItemIconTone.WorkflowWorkbook
+        | "isa.run.xlsx" -> Some FileItemIconTone.RunWorkbook
         | _ -> None
 
     let private folderIcon (path: string) =
         let segments = pathSegments path
 
         match segments |> Array.tryHead |> Option.map lowerInvariant, segments.Length with
-        | Some rootSegment, 1 -> iconForArcCollectionFolder rootSegment |> Option.defaultValue FileItemIcon.Folder
+        | Some rootSegment, 1 ->
+            iconForArcCollectionFolder rootSegment
+            |> Option.defaultValue FileItemIcon.Folder
+
         | Some "studies", 2 -> FileItemIcon.Study
         | Some "assays", 2 -> FileItemIcon.Assay
         | Some "workflows", 2 -> FileItemIcon.Workflow
         | Some "runs", 2 -> FileItemIcon.Run
+        | Some "notes", 2 -> FileItemIcon.Notebook
+
         | _ -> FileItemIcon.Folder
 
     let private folderIconTone (path: string) =
-        let segments = pathSegments path
-
-        match segments |> Array.tryHead |> Option.map lowerInvariant, segments.Length with
-        | Some rootSegment, 1 -> iconToneForArcCollectionFolder rootSegment
-        | Some "studies", 2 -> Some FileItemIconTone.Accent
-        | Some "assays", 2 -> Some FileItemIconTone.Success
-        | Some "workflows", 2 -> Some FileItemIconTone.Primary
-        | Some "runs", 2 -> Some FileItemIconTone.Warning
-        | _ -> None
+        path |> rootConceptFromPath |> Option.bind folderToneForConcept
 
     let private fileIcon (path: string) =
         let normalizedPath = normalizeNodePath path
@@ -84,25 +103,44 @@ module private FileExplorerHelper =
 
         match iconForArcWorkbookFile fileName with
         | Some icon -> icon
+
         | None when DatamapParentInfo.tryFromPath normalizedPath |> Option.isSome -> FileItemIcon.Table
-        | None when (segments |> Array.tryHead |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
-                     && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ->
+
+        | None when
+            (segments
+             |> Array.tryHead
+             |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
+            && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+            ->
             FileItemIcon.Note
+
         | None when fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) -> FileItemIcon.Table
+
         | None -> FileItemIcon.Document
 
     let private fileIconTone (path: string) =
         let normalizedPath = normalizeNodePath path
         let segments = pathSegments normalizedPath
         let fileName = getFileName normalizedPath |> lowerInvariant
+        let rootConcept = rootConceptFromPath normalizedPath
 
-        match iconToneForArcWorkbookFile fileName with
+        match workbookToneForFileName fileName with
         | Some tone -> Some tone
-        | None when DatamapParentInfo.tryFromPath normalizedPath |> Option.isSome -> Some FileItemIconTone.Info
-        | None when (segments |> Array.tryHead |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
-                     && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ->
-            Some FileItemIconTone.Error
-        | None when fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) -> Some FileItemIconTone.Info
+
+        | None when DatamapParentInfo.tryFromPath normalizedPath |> Option.isSome ->
+            rootConcept |> Option.bind datamapToneForConcept
+
+        | None when
+            (segments
+             |> Array.tryHead
+             |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
+            && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+            ->
+            Some FileItemIconTone.NotesWorkbook
+
+        | None when fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) ->
+            rootConcept |> Option.bind workbookToneForConcept
+
         | None -> None
 
     let rec private collectSelectedDirectoryPathChain
@@ -139,11 +177,7 @@ module private FileExplorerHelper =
 
         collectSelectedDirectoryPathChain selectedTreeItemPath root rootPathSet
 
-    let rec loopPaths
-        (loadedDirectoryPaths: Set<string>)
-        (selectedTreeItemPath: string option)
-        (parent: FileTreeNode)
-        =
+    let rec loopPaths (loadedDirectoryPaths: Set<string>) (selectedTreeItemPath: string option) (parent: FileTreeNode) =
         match parent.isDirectory with
         | true ->
             let normalizedParentPath = normalizeNodePath parent.path
@@ -169,6 +203,7 @@ module private FileExplorerHelper =
                     IsLFS = parent.isLfs
                     Children = Some tmp
             }
+
         | false ->
             Some {
                 FileTree.createFile parent.name (Some parent.path) (fileIcon parent.path) with
@@ -206,7 +241,8 @@ type FileExplorer =
                         fileStateCtx.state.FileTree
                         |> toFileTreeNode
                         |> collapseSingleChildSameNameDirectories
-                        |> Some),
+                        |> Some
+                ),
                 [| box fileStateCtx.state.FileTree |]
             )
 
@@ -215,27 +251,27 @@ type FileExplorer =
                 (fun () ->
                     match fileTree with
                     | Some tree -> requiredLoadedDirectoryPaths fileStateCtx.state.Selection.TreePath tree
-                    | None -> Set.empty),
-                [| box fileTree; box fileStateCtx.state.Selection.TreePath |]
+                    | None -> Set.empty
+                ),
+                [|
+                    box fileTree
+                    box fileStateCtx.state.Selection.TreePath
+                |]
             )
 
         let loadedDirectoryPaths, setLoadedDirectoryPaths =
             React.useStateWithUpdater requiredLoadedDirectories
 
-        React.useEffect (
-            (fun () -> setLoadedDirectoryPaths (fun _ -> requiredLoadedDirectories)),
-            [| box fileTree |]
-        )
+        React.useEffect ((fun () -> setLoadedDirectoryPaths (fun _ -> requiredLoadedDirectories)), [| box fileTree |])
 
         React.useEffect (
             (fun () ->
                 setLoadedDirectoryPaths (fun current ->
                     let next = Set.union current requiredLoadedDirectories
 
-                    if next = current then
-                        current
-                    else
-                        next)),
+                    if next = current then current else next
+                )
+            ),
             [| box requiredLoadedDirectories |]
         )
 
@@ -245,7 +281,10 @@ type FileExplorer =
 
         let setError (errorMsg: string option) =
             match errorMsg with
-            | Some msg -> errorModal.enqueue (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
+            | Some msg ->
+                errorModal.enqueue (
+                    ErrorModalRequest.create (msg, title = "Git LFS update failed", ?scopeId = arcScopeId)
+                )
             | None -> ()
 
         let toggleLfsMark =
@@ -259,7 +298,11 @@ type FileExplorer =
                 match item.Path with
                 | None ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create($"File '{item.Name}' has no path.", title = "Preview failed", ?scopeId = arcScopeId)
+                        ErrorModalRequest.create (
+                            $"File '{item.Name}' has no path.",
+                            title = "Preview failed",
+                            ?scopeId = arcScopeId
+                        )
                     )
                 | Some path when item.IsDirectory ->
                     if not item.IsExpanded then
@@ -269,7 +312,8 @@ type FileExplorer =
                             if current.Contains normalizedPath then
                                 current
                             else
-                                current.Add normalizedPath)
+                                current.Add normalizedPath
+                        )
 
                     let selectedPath = normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))

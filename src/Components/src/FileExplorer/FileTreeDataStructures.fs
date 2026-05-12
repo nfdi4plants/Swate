@@ -14,6 +14,27 @@ type FileItemIconTone =
     | Accent
     | Error
 
+    // Custom tones for specific file types
+    | StudyFolder
+    | StudyWorkbook
+    | StudyDatamap
+
+    | AssayFolder
+    | AssayWorkbook
+    | AssayDatamap
+
+    | WorkflowFolder
+    | WorkflowWorkbook
+    | WorkflowDatamap
+
+    | RunFolder
+    | RunWorkbook
+    | RunDatamap
+
+    | NotesFolder
+    | NotesWorkbook
+    | NotesDatamap
+
 [<RequireQualifiedAccess>]
 module FileItemIconTone =
 
@@ -28,6 +49,27 @@ module FileItemIconTone =
         | FileItemIconTone.Info -> "swt:text-info"
         | FileItemIconTone.Accent -> "swt:text-accent"
         | FileItemIconTone.Error -> "swt:text-error"
+
+        // Custom tones for specific file types
+        | FileItemIconTone.StudyFolder -> "swt:text-amber-500"
+        | FileItemIconTone.StudyWorkbook -> "swt:text-amber-700"
+        | FileItemIconTone.StudyDatamap -> "swt:text-amber-900"
+
+        | FileItemIconTone.AssayFolder -> "swt:text-lime-500"
+        | FileItemIconTone.AssayWorkbook -> "swt:text-lime-700"
+        | FileItemIconTone.AssayDatamap -> "swt:text-lime-900"
+
+        | FileItemIconTone.WorkflowFolder -> "swt:text-emerald-500"
+        | FileItemIconTone.WorkflowWorkbook -> "swt:text-emerald-700"
+        | FileItemIconTone.WorkflowDatamap -> "swt:text-emerald-900"
+
+        | FileItemIconTone.RunFolder -> "swt:text-cyan-500"
+        | FileItemIconTone.RunWorkbook -> "swt:text-cyan-700"
+        | FileItemIconTone.RunDatamap -> "swt:text-cyan-900"
+
+        | FileItemIconTone.NotesFolder -> "swt:text-rose-500"
+        | FileItemIconTone.NotesWorkbook -> "swt:text-rose-700"
+        | FileItemIconTone.NotesDatamap -> "swt:text-rose-900"
 
 [<RequireQualifiedAccess>]
 type FileItemIcon =
@@ -340,8 +382,7 @@ module FileExplorerLogic =
             if includeSelectedItem then
                 pathItems
             else
-                pathItems
-                |> List.take (max 0 (List.length pathItems - 1))
+                pathItems |> List.take (max 0 (List.length pathItems - 1))
 
         expandablePathItems
         |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
@@ -395,17 +436,16 @@ module FileExplorerLogic =
         | RenameItem of string * string
         | ToggleLFSDownload of string
 
-    let init items =
-        {
-            Items = items
-            SelectedId = None
-            BreadcrumbPath = []
-            ExpandedIds = collectExpandedIds Set.empty items
-            ContextMenuVisible = false
-            ContextMenuX = 0.0
-            ContextMenuY = 0.0
-            ContextMenuItems = []
-        }
+    let init items = {
+        Items = items
+        SelectedId = None
+        BreadcrumbPath = []
+        ExpandedIds = collectExpandedIds Set.empty items
+        ContextMenuVisible = false
+        ContextMenuX = 0.0
+        ContextMenuY = 0.0
+        ContextMenuItems = []
+    }
 
     let rec update msg model =
         match msg with
@@ -478,12 +518,9 @@ module FileExplorerLogic =
             let expandedFromItems = collectExpandedIds Set.empty items
 
             let persistedExpanded =
-                model.ExpandedIds
-                |> Set.filter (fun id -> validIds.Contains id)
+                model.ExpandedIds |> Set.filter (fun id -> validIds.Contains id)
 
-            let persistedSelectedId =
-                model.SelectedId
-                |> Option.filter validIds.Contains
+            let persistedSelectedId = model.SelectedId |> Option.filter validIds.Contains
 
             let nextSelectedId =
                 selectedItemId
