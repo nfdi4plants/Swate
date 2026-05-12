@@ -316,6 +316,7 @@ type FileTree =
                             onItemClick = openPreview,
                             onDirectoryArrowToggle = handleDirectoryArrowToggle,
                             onContextMenu = createContextMenuItems,
+                            getItemIconClass = getItemIconClass,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
                             canDeleteItem = canDeleteItem,

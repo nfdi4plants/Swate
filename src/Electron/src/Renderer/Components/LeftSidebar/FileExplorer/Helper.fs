@@ -1,5 +1,6 @@
 module Renderer.Components.LeftSidebar.FileExplorer.Helper
 
+open System
 open Swate.Components
 open Swate.Components.FileExplorer.Types
 open Swate.Components.Shared
@@ -7,6 +8,104 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 open Types
+
+let private normalizeNodePath (path: string) = PathHelpers.normalizePath path
+
+let private pathSegments (path: string) = path |> normalizeNodePath |> getNonEmptyPathParts
+
+let private lowerInvariant (value: string) = value.ToLowerInvariant()
+
+let private iconForArcCollectionFolder =
+    function
+    | "studies" -> Some FileItemIcon.Study
+    | "assays" -> Some FileItemIcon.Assay
+    | "workflows" -> Some FileItemIcon.Workflow
+    | "runs" -> Some FileItemIcon.Run
+    | "notes" -> Some FileItemIcon.Notebook
+    | _ -> None
+
+let private colorClassForArcCollectionFolder =
+    function
+    | "studies" -> Some "swt:text-amber-500"
+    | "assays" -> Some "swt:text-lime-500"
+    | "workflows" -> Some "swt:text-emerald-500"
+    | "runs" -> Some "swt:text-cyan-500"
+    | _ -> None
+
+let private iconForArcWorkbookFile =
+    function
+    | "isa.study.xlsx" -> Some FileItemIcon.Study
+    | "isa.assay.xlsx" -> Some FileItemIcon.Assay
+    | "isa.workflow.xlsx" -> Some FileItemIcon.Workflow
+    | "isa.run.xlsx" -> Some FileItemIcon.Run
+    | _ -> None
+
+let private colorClassForArcWorkbookFile =
+    function
+    | "isa.study.xlsx" -> Some "swt:text-amber-300"
+    | "isa.assay.xlsx" -> Some "swt:text-lime-300"
+    | "isa.workflow.xlsx" -> Some "swt:text-emerald-300"
+    | "isa.run.xlsx" -> Some "swt:text-cyan-300"
+    | _ -> None
+
+let private colorClassForDatamapPath (path: string) =
+    match DatamapParentInfo.tryFromPath path with
+    | Some dmpi ->
+        match dmpi.Parent with
+        | DataMapParent.Study -> Some "swt:text-amber-700"
+        | DataMapParent.Assay -> Some "swt:text-lime-700"
+        | DataMapParent.Workflow -> Some "swt:text-emerald-700"
+        | DataMapParent.Run -> Some "swt:text-cyan-700"
+    | None -> None
+
+let private folderIcon (path: string) =
+    let segments = pathSegments path
+
+    match segments |> Array.tryHead |> Option.map lowerInvariant, segments.Length with
+    | Some rootSegment, 1 -> iconForArcCollectionFolder rootSegment |> Option.defaultValue FileItemIcon.Folder
+    | Some "studies", 2 -> FileItemIcon.Study
+    | Some "assays", 2 -> FileItemIcon.Assay
+    | Some "workflows", 2 -> FileItemIcon.Workflow
+    | Some "runs", 2 -> FileItemIcon.Run
+    | Some "notes", _ -> FileItemIcon.Notebook
+    | _ -> FileItemIcon.Folder
+
+let private fileIcon (path: string) =
+    let normalizedPath = normalizeNodePath path
+    let segments = pathSegments normalizedPath
+    let fileName = PathHelpers.getFileName normalizedPath |> lowerInvariant
+
+    match colorClassForDatamapPath normalizedPath with
+    | Some _ -> FileItemIcon.Database
+    | None ->
+        match iconForArcWorkbookFile fileName with
+        | Some icon -> icon
+        | None when (segments |> Array.tryHead |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
+                     && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ->
+            FileItemIcon.Note
+        | None when fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) -> FileItemIcon.Table
+        | None -> FileItemIcon.Document
+
+let getItemIconClass (item: FileItem) =
+    match item.Path with
+    | None -> None
+    | Some path when item.IsDirectory ->
+        let segments = pathSegments path
+
+        match segments |> Array.tryHead |> Option.map lowerInvariant, segments.Length with
+        | Some rootSegment, 1 -> colorClassForArcCollectionFolder rootSegment
+        | Some "studies", 2 -> Some "swt:text-amber-500"
+        | Some "assays", 2 -> Some "swt:text-lime-500"
+        | Some "workflows", 2 -> Some "swt:text-emerald-500"
+        | Some "runs", 2 -> Some "swt:text-cyan-500"
+        | _ -> None
+    | Some path ->
+        let normalizedPath = normalizeNodePath path
+        let fileName = PathHelpers.getFileName normalizedPath |> lowerInvariant
+
+        match colorClassForDatamapPath normalizedPath with
+        | Some colorClass -> Some colorClass
+        | None -> colorClassForArcWorkbookFile fileName
 
 
 let tryGetArcFileRelativePath (arcFile: ArcFiles) =
@@ -103,7 +202,7 @@ let rec loopPaths (loadedDirectoryPaths: Set<string>) (selectedTreeItemPath: str
             else Some []
 
         {
-            FileTree.createFolder parent.name (Some parent.path) FileItemIcon.Folder with
+            FileTree.createFolder parent.name (Some parent.path) (folderIcon parent.path) with
                 Id = parent.path
                 IsExpanded =
                     selectedTreeItemPath
@@ -114,7 +213,7 @@ let rec loopPaths (loadedDirectoryPaths: Set<string>) (selectedTreeItemPath: str
         |> Some
     | false ->
         {
-            FileTree.createFile parent.name (Some parent.path) FileItemIcon.Document with
+            FileTree.createFile parent.name (Some parent.path) (fileIcon parent.path) with
                 Id = parent.path
         }
         |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState parent
