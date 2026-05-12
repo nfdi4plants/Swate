@@ -10,6 +10,38 @@ open Swate.Components.AnnotationTable
 open Swate.Components.AnnotationTable.Context
 open Swate.Components.Widgets.Context
 
+/// This context is designed to be used only internally in this file.
+module private FilePickerWidgetContext =
+
+    let SelectedPathsCtx =
+        React.createContext<StateUpdaterContext<string list>> (unbox null)
+
+    [<Hook>]
+    let useSelectedPathsCtx () = React.useContext SelectedPathsCtx
+
+    [<Hook>]
+    let useSelectedPathCtx (path: string) =
+        let ctx = useSelectedPathsCtx ()
+        let isSelected = List.contains path ctx.state
+
+        let toggle =
+            React.useCallback (
+                (fun () ->
+                    ctx.setStateUpdater (fun current ->
+                        if isSelected then
+                            List.filter ((<>) path) current
+                        else
+                            path :: current
+                    )
+                ),
+                [| box ctx; box path |]
+            )
+
+        {|
+            isSelected = isSelected
+            toggle = toggle
+        |}
+
 module private FilePickerWidgetHelper =
     let appendPickedPaths (setPaths: (string[] -> string[]) -> unit) =
         fun (paths: string[]) ->
@@ -18,14 +50,6 @@ module private FilePickerWidgetHelper =
 
                     Array.append existingPaths paths |> Array.distinct
                 )
-
-    let clearPaths (setPaths: (string[] -> string[]) -> unit) = fun () -> setPaths (fun _ -> [||])
-
-    let sortAscending (setPaths: (string[] -> string[]) -> unit) =
-        fun () -> setPaths (fun current -> current |> Array.sortBy id)
-
-    let sortDescending (setPaths: (string[] -> string[]) -> unit) =
-        fun () -> setPaths (fun current -> current |> Array.sortByDescending id)
 
     let movePathByIndex (setPaths: (string[] -> string[]) -> unit) =
         fun (oldIndex: int) (newIndex: int) ->
@@ -53,30 +77,28 @@ module private FilePickerWidgetHelper =
         (paths: string[])
         (selectedCells: option<CellCoordinateRange>)
         =
-        fun () ->
+        match arcFile.TryGetActiveTable(activeTableIndex), selectedCells with
+        | Some(_, table), Some selection ->
+            let columnIndex = selection.xStart
+            let mutable rowIndex = selection.yStart
 
-            match arcFile.TryGetActiveTable(activeTableIndex), selectedCells with
-            | Some(_, table), Some selection ->
-                let columnIndex = selection.xStart
-                let mutable rowIndex = selection.yStart
+            let cellsToInsert = [|
+                for path in paths do
+                    match table.TryGetCellAt(columnIndex, rowIndex) with
+                    | Some cell ->
+                        let nextCell = cell.UpdateMainField path
+                        let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
+                        coordinate, nextCell
+                        rowIndex <- rowIndex + 1
+                    | None -> ()
+            |]
 
-                let cellsToInsert = [|
-                    for path in paths do
-                        match table.TryGetCellAt(columnIndex, rowIndex) with
-                        | Some cell ->
-                            let nextCell = cell.UpdateMainField path
-                            let coordinate: CellCoordinate = {| x = columnIndex; y = rowIndex |}
-                            coordinate, nextCell
-                            rowIndex <- rowIndex + 1
-                        | None -> ()
-                |]
-
-                if cellsToInsert.Length = 0 then
-                    failwith "No valid cells to insert paths into. Please check the selected range and try again."
-                else
-                    table.SetCellsAt cellsToInsert
-                    setArcFile (ArcFiles.refreshRef arcFile)
-            | _ -> ()
+            if cellsToInsert.Length = 0 then
+                failwith "No valid cells to insert paths into. Please check the selected range and try again."
+            else
+                table.SetCellsAt cellsToInsert
+                setArcFile (ArcFiles.refreshRef arcFile)
+        | _ -> ()
 
 
 [<Erase; Mangle(false)>]
@@ -85,16 +107,10 @@ type FilePickerWidget =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private SortableTableRow
-        (
-            index: int,
-            path: string,
-            isSelected: bool,
-            movePath: int -> int -> unit,
-            removePath: int -> unit,
-            setIsSelected: (bool -> unit),
-            ?key: string
-        ) =
+        (index: int, path: string, movePath: int -> int -> unit, removePath: int -> unit, ?key: string)
+        =
         let sortable = DndKit.useSortable ({| id = path |})
+        let filerPickerItemCtx = FilePickerWidgetContext.useSelectedPathCtx path
 
         let style = [
             style.custom ("transform", DndKit.CSS.Transform.toString sortable.transform)
@@ -105,10 +121,10 @@ type FilePickerWidget =
             prop.key path
             prop.ref sortable.setNodeRef
             prop.style style
-            prop.onClick (fun _ -> setIsSelected (not isSelected))
+            prop.onClick (fun _ -> filerPickerItemCtx.toggle ())
             prop.className [
                 "swt:cursor-pointer swt:table-auto"
-                if isSelected then
+                if filerPickerItemCtx.isSelected then
                     "swt:bg-base-300"
             ]
             prop.children [
@@ -122,18 +138,6 @@ type FilePickerWidget =
                             yield! prop.spread sortable.attributes
                             yield! prop.spread sortable.listeners
                             prop.children [ Icons.ArrowUpDown() ]
-                        ]
-                    ]
-                ]
-                Html.td [
-                    prop.className "swt:w-10"
-                    prop.children [
-                        Html.input [
-                            prop.onClick (fun e -> e.stopPropagation ())
-                            prop.className "swt:checkbox"
-                            prop.type'.checkbox
-                            prop.isChecked isSelected
-                            prop.onChange setIsSelected
                         ]
                     ]
                 ]
@@ -189,8 +193,6 @@ type FilePickerWidget =
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private Table(paths: string[], setPaths: (string[] -> string[]) -> unit) =
 
-        let selectedPaths, setSelectedPaths = React.useStateWithUpdater ([]: string list)
-
         let movePath =
             React.useCallback (
                 (fun current next -> FilePickerWidgetHelper.movePathByIndex setPaths current next),
@@ -210,23 +212,8 @@ type FilePickerWidget =
                         Html.tbody [
                             for index in 0 .. paths.Length - 1 do
                                 let path = paths.[index]
-                                let isSelected = List.contains path selectedPaths
 
-                                let setIsSelected (value: bool) =
-                                    if value then
-                                        setSelectedPaths (fun prev -> path :: prev)
-                                    else
-                                        setSelectedPaths (fun prev -> List.filter ((<>) path) prev)
-
-                                FilePickerWidget.SortableTableRow(
-                                    index,
-                                    path,
-                                    isSelected,
-                                    movePath,
-                                    removePath,
-                                    setIsSelected,
-                                    key = path
-                                )
+                                FilePickerWidget.SortableTableRow(index, path, movePath, removePath, key = path)
                         ]
                     ]
                 ]
@@ -236,9 +223,10 @@ type FilePickerWidget =
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private SortPathsButtons(setPaths: (string[] -> string[]) -> unit) =
 
-        let sortAscending = FilePickerWidgetHelper.sortAscending setPaths
+        let sortAscending = fun () -> setPaths (fun current -> current |> Array.sortBy id)
 
-        let sortDescending = FilePickerWidgetHelper.sortDescending setPaths
+        let sortDescending =
+            fun () -> setPaths (fun current -> current |> Array.sortByDescending id)
 
         Html.div [
             prop.className "swt:join"
@@ -305,27 +293,57 @@ type FilePickerWidget =
 
     [<ReactComponent>]
     static member private ActionButtons
-        (pickPaths, clearPaths: unit -> unit, insertPaths: unit -> unit, canInsert: bool)
+        (setPaths: (string[] -> string[]) -> unit, pickPaths, insertPaths: bool -> unit, canInsert: bool)
         =
+        let selectedPathsCtx = FilePickerWidgetContext.useSelectedPathsCtx ()
+
         Html.div [
             prop.className "swt:flex swt:gap-2 swt:w-full"
             prop.children [
                 Html.button [
                     prop.className "swt:btn swt:btn-outline"
-                    prop.text "Clear"
-                    prop.onClick (fun _ -> clearPaths ())
-                ]
-                Html.button [
-                    prop.className "swt:btn swt:btn-neutral"
                     prop.text "Pick more files"
+                    prop.title "Select more file paths and add them to the list"
                     prop.onClick (fun _ -> pickPaths ())
                 ]
-                Html.button [
-                    prop.className "swt:btn swt:btn-primary swt:ml-auto"
-                    prop.disabled (not canInsert)
-                    prop.text "Insert file names"
-                    prop.onClick (fun _ -> insertPaths ())
-                ]
+                match selectedPathsCtx.state with
+                | [] ->
+                    Html.button [
+                        prop.className "swt:btn swt:btn-neutral"
+                        prop.text "Clear"
+                        prop.title "Clear all file paths from the list"
+                        prop.onClick (fun _ -> setPaths (fun _ -> [||]))
+                    ]
+
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                        prop.disabled (not canInsert)
+                        prop.text "Insert file names"
+                        prop.title
+                            "Insert file paths into the currently selected table cells. Requires an active table view and selected cells."
+                        prop.onClick (fun _ -> insertPaths false)
+                    ]
+                | _ ->
+                    Html.button [
+                        prop.className "swt:btn swt:btn-neutral"
+                        prop.text "Clear Selected"
+                        prop.title "Clear only the currently selected paths from the list"
+                        prop.onClick (fun _ ->
+                            setPaths (fun current ->
+                                let selected = selectedPathsCtx.state
+                                current |> Array.filter (fun path -> not (List.contains path selected))
+                            )
+                        )
+                    ]
+
+                    Html.button [
+                        prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                        prop.disabled (not canInsert)
+                        prop.title
+                            "Insert selected file paths into the currently selected table cells. Requires an active table view and selected cells."
+                        prop.text "Insert selected"
+                        prop.onClick (fun _ -> insertPaths true)
+                    ]
             ]
         ]
 
@@ -352,6 +370,7 @@ type FilePickerWidget =
         ) =
 
         let paths, setPaths = React.useStateWithUpdater ([||]: string[])
+        let selectedPaths, setSelectedPaths = React.useStateWithUpdater ([]: string list)
         let isLoading, setIsLoading = React.useState false
 
         let annotationCtx = useAnnotationTableStateCtx ()
@@ -388,15 +407,29 @@ type FilePickerWidget =
             }
             |> Promise.start
 
-        let clearPaths = FilePickerWidgetHelper.clearPaths setPaths
-
         let insertPaths =
-            FilePickerWidgetHelper.insertPathsIntoSelectedTableCells
-                arcFile
-                setArcFile
-                activeTableIndex
-                paths
-                selectedCells
+            fun (useSelectedPaths: bool) ->
+                let paths =
+                    if useSelectedPaths then
+                        paths |> Array.filter (fun path -> List.contains path selectedPaths)
+                    else
+                        paths
+
+                FilePickerWidgetHelper.insertPathsIntoSelectedTableCells
+                    arcFile
+                    setArcFile
+                    activeTableIndex
+                    paths
+                    selectedCells
+
+        let selectContextState =
+            React.useMemo (
+                (fun () -> {
+                    state = selectedPaths
+                    setStateUpdater = setSelectedPaths
+                }),
+                [| selectedPaths |]
+            )
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-sm"
@@ -406,15 +439,20 @@ type FilePickerWidget =
                 else if hasPaths then
                     let canInsert = hasActiveTableView && selectedCells.IsSome && hasPaths
 
-                    FilePickerWidget.SortPathsButtons(setPaths)
+                    FilePickerWidgetContext.SelectedPathsCtx.Provider(
+                        selectContextState,
+                        React.Fragment [
+                            FilePickerWidget.SortPathsButtons(setPaths)
 
-                    FilePickerWidget.VerticalPathDragAndDropContext(
-                        paths,
-                        setPaths,
-                        FilePickerWidget.Table(paths, setPaths)
+                            FilePickerWidget.VerticalPathDragAndDropContext(
+                                paths,
+                                setPaths,
+                                FilePickerWidget.Table(paths, setPaths)
+                            )
+
+                            FilePickerWidget.ActionButtons(setPaths, pickPaths, insertPaths, canInsert)
+                        ]
                     )
-
-                    FilePickerWidget.ActionButtons(pickPaths, clearPaths, insertPaths, canInsert)
                 else
                     Html.span [
                         prop.className "swt:text-sm swt:opacity-70 swt:p-4 swt:text-center"
