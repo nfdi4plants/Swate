@@ -36,13 +36,6 @@ let private expectSourceContainsInOrder (sourceText: string) (snippets: string[]
         Vitest.expect(snippetIndex >= 0, $"Expected source to contain (in order): {snippet}").toBe(true)
         searchStartIndex <- snippetIndex + snippet.Length
 
-let private createNodeLikeError (code: string) (message: string) : exn =
-    createObj [
-        "message" ==> message
-        "code" ==> code
-    ]
-    |> unbox<exn>
-
 Vitest.describe("IPC architecture review fixes", fun () ->
     Vitest.test("Arc vault dialogs consistently use a centralized IPC dialog parent helper", fun () ->
         promise {
@@ -120,58 +113,6 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies").toBe(false)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "README.md").toBe(false)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
-    )
-
-    Vitest.test("maps ENOENT to explicit memory-only delete error for canonical targets present in memory", fun () ->
-        let arcLocal = ARC("MemoryOnlyArc")
-        arcLocal.InitAssay("PendingAssay") |> ignore
-
-        let missingPathError = createNodeLikeError "ENOENT" "missing path"
-
-        let memoryOnlyError =
-            ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
-                "assays/PendingAssay/isa.assay.xlsx"
-                arcLocal
-                missingPathError
-
-        Vitest.expect(memoryOnlyError.IsSome).toBe(true)
-        Vitest.expect(memoryOnlyError.Value.Message.Contains("exists only in memory and is not written to disk yet.")).toBe(true)
-    )
-
-    Vitest.test("does not map ENOENT to memory-only error when canonical target is not present in memory", fun () ->
-        let arcLocal = ARC("MemoryOnlyArc")
-        let missingPathError = createNodeLikeError "ENOENT" "missing path"
-
-        let memoryOnlyError =
-            ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
-                "assays/PendingAssay/isa.assay.xlsx"
-                arcLocal
-                missingPathError
-
-        Vitest.expect(memoryOnlyError).toEqual(None)
-    )
-
-    Vitest.test("does not map non-canonical or non-ENOENT delete errors to memory-only error", fun () ->
-        let arcLocal = ARC("MemoryOnlyArc")
-        arcLocal.InitAssay("PendingAssay") |> ignore
-
-        let missingPathError = createNodeLikeError "ENOENT" "missing path"
-        let accessError = createNodeLikeError "EACCES" "permission denied"
-
-        let canonicalWithNonEnoent =
-            ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
-                "assays/PendingAssay/isa.assay.xlsx"
-                arcLocal
-                accessError
-
-        let nonCanonicalWithEnoent =
-            ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
-                "assays/PendingAssay/readme.md"
-                arcLocal
-                missingPathError
-
-        Vitest.expect(canonicalWithNonEnoent).toEqual(None)
-        Vitest.expect(nonCanonicalWithEnoent).toEqual(None)
     )
 
     Vitest.test("mergeReloadedArcAfterDelete preserves unrelated local in-memory entities", fun () ->

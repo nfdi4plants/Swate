@@ -142,62 +142,6 @@ let private isSameOrDescendantPathForComparison (path: string) (ancestorPath: st
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-
-    let private tryGetNodeErrorCode (error: exn) : string option =
-        try
-            error?code |> unbox<string> |> Option.ofObj
-        with _ ->
-            None
-
-    let private isMissingPathError (deleteError: exn) =
-        match tryGetNodeErrorCode deleteError with
-        | Some "ENOENT" -> true
-        | _ -> false
-
-    let private entityExistsInMemory (arcLocal: ARC) (zone: ArcDeletePathRules.AddZone) (identifier: string) =
-        match zone with
-        | ArcDeletePathRules.AddZone.Assays -> arcLocal.ContainsAssay(identifier)
-        | ArcDeletePathRules.AddZone.Studies -> arcLocal.ContainsStudy(identifier)
-        | ArcDeletePathRules.AddZone.Workflows -> arcLocal.ContainsWorkflow(identifier)
-        | ArcDeletePathRules.AddZone.Runs -> arcLocal.ContainsRun(identifier)
-
-    let private dataMapExistsInMemory (arcLocal: ARC) (zone: ArcDeletePathRules.AddZone) (identifier: string) =
-        match zone with
-        | ArcDeletePathRules.AddZone.Assays ->
-            arcLocal.TryGetAssay(identifier) |> Option.exists (fun assay -> assay.DataMap.IsSome)
-        | ArcDeletePathRules.AddZone.Studies ->
-            arcLocal.TryGetStudy(identifier) |> Option.exists (fun study -> study.DataMap.IsSome)
-        | ArcDeletePathRules.AddZone.Workflows ->
-            arcLocal.TryGetWorkflow(identifier) |> Option.exists (fun workflow -> workflow.DataMap.IsSome)
-        | ArcDeletePathRules.AddZone.Runs ->
-            arcLocal.TryGetRun(identifier) |> Option.exists (fun run -> run.DataMap.IsSome)
-
-    let private isMemoryOnlyDeleteTarget
-        (arcLocal: ARC)
-        (targetClassification: ArcDeletePathRules.DeletePathClassification)
-        =
-        match targetClassification with
-        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcDeletePathRules.CanonicalArcFileTarget.EntityFile(zone, identifier),
-            _
-          ) -> entityExistsInMemory arcLocal zone identifier
-        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile(zone, identifier),
-            _
-          ) -> dataMapExistsInMemory arcLocal zone identifier
-        | ArcDeletePathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, _) ->
-            entityExistsInMemory arcLocal zone identifier
-        | _ -> false
-
-    let tryCreateMemoryOnlyDeleteError (deletedPath: string) (arcLocal: ARC) (deleteError: exn) =
-        if isMissingPathError deleteError then
-            match ArcDeletePathRules.classifyDeleteTarget deletedPath with
-            | targetClassification when isMemoryOnlyDeleteTarget arcLocal targetClassification ->
-                Some(exn $"Target '{deletedPath}' exists only in memory and is not written to disk yet.")
-            | _ -> None
-        else
-            None
-
     type MergeResult = {
         Arc: ARC
     }
@@ -570,31 +514,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 vault.isBusyWriting <- true
 
                                 try
-                                    let! deleteResult =
-                                        promise {
-                                            try
-                                                let! _ =
-                                                    fsPromisesDynamic?rm (
-                                                        absolutePath,
-                                                        createObj [ "recursive" ==> true; "force" ==> false ]
-                                                    )
-                                                    |> unbox<JS.Promise<obj>>
+                                    try
+                                        let! _ =
+                                            fsPromisesDynamic?rm (
+                                                absolutePath,
+                                                createObj [ "recursive" ==> true; "force" ==> false ]
+                                            )
+                                            |> unbox<JS.Promise<obj>>
 
-                                                return Ok()
-                                            with deleteError ->
-                                                match
-                                                    ArcDeleteHelper.tryCreateMemoryOnlyDeleteError
-                                                        normalizedRelativePath
-                                                        arcLocal
-                                                        deleteError
-                                                with
-                                                | Some memoryOnlyError -> return Error memoryOnlyError
-                                                | None -> return Error deleteError
-                                        }
-
-                                    match deleteResult with
-                                    | Error deleteError -> return Error deleteError
-                                    | Ok() ->
                                         do! vault.RefreshFileTree()
 
                                         match! ARC.tryLoadAsync arcPath with
@@ -613,6 +540,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 vault.arc <- Some mergeResult.Arc
                                                 vault.window.title <- mergeResult.Arc.Identifier
                                                 return Ok()
+                                    with deleteError ->
+                                        return Error deleteError
                                 finally
                                     vault.isBusyWriting <- false
             with e ->
