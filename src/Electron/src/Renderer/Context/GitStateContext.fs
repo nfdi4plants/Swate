@@ -34,6 +34,8 @@ type GitStateController = {
     switchBranch: string -> unit
     selectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
     confirmMergeResolution: GitConfirmMergeResolutionRequest -> unit
+    pruneLfsCache: unit -> unit
+    dedupLfsStorage: unit -> unit
 }
 
 module private Helper =
@@ -84,7 +86,10 @@ module private Helper =
         gitDiscardPaths = Renderer.GitApiClient.gitDiscardPaths
         gitCommit = Renderer.GitApiClient.gitCommit
         setGitLfsSettings = Renderer.GitApiClient.setGitLfsSettings
+        gitLfsPrune = Renderer.GitApiClient.gitLfsPrune
+        gitLfsDedup = Renderer.GitApiClient.gitLfsDedup
         confirmGitMergeResolution = Renderer.GitApiClient.confirmGitMergeResolution
+        confirmLfsPrune = fun message -> window.confirm message
         confirmInstall = fun message -> window.confirm message
     }
 
@@ -112,6 +117,8 @@ let GitStateCtx =
             switchBranch = fun _ -> ()
             selectChange = fun _ -> promise { return Ok() }
             confirmMergeResolution = fun _ -> ()
+            pruneLfsCache = fun () -> ()
+            dedupLfsStorage = fun () -> ()
         }
     )
 
@@ -181,6 +188,12 @@ let GitStateCtxProvider (children: ReactElement) =
     let confirmMergeResolutionAction request =
         dispatch (ConfirmMergeResolutionRequested request)
 
+    let pruneLfsCache () =
+        dispatch PruneLfsCacheRequested
+
+    let dedupLfsStorage () =
+        dispatch DedupLfsStorageRequested
+
     React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx)), [| box appStateCtx |])
 
     let gitStateController: GitStateController =
@@ -207,6 +220,8 @@ let GitStateCtxProvider (children: ReactElement) =
                 switchBranch = switchBranchTo
                 selectChange = selectChange
                 confirmMergeResolution = confirmMergeResolutionAction
+                pruneLfsCache = pruneLfsCache
+                dedupLfsStorage = dedupLfsStorage
             }),
             [| box gitState |]
         )
