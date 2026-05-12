@@ -85,8 +85,15 @@ type FilePickerWidget =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private SortableTableRow
-        (index: int, path: string, movePath: int -> int -> unit, removePath: int -> unit, ?key: string)
-        =
+        (
+            index: int,
+            path: string,
+            isSelected: bool,
+            movePath: int -> int -> unit,
+            removePath: int -> unit,
+            setIsSelected: (bool -> unit),
+            ?key: string
+        ) =
         let sortable = DndKit.useSortable ({| id = path |})
 
         let style = [
@@ -98,11 +105,18 @@ type FilePickerWidget =
             prop.key path
             prop.ref sortable.setNodeRef
             prop.style style
+            prop.onClick (fun _ -> setIsSelected (not isSelected))
+            prop.className [
+                "swt:cursor-pointer swt:table-auto"
+                if isSelected then
+                    "swt:bg-base-300"
+            ]
             prop.children [
                 Html.td [
                     prop.className "swt:w-10"
                     prop.children [
                         Html.button [
+                            prop.onClick (fun e -> e.stopPropagation ())
                             prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:cursor-grab"
                             prop.type'.button
                             yield! prop.spread sortable.attributes
@@ -112,12 +126,24 @@ type FilePickerWidget =
                     ]
                 ]
                 Html.td [
+                    prop.className "swt:w-10"
+                    prop.children [
+                        Html.input [
+                            prop.onClick (fun e -> e.stopPropagation ())
+                            prop.className "swt:checkbox"
+                            prop.type'.checkbox
+                            prop.isChecked isSelected
+                            prop.onChange setIsSelected
+                        ]
+                    ]
+                ]
+                Html.td [
                     prop.className "swt:max-w-md swt:truncate swt:font-mono"
                     prop.title path
                     prop.text path
                 ]
                 Html.td [
-                    prop.className "swt:w-28"
+                    prop.className "swt:w-20"
                     prop.children [
                         Html.div [
                             prop.className "swt:join"
@@ -125,12 +151,18 @@ type FilePickerWidget =
                                 Html.button [
                                     prop.className "swt:btn swt:btn-xs swt:join-item"
                                     prop.type'.button
-                                    prop.onClick (fun _ -> movePath index (index - 1))
+                                    prop.onClick (fun e ->
+                                        e.stopPropagation ()
+                                        movePath index (index - 1)
+                                    )
                                     prop.children [ Icons.ArrowUp() ]
                                 ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-xs swt:join-item"
-                                    prop.onClick (fun _ -> movePath index (index + 1))
+                                    prop.onClick (fun e ->
+                                        e.stopPropagation ()
+                                        movePath index (index + 1)
+                                    )
                                     prop.children [ Icons.ArrowDown() ]
                                 ]
                             ]
@@ -138,11 +170,14 @@ type FilePickerWidget =
                     ]
                 ]
                 Html.td [
-                    prop.className "swt:w-20 swt:text-right"
+                    prop.className "swt:text-right swt:w-14"
                     prop.children [
                         Html.button [
                             prop.className "swt:btn swt:btn-xs swt:btn-error swt:btn-outline"
-                            prop.onClick (fun _ -> removePath index)
+                            prop.onClick (fun e ->
+                                e.stopPropagation ()
+                                removePath index
+                            )
                             prop.children [ Icons.Delete() ]
                         ]
                     ]
@@ -153,6 +188,8 @@ type FilePickerWidget =
     /// TODO: Virtualize paths
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private Table(paths: string[], setPaths: (string[] -> string[]) -> unit) =
+
+        let selectedPaths, setSelectedPaths = React.useStateWithUpdater ([]: string list)
 
         let movePath =
             React.useCallback (
@@ -168,13 +205,28 @@ type FilePickerWidget =
                 "swt:overflow-y-auto swt:overflow-x-auto swt:max-h-[45vh] swt:border swt:border-base-300 swt:rounded-box"
             prop.children [
                 Html.table [
-                    prop.className "swt:table swt:table-xs swt:table-zebra swt:table-fixed swt:min-w-full"
+                    prop.className "swt:table swt:table-xs swt:table-fixed swt:min-w-full"
                     prop.children [
                         Html.tbody [
                             for index in 0 .. paths.Length - 1 do
                                 let path = paths.[index]
+                                let isSelected = List.contains path selectedPaths
 
-                                FilePickerWidget.SortableTableRow(index, path, movePath, removePath, key = path)
+                                let setIsSelected (value: bool) =
+                                    if value then
+                                        setSelectedPaths (fun prev -> path :: prev)
+                                    else
+                                        setSelectedPaths (fun prev -> List.filter ((<>) path) prev)
+
+                                FilePickerWidget.SortableTableRow(
+                                    index,
+                                    path,
+                                    isSelected,
+                                    movePath,
+                                    removePath,
+                                    setIsSelected,
+                                    key = path
+                                )
                         ]
                     ]
                 ]
@@ -205,7 +257,9 @@ type FilePickerWidget =
         ]
 
     [<ReactComponent>]
-    static member private FilePathViewer(paths: string[], setPaths: (string[] -> string[]) -> unit) =
+    static member private VerticalPathDragAndDropContext
+        (paths: string[], setPaths: (string[] -> string[]) -> unit, children: ReactElement)
+        =
 
         let movePathById =
             React.useCallback (
@@ -245,7 +299,7 @@ type FilePickerWidget =
                 DndKit.SortableContext(
                     items = itemIds,
                     strategy = DndKit.verticalListSortingStrategy,
-                    children = FilePickerWidget.Table(paths, setPaths)
+                    children = children
                 )
         )
 
@@ -354,7 +408,11 @@ type FilePickerWidget =
 
                     FilePickerWidget.SortPathsButtons(setPaths)
 
-                    FilePickerWidget.FilePathViewer(paths, setPaths)
+                    FilePickerWidget.VerticalPathDragAndDropContext(
+                        paths,
+                        setPaths,
+                        FilePickerWidget.Table(paths, setPaths)
+                    )
 
                     FilePickerWidget.ActionButtons(pickPaths, clearPaths, insertPaths, canInsert)
                 else
