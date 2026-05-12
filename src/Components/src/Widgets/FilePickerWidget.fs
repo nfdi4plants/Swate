@@ -72,7 +72,7 @@ module private FilePickerWidgetHelper =
                 |]
 
                 if cellsToInsert.Length = 0 then
-                    ()
+                    failwith "No valid cells to insert paths into. Please check the selected range and try again."
                 else
                     table.SetCellsAt cellsToInsert
                     setArcFile (ArcFiles.refreshRef arcFile)
