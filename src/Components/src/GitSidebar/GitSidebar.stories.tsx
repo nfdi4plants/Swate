@@ -35,6 +35,8 @@ const baseCallbacks = {
   OnCreateBranch: noopWithArg,
   OnSwitchBranch: noopWithBranch,
   OnSelectChange: noopSelectChange,
+  OnPruneLfsCache: noop,
+  OnDedupLfsStorage: noop,
 };
 
 const buildCallbacks = (
@@ -295,6 +297,8 @@ export const AdvancedActions: Story = {
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toBeVisible();
+    await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toBeVisible();
     const downloadLargeFilesCheckbox = canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox");
     const lfsThresholdInput = canvas.getByTestId("GitSidebarLfsThresholdInput");
 

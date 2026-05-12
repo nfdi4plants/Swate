@@ -156,6 +156,8 @@ type private AdvancedActionsProps = {
     OpenSwitchBranchModal: unit -> unit
     CanSwitchBranch: bool
     LfsSettings: LfsSettingsSectionProps
+    SubmitPruneLfsCache: unit -> unit
+    SubmitDedupLfsStorage: unit -> unit
 }
 
 type private CommitSectionProps = {
@@ -774,6 +776,20 @@ type GitSidebar =
                                     props.OpenSwitchBranchModal,
                                     testId = "GitSidebarSwitchBranchButton",
                                     tooltipText = "Switch To Work Copy:\n- git checkout <branch>"
+                                )
+                                GitSidebar.ActionButton(
+                                    "Clean LFS Cache",
+                                    "swt:fluent--broom-24-regular",
+                                    props.IsBusy,
+                                    props.SubmitPruneLfsCache,
+                                    testId = "GitSidebarLfsPruneButton"
+                                )
+                                GitSidebar.ActionButton(
+                                    "Reduce LFS Storage",
+                                    "swt:fluent--folder-sync-24-regular",
+                                    props.IsBusy,
+                                    props.SubmitDedupLfsStorage,
+                                    testId = "GitSidebarLfsDedupButton"
                                 )
                             ]
                         ]
@@ -1728,6 +1744,14 @@ type GitSidebar =
                 onSwitchBranch branchName
                 setActiveDialog ActiveDialog.None
 
+        let submitPruneLfsCache () =
+            setLocalError None
+            callbacks.OnPruneLfsCache()
+
+        let submitDedupLfsStorage () =
+            setLocalError None
+            callbacks.OnDedupLfsStorage()
+
         let hasConflicts = GitSidebarInternal.hasConflicts status changedFiles
         let canEditCommit = not status.IsClean && not hasConflicts && not isBusy
         let markedCount = Set.count markedPaths
@@ -1801,6 +1825,8 @@ type GitSidebar =
                         OpenCreateBranchModal = openCreateBranchModal
                         OpenSwitchBranchModal = openSwitchBranchModal
                         CanSwitchBranch = canSwitchBranch
+                        SubmitPruneLfsCache = submitPruneLfsCache
+                        SubmitDedupLfsStorage = submitDedupLfsStorage
                         LfsSettings = {
                             IsBusy = isBusy
                             LfsThresholdInput = lfsThresholdInput
