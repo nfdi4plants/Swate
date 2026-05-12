@@ -154,30 +154,45 @@ module ArcDeleteHelper =
         | Some "ENOENT" -> true
         | _ -> false
 
-    let private canonicalTargetExistsInMemory (arcLocal: ARC) (target: ArcDeletePathRules.CanonicalArcFileTarget) =
-        match target with
-        | ArcDeletePathRules.CanonicalArcFileTarget.InvestigationFile -> true
-        | ArcDeletePathRules.CanonicalArcFileTarget.EntityFile(zone, identifier) ->
-            match zone with
-            | ArcDeletePathRules.AddZone.Assays -> arcLocal.ContainsAssay(identifier)
-            | ArcDeletePathRules.AddZone.Studies -> arcLocal.ContainsStudy(identifier)
-            | ArcDeletePathRules.AddZone.Workflows -> arcLocal.ContainsWorkflow(identifier)
-            | ArcDeletePathRules.AddZone.Runs -> arcLocal.ContainsRun(identifier)
-        | ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile(zone, identifier) ->
-            match zone with
-            | ArcDeletePathRules.AddZone.Assays ->
-                arcLocal.TryGetAssay(identifier) |> Option.exists (fun assay -> assay.DataMap.IsSome)
-            | ArcDeletePathRules.AddZone.Studies ->
-                arcLocal.TryGetStudy(identifier) |> Option.exists (fun study -> study.DataMap.IsSome)
-            | ArcDeletePathRules.AddZone.Workflows ->
-                arcLocal.TryGetWorkflow(identifier) |> Option.exists (fun workflow -> workflow.DataMap.IsSome)
-            | ArcDeletePathRules.AddZone.Runs ->
-                arcLocal.TryGetRun(identifier) |> Option.exists (fun run -> run.DataMap.IsSome)
+    let private entityExistsInMemory (arcLocal: ARC) (zone: ArcDeletePathRules.AddZone) (identifier: string) =
+        match zone with
+        | ArcDeletePathRules.AddZone.Assays -> arcLocal.ContainsAssay(identifier)
+        | ArcDeletePathRules.AddZone.Studies -> arcLocal.ContainsStudy(identifier)
+        | ArcDeletePathRules.AddZone.Workflows -> arcLocal.ContainsWorkflow(identifier)
+        | ArcDeletePathRules.AddZone.Runs -> arcLocal.ContainsRun(identifier)
+
+    let private dataMapExistsInMemory (arcLocal: ARC) (zone: ArcDeletePathRules.AddZone) (identifier: string) =
+        match zone with
+        | ArcDeletePathRules.AddZone.Assays ->
+            arcLocal.TryGetAssay(identifier) |> Option.exists (fun assay -> assay.DataMap.IsSome)
+        | ArcDeletePathRules.AddZone.Studies ->
+            arcLocal.TryGetStudy(identifier) |> Option.exists (fun study -> study.DataMap.IsSome)
+        | ArcDeletePathRules.AddZone.Workflows ->
+            arcLocal.TryGetWorkflow(identifier) |> Option.exists (fun workflow -> workflow.DataMap.IsSome)
+        | ArcDeletePathRules.AddZone.Runs ->
+            arcLocal.TryGetRun(identifier) |> Option.exists (fun run -> run.DataMap.IsSome)
+
+    let private isMemoryOnlyDeleteTarget
+        (arcLocal: ARC)
+        (targetClassification: ArcDeletePathRules.DeletePathClassification)
+        =
+        match targetClassification with
+        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
+            ArcDeletePathRules.CanonicalArcFileTarget.EntityFile(zone, identifier),
+            _
+          ) -> entityExistsInMemory arcLocal zone identifier
+        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
+            ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile(zone, identifier),
+            _
+          ) -> dataMapExistsInMemory arcLocal zone identifier
+        | ArcDeletePathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, _) ->
+            entityExistsInMemory arcLocal zone identifier
+        | _ -> false
 
     let tryCreateMemoryOnlyDeleteError (deletedPath: string) (arcLocal: ARC) (deleteError: exn) =
         if isMissingPathError deleteError then
-            match ArcDeletePathRules.tryParseCanonicalArcFileTarget deletedPath with
-            | Some target when canonicalTargetExistsInMemory arcLocal target ->
+            match ArcDeletePathRules.classifyDeleteTarget deletedPath with
+            | targetClassification when isMemoryOnlyDeleteTarget arcLocal targetClassification ->
                 Some(exn $"Target '{deletedPath}' exists only in memory and is not written to disk yet.")
             | _ -> None
         else
