@@ -40,17 +40,12 @@ module MainContentHelper =
     let saveArcFileAndOpen (arcFile: ArcFiles) =
         withArcFileRequest arcFile (fun request ->
             promise {
-                let! setResult = Api.ipcArcVaultApi.setArcFileInMemory request
+                let! saveResult = Api.ipcArcVaultApi.applyArcFileAndSave request
 
-                match setResult with
+                match saveResult with
                 | Error exn -> return Error exn
                 | Ok() ->
-                    let! saveResult = Api.ipcArcVaultApi.saveArcFile ()
-
-                    match saveResult with
-                    | Error exn -> return Error exn
-                    | Ok() ->
-                        let! openResult = Api.ipcArcVaultApi.openFile request.path
-                        return openResult
+                    let! openResult = Api.ipcArcVaultApi.openFile request.path
+                    return openResult
             }
         )

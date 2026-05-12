@@ -484,6 +484,22 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    applyArcFileAndSave =
+        fun (request: FileContentDTO) -> promise {
+            try
+                return!
+                    withLoadedArcVault event (fun vault ->
+                        promise {
+                            match! vault.ApplyArcFileAndSave(request) with
+                            | Error saveError -> return Error saveError
+                            | Ok() ->
+                                do! vault.RefreshFileTree()
+                                return Ok()
+                        }
+                    )
+            with e ->
+                return Error e
+        }
     deletePath =
         fun (relativePath: string) -> promise {
             try

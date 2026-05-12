@@ -153,6 +153,34 @@ module ArcVaultExtensions =
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
+        /// Applies an ARC file request on a copy and persists it.
+        /// The in-memory ARC is only replaced after successful persistence.
+        member this.ApplyArcFileAndSave(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
+            match this.path, this.arc with
+            | Some arcPath, Some arc ->
+                let normalizedRequest =
+                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
+
+                let workingArc = arc.Copy()
+
+                match updateARCByFileContentDTO workingArc normalizedRequest with
+                | Error updateError -> return Error updateError
+                | Ok updatedArc ->
+                    this.isBusyWriting <- true
+
+                    try
+                        try
+                            do! updatedArc.UpdateAsync(arcPath)
+                            this.SetArc(updatedArc)
+                            this.hasUnsavedArcChanges <- false
+                            return Ok()
+                        with e ->
+                            return Error(exn $"Failed to persist ARC to disk: {e.Message}")
+                    finally
+                        this.isBusyWriting <- false
+            | _ -> return Error(exn "ARC is not loaded.")
+        }
+
         member this.SetFileTree(fileTree: Dictionary<string, FileEntry>) =
             this.fileTree <- fileTree
 

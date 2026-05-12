@@ -21,12 +21,10 @@ module private FileTreeHelper =
         match FileContentDTO.fromArcFile arcFile with
         | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
         | Some request ->
-            match! Api.ipcArcVaultApi.setArcFileInMemory request with
-            | Error setError -> return Error setError
+            match! Api.ipcArcVaultApi.applyArcFileAndSave request with
+            | Error saveError -> return Error saveError
             | Ok() ->
-                match! Api.ipcArcVaultApi.saveArcFile() with
-                | Error saveError -> return Error saveError
-                | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
+                return! Api.ipcArcVaultApi.openFile request.path
     }
 
 open FileTreeHelper
