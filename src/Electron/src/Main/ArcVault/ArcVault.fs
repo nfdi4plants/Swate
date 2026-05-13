@@ -192,12 +192,12 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id $"No path set for StartFileWatcher."
         }
 
-        member this.StartFileWatcher() =
+        member this.StartFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
                 match this.watcher with
                 | Some _ -> ()
                 | None ->
-                    let watcher = createFileWatcher this.path.Value
+                    let watcher = createFileWatcher this.path.Value usePolling
 
                     let sendMsgApi =
                         Remoting.createIpc ()

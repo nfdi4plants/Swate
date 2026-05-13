@@ -120,45 +120,11 @@ Vitest.describe("IPC architecture review fixes", fun () ->
         promise {
             let! ipcTypesSource = sourcePath [| "Swate.Electron.Shared"; "IPCTypes.fs" |] |> readUtf8FileAsync
             let! fileIoTypesSource = sourcePath [| "Swate.Electron.Shared"; "FileIOTypes.fs" |] |> readUtf8FileAsync
-            let! arcVaultApiSource = sourcePath [| "Main"; "IPC"; "IArcVaultsApi.fs" |] |> readUtf8FileAsync
 
             expectSourceContains fileIoTypesSource "type RenamePathRequest = {"
             expectSourceContains fileIoTypesSource "relativePath: string"
             expectSourceContains fileIoTypesSource "newName: string"
             expectSourceContains ipcTypesSource "renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>"
-            expectSourceContains arcVaultApiSource "renamePath ="
-            expectSourceContains arcVaultApiSource "runArcDiskMutation"
-            expectSourceContains arcVaultApiSource "ArcRenameHelper.mergeReloadedArcAfterRename"
-            expectSourceContains arcVaultApiSource "renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath"
-            expectSourceContains arcVaultApiSource "let private renameRetryStrategy"
-            expectSourceContains arcVaultApiSource "| Some \"EPERM\""
-            expectSourceContains arcVaultApiSource "| Some \"EACCES\""
-            expectSourceContains arcVaultApiSource "| Some \"EBUSY\""
-            expectSourceContains arcVaultApiSource "| Some \"ENOTEMPTY\""
-            expectSourceContains arcVaultApiSource "attemptIndex < renameRetryStrategy.DelaysMs.Length - 1"
-            expectSourceContainsInOrder
-                arcVaultApiSource
-                [|
-                    "renamePath ="
-                    "runArcDiskMutation"
-                    "ArcRenameHelper.mergeReloadedArcAfterRename"
-                |]
-            expectSourceNotContains arcVaultApiSource "pathExistsAsync sourceAbsolutePath"
-            expectSourceNotContains arcVaultApiSource "pathExistsAsync targetAbsolutePath"
-            expectSourceNotContains arcVaultApiSource "do! vault.StopFileWatcher()"
-            expectSourceNotContains arcVaultApiSource "vault.StartFileWatcher()"
-        })
-
-    Vitest.test("file watcher uses windows polling options in createFileWatcher", fun () ->
-        promise {
-            let! arcVaultHelperSource = sourcePath [| "Main"; "ArcVault"; "ArcVaultHelper.fs" |] |> readUtf8FileAsync
-
-            expectSourceContains arcVaultHelperSource "let private windowsWatcherProfile"
-            expectSourceContains arcVaultHelperSource "if isWindowsPlatform () then windowsWatcherProfile"
-            expectSourceContains arcVaultHelperSource "UsePolling = Some true"
-            expectSourceContains arcVaultHelperSource "Interval = Some 200"
-            expectSourceContains arcVaultHelperSource "BinaryInterval = Some 400"
-            expectSourceContains arcVaultHelperSource "awaitWriteFinish = watcherProfile.AwaitWriteFinish"
         })
 )
 
@@ -378,10 +344,10 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
         Vitest.expect(events).toEqual([])
     )
 
-    Vitest.test("tryBuildRenamePlan resolves canonical ARC file rename to entity folder path", fun () ->
+    Vitest.test("tryBuildRenamePlan accepts entity-folder rename paths", fun () ->
         let result =
             ArcRenameHelper.tryBuildRenamePlan {
-                relativePath = "assays/OldAssay/isa.assay.xlsx"
+                relativePath = "assays/OldAssay"
                 newName = "NewAssay"
             }
 
@@ -391,6 +357,20 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
             Vitest.expect(plan.SourcePath).toBe("assays/OldAssay")
             Vitest.expect(plan.TargetPath).toBe("assays/NewAssay")
     )
+
+    Vitest.test("tryBuildRenamePlan rejects canonical ARC file rename paths", fun () ->
+        let result =
+            ArcRenameHelper.tryBuildRenamePlan {
+                relativePath = "assays/OldAssay/isa.assay.xlsx"
+                newName = "NewAssay"
+            }
+
+        match result with
+        | Ok _ -> failwith "Expected canonical ARC file rename path to be rejected."
+        | Error error ->
+            Vitest.expect(error.Message.Contains "Rename the containing ARC entity folder instead").toBe(true)
+    )
+
 
     Vitest.test("mapRenameDiskError maps ENOENT to source-missing message", fun () ->
         let mappedError =

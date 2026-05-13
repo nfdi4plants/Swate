@@ -25,6 +25,12 @@ Vitest.describe("RenamePathRules", fun () ->
         let result = tryBuildRenameTargetPath "assays/OldAssay" "OldAssay"
         Vitest.expect(result).toEqual(Error "Rename target is identical to the current path.")
     )
+
+    Vitest.test("ArcDeletePathRules.isRenamePathAllowed only allows entity folders", fun () ->
+        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay").toBe(true)
+        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe(false)
+        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe(false)
+    )
 )
 
 Vitest.describe("PathHelpers path relation helpers", fun () ->

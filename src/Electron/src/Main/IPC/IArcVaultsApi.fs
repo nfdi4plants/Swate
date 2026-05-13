@@ -21,6 +21,14 @@ open Swate.Electron.Shared.DTOs.NoteSearchDto
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
+let private processDynamic: obj = emitJsExpr () "process"
+
+let private isWindowsPlatform () =
+    try
+        let platform = processDynamic?platform |> unbox<string>
+        platform = "win32"
+    with _ ->
+        false
 
 [<RequireQualifiedAccess>]
 module ArcPathValidation =
@@ -132,8 +140,7 @@ let private renameRetryStrategy = {
         function
         | Some "EPERM"
         | Some "EACCES"
-        | Some "EBUSY"
-        | Some "ENOTEMPTY" -> true
+        | Some "EBUSY" -> true
         | _ -> false
 }
 
@@ -219,6 +226,32 @@ let private runArcDiskMutation
                         return Ok()
         finally
             vault.isBusyWriting <- false
+    }
+
+let private runWithRenameScopedPolling
+    (vault: ArcVault)
+    (operation: unit -> JS.Promise<Result<unit, exn>>)
+    : JS.Promise<Result<unit, exn>> =
+    promise {
+        let useScopedPolling = isWindowsPlatform () && vault.watcher.IsSome
+
+        if useScopedPolling then
+            do! vault.StopFileWatcher()
+            vault.StartFileWatcher(usePolling = true)
+
+        let! operationResult =
+            promise {
+                try
+                    return! operation ()
+                with e ->
+                    return Error e
+            }
+
+        if useScopedPolling then
+            do! vault.StopFileWatcher()
+            vault.StartFileWatcher()
+
+        return operationResult
     }
 
 [<RequireQualifiedAccess>]
@@ -373,6 +406,7 @@ module ArcRenameHelper =
 
     let private validateRenamePathClassification (classification: ArcDeletePathRules.RenamePathClassification) =
         match classification with
+        | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget _ -> Ok()
         | ArcDeletePathRules.RenamePathClassification.RootTarget ->
             Error(exn "Renaming the ARC root is not allowed.")
         | ArcDeletePathRules.RenamePathClassification.DisallowedTarget _ ->
@@ -383,10 +417,11 @@ module ArcRenameHelper =
             Error(exn "Renaming the investigation file is not supported.")
         | ArcDeletePathRules.RenamePathClassification.AddZoneRootTarget _ ->
             Error(exn "Renaming add-zone root folders (studies/, assays/, workflows/, runs/) is not allowed.")
-        | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget _
         | ArcDeletePathRules.RenamePathClassification.CanonicalEntityFileTarget _
-        | ArcDeletePathRules.RenamePathClassification.CanonicalDataMapFileTarget _
-        | ArcDeletePathRules.RenamePathClassification.GenericTarget _ -> Ok()
+        | ArcDeletePathRules.RenamePathClassification.CanonicalDataMapFileTarget _ ->
+            Error(exn "Renaming canonical ARC files is not supported. Rename the containing ARC entity folder instead.")
+        | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
+            Error(exn "Renaming generic files or folders is not supported from the ARC file tree.")
 
     let tryBuildRenamePlan (request: RenamePathRequest) : Result<RenamePlan, exn> =
         let requestedRelativePath = normalizeRelativePathForComparison request.relativePath
@@ -857,22 +892,25 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         }
 
                                     return!
-                                        runArcDiskMutation
+                                        runWithRenameScopedPolling
                                             vault
-                                            $"renaming '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}'"
-                                            renameDiskMutation
-                                            (fun reloadedArc ->
-                                                ArcRenameHelper.mergeReloadedArcAfterRename
-                                                    renamePlan.SourcePath
-                                                    renamePlan.TargetPath
-                                                    arcLocal
-                                                    reloadedArc
-                                                    vault.pendingArcFileSave
-                                                |> Result.map (fun mergeResult -> {
-                                                    Arc = mergeResult.Arc
-                                                    PendingArcFileSave = mergeResult.PendingArcFileSave
-                                                })
-                                            )
+                                            (fun () ->
+                                                runArcDiskMutation
+                                                    vault
+                                                    $"renaming '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}'"
+                                                    renameDiskMutation
+                                                    (fun reloadedArc ->
+                                                        ArcRenameHelper.mergeReloadedArcAfterRename
+                                                            renamePlan.SourcePath
+                                                            renamePlan.TargetPath
+                                                            arcLocal
+                                                            reloadedArc
+                                                            vault.pendingArcFileSave
+                                                        |> Result.map (fun mergeResult -> {
+                                                            Arc = mergeResult.Arc
+                                                            PendingArcFileSave = mergeResult.PendingArcFileSave
+                                                        })
+                                                    ))
                         }
                     )
             with e ->

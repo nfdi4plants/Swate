@@ -23,11 +23,7 @@ let buildRenamedPath (sourcePath: string) (newName: string) =
     buildRenamedSiblingPath sourcePath newName
 
 let private isRenameContextMenuTarget (relativePath: string) =
-    match ArcDeletePathRules.classifyRenameTarget relativePath with
-    | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget _
-    | ArcDeletePathRules.RenamePathClassification.CanonicalEntityFileTarget _
-    | ArcDeletePathRules.RenamePathClassification.CanonicalDataMapFileTarget _ -> true
-    | _ -> false
+    ArcDeletePathRules.isRenamePathAllowed relativePath
 
 let canRenameItem (item: FileItem) =
     tryGetItemRelativePath item
@@ -42,10 +38,7 @@ let tryBuildRenameDraft (item: FileItem) : Result<ArcRenameDraft, string> =
         if ArcDeletePathRules.isRenamePathAllowed normalizedRelativePath |> not then
             Error "Renaming this item is not allowed."
         else
-            let sourcePath =
-                normalizedRelativePath
-                |> ArcDeletePathRules.resolveRenameSourcePath
-                |> normalizeRelativePath
+            let sourcePath = normalizedRelativePath
 
             let initialName = PathHelpers.getNameFromPath sourcePath
 

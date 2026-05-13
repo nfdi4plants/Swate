@@ -323,10 +323,7 @@ module ArcDeletePathRules =
 
     let isRenamePathAllowed (relativePath: string) =
         match classifyRenameTarget relativePath with
-        | RenamePathClassification.EntityFolderTarget _
-        | RenamePathClassification.CanonicalEntityFileTarget _
-        | RenamePathClassification.CanonicalDataMapFileTarget _
-        | RenamePathClassification.GenericTarget _ -> true
+        | RenamePathClassification.EntityFolderTarget _ -> true
         | _ -> false
 
     let resolveRenameSourcePath (relativePath: string) =

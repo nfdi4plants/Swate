@@ -15,10 +15,12 @@ module FileTreeRenameWorkflow =
     type ConfirmRenameConfig = {
         pendingRenameDraft: ArcRenameDraft option
         selectedTreePath: string option
+        pageState: Renderer.Types.PageState option
         closeRenameModal: unit -> unit
         setIsRenaming: bool -> unit
         setSelection: ArcSelection -> unit
         refreshGitStatus: unit -> unit
+        reloadPreviewByPath: string -> JS.Promise<Result<unit, string>>
         renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
         enqueueError: ErrorModalRequest -> unit
         arcScopeId: string option
@@ -39,6 +41,19 @@ module FileTreeRenameWorkflow =
 
     let private applyRenameError (config: ConfirmRenameConfig) (errorMessage: string) =
         enqueueRenameError config.enqueueError config.arcScopeId errorMessage
+
+    let private tryRemapActiveArcFilePath
+        (sourcePath: string)
+        (targetPath: string)
+        (pageState: Renderer.Types.PageState option)
+        =
+        match pageState with
+        | Some(Renderer.Types.PageState.ArcFilePage arcFile) ->
+            arcFile.TryGetRelativePath()
+            |> Option.bind (fun arcFilePath ->
+                tryRemapSelectionPath sourcePath targetPath (Some arcFilePath)
+            )
+        | _ -> None
 
     let requestRenameItem
         (setPendingRenameDraft: ArcRenameDraft option -> unit)
@@ -90,6 +105,18 @@ module FileTreeRenameWorkflow =
                             |> Option.iter (fun remappedSelectionPath ->
                                 config.setSelection (ArcSelection.forTreePath (Some remappedSelectionPath))
                             )
+
+                            match tryRemapActiveArcFilePath renameDraft.SourcePath targetPath config.pageState with
+                            | Some remappedArcFilePath ->
+                                let! reloadResult = config.reloadPreviewByPath remappedArcFilePath
+
+                                match reloadResult with
+                                | Ok() -> ()
+                                | Error reloadError ->
+                                    applyRenameError
+                                        config
+                                        $"Renamed item, but could not refresh the open ARC file preview: {reloadError}"
+                            | None -> ()
 
                             config.refreshGitStatus ()
                             config.closeRenameModal ()

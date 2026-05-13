@@ -228,10 +228,21 @@ type FileTree =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
         let canRenameFromItem (item: FileItem) =
-            item.IsDirectory && FileTreeRenameHelper.canRenameItem item
+            FileTreeRenameHelper.canRenameItem item
 
         let applyCreateError errorMessage =
             Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState errorMessage
+
+        let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> =
+            promise {
+                let! openResult = Renderer.Components.ARCHelper.openView path
+
+                match openResult with
+                | Ok loaded ->
+                    Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                    return Ok()
+                | Error errorMessage -> return Error errorMessage
+            }
 
         let confirmDeleteItem () =
             FileTreeDeleteWorkflow.confirmDeleteItem {
@@ -304,10 +315,12 @@ type FileTree =
                 {
                     pendingRenameDraft = pendingRenameDraft
                     selectedTreePath = fileStateCtx.state.Selection.TreePath
+                    pageState = pageStateCtx.state
                     closeRenameModal = closeRenameModal
                     setIsRenaming = setIsRenaming
                     setSelection = fileStateCtx.setSelection
                     refreshGitStatus = gitStateCtx.refresh
+                    reloadPreviewByPath = reloadPreviewByPath
                     renamePath = Api.ipcArcVaultApi.renamePath
                     enqueueError = errorModal.enqueue
                     arcScopeId = arcScopeId

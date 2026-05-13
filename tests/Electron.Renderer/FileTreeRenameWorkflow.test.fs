@@ -3,6 +3,7 @@ module ElectronRenderer.FileTreeRenameWorkflowTests
 open Browser.Dom
 open Browser.Types
 open Feliz
+open ARCtrl
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Swate.Components.FileExplorer.Types
@@ -53,14 +54,12 @@ let private createFolderItem (name: string) (path: string) =
 Vitest.afterEach (fun () -> document.body.innerHTML <- "")
 
 Vitest.describe("FileTreeRenameHelper", fun () ->
-    Vitest.test("tryBuildRenameDraft resolves canonical ARC files to entity folder rename source", fun () ->
+    Vitest.test("tryBuildRenameDraft rejects canonical ARC files", fun () ->
         let item = createFileItem "isa.assay.xlsx" "assays/OldAssay/isa.assay.xlsx"
 
         match tryBuildRenameDraft item with
-        | Error error -> failwith error
-        | Ok draft ->
-            Vitest.expect(draft.SourcePath).toBe("assays/OldAssay")
-            Vitest.expect(draft.InitialName).toBe("OldAssay")
+        | Ok _ -> failwith "Expected canonical ARC files to be non-renameable."
+        | Error _ -> ()
     )
 
     Vitest.test("tryRemapSelectionPath remaps descendants under renamed source prefixes", fun () ->
@@ -97,7 +96,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         )
     )
 
-    Vitest.test("rename context menu item is shown for canonical entity and datamap ARC files", fun () ->
+    Vitest.test("rename context menu item is hidden for canonical entity and datamap ARC files", fun () ->
         let canonicalFilePaths =
             [
                 "assays/AssayA/isa.assay.xlsx"
@@ -114,8 +113,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         |> List.iter (fun path ->
             let item = createFileItem (PathHelpers.getNameFromPath path) path
             let menuItems = getRenameMenuItems item
-            Vitest.expect(menuItems.Length).toBe(1)
-            Vitest.expect(menuItems.[0].Icon).toBe("swt:fluent--edit-24-regular")
+            Vitest.expect(menuItems.Length).toBe(0)
         )
     )
 
@@ -143,7 +141,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
     )
 
     Vitest.test("rename context menu action requests a rename draft for renameable items", fun () ->
-        let item = createFileItem "isa.assay.xlsx" "assays/OldAssay/isa.assay.xlsx"
+        let item = createFolderItem "OldAssay" "assays/OldAssay"
         let mutable pendingRenameDraft: ArcRenameDraft option = None
 
         let requestRenameItem =
@@ -221,7 +219,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
     Vitest.test("confirmRenameItem dispatches renamePath, remaps active selection, and refreshes git status", fun () ->
         promise {
             let renameDraftResult =
-                createFileItem "isa.assay.xlsx" "assays/OldAssay/isa.assay.xlsx"
+                createFolderItem "OldAssay" "assays/OldAssay"
                 |> tryBuildRenameDraft
 
             let renameDraft =
@@ -233,14 +231,22 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
             let mutable renamedSelection: ArcSelection option = None
             let mutable closed = false
             let mutable gitStatusRefreshCount = 0
+            let mutable reloadedPreviewPath: string option = None
 
             let config: RenameWorkflow.ConfirmRenameConfig = {
                 pendingRenameDraft = Some renameDraft
                 selectedTreePath = Some "assays/OldAssay/notes/protocol.md"
+                pageState = Some(Renderer.Types.PageState.ArcFilePage(ArcFiles.Assay(ArcAssay.init "OldAssay")))
                 closeRenameModal = fun () -> closed <- true
                 setIsRenaming = ignore
                 setSelection = fun selection -> renamedSelection <- Some selection
                 refreshGitStatus = fun () -> gitStatusRefreshCount <- gitStatusRefreshCount + 1
+                reloadPreviewByPath =
+                    fun path ->
+                        promise {
+                            reloadedPreviewPath <- Some path
+                            return Ok()
+                        }
                 renamePath =
                     fun request ->
                         promise {
@@ -262,6 +268,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
 
             Vitest.expect(renamedSelection.IsSome).toBe(true)
             Vitest.expect(renamedSelection.Value.TreePath).toEqual(Some "assays/NewAssay/notes/protocol.md")
+            Vitest.expect(reloadedPreviewPath).toEqual(Some "assays/NewAssay/isa.assay.xlsx")
             Vitest.expect(gitStatusRefreshCount).toBe(1)
         }
     )

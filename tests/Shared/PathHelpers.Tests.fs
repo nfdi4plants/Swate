@@ -171,7 +171,7 @@ let tests =
                 "runs/MyRun"
                 "Renaming a canonical ARC file should rename the parent entity folder."
 
-        testCase "isRenamePathAllowed blocks root and add-zone roots but allows generic descendants" <| fun _ ->
+        testCase "isRenamePathAllowed only allows entity folders" <| fun _ ->
             Expect.isFalse
                 (ArcDeletePathRules.isRenamePathAllowed "")
                 "ARC root must not be renameable."
@@ -180,9 +180,17 @@ let tests =
                 (ArcDeletePathRules.isRenamePathAllowed "studies")
                 "Add-zone roots must stay protected."
 
+            Expect.isFalse
+                (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy/isa.study.xlsx")
+                "Canonical ARC files should not be renameable."
+
             Expect.isTrue
+                (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy")
+                "Entity folders should be renameable."
+
+            Expect.isFalse
                 (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
-                "Generic descendants under add zones should stay renameable."
+                "Generic descendants should not be renameable."
 
         testCase "buildCanonicalEntityPaths returns entity and datamap canonical files" <| fun _ ->
             let paths =
