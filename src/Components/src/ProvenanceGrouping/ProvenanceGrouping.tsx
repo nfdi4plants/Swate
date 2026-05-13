@@ -491,8 +491,10 @@ function GroupEditor(props: {
 function ParameterRail(props: {
   side: ProvenanceSide;
   layer: ProvenanceLayer;
+  items: ProvenanceItem[];
   keys: string[];
   activeKeys: string[];
+  detail?: ProvenanceDetail;
   onToggleGrouping: (layerId: string, key: string) => void;
   onOpenDetail: (detail: ProvenanceDetail) => void;
 }) {
@@ -509,37 +511,73 @@ function ParameterRail(props: {
         ) : (
           props.keys.map((key) => {
             const active = props.activeKeys.includes(key);
+            const expanded =
+              props.detail?.kind === "parameter" &&
+              props.detail.layerId === props.layer.id &&
+              props.detail.key === key;
+            const layerItems = props.items.filter((item) => item.layerId === props.layer.id);
+
             return (
               <div
                 className={[
-                  "swt:flex swt:items-center swt:gap-2 swt:rounded swt:border swt:p-2",
+                  "swt:flex swt:flex-col swt:gap-2 swt:rounded swt:border swt:p-2",
                   active ? "swt:border-primary swt:bg-primary/10" : "swt:border-base-content/10 swt:bg-base-100",
                 ].join(" ")}
+                data-testid={`ProvenanceGrouping-param-${props.side}-${key}-block`}
                 key={key}
               >
-                <button
-                  className="swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:text-left swt:text-sm swt:font-medium"
-                  data-testid={`ProvenanceGrouping-param-${props.side}-${key}`}
-                  type="button"
-                  onClick={() => props.onToggleGrouping(props.layer.id, key)}
-                >
-                  <i
-                    className={[
-                      "swt:iconify swt:size-4 swt:shrink-0",
-                      active ? "swt:fluent--group-list-24-filled" : "swt:fluent--group-list-24-regular",
-                    ].join(" ")}
-                  />
-                  <span className="swt:truncate">{key}</span>
-                </button>
-                <button
-                  aria-label={`Show ${key} values`}
-                  className="swt:btn swt:btn-ghost swt:btn-xs swt:btn-square"
-                  data-testid={`ProvenanceGrouping-param-${props.side}-${key}-details`}
-                  type="button"
-                  onClick={() => props.onOpenDetail({ kind: "parameter", layerId: props.layer.id, key })}
-                >
-                  <i className="swt:iconify swt:fluent--panel-right-expand-20-regular swt:size-4" />
-                </button>
+                <div className="swt:flex swt:items-center swt:gap-2">
+                  <button
+                    className="swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:text-left swt:text-sm swt:font-medium"
+                    data-testid={`ProvenanceGrouping-param-${props.side}-${key}`}
+                    type="button"
+                    onClick={() => props.onToggleGrouping(props.layer.id, key)}
+                  >
+                    <i
+                      className={[
+                        "swt:iconify swt:size-4 swt:shrink-0",
+                        active ? "swt:fluent--group-list-24-filled" : "swt:fluent--group-list-24-regular",
+                      ].join(" ")}
+                    />
+                    <span className="swt:truncate">{key}</span>
+                  </button>
+                  <button
+                    aria-label={expanded ? `Hide ${key} values` : `Show ${key} values`}
+                    className="swt:btn swt:btn-ghost swt:btn-xs swt:btn-square"
+                    data-testid={`ProvenanceGrouping-param-${props.side}-${key}-details`}
+                    type="button"
+                    onClick={() => props.onOpenDetail({ kind: "parameter", layerId: props.layer.id, key })}
+                  >
+                    <i
+                      className={[
+                        "swt:iconify swt:size-4",
+                        expanded
+                          ? "swt:fluent--chevron-up-20-regular"
+                          : "swt:fluent--chevron-down-20-regular",
+                      ].join(" ")}
+                    />
+                  </button>
+                </div>
+                {expanded ? (
+                  <div
+                    className="swt:flex swt:max-h-56 swt:flex-col swt:gap-1 swt:overflow-auto swt:rounded swt:bg-base-200 swt:p-2"
+                    data-testid={`ProvenanceGrouping-param-${props.side}-${key}-inline-detail`}
+                  >
+                    {layerItems.map((item) => (
+                      <div
+                        className="swt:grid swt:grid-cols-[minmax(0,1fr)_auto] swt:gap-2 swt:rounded swt:bg-base-100 swt:px-2 swt:py-1 swt:text-xs"
+                        key={`${item.id}-${key}`}
+                      >
+                        <span className="swt:truncate" title={item.name}>
+                          {item.name}
+                        </span>
+                        <span className="swt:font-medium swt:text-base-content/70">
+                          {getParameterValue(item, key) ?? missingValue(key)}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             );
           })
@@ -584,76 +622,6 @@ function CreateItemControl(props: {
   );
 }
 
-function DetailPanel(props: {
-  detail?: ProvenanceDetail;
-  items: ProvenanceItem[];
-  leftGroups: ProvenanceGroup[];
-  rightGroups: ProvenanceGroup[];
-  layers: ProvenanceLayer[];
-}) {
-  if (!props.detail) {
-    return null;
-  }
-
-  if (props.detail.kind === "parameter") {
-    const layer = findLayer(props.layers, props.detail.layerId);
-    const layerItems = props.items.filter((item) => item.layerId === props.detail.layerId);
-
-    return (
-      <section
-        className="swt:max-h-56 swt:overflow-auto swt:border-t swt:border-base-content/10 swt:bg-base-100 swt:p-4"
-        data-testid="ProvenanceGrouping-detail-panel"
-      >
-        <h3 className="swt:text-sm swt:font-semibold">
-          {layer.label}: {props.detail.key}
-        </h3>
-        <div className="swt:mt-3 swt:grid swt:grid-cols-1 swt:gap-2 swt:md:grid-cols-2 swt:lg:grid-cols-3">
-          {layerItems.map((item) => (
-            <div className="swt:rounded swt:border swt:border-base-content/10 swt:p-2 swt:text-sm" key={item.id}>
-              <div className="swt:font-medium">{item.name}</div>
-              <div className="swt:text-base-content/70">{getParameterValue(item, props.detail.key) ?? missingValue(props.detail.key)}</div>
-            </div>
-          ))}
-        </div>
-      </section>
-    );
-  }
-
-  const groups = props.detail.side === "left" ? props.leftGroups : props.rightGroups;
-  const group = groups.find((candidate) => candidate.id === props.detail?.groupId);
-
-  if (!group) {
-    return null;
-  }
-
-  return (
-    <section
-      className="swt:max-h-56 swt:overflow-auto swt:border-t swt:border-base-content/10 swt:bg-base-100 swt:p-4"
-      data-testid="ProvenanceGrouping-detail-panel"
-    >
-      <h3 className="swt:text-sm swt:font-semibold">{group.label}</h3>
-      <div className="swt:mt-3 swt:grid swt:grid-cols-1 swt:gap-2 swt:md:grid-cols-2 swt:lg:grid-cols-3">
-        {group.items.map((item) => (
-          <div className="swt:rounded swt:border swt:border-base-content/10 swt:p-2 swt:text-sm" key={item.id}>
-            <div className="swt:font-medium">{item.name}</div>
-            <div className="swt:mt-1 swt:flex swt:flex-wrap swt:gap-1">
-              {item.parameters.length === 0 ? (
-                <span className="swt:text-base-content/60">No parameters</span>
-              ) : (
-                item.parameters.map((parameter) => (
-                  <span className="swt:badge swt:badge-outline swt:badge-sm" key={`${item.id}-${parameter.key}`}>
-                    {parameter.key}: {parameter.value}
-                  </span>
-                ))
-              )}
-            </div>
-          </div>
-        ))}
-      </div>
-    </section>
-  );
-}
-
 export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactElement {
   const [editor, setEditor] = React.useState<EditorState | undefined>();
 
@@ -670,6 +638,8 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   const renderGroup = (side: ProvenanceSide, group: ProvenanceGroup) => {
     const selected =
       side === "left" ? props.selectedSourceGroupId === group.id : props.selectedTargetGroupId === group.id;
+    const expanded =
+      props.detail?.kind === "group" && props.detail.side === side && props.detail.groupId === group.id;
 
     return (
       <article
@@ -698,12 +668,18 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
               Select
             </button>
             <button
-              aria-label={`Show ${group.label} entries`}
+              aria-label={expanded ? `Hide ${group.label} entries` : `Show ${group.label} entries`}
               className="swt:btn swt:btn-ghost swt:btn-xs swt:btn-square"
+              data-testid="ProvenanceGrouping-group-details"
               type="button"
               onClick={() => props.onOpenDetail({ kind: "group", side, groupId: group.id })}
             >
-              <i className="swt:iconify swt:fluent--panel-right-expand-20-regular swt:size-4" />
+              <i
+                className={[
+                  "swt:iconify swt:size-4",
+                  expanded ? "swt:fluent--chevron-up-20-regular" : "swt:fluent--chevron-down-20-regular",
+                ].join(" ")}
+              />
             </button>
           </div>
         </div>
@@ -722,6 +698,29 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
             setEditor(undefined);
           }}
         />
+        {expanded ? (
+          <div
+            className="swt:flex swt:max-h-64 swt:flex-col swt:gap-2 swt:overflow-auto swt:rounded swt:border swt:border-base-content/10 swt:bg-base-200 swt:p-2"
+            data-testid="ProvenanceGrouping-group-inline-detail"
+          >
+            {group.items.map((item) => (
+              <div className="swt:rounded swt:bg-base-100 swt:p-2 swt:text-xs" key={item.id}>
+                <div className="swt:font-medium">{item.name}</div>
+                <div className="swt:mt-1 swt:flex swt:flex-wrap swt:gap-1">
+                  {item.parameters.length === 0 ? (
+                    <span className="swt:text-base-content/60">No parameters</span>
+                  ) : (
+                    item.parameters.map((parameter) => (
+                      <span className="swt:badge swt:badge-outline swt:badge-sm" key={`${item.id}-${parameter.key}`}>
+                        {parameter.key}: {parameter.value}
+                      </span>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))}
+          </div>
+        ) : null}
       </article>
     );
   };
@@ -784,6 +783,8 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
       <main className="swt:grid swt:min-h-0 swt:flex-1 swt:grid-cols-1 swt:gap-3 swt:overflow-auto swt:p-3 swt:xl:grid-cols-[220px_minmax(260px,1fr)_220px_minmax(260px,1fr)_220px]">
         <ParameterRail
           activeKeys={leftGroupingKeys}
+          detail={props.detail}
+          items={props.items}
           keys={leftParameterKeys}
           layer={leftLayer}
           side="left"
@@ -888,6 +889,8 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
 
         <ParameterRail
           activeKeys={rightGroupingKeys}
+          detail={props.detail}
+          items={props.items}
           keys={rightParameterKeys}
           layer={rightLayer}
           side="right"
@@ -896,13 +899,6 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         />
       </main>
 
-      <DetailPanel
-        detail={props.detail}
-        items={props.items}
-        layers={props.layers}
-        leftGroups={leftGroups}
-        rightGroups={rightGroups}
-      />
     </div>
   );
 }

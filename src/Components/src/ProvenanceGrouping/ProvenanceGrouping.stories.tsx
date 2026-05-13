@@ -245,7 +245,25 @@ function StatefulMockup() {
   };
 
   const openDetail = (detail: ProvenanceDetail) => {
-    setModel((current) => ({ ...current, detail, error: undefined }));
+    setModel((current) => {
+      const currentDetail = current.detail;
+      const isSameParameter =
+        currentDetail?.kind === "parameter" &&
+        detail.kind === "parameter" &&
+        currentDetail.layerId === detail.layerId &&
+        currentDetail.key === detail.key;
+      const isSameGroup =
+        currentDetail?.kind === "group" &&
+        detail.kind === "group" &&
+        currentDetail.side === detail.side &&
+        currentDetail.groupId === detail.groupId;
+
+      return {
+        ...current,
+        detail: isSameParameter || isSameGroup ? undefined : detail,
+        error: undefined,
+      };
+    });
   };
 
   const addParameter = (side: Side, groupId: string, key: string, value: string) => {
@@ -388,8 +406,19 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div className="swt:h-screen swt:bg-base-200 swt:p-4">
-        <Story />
+      <div className="swt:h-screen swt:w-full swt:overflow-auto swt:bg-base-200 swt:p-4">
+        <div
+          className="swt:h-full swt:min-w-[980px]"
+          data-testid="ProvenanceGrouping-preview-frame"
+          style={{
+            resize: "horizontal",
+            overflow: "auto",
+            width: 1440,
+            maxWidth: "none",
+          }}
+        >
+          <Story />
+        </div>
       </div>
     ),
   ],
@@ -410,6 +439,9 @@ export const InteractionFlow: Story = {
     const canvas = within(canvasElement);
 
     await expect(await canvas.findByTestId("ProvenanceGrouping-root")).toBeInTheDocument();
+    await expect(await canvas.findByTestId("ProvenanceGrouping-preview-frame")).toHaveStyle({
+      resize: "horizontal",
+    });
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Temperature"));
     await waitFor(() => {
@@ -425,8 +457,10 @@ export const InteractionFlow: Story = {
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Species-details"));
     await waitFor(async () => {
-      await expect(await canvas.findByTestId("ProvenanceGrouping-detail-panel")).toHaveTextContent("Input A");
-      await expect(await canvas.findByTestId("ProvenanceGrouping-detail-panel")).toHaveTextContent("Arabidopsis");
+      const parameterBlock = await canvas.findByTestId("ProvenanceGrouping-param-left-Species-block");
+      await expect(parameterBlock).toHaveTextContent("Input A");
+      await expect(parameterBlock).toHaveTextContent("Arabidopsis");
+      expect(canvas.queryByTestId("ProvenanceGrouping-detail-panel")).not.toBeInTheDocument();
     });
 
     const arabidopsis12Group = await canvas.findByTestId(/ProvenanceGrouping-group-left-.*12-C.*Arabidopsis/);
