@@ -190,3 +190,12 @@ let createFileWatcher (path: string) =
 
     watcher
 
+open Fable.Electron.Remoting.Main
+
+let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
+    let sendMsg =
+        Remoting.createIpc ()
+        |> Remoting.withWindow window
+        |> Remoting.buildProxySender<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
+
+    sendMsg.arcUnsavedChangesUpdate hasUnsavedChanges

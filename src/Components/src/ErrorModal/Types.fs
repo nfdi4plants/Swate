@@ -14,13 +14,7 @@ type ErrorModalAction = {
     Style: ErrorModalActionStyle
 } with
 
-    static member create
-        (
-            label: string,
-            onClick: unit -> unit,
-            ?iconClassName: string,
-            ?style: ErrorModalActionStyle
-        ) = {
+    static member create(label: string, onClick: unit -> unit, ?iconClassName: string, ?style: ErrorModalActionStyle) = {
         Label = label
         OnClick = onClick
         IconClassName = iconClassName
@@ -48,16 +42,17 @@ type ErrorModalRequest = {
             ?actions: ErrorModalAction list,
             ?scopeId: string,
             ?id: string
-        ) = {
-        Id = defaultArg id (System.Guid.NewGuid().ToString())
-        ScopeId = scopeId
-        Title = defaultArg title "Something went wrong"
-        Message = message
-        Details = details
-        DismissLabel = defaultArg dismissLabel "OK"
-        OnDismiss = onDismiss
-        Actions = defaultArg actions []
-    }
+        ) =
+        {
+            Id = defaultArg id (System.Guid.NewGuid().ToString())
+            ScopeId = scopeId
+            Title = defaultArg title "Something went wrong"
+            Message = message
+            Details = details
+            DismissLabel = defaultArg dismissLabel "OK"
+            OnDismiss = onDismiss
+            Actions = defaultArg actions []
+        }
 
 type ErrorModalBatch = {
     Id: string
@@ -78,20 +73,22 @@ type ErrorModalBatch = {
             ?onDismiss: unit -> unit,
             ?scopeId: string,
             ?id: string
-        ) = {
-        Id = defaultArg id (System.Guid.NewGuid().ToString())
-        ScopeId = scopeId
-        Title = defaultArg title "Multiple errors occurred"
-        Summary = summary
-        Errors = errors
-        DismissLabel = defaultArg dismissLabel "Dismiss Visible Errors"
-        OnDismiss = onDismiss
-    }
+        ) =
+        {
+            Id = defaultArg id (System.Guid.NewGuid().ToString())
+            ScopeId = scopeId
+            Title = defaultArg title "Multiple errors occurred"
+            Summary = summary
+            Errors = errors
+            DismissLabel = defaultArg dismissLabel "Dismiss Visible Errors"
+            OnDismiss = onDismiss
+        }
 
 [<RequireQualifiedAccess>]
 type ErrorModalEntry =
     | Single of ErrorModalRequest
     | Batch of ErrorModalBatch
+
     member this.Id =
         match this with
         | Single request -> request.Id

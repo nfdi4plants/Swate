@@ -198,12 +198,48 @@ type Navbar =
 
     [<ReactComponent>]
     static member private SaveArcButton() =
+
+        let errorCtx = Swate.Components.ErrorModal.Context.useErrorModalCtx ()
+
+        let hasUnsavedChanges =
+            Renderer.MainSyncedState.useMainSyncedState {
+                initial = false
+                load =
+                    fun () -> promise {
+                        match! Api.ipcArcVaultApi.getHasUnsavedArcChanges () with
+                        | Ok hasUnsavedChanges -> return hasUnsavedChanges
+                        | Error _ -> return false
+                    }
+                subscribe =
+                    fun setHasUnsavedChanges ->
+                        Renderer.IpcReceiver.subscribeProxyReceiver<IHasUnsavedArcChangesRendererApi> {
+                            arcUnsavedChangesUpdate = setHasUnsavedChanges
+                        }
+                onError =
+                    fun ex ->
+                        errorCtx.enqueue (
+                            Swate.Components.ErrorModal.ErrorModalRequest.create (
+                                ex.Message,
+                                title = "Error checking for unsaved changes"
+                            )
+                        )
+                dependencies = [||]
+            }
+
         let onSaveArc =
-            fun _ -> promise { return! Api.ipcArcVaultApi.saveArcFile () } |> Promise.start
+            fun _ ->
+                promise {
+                    if not hasUnsavedChanges.state then
+                        return ()
+
+                    return! Api.ipcArcVaultApi.saveArcFile ()
+                }
+                |> Promise.start
 
         Html.button [
             prop.type'.button
-            prop.className "swt:btn swt:btn-square swt:btn-sm"
+            prop.disabled (not hasUnsavedChanges.state)
+            prop.className "swt:btn swt:btn-square swt:btn-info swt:btn-sm"
             prop.onClick onSaveArc
             prop.children [
                 Html.i [
