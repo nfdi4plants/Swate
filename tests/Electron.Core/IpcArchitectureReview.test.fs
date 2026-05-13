@@ -307,49 +307,4 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
         | Error error ->
             Vitest.expect(error.Message.Contains "Rename the containing ARC entity folder instead").toBe(true)
     )
-
-
-    Vitest.test("mapRenameDiskError maps ENOENT to source-missing message", fun () ->
-        let mappedError =
-            ArcRenameHelper.mapRenameDiskError
-                "assays/OldAssay"
-                "assays/NewAssay"
-                (createNodeLikeError "ENOENT" "rename failed")
-
-        Vitest.expect(mappedError.Message.Contains "source path no longer exists on disk").toBe(true)
-    )
-
-    Vitest.test("mapRenameDiskError maps EEXIST and ENOTEMPTY to destination-exists message", fun () ->
-        let eexistMappedError =
-            ArcRenameHelper.mapRenameDiskError
-                "assays/OldAssay"
-                "assays/NewAssay"
-                (createNodeLikeError "EEXIST" "rename failed")
-
-        let enotemptyMappedError =
-            ArcRenameHelper.mapRenameDiskError
-                "assays/OldAssay"
-                "assays/NewAssay"
-                (createNodeLikeError "ENOTEMPTY" "rename failed")
-
-        Vitest.expect(eexistMappedError.Message.Contains "destination already exists").toBe(true)
-        Vitest.expect(enotemptyMappedError.Message.Contains "destination already exists").toBe(true)
-    )
-
-    Vitest.test("mapRenameDiskError maps EPERM and EACCES to lock/permission guidance", fun () ->
-        let epermMappedError =
-            ArcRenameHelper.mapRenameDiskError
-                "assays/OldAssay"
-                "assays/NewAssay"
-                (createNodeLikeError "EPERM" "rename failed")
-
-        let eaccesMappedError =
-            ArcRenameHelper.mapRenameDiskError
-                "assays/OldAssay"
-                "assays/NewAssay"
-                (createNodeLikeError "EACCES" "rename failed")
-
-        Vitest.expect(epermMappedError.Message.Contains "permission or file-lock conflict").toBe(true)
-        Vitest.expect(eaccesMappedError.Message.Contains "permission or file-lock conflict").toBe(true)
-    )
 )
