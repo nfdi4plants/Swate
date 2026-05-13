@@ -39,6 +39,7 @@ export default defineConfig({
                 'react-dom',
                 'tailwindcss',
                 '@fable-org/fable-library-js',
+                /^@fable-org\/fable-library-js\//,
                 "@floating-ui/react",
                 "@tanstack/react-virtual",
                 "@nfdi4plants/arctrl"

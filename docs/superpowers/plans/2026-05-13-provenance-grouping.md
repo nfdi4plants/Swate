@@ -56,7 +56,7 @@ await expect(await canvas.findByText(/Species: Arabidopsis/)).toBeInTheDocument(
 
 - [ ] **Step 2: Run test to verify it fails**
 
-Run: `npm run test:run -- --include src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
+Run: `npm run test:run -- src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
 
 Expected: FAIL because `./ProvenanceGrouping` does not exist yet.
 
@@ -116,7 +116,7 @@ Rules:
 
 - [ ] **Step 2: Run test to verify helper-backed story now compiles further**
 
-Run: `npm run test:run -- --include src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
+Run: `npm run test:run -- src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
 
 Expected: FAIL because the component UI is not implemented yet, not because helper exports are missing.
 
@@ -145,7 +145,7 @@ The component must render:
 
 - [ ] **Step 2: Run story test**
 
-Run: `npm run test:run -- --include src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
+Run: `npm run test:run -- src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
 
 Expected: FAIL only for story-owned mutation behavior that is not wired yet.
 
@@ -169,7 +169,7 @@ The story wrapper must:
 
 - [ ] **Step 2: Run story test**
 
-Run: `npm run test:run -- --include src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
+Run: `npm run test:run -- src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
 
 Expected: PASS for the provenance grouping story.
 
