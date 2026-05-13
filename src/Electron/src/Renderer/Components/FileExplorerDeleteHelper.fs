@@ -7,12 +7,6 @@ open Swate.Electron.Shared.FileIOTypes
 [<RequireQualifiedAccess>]
 module FileExplorerDeleteHelper =
 
-    let private normalizeRelativePath (path: string) =
-        path
-        |> PathHelpers.normalizeRelativePath
-        |> PathHelpers.normalizePath
-
-
     let containsPath (paths: string seq) (relativePath: string) =
         let normalizedTargetPath = PathHelpers.normalizePath relativePath
 
@@ -57,12 +51,3 @@ module FileExplorerDeleteHelper =
                 )
                 |> Option.map (fun entry -> PathHelpers.normalizePath entry.path)
             )
-
-    let isPendingPathAffectedByDelete (deletedPath: string) (pendingPath: string option) =
-        let normalizedDeletedPath = normalizeRelativePath deletedPath
-
-        pendingPath
-        |> Option.map normalizeRelativePath
-        |> Option.exists (fun normalizedPendingPath ->
-            isSameOrDescendantPath normalizedPendingPath normalizedDeletedPath
-        )

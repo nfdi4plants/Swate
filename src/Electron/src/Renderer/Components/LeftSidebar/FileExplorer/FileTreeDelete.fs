@@ -1,6 +1,5 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
-open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
 open Swate.Components.ErrorModal
 open Swate.Components.FileExplorer.Types
@@ -14,11 +13,8 @@ module FileTreeDeleteWorkflow =
 
     type ConfirmDeleteConfig = {
         pendingDeleteItem: FileItem option
-        pendingArcFileSave: ArcFiles option
         closeDeleteModal: unit -> unit
         setIsDeleting: bool -> unit
-        setPendingArcFileSave: ArcFiles option -> unit
-        stagePendingArcFileSave: ArcFiles option -> JS.Promise<Result<unit, exn>>
         enqueueError: ErrorModalRequest -> unit
         arcScopeId: string option
     }
@@ -45,23 +41,10 @@ module FileTreeDeleteWorkflow =
             config.setIsDeleting true
 
             promise {
-                let pendingPath = tryGetArcFilePendingPath config.pendingArcFileSave
-
-                let shouldClearPendingDraft =
-                    FileExplorerDeleteHelper.isPendingPathAffectedByDelete deletePath pendingPath
-
                 let! deleteResult = Api.ipcArcVaultApi.deletePath deletePath
 
                 match deleteResult with
-                | Ok() ->
-                    if shouldClearPendingDraft then
-                        config.setPendingArcFileSave None
-
-                        match! config.stagePendingArcFileSave None with
-                        | Ok() -> ()
-                        | Error exn -> applyDeleteError config exn.Message
-
-                    config.closeDeleteModal ()
+                | Ok() -> config.closeDeleteModal ()
                 | Error exn -> applyDeleteError config exn.Message
             }
             |> Promise.catch (fun exn -> applyDeleteError config exn.Message)

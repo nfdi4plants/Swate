@@ -109,33 +109,6 @@ let getItemIconClass (item: FileItem) =
         | None -> colorClassForArcWorkbookFile fileName
 
 
-let tryGetArcFileRelativePath (arcFile: ArcFiles) =
-    arcFile.TryGetRelativePath() |> Option.map PathHelpers.normalizePath
-
-let tryGetArcFilePendingPath (pendingArcFile: ArcFiles option) =
-    pendingArcFile |> Option.bind tryGetArcFileRelativePath
-
-let tryPendingArcFileEntry (arcFile: ArcFiles) =
-    tryGetArcFileRelativePath arcFile
-    |> Option.map (fun path -> FileEntry.create (PathHelpers.getFileName path, path, false))
-
-let withPendingArcFileEntry (fileTree: FileEntry[]) (pendingArcFile: ArcFiles option) =
-    match pendingArcFile |> Option.bind tryPendingArcFileEntry with
-    | Some pendingEntry when
-        fileTree
-        |> Array.exists (fun entry -> PathHelpers.pathsEqual entry.path pendingEntry.path)
-        |> not
-        ->
-        Array.append fileTree [| pendingEntry |]
-    | _ -> fileTree
-
-let tryFindPendingArcFileByPath (path: string) (pendingArcFile: ArcFiles option) =
-    pendingArcFile
-    |> Option.filter (fun arcFile ->
-        tryGetArcFileRelativePath arcFile
-        |> Option.exists (fun pendingPath -> PathHelpers.pathsEqual pendingPath path)
-    )
-
 let tryGetItemRelativePath (item: FileItem) =
     item.Path
     |> Option.map PathHelpers.normalizeRelativePath

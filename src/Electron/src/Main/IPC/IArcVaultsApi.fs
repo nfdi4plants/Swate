@@ -142,35 +142,8 @@ let private isSameOrDescendantPathForComparison (path: string) (ancestorPath: st
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-
-    let isPendingPathAffectedByDelete (deletedPath: string) (pendingArcFileSave: FileContentDTO option) =
-        pendingArcFileSave
-        |> Option.exists (fun pendingArcFileSave ->
-            isSameOrDescendantPathForComparison pendingArcFileSave.path deletedPath
-        )
-
-    let private tryGetNodeErrorCode (error: exn) : string option =
-        try
-            error?code |> unbox<string> |> Option.ofObj
-        with _ ->
-            None
-
-    let shouldIgnoreMissingDiskDeleteError
-        (deletedPath: string)
-        (pendingArcFileSave: FileContentDTO option)
-        (deleteError: exn)
-        =
-        let isMissingPathError =
-            match tryGetNodeErrorCode deleteError with
-            | Some "ENOENT" -> true
-            | _ -> false
-
-        isMissingPathError
-        && isPendingPathAffectedByDelete deletedPath pendingArcFileSave
-
     type MergeResult = {
         Arc: ARC
-        PendingArcFileSave: FileContentDTO option
     }
 
     let private normalizeRelativePathForMerge (path: string) =
@@ -222,35 +195,12 @@ module ArcDeleteHelper =
         (preDeleteFileRelativePaths: string seq)
         (arcLocal: ARC)
         (reloadedArc: ARC)
-        (pendingArcFileSave: FileContentDTO option)
         : Result<MergeResult, exn> =
-        let shouldDropPendingArcFileSave =
-            isPendingPathAffectedByDelete deletedPath pendingArcFileSave
-
-        let pendingForMerge =
-            if shouldDropPendingArcFileSave then
-                None
-            else
-                pendingArcFileSave
-
         let arcLocalForMerge = arcLocal.Copy()
+        let unlinkEvents = buildDeleteUnlinkEvents deletedPath preDeleteFileRelativePaths
+        let mergedArc = ARC.merge arcLocalForMerge reloadedArc unlinkEvents
 
-        let arcLocalForMergeResult =
-            match pendingForMerge with
-            | None -> Ok arcLocalForMerge
-            | Some pendingArcFileSave ->
-                Main.ArcVaultHelper.updateARCByFileContentDTO arcLocalForMerge pendingArcFileSave
-
-        match arcLocalForMergeResult with
-        | Error mergeError -> Error mergeError
-        | Ok arcLocalForMerge ->
-            let unlinkEvents = buildDeleteUnlinkEvents deletedPath preDeleteFileRelativePaths
-            let mergedArc = ARC.merge arcLocalForMerge reloadedArc unlinkEvents
-
-            Ok {
-                Arc = mergedArc
-                PendingArcFileSave = pendingForMerge
-            }
+        Ok { Arc = mergedArc }
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
@@ -507,7 +457,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     saveArcFile =
         fun () -> promise {
             try
-                return! withLoadedArcVault event (fun vault -> vault.WriteArc())
+                return!
+                    withLoadedArcVault event (fun vault ->
+                        promise {
+                            match! vault.WriteArc() with
+                            | Error saveError -> return Error saveError
+                            | Ok() ->
+                                do! vault.RefreshFileTree()
+                                return Ok()
+                        }
+                    )
             with e ->
                 return Error e
         }
@@ -525,16 +484,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    setPendingArcFileSave =
-        fun (pendingArcFileSave: FileContentDTO option) -> promise {
+    applyArcFileAndSave =
+        fun (request: FileContentDTO) -> promise {
             try
-                let windowId = windowIdFromIpcEvent event
-
-                match ARC_VAULTS.TryGetVault(windowId) with
-                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-                | Some vault ->
-                    vault.pendingArcFileSave <- pendingArcFileSave
-                    return Ok()
+                return!
+                    withLoadedArcVault event (fun vault ->
+                        promise {
+                            match! vault.ApplyArcFileAndSave(request) with
+                            | Error saveError -> return Error saveError
+                            | Ok() ->
+                                do! vault.RefreshFileTree()
+                                return Ok()
+                        }
+                    )
             with e ->
                 return Error e
         }
@@ -568,34 +530,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 vault.isBusyWriting <- true
 
                                 try
-                                    let pendingArcFileSave = vault.pendingArcFileSave
+                                    try
+                                        let! _ =
+                                            fsPromisesDynamic?rm (
+                                                absolutePath,
+                                                createObj [ "recursive" ==> true; "force" ==> false ]
+                                            )
+                                            |> unbox<JS.Promise<obj>>
 
-                                    let! deleteResult =
-                                        promise {
-                                            try
-                                                let! _ =
-                                                    fsPromisesDynamic?rm (
-                                                        absolutePath,
-                                                        createObj [ "recursive" ==> true; "force" ==> false ]
-                                                    )
-                                                    |> unbox<JS.Promise<obj>>
-
-                                                return Ok()
-                                            with deleteError ->
-                                                if
-                                                    ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
-                                                        normalizedRelativePath
-                                                        pendingArcFileSave
-                                                        deleteError
-                                                then
-                                                    return Ok()
-                                                else
-                                                    return Error deleteError
-                                        }
-
-                                    match deleteResult with
-                                    | Error deleteError -> return Error deleteError
-                                    | Ok() ->
                                         do! vault.RefreshFileTree()
 
                                         match! ARC.tryLoadAsync arcPath with
@@ -608,14 +550,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                     preDeleteFileRelativePaths
                                                     arcLocal
                                                     reloadedArc
-                                                    pendingArcFileSave
                                             with
                                             | Error mergeError -> return Error mergeError
                                             | Ok mergeResult ->
                                                 vault.arc <- Some mergeResult.Arc
-                                                vault.pendingArcFileSave <- mergeResult.PendingArcFileSave
                                                 vault.window.title <- mergeResult.Arc.Identifier
                                                 return Ok()
+                                    with deleteError ->
+                                        return Error deleteError
                                 finally
                                     vault.isBusyWriting <- false
             with e ->

@@ -46,8 +46,8 @@ type IArcVaultsApi = {
     saveArcFile: unit -> JS.Promise<Result<unit, exn>>
     /// Applies ARC file changes to the active vault's in-memory ARC without writing to disk.
     setArcFileInMemory: FileContentDTO -> JS.Promise<Result<unit, exn>>
-    /// Stores or clears the currently pending ARC file save draft for the active vault window.
-    setPendingArcFileSave: FileContentDTO option -> JS.Promise<Result<unit, exn>>
+    /// Applies ARC file changes and persists to disk atomically. In-memory ARC is only committed on successful save.
+    applyArcFileAndSave: FileContentDTO -> JS.Promise<Result<unit, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
