@@ -36,6 +36,7 @@ module DndKit =
 
     type IDroppable =
         abstract member setNodeRef: obj -> unit
+        abstract member isOver: bool
 
     type IDndKitEvent =
         abstract member active: HTMLElement
@@ -43,6 +44,9 @@ module DndKit =
 
     [<Import("closestCenter", "@dnd-kit/core")>]
     let closestCenter: obj = jsNative
+
+    [<Import("pointerWithin", "@dnd-kit/core")>]
+    let pointerWithin: obj = jsNative
 
     [<Import("KeyboardSensor", "@dnd-kit/core")>]
     let KeyboardSensor: obj = jsNative
@@ -83,7 +87,9 @@ type DndKit =
     static member useSensors([<ParamSeqAttribute>] sensors: ISensor[]) : obj = jsNative
 
     [<ReactComponent("DndContext", "@dnd-kit/core")>]
-    static member DndContext(?onDragEnd, ?sensors, ?collisionDetection, ?children: ReactElement, ?key) =
+    static member DndContext
+        (?onDragStart, ?onDragCancel, ?onDragEnd, ?sensors, ?collisionDetection, ?children: ReactElement, ?key)
+        =
         React.Imported()
 
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]

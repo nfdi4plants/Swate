@@ -11,10 +11,6 @@ type WidgetHostView =
     | MetadataView
     | PreviewErrorView
 
-type FilePickerWidgetServices = {
-    pickPaths: unit -> JS.Promise<Result<string[], string>>
-}
-
 type DataAnnotatorWidgetServices = {
     pickTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], string>>
 }

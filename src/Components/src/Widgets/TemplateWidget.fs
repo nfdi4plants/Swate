@@ -13,16 +13,6 @@ module TemplateTypes = Swate.Components.Template.Types
 module TemplateActions = Swate.Components.Template.TemplateActions
 module TemplateCacheContext = Swate.Components.Template.TemplateCacheContext
 
-
-module private TemplateWidgetHelper =
-
-    [<Literal>]
-    let WidgetContainerClass =
-        "swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:w-[64rem] swt:max-w-[95vw] swt:h-[70vh] swt:max-h-[80vh]"
-
-
-open TemplateWidgetHelper
-
 [<Erase; Mangle(false)>]
 type TemplateWidget =
 
