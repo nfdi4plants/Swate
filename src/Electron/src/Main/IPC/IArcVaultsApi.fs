@@ -325,6 +325,12 @@ module ArcRenameHelper =
         TargetPath: string
     }
 
+    type IdentifierRenameSyncPlan = {
+        Zone: ArcDeletePathRules.AddZone
+        OldIdentifier: string
+        NewIdentifier: string
+    }
+
     type MergeResult = {
         Arc: ARC
     }
@@ -341,6 +347,80 @@ module ArcRenameHelper =
             event.EventName
         )
         |> Seq.toList
+
+    let tryBuildIdentifierRenameSyncPlan
+        (sourcePath: string)
+        (targetPath: string)
+        : Result<IdentifierRenameSyncPlan, exn> =
+        let normalizedSourcePath = normalizeRelativePathForComparison sourcePath
+        let normalizedTargetPath = normalizeRelativePathForComparison targetPath
+
+        match
+            ArcDeletePathRules.tryGetRenameEntityFolderTarget normalizedSourcePath,
+            ArcDeletePathRules.tryGetRenameEntityFolderTarget normalizedTargetPath
+        with
+        | Some(sourceZone, sourceIdentifier), Some(targetZone, targetIdentifier) ->
+            if sourceZone <> targetZone then
+                Error(
+                    exn
+                        $"Renamed folder from '{sourcePath}' to '{targetPath}', but ARC identifier sync only supports renames within the same entity zone."
+                )
+            elif PathHelpers.pathsEqual sourceIdentifier targetIdentifier then
+                Error(
+                    exn
+                        $"Renamed folder from '{sourcePath}' to '{targetPath}', but no ARC identifier change was detected for content sync."
+                )
+            else
+                Ok {
+                    Zone = sourceZone
+                    OldIdentifier = sourceIdentifier
+                    NewIdentifier = targetIdentifier
+                }
+        | _ ->
+            Error(
+                exn
+                    $"Renamed folder from '{sourcePath}' to '{targetPath}', but ARC identifier sync requires ARC entity folder paths under studies/, assays/, workflows/, or runs/."
+            )
+
+    let private applyIdentifierRenameSyncPlan (arc: ARC) (syncPlan: IdentifierRenameSyncPlan) =
+        match syncPlan.Zone with
+        | ArcDeletePathRules.AddZone.Assays ->
+            arc.RenameAssay(syncPlan.OldIdentifier, syncPlan.NewIdentifier)
+        | ArcDeletePathRules.AddZone.Studies ->
+            arc.RenameStudy(syncPlan.OldIdentifier, syncPlan.NewIdentifier)
+        | ArcDeletePathRules.AddZone.Workflows ->
+            arc.RenameWorkflow(syncPlan.OldIdentifier, syncPlan.NewIdentifier)
+        | ArcDeletePathRules.AddZone.Runs ->
+            arc.RenameRun(syncPlan.OldIdentifier, syncPlan.NewIdentifier)
+
+    let syncRenamedEntityIdentifierOnDisk
+        (arcPath: string)
+        (sourcePath: string)
+        (targetPath: string)
+        : JS.Promise<Result<unit, exn>> =
+        promise {
+            match tryBuildIdentifierRenameSyncPlan sourcePath targetPath with
+            | Error planError -> return Error planError
+            | Ok syncPlan ->
+                match! ARC.tryLoadAsync arcPath with
+                | Error loadError ->
+                    return
+                        Error(
+                            exn
+                                $"Renamed folder from '{sourcePath}' to '{targetPath}', but could not reload ARC for identifier sync: {loadError}"
+                        )
+                | Ok reloadedArc ->
+                    try
+                        applyIdentifierRenameSyncPlan reloadedArc syncPlan
+                        do! reloadedArc.UpdateAsync arcPath
+                        return Ok()
+                    with syncError ->
+                        return
+                            Error(
+                                exn
+                                    $"Renamed folder from '{sourcePath}' to '{targetPath}', but failed to sync ARC identifier from '{syncPlan.OldIdentifier}' to '{syncPlan.NewIdentifier}': {syncError.Message}"
+                            )
+        }
 
     let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
         match tryGetNodeErrorCode renameError with
@@ -816,7 +896,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
 
                                             match renameResult with
-                                            | Ok() -> return Ok()
+                                            | Ok() ->
+                                                let! syncResult =
+                                                    ArcRenameHelper.syncRenamedEntityIdentifierOnDisk
+                                                        arcPath
+                                                        renamePlan.SourcePath
+                                                        renamePlan.TargetPath
+
+                                                return syncResult
                                             | Error renameError ->
                                                 return
                                                     Error(
