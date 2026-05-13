@@ -13,6 +13,7 @@ open Fable.Electron.Main
 open Fable.Core.JsInterop
 open Main
 open Main.ArcMerge
+open Main.ArcVaultHelper
 open Node.Api
 open ARCtrl
 open Swate.Electron.Shared.DTOs.NoteSearchDto
@@ -193,9 +194,10 @@ module ArcDeleteHelper =
         (arcLocal: ARC)
         (reloadedArc: ARC)
         : Result<MergeResult, exn> =
-        let arcLocalForMerge = arcLocal.Copy()
+        let arcLocalForMerge = copyArcPreservingStaticHashes arcLocal
         let unlinkEvents = buildDeleteUnlinkEvents deletedPath preDeleteFileRelativePaths
         let mergedArc = ARC.merge arcLocalForMerge reloadedArc unlinkEvents
+        syncArcStaticHashes arcLocal mergedArc
 
         Ok { Arc = mergedArc }
 
