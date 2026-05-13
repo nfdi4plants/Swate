@@ -73,45 +73,35 @@ module ArcVaultExtensions =
                                     do! this.LoadArc()
                                     sendMsgApi.IsLoadingChanges false
 
-                                    let pathUpdater (path: string) =
-                                        $"{this.path.Value}\{path}"
-                                            .Replace(ArcPathHelper.PathSeperatorWindows, ArcPathHelper.PathSeperator)
+                                    match this.path with
+                                    | None -> ()
+                                    | Some arcPath ->
+                                        let eventPath =
+                                            $"{arcPath}\{path}"
+                                                .Replace(ArcPathHelper.PathSeperatorWindows, ArcPathHelper.PathSeperator)
 
-                                    match eventName.ToLower() with
-                                    | name when name = Chokidar.Events.Add.ToString() ->
-                                        if this.path.IsSome then
-                                            let newPath = pathUpdater path
-                                            let! addedFile = getFileEntryWithLfsMetadata this.path.Value newPath
-                                            let newFileTree = this.fileTree
-                                            newFileTree.Add(addedFile.path, addedFile)
-                                            this.SetFileTree(newFileTree)
-                                    | name when name = Chokidar.Events.AddDir.ToString() ->
-                                        if this.path.IsSome then
-                                            let newPath = pathUpdater path
-                                            let! addedFile = getFileEntry (newPath)
-                                            let newFileTree = this.fileTree
-                                            newFileTree.Add(addedFile.path, addedFile)
-                                            this.SetFileTree(newFileTree)
-                                    | name when name = Chokidar.Events.Unlink.ToString() ->
-                                        let newPath = pathUpdater path
-
-                                        if this.path.IsSome then
-                                            let nextFileTree = removePathAndDescendants newPath this.fileTree
+                                        match eventName.ToLowerInvariant() with
+                                        | name when name = Chokidar.Events.Add.ToString().ToLowerInvariant()
+                                                    || name = Chokidar.Events.Change.ToString().ToLowerInvariant() ->
+                                            let! changedFile = getFileEntryWithLfsMetadata arcPath eventPath
+                                            let nextFileTree = upsertFileEntry changedFile this.fileTree
                                             this.SetFileTree(nextFileTree)
-                                    | name when name = Chokidar.Events.UnlinkDir.ToString() ->
-                                        let newPath = pathUpdater path
-
-                                        if this.path.IsSome then
-                                            let nextFileTree = removePathAndDescendants newPath this.fileTree
+                                        | name when name = Chokidar.Events.AddDir.ToString().ToLowerInvariant() ->
+                                            let! addedDirectory = getFileEntry eventPath
+                                            let nextFileTree = upsertFileEntry addedDirectory this.fileTree
                                             this.SetFileTree(nextFileTree)
-                                    | _ ->
-                                        if this.path.IsSome then
-                                            let! fileEntries = getFileEntries this.path.Value
-                                            let fileTree = createFileEntryTree fileEntries
-                                            this.SetFileTree(fileTree)
+                                        | name when name = Chokidar.Events.Unlink.ToString().ToLowerInvariant()
+                                                    || name = Chokidar.Events.UnlinkDir.ToString().ToLowerInvariant() ->
+                                            let nextFileTree = removePathAndDescendants eventPath this.fileTree
+                                            this.SetFileTree(nextFileTree)
+                                        | _ -> ()
 
                                     this.fileWatcherReloadArcTimeout <- None
                                 }
+                                |> Promise.catch (fun ex ->
+                                    swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
+                                    sendMsgApi.IsLoadingChanges false
+                                    this.fileWatcherReloadArcTimeout <- None)
                                 |> Promise.start
                             )
                             500

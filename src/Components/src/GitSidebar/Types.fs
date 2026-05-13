@@ -77,6 +77,8 @@ type GitSidebarCallbacks = {
     OnCreateBranch: GitSidebarCreateBranchRequest -> unit
     OnSwitchBranch: string -> unit
     OnSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
+    OnPruneLfsCache: unit -> unit
+    OnDedupLfsStorage: unit -> unit
 }
 
 [<RequireQualifiedAccess>]

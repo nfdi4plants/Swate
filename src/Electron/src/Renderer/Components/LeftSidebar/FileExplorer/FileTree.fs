@@ -58,6 +58,7 @@ type FileTree =
         let pendingArcFileSave, setPendingArcFileSave = React.useState<ArcFiles option> None
         let pendingDeleteItem, setPendingDeleteItem = React.useState<FileItem option> None
         let isDeleting, setIsDeleting = React.useState false
+        let hasObservedFileTreeUpdateRef = React.useRef false
 
         let effectiveFileTree =
             React.useMemo (
@@ -179,6 +180,40 @@ type FileTree =
                             Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
             }
             |> Promise.start
+
+        let reloadSelectedPreviewAfterFileTreeUpdate () =
+            match
+                FileExplorerDeleteHelper.tryGetReloadableSelectedFilePath
+                    fileStateCtx.state.FileTree
+                    fileStateCtx.state.Selection.TreePath
+                    pageStateCtx.state
+            with
+            | None -> ()
+            | Some selectedPath ->
+                promise {
+                    let! result = Renderer.Components.ARCHelper.openView selectedPath
+
+                    match result with
+                    | Ok loaded -> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                    | Error errorMessage ->
+                        Renderer.Components.ARCHelper.applyViewError
+                            pageStateCtx.setState
+                            $"Could not reload preview for '{selectedPath}': {errorMessage}"
+                }
+                |> Promise.catch (fun exn ->
+                    Renderer.Components.ARCHelper.applyViewError
+                        pageStateCtx.setState
+                        $"Could not reload preview for '{selectedPath}': {exn.Message}")
+                |> Promise.start
+
+        React.useEffect (
+            (fun () ->
+                if hasObservedFileTreeUpdateRef.current then
+                    reloadSelectedPreviewAfterFileTreeUpdate ()
+                else
+                    hasObservedFileTreeUpdateRef.current <- true),
+            [| box fileStateCtx.state.FileTree |]
+        )
 
         let handleDirectoryArrowToggle (item: FileItem) (willExpand: bool) =
             if willExpand then

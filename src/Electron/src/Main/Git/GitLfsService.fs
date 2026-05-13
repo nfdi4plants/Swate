@@ -211,6 +211,39 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
             return Dictionary<string, GitLfsLsFileInfo>()
     }
 
+let storagePruneArgs =
+    [| "lfs"; "prune"; "--verify-remote"; "--verify-unreachable"; "--when-unverified=halt" |]
+
+let storageDedupArgs = [| "lfs"; "dedup" |]
+
+let buildFetchRefetchArgs (relativePath: string) =
+    [|
+        "lfs"
+        "fetch"
+        "--refetch"
+        $"--include={relativePath}"
+        "origin"
+        "HEAD"
+    |]
+
+let buildLsFilesJsonArgs (relativePath: string) =
+    [| "lfs"; "ls-files"; "-l"; "--size"; "--json"; $"--include={relativePath}" |]
+
+let tryFindListingForPath (relativePath: string) (listingJson: string) : Result<GitLfsLsFileInfo, string> =
+    try
+        let normalizedPath = PathHelpers.normalizeSeparators relativePath
+
+        match
+            listingJson
+            |> parseLsFiles
+            |> Array.tryFind (fun file ->
+                String.Equals(PathHelpers.normalizeSeparators file.name, normalizedPath, StringComparison.Ordinal))
+        with
+        | None -> Error "The file is not listed by Git LFS in the current checkout."
+        | Some file -> Ok { file with name = PathHelpers.normalizeSeparators file.name }
+    with error ->
+        Error $"Could not read Git LFS file metadata: {error.Message}"
+
 let private formatDiagnosticsSection (title: string) (content: string option) =
     match content |> Option.map _.Trim() with
     | Some value when not (String.IsNullOrWhiteSpace value) -> Some $"{title}:\n{redactDiagnosticText value}"
