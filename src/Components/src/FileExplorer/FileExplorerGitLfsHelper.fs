@@ -75,7 +75,7 @@ let contextMenuItems
                     [
                         {
                             Label = "Free local LFS copy"
-                            Icon = "swt:fluent--document-arrow-up-24-regular"
+                            Icon = "swt:fluent--document-arrow-up-20-regular"
                             OnClick = fun () -> freeLocalCopy item
                             Disabled = None
                         }
@@ -84,7 +84,7 @@ let contextMenuItems
                     [
                         {
                             Label = "Free local LFS copy"
-                            Icon = "swt:fluent--document-arrow-up-24-regular"
+                            Icon = "swt:fluent--document-arrow-up-20-regular"
                             OnClick = fun () -> ()
                             Disabled = Some true
                         }
