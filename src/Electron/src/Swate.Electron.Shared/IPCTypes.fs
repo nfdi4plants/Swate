@@ -101,9 +101,7 @@ type IGitLabApi = {
 /// One Way Bridge: Main -> Renderer
 module MainToRendererIpc =
 
-    type IPathChangeRendererApi = {
-        pathChange: string option -> unit
-    }
+    type IPathChangeRendererApi = { pathChange: string option -> unit }
 
     type IRecentArcsRendererApi = {
         recentARCsUpdate: ARCPointer[] -> unit

@@ -197,8 +197,29 @@ module private Authentication =
 type Navbar =
 
     [<ReactComponent>]
+    static member private SaveArcButton() =
+        let onSaveArc =
+            fun _ -> promise { return! Api.ipcArcVaultApi.saveArcFile () } |> Promise.start
+
+        Html.button [
+            prop.type'.button
+            prop.className "swt:btn swt:btn-square swt:btn-sm"
+            prop.onClick onSaveArc
+            prop.children [
+                Html.i [
+                    prop.className "swt:iconify swt:fluent--save-16-filled swt:size-5"
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member Main() =
-        let left = Selector.Main()
+
+        let left =
+            Html.div [
+                prop.className "swt:flex swt:items-center swt:gap-2"
+                prop.children [ Selector.Main(); Navbar.SaveArcButton() ]
+            ]
 
         let right =
             Html.div [
