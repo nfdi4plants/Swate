@@ -20,7 +20,11 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (
-                    ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory", ?scopeId = arcScopeId)
+                    ErrorModalRequest.create (
+                        exn.Message,
+                        title = "Could not update ARC in memory",
+                        ?scopeId = arcScopeId
+                    )
                 )
         }
         |> Promise.start
@@ -44,7 +48,23 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             }
             |> Promise.start
 
+    let pickFilePaths =
+        React.useCallback (
+            (fun () -> promise {
+                match! Api.ipcArcVaultApi.pickArcPaths () with
+                | Ok paths -> return paths
+                | Error exn ->
+                    errorModal.enqueue (
+                        ErrorModalRequest.create (exn.Message, title = "Could not pick files", ?scopeId = arcScopeId)
+                    )
+
+                    return [||]
+            }),
+            [| errorModal |]
+
+        )
+
     let renderTrailingNavbarElements _ =
         QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveArcFile)
 
-    Main.ArcFileEditor(arcFile, setArcFile, trailingNavbarElements = renderTrailingNavbarElements)
+    Main.ArcFileEditor(arcFile, setArcFile, pickFilePaths, trailingNavbarElements = renderTrailingNavbarElements)

@@ -2,6 +2,7 @@ import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { screen, within, expect, userEvent, waitFor, fireEvent } from "storybook/test";
 import { FileExplorer, FileExplorerExample_Example as FileExplorerExample } from "./FileExplorer.fs.js";
+import { contextMenuItems as fileExplorerGitLfsContextMenuItems } from "./FileExplorerGitLfsHelper.fs.js";
 import {
   ContextMenuItem,
   FileItemIcon_Document$,
@@ -105,6 +106,42 @@ const DestructiveContextMenuFileExplorer = () => {
         }
       />
       <div data-testid="context-click-count">Context clicks: {clickCount}</div>
+    </div>
+  );
+};
+
+const LfsContextMenuFileExplorer = () => {
+  const items = React.useMemo(
+    () =>
+      ofArray([
+        Object.assign(
+          FileTree_createFile("Downloaded LFS", "data/downloaded.bin", FileItemIcon_Document$()),
+          { IsLFS: true, Downloaded: true, IsLFSPointer: false },
+        ),
+        Object.assign(
+          FileTree_createFile("Pointer LFS", "data/pointer.bin", FileItemIcon_Document$()),
+          { IsLFS: true, Downloaded: false, IsLFSPointer: true },
+        ),
+        Object.assign(
+          FileTree_createFile("Plain File", "data/plain.txt", FileItemIcon_Document$()),
+          { IsLFS: false, Downloaded: false, IsLFSPointer: false },
+        ),
+      ]),
+    [],
+  );
+
+  return (
+    <div className="swt:p-4">
+      <FileExplorer
+        initialItems={items}
+        onContextMenu={(item) =>
+          fileExplorerGitLfsContextMenuItems(
+            item,
+            () => {},
+            () => {},
+          )
+        }
+      />
     </div>
   );
 };
@@ -215,5 +252,54 @@ export const ContextMenuItemDispatchesAction: StoryObj<typeof DestructiveContext
     await waitFor(() =>
       expect(canvas.getByTestId("context-click-count")).toHaveTextContent("Context clicks: 1"),
     );
+  },
+};
+
+export const LfsContextMenuStates: StoryObj<typeof LfsContextMenuFileExplorer> = {
+  render: () => <LfsContextMenuFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const downloadedFile = await canvas.findByText("Downloaded LFS");
+    const downloadedItem = downloadedFile.closest("[data-file-item-id]");
+    await waitFor(() => expect(downloadedItem).toBeTruthy());
+
+    if (!downloadedItem) {
+      throw new Error("Expected downloaded LFS file item.");
+    }
+
+    fireEvent.contextMenu(downloadedItem, { clientX: 30, clientY: 30, bubbles: true });
+    const enabledMenuItem = await screen.findByText("Free local LFS copy");
+    await expect(enabledMenuItem).toBeVisible();
+    await expect(enabledMenuItem).not.toHaveClass("swt:opacity-50");
+
+    await userEvent.click(document.body);
+
+    const pointerFile = await canvas.findByText("Pointer LFS");
+    const pointerItem = pointerFile.closest("[data-file-item-id]");
+    await waitFor(() => expect(pointerItem).toBeTruthy());
+
+    if (!pointerItem) {
+      throw new Error("Expected pointer LFS file item.");
+    }
+
+    fireEvent.contextMenu(pointerItem, { clientX: 30, clientY: 30, bubbles: true });
+    const disabledMenuItem = await screen.findByText("Free local LFS copy");
+    await expect(disabledMenuItem).toBeVisible();
+    await expect(disabledMenuItem).toHaveClass("swt:opacity-50");
+
+    await userEvent.click(document.body);
+
+    const plainFile = await canvas.findByText("Plain File");
+    const plainItem = plainFile.closest("[data-file-item-id]");
+    await waitFor(() => expect(plainItem).toBeTruthy());
+
+    if (!plainItem) {
+      throw new Error("Expected plain file item.");
+    }
+
+    fireEvent.contextMenu(plainItem, { clientX: 30, clientY: 30, bubbles: true });
+    await expect(screen.queryByText("Free local LFS copy")).toBeNull();
   },
 };

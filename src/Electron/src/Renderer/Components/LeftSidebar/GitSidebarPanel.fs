@@ -136,6 +136,8 @@ let Main () =
                 OnCreateBranch = gitStateCtx.createBranch
                 OnSwitchBranch = gitStateCtx.switchBranch
                 OnSelectChange = gitStateCtx.selectChange
+                OnPruneLfsCache = gitStateCtx.pruneLfsCache
+                OnDedupLfsStorage = gitStateCtx.dedupLfsStorage
             },
             downloadLargeFiles = gitStateCtx.state.DownloadLargeFiles,
             lfsAutoTrackThresholdMb = gitStateCtx.state.LfsAutoTrackThresholdMb,

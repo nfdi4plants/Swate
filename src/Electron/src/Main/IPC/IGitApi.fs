@@ -377,6 +377,47 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
 
                 return toGitOperationResult (fun () -> Some "Git LFS settings updated.") None None result
         }
+    gitLfsPrune =
+        fun () -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                return!
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.pruneLfsCache arcPath
+                            return toGitOperationResult (fun _ -> Some "Hidden Git LFS cache cleaned.") None None result
+                        })
+        }
+    gitLfsDedup =
+        fun () -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                return!
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.dedupLfsStorage arcPath
+                            return toGitOperationResult (fun _ -> Some "Git LFS deduplication completed.") None None result
+                        })
+        }
+    gitLfsFreeLocalCopy =
+        fun (request: GitLfsFreeLocalCopyRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                return!
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.freeLocalLfsCopy arcPath request.Path
+                            if Result.isOk result then
+                                do! vault.RefreshFileTree()
+                            return toGitOperationResult (fun () -> Some $"Freed local LFS copy for '{request.Path}'.") None None result
+                        })
+        }
     createBranch =
         fun (request: GitCreateBranchRequest) -> promise {
             match tryGetVaultAndArcPath event with

@@ -251,6 +251,9 @@ let private defaultDependencies: GitDependencies = {
     gitCommit = fun _ -> unexpectedPromise "gitCommit"
     setGitLfsSettings = fun _ -> unexpectedPromise "setGitLfsSettings"
     confirmGitMergeResolution = fun _ -> unexpectedPromise "confirmGitMergeResolution"
+    gitLfsPrune = fun () -> unexpectedPromise "gitLfsPrune"
+    gitLfsDedup = fun () -> unexpectedPromise "gitLfsDedup"
+    confirmLfsPrune = fun message -> failwith $"Unexpected LFS prune confirmation: {message}"
     confirmInstall = fun message -> failwith $"Unexpected install prompt: {message}"
 }
 
@@ -295,6 +298,8 @@ let private noopCallbacks: GitSidebarCallbacks = {
     OnCreateBranch = fun _ -> ()
     OnSwitchBranch = fun _ -> ()
     OnSelectChange = fun _ -> promise { return Ok() }
+    OnPruneLfsCache = fun () -> ()
+    OnDedupLfsStorage = fun () -> ()
 }
 
 Vitest.afterEach (fun () -> document.body.innerHTML <- "")
@@ -421,6 +426,53 @@ Vitest.describe (
                     Vitest.expect(hasOwnProperty body "path").toBe(false)
                 finally
                     cleanupGitLabCreateProjectFetchSpy ()
+            }
+        )
+)
+
+Vitest.describe (
+    "GitWorkflow LFS storage maintenance",
+    fun () ->
+        Vitest.test (
+            "PruneLfsCacheRequested asks for confirmation before running prune",
+            fun () -> promise {
+                let mutable confirmedMessage = None
+
+                let deps = {
+                    defaultDependencies with
+                        confirmLfsPrune =
+                            fun message ->
+                                confirmedMessage <- Some message
+                                true
+                        gitLfsPrune = fun () -> promise { return Ok okOperationResult }
+                }
+
+                let model = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ArcSessionId = 1
+                }
+
+                let nextModel, cmd = update deps ignore PruneLfsCacheRequested model
+                let! _ = collectMessages cmd
+
+                Vitest.expect(confirmedMessage.IsSome).toBe(true)
+                Vitest.expect(nextModel.BusyOperation).toBe(None)
+            }
+        )
+
+        Vitest.test (
+            "DedupLfsStorageRequested starts dedup write operation",
+            fun () -> promise {
+                let model = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ArcSessionId = 1
+                }
+
+                let nextModel, _cmd = update defaultDependencies ignore (WriteRequested DedupLfsStorage) model
+
+                Vitest.expect(nextModel.BusyOperation).toEqual(Some GitBusyOperation.DeduplicatingGitLfsStorage)
             }
         )
 )
@@ -1936,6 +1988,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2014,6 +2068,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
@@ -2068,6 +2124,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2118,6 +2176,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2171,6 +2231,8 @@ Vitest.describe (
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
+                                        OnPruneLfsCache = fun () -> ()
+                                        OnDedupLfsStorage = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5
@@ -2253,6 +2315,8 @@ Vitest.describe (
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
+                                        OnPruneLfsCache = fun () -> ()
+                                        OnDedupLfsStorage = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5
@@ -2338,6 +2402,8 @@ Vitest.describe (
                                                         OnCreateBranch = fun _ -> ()
                                                         OnSwitchBranch = fun _ -> ()
                                                         OnSelectChange = fun _ -> promise { return Ok() }
+                                                        OnPruneLfsCache = fun () -> ()
+                                                        OnDedupLfsStorage = fun () -> ()
                                                     },
                                                     downloadLargeFiles = true,
                                                     lfsAutoTrackThresholdMb = 5
@@ -2402,6 +2468,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2459,6 +2527,8 @@ Vitest.describe (
                                         OnCreateBranch = fun _ -> ()
                                         OnSwitchBranch = fun _ -> ()
                                         OnSelectChange = fun _ -> promise { return Ok() }
+                                        OnPruneLfsCache = fun () -> ()
+                                        OnDedupLfsStorage = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5
@@ -2509,6 +2579,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2628,6 +2700,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2705,6 +2779,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2782,6 +2858,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Error "Diff failed to load." }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2836,6 +2914,8 @@ Vitest.describe (
                                 OnCreateBranch = fun _ -> ()
                                 OnSwitchBranch = fun _ -> ()
                                 OnSelectChange = fun _ -> promise { return Ok() }
+                                OnPruneLfsCache = fun () -> ()
+                                OnDedupLfsStorage = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5

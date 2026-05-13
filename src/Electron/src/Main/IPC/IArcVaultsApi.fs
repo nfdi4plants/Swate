@@ -191,12 +191,10 @@ let private withLoadedArcVault<'T>
 
 type private ArcMutationMergeResult = {
     Arc: ARC
-    PendingArcFileSave: FileContentDTO option
 }
 
 let private applyArcMutationMergeResult (vault: ArcVault) (mergeResult: ArcMutationMergeResult) =
     vault.arc <- Some mergeResult.Arc
-    vault.pendingArcFileSave <- mergeResult.PendingArcFileSave
     vault.window.title <- mergeResult.Arc.Identifier
 
 let private runArcDiskMutation
@@ -257,29 +255,8 @@ let private runWithRenameScopedPolling
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-
-    let isPendingPathAffectedByDelete (deletedPath: string) (pendingArcFileSave: FileContentDTO option) =
-        pendingArcFileSave
-        |> Option.exists (fun pendingArcFileSave ->
-            PathHelpers.isSameOrDescendantPathForFsComparison pendingArcFileSave.path deletedPath
-        )
-
-    let shouldIgnoreMissingDiskDeleteError
-        (deletedPath: string)
-        (pendingArcFileSave: FileContentDTO option)
-        (deleteError: exn)
-        =
-        let isMissingPathError =
-            match tryGetNodeErrorCode deleteError with
-            | Some "ENOENT" -> true
-            | _ -> false
-
-        isMissingPathError
-        && isPendingPathAffectedByDelete deletedPath pendingArcFileSave
-
     type MergeResult = {
         Arc: ARC
-        PendingArcFileSave: FileContentDTO option
     }
 
     let private normalizeRelativePathForMerge (path: string) =
@@ -333,35 +310,12 @@ module ArcDeleteHelper =
         (preDeleteFileRelativePaths: string seq)
         (arcLocal: ARC)
         (reloadedArc: ARC)
-        (pendingArcFileSave: FileContentDTO option)
         : Result<MergeResult, exn> =
-        let shouldDropPendingArcFileSave =
-            isPendingPathAffectedByDelete deletedPath pendingArcFileSave
-
-        let pendingForMerge =
-            if shouldDropPendingArcFileSave then
-                None
-            else
-                pendingArcFileSave
-
         let arcLocalForMerge = arcLocal.Copy()
+        let unlinkEvents = buildDeleteUnlinkEvents deletedPath preDeleteFileRelativePaths
+        let mergedArc = ARC.merge arcLocalForMerge reloadedArc unlinkEvents
 
-        let arcLocalForMergeResult =
-            match pendingForMerge with
-            | None -> Ok arcLocalForMerge
-            | Some pendingArcFileSave ->
-                Main.ArcVaultHelper.updateARCByFileContentDTO arcLocalForMerge pendingArcFileSave
-
-        match arcLocalForMergeResult with
-        | Error mergeError -> Error mergeError
-        | Ok arcLocalForMerge ->
-            let unlinkEvents = buildDeleteUnlinkEvents deletedPath preDeleteFileRelativePaths
-            let mergedArc = ARC.merge arcLocalForMerge reloadedArc unlinkEvents
-
-            Ok {
-                Arc = mergedArc
-                PendingArcFileSave = pendingForMerge
-            }
+        Ok { Arc = mergedArc }
 
 [<RequireQualifiedAccess>]
 module ArcRenameHelper =
@@ -373,7 +327,6 @@ module ArcRenameHelper =
 
     type MergeResult = {
         Arc: ARC
-        PendingArcFileSave: FileContentDTO option
     }
 
     let private normalizeRelativePathForComparison (path: string) =
@@ -478,26 +431,12 @@ module ArcRenameHelper =
         (targetPath: string)
         (arcLocal: ARC)
         (reloadedArc: ARC)
-        (pendingArcFileSave: FileContentDTO option)
         : Result<MergeResult, exn> =
         let arcLocalForMerge = arcLocal.Copy()
+        let renameEvents = buildRenameEvents sourcePath targetPath
+        let mergedArc = ARC.merge arcLocalForMerge reloadedArc renameEvents
 
-        let arcLocalForMergeResult =
-            match pendingArcFileSave with
-            | None -> Ok arcLocalForMerge
-            | Some pendingArcFileSave ->
-                Main.ArcVaultHelper.updateARCByFileContentDTO arcLocalForMerge pendingArcFileSave
-
-        match arcLocalForMergeResult with
-        | Error mergeError -> Error mergeError
-        | Ok arcLocalForMerge ->
-            let renameEvents = buildRenameEvents sourcePath targetPath
-            let mergedArc = ARC.merge arcLocalForMerge reloadedArc renameEvents
-
-            Ok {
-                Arc = mergedArc
-                PendingArcFileSave = pendingArcFileSave
-            }
+        Ok { Arc = mergedArc }
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
@@ -754,7 +693,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     saveArcFile =
         fun () -> promise {
             try
-                return! withLoadedArcVault event (fun vault -> vault.WriteArc())
+                return!
+                    withLoadedArcVault event (fun vault ->
+                        promise {
+                            match! vault.WriteArc() with
+                            | Error saveError -> return Error saveError
+                            | Ok() ->
+                                do! vault.RefreshFileTree()
+                                return Ok()
+                        }
+                    )
             with e ->
                 return Error e
         }
@@ -772,16 +720,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    setPendingArcFileSave =
-        fun (pendingArcFileSave: FileContentDTO option) -> promise {
+    applyArcFileAndSave =
+        fun (request: FileContentDTO) -> promise {
             try
-                let windowId = windowIdFromIpcEvent event
-
-                match ARC_VAULTS.TryGetVault(windowId) with
-                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
-                | Some vault ->
-                    vault.pendingArcFileSave <- pendingArcFileSave
-                    return Ok()
+                return!
+                    withLoadedArcVault event (fun vault ->
+                        promise {
+                            match! vault.ApplyArcFileAndSave(request) with
+                            | Error saveError -> return Error saveError
+                            | Ok() ->
+                                do! vault.RefreshFileTree()
+                                return Ok()
+                        }
+                    )
             with e ->
                 return Error e
         }
@@ -808,8 +759,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     let preDeleteFileRelativePaths =
                                         ArcDeleteHelper.getPreDeleteFileRelativePaths arcPath vault.fileTree.Values
 
-                                    let pendingArcFileSave = vault.pendingArcFileSave
-
                                     let deleteDiskMutation () =
                                         promise {
                                             try
@@ -822,15 +771,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                                 return Ok()
                                             with deleteError ->
-                                                if
-                                                    ArcDeleteHelper.shouldIgnoreMissingDiskDeleteError
-                                                        normalizedRelativePath
-                                                        pendingArcFileSave
-                                                        deleteError
-                                                then
-                                                    return Ok()
-                                                else
-                                                    return Error deleteError
+                                                return Error deleteError
                                         }
 
                                     return!
@@ -844,12 +785,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                     preDeleteFileRelativePaths
                                                     arcLocal
                                                     reloadedArc
-                                                    pendingArcFileSave
-                                                |> Result.map (fun mergeResult -> {
-                                                    Arc = mergeResult.Arc
-                                                    PendingArcFileSave = mergeResult.PendingArcFileSave
-                                                })
-                                            )
+                                                |> Result.map (fun mergeResult -> { Arc = mergeResult.Arc }))
                         }
                     )
             with e ->
@@ -905,12 +841,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                             renamePlan.TargetPath
                                                             arcLocal
                                                             reloadedArc
-                                                            vault.pendingArcFileSave
-                                                        |> Result.map (fun mergeResult -> {
-                                                            Arc = mergeResult.Arc
-                                                            PendingArcFileSave = mergeResult.PendingArcFileSave
-                                                        })
-                                                    ))
+                                                        |> Result.map (fun mergeResult -> { Arc = mergeResult.Arc })))
                         }
                     )
             with e ->
@@ -1016,3 +947,4 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error e
         }
 }
+

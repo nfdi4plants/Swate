@@ -35,6 +35,8 @@ const baseCallbacks = {
   OnCreateBranch: noopWithArg,
   OnSwitchBranch: noopWithBranch,
   OnSelectChange: noopSelectChange,
+  OnPruneLfsCache: noop,
+  OnDedupLfsStorage: noop,
 };
 
 const buildCallbacks = (
@@ -295,6 +297,8 @@ export const AdvancedActions: Story = {
     await expect(canvas.getByTestId("GitSidebarFetchButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPullButton")).toBeInTheDocument();
     await expect(canvas.getByTestId("GitSidebarPushButton")).toBeInTheDocument();
+    await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toBeVisible();
+    await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toBeVisible();
     const downloadLargeFilesCheckbox = canvas.getByTestId("GitSidebarDownloadLargeFilesCheckbox");
     const lfsThresholdInput = canvas.getByTestId("GitSidebarLfsThresholdInput");
 
@@ -342,6 +346,14 @@ export const ActionTooltipsAndResponsiveLabels: Story = {
     await expect(canvas.getByTestId("GitSidebarPushButton")).toHaveAttribute(
       "title",
       "Upload Changes:\n- git push origin",
+    );
+    await expect(canvas.getByTestId("GitSidebarLfsPruneButton")).toHaveAttribute(
+      "title",
+      "Clean LFS Cache:\n- git lfs prune --verify-remote --verify-unreachable --when-unverified=halt",
+    );
+    await expect(canvas.getByTestId("GitSidebarLfsDedupButton")).toHaveAttribute(
+      "title",
+      "Reduce LFS Storage:\n- git lfs dedup",
     );
   },
 };

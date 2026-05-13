@@ -146,17 +146,17 @@ type Main =
                             Swate.Components.Actionbar.Main(
                                 [|
                                     Actionbar.ButtonInfo.create (
-                                        "swt:fluent--document-bullet-list-24-regular swt:size-5",
+                                        "swt:fluent--book-open-24-regular swt:size-5",
                                         "Lab book view",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.LandingDraftPage)
                                     )
                                     Actionbar.ButtonInfo.create (
-                                        "swt:fluent--document-24-regular swt:size-5",
+                                        "swt:fluent--document-add-24-regular swt:size-5",
                                         "Create Note",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage)
                                     )
                                     Actionbar.ButtonInfo.create (
-                                        "swt:fluent--search-24-regular swt:size-5",
+                                        "swt:fluent--document-search-24-regular swt:size-5",
                                         "Note Search",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
                                     )

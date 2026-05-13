@@ -47,6 +47,11 @@ type DaisyuiTooltipPosition =
 
 type StateContext<'T> = { state: 'T; setState: 'T -> unit }
 
+type StateUpdaterContext<'T> = {
+    state: 'T
+    setStateUpdater: ('T -> 'T) -> unit
+}
+
 module StateContext =
     let init initialState = {
         state = initialState

@@ -45,6 +45,9 @@ gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, str
 gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, string>>
 setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, string>>
 confirmGitMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, string>>
+gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, string>>
+gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, string>>
+gitLfsFreeLocalCopy: GitLfsFreeLocalCopyRequest -> JS.Promise<Result<GitOperationResult, string>>
 ```
 
 Most app code should access these through `GitWorkflow.GitDependencies`, which is populated in `GitStateContext.fs`. That dependency layer maps diff and merge page-load DTOs to `PageState`.
@@ -214,6 +217,7 @@ promise {
 - Remote sync: `fetch`, `previewPull`, `pull`, `push`
 - Local writes: `stagePaths`, `unstagePaths`, `discardPaths`, `commit`, `createBranch`, `checkoutBranch`, `addRemote`
 - LFS settings: `getLfsSettings`, `setLfsSettings`
+- LFS storage maintenance: `pruneLfsCache`, `dedupLfsStorage`, `freeLocalLfsCopy`
 - Merge resolution: `confirmMergeResolution`
 
 `GitProvisioningService.fs` owns path-driven operations that do not require an active ARC:
@@ -225,6 +229,7 @@ promise {
 
 - System install/probe: `installSystem`, `isSystemInstalled`
 - Tracking: `track`, `isTrackedByAttributes`
+- Storage helpers: `storagePruneArgs`, `storageDedupArgs`, `buildFetchRefetchArgs`, `buildLsFilesJsonArgs`, `tryFindListingForPath`
 - Push support: `planOutboundPush`, `uploadObjects`, `collectPushDiagnostics`
 
 `GitAuthAdapter.fs` builds scoped auth config and redacts secrets. `GitTokenProvider.fs` is the process-wide token lookup hook installed by `AuthService`.
@@ -286,6 +291,12 @@ Pull applies `GIT_LFS_SKIP_SMUDGE` when large-file download is disabled. When en
 
 Push uses `GitLfsService.planOutboundPush` to detect outbound LFS pointer objects. If needed, `GitLfsService.uploadObjects` uploads exact object IDs before the git push; if exact upload is unsupported by the installed git-lfs, it falls back to refspec upload.
 
+Additional LFS storage actions:
+
+- "Clean LFS Cache" requires a clean working tree, rejects repositories with custom `lfs.storage`, and runs `git lfs prune --verify-remote --verify-unreachable --when-unverified=halt` through the active ARC. This removes hidden local LFS cache objects only after Git LFS can verify the configured origin remote.
+- "Reduce LFS Storage" requires a clean working tree and runs `git lfs dedup`. It may fail on file systems without copy-on-write support or when Git LFS extensions are configured; this is expected and should be shown to users.
+- "Free local LFS copy" is available from LFS-tracked file context menus. It verifies the file is clean, confirms Git LFS can fetch it from the remote, then replaces the visible full file with the small LFS pointer. The file can be downloaded again with Git LFS pull.
+
 ## 9. Branches and Pull Workflow
 
 `getGitBranches` returns local branches and remote branch refs. The renderer maps remote branch switches to:
@@ -337,6 +348,9 @@ Operations wrapped in `withBusyWriting`:
 - `createBranch`
 - `checkoutBranch`
 - `confirmGitMergeResolution`
+- `gitLfsPrune`
+- `gitLfsDedup`
+- `gitLfsFreeLocalCopy`
 
 Operations not wrapped:
 
