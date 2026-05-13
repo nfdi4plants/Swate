@@ -55,6 +55,20 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
         | Error exn -> Error exn.Message
 }
 
+let runFreeLocalLfsCopy (relativePath: string) = promise {
+    let request: GitLfsFreeLocalCopyRequest = {
+        Path = relativePath
+    }
+
+    let! result = Renderer.GitApiClient.gitLfsFreeLocalCopy request
+
+    return
+        match result with
+        | Ok operation when operation.Success -> Ok()
+        | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS cleanup failed.")
+        | Error message -> Error message
+}
+
 let private loadViewResult (previewPath: string) = promise {
     let! result = Api.ipcArcVaultApi.openFile previewPath
 

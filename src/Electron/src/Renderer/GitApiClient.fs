@@ -100,3 +100,12 @@ let setGitLfsSettings (settings: GitLfsSettingsDto) =
 
 let confirmGitMergeResolution (request: GitConfirmMergeResolutionRequest) =
     callIpcWith request (gitApi.confirmGitMergeResolution)
+
+let gitLfsPrune () =
+    callIpc (fun () -> gitApi.gitLfsPrune ())
+
+let gitLfsDedup () =
+    callIpc (fun () -> gitApi.gitLfsDedup ())
+
+let gitLfsFreeLocalCopy (request: GitLfsFreeLocalCopyRequest) =
+    callIpcWith request (gitApi.gitLfsFreeLocalCopy)

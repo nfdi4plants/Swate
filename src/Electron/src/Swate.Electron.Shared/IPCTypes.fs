@@ -78,6 +78,9 @@ type IGitApi = {
     gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, exn>>
     setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
+    gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, exn>>
+    gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, exn>>
+    gitLfsFreeLocalCopy: GitLfsFreeLocalCopyRequest -> JS.Promise<Result<GitOperationResult, exn>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     confirmGitMergeResolution:

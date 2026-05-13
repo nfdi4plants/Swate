@@ -2,6 +2,7 @@ module Renderer.Components.FileExplorerDeleteHelper
 
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 
 [<RequireQualifiedAccess>]
 module FileExplorerDeleteHelper =

@@ -32,6 +32,8 @@ type GitBusyOperation =
     | CreatingBranch
     | SwitchingBranch
     | InstallingGitLfs
+    | PruningGitLfsCache
+    | DeduplicatingGitLfsStorage
     | ConfirmingMergeResolution of path: string
 
 [<RequireQualifiedAccess>]
@@ -155,6 +157,8 @@ type WriteRequest =
     | CommitAll of PreparedCommitOperation
     | DiscardSelection of string[]
     | SaveLfsSettings of GitBusyOperation * GitLfsSettingsDto
+    | PruneLfsCache
+    | DedupLfsStorage
     | CreateBranch of GitCreateBranchRequest
     | SwitchBranch of GitCheckoutBranchRequest
 
@@ -205,6 +209,8 @@ type Msg =
     | CancelPendingRemoteActionRequested
     | CreateBranchRequested of GitSidebarCreateBranchRequest
     | SwitchBranchRequested of string
+    | PruneLfsCacheRequested
+    | DedupLfsStorageRequested
     | WriteRequested of WriteRequest
     | WriteCompleted of sessionId: int * WriteRequest * Result<WriteAttemptOutcome, string>
     | WriteInstallPromptAnswered of sessionId: int * WriteRequest * bool
@@ -232,8 +238,11 @@ type GitDependencies = {
     gitDiscardPaths: GitPathspecRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitCommit: GitCommitRequest -> JS.Promise<Result<GitOperationResult, string>>
     setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, string>>
+    gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, string>>
+    gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, string>>
     confirmGitMergeResolution:
         GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, string>>
+    confirmLfsPrune: string -> bool
     confirmInstall: string -> bool
 }
 
@@ -270,6 +279,8 @@ let busyNoticeFromOperation =
     | GitBusyOperation.CreatingBranch -> Some "Creating branch"
     | GitBusyOperation.SwitchingBranch -> Some "Switching branch"
     | GitBusyOperation.InstallingGitLfs -> Some "Installing Git LFS"
+    | GitBusyOperation.PruningGitLfsCache -> Some "Cleaning Git LFS cache"
+    | GitBusyOperation.DeduplicatingGitLfsStorage -> Some "Reducing Git LFS duplicate storage"
     | GitBusyOperation.ConfirmingMergeResolution _ -> Some "Confirming merge resolution"
 
 let currentRunStatus (model: GitState) =
@@ -572,6 +583,8 @@ let private busyOperationForWriteRequest =
     | CommitAll prepared -> prepared.BusyOperation
     | DiscardSelection _ -> GitBusyOperation.DiscardingSelectedChanges
     | SaveLfsSettings(busyOperation, _) -> busyOperation
+    | PruneLfsCache -> GitBusyOperation.PruningGitLfsCache
+    | DedupLfsStorage -> GitBusyOperation.DeduplicatingGitLfsStorage
     | CreateBranch _ -> GitBusyOperation.CreatingBranch
     | SwitchBranch _ -> GitBusyOperation.SwitchingBranch
 
@@ -868,6 +881,18 @@ let private executeWriteAttempt (deps: GitDependencies) (state: GitState) (reque
     | CommitAll prepared -> return! runCommitAttemptAsync deps prepared
     | DiscardSelection paths -> return! runDiscardAttemptAsync deps paths
     | SaveLfsSettings(busyOperation, settings) -> return! runSaveLfsSettingsAttemptAsync deps busyOperation settings
+    | PruneLfsCache ->
+        return!
+            runSimpleWriteAttemptAsync
+                deps
+                GitBusyOperation.PruningGitLfsCache
+                deps.gitLfsPrune
+    | DedupLfsStorage ->
+        return!
+            runSimpleWriteAttemptAsync
+                deps
+                GitBusyOperation.DeduplicatingGitLfsStorage
+                deps.gitLfsDedup
     | CreateBranch request ->
         return! runSimpleWriteAttemptAsync deps GitBusyOperation.CreatingBranch (fun () -> deps.createBranch request)
     | SwitchBranch request ->
@@ -1323,6 +1348,16 @@ let update
                 | _ -> None, normalizedBranchName
 
             model, Cmd.ofMsg (WriteRequested(SwitchBranch { Name = localName; StartPoint = startPoint }))
+    | PruneLfsCacheRequested ->
+        let message =
+            "This cleans hidden Git LFS cache files for the current ARC. Files that are still needed can be downloaded again from the remote. Continue?"
+
+        if deps.confirmLfsPrune message then
+            model, Cmd.ofMsg (WriteRequested PruneLfsCache)
+        else
+            model, Cmd.none
+    | DedupLfsStorageRequested ->
+        model, Cmd.ofMsg (WriteRequested DedupLfsStorage)
     | WriteRequested request when requiresArcForWriteRequest request && model.CurrentArcPath.IsNone -> model, Cmd.none
     | WriteRequested request ->
         let nextModel =

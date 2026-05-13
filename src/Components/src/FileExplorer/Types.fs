@@ -33,10 +33,18 @@ module FileItemIconTone =
 type FileItemIcon =
     | Folder
     | Document
+    | BookOpen
     | Table
+    | Map
     | Database
     | Tag
     | Block
+    | Study
+    | Assay
+    | Workflow
+    | Run
+    | Notebook
+    | Note
     | MoreHorizontal
 
 [<RequireQualifiedAccess>]
@@ -46,10 +54,18 @@ module FileItemIcon =
         function
         | FileItemIcon.Folder -> "swt:fluent--folder-24-regular"
         | FileItemIcon.Document -> "swt:fluent--document-24-regular"
+        | FileItemIcon.BookOpen -> "swt:fluent--book-open-24-regular"
         | FileItemIcon.Table -> "swt:fluent--table-24-regular"
+        | FileItemIcon.Map -> "swt:fluent--map-16-regular"
         | FileItemIcon.Database -> "swt:fluent--database-24-regular"
         | FileItemIcon.Tag -> "swt:fluent--tag-24-regular"
         | FileItemIcon.Block -> "swt:fluent--prohibited-24-regular"
+        | FileItemIcon.Study -> "swt:fluent--document-table-24-regular"
+        | FileItemIcon.Assay -> "swt:fluent--beaker-24-regular"
+        | FileItemIcon.Workflow -> "swt:fluent--flowchart-24-regular"
+        | FileItemIcon.Run -> "swt:fluent--play-24-regular"
+        | FileItemIcon.Notebook -> "swt:fluent--notebook-24-regular"
+        | FileItemIcon.Note -> "swt:fluent--note-24-regular"
         | FileItemIcon.MoreHorizontal -> "swt:fluent--more-horizontal-24-regular"
 
 type FileItem = {

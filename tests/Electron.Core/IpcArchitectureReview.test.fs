@@ -100,6 +100,20 @@ Vitest.describe("IPC architecture review fixes", fun () ->
                     "ArcDeleteHelper.mergeReloadedArcAfterDelete"
                 |]
         })
+
+    Vitest.test("Git LFS storage management is exposed through IGitApi only", fun () ->
+        promise {
+            let! ipcTypesSource = sourcePath [| "Swate.Electron.Shared"; "IPCTypes.fs" |] |> readUtf8FileAsync
+
+            expectSourceContainsInOrder
+                ipcTypesSource
+                [|
+                    "setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>"
+                    "gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, exn>>"
+                    "gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, exn>>"
+                    "gitLfsFreeLocalCopy: GitLfsFreeLocalCopyRequest -> JS.Promise<Result<GitOperationResult, exn>>"
+                |]
+        })
 )
 
 Vitest.describe("ArcDeleteHelper merge and validation", fun () ->

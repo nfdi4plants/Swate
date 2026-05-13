@@ -424,6 +424,36 @@ let private tryResolveArcRelativePath (arcPath: string) (requestedPath: string) 
         else
             Ok(safeRelativePath, absolutePath)
 
+let private createTemporaryLfsBackupPath (absolutePath: string) =
+    $"{absolutePath}.swate-lfs-backup-{Guid.NewGuid():N}"
+
+let private isPathCleanInStatus (status: StatusResult) (relativePath: string) =
+    valueOrEmptyArray status.files
+    |> Array.exists (fun fileStatus ->
+        String.Equals(fileStatus.path, relativePath, StringComparison.Ordinal)
+        || (fileStatus.``from`` |> Option.exists (fun original -> String.Equals(original, relativePath, StringComparison.Ordinal))))
+    |> not
+
+let private ensureBackupMatchesLfsOid (backupPath: string) (listing: Swate.Electron.Shared.FileIOTypes.GitLfsLsFileInfo) =
+    promise {
+        let! pointerTextResult =
+            runGitCaptured {
+                WorkingDirectory = None
+                Arguments = [| "lfs"; "pointer"; "--file"; backupPath |]
+                Environment = None
+                StandardInput = None
+                TimeoutMs = Some 30000
+            }
+
+        let generatedPointer = $"{pointerTextResult.StdoutText}\n{pointerTextResult.StderrText}"
+
+        return
+            if pointerTextResult.ExitCode = 0 && generatedPointer.Contains($"oid sha256:{listing.oid}") then
+                Ok()
+            else
+                Error(exn "The temporary LFS backup did not match the expected object. The original file was restored.")
+    }
+
 let private isMergeInProgress (arcPath: string) =
     let mergeHeadPath = pathDynamic?resolve (arcPath, ".git", "MERGE_HEAD") |> unbox<string>
     existsSync mergeHeadPath
@@ -1011,6 +1041,38 @@ let private createAuthenticatedGitSession
                             }
     }
 
+let private createOriginLfsRemoteGit
+    (arcPath: string)
+    (progressCallback: GitProgressCallback option)
+    : JS.Promise<GitResult<ISimpleGit>> =
+    promise {
+        let remoteName = "origin"
+        let probeOptions = createOptions arcPath standardTimeout None
+        let probeGit = createGit probeOptions
+
+        let! remoteResult =
+            runSimpleGit
+                (fun git -> promise {
+                    let! remoteUrl = git.raw [| "config"; "--get"; $"remote.{remoteName}.url" |]
+                    return remoteUrl.Trim()
+                })
+                probeGit
+
+        match remoteResult with
+        | Error failure -> return Error failure
+        | Ok remoteUrl ->
+            match ensureAllowedRemoteUrl remoteUrl with
+            | Ok _ ->
+                let! sessionResult = createAuthenticatedGitSession arcPath remoteName progressCallback
+                return sessionResult |> Result.map _.Git
+            | Error _ when remoteUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+                           || (pathDynamic?isAbsolute(remoteUrl) |> unbox<bool>) ->
+                let options = createOptions arcPath syncTimeout progressCallback
+                return Ok(createGit options)
+            | Error validationError ->
+                return errorResult validationError
+    }
+
 let private ensureRepo (git: ISimpleGit) = promise {
     let! isRepo = git.checkIsRepo ()
 
@@ -1043,6 +1105,31 @@ let private withAuthenticatedGit
         match gitResult with
         | Error failure -> return Error failure
         | Ok session -> return! runSimpleGit operation session.Git
+    }
+
+let private requireCleanWorkingTreeForLfsStorageAction (actionLabel: string) (git: ISimpleGit) =
+    promise {
+        let! status = git.status ()
+
+        return
+            if status.isClean () then
+                Ok()
+            else
+                Error(exn $"{actionLabel} requires a clean working tree. Save, discard, or commit local changes first.")
+    }
+
+let private rejectCustomLfsStorageForPrune (git: ISimpleGit) =
+    promise {
+        let! storageResult =
+            runSimpleGit
+                (fun currentGit -> currentGit.raw [| "config"; "--get"; "lfs.storage" |])
+                git
+
+        return
+            match storageResult with
+            | Ok value when not (String.IsNullOrWhiteSpace(value.Trim())) ->
+                Error(exn "Git LFS prune is disabled because this repository uses a custom lfs.storage directory.")
+            | _ -> Ok()
     }
 
 /// Reads status for the active ARC repository, including conflict metadata used by the sidebar and merge UI.
@@ -1635,6 +1722,43 @@ let setLfsSettings (arcPath: string) (settings: GitLfsSettingsDto) : JS.Promise<
                     })
     }
 
+let pruneLfsCache (arcPath: string) : JS.Promise<GitResult<string>> =
+    promise {
+        let! localValidationResult =
+            withLocalGit
+                arcPath
+                (fun git -> promise {
+                    match! requireCleanWorkingTreeForLfsStorageAction "Cleaning the Git LFS cache" git with
+                    | Error validationError -> return abortGitPromiseWith validationError
+                    | Ok() ->
+                        match! rejectCustomLfsStorageForPrune git with
+                        | Error validationError -> return abortGitPromiseWith validationError
+                        | Ok() -> return ()
+                })
+
+        match localValidationResult with
+        | Error failure -> return Error failure
+        | Ok() ->
+            let! gitResult = createOriginLfsRemoteGit arcPath None
+
+            match gitResult with
+            | Error failure -> return Error failure
+            | Ok git ->
+                let! result = runSimpleGit (fun currentGit -> currentGit.raw GitLfsService.storagePruneArgs) git
+                return result
+    }
+
+let dedupLfsStorage (arcPath: string) : JS.Promise<GitResult<string>> =
+    withLocalGit
+        arcPath
+        (fun git -> promise {
+            match! requireCleanWorkingTreeForLfsStorageAction "Reducing Git LFS duplicate storage" git with
+            | Error validationError -> return abortGitPromiseWith validationError
+            | Ok() ->
+                let! output = git.raw GitLfsService.storageDedupArgs
+                return output
+        })
+
 /// Stages validated pathspecs and auto-tracks oversized selected files in Git LFS before restaging.
 let stagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {
     match validatePathspecs pathSpecs with
@@ -1711,6 +1835,105 @@ let private discardPathspecsWithOriginals (arcPath: string) (status: StatusResul
 
     Array.append safePathSpecs originalPaths
     |> Array.distinct
+
+let freeLocalLfsCopy
+    (arcPath: string)
+    (requestedPath: string)
+    : JS.Promise<GitResult<unit>> =
+    promise {
+        match tryResolveArcRelativePath arcPath requestedPath with
+        | Error validationError -> return errorResult validationError
+        | Ok(safePath, absolutePath) ->
+            if not (isTrackedByAttributes arcPath safePath) then
+                return errorResult (exn $"'{safePath}' is not tracked by Git LFS.")
+            else
+                let! gitResult = createOriginLfsRemoteGit arcPath None
+
+                match gitResult with
+                | Error failure -> return Error failure
+                | Ok git ->
+                    let! statusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
+
+                    match statusResult with
+                    | Error failure -> return Error failure
+                    | Ok status when not (isPathCleanInStatus status safePath) ->
+                        return
+                            errorResult (
+                                exn $"'{safePath}' has local changes. Save, discard, or commit them before freeing the local LFS copy."
+                            )
+                    | Ok _ ->
+                        let! listingResult =
+                            runSimpleGit
+                                (fun currentGit -> currentGit.raw (GitLfsService.buildLsFilesJsonArgs safePath))
+                                git
+
+                        match listingResult with
+                        | Error failure -> return Error failure
+                        | Ok listingJson ->
+                            match GitLfsService.tryFindListingForPath safePath listingJson with
+                            | Error message -> return errorResult (exn $"'{safePath}' {message}")
+                            | Ok listing when not listing.checkout -> return Ok()
+                            | Ok listing ->
+                                let! fetchResult =
+                                    runSimpleGit
+                                        (fun currentGit -> currentGit.raw (GitLfsService.buildFetchRefetchArgs safePath))
+                                        git
+
+                                match fetchResult with
+                                | Error failure -> return Error failure
+                                | Ok _ ->
+                                    let backupPath = createTemporaryLfsBackupPath absolutePath
+
+                                    try
+                                        renameSync absolutePath backupPath
+
+                                        match! ensureBackupMatchesLfsOid backupPath listing with
+                                        | Error validationError ->
+                                            if existsSync backupPath then
+                                                renameSync backupPath absolutePath
+
+                                            return errorResult validationError
+                                        | Ok() ->
+                                            let pointerGit = git.env (GitLfsSkipSmudgeEnvKey, "1")
+                                            let! checkoutResult =
+                                                runSimpleGit
+                                                    (fun currentGit -> currentGit.raw [| "checkout"; "HEAD"; "--"; safePath |])
+                                                    pointerGit
+
+                                            match checkoutResult with
+                                            | Error failure ->
+                                                if existsSync backupPath then
+                                                    renameSync backupPath absolutePath
+
+                                                return Error failure
+                                            | Ok _ ->
+                                                let! finalStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
+
+                                                match finalStatusResult with
+                                                | Error failure ->
+                                                    if existsSync backupPath then
+                                                        renameSync backupPath absolutePath
+
+                                                    return Error failure
+                                                | Ok finalStatus when not (isPathCleanInStatus finalStatus safePath) ->
+                                                    if existsSync backupPath then
+                                                        renameSync backupPath absolutePath
+
+                                                    return
+                                                        errorResult (
+                                                            exn $"Could not replace '{safePath}' with an LFS pointer without changing Git status."
+                                                        )
+                                                | Ok _ ->
+                                                    if existsSync backupPath then
+                                                        unlinkSync backupPath
+
+                                                    return Ok()
+                                    with ex ->
+                                        if existsSync backupPath then
+                                            renameSync backupPath absolutePath
+
+                                        return errorResult ex
+    }
 
 /// Discards validated pathspecs by restoring tracked paths from HEAD and cleaning selected untracked files.
 let discardPaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {
