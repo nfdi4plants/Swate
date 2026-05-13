@@ -6,9 +6,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Shared
-open Swate.Components.AnnotationTable
 open Swate.Components.AnnotationTable.Context
-open Swate.Components.Widgets.Context
 
 /// This context is designed to be used only internally in this file.
 module private FilePickerWidgetContext =
@@ -107,8 +105,14 @@ type FilePickerWidget =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member private SortableTableRow
-        (index: int, path: string, movePath: int -> int -> unit, removePath: int -> unit, ?key: string)
-        =
+        (
+            index: int,
+            path: string,
+            movePath: int -> int -> unit,
+            removePath: int -> unit,
+            ?key: string,
+            ?isLastItem: bool
+        ) =
         let sortable = DndKit.useSortable ({| id = path |})
         let filerPickerItemCtx = FilePickerWidgetContext.useSelectedPathCtx path
 
@@ -155,6 +159,7 @@ type FilePickerWidget =
                                 Html.button [
                                     prop.className "swt:btn swt:btn-xs swt:join-item"
                                     prop.type'.button
+                                    prop.disabled ((index = 0))
                                     prop.onClick (fun e ->
                                         e.stopPropagation ()
                                         movePath index (index - 1)
@@ -163,6 +168,8 @@ type FilePickerWidget =
                                 ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-xs swt:join-item"
+                                    prop.type'.button
+                                    prop.disabled ((isLastItem.IsSome && isLastItem.Value))
                                     prop.onClick (fun e ->
                                         e.stopPropagation ()
                                         movePath index (index + 1)
@@ -212,8 +219,16 @@ type FilePickerWidget =
                         Html.tbody [
                             for index in 0 .. paths.Length - 1 do
                                 let path = paths.[index]
+                                let isLast = if index = paths.Length - 1 then Some true else None
 
-                                FilePickerWidget.SortableTableRow(index, path, movePath, removePath, key = path)
+                                FilePickerWidget.SortableTableRow(
+                                    index,
+                                    path,
+                                    movePath,
+                                    removePath,
+                                    key = path,
+                                    ?isLastItem = isLast
+                                )
                         ]
                     ]
                 ]
@@ -333,6 +348,8 @@ type FilePickerWidget =
                                 let selected = selectedPathsCtx.state
                                 current |> Array.filter (fun path -> not (List.contains path selected))
                             )
+
+                            selectedPathsCtx.setStateUpdater (fun _ -> [])
                         )
                     ]
 
