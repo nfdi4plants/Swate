@@ -147,3 +147,53 @@ Vitest.describe("FileTreeCreator.removePathAndDescendants", fun () ->
         Vitest.expect(updatedTree.ContainsKey("C:/arc/assays/AB/isa.assay.xlsx")).toBe(true)
     )
 )
+
+Vitest.describe("FileTreeCreator.upsertFileEntry", fun () ->
+    let createFileEntry path isDirectory lfs = {
+        name =
+            path
+            |> Swate.Components.Shared.PathHelpers.normalizePath
+            |> Swate.Components.Shared.PathHelpers.getFileName
+        isDirectory = isDirectory
+        path = path
+        lfs = lfs
+    }
+
+    let pointerInfo: GitLfsLsFileInfo = {
+        name = "data.bin"
+        size = 128.0
+        checkout = false
+        downloaded = false
+        ``oid_type`` = "sha256"
+        oid = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+        version = "https://git-lfs.github.com/spec/v1"
+    }
+
+    Vitest.test("replaces an existing file entry without throwing", fun () ->
+        let tree = Dictionary<string, FileEntry>()
+        tree.Add("C:/arc/data.bin", createFileEntry "C:/arc/data.bin" false None)
+        tree.Add("C:/arc/other.bin", createFileEntry "C:/arc/other.bin" false None)
+
+        let updatedTree =
+            FileTreeCreator.upsertFileEntry
+                (createFileEntry "C:/arc/data.bin" false (Some pointerInfo))
+                tree
+
+        Vitest.expect(updatedTree.Count).toBe(2)
+        Vitest.expect(updatedTree.["C:/arc/data.bin"].lfs).toEqual(Some pointerInfo)
+        Vitest.expect(updatedTree.ContainsKey("C:/arc/other.bin")).toBe(true)
+    )
+
+    Vitest.test("returns a new dictionary instead of mutating the current file tree", fun () ->
+        let tree = Dictionary<string, FileEntry>()
+        tree.Add("C:/arc/data.bin", createFileEntry "C:/arc/data.bin" false None)
+
+        let updatedTree =
+            FileTreeCreator.upsertFileEntry
+                (createFileEntry "C:/arc/data.bin" false (Some pointerInfo))
+                tree
+
+        Vitest.expect(tree.["C:/arc/data.bin"].lfs).toEqual(None)
+        Vitest.expect(updatedTree.["C:/arc/data.bin"].lfs).toEqual(Some pointerInfo)
+    )
+)

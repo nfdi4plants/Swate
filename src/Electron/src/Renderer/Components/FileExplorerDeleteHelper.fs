@@ -2,6 +2,7 @@ module Renderer.Components.FileExplorerDeleteHelper
 
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 
 [<RequireQualifiedAccess>]
 module FileExplorerDeleteHelper =
@@ -30,6 +31,32 @@ module FileExplorerDeleteHelper =
         | Some Renderer.Types.PageState.UnknownPage
         | Some(Renderer.Types.PageState.ErrorPage _) -> true
         | _ -> false
+
+    let private shouldReloadPageStateAfterSelectedFileUpdate (pageState: Renderer.Types.PageState option) =
+        match pageState with
+        | Some(Renderer.Types.PageState.TextPage _)
+        | Some Renderer.Types.PageState.UnknownPage
+        | Some(Renderer.Types.PageState.ErrorPage _) -> true
+        | _ -> false
+
+    let tryGetReloadableSelectedFilePath
+        (fileTree: FileEntry[])
+        (selectionPath: string option)
+        (pageState: Renderer.Types.PageState option)
+        =
+        if shouldReloadPageStateAfterSelectedFileUpdate pageState |> not then
+            None
+        else
+            selectionPath
+            |> Option.map PathHelpers.normalizePath
+            |> Option.bind (fun selectedPath ->
+                fileTree
+                |> Array.tryFind (fun entry ->
+                    not entry.isDirectory
+                    && PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) selectedPath
+                )
+                |> Option.map (fun entry -> PathHelpers.normalizePath entry.path)
+            )
 
     let isPendingPathAffectedByDelete (deletedPath: string) (pendingPath: string option) =
         let normalizedDeletedPath = normalizeRelativePath deletedPath
