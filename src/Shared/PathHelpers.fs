@@ -16,6 +16,11 @@ module PathHelpers =
     let normalizeRelativePath (path: string) =
         normalizeSeparators path |> fun normalized -> normalized.Trim('/').Trim()
 
+    let normalizeCanonicalRelativePath (path: string) =
+        path
+        |> normalizeRelativePath
+        |> normalizePath
+
     let normalizeForComparison (path: string) =
         normalizeSeparators path
         |> fun normalized -> normalized.Trim().TrimEnd('/').ToLowerInvariant()
@@ -141,8 +146,7 @@ module ArcDeletePathRules =
 
     let private normalizeRelativePath (path: string) =
         path
-        |> PathHelpers.normalizeRelativePath
-        |> PathHelpers.normalizePath
+        |> PathHelpers.normalizeCanonicalRelativePath
 
     let private splitPathSegments (path: string) =
         path.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)

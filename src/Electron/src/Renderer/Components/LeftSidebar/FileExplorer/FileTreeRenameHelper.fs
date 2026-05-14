@@ -8,13 +8,11 @@ open Renderer.Components.LeftSidebar.FileExplorer.Types
 
 let private tryGetItemRelativePath (item: FileItem) =
     item.Path
-    |> Option.map PathHelpers.normalizeRelativePath
-    |> Option.map PathHelpers.normalizePath
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
 
 let private normalizeRelativePath (path: string) =
     path
-    |> PathHelpers.normalizeRelativePath
-    |> PathHelpers.normalizePath
+    |> PathHelpers.normalizeCanonicalRelativePath
 
 let normalizeRenameName (newName: string) =
     validateRenameName newName

@@ -338,8 +338,7 @@ module ArcRenameHelper =
 
     let private normalizeRelativePathForComparison (path: string) =
         path
-        |> PathHelpers.normalizeRelativePath
-        |> PathHelpers.normalizePath
+        |> PathHelpers.normalizeCanonicalRelativePath
 
     let private applyIdentifierRenameSyncPlan (arc: ARC) (syncPlan: IdentifierRenameSyncPlan) =
         match syncPlan.Zone with
@@ -465,18 +464,22 @@ module ArcRenameHelper =
         (arcLocal: ARC)
         (reloadedArc: ARC)
         : Result<MergeResult, exn> =
-        if not (arcLocal.hasInMemoryChanges()) then
-            Ok { Arc = reloadedArc.Copy() }
-        else
-            try
-                let mergedArc = arcLocal.Copy()
-                applyIdentifierRenameSyncPlan mergedArc renamePlan.SyncPlan
-                Ok { Arc = mergedArc }
-            with mergeError ->
-                Error(
-                    exn
-                        $"Unable to merge renamed ARC entity from '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}': {mergeError.Message}"
-                )
+        try
+            let arcLocalForMerge =
+                if arcLocal.hasInMemoryChanges() then
+                    let renamedLocalArc = arcLocal.Copy()
+                    applyIdentifierRenameSyncPlan renamedLocalArc renamePlan.SyncPlan
+                    renamedLocalArc
+                else
+                    arcLocal
+
+            let mergedArc = ARC.merge arcLocalForMerge reloadedArc []
+            Ok { Arc = mergedArc }
+        with mergeError ->
+            Error(
+                exn
+                    $"Unable to merge renamed ARC entity from '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}': {mergeError.Message}"
+            )
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/

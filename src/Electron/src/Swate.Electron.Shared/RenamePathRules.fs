@@ -5,8 +5,7 @@ open Swate.Components.Shared
 
 let private normalizeRelativePath (path: string) =
     path
-    |> PathHelpers.normalizeRelativePath
-    |> PathHelpers.normalizePath
+    |> PathHelpers.normalizeCanonicalRelativePath
 
 let private tryGetParentPath (path: string) =
     let normalizedPath = PathHelpers.normalizePath path
