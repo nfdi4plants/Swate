@@ -6,6 +6,7 @@ open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Bindings
+open Main.ArcMerge
 open Main.ArcVaultHelper
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
@@ -151,23 +152,51 @@ module ArcVaultExtensions =
                 let normalizedRequest =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
-                let workingArc = arc.Copy()
+                let newTopLevelArcFile = tryGetNewTopLevelArcFile arc normalizedRequest
 
-                match updateARCByFileContentDTO workingArc normalizedRequest with
-                | Error updateError -> return Error updateError
-                | Ok updatedArc ->
+                match newTopLevelArcFile with
+                | Some arcFile ->
+                    let hadUnsavedArcChanges = this.hasUnsavedArcChanges
                     this.isBusyWriting <- true
 
                     try
-                        try
-                            do! updatedArc.UpdateAsync(arcPath)
-                            this.SetArc(updatedArc)
-                            this.hasUnsavedArcChanges <- false
-                            return Ok()
-                        with e ->
-                            return Error(exn $"Failed to persist ARC to disk: {e.Message}")
+                        match! ARC.tryLoadAsync arcPath with
+                        | Error loadErrors ->
+                            let loadErrorMessage = String.concat "\n" loadErrors
+                            return Error(exn $"Unable to reload ARC before add: {loadErrorMessage}")
+                        | Ok arcFromDisk ->
+                            let arcForDiskPersistence = arcFromDisk
+                            let addEvents = getAddArcFileEvents arcFile
+
+                            try
+                                do! arcForDiskPersistence.AddAsync(arcPath, arcFile)
+                                let mergedArc = ARC.merge arc arcForDiskPersistence addEvents
+                                syncArcStaticHashes arcForDiskPersistence mergedArc
+                                this.SetArc(mergedArc)
+                                this.hasUnsavedArcChanges <- hadUnsavedArcChanges || mergedArc.hasInMemoryChanges()
+                                return Ok()
+                            with e ->
+                                return Error(exn $"Failed to persist ARC to disk: {e.Message}")
                     finally
                         this.isBusyWriting <- false
+                | None ->
+                    let workingArc = arc.Copy()
+
+                    match updateARCByFileContentDTO workingArc normalizedRequest with
+                    | Error updateError -> return Error updateError
+                    | Ok updatedArc ->
+                        this.isBusyWriting <- true
+
+                        try
+                            try
+                                do! updatedArc.UpdateAsync(arcPath)
+                                this.SetArc(updatedArc)
+                                this.hasUnsavedArcChanges <- false
+                                return Ok()
+                            with e ->
+                                return Error(exn $"Failed to persist ARC to disk: {e.Message}")
+                        finally
+                            this.isBusyWriting <- false
             | _ -> return Error(exn "ARC is not loaded.")
         }
 

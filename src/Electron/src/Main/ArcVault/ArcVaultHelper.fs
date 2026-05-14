@@ -8,6 +8,7 @@ open ARCtrl
 open Fable.Electron
 open Fable.Core.JsInterop
 open Main
+open Main.ArcMerge
 open Main.Bindings
 open Node.Api
 
@@ -58,6 +59,61 @@ let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: Dat
             Ok()
     with e ->
         Error(exn $"Failed to set datamap on ARC: {e.Message}")
+
+let private syncDataMapStaticHash (sourceDataMap: DataMap option) (targetDataMap: DataMap option) =
+    match sourceDataMap, targetDataMap with
+    | Some sourceDataMap, Some targetDataMap -> targetDataMap.StaticHash <- sourceDataMap.StaticHash
+    | _ -> ()
+
+/// Syncs static hashes from source ARC to target ARC for matching entities.
+/// This keeps ARCtrl update contract generation scoped to actual changes.
+let syncArcStaticHashes (source: ARC) (target: ARC) : unit =
+    target.StaticHash <- source.StaticHash
+
+    match source.License, target.License with
+    | Some sourceLicense, Some targetLicense -> targetLicense.StaticHash <- sourceLicense.StaticHash
+    | _ -> ()
+
+    for targetStudy in target.Studies do
+        match source.TryGetStudy targetStudy.Identifier with
+        | Some sourceStudy ->
+            targetStudy.StaticHash <- sourceStudy.StaticHash
+            syncDataMapStaticHash sourceStudy.DataMap targetStudy.DataMap
+        | None -> ()
+
+    for targetAssay in target.Assays do
+        match source.TryGetAssay targetAssay.Identifier with
+        | Some sourceAssay ->
+            targetAssay.StaticHash <- sourceAssay.StaticHash
+            syncDataMapStaticHash sourceAssay.DataMap targetAssay.DataMap
+        | None -> ()
+
+    for targetWorkflow in target.Workflows do
+        match source.TryGetWorkflow targetWorkflow.Identifier with
+        | Some sourceWorkflow ->
+            targetWorkflow.StaticHash <- sourceWorkflow.StaticHash
+            syncDataMapStaticHash sourceWorkflow.DataMap targetWorkflow.DataMap
+        | None -> ()
+
+    for targetRun in target.Runs do
+        match source.TryGetRun targetRun.Identifier with
+        | Some sourceRun ->
+            targetRun.StaticHash <- sourceRun.StaticHash
+            syncDataMapStaticHash sourceRun.DataMap targetRun.DataMap
+        | None -> ()
+
+let tryGetNewTopLevelArcFile (arc: ARC) (dto: FileContentDTO) : ArcFiles option =
+    match FileContentDTO.toArcFile dto with
+    | Some(ArcFiles.Assay assay as arcFile) when arc.ContainsAssay assay.Identifier |> not -> Some arcFile
+    | Some(ArcFiles.Study(study, _) as arcFile) when arc.ContainsStudy study.Identifier |> not -> Some arcFile
+    | Some(ArcFiles.Run run as arcFile) when arc.ContainsRun run.Identifier |> not -> Some arcFile
+    | Some(ArcFiles.Workflow workflow as arcFile) when arc.ContainsWorkflow workflow.Identifier |> not -> Some arcFile
+    | _ -> None
+
+let getAddArcFileEvents (arcFile: ArcFiles) : FileEvent list =
+    arcFile.TryGetRelativePath()
+    |> Option.map (fun path -> [ { EventName = EventName.Add; Path = path } ])
+    |> Option.defaultValue []
 
 /// This function should only be used for partial updates to an ARC based on a file content DTO.
 let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, exn> =
