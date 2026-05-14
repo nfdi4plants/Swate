@@ -64,6 +64,7 @@ const InMemoryCreateFileExplorer = () => {
 
 const DeleteActionFileExplorer = () => {
   const [lastDeleted, setLastDeleted] = React.useState<string>("none");
+  const [lastAction, setLastAction] = React.useState<string>("none");
 
   const items = React.useMemo(
     () =>
@@ -80,8 +81,12 @@ const DeleteActionFileExplorer = () => {
         initialItems={items}
         canDeleteItem={() => true}
         onDeleteItem={(item) => setLastDeleted(item.Name)}
+        getItemActions={(item) =>
+          ofArray([new ContextMenuItem("Mark", "swt:fluent--star-24-regular", () => setLastAction(item.Name), undefined)])
+        }
       />
       <div data-testid="last-deleted">Last deleted: {lastDeleted}</div>
+      <div data-testid="last-row-action">Last action: {lastAction}</div>
     </div>
   );
 };
@@ -216,19 +221,17 @@ export const InlineDeleteDispatchesForFileAndDirectory: StoryObj<typeof DeleteAc
 
     const deletableDirectory = await canvas.findByText("Deletable Folder");
     await userEvent.hover(deletableDirectory);
+    await userEvent.click(await canvas.findByRole("button", { name: "Mark Deletable Folder" }));
+    await waitFor(() => expect(canvas.getByTestId("last-row-action")).toHaveTextContent("Last action: Deletable Folder"));
     await userEvent.click(await canvas.findByRole("button", { name: "Delete Deletable Folder" }));
-
-    await waitFor(() =>
-      expect(canvas.getByTestId("last-deleted")).toHaveTextContent("Last deleted: Deletable Folder"),
-    );
+    await waitFor(() => expect(canvas.getByTestId("last-deleted")).toHaveTextContent("Last deleted: Deletable Folder"));
 
     const deletableFile = await canvas.findByText("Deletable File");
     await userEvent.hover(deletableFile);
+    await userEvent.click(await canvas.findByRole("button", { name: "Mark Deletable File" }));
+    await waitFor(() => expect(canvas.getByTestId("last-row-action")).toHaveTextContent("Last action: Deletable File"));
     await userEvent.click(await canvas.findByRole("button", { name: "Delete Deletable File" }));
-
-    await waitFor(() =>
-      expect(canvas.getByTestId("last-deleted")).toHaveTextContent("Last deleted: Deletable File"),
-    );
+    await waitFor(() => expect(canvas.getByTestId("last-deleted")).toHaveTextContent("Last deleted: Deletable File"));
   },
 };
 

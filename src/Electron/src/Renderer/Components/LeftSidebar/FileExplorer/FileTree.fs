@@ -245,9 +245,6 @@ type FileTree =
         let createFromItem item =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
-        let canRenameFromItem (item: FileItem) =
-            FileTreeRenameHelper.canRenameItem item
-
         let applyCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file", ?scopeId = arcScopeId))
 
@@ -386,8 +383,7 @@ type FileTree =
                             getItemIconClass = getItemIconClass,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
-                            canRenameItem = canRenameFromItem,
-                            onRenameItem = requestRenameItem,
+                            getItemActions = renameContextMenuItems,
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
