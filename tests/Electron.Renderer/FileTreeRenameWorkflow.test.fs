@@ -193,9 +193,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
             let! container, cleanup =
                 renderToBody (
                     Swate.Components.FileExplorer.FileExplorer.FileExplorer(
-                        initialItems = items,
-                        canRenameItem = canRenameItem,
-                        onRenameItem = onRenameItem
+                        initialItems = items
                     )
                 )
 
