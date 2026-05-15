@@ -47,8 +47,12 @@ type ArcVault(window: BrowserWindow) =
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.SetHasUnsavedArcChanges(hasChanges: bool) =
+        /// Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
+        let valueIsChanging = this.hasUnsavedArcChanges <> hasChanges
         this.hasUnsavedArcChanges <- hasChanges
-        sendArcHasUnsavedChangesUpdate hasChanges this.window
+
+        if valueIsChanging then
+            sendArcHasUnsavedChangesUpdate hasChanges this.window
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -176,8 +180,7 @@ module ArcVaultExtensions =
 
                 try
                     match! ARC.tryLoadAsync arcPath with
-                    | Error loadError ->
-                        return Error(exn $"Unable to reload ARC before scoped save: {loadError}")
+                    | Error loadError -> return Error(exn $"Unable to reload ARC before scoped save: {loadError}")
                     | Ok arcFromDisk ->
                         let arcForDiskPersistence = copyArcPreservingStaticHashes arcFromDisk
                         let arcForInMemoryState = copyArcPreservingStaticHashes arcLocal

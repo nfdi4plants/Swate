@@ -232,7 +232,15 @@ type Navbar =
                     if not hasUnsavedChanges.state then
                         return ()
 
-                    return! Api.ipcArcVaultApi.saveArcFile ()
+                    match! Api.ipcArcVaultApi.saveArcFile () with
+                    | Ok _ -> ()
+                    | Error ex ->
+                        errorCtx.enqueue (
+                            Swate.Components.ErrorModal.ErrorModalRequest.create (
+                                ex.Message,
+                                title = "Error saving ARC"
+                            )
+                        )
                 }
                 |> Promise.start
 
@@ -241,6 +249,8 @@ type Navbar =
             prop.disabled (not hasUnsavedChanges.state)
             prop.className "swt:btn swt:btn-square swt:btn-info swt:btn-sm"
             prop.onClick onSaveArc
+            prop.title "Save ARC"
+            prop.ariaLabel "Save ARC"
             prop.children [
                 Html.i [
                     prop.className "swt:iconify swt:fluent--save-16-filled swt:size-5"

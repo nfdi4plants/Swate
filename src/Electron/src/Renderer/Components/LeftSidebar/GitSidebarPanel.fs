@@ -12,6 +12,7 @@ let Main () =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
+    let errorCtx = Swate.Components.ErrorModal.Context.useErrorModalCtx ()
 
     React.useEffectOnce (fun () ->
         if not gitVersionCheckStarted then
@@ -46,7 +47,10 @@ let Main () =
                 let! r = Api.ipcArcVaultApi.openARC ()
 
                 match r with
-                | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
+                | Error e ->
+                    errorCtx.enqueue (
+                        Swate.Components.ErrorModal.ErrorModalRequest.create (e.Message, title = "Error opening ARC")
+                    )
                 | Ok _ -> ()
             }
             |> Promise.start

@@ -192,16 +192,16 @@ let Main () =
                                             CloseWindowController.CloseWindowController.Subscription()
                                         |],
                                     navbar = Renderer.Components.Navbar.Main(),
-                                    leftSidebar =
+                                    ?leftSidebar =
                                         (if isInitializedArcVault then
-                                             Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget)
+                                             Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget) |> Some
                                          else
-                                             Html.none),
-                                    leftActions =
+                                             None),
+                                    ?leftActions =
                                         (if isInitializedArcVault then
-                                             LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget)
+                                             LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget) |> Some
                                          else
-                                             Html.none)
+                                             None)
                                 )
                             )
                         )
