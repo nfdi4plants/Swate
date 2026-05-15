@@ -257,10 +257,15 @@ function StatefulMockup() {
         detail.kind === "group" &&
         currentDetail.side === detail.side &&
         currentDetail.groupId === detail.groupId;
+      const isSameConnection =
+        currentDetail?.kind === "connection" &&
+        detail.kind === "connection" &&
+        currentDetail.sourceGroupId === detail.sourceGroupId &&
+        currentDetail.targetGroupId === detail.targetGroupId;
 
       return {
         ...current,
-        detail: isSameParameter || isSameGroup ? undefined : detail,
+        detail: isSameParameter || isSameGroup || isSameConnection ? undefined : detail,
         error: undefined,
       };
     });
@@ -406,18 +411,33 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div className="swt:h-screen swt:w-full swt:overflow-auto swt:bg-base-200 swt:p-4">
+      <div className="swt:h-screen swt:w-screen swt:overflow-auto swt:bg-base-200">
+        <style>{`
+          html,
+          body,
+          #storybook-root {
+            width: 100vw;
+            height: 100vh;
+            margin: 0;
+          }
+        `}</style>
         <div
-          className="swt:h-full swt:min-w-[980px]"
+          className="swt:relative swt:h-screen swt:min-h-[560px] swt:min-w-[980px] swt:overflow-auto"
           data-testid="ProvenanceGrouping-preview-frame"
           style={{
-            resize: "horizontal",
+            resize: "both",
             overflow: "auto",
-            width: 1440,
+            width: "100vw",
             maxWidth: "none",
           }}
         >
           <Story />
+          <div
+            aria-hidden="true"
+            className="swt:pointer-events-none swt:absolute swt:bottom-1 swt:right-1 swt:flex swt:size-5 swt:items-center swt:justify-center swt:rounded swt:bg-base-100/80 swt:text-base-content/60"
+          >
+            <i className="swt:iconify swt:fluent--resize-large-20-regular swt:size-4" />
+          </div>
         </div>
       </div>
     ),
@@ -439,8 +459,21 @@ export const InteractionFlow: Story = {
     const canvas = within(canvasElement);
 
     await expect(await canvas.findByTestId("ProvenanceGrouping-root")).toBeInTheDocument();
-    await expect(await canvas.findByTestId("ProvenanceGrouping-preview-frame")).toHaveStyle({
-      resize: "horizontal",
+    const previewFrame = await canvas.findByTestId("ProvenanceGrouping-preview-frame");
+    await expect(previewFrame).toHaveStyle({
+      resize: "both",
+    });
+    expect(previewFrame.style.width).toBe("100vw");
+    expect(Math.round(previewFrame.getBoundingClientRect().width)).toBeGreaterThanOrEqual(window.innerWidth);
+    expect(Math.round((await canvas.findByTestId("ProvenanceGrouping-root")).getBoundingClientRect().left)).toBe(0);
+
+    const groupLink = await canvas.findByTestId("ProvenanceGrouping-connection-partial");
+    await userEvent.click(within(groupLink).getByTestId("ProvenanceGrouping-connection-toggle"));
+    await waitFor(async () => {
+      const detail = await within(groupLink).findByTestId("ProvenanceGrouping-connection-inline-detail");
+      await expect(detail).toHaveTextContent("Input A");
+      await expect(detail).toHaveTextContent("Output A");
+      await expect(detail).toHaveTextContent("Output B");
     });
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Temperature"));

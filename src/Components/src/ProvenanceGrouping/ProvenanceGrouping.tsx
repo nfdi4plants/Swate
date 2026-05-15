@@ -46,7 +46,8 @@ export type ProvenanceSide = "left" | "right";
 
 export type ProvenanceDetail =
   | { kind: "group"; side: ProvenanceSide; groupId: string }
-  | { kind: "parameter"; layerId: string; key: string };
+  | { kind: "parameter"; layerId: string; key: string }
+  | { kind: "connection"; sourceGroupId: string; targetGroupId: string };
 
 export type ProvenanceGroupingProps = {
   layers: ProvenanceLayer[];
@@ -76,6 +77,13 @@ type ConnectionSummary = {
   sourceGroup: ProvenanceGroup;
   targetGroup: ProvenanceGroup;
   coverage: ConnectionCoverage;
+  links: ProvenanceConnectionDetail[];
+};
+
+type ProvenanceConnectionDetail = {
+  id: string;
+  source: ProvenanceItem;
+  target: ProvenanceItem;
 };
 
 type EditorState = {
@@ -338,19 +346,50 @@ function groupConnectionSummaries(
 
   sourceGroups.forEach((sourceGroup) => {
     targetGroups.forEach((targetGroup) => {
-      const coverage = classifyGroupConnection(sourceGroup, targetGroup, connections);
-      if (coverage !== "none") {
+      const links = connectionDetailsForGroups(sourceGroup, targetGroup, connections);
+
+      if (links.length > 0) {
         summaries.push({
           id: `${sourceGroup.id}-${targetGroup.id}`,
           sourceGroup,
           targetGroup,
-          coverage,
+          coverage: classifyGroupConnection(sourceGroup, targetGroup, connections),
+          links,
         });
       }
     });
   });
 
   return summaries;
+}
+
+function connectionDetailsForGroups(
+  sourceGroup: ProvenanceGroup,
+  targetGroup: ProvenanceGroup,
+  connections: ProvenanceConnection[],
+): ProvenanceConnectionDetail[] {
+  const sourceItems = new Map(sourceGroup.items.map((item) => [item.id, item]));
+  const targetItems = new Map(targetGroup.items.map((item) => [item.id, item]));
+
+  return connections
+    .flatMap((connection) => {
+      const source = sourceItems.get(connection.sourceId);
+      const target = targetItems.get(connection.targetId);
+
+      return source && target
+        ? [
+            {
+              id: connectionKey(connection),
+              source,
+              target,
+            },
+          ]
+        : [];
+    })
+    .sort((left, right) => {
+      const sourceComparison = left.source.name.localeCompare(right.source.name);
+      return sourceComparison !== 0 ? sourceComparison : left.target.name.localeCompare(right.target.name);
+    });
 }
 
 function parameterKeysForGroup(group: ProvenanceGroup): string[] {
@@ -829,42 +868,93 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
               </div>
             ) : (
               <div className="swt:flex swt:flex-col swt:gap-2">
-                {summaries.map((summary) => (
-                  <div
-                    className={[
-                      "swt:rounded swt:border swt:bg-base-100 swt:p-2 swt:text-xs",
-                      summary.coverage === "full" ? "swt:border-success/40" : "swt:border-warning/60",
-                    ].join(" ")}
-                    data-testid={
-                      summary.coverage === "full"
-                        ? "ProvenanceGrouping-connection-full"
-                        : "ProvenanceGrouping-connection-partial"
-                    }
-                    key={summary.id}
-                  >
-                    <div className="swt:flex swt:items-center swt:gap-2">
-                      <span className="swt:h-px swt:flex-1 swt:bg-base-content/30" />
-                      <span
-                        className={[
-                          "swt:badge swt:badge-sm",
-                          summary.coverage === "full" ? "swt:badge-success" : "swt:badge-warning",
-                        ].join(" ")}
+                {summaries.map((summary) => {
+                  const expanded =
+                    props.detail?.kind === "connection" &&
+                    props.detail.sourceGroupId === summary.sourceGroup.id &&
+                    props.detail.targetGroupId === summary.targetGroup.id;
+
+                  return (
+                    <article
+                      className={[
+                        "swt:rounded swt:border swt:bg-base-100 swt:p-2 swt:text-xs",
+                        summary.coverage === "full" ? "swt:border-success/40" : "swt:border-warning/60",
+                      ].join(" ")}
+                      data-testid={
+                        summary.coverage === "full"
+                          ? "ProvenanceGrouping-connection-full"
+                          : "ProvenanceGrouping-connection-partial"
+                      }
+                      key={summary.id}
+                    >
+                      <button
+                        aria-expanded={expanded}
+                        className="swt:w-full swt:appearance-none swt:border-0 swt:bg-transparent swt:p-0 swt:text-left swt:text-inherit"
+                        data-testid="ProvenanceGrouping-connection-toggle"
+                        type="button"
+                        onClick={() =>
+                          props.onOpenDetail({
+                            kind: "connection",
+                            sourceGroupId: summary.sourceGroup.id,
+                            targetGroupId: summary.targetGroup.id,
+                          })
+                        }
                       >
-                        {summary.coverage === "full" ? "full coverage" : "partial"}
-                      </span>
-                      <span className="swt:h-px swt:flex-1 swt:bg-base-content/30" />
-                    </div>
-                    <div className="swt:mt-2 swt:grid swt:grid-cols-[1fr_auto_1fr] swt:items-center swt:gap-2">
-                      <span className="swt:truncate" title={summary.sourceGroup.label}>
-                        {summary.sourceGroup.label}
-                      </span>
-                      <i className="swt:iconify swt:fluent--arrow-right-20-regular swt:size-4" />
-                      <span className="swt:truncate swt:text-right" title={summary.targetGroup.label}>
-                        {summary.targetGroup.label}
-                      </span>
-                    </div>
-                  </div>
-                ))}
+                        <div className="swt:flex swt:items-center swt:gap-2">
+                          <span className="swt:h-px swt:flex-1 swt:bg-base-content/30" />
+                          <span
+                            className={[
+                              "swt:badge swt:badge-sm",
+                              summary.coverage === "full" ? "swt:badge-success" : "swt:badge-warning",
+                            ].join(" ")}
+                          >
+                            {summary.coverage === "full" ? "full coverage" : "partial"}
+                          </span>
+                          <span className="swt:h-px swt:flex-1 swt:bg-base-content/30" />
+                        </div>
+                        <div className="swt:mt-2 swt:grid swt:grid-cols-[1fr_auto_1fr_auto] swt:items-center swt:gap-2">
+                          <span className="swt:truncate" title={summary.sourceGroup.label}>
+                            {summary.sourceGroup.label}
+                          </span>
+                          <i className="swt:iconify swt:fluent--arrow-right-20-regular swt:size-4" />
+                          <span className="swt:truncate swt:text-right" title={summary.targetGroup.label}>
+                            {summary.targetGroup.label}
+                          </span>
+                          <i
+                            className={[
+                              "swt:iconify swt:size-4 swt:text-base-content/60",
+                              expanded
+                                ? "swt:fluent--chevron-up-20-regular"
+                                : "swt:fluent--chevron-down-20-regular",
+                            ].join(" ")}
+                          />
+                        </div>
+                      </button>
+                      {expanded ? (
+                        <div
+                          className="swt:mt-2 swt:flex swt:max-h-56 swt:flex-col swt:gap-1 swt:overflow-auto swt:rounded swt:bg-base-200 swt:p-2"
+                          data-testid="ProvenanceGrouping-connection-inline-detail"
+                        >
+                          {summary.links.map((link) => (
+                            <div
+                              className="swt:grid swt:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] swt:items-center swt:gap-2 swt:rounded swt:bg-base-100 swt:px-2 swt:py-1"
+                              data-testid="ProvenanceGrouping-individual-connection"
+                              key={link.id}
+                            >
+                              <span className="swt:truncate" title={link.source.name}>
+                                {link.source.name}
+                              </span>
+                              <i className="swt:iconify swt:fluent--arrow-right-20-regular swt:size-4 swt:text-base-content/60" />
+                              <span className="swt:truncate swt:text-right" title={link.target.name}>
+                                {link.target.name}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
               </div>
             )}
           </div>
