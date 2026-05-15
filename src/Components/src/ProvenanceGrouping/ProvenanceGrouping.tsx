@@ -56,6 +56,7 @@ export type ProvenanceGroupingProps = {
   leftLayerId: string;
   rightLayerId: string;
   groupingByLayer: Record<string, string[]>;
+  sortingByLayer?: Record<string, string | undefined>;
   parameterValuesByLayer?: Record<string, Record<string, string[]>>;
   parameterRailByKey?: Record<string, ProvenanceSide>;
   selectedSourceGroupId?: string;
@@ -63,6 +64,7 @@ export type ProvenanceGroupingProps = {
   detail?: ProvenanceDetail;
   error?: string;
   onToggleGrouping: (side: ProvenanceSide, key: string) => void;
+  onSortLayer: (layerId: string, key: string | undefined) => void;
   onMoveParameter: (key: string, side: ProvenanceSide) => void;
   onCreateParameter: (side: ProvenanceSide, key: string) => void;
   onCreateParameterValue: (side: ProvenanceSide, key: string, value: string) => void;
@@ -226,6 +228,15 @@ function keyLookup(keys: string[]): Map<string, string> {
 function containsKey(keys: string[], key: string): boolean {
   const normalized = normalizeKey(key);
   return keys.some((existingKey) => normalizeKey(existingKey) === normalized);
+}
+
+function canonicalKey(keys: string[], key: string | undefined): string | undefined {
+  if (!key) {
+    return undefined;
+  }
+
+  const normalized = normalizeKey(key);
+  return keys.find((existingKey) => normalizeKey(existingKey) === normalized);
 }
 
 function displayKey(leftKey: string | undefined, rightKey: string | undefined): string {
@@ -439,6 +450,64 @@ export function buildGroups(
   });
 
   return Array.from(groups.values()).sort((left, right) => left.label.localeCompare(right.label));
+}
+
+function compareOptionalValues(left: string | undefined, right: string | undefined): number {
+  if (left === undefined && right === undefined) {
+    return 0;
+  }
+
+  if (left === undefined) {
+    return 1;
+  }
+
+  if (right === undefined) {
+    return -1;
+  }
+
+  return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
+}
+
+function compareItemsByParameter(key: string | undefined) {
+  return (left: ProvenanceItem, right: ProvenanceItem): number => {
+    if (!key) {
+      return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
+    }
+
+    const valueComparison = compareOptionalValues(getParameterValue(left, key), getParameterValue(right, key));
+    return valueComparison !== 0
+      ? valueComparison
+      : left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
+  };
+}
+
+function sortGroups(groups: ProvenanceGroup[], sortKey: string | undefined): ProvenanceGroup[] {
+  if (!sortKey) {
+    return groups.map((group) => ({
+      ...group,
+      items: [...group.items].sort(compareItemsByParameter(undefined)),
+    }));
+  }
+
+  return groups
+    .map((group) => ({
+      ...group,
+      items: [...group.items].sort(compareItemsByParameter(sortKey)),
+    }))
+    .sort((left, right) => {
+      const leftValue = left.items.length === 0 ? undefined : getParameterValue(left.items[0], sortKey);
+      const rightValue = right.items.length === 0 ? undefined : getParameterValue(right.items[0], sortKey);
+      const valueComparison = compareOptionalValues(leftValue, rightValue);
+      return valueComparison !== 0
+        ? valueComparison
+        : left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: "base" });
+    });
+}
+
+function sortOptionsForLayer(parameterKeys: string[], groupingKeys: string[]): string[] {
+  return parameterKeys
+    .filter((key) => !containsKey(groupingKeys, key))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }));
 }
 
 export function classifyGroupConnection(
@@ -990,6 +1059,33 @@ function CreateItemControl(props: {
   );
 }
 
+function GroupSortControl(props: {
+  side: ProvenanceSide;
+  layerId: string;
+  options: string[];
+  value: string | undefined;
+  onSortLayer: (layerId: string, key: string | undefined) => void;
+}) {
+  return (
+    <label className="swt:flex swt:min-w-0 swt:items-center swt:gap-1 swt:text-xs swt:text-base-content/60">
+      <i className="swt:iconify swt:fluent--arrow-sort-20-regular swt:size-4 swt:shrink-0" />
+      <select
+        className="swt:select swt:select-xs swt:w-36 swt:max-w-full"
+        data-testid={`ProvenanceGrouping-sort-${props.side}`}
+        value={props.value ?? ""}
+        onChange={(event) => props.onSortLayer(props.layerId, event.currentTarget.value || undefined)}
+      >
+        <option value="">Default</option>
+        {props.options.map((key) => (
+          <option key={key} value={key}>
+            {key}
+          </option>
+        ))}
+      </select>
+    </label>
+  );
+}
+
 export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactElement {
   const [editor, setEditor] = React.useState<EditorState | undefined>();
   const [dragOverGroup, setDragOverGroup] = React.useState<{ side: ProvenanceSide; groupId: string } | undefined>();
@@ -1006,12 +1102,16 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   const rightLayer = findLayer(props.layers, props.rightLayerId);
   const leftGroupingKeys = props.groupingByLayer[props.leftLayerId] ?? [];
   const rightGroupingKeys = props.groupingByLayer[props.rightLayerId] ?? [];
-  const leftGroups = buildGroups(props.items, props.leftLayerId, leftGroupingKeys);
-  const rightGroups = buildGroups(props.items, props.rightLayerId, rightGroupingKeys);
   const leftParameterValues = parameterValueConfigForLayer(props.parameterValuesByLayer, props.leftLayerId);
   const rightParameterValues = parameterValueConfigForLayer(props.parameterValuesByLayer, props.rightLayerId);
   const leftParameterKeys = mergeKeys(availableParameterKeys(props.items, props.leftLayerId), configuredKeys(leftParameterValues));
   const rightParameterKeys = mergeKeys(availableParameterKeys(props.items, props.rightLayerId), configuredKeys(rightParameterValues));
+  const leftSortOptions = sortOptionsForLayer(leftParameterKeys, leftGroupingKeys);
+  const rightSortOptions = sortOptionsForLayer(rightParameterKeys, rightGroupingKeys);
+  const leftSortKey = canonicalKey(leftSortOptions, props.sortingByLayer?.[props.leftLayerId]);
+  const rightSortKey = canonicalKey(rightSortOptions, props.sortingByLayer?.[props.rightLayerId]);
+  const leftGroups = sortGroups(buildGroups(props.items, props.leftLayerId, leftGroupingKeys), leftSortKey);
+  const rightGroups = sortGroups(buildGroups(props.items, props.rightLayerId, rightGroupingKeys), rightSortKey);
   const parameterRails = buildParameterRailEntries(
     leftParameterKeys,
     rightParameterKeys,
@@ -1548,9 +1648,18 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         <div className="swt:hidden swt:min-w-0 swt:xl:block" data-testid="ProvenanceGrouping-value-lane-left" />
 
         <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
-          <div className="swt:flex swt:items-center swt:justify-between swt:gap-2">
-            <h3 className="swt:text-sm swt:font-semibold">{leftLayer.label} groups</h3>
-            <span className="swt:badge swt:badge-outline swt:badge-sm">{leftGroups.length}</span>
+          <div className="swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2">
+            <div className="swt:flex swt:items-center swt:gap-2">
+              <h3 className="swt:text-sm swt:font-semibold">{leftLayer.label} groups</h3>
+              <span className="swt:badge swt:badge-outline swt:badge-sm">{leftGroups.length}</span>
+            </div>
+            <GroupSortControl
+              layerId={props.leftLayerId}
+              options={leftSortOptions}
+              side="left"
+              value={leftSortKey}
+              onSortLayer={props.onSortLayer}
+            />
           </div>
           <CreateItemControl layerId={props.leftLayerId} side="left" onCreateItem={props.onCreateItem} />
           <div className="swt:flex swt:flex-col swt:gap-3">
@@ -1577,9 +1686,18 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         </section>
 
         <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
-          <div className="swt:flex swt:items-center swt:justify-between swt:gap-2">
-            <h3 className="swt:text-sm swt:font-semibold">{rightLayer.label} groups</h3>
-            <span className="swt:badge swt:badge-outline swt:badge-sm">{rightGroups.length}</span>
+          <div className="swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2">
+            <div className="swt:flex swt:items-center swt:gap-2">
+              <h3 className="swt:text-sm swt:font-semibold">{rightLayer.label} groups</h3>
+              <span className="swt:badge swt:badge-outline swt:badge-sm">{rightGroups.length}</span>
+            </div>
+            <GroupSortControl
+              layerId={props.rightLayerId}
+              options={rightSortOptions}
+              side="right"
+              value={rightSortKey}
+              onSortLayer={props.onSortLayer}
+            />
           </div>
           <CreateItemControl layerId={props.rightLayerId} side="right" onCreateItem={props.onCreateItem} />
           <div className="swt:flex swt:flex-col swt:gap-3">

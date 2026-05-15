@@ -66,6 +66,8 @@ Groups are derived from the selected keys:
 
 The UI displays groups, not raw entries. Entries appear only in drill-in/detail views.
 
+Each displayed layer can also be sorted by one non-grouping parameter. The sort applies to the visible group cards by the selected parameter's first sorted member value, and to the entries shown inside expanded groups. When grouping is still at the initial one-signature-per-entry state, the same sort orders those single-entry groups.
+
 ## Layout
 
 The component shows one adjacent layer pair at a time:

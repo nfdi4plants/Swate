@@ -22,6 +22,7 @@ type MockModel = {
   leftLayerId: string;
   rightLayerId: string;
   groupingByLayer: Record<string, string[]>;
+  sortingByLayer: Record<string, string | undefined>;
   parameterValuesByLayer: Record<string, Record<string, string[]>>;
   parameterRailByKey: Record<string, Side>;
   selectedSourceGroupId?: string;
@@ -147,6 +148,7 @@ function initialModel(): MockModel {
       inputs: [],
       outputs: [],
     },
+    sortingByLayer: {},
     parameterValuesByLayer: {
       inputs: {},
       outputs: {},
@@ -364,6 +366,18 @@ function StatefulMockup() {
     }));
   };
 
+  const sortLayer = (layerId: string, key: string | undefined) => {
+    setModel((current) => ({
+      ...current,
+      sortingByLayer: {
+        ...current.sortingByLayer,
+        [layerId]: key,
+      },
+      detail: undefined,
+      error: undefined,
+    }));
+  };
+
   const createParameter = (side: Side, key: string) => {
     setModel((current) => {
       const trimmedKey = key.trim();
@@ -532,6 +546,10 @@ function StatefulMockup() {
           ...current.groupingByLayer,
           [nextLayer.id]: [],
         },
+        sortingByLayer: {
+          ...current.sortingByLayer,
+          [nextLayer.id]: undefined,
+        },
         parameterValuesByLayer: {
           ...current.parameterValuesByLayer,
           [nextLayer.id]: {},
@@ -564,6 +582,7 @@ function StatefulMockup() {
       leftLayerId={model.leftLayerId}
       rightLayerId={model.rightLayerId}
       groupingByLayer={model.groupingByLayer}
+      sortingByLayer={model.sortingByLayer}
       parameterValuesByLayer={model.parameterValuesByLayer}
       parameterRailByKey={model.parameterRailByKey}
       selectedSourceGroupId={model.selectedSourceGroupId}
@@ -571,6 +590,7 @@ function StatefulMockup() {
       detail={model.detail}
       error={model.error}
       onToggleGrouping={toggleGrouping}
+      onSortLayer={sortLayer}
       onMoveParameter={moveParameter}
       onCreateParameter={createParameter}
       onCreateParameterValue={createParameterValue}
@@ -739,6 +759,43 @@ export const GroupedConnectionDetails: Story = {
 
     await waitFor(async () => {
       await expect(await canvas.findAllByTestId("ProvenanceGrouping-individual-connector")).toHaveLength(4);
+    });
+  },
+};
+
+export const SortByNonGroupingParameter: Story = {
+  name: "Sort by non-grouping parameter",
+  render: () => <StatefulMockup />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByTestId("ProvenanceGrouping-root")).toBeInTheDocument();
+
+    await userEvent.selectOptions(canvas.getByTestId("ProvenanceGrouping-sort-left"), "Temperature");
+    await waitFor(() => {
+      const labels = Array.from(
+        canvasElement.querySelectorAll('[data-testid^="ProvenanceGrouping-group-left-"] h3'),
+      ).map((element) => element.textContent ?? "");
+
+      expect(labels.slice(0, 2).every((label) => label.includes("Temperature: 12 C"))).toBe(true);
+      expect(labels.slice(2).every((label) => label.includes("Temperature: 24 C"))).toBe(true);
+    });
+
+    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Species"));
+    await waitFor(() => {
+      const sortSelect = canvas.getByTestId("ProvenanceGrouping-sort-left") as HTMLSelectElement;
+      expect(Array.from(sortSelect.options).map((option) => option.value)).not.toContain("Species");
+    });
+
+    await userEvent.selectOptions(canvas.getByTestId("ProvenanceGrouping-sort-left"), "Replicate");
+    const arabidopsisGroup = await canvas.findByTestId(/ProvenanceGrouping-group-left-.*Arabidopsis/);
+    await userEvent.click(within(arabidopsisGroup).getByTestId("ProvenanceGrouping-group-details"));
+
+    await waitFor(async () => {
+      const detailText = (await within(arabidopsisGroup).findByTestId("ProvenanceGrouping-group-inline-detail"))
+        .textContent ?? "";
+      expect(detailText.indexOf("Input A")).toBeLessThan(detailText.indexOf("Input C"));
+      expect(detailText.indexOf("Input C")).toBeLessThan(detailText.indexOf("Input B"));
     });
   },
 };
