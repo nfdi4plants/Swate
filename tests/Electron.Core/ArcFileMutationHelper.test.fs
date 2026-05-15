@@ -82,4 +82,77 @@ Vitest.describe("ArcFileMutationHelper", fun () ->
         let updatedArc = updateARCByFileContentDTO oldArc request |> expectOk
         let updatedAssay = updatedArc.GetAssay("assay_1")
         Vitest.expect(updatedAssay.Title).toEqual(Some "stable"))
+
+    Vitest.test("copyArcPreservingStaticHashes keeps static hashes for unchanged entities", fun () ->
+        let sourceArc = ARC("test-arc")
+        sourceArc.AddAssay(ArcAssay("assay_1", title = "stable"))
+
+        sourceArc.GetWriteContracts() |> ignore
+
+        let copiedArc = copyArcPreservingStaticHashes sourceArc
+
+        Vitest.expect(copiedArc.StaticHash).toBe(sourceArc.StaticHash)
+        Vitest.expect(copiedArc.GetAssay("assay_1").StaticHash).toBe(sourceArc.GetAssay("assay_1").StaticHash)
+
+        let updateContracts = copiedArc.GetUpdateContracts()
+        let contractPaths = updateContracts |> Array.map _.Path
+        Vitest.expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))).toBe(false))
+
+    Vitest.test("preserved-hash working copy only generates contracts for newly added entity subtree", fun () ->
+        let oldArc = ARC("test-arc")
+        oldArc.AddAssay(ArcAssay("assay_1", title = "stable"))
+        oldArc.GetWriteContracts() |> ignore
+
+        let workingArc = copyArcPreservingStaticHashes oldArc
+        let newAssay = ArcAssay("assay_2", title = "new-title")
+
+        let request =
+            FileContentDTO.fromArcFile(ArcFiles.Assay newAssay)
+            |> expectSome <| "Expected new assay request DTO."
+
+        let updatedArc = updateARCByFileContentDTO workingArc request |> expectOk
+        let updateContracts = updatedArc.GetUpdateContracts()
+        let contractPaths = updateContracts |> Array.map _.Path
+
+        Vitest.expect(updateContracts.Length).toBe(4)
+        Vitest.expect(contractPaths |> Array.exists (fun path -> path = "assays/assay_2/isa.assay.xlsx")).toBe(true)
+        Vitest.expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_2/"))).toBe(true)
+        Vitest.expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))).toBe(false)
+        Vitest.expect(contractPaths |> Array.exists (fun path -> path = "isa.investigation.xlsx")).toBe(false))
+
+    Vitest.test("scoped add persistence does not flush unrelated in-memory entity edits", fun () ->
+        let persistedArc = ARC("test-arc")
+        persistedArc.AddAssay(ArcAssay("assay_1", title = "stable"))
+        persistedArc.GetWriteContracts() |> ignore
+
+        let localDirtyArc = copyArcPreservingStaticHashes persistedArc
+        let dirtyAssay = ArcAssay("assay_1", title = "local-unsaved-change")
+
+        let dirtyRequest =
+            FileContentDTO.fromArcFile(ArcFiles.Assay dirtyAssay)
+            |> expectSome <| "Expected local dirty assay request DTO."
+
+        let localDirtyArc = updateARCByFileContentDTO localDirtyArc dirtyRequest |> expectOk
+
+        let addRequest =
+            FileContentDTO.fromArcFile(ArcFiles.Assay(ArcAssay("assay_2", title = "new-assay")))
+            |> expectSome <| "Expected add-assay request DTO."
+
+        // Simulate scoped disk persistence: base the write on a clean reloaded ARC.
+        let diskWorkingArc = copyArcPreservingStaticHashes persistedArc
+        let updatedArcForDiskPersistence = updateARCByFileContentDTO diskWorkingArc addRequest |> expectOk
+        let diskContracts = updatedArcForDiskPersistence.GetUpdateContracts() |> Array.map _.Path
+
+        Vitest.expect(diskContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_2/"))).toBe(true)
+        Vitest.expect(diskContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))).toBe(false)
+
+        // Simulate post-save in-memory state: keep local edits, add the new entity, sync hash baseline from disk write.
+        let localWorkingArc = copyArcPreservingStaticHashes localDirtyArc
+        let updatedArcForInMemoryState = updateARCByFileContentDTO localWorkingArc addRequest |> expectOk
+        syncArcStaticHashes updatedArcForDiskPersistence updatedArcForInMemoryState
+
+        let remainingUnsavedContracts = updatedArcForInMemoryState.GetUpdateContracts() |> Array.map _.Path
+
+        Vitest.expect(remainingUnsavedContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))).toBe(true)
+        Vitest.expect(remainingUnsavedContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_2/"))).toBe(false))
 )

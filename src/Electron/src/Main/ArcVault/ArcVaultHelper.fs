@@ -60,6 +60,54 @@ let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: Dat
     with e ->
         Error(exn $"Failed to set datamap on ARC: {e.Message}")
 
+let private syncDataMapStaticHash (sourceDataMap: DataMap option) (targetDataMap: DataMap option) =
+    match sourceDataMap, targetDataMap with
+    | Some sourceDataMap, Some targetDataMap -> targetDataMap.StaticHash <- sourceDataMap.StaticHash
+    | _ -> ()
+
+/// Syncs static hashes from source ARC to target ARC for matching entities.
+/// This keeps ARCtrl update contract generation scoped to actual changes.
+let syncArcStaticHashes (source: ARC) (target: ARC) : unit =
+    target.StaticHash <- source.StaticHash
+
+    match source.License, target.License with
+    | Some sourceLicense, Some targetLicense -> targetLicense.StaticHash <- sourceLicense.StaticHash
+    | _ -> ()
+
+    for targetStudy in target.Studies do
+        match source.TryGetStudy targetStudy.Identifier with
+        | Some sourceStudy ->
+            targetStudy.StaticHash <- sourceStudy.StaticHash
+            syncDataMapStaticHash sourceStudy.DataMap targetStudy.DataMap
+        | None -> ()
+
+    for targetAssay in target.Assays do
+        match source.TryGetAssay targetAssay.Identifier with
+        | Some sourceAssay ->
+            targetAssay.StaticHash <- sourceAssay.StaticHash
+            syncDataMapStaticHash sourceAssay.DataMap targetAssay.DataMap
+        | None -> ()
+
+    for targetWorkflow in target.Workflows do
+        match source.TryGetWorkflow targetWorkflow.Identifier with
+        | Some sourceWorkflow ->
+            targetWorkflow.StaticHash <- sourceWorkflow.StaticHash
+            syncDataMapStaticHash sourceWorkflow.DataMap targetWorkflow.DataMap
+        | None -> ()
+
+    for targetRun in target.Runs do
+        match source.TryGetRun targetRun.Identifier with
+        | Some sourceRun ->
+            targetRun.StaticHash <- sourceRun.StaticHash
+            syncDataMapStaticHash sourceRun.DataMap targetRun.DataMap
+        | None -> ()
+
+/// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
+let copyArcPreservingStaticHashes (arc: ARC) : ARC =
+    let copiedArc = arc.Copy()
+    syncArcStaticHashes arc copiedArc
+    copiedArc
+
 /// This function should only be used for partial updates to an ARC based on a file content DTO.
 let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, exn> =
     let arcfile = FileContentDTO.toArcFile dto

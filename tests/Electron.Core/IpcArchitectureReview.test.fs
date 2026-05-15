@@ -209,6 +209,32 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
             Vitest.expect(mergeResult.Arc.ContainsAssay("My Assay")).toBe(false)
     )
 
+    Vitest.test("mergeReloadedArcAfterDelete preserves hash baseline so unaffected entities do not get rewritten", fun () ->
+        let localArc = ARC("MergeArc")
+        localArc.InitAssay("AssayKeep") |> ignore
+        localArc.InitAssay("AssayDelete") |> ignore
+        localArc.GetWriteContracts() |> ignore
+
+        let reloadedArc = localArc.Copy()
+        reloadedArc.RemoveAssay("AssayDelete")
+
+        let result =
+            ArcDeleteHelper.mergeReloadedArcAfterDelete
+                "assays/AssayDelete/isa.assay.xlsx"
+                [ "assays/AssayDelete/isa.assay.xlsx" ]
+                localArc
+                reloadedArc
+
+        match result with
+        | Error error -> failwith error.Message
+        | Ok mergeResult ->
+            Vitest.expect(mergeResult.Arc.ContainsAssay("AssayDelete")).toBe(false)
+            Vitest.expect(mergeResult.Arc.ContainsAssay("AssayKeep")).toBe(true)
+
+            let followUpContracts = mergeResult.Arc.GetUpdateContracts()
+            Vitest.expect(followUpContracts.Length).toBe(0)
+    )
+
     Vitest.test("unlink event path dedupe is idempotent", fun () ->
         let events =
             ArcDeleteHelper.buildDeleteUnlinkEvents

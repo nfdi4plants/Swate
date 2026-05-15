@@ -78,7 +78,14 @@ module ArcVaultExtensions =
                             (fun () ->
                                 promise {
                                     swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
-                                    do! this.LoadArc()
+
+                                    if this.hasUnsavedArcChanges then
+                                        swatelogfn
+                                            this.window.id
+                                            "Skipping ARC reload due to unsaved in-memory ARC changes."
+                                    else
+                                        do! this.LoadArc()
+
                                     sendMsgApi.IsLoadingChanges false
 
                                     match this.path with
@@ -161,27 +168,47 @@ module ArcVaultExtensions =
         /// The in-memory ARC is only replaced after successful persistence.
         member this.ApplyArcFileAndSave(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
-            | Some arcPath, Some arc ->
+            | Some arcPath, Some arcLocal ->
                 let normalizedRequest =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
-                let workingArc = arc.Copy()
+                this.isBusyWriting <- true
 
-                match updateARCByFileContentDTO workingArc normalizedRequest with
-                | Error updateError -> return Error updateError
-                | Ok updatedArc ->
-                    this.isBusyWriting <- true
+                try
+                    match! ARC.tryLoadAsync arcPath with
+                    | Error loadError ->
+                        return Error(exn $"Unable to reload ARC before scoped save: {loadError}")
+                    | Ok arcFromDisk ->
+                        let arcForDiskPersistence = copyArcPreservingStaticHashes arcFromDisk
+                        let arcForInMemoryState = copyArcPreservingStaticHashes arcLocal
 
-                    try
-                        try
-                            do! updatedArc.UpdateAsync(arcPath)
-                            this.SetArc(updatedArc)
-                            this.SetHasUnsavedArcChanges false
-                            return Ok()
-                        with e ->
-                            return Error(exn $"Failed to persist ARC to disk: {e.Message}")
-                    finally
-                        this.isBusyWriting <- false
+                        match
+                            updateARCByFileContentDTO arcForDiskPersistence normalizedRequest,
+                            updateARCByFileContentDTO arcForInMemoryState normalizedRequest
+                        with
+                        | Error updateError, _
+                        | _, Error updateError -> return Error updateError
+                        | Ok updatedArcForDiskPersistence, Ok updatedArcForInMemoryState ->
+                            try
+                                do! updatedArcForDiskPersistence.UpdateAsync(arcPath)
+                                // Carry over the fresh persisted hash baseline so follow-up writes stay scoped.
+                                syncArcStaticHashes updatedArcForDiskPersistence updatedArcForInMemoryState
+
+                                let hasRemainingUnsavedArcChanges =
+                                    updatedArcForInMemoryState.GetUpdateContracts().Length > 0
+
+                                // Preserve a pre-existing dirty marker so scoped add/save does not
+                                // accidentally clear unrelated unsaved in-memory changes.
+                                let nextHasUnsavedArcChanges =
+                                    this.hasUnsavedArcChanges || hasRemainingUnsavedArcChanges
+
+                                this.SetArc(updatedArcForInMemoryState)
+                                this.SetHasUnsavedArcChanges nextHasUnsavedArcChanges
+                                return Ok()
+                            with e ->
+                                return Error(exn $"Failed to persist ARC to disk: {e.Message}")
+                finally
+                    this.isBusyWriting <- false
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
