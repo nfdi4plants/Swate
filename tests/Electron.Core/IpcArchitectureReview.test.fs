@@ -175,7 +175,8 @@ Vitest.describe("IPC architecture review fixes", fun () ->
                 [|
                     "let private runArcDiskMutation"
                     "do! vault.RefreshFileTree()"
-                    "match mergeReloadedArc reloadedArc"
+                    "match! postReloadArcMutation reloadedArc"
+                    "match mergeReloadedArc postMutationArc"
                 |]
         })
 

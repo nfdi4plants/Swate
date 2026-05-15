@@ -197,10 +197,14 @@ let private applyArcMutationMergeResult (vault: ArcVault) (mergeResult: ArcMutat
     vault.arc <- Some mergeResult.Arc
     vault.window.title <- mergeResult.Arc.Identifier
 
+let private passthroughReloadedArc (reloadedArc: ARC) : JS.Promise<Result<ARC, exn>> =
+    promise { return Ok reloadedArc }
+
 let private runArcDiskMutation
     (vault: ArcVault)
     (reloadErrorContext: string)
     (diskMutation: unit -> JS.Promise<Result<unit, exn>>)
+    (postReloadArcMutation: ARC -> JS.Promise<Result<ARC, exn>>)
     (mergeReloadedArc: ARC -> Result<ArcMutationMergeResult, exn>)
     : JS.Promise<Result<unit, exn>> =
     promise {
@@ -217,13 +221,26 @@ let private runArcDiskMutation
                 match! ARC.tryLoadAsync vault.path.Value with
                 | Error loadError -> return Error(exn $"Unable to reload ARC after {reloadErrorContext}: {loadError}")
                 | Ok reloadedArc ->
-                    match mergeReloadedArc reloadedArc with
-                    | Error mergeError -> return Error mergeError
-                    | Ok mergeResult ->
-                        applyArcMutationMergeResult vault mergeResult
-                        return Ok()
+                    match! postReloadArcMutation reloadedArc with
+                    | Error postReloadError -> return Error postReloadError
+                    | Ok postMutationArc ->
+                        match mergeReloadedArc postMutationArc with
+                        | Error mergeError -> return Error mergeError
+                        | Ok mergeResult ->
+                            applyArcMutationMergeResult vault mergeResult
+                            return Ok()
         finally
             vault.isBusyWriting <- false
+    }
+
+let private runRenameOperationSafely
+    (operation: unit -> JS.Promise<Result<unit, exn>>)
+    : JS.Promise<Result<unit, exn>> =
+    promise {
+        try
+            return! operation ()
+        with operationError ->
+            return Error operationError
     }
 
 let private runWithRenameScopedPolling
@@ -233,23 +250,18 @@ let private runWithRenameScopedPolling
     promise {
         let useScopedPolling = isWindowsPlatform () && vault.watcher.IsSome
 
-        if useScopedPolling then
+        if useScopedPolling |> not then
+            return! runRenameOperationSafely operation
+        else
             do! vault.StopFileWatcher()
             vault.StartFileWatcher(usePolling = true)
 
-        let! operationResult =
-            promise {
-                try
-                    return! operation ()
-                with e ->
-                    return Error e
-            }
+            let! operationResult = runRenameOperationSafely operation
 
-        if useScopedPolling then
             do! vault.StopFileWatcher()
             vault.StartFileWatcher()
 
-        return operationResult
+            return operationResult
     }
 
 [<RequireQualifiedAccess>]
@@ -374,6 +386,24 @@ module ArcRenameHelper =
                             exn
                                 $"Renamed folder from '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}', but failed to sync ARC identifier from '{renamePlan.SyncPlan.OldIdentifier}' to '{renamePlan.SyncPlan.NewIdentifier}': {syncError.Message}"
                         )
+        }
+
+    let syncRenamedEntityIdentifierOnLoadedArc
+        (arcPath: string)
+        (renamePlan: RenamePlan)
+        (reloadedArc: ARC)
+        : JS.Promise<Result<ARC, exn>> =
+        promise {
+            try
+                applyIdentifierRenameSyncPlan reloadedArc renamePlan.SyncPlan
+                do! reloadedArc.UpdateAsync arcPath
+                return Ok reloadedArc
+            with syncError ->
+                return
+                    Error(
+                        exn
+                            $"Renamed folder from '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}', but failed to sync ARC identifier from '{renamePlan.SyncPlan.OldIdentifier}' to '{renamePlan.SyncPlan.NewIdentifier}': {syncError.Message}"
+                    )
         }
 
     let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
@@ -822,6 +852,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             vault
                                             $"deleting '{normalizedRelativePath}'"
                                             deleteDiskMutation
+                                            passthroughReloadedArc
                                             (fun reloadedArc ->
                                                 ArcDeleteHelper.mergeReloadedArcAfterDelete
                                                     normalizedRelativePath
@@ -859,13 +890,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
 
                                             match renameResult with
-                                            | Ok() ->
-                                                let! syncResult =
-                                                    ArcRenameHelper.syncRenamedEntityIdentifierOnDisk
-                                                        arcPath
-                                                        renamePlan
-
-                                                return syncResult
+                                            | Ok() -> return Ok()
                                             | Error renameError ->
                                                 return
                                                     Error(
@@ -884,6 +909,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                     vault
                                                     $"renaming '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}'"
                                                     renameDiskMutation
+                                                    (ArcRenameHelper.syncRenamedEntityIdentifierOnLoadedArc arcPath renamePlan)
                                                     (fun reloadedArc ->
                                                         ArcRenameHelper.mergeReloadedArcAfterRename
                                                             renamePlan
