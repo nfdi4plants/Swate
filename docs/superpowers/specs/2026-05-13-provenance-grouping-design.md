@@ -62,7 +62,7 @@ Groups are derived from the selected keys:
 - One key: one group for each distinct value.
 - Multiple keys: one group for each distinct ordered tuple of values.
 - Once a key is selected for grouping, non-selected parameters are ignored for grouping.
-- Missing values for selected keys are shown explicitly as `Missing <key>` so items do not disappear.
+- Missing selected keys are ignored for grouping rather than becoming their own `Missing <key>` category. If an item has none of the selected keys, it appears in a single `Ungrouped` bucket.
 
 The UI displays groups, not raw entries. Entries appear only in drill-in/detail views.
 
@@ -86,29 +86,23 @@ Use `swt:iconify` with fully qualified Fluent icon classes for new icons.
 
 ## Group-Level Connections
 
-Connections are rendered as lines between visible groups only. There are no per-entry connection lines in the main view.
+Connections are rendered as clickable lines between visible groups only. There is no separate group-link list or box in the connector area.
 
-A line between source group `A` and target group `B` means full coverage:
+A line between source group `A` and target group `B` means a complete group link.
 
-- Every entry in source group `A` has at least one connection to an entry in target group `B`.
-- Every entry in target group `B` has at least one connection from an entry in source group `A`.
+The mockup does not expose partial group links. Creating a group link connects all source entries in the source group with all target entries in the target group. Clicking a group connector expands both connected groups and replaces that connector with member-level connector lines between the expanded entries.
 
-The line does not mean every source entry is connected to every target entry. Full mesh is not required.
-
-Partial group connections are invalid. If sample data or an edit creates a state where only some entries in either group are covered, the UI should flag that connection as invalid instead of presenting it as a normal line.
-
-Creating a group-level connection should create the minimum item-level links needed to satisfy full coverage. When connecting groups, target items inherit missing source parameters from connected sources. Existing target parameter values are preserved by connection inheritance.
+Creating a group-level connection should create all item-level links between the source and target group. When connecting groups, target items inherit missing source parameters from connected sources. Existing target parameter values are preserved by connection inheritance.
 
 ## Editing Rules
 
-Bulk edits happen at group level.
+Bulk edits happen through group-level controls and parameter rails.
 
-Adding a parameter:
+Adding a parameter value from a rail:
 
-- Applies to every item in the selected group.
+- Adds the value as a candidate in the parameter block.
+- Applies to every item in the drop target group when dragged onto a group.
 - Propagates through the full downstream chain.
-- Fails if any affected item already has the same parameter key.
-- Shows an error telling the user to choose another parameter name.
 
 Updating an existing parameter:
 
@@ -178,8 +172,6 @@ Story interaction tests should cover the core behavior, but the story itself is 
 
 The mockup should surface errors inline near the action that caused them. Required errors:
 
-- Adding a parameter key that already exists in the affected group or downstream chain.
-- Attempting to present a partial grouped connection as a normal connection.
 - Trying to connect groups when either group is empty.
 
 Errors should not silently mutate state.
@@ -189,22 +181,18 @@ Errors should not silently mutate state.
 Test the pure helper logic before relying on the UI:
 
 - Grouping by zero, one, and multiple keys.
-- Missing parameter bucket creation.
 - Group connection full-coverage detection.
-- Partial connection detection.
-- Bulk add propagation success.
-- Bulk add duplicate-key failure.
 - Bulk update propagation with overwrite.
-- Minimum-link creation for many-to-many full coverage.
+- Complete item-link creation for many-to-many group connections.
 
 Add Storybook play tests for the first mockup flow:
 
 - Toggle `Temperature` grouping and verify distinct groups appear.
 - Add `Species` grouping and verify refined group labels.
 - Open parameter detail.
-- Attempt duplicate parameter add and verify the error.
 - Update an existing parameter and verify downstream output values change.
 - Create a group connection and verify a group-level line appears.
+- Click a group connection and verify both groups expand with member-level connector lines.
 - Add a downstream layer and verify the adjacent pair switches or becomes selectable.
 
 ## Non-Goals For The First Mockup

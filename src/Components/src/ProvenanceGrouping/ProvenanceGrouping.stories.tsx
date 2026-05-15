@@ -3,7 +3,6 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import {
   ProvenanceGrouping,
-  addParameterToGroup,
   buildGroups,
   connectGroups,
   updateParameterInGroup,
@@ -462,20 +461,6 @@ function StatefulMockup() {
     });
   };
 
-  const addParameter = (side: Side, groupId: string, key: string, value: string) => {
-    setModel((current) => {
-      const group = findVisibleGroup(current, side, groupId);
-      if (!group) {
-        return { ...current, error: "The selected group no longer exists." };
-      }
-
-      const result = addParameterToGroup(current.items, current.connections, group, key, value);
-      return result.ok
-        ? { ...current, items: result.value, error: undefined }
-        : { ...current, error: result.error };
-    });
-  };
-
   const updateParameter = (side: Side, groupId: string, key: string, value: string) => {
     setModel((current) => {
       const group = findVisibleGroup(current, side, groupId);
@@ -592,7 +577,6 @@ function StatefulMockup() {
       onAssignParameterValue={assignParameterValue}
       onSelectGroup={selectGroup}
       onOpenDetail={openDetail}
-      onAddParameter={addParameter}
       onUpdateParameter={updateParameter}
       onConnectSelectedGroups={connectSelectedGroups}
       onCreateItem={createItem}
@@ -674,12 +658,14 @@ export const InteractionFlow: Story = {
       expect(canvasElement).not.toHaveTextContent("All items");
     });
 
-    const [groupLink] = await canvas.findAllByTestId("ProvenanceGrouping-connection-full");
-    await userEvent.click(within(groupLink).getByTestId("ProvenanceGrouping-connection-toggle"));
+    const [groupLink] = await canvas.findAllByTestId("ProvenanceGrouping-group-connector");
+    await userEvent.click(groupLink);
     await waitFor(async () => {
-      const detail = await within(groupLink).findByTestId("ProvenanceGrouping-connection-inline-detail");
-      await expect(detail).toHaveTextContent("Input A");
-      await expect(detail).toHaveTextContent("Output A");
+      const expandedGroups = await canvas.findAllByTestId("ProvenanceGrouping-group-inline-detail");
+      expect(expandedGroups.length).toBeGreaterThanOrEqual(2);
+      await expect(canvasElement).toHaveTextContent("Input A");
+      await expect(canvasElement).toHaveTextContent("Output A");
+      expect((await canvas.findAllByTestId("ProvenanceGrouping-individual-connector")).length).toBeGreaterThan(0);
     });
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Temperature"));
@@ -699,18 +685,6 @@ export const InteractionFlow: Story = {
 
     const arabidopsis12Group = await canvas.findByTestId(/ProvenanceGrouping-group-left-.*12-C.*Arabidopsis/);
     await userEvent.click(within(arabidopsis12Group).getByTestId("ProvenanceGrouping-group-select"));
-    await userEvent.click(within(arabidopsis12Group).getByTestId("ProvenanceGrouping-group-add-param"));
-    await userEvent.type(within(arabidopsis12Group).getByTestId("ProvenanceGrouping-param-key-input"), "Species");
-    await userEvent.type(within(arabidopsis12Group).getByTestId("ProvenanceGrouping-param-value-input"), "Lemna");
-    await userEvent.click(within(arabidopsis12Group).getByTestId("ProvenanceGrouping-param-submit"));
-
-    await waitFor(async () => {
-      await expect(await canvas.findByTestId("ProvenanceGrouping-error")).toHaveTextContent(
-        "Choose another parameter name",
-      );
-    });
-
-    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-error-dismiss"));
     await userEvent.click(within(arabidopsis12Group).getByTestId("ProvenanceGrouping-group-update-param"));
     await userEvent.selectOptions(
       within(arabidopsis12Group).getByTestId("ProvenanceGrouping-update-key-select"),
@@ -733,13 +707,14 @@ export const InteractionFlow: Story = {
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-connect-selected"));
 
     await waitFor(async () => {
-      await expect((await canvas.findAllByTestId("ProvenanceGrouping-connection-full")).length).toBeGreaterThan(0);
+      await expect((await canvas.findAllByTestId("ProvenanceGrouping-group-connector")).length).toBeGreaterThan(0);
     });
 
     await userEvent.type(canvas.getByTestId("ProvenanceGrouping-create-item-right-input"), "Fresh output");
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-create-item-right-submit"));
     await waitFor(() => {
-      expect(canvasElement).toHaveTextContent("Analysis: Missing Analysis");
+      expect(canvasElement).toHaveTextContent("Ungrouped");
+      expect(canvasElement).not.toHaveTextContent("Missing Analysis");
     });
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-add-layer"));

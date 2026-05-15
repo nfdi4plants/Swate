@@ -36,7 +36,7 @@ export type ProvenanceGroup = {
   items: ProvenanceItem[];
 };
 
-export type ConnectionCoverage = "none" | "partial" | "full";
+export type ConnectionCoverage = "none" | "full";
 
 export type ModelMutationResult<T> =
   | { ok: true; value: T }
@@ -69,7 +69,6 @@ export type ProvenanceGroupingProps = {
   onAssignParameterValue: (side: ProvenanceSide, key: string, value: string, groupId: string) => void;
   onSelectGroup: (side: ProvenanceSide, groupId: string) => void;
   onOpenDetail: (detail: ProvenanceDetail) => void;
-  onAddParameter: (side: ProvenanceSide, groupId: string, key: string, value: string) => void;
   onUpdateParameter: (side: ProvenanceSide, groupId: string, key: string, value: string) => void;
   onConnectSelectedGroups: () => void;
   onCreateItem: (layerId: string, name: string) => void;
@@ -82,7 +81,6 @@ type ConnectionSummary = {
   id: string;
   sourceGroup: ProvenanceGroup;
   targetGroup: ProvenanceGroup;
-  coverage: ConnectionCoverage;
   links: ProvenanceConnectionDetail[];
 };
 
@@ -95,7 +93,6 @@ type ProvenanceConnectionDetail = {
 type EditorState = {
   side: ProvenanceSide;
   groupId: string;
-  mode: "add" | "update";
 };
 
 type ParameterAvailability = "shared" | "left-only" | "right-only";
@@ -130,7 +127,29 @@ type RenderedConnectorPath = {
 type ConnectorOverlay = {
   width: number;
   height: number;
-  paths: RenderedConnectorPath[];
+  valuePaths: RenderedConnectorPath[];
+  groupPaths: RenderedGroupConnectorPath[];
+  itemPaths: RenderedItemConnectorPath[];
+};
+
+type RenderedGroupConnectorPath = {
+  id: string;
+  path: string;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+  sourceGroupId: string;
+  targetGroupId: string;
+  sourceLabel: string;
+  targetLabel: string;
+};
+
+type RenderedItemConnectorPath = {
+  id: string;
+  path: string;
+  sourceGroupId: string;
+  targetGroupId: string;
+  sourceName: string;
+  targetName: string;
 };
 
 type DraggedParameterValue = {
@@ -138,8 +157,6 @@ type DraggedParameterValue = {
   key: string;
   value: string;
 };
-
-const missingValue = (key: string) => `Missing ${key}`;
 
 const normalizeKey = (key: string) => key.trim().toLowerCase();
 
@@ -267,16 +284,17 @@ function valueConnectorsForKey(
   const layerItems = items.filter((item) => item.layerId === layerId);
   const values = new Set([
     ...configuredValues.filter((value) => value.trim()),
-    ...layerItems.map((item) => getParameterValue(item, key) ?? missingValue(key)),
+    ...layerItems.flatMap((item) => {
+      const value = getParameterValue(item, key);
+      return value === undefined ? [] : [value];
+    }),
   ]);
 
   return Array.from(values)
     .sort((left, right) => left.localeCompare(right))
     .map((value) => ({
       value,
-      groups: groups.filter((group) =>
-        group.items.some((item) => (getParameterValue(item, key) ?? missingValue(key)) === value),
-      ),
+      groups: groups.filter((group) => group.items.some((item) => getParameterValue(item, key) === value)),
     }));
 }
 
@@ -286,6 +304,10 @@ function valueNodeId(side: ProvenanceSide, layerId: string, key: string, value: 
 
 function groupNodeId(side: ProvenanceSide, groupIdValue: string): string {
   return `group-${side}-${slug(groupIdValue)}`;
+}
+
+function itemNodeId(side: ProvenanceSide, itemId: string): string {
+  return `item-${side}-${slug(itemId)}`;
 }
 
 function readDraggedParameterValue(event: React.DragEvent): DraggedParameterValue | undefined {
@@ -395,11 +417,11 @@ export function buildGroups(
   const groups = new Map<string, ProvenanceGroup>();
 
   layerItems.forEach((item) => {
-    const labelParts = groupingKeys.map((key) => ({
-      key,
-      value: getParameterValue(item, key) ?? missingValue(key),
-    }));
-    const id = groupId(layerId, labelParts);
+    const labelParts = groupingKeys.flatMap((key) => {
+      const value = getParameterValue(item, key);
+      return value === undefined ? [] : [{ key, value }];
+    });
+    const id = labelParts.length === 0 ? `${layerId}-ungrouped` : groupId(layerId, labelParts);
     const existing = groups.get(id);
 
     if (existing) {
@@ -408,7 +430,7 @@ export function buildGroups(
       groups.set(id, {
         id,
         layerId,
-        label: groupLabel(labelParts),
+        label: labelParts.length === 0 ? "Ungrouped" : groupLabel(labelParts),
         groupingKeys,
         labelParts,
         items: [item],
@@ -438,12 +460,7 @@ export function classifyGroupConnection(
     return "none";
   }
 
-  const coveredSources = new Set(links.map((connection) => connection.sourceId));
-  const coveredTargets = new Set(links.map((connection) => connection.targetId));
-
-  return coveredSources.size === sourceIds.size && coveredTargets.size === targetIds.size
-    ? "full"
-    : "partial";
+  return "full";
 }
 
 function downstreamIds(connections: ProvenanceConnection[], startIds: string[]): Set<string> {
@@ -492,36 +509,6 @@ function setParameter(item: ProvenanceItem, key: string, value: string): Provena
   };
 }
 
-export function addParameterToGroup(
-  items: ProvenanceItem[],
-  connections: ProvenanceConnection[],
-  group: ProvenanceGroup,
-  key: string,
-  value: string,
-): ModelMutationResult<ProvenanceItem[]> {
-  const trimmedKey = key.trim();
-  const trimmedValue = value.trim();
-
-  if (!trimmedKey || !trimmedValue) {
-    return { ok: false, error: "Enter both a parameter name and value." };
-  }
-
-  const affectedIds = downstreamIds(connections, group.items.map((item) => item.id));
-  const duplicate = items.find((item) => affectedIds.has(item.id) && hasParameter(item, trimmedKey));
-
-  if (duplicate) {
-    return {
-      ok: false,
-      error: `Choose another parameter name. "${trimmedKey}" already exists in the affected group or downstream chain.`,
-    };
-  }
-
-  return {
-    ok: true,
-    value: items.map((item) => (affectedIds.has(item.id) ? setParameter(item, trimmedKey, trimmedValue) : item)),
-  };
-}
-
 export function updateParameterInGroup(
   items: ProvenanceItem[],
   connections: ProvenanceConnection[],
@@ -559,19 +546,18 @@ export function connectGroups(
 
   const nextConnections = [...connections];
   const existing = new Set(nextConnections.map(connectionKey));
-  const count = Math.max(sourceGroup.items.length, targetGroup.items.length);
 
-  for (let index = 0; index < count; index += 1) {
-    const source = sourceGroup.items[index % sourceGroup.items.length];
-    const target = targetGroup.items[index % targetGroup.items.length];
-    const next = { sourceId: source.id, targetId: target.id };
-    const key = connectionKey(next);
+  sourceGroup.items.forEach((source) => {
+    targetGroup.items.forEach((target) => {
+      const next = { sourceId: source.id, targetId: target.id };
+      const key = connectionKey(next);
 
-    if (!existing.has(key)) {
-      existing.add(key);
-      nextConnections.push(next);
-    }
-  }
+      if (!existing.has(key)) {
+        existing.add(key);
+        nextConnections.push(next);
+      }
+    });
+  });
 
   return nextConnections;
 }
@@ -592,7 +578,6 @@ function groupConnectionSummaries(
           id: `${sourceGroup.id}-${targetGroup.id}`,
           sourceGroup,
           targetGroup,
-          coverage: classifyGroupConnection(sourceGroup, targetGroup, connections),
           links,
         });
       }
@@ -607,28 +592,29 @@ function connectionDetailsForGroups(
   targetGroup: ProvenanceGroup,
   connections: ProvenanceConnection[],
 ): ProvenanceConnectionDetail[] {
-  const sourceItems = new Map(sourceGroup.items.map((item) => [item.id, item]));
-  const targetItems = new Map(targetGroup.items.map((item) => [item.id, item]));
+  const sourceIds = new Set(sourceGroup.items.map((item) => item.id));
+  const targetIds = new Set(targetGroup.items.map((item) => item.id));
+  const connected = connections.some(
+    (connection) => sourceIds.has(connection.sourceId) && targetIds.has(connection.targetId),
+  );
 
-  return connections
-    .flatMap((connection) => {
-      const source = sourceItems.get(connection.sourceId);
-      const target = targetItems.get(connection.targetId);
+  if (!connected) {
+    return [];
+  }
 
-      return source && target
-        ? [
-            {
-              id: connectionKey(connection),
-              source,
-              target,
-            },
-          ]
-        : [];
-    })
+  return sourceGroup.items
+    .flatMap((source) =>
+      targetGroup.items.map((target) => ({
+        id: connectionKey({ sourceId: source.id, targetId: target.id }),
+        source,
+        target,
+      })),
+    )
     .sort((left, right) => {
       const sourceComparison = left.source.name.localeCompare(right.source.name);
       return sourceComparison !== 0 ? sourceComparison : left.target.name.localeCompare(right.target.name);
-    });
+    })
+    .filter((link, index, links) => links.findIndex((candidate) => candidate.id === link.id) === index);
 }
 
 function parameterKeysForGroup(group: ProvenanceGroup): string[] {
@@ -662,7 +648,7 @@ function GroupEditor(props: {
   side: ProvenanceSide;
   onStartEditor: (editor: EditorState) => void;
   onCancel: () => void;
-  onSubmit: (side: ProvenanceSide, groupId: string, key: string, value: string, mode: "add" | "update") => void;
+  onSubmit: (side: ProvenanceSide, groupId: string, key: string, value: string) => void;
 }) {
   const active = props.editor?.groupId === props.group.id && props.editor.side === props.side;
   const [keyDraft, setKeyDraft] = React.useState("");
@@ -675,37 +661,24 @@ function GroupEditor(props: {
       return;
     }
 
-    if (props.editor?.mode === "update") {
-      setKeyDraft(defaultUpdateKey);
-      setValueDraft("");
-    } else {
-      setKeyDraft("");
-      setValueDraft("");
-    }
-  }, [active, defaultUpdateKey, props.editor?.mode]);
+    setKeyDraft(defaultUpdateKey);
+    setValueDraft("");
+  }, [active, defaultUpdateKey]);
 
   if (!active) {
+    if (groupKeys.length === 0) {
+      return null;
+    }
+
     return (
       <div className="swt:flex swt:flex-wrap swt:gap-2">
-        <button
-          className="swt:btn swt:btn-xs swt:btn-outline"
-          data-testid="ProvenanceGrouping-group-add-param"
-          type="button"
-          onClick={(event) => {
-            event.stopPropagation();
-            props.onStartEditor({ side: props.side, groupId: props.group.id, mode: "add" });
-          }}
-        >
-          <i className="swt:iconify swt:fluent--add-20-regular swt:size-3" />
-          Add
-        </button>
         <button
           className="swt:btn swt:btn-xs swt:btn-outline"
           data-testid="ProvenanceGrouping-group-update-param"
           type="button"
           onClick={(event) => {
             event.stopPropagation();
-            props.onStartEditor({ side: props.side, groupId: props.group.id, mode: "update" });
+            props.onStartEditor({ side: props.side, groupId: props.group.id });
           }}
         >
           <i className="swt:iconify swt:fluent--edit-20-regular swt:size-3" />
@@ -715,38 +688,26 @@ function GroupEditor(props: {
     );
   }
 
-  const isUpdate = props.editor?.mode === "update";
-
   return (
     <form
       className="swt:flex swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-base-content/10 swt:bg-base-200 swt:p-2"
       onSubmit={(event) => {
         event.preventDefault();
-        props.onSubmit(props.side, props.group.id, keyDraft, valueDraft, isUpdate ? "update" : "add");
+        props.onSubmit(props.side, props.group.id, keyDraft, valueDraft);
       }}
     >
-      {isUpdate ? (
-        <select
-          className="swt:select swt:select-xs swt:w-full"
-          data-testid="ProvenanceGrouping-update-key-select"
-          value={keyDraft}
-          onChange={(event) => setKeyDraft(event.currentTarget.value)}
-        >
-          {groupKeys.map((key) => (
-            <option key={key} value={key}>
-              {key}
-            </option>
-          ))}
-        </select>
-      ) : (
-        <input
-          className="swt:input swt:input-xs swt:w-full"
-          data-testid="ProvenanceGrouping-param-key-input"
-          placeholder="Parameter"
-          value={keyDraft}
-          onChange={(event) => setKeyDraft(event.currentTarget.value)}
-        />
-      )}
+      <select
+        className="swt:select swt:select-xs swt:w-full"
+        data-testid="ProvenanceGrouping-update-key-select"
+        value={keyDraft}
+        onChange={(event) => setKeyDraft(event.currentTarget.value)}
+      >
+        {groupKeys.map((key) => (
+          <option key={key} value={key}>
+            {key}
+          </option>
+        ))}
+      </select>
       <input
         className="swt:input swt:input-xs swt:w-full"
         data-testid="ProvenanceGrouping-param-value-input"
@@ -1036,7 +997,9 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   const [connectorOverlay, setConnectorOverlay] = React.useState<ConnectorOverlay>({
     width: 0,
     height: 0,
-    paths: [],
+    valuePaths: [],
+    groupPaths: [],
+    itemPaths: [],
   });
 
   const leftLayer = findLayer(props.layers, props.leftLayerId);
@@ -1057,6 +1020,14 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
     props.parameterRailByKey,
   );
   const summaries = groupConnectionSummaries(leftGroups, rightGroups, props.connections);
+  const selectedConnectionSummary =
+    props.detail?.kind === "connection"
+      ? summaries.find(
+          (summary) =>
+            summary.sourceGroup.id === props.detail?.sourceGroupId &&
+            summary.targetGroup.id === props.detail?.targetGroupId,
+        )
+      : undefined;
   const valueGroupConnections = [
     ...valueGroupConnectionsForRail("left", props.leftLayerId, parameterRails.left, props.items, leftGroups, leftParameterValues),
     ...valueGroupConnectionsForRail(
@@ -1078,7 +1049,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
 
     const updateConnectorOverlay = () => {
       const containerRect = container.getBoundingClientRect();
-      const paths = valueGroupConnections.flatMap((connection) => {
+      const valuePaths = valueGroupConnections.flatMap((connection) => {
         const valueNode = container.querySelector<HTMLElement>(
           `[data-provenance-value-node="${connection.valueNodeId}"]`,
         );
@@ -1126,10 +1097,86 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           },
         ];
       });
+      const groupPaths = summaries.flatMap((summary) => {
+        const sourceNode = container.querySelector<HTMLElement>(
+          `[data-provenance-group-node="${groupNodeId("left", summary.sourceGroup.id)}"]`,
+        );
+        const targetNode = container.querySelector<HTMLElement>(
+          `[data-provenance-group-node="${groupNodeId("right", summary.targetGroup.id)}"]`,
+        );
+
+        if (!sourceNode || !targetNode) {
+          return [];
+        }
+
+        const sourceRect = sourceNode.getBoundingClientRect();
+        const targetRect = targetNode.getBoundingClientRect();
+        const start = {
+          x: sourceRect.right - containerRect.left + container.scrollLeft,
+          y: sourceRect.top - containerRect.top + container.scrollTop + sourceRect.height / 2,
+        };
+        const end = {
+          x: targetRect.left - containerRect.left + container.scrollLeft,
+          y: targetRect.top - containerRect.top + container.scrollTop + targetRect.height / 2,
+        };
+        const bend = Math.max(72, Math.abs(end.x - start.x) / 2);
+
+        return [
+          {
+            id: summary.id,
+            path: `M ${start.x} ${start.y} C ${start.x + bend} ${start.y}, ${end.x - bend} ${end.y}, ${end.x} ${end.y}`,
+            start,
+            end,
+            sourceGroupId: summary.sourceGroup.id,
+            targetGroupId: summary.targetGroup.id,
+            sourceLabel: summary.sourceGroup.label,
+            targetLabel: summary.targetGroup.label,
+          },
+        ];
+      });
+      const itemPaths = selectedConnectionSummary
+        ? selectedConnectionSummary.links.flatMap((link) => {
+            const sourceNode = container.querySelector<HTMLElement>(
+              `[data-provenance-item-node="${itemNodeId("left", link.source.id)}"]`,
+            );
+            const targetNode = container.querySelector<HTMLElement>(
+              `[data-provenance-item-node="${itemNodeId("right", link.target.id)}"]`,
+            );
+
+            if (!sourceNode || !targetNode) {
+              return [];
+            }
+
+            const sourceRect = sourceNode.getBoundingClientRect();
+            const targetRect = targetNode.getBoundingClientRect();
+            const start = {
+              x: sourceRect.right - containerRect.left + container.scrollLeft,
+              y: sourceRect.top - containerRect.top + container.scrollTop + sourceRect.height / 2,
+            };
+            const end = {
+              x: targetRect.left - containerRect.left + container.scrollLeft,
+              y: targetRect.top - containerRect.top + container.scrollTop + targetRect.height / 2,
+            };
+            const bend = Math.max(64, Math.abs(end.x - start.x) / 2);
+
+            return [
+              {
+                id: link.id,
+                path: `M ${start.x} ${start.y} C ${start.x + bend} ${start.y}, ${end.x - bend} ${end.y}, ${end.x} ${end.y}`,
+                sourceGroupId: selectedConnectionSummary.sourceGroup.id,
+                targetGroupId: selectedConnectionSummary.targetGroup.id,
+                sourceName: link.source.name,
+                targetName: link.target.name,
+              },
+            ];
+          })
+        : [];
       const nextOverlay = {
         width: container.scrollWidth,
         height: container.scrollHeight,
-        paths,
+        valuePaths,
+        groupPaths,
+        itemPaths,
       };
 
       setConnectorOverlay((current) =>
@@ -1143,9 +1190,9 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
     const resizeObserver =
       typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(updateConnectorOverlay);
     resizeObserver?.observe(container);
-    Array.from(container.querySelectorAll("[data-provenance-value-node], [data-provenance-group-node]")).forEach(
-      (element) => resizeObserver?.observe(element),
-    );
+    Array.from(
+      container.querySelectorAll("[data-provenance-value-node], [data-provenance-group-node], [data-provenance-item-node]"),
+    ).forEach((element) => resizeObserver?.observe(element));
 
     return () => {
       container.removeEventListener("scroll", updateConnectorOverlay);
@@ -1157,8 +1204,14 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   const renderGroup = (side: ProvenanceSide, group: ProvenanceGroup) => {
     const selected =
       side === "left" ? props.selectedSourceGroupId === group.id : props.selectedTargetGroupId === group.id;
+    const expandedByConnection =
+      selectedConnectionSummary !== undefined &&
+      (side === "left"
+        ? selectedConnectionSummary.sourceGroup.id === group.id
+        : selectedConnectionSummary.targetGroup.id === group.id);
     const expanded =
-      props.detail?.kind === "group" && props.detail.side === side && props.detail.groupId === group.id;
+      expandedByConnection ||
+      (props.detail?.kind === "group" && props.detail.side === side && props.detail.groupId === group.id);
     const dragTarget = dragOverGroup?.side === side && dragOverGroup.groupId === group.id;
 
     return (
@@ -1234,12 +1287,8 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           side={side}
           onCancel={() => setEditor(undefined)}
           onStartEditor={setEditor}
-          onSubmit={(submitSide, groupId, key, value, mode) => {
-            if (mode === "add") {
-              props.onAddParameter(submitSide, groupId, key, value);
-            } else {
-              props.onUpdateParameter(submitSide, groupId, key, value);
-            }
+          onSubmit={(submitSide, groupId, key, value) => {
+            props.onUpdateParameter(submitSide, groupId, key, value);
             setEditor(undefined);
           }}
         />
@@ -1249,7 +1298,11 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
             data-testid="ProvenanceGrouping-group-inline-detail"
           >
             {group.items.map((item) => (
-              <div className="swt:rounded swt:bg-base-100 swt:p-2 swt:text-xs" key={item.id}>
+              <div
+                className="swt:rounded swt:bg-base-100 swt:p-2 swt:text-xs"
+                data-provenance-item-node={itemNodeId(side, item.id)}
+                key={item.id}
+              >
                 <div className="swt:font-medium">{item.name}</div>
                 <div className="swt:mt-1 swt:flex swt:flex-wrap swt:gap-1">
                   {item.parameters.length === 0 ? (
@@ -1336,7 +1389,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           height={connectorOverlay.height}
           width={connectorOverlay.width}
         >
-          {connectorOverlay.paths.map((connector) => (
+          {connectorOverlay.valuePaths.map((connector) => (
             <g key={connector.id}>
               <path
                 d={connector.path}
@@ -1356,6 +1409,125 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
                 cy={connector.end.y}
                 fill={connector.side === "left" ? "rgba(37, 99, 235, 0.65)" : "rgba(5, 150, 105, 0.65)"}
                 r="3"
+              />
+            </g>
+          ))}
+        </svg>
+        <svg
+          aria-label="Group connectors"
+          className="swt:pointer-events-none swt:absolute swt:left-0 swt:top-0 swt:z-20"
+          data-testid="ProvenanceGrouping-group-connectors"
+          height={connectorOverlay.height}
+          width={connectorOverlay.width}
+        >
+          {connectorOverlay.groupPaths.map((connector) => {
+            const selected =
+              props.detail?.kind === "connection" &&
+              props.detail.sourceGroupId === connector.sourceGroupId &&
+              props.detail.targetGroupId === connector.targetGroupId;
+
+            if (selected) {
+              return null;
+            }
+
+            return (
+              <g
+                aria-label={`${connector.sourceLabel} to ${connector.targetLabel}`}
+                className="swt:pointer-events-auto swt:cursor-pointer"
+                data-testid="ProvenanceGrouping-group-connector"
+                key={connector.id}
+                role="button"
+                tabIndex={0}
+                onClick={() =>
+                  props.onOpenDetail({
+                    kind: "connection",
+                    sourceGroupId: connector.sourceGroupId,
+                    targetGroupId: connector.targetGroupId,
+                  })
+                }
+                onKeyDown={(event) => {
+                  if (event.key !== "Enter" && event.key !== " ") {
+                    return;
+                  }
+
+                  event.preventDefault();
+                  props.onOpenDetail({
+                    kind: "connection",
+                    sourceGroupId: connector.sourceGroupId,
+                    targetGroupId: connector.targetGroupId,
+                  });
+                }}
+              >
+                <path
+                  d={connector.path}
+                  fill="none"
+                  stroke="transparent"
+                  strokeLinecap="round"
+                  strokeWidth="8"
+                />
+                <path
+                  d={connector.path}
+                  fill="none"
+                  stroke={selected ? "rgba(79, 70, 229, 0.95)" : "rgba(15, 23, 42, 0.46)"}
+                  strokeLinecap="round"
+                  strokeWidth={selected ? "4" : "3"}
+                />
+                <circle
+                  cx={connector.start.x}
+                  cy={connector.start.y}
+                  fill={selected ? "rgba(79, 70, 229, 0.95)" : "rgba(15, 23, 42, 0.68)"}
+                  r={selected ? "4" : "3"}
+                />
+                <circle
+                  cx={connector.end.x}
+                  cy={connector.end.y}
+                  fill={selected ? "rgba(79, 70, 229, 0.95)" : "rgba(15, 23, 42, 0.68)"}
+                  r={selected ? "4" : "3"}
+                />
+              </g>
+            );
+          })}
+          {connectorOverlay.itemPaths.map((connector) => (
+            <g
+              aria-label={`${connector.sourceName} to ${connector.targetName}`}
+              className="swt:pointer-events-auto swt:cursor-pointer"
+              data-testid="ProvenanceGrouping-individual-connector"
+              key={connector.id}
+              role="button"
+              tabIndex={0}
+              onClick={() =>
+                props.onOpenDetail({
+                  kind: "connection",
+                  sourceGroupId: connector.sourceGroupId,
+                  targetGroupId: connector.targetGroupId,
+                })
+              }
+              onKeyDown={(event) => {
+                if (event.key !== "Enter" && event.key !== " ") {
+                  return;
+                }
+
+                event.preventDefault();
+                props.onOpenDetail({
+                  kind: "connection",
+                  sourceGroupId: connector.sourceGroupId,
+                  targetGroupId: connector.targetGroupId,
+                });
+              }}
+            >
+              <path
+                d={connector.path}
+                fill="none"
+                stroke="transparent"
+                strokeLinecap="round"
+                strokeWidth="7"
+              />
+              <path
+                d={connector.path}
+                fill="none"
+                stroke="rgba(79, 70, 229, 0.86)"
+                strokeLinecap="round"
+                strokeWidth="2.5"
               />
             </g>
           ))}
@@ -1392,9 +1564,9 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           </div>
         </section>
 
-        <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:self-stretch">
+        <section className="swt:pointer-events-none swt:relative swt:z-30 swt:flex swt:min-w-0 swt:flex-col swt:items-center swt:self-stretch">
           <button
-            className="swt:btn swt:btn-primary swt:btn-sm"
+            className="swt:btn swt:btn-primary swt:btn-sm swt:pointer-events-auto"
             data-testid="ProvenanceGrouping-connect-selected"
             type="button"
             onClick={props.onConnectSelectedGroups}
@@ -1402,106 +1574,6 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
             <i className="swt:iconify swt:fluent--plug-connected-20-regular swt:size-4" />
             Connect selected
           </button>
-          <div className="swt:flex swt:min-h-0 swt:flex-1 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-base-content/10 swt:bg-base-200 swt:p-3">
-            <div className="swt:text-xs swt:font-semibold swt:uppercase swt:tracking-normal swt:text-base-content/60">
-              Group links
-            </div>
-            {summaries.length === 0 ? (
-              <div className="swt:flex swt:flex-1 swt:items-center swt:justify-center swt:rounded swt:border swt:border-dashed swt:border-base-content/20 swt:p-4 swt:text-center swt:text-sm swt:text-base-content/60">
-                No group-level connections
-              </div>
-            ) : (
-              <div className="swt:flex swt:flex-col swt:gap-2">
-                {summaries.map((summary) => {
-                  const expanded =
-                    props.detail?.kind === "connection" &&
-                    props.detail.sourceGroupId === summary.sourceGroup.id &&
-                    props.detail.targetGroupId === summary.targetGroup.id;
-
-                  return (
-                    <article
-                      className={[
-                        "swt:rounded swt:border swt:bg-base-100 swt:p-2 swt:text-xs",
-                        summary.coverage === "full" ? "swt:border-success/40" : "swt:border-warning/60",
-                      ].join(" ")}
-                      data-testid={
-                        summary.coverage === "full"
-                          ? "ProvenanceGrouping-connection-full"
-                          : "ProvenanceGrouping-connection-partial"
-                      }
-                      key={summary.id}
-                    >
-                      <button
-                        aria-expanded={expanded}
-                        className="swt:w-full swt:appearance-none swt:border-0 swt:bg-transparent swt:p-0 swt:text-left swt:text-inherit"
-                        data-testid="ProvenanceGrouping-connection-toggle"
-                        type="button"
-                        onClick={() =>
-                          props.onOpenDetail({
-                            kind: "connection",
-                            sourceGroupId: summary.sourceGroup.id,
-                            targetGroupId: summary.targetGroup.id,
-                          })
-                        }
-                      >
-                        <div className="swt:flex swt:items-center swt:gap-2">
-                          <span className="swt:h-px swt:flex-1 swt:bg-base-content/30" />
-                          <span
-                            className={[
-                              "swt:badge swt:badge-sm",
-                              summary.coverage === "full" ? "swt:badge-success" : "swt:badge-warning",
-                            ].join(" ")}
-                          >
-                            {summary.coverage === "full" ? "full coverage" : "partial"}
-                          </span>
-                          <span className="swt:h-px swt:flex-1 swt:bg-base-content/30" />
-                        </div>
-                        <div className="swt:mt-2 swt:grid swt:grid-cols-[1fr_auto_1fr_auto] swt:items-center swt:gap-2">
-                          <span className="swt:truncate" title={summary.sourceGroup.label}>
-                            {summary.sourceGroup.label}
-                          </span>
-                          <i className="swt:iconify swt:fluent--arrow-right-20-regular swt:size-4" />
-                          <span className="swt:truncate swt:text-right" title={summary.targetGroup.label}>
-                            {summary.targetGroup.label}
-                          </span>
-                          <i
-                            className={[
-                              "swt:iconify swt:size-4 swt:text-base-content/60",
-                              expanded
-                                ? "swt:fluent--chevron-up-20-regular"
-                                : "swt:fluent--chevron-down-20-regular",
-                            ].join(" ")}
-                          />
-                        </div>
-                      </button>
-                      {expanded ? (
-                        <div
-                          className="swt:mt-2 swt:flex swt:max-h-56 swt:flex-col swt:gap-1 swt:overflow-auto swt:rounded swt:bg-base-200 swt:p-2"
-                          data-testid="ProvenanceGrouping-connection-inline-detail"
-                        >
-                          {summary.links.map((link) => (
-                            <div
-                              className="swt:grid swt:grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] swt:items-center swt:gap-2 swt:rounded swt:bg-base-100 swt:px-2 swt:py-1"
-                              data-testid="ProvenanceGrouping-individual-connection"
-                              key={link.id}
-                            >
-                              <span className="swt:truncate" title={link.source.name}>
-                                {link.source.name}
-                              </span>
-                              <i className="swt:iconify swt:fluent--arrow-right-20-regular swt:size-4 swt:text-base-content/60" />
-                              <span className="swt:truncate swt:text-right" title={link.target.name}>
-                                {link.target.name}
-                              </span>
-                            </div>
-                          ))}
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </section>
 
         <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
