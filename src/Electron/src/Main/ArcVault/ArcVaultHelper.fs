@@ -8,9 +8,9 @@ open ARCtrl
 open Fable.Electron
 open Fable.Core.JsInterop
 open Main
+open Main.ArcMerge
 open Main.Bindings
 open Node.Api
-
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
@@ -210,7 +210,7 @@ let createWindow () = promise {
     return window
 }
 
-let createFileWatcher (path: string) =
+let createFileWatcher (path: string) (usePolling: bool option) =
 
     let ignoreFn =
         fun (path: string) ->
@@ -230,11 +230,28 @@ let createFileWatcher (path: string) =
             else
                 false
 
-    let watcher =
-        Chokidar.Chokidar.watch (
-            path,
-            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
-        )
+    let usePolling = defaultArg usePolling false
+
+    let watcherOptions =
+        if usePolling then
+            Chokidar.WatchOptions(
+                cwd = path,
+                awaitWriteFinish = true,
+                ignored = !^ignoreFn,
+                ignoreInitial = true,
+                usePolling = true,
+                interval = 200,
+                binaryInterval = 400
+            )
+        else
+            Chokidar.WatchOptions(
+                cwd = path,
+                awaitWriteFinish = true,
+                ignored = !^ignoreFn,
+                ignoreInitial = true
+            )
+
+    let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 
     watcher
 

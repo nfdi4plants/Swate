@@ -51,6 +51,7 @@ type IArcVaultsApi = {
     /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
+    renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: string -> JS.Promise<Result<string, exn>>

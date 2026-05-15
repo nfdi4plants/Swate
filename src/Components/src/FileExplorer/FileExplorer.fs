@@ -114,6 +114,7 @@ type FileExplorer =
             ?onContextMenu: FileItem -> Swate.Components.FileExplorer.Types.ContextMenuItem list,
             ?canCreateItem: FileItem -> bool,
             ?onCreateItem: FileItem -> unit,
+            ?getItemActions: FileItem -> Swate.Components.FileExplorer.Types.ContextMenuItem list,
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
@@ -131,6 +132,7 @@ type FileExplorer =
         let showBreadcrumbs = defaultArg showBreadcrumbs true
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
+        let getItemActions = defaultArg getItemActions (fun (_: FileItem) -> [])
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
@@ -222,6 +224,8 @@ type FileExplorer =
                 | Some children -> not (List.isEmpty children)
                 | None -> true
 
+            let itemActions = getItemActions item
+
             if item.IsDirectory then
                 let childrenTree =
                     if isExpanded then
@@ -253,6 +257,7 @@ type FileExplorer =
                     ),
                     ?onCreateItem = onCreateItem,
                     canCreateItem = canCreateItem,
+                    itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
                     ?children = childrenTree
@@ -264,6 +269,7 @@ type FileExplorer =
                     selectedNameClass,
                     getItemIconClass,
                     (fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch),
+                    itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem
                 )

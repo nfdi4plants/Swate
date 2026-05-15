@@ -6,6 +6,7 @@ open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Bindings
+open Main.ArcMerge
 open Main.ArcVaultHelper
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
@@ -200,13 +201,8 @@ module ArcVaultExtensions =
                                 let hasRemainingUnsavedArcChanges =
                                     updatedArcForInMemoryState.GetUpdateContracts().Length > 0
 
-                                // Preserve a pre-existing dirty marker so scoped add/save does not
-                                // accidentally clear unrelated unsaved in-memory changes.
-                                let nextHasUnsavedArcChanges =
-                                    this.hasUnsavedArcChanges || hasRemainingUnsavedArcChanges
-
                                 this.SetArc(updatedArcForInMemoryState)
-                                this.SetHasUnsavedArcChanges nextHasUnsavedArcChanges
+                                this.SetHasUnsavedArcChanges hasRemainingUnsavedArcChanges
                                 return Ok()
                             with e ->
                                 return Error(exn $"Failed to persist ARC to disk: {e.Message}")
@@ -252,18 +248,34 @@ module ArcVaultExtensions =
                 swatefailfn this.window.id $"No path set for StartFileWatcher."
         }
 
-        member private this.StartFileWatcher() =
+        member this.StartFileWatcher(?usePolling: bool) =
             if this.path.IsSome then
-                let watcher = createFileWatcher this.path.Value
+                match this.watcher with
+                | Some _ -> ()
+                | None ->
+                    let watcher = createFileWatcher this.path.Value usePolling
 
-                let sendMsgApi =
-                    Remoting.createIpc ()
-                    |> Remoting.withWindow this.window
-                    |> Remoting.buildProxySender<IArcFileWatcherApi>
+                    let sendMsgApi =
+                        Remoting.createIpc ()
+                        |> Remoting.withWindow this.window
+                        |> Remoting.buildProxySender<IArcFileWatcherApi>
 
-                watcher.on (Chokidar.Events.All, this._ScheduleReloadArc sendMsgApi) |> ignore
+                    watcher.on (Chokidar.Events.All, this._ScheduleReloadArc sendMsgApi) |> ignore
+                    this.watcher <- Some watcher
             else
                 swatefailfn this.window.id $"No path set for StartFileWatcher."
+
+        member this.StopFileWatcher() = promise {
+            match this.watcher with
+            | None -> return ()
+            | Some watcher ->
+                try
+                    do! watcher.close ()
+                with _ ->
+                    ()
+
+                this.watcher <- None
+        }
 
         /// This functions should be called once, when an vault is first started with a path
         member this.Startup() = promise {
@@ -372,7 +384,7 @@ type ArcVaults() =
         match this.Vaults.TryGetValue(id) with
         | false, _ -> swatefailfn id $"Failed to remove vault."
         | true, vault ->
-            vault.watcher |> Option.iter (fun watcher -> watcher.close () |> Promise.start)
+            vault.StopFileWatcher() |> Promise.start
             this.Vaults.Remove(id) |> ignore
             vault.path |> Option.iter (fun p -> RECENT_ARCS.Inactivate(p) |> ignore)
             this.BroadcastRecentARCs()

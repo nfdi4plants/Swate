@@ -127,7 +127,7 @@ let rec private collectSelectedDirectoryPathChain
 
     let isInSelectedPathChain =
         selectedTreeItemPath
-        |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath normalizedNodePath)
+        |> Option.exists (fun focusedPath -> PathHelpers.isSameOrDescendantPath focusedPath normalizedNodePath)
 
     if node.isDirectory then
         let nextLoadedPaths =
@@ -180,7 +180,7 @@ let rec loopPaths (loadedDirectoryPaths: Set<string>) (selectedTreeItemPath: str
                 Id = parent.path
                 IsExpanded =
                     selectedTreeItemPath
-                    |> Option.exists (fun focusedPath -> isSameOrDescendantPath focusedPath parent.path)
+                    |> Option.exists (fun focusedPath -> PathHelpers.isSameOrDescendantPath focusedPath parent.path)
                 Children = children
         }
         |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState parent

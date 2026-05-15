@@ -17,16 +17,6 @@ let getPathDepth (path: string) =
 let pathsEqual (left: string) (right: string) =
     PathHelpers.normalizePath left = PathHelpers.normalizePath right
 
-let isSameOrDescendantPath (path: string) (ancestorPath: string) =
-    let normalizedPath = PathHelpers.normalizePath path
-    let normalizedAncestorPath = PathHelpers.normalizePath ancestorPath
-    String.IsNullOrWhiteSpace normalizedAncestorPath
-    || normalizedPath = normalizedAncestorPath
-    || normalizedPath.StartsWith(normalizedAncestorPath + "/", StringComparison.OrdinalIgnoreCase)
-
-let private containsTraversalSegments (path: string) =
-    path.Split('/') |> Array.exists (fun segment -> segment = "." || segment = "..")
-
 let private tryGetRepoRelativePathCore (repoRoot: string) (absolutePath: string) (allowRoot: bool) =
     let normalizedRoot = PathHelpers.normalizePath repoRoot
     let normalizedAbsolutePath = PathHelpers.normalizePath absolutePath
@@ -35,13 +25,13 @@ let private tryGetRepoRelativePathCore (repoRoot: string) (absolutePath: string)
         None
     elif pathsEqual normalizedAbsolutePath normalizedRoot then
         if allowRoot then Some "" else None
-    elif isSameOrDescendantPath normalizedAbsolutePath normalizedRoot then
+    elif PathHelpers.isSameOrDescendantPath normalizedAbsolutePath normalizedRoot then
         let prefix = normalizedRoot + "/"
 
         if normalizedAbsolutePath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
             let relativePath = normalizedAbsolutePath.Substring(prefix.Length)
 
-            if String.IsNullOrWhiteSpace relativePath || containsTraversalSegments relativePath then
+            if String.IsNullOrWhiteSpace relativePath || PathHelpers.containsPathTraversalSegments relativePath then
                 None
             else
                 Some relativePath

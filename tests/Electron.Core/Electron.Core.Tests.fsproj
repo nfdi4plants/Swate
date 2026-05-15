@@ -6,6 +6,7 @@
     <Compile Include="FileTreeCompaction.test.fs" />
     <Compile Include="FileTreeCreator.test.fs" />
     <Compile Include="ArcFileMutationHelper.test.fs" />
+    <Compile Include="ArcAddExtensions.test.fs" />
     <Compile Include="ArcObjectWidget.test.fs" />
     <Compile Include="ArcObjectGraphExplorer.test.fs" />
     <Compile Include="JsonDTOUnwrapper.test.fs" />
@@ -13,6 +14,7 @@
     <Compile Include="NoteSearchReader.test.fs" />
     <Compile Include="GitService.test.fs" />
     <Compile Include="IpcArchitectureReview.test.fs" />
+    <Compile Include="RenamePathRules.test.fs" />
     <Compile Include="GitValidation.test.fs" />
     <Compile Include="SecureAuthStore.test.fs" />
   </ItemGroup>

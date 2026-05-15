@@ -25,7 +25,10 @@ type WatchOptions
         ?ignoreInitial: bool,
         ?followSimlinks: bool,
         ?cwd: string,
-        ?awaitWriteFinish: bool
+        ?awaitWriteFinish: bool,
+        ?usePolling: bool,
+        ?interval: int,
+        ?binaryInterval: int
     ) =
     member val persistent: bool option = persistent with get, set
     member val ignored = ignored with get, set
@@ -33,6 +36,9 @@ type WatchOptions
     member val followSimlinks: bool option = followSimlinks with get, set
     member val cwd: string option = cwd with get, set
     member val awaitWriteFinish: bool option = awaitWriteFinish with get, set
+    member val usePolling: bool option = usePolling with get, set
+    member val interval: int option = interval with get, set
+    member val binaryInterval: int option = binaryInterval with get, set
 
 type IWatched =
     [<EmitIndexerAttribute>]

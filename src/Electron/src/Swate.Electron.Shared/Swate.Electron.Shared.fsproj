@@ -13,6 +13,7 @@
     <Compile Include="GitTypes.fs" />
     <Compile Include="IPCTypes.fs" />
     <Compile Include="Types.fs" />
+    <Compile Include="RenamePathRules.fs" />
     <Compile Include="FileIOHelper.fs" />
   </ItemGroup>
 

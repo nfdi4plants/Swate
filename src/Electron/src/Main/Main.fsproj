@@ -24,6 +24,7 @@
     <Compile Include="ArcMerge\Extensions.fs" />
     <Compile Include="ArcMerge\ArcEntityRefHelper.fs" />
     <Compile Include="ArcMerge\ArcMergeLibraryExtensions.fs" />
+    <Compile Include="ArcMerge\ArcAddExtensions.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />
     <Compile Include="Git\GitInternals.fs" />
     <Compile Include="Git\GitService.fs" />
