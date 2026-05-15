@@ -1,5 +1,6 @@
 module Swate.Components.ErrorModal.Context
 
+open Swate.Components
 
 open Feliz
 

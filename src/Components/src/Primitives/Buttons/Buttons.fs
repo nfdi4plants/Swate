@@ -1,6 +1,7 @@
 namespace Swate.Components
 
 open Feliz
+open Swate.Components.Primitives
 
 type Components =
 

@@ -1,8 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.Primitives
 
 open Fable.Core
 open Feliz
 
+/// This is deprecated and we want to use tailwind classes instead. This is kept until we have replaced all icons with tailwind classes.
+// [<System.Obsolete("This is deprecated and we want to use tailwind classes instead. This is kept until we have replaced all icons with tailwind classes.")>]
 [<Erase; Mangle(false)>]
 type Icons =
 

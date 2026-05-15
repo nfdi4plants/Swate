@@ -6,6 +6,8 @@ open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
 
+open Swate.Components
+open Swate.Components.Primitives
 open Swate.Components.Types.Actionbar
 
 [<Erase; Mangle(false)>]

@@ -3,6 +3,7 @@ namespace Swate.Components
 open Feliz
 open Fable.Core
 open Swate.Components.GenericComponents.BaseModalContext
+open Swate.Components.Primitives
 
 [<Mangle(false); Erase>]
 type BaseModal =

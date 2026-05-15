@@ -2,6 +2,7 @@ namespace Swate.Components
 
 open Feliz
 open Swate.Components
+open Swate.Components.Primitives
 
 [<RequireQualifiedAccess>]
 type LayoutComponents =

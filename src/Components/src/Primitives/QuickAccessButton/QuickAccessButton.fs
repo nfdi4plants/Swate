@@ -3,6 +3,7 @@ namespace Swate.Components
 open Fable.Core
 open Feliz
 open Browser.Types
+open Swate.Components.Primitives
 
 [<Erase; Mangle(false)>]
 type QuickAccessButton =
