@@ -193,24 +193,27 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
             let! container, cleanup =
                 renderToBody (
                     Swate.Components.FileExplorer.FileExplorer.FileExplorer(
-                        initialItems = items
+                        initialItems = items,
+                        getItemActions = RenameWorkflow.renameContextMenuItems onRenameItem
                     )
                 )
 
-            entityFolderPaths
-            |> List.iter (fun path ->
-                let itemName = PathHelpers.getNameFromPath path
-                let buttonSelector = $"button[aria-label='Rename {itemName}']"
-                let renameButton = container.querySelector buttonSelector
+            try
+                entityFolderPaths
+                |> List.iter (fun path ->
+                    let itemName = PathHelpers.getNameFromPath path
+                    let buttonSelector = $"button[aria-label='Rename {itemName}']"
+                    let renameButton = container.querySelector buttonSelector
 
-                Vitest.expect(renameButton).not.toBeNull ()
-                (renameButton :?> HTMLElement).click ()
-            )
+                    Vitest.expect(renameButton).not.toBeNull ()
+                    (renameButton :?> HTMLElement).click ()
+                )
 
-            do! Promise.sleep 0
+                do! Promise.sleep 0
 
-            Vitest.expect(renamedPaths |> List.rev).toEqual(entityFolderPaths)
-            cleanup ()
+                Vitest.expect(renamedPaths |> List.rev).toEqual(entityFolderPaths)
+            finally
+                cleanup ()
         }
     )
 
