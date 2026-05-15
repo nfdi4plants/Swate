@@ -592,24 +592,24 @@ function connectionDetailsForGroups(
   targetGroup: ProvenanceGroup,
   connections: ProvenanceConnection[],
 ): ProvenanceConnectionDetail[] {
-  const sourceIds = new Set(sourceGroup.items.map((item) => item.id));
-  const targetIds = new Set(targetGroup.items.map((item) => item.id));
-  const connected = connections.some(
-    (connection) => sourceIds.has(connection.sourceId) && targetIds.has(connection.targetId),
-  );
+  const sourceItems = new Map(sourceGroup.items.map((item) => [item.id, item]));
+  const targetItems = new Map(targetGroup.items.map((item) => [item.id, item]));
 
-  if (!connected) {
-    return [];
-  }
+  return connections
+    .flatMap((connection) => {
+      const source = sourceItems.get(connection.sourceId);
+      const target = targetItems.get(connection.targetId);
 
-  return sourceGroup.items
-    .flatMap((source) =>
-      targetGroup.items.map((target) => ({
-        id: connectionKey({ sourceId: source.id, targetId: target.id }),
-        source,
-        target,
-      })),
-    )
+      return source && target
+        ? [
+            {
+              id: connectionKey(connection),
+              source,
+              target,
+            },
+          ]
+        : [];
+    })
     .sort((left, right) => {
       const sourceComparison = left.source.name.localeCompare(right.source.name);
       return sourceComparison !== 0 ? sourceComparison : left.target.name.localeCompare(right.target.name);

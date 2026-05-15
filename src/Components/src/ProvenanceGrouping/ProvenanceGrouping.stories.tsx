@@ -723,3 +723,22 @@ export const InteractionFlow: Story = {
     });
   },
 };
+
+export const GroupedConnectionDetails: Story = {
+  name: "Grouped connection details",
+  render: () => <StatefulMockup />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByTestId("ProvenanceGrouping-root")).toBeInTheDocument();
+    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Species-move"));
+    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-right-Species"));
+
+    const arabidopsisConnector = await canvas.findByLabelText("Species: Arabidopsis to Species: Arabidopsis");
+    await userEvent.click(arabidopsisConnector);
+
+    await waitFor(async () => {
+      await expect(await canvas.findAllByTestId("ProvenanceGrouping-individual-connector")).toHaveLength(4);
+    });
+  },
+};
