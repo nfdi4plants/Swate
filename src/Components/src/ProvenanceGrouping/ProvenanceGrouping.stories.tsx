@@ -23,6 +23,7 @@ type MockModel = {
   leftLayerId: string;
   rightLayerId: string;
   groupingByLayer: Record<string, string[]>;
+  parameterValuesByLayer: Record<string, Record<string, string[]>>;
   parameterRailByKey: Record<string, Side>;
   selectedSourceGroupId?: string;
   selectedTargetGroupId?: string;
@@ -147,6 +148,10 @@ function initialModel(): MockModel {
       inputs: [],
       outputs: [],
     },
+    parameterValuesByLayer: {
+      inputs: {},
+      outputs: {},
+    },
     parameterRailByKey: {},
   };
 }
@@ -185,6 +190,64 @@ function findVisibleGroup(model: MockModel, side: Side, groupId: string): Proven
 
 function parameterMap(item: ProvenanceItem): Map<string, string> {
   return new Map(item.parameters.map((parameter) => [parameter.key.toLowerCase(), parameter.value]));
+}
+
+function setItemParameter(item: ProvenanceItem, key: string, value: string): ProvenanceItem {
+  const normalized = normalizedKey(key);
+  let replaced = false;
+  const parameters = item.parameters.map((parameter) => {
+    if (normalizedKey(parameter.key) !== normalized) {
+      return parameter;
+    }
+
+    replaced = true;
+    return { ...parameter, key, value };
+  });
+
+  return {
+    ...item,
+    parameters: replaced ? parameters : [...parameters, { key, value }],
+  };
+}
+
+function addCatalogParameter(
+  catalog: Record<string, Record<string, string[]>>,
+  layerId: string,
+  key: string,
+): Record<string, Record<string, string[]>> {
+  const trimmedKey = key.trim();
+  const layerCatalog = catalog[layerId] ?? {};
+  const existingKey = Object.keys(layerCatalog).find((candidate) => normalizedKey(candidate) === normalizedKey(trimmedKey));
+
+  return {
+    ...catalog,
+    [layerId]: {
+      ...layerCatalog,
+      [existingKey ?? trimmedKey]: layerCatalog[existingKey ?? trimmedKey] ?? [],
+    },
+  };
+}
+
+function addCatalogValue(
+  catalog: Record<string, Record<string, string[]>>,
+  layerId: string,
+  key: string,
+  value: string,
+): Record<string, Record<string, string[]>> {
+  const trimmedValue = value.trim();
+  const withParameter = addCatalogParameter(catalog, layerId, key);
+  const layerCatalog = withParameter[layerId] ?? {};
+  const existingKey = Object.keys(layerCatalog).find((candidate) => normalizedKey(candidate) === normalizedKey(key)) ?? key;
+  const values = layerCatalog[existingKey] ?? [];
+  const hasValue = values.some((candidate) => candidate.trim().toLowerCase() === trimmedValue.toLowerCase());
+
+  return {
+    ...withParameter,
+    [layerId]: {
+      ...layerCatalog,
+      [existingKey]: hasValue ? values : [...values, trimmedValue],
+    },
+  };
 }
 
 function copyMissingSourceParameters(
@@ -227,6 +290,29 @@ function copyMissingSourceParameters(
       ? item
       : { ...item, parameters: [...item.parameters, ...inherited] };
   });
+}
+
+function downstreamIds(connections: ProvenanceConnection[], startIds: string[]): Set<string> {
+  const visited = new Set<string>();
+  const queue = [...startIds];
+
+  while (queue.length > 0) {
+    const currentId = queue.shift();
+    if (!currentId || visited.has(currentId)) {
+      continue;
+    }
+
+    visited.add(currentId);
+    connections
+      .filter((connection) => connection.sourceId === currentId)
+      .forEach((connection) => {
+        if (!visited.has(connection.targetId)) {
+          queue.push(connection.targetId);
+        }
+      });
+  }
+
+  return visited;
 }
 
 function StatefulMockup() {
@@ -277,6 +363,67 @@ function StatefulMockup() {
       },
       error: undefined,
     }));
+  };
+
+  const createParameter = (side: Side, key: string) => {
+    setModel((current) => {
+      const trimmedKey = key.trim();
+      if (!trimmedKey) {
+        return { ...current, error: "Enter a parameter name." };
+      }
+
+      const layerId = side === "left" ? current.leftLayerId : current.rightLayerId;
+
+      return {
+        ...current,
+        parameterValuesByLayer: addCatalogParameter(current.parameterValuesByLayer, layerId, trimmedKey),
+        parameterRailByKey: {
+          ...current.parameterRailByKey,
+          [normalizedKey(trimmedKey)]: side,
+        },
+        error: undefined,
+      };
+    });
+  };
+
+  const createParameterValue = (side: Side, key: string, value: string) => {
+    setModel((current) => {
+      const trimmedValue = value.trim();
+      if (!trimmedValue) {
+        return { ...current, error: "Enter a parameter value." };
+      }
+
+      const layerId = side === "left" ? current.leftLayerId : current.rightLayerId;
+
+      return {
+        ...current,
+        parameterValuesByLayer: addCatalogValue(current.parameterValuesByLayer, layerId, key, trimmedValue),
+        error: undefined,
+      };
+    });
+  };
+
+  const assignParameterValue = (side: Side, key: string, value: string, groupId: string) => {
+    setModel((current) => {
+      const layerId = side === "left" ? current.leftLayerId : current.rightLayerId;
+      const group = findVisibleGroup(current, side, groupId);
+
+      if (!group) {
+        return { ...current, error: "The selected group no longer exists." };
+      }
+
+      const affectedIds = downstreamIds(
+        current.connections,
+        group.items.map((item) => item.id),
+      );
+
+      return {
+        ...current,
+        items: current.items.map((item) => (affectedIds.has(item.id) ? setItemParameter(item, key, value) : item)),
+        parameterValuesByLayer: addCatalogValue(current.parameterValuesByLayer, layerId, key, value),
+        error: undefined,
+      };
+    });
   };
 
   const selectGroup = (side: Side, groupId: string) => {
@@ -400,6 +547,10 @@ function StatefulMockup() {
           ...current.groupingByLayer,
           [nextLayer.id]: [],
         },
+        parameterValuesByLayer: {
+          ...current.parameterValuesByLayer,
+          [nextLayer.id]: {},
+        },
         selectedSourceGroupId: undefined,
         selectedTargetGroupId: undefined,
         detail: undefined,
@@ -428,6 +579,7 @@ function StatefulMockup() {
       leftLayerId={model.leftLayerId}
       rightLayerId={model.rightLayerId}
       groupingByLayer={model.groupingByLayer}
+      parameterValuesByLayer={model.parameterValuesByLayer}
       parameterRailByKey={model.parameterRailByKey}
       selectedSourceGroupId={model.selectedSourceGroupId}
       selectedTargetGroupId={model.selectedTargetGroupId}
@@ -435,6 +587,9 @@ function StatefulMockup() {
       error={model.error}
       onToggleGrouping={toggleGrouping}
       onMoveParameter={moveParameter}
+      onCreateParameter={createParameter}
+      onCreateParameterValue={createParameterValue}
+      onAssignParameterValue={assignParameterValue}
       onSelectGroup={selectGroup}
       onOpenDetail={openDetail}
       onAddParameter={addParameter}

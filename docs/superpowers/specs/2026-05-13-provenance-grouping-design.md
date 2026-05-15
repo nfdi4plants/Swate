@@ -80,6 +80,8 @@ The layout should feel like a dense work surface or table/block editor, not a gr
 
 Parameter blocks are grouping controls. Clicking a block on the left groups the left layer by that parameter. Clicking a block on the right groups both displayed layers by that parameter. Shared parameter blocks can be moved between rails by drag/drop or the move affordance. Each block shows distinct values only; SVG connector lines link each value to the group cards it applies to.
 
+Users can add parameters to either rail and add candidate values to those parameters. Candidate values appear as draggable value rows even before they are assigned to any group. Dragging a value onto a group assigns that parameter value to every item in the group. A group can still show multiple values for a parameter when those values already exist among its member items before grouping by a different parameter.
+
 Use `swt:iconify` with fully qualified Fluent icon classes for new icons.
 
 ## Group-Level Connections

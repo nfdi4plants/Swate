@@ -56,6 +56,7 @@ export type ProvenanceGroupingProps = {
   leftLayerId: string;
   rightLayerId: string;
   groupingByLayer: Record<string, string[]>;
+  parameterValuesByLayer?: Record<string, Record<string, string[]>>;
   parameterRailByKey?: Record<string, ProvenanceSide>;
   selectedSourceGroupId?: string;
   selectedTargetGroupId?: string;
@@ -63,6 +64,9 @@ export type ProvenanceGroupingProps = {
   error?: string;
   onToggleGrouping: (side: ProvenanceSide, key: string) => void;
   onMoveParameter: (key: string, side: ProvenanceSide) => void;
+  onCreateParameter: (side: ProvenanceSide, key: string) => void;
+  onCreateParameterValue: (side: ProvenanceSide, key: string, value: string) => void;
+  onAssignParameterValue: (side: ProvenanceSide, key: string, value: string, groupId: string) => void;
   onSelectGroup: (side: ProvenanceSide, groupId: string) => void;
   onOpenDetail: (detail: ProvenanceDetail) => void;
   onAddParameter: (side: ProvenanceSide, groupId: string, key: string, value: string) => void;
@@ -129,6 +133,12 @@ type ConnectorOverlay = {
   paths: RenderedConnectorPath[];
 };
 
+type DraggedParameterValue = {
+  side: ProvenanceSide;
+  key: string;
+  value: string;
+};
+
 const missingValue = (key: string) => `Missing ${key}`;
 
 const normalizeKey = (key: string) => key.trim().toLowerCase();
@@ -162,6 +172,32 @@ export function availableParameterKeys(items: ProvenanceItem[], layerId: string)
         }
       });
     });
+
+  return keys;
+}
+
+function parameterValueConfigForLayer(
+  parameterValuesByLayer: Record<string, Record<string, string[]>> | undefined,
+  layerId: string,
+): Record<string, string[]> {
+  return parameterValuesByLayer?.[layerId] ?? {};
+}
+
+function configuredKeys(parameterValues: Record<string, string[]>): string[] {
+  return Object.keys(parameterValues).filter((key) => key.trim());
+}
+
+function mergeKeys(left: string[], right: string[]): string[] {
+  const keys: string[] = [];
+  const seen = new Set<string>();
+
+  [...left, ...right].forEach((key) => {
+    const normalized = normalizeKey(key);
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      keys.push(key);
+    }
+  });
 
   return keys;
 }
@@ -226,9 +262,13 @@ function valueConnectorsForKey(
   layerId: string,
   groups: ProvenanceGroup[],
   key: string,
+  configuredValues: string[],
 ): ParameterValueConnector[] {
   const layerItems = items.filter((item) => item.layerId === layerId);
-  const values = new Set(layerItems.map((item) => getParameterValue(item, key) ?? missingValue(key)));
+  const values = new Set([
+    ...configuredValues.filter((value) => value.trim()),
+    ...layerItems.map((item) => getParameterValue(item, key) ?? missingValue(key)),
+  ]);
 
   return Array.from(values)
     .sort((left, right) => left.localeCompare(right))
@@ -248,15 +288,31 @@ function groupNodeId(side: ProvenanceSide, groupIdValue: string): string {
   return `group-${side}-${slug(groupIdValue)}`;
 }
 
+function readDraggedParameterValue(event: React.DragEvent): DraggedParameterValue | undefined {
+  const rawValue = event.dataTransfer.getData("application/x-provenance-value");
+
+  if (!rawValue) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as DraggedParameterValue;
+    return (parsed.side === "left" || parsed.side === "right") && parsed.key && parsed.value ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 function valueGroupConnectionsForRail(
   side: ProvenanceSide,
   layerId: string,
   entries: ParameterRailEntry[],
   items: ProvenanceItem[],
   groups: ProvenanceGroup[],
+  parameterValues: Record<string, string[]>,
 ): ValueGroupConnection[] {
   return entries.flatMap((entry) =>
-    valueConnectorsForKey(items, layerId, groups, entry.key).flatMap((value) =>
+    valueConnectorsForKey(items, layerId, groups, entry.key, parameterValues[entry.key] ?? []).flatMap((value) =>
       value.groups.map((group) => ({
         id: `${valueNodeId(side, layerId, entry.key, value.value)}-${groupNodeId(side, group.id)}`,
         side,
@@ -710,14 +766,86 @@ function GroupEditor(props: {
   );
 }
 
+function AddParameterControl(props: {
+  side: ProvenanceSide;
+  onCreateParameter: (side: ProvenanceSide, key: string) => void;
+}) {
+  const [keyDraft, setKeyDraft] = React.useState("");
+
+  return (
+    <form
+      className="swt:flex swt:gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.onCreateParameter(props.side, keyDraft);
+        setKeyDraft("");
+      }}
+    >
+      <input
+        className="swt:input swt:input-xs swt:min-w-0 swt:flex-1"
+        data-testid={`ProvenanceGrouping-create-parameter-${props.side}-input`}
+        placeholder="New parameter"
+        value={keyDraft}
+        onChange={(event) => setKeyDraft(event.currentTarget.value)}
+      />
+      <button
+        className="swt:btn swt:btn-xs swt:btn-outline swt:btn-square"
+        data-testid={`ProvenanceGrouping-create-parameter-${props.side}-submit`}
+        title="Create parameter"
+        type="submit"
+      >
+        <i className="swt:iconify swt:fluent--add-20-regular swt:size-3" />
+      </button>
+    </form>
+  );
+}
+
+function AddParameterValueControl(props: {
+  side: ProvenanceSide;
+  parameterKey: string;
+  onCreateParameterValue: (side: ProvenanceSide, key: string, value: string) => void;
+}) {
+  const [valueDraft, setValueDraft] = React.useState("");
+
+  return (
+    <form
+      className="swt:flex swt:gap-2"
+      onSubmit={(event) => {
+        event.preventDefault();
+        props.onCreateParameterValue(props.side, props.parameterKey, valueDraft);
+        setValueDraft("");
+      }}
+    >
+      <input
+        className="swt:input swt:input-xs swt:min-w-0 swt:flex-1"
+        data-testid={`ProvenanceGrouping-create-value-${props.side}-${props.parameterKey}-input`}
+        placeholder="New value"
+        value={valueDraft}
+        onChange={(event) => setValueDraft(event.currentTarget.value)}
+      />
+      <button
+        className="swt:btn swt:btn-xs swt:btn-outline swt:btn-square"
+        data-testid={`ProvenanceGrouping-create-value-${props.side}-${props.parameterKey}-submit`}
+        title="Create value"
+        type="submit"
+      >
+        <i className="swt:iconify swt:fluent--add-20-regular swt:size-3" />
+      </button>
+    </form>
+  );
+}
+
 function ParameterRail(props: {
   side: ProvenanceSide;
   layer: ProvenanceLayer;
   items: ProvenanceItem[];
   groups: ProvenanceGroup[];
   entries: ParameterRailEntry[];
+  parameterValues: Record<string, string[]>;
   onToggleGrouping: (side: ProvenanceSide, key: string) => void;
   onMoveParameter: (key: string, side: ProvenanceSide) => void;
+  onCreateParameter: (side: ProvenanceSide, key: string) => void;
+  onCreateParameterValue: (side: ProvenanceSide, key: string, value: string) => void;
 }) {
   const [dragOver, setDragOver] = React.useState(false);
   const targetSide = props.side === "left" ? "right" : "left";
@@ -749,6 +877,7 @@ function ParameterRail(props: {
       <div className="swt:text-xs swt:font-semibold swt:uppercase swt:tracking-normal swt:text-base-content/60">
         {props.layer.label} parameters
       </div>
+      <AddParameterControl side={props.side} onCreateParameter={props.onCreateParameter} />
       <div className="swt:flex swt:flex-col swt:gap-2">
         {props.entries.length === 0 ? (
           <div className="swt:rounded swt:border swt:border-dashed swt:border-base-content/20 swt:p-3 swt:text-sm swt:text-base-content/60">
@@ -756,7 +885,13 @@ function ParameterRail(props: {
           </div>
         ) : (
           props.entries.map((entry) => {
-            const values = valueConnectorsForKey(props.items, props.layer.id, props.groups, entry.key);
+            const values = valueConnectorsForKey(
+              props.items,
+              props.layer.id,
+              props.groups,
+              entry.key,
+              props.parameterValues[entry.key] ?? [],
+            );
 
             return (
               <div
@@ -815,15 +950,28 @@ function ParameterRail(props: {
                   className="swt:flex swt:max-h-64 swt:flex-col swt:gap-1 swt:overflow-auto swt:rounded swt:bg-base-200 swt:p-2"
                   data-testid={`ProvenanceGrouping-param-${props.side}-${entry.key}-values`}
                 >
+                  <AddParameterValueControl
+                    parameterKey={entry.key}
+                    side={props.side}
+                    onCreateParameterValue={props.onCreateParameterValue}
+                  />
                   {values.map((value) => (
                     <div
                       className={[
-                        "swt:flex swt:items-center swt:gap-2 swt:rounded swt:bg-base-100 swt:px-2 swt:py-1 swt:text-xs",
+                        "swt:flex swt:cursor-grab swt:items-center swt:gap-2 swt:rounded swt:bg-base-100 swt:px-2 swt:py-1 swt:text-xs swt:active:cursor-grabbing",
                         props.side === "right" ? "swt:justify-start" : "swt:justify-end",
                       ].join(" ")}
                       data-provenance-value-node={valueNodeId(props.side, props.layer.id, entry.key, value.value)}
                       data-testid={`ProvenanceGrouping-param-${props.side}-${entry.key}-value`}
+                      draggable
                       key={`${entry.key}-${value.value}`}
+                      onDragStart={(event) => {
+                        event.dataTransfer.effectAllowed = "copy";
+                        event.dataTransfer.setData(
+                          "application/x-provenance-value",
+                          JSON.stringify({ side: props.side, key: entry.key, value: value.value }),
+                        );
+                      }}
                     >
                       {props.side === "right" ? (
                         <span className="swt:h-px swt:w-8 swt:shrink-0 swt:bg-base-content/40" />
@@ -883,6 +1031,7 @@ function CreateItemControl(props: {
 
 export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactElement {
   const [editor, setEditor] = React.useState<EditorState | undefined>();
+  const [dragOverGroup, setDragOverGroup] = React.useState<{ side: ProvenanceSide; groupId: string } | undefined>();
   const mainRef = React.useRef<HTMLElement | null>(null);
   const [connectorOverlay, setConnectorOverlay] = React.useState<ConnectorOverlay>({
     width: 0,
@@ -896,8 +1045,10 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   const rightGroupingKeys = props.groupingByLayer[props.rightLayerId] ?? [];
   const leftGroups = buildGroups(props.items, props.leftLayerId, leftGroupingKeys);
   const rightGroups = buildGroups(props.items, props.rightLayerId, rightGroupingKeys);
-  const leftParameterKeys = availableParameterKeys(props.items, props.leftLayerId);
-  const rightParameterKeys = availableParameterKeys(props.items, props.rightLayerId);
+  const leftParameterValues = parameterValueConfigForLayer(props.parameterValuesByLayer, props.leftLayerId);
+  const rightParameterValues = parameterValueConfigForLayer(props.parameterValuesByLayer, props.rightLayerId);
+  const leftParameterKeys = mergeKeys(availableParameterKeys(props.items, props.leftLayerId), configuredKeys(leftParameterValues));
+  const rightParameterKeys = mergeKeys(availableParameterKeys(props.items, props.rightLayerId), configuredKeys(rightParameterValues));
   const parameterRails = buildParameterRailEntries(
     leftParameterKeys,
     rightParameterKeys,
@@ -907,8 +1058,15 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   );
   const summaries = groupConnectionSummaries(leftGroups, rightGroups, props.connections);
   const valueGroupConnections = [
-    ...valueGroupConnectionsForRail("left", props.leftLayerId, parameterRails.left, props.items, leftGroups),
-    ...valueGroupConnectionsForRail("right", props.rightLayerId, parameterRails.right, props.items, rightGroups),
+    ...valueGroupConnectionsForRail("left", props.leftLayerId, parameterRails.left, props.items, leftGroups, leftParameterValues),
+    ...valueGroupConnectionsForRail(
+      "right",
+      props.rightLayerId,
+      parameterRails.right,
+      props.items,
+      rightGroups,
+      rightParameterValues,
+    ),
   ];
 
   React.useLayoutEffect(() => {
@@ -1001,16 +1159,41 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
       side === "left" ? props.selectedSourceGroupId === group.id : props.selectedTargetGroupId === group.id;
     const expanded =
       props.detail?.kind === "group" && props.detail.side === side && props.detail.groupId === group.id;
+    const dragTarget = dragOverGroup?.side === side && dragOverGroup.groupId === group.id;
 
     return (
       <article
         className={[
           "swt:flex swt:flex-col swt:gap-3 swt:rounded swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm",
           selected ? "swt:border-primary swt:ring-2 swt:ring-primary/20" : "swt:border-base-content/10",
+          dragTarget ? "swt:ring-2 swt:ring-accent/50" : "",
         ].join(" ")}
         data-provenance-group-node={groupNodeId(side, group.id)}
         data-testid={`ProvenanceGrouping-group-${side}-${group.id}`}
         key={group.id}
+        onDragLeave={() => setDragOverGroup(undefined)}
+        onDragOver={(event) => {
+          const draggedValue = readDraggedParameterValue(event);
+
+          if (draggedValue?.side !== side) {
+            return;
+          }
+
+          event.preventDefault();
+          event.dataTransfer.dropEffect = "copy";
+          setDragOverGroup({ side, groupId: group.id });
+        }}
+        onDrop={(event) => {
+          const draggedValue = readDraggedParameterValue(event);
+          setDragOverGroup(undefined);
+
+          if (draggedValue?.side !== side) {
+            return;
+          }
+
+          event.preventDefault();
+          props.onAssignParameterValue(side, draggedValue.key, draggedValue.value, group.id);
+        }}
       >
         <div className="swt:flex swt:items-start swt:justify-between swt:gap-3">
           <div className="swt:min-w-0">
@@ -1143,7 +1326,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
       ) : null}
 
       <main
-        className="swt:relative swt:grid swt:min-h-0 swt:flex-1 swt:grid-cols-1 swt:gap-3 swt:overflow-auto swt:p-3 swt:xl:grid-cols-[300px_minmax(300px,1fr)_220px_minmax(300px,1fr)_300px]"
+        className="swt:relative swt:grid swt:min-h-0 swt:flex-1 swt:grid-cols-1 swt:gap-4 swt:overflow-auto swt:p-3 swt:xl:grid-cols-[300px_112px_minmax(300px,1fr)_220px_minmax(300px,1fr)_112px_300px]"
         ref={mainRef}
       >
         <svg
@@ -1182,10 +1365,15 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           groups={leftGroups}
           items={props.items}
           layer={leftLayer}
+          parameterValues={leftParameterValues}
           side="left"
+          onCreateParameter={props.onCreateParameter}
+          onCreateParameterValue={props.onCreateParameterValue}
           onMoveParameter={props.onMoveParameter}
           onToggleGrouping={props.onToggleGrouping}
         />
+
+        <div className="swt:hidden swt:min-w-0 swt:xl:block" data-testid="ProvenanceGrouping-value-lane-left" />
 
         <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
           <div className="swt:flex swt:items-center swt:justify-between swt:gap-2">
@@ -1333,12 +1521,17 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           </div>
         </section>
 
+        <div className="swt:hidden swt:min-w-0 swt:xl:block" data-testid="ProvenanceGrouping-value-lane-right" />
+
         <ParameterRail
           entries={parameterRails.right}
           groups={rightGroups}
           items={props.items}
           layer={rightLayer}
+          parameterValues={rightParameterValues}
           side="right"
+          onCreateParameter={props.onCreateParameter}
+          onCreateParameterValue={props.onCreateParameterValue}
           onMoveParameter={props.onMoveParameter}
           onToggleGrouping={props.onToggleGrouping}
         />
