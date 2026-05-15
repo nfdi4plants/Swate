@@ -129,6 +129,39 @@ export function availableParameterKeys(items: ProvenanceItem[], layerId: string)
   return keys;
 }
 
+function fullParameterSignature(item: ProvenanceItem): ProvenanceGroupPart[] {
+  const partsByKey = new Map<string, ProvenanceGroupPart>();
+
+  item.parameters.forEach((parameter) => {
+    const key = parameter.key.trim();
+    const value = parameter.value.trim();
+    const normalized = normalizeKey(key);
+
+    if (key && !partsByKey.has(normalized)) {
+      partsByKey.set(normalized, { key, value });
+    }
+  });
+
+  return Array.from(partsByKey.values()).sort((left, right) => {
+    const keyComparison = normalizeKey(left.key).localeCompare(normalizeKey(right.key));
+    return keyComparison !== 0 ? keyComparison : left.value.localeCompare(right.value);
+  });
+}
+
+function groupLabel(labelParts: ProvenanceGroupPart[]): string {
+  return labelParts.length === 0
+    ? "No parameters"
+    : labelParts.map((part) => `${part.key}: ${part.value}`).join(", ");
+}
+
+function groupId(layerId: string, labelParts: ProvenanceGroupPart[]): string {
+  return `${layerId}-${
+    labelParts.length === 0
+      ? "no-parameters"
+      : labelParts.map((part) => `${slug(part.key)}-${slug(part.value)}`).join("-")
+  }`;
+}
+
 export function buildGroups(
   items: ProvenanceItem[],
   layerId: string,
@@ -141,16 +174,28 @@ export function buildGroups(
   }
 
   if (groupingKeys.length === 0) {
-    return [
-      {
-        id: `${layerId}-all-items`,
-        layerId,
-        label: "All items",
-        groupingKeys: [],
-        labelParts: [],
-        items: layerItems,
-      },
-    ];
+    const groups = new Map<string, ProvenanceGroup>();
+
+    layerItems.forEach((item) => {
+      const labelParts = fullParameterSignature(item);
+      const id = groupId(layerId, labelParts);
+      const existing = groups.get(id);
+
+      if (existing) {
+        existing.items.push(item);
+      } else {
+        groups.set(id, {
+          id,
+          layerId,
+          label: groupLabel(labelParts),
+          groupingKeys: [],
+          labelParts,
+          items: [item],
+        });
+      }
+    });
+
+    return Array.from(groups.values()).sort((left, right) => left.label.localeCompare(right.label));
   }
 
   const groups = new Map<string, ProvenanceGroup>();
@@ -160,7 +205,7 @@ export function buildGroups(
       key,
       value: getParameterValue(item, key) ?? missingValue(key),
     }));
-    const id = `${layerId}-${labelParts.map((part) => `${slug(part.key)}-${slug(part.value)}`).join("-")}`;
+    const id = groupId(layerId, labelParts);
     const existing = groups.get(id);
 
     if (existing) {
@@ -169,7 +214,7 @@ export function buildGroups(
       groups.set(id, {
         id,
         layerId,
-        label: labelParts.map((part) => `${part.key}: ${part.value}`).join(", "),
+        label: groupLabel(labelParts),
         groupingKeys,
         labelParts,
         items: [item],

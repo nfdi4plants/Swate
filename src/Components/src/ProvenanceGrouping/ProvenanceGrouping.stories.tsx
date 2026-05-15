@@ -467,19 +467,27 @@ export const InteractionFlow: Story = {
     expect(Math.round(previewFrame.getBoundingClientRect().width)).toBeGreaterThanOrEqual(window.innerWidth);
     expect(Math.round((await canvas.findByTestId("ProvenanceGrouping-root")).getBoundingClientRect().left)).toBe(0);
 
-    const groupLink = await canvas.findByTestId("ProvenanceGrouping-connection-partial");
+    await waitFor(async () => {
+      await expect(await canvas.findAllByTestId(/ProvenanceGrouping-group-left-/)).toHaveLength(4);
+      await expect(await canvas.findAllByTestId(/ProvenanceGrouping-group-right-/)).toHaveLength(5);
+      expect(canvasElement).not.toHaveTextContent("All items");
+    });
+
+    const [groupLink] = await canvas.findAllByTestId("ProvenanceGrouping-connection-full");
     await userEvent.click(within(groupLink).getByTestId("ProvenanceGrouping-connection-toggle"));
     await waitFor(async () => {
       const detail = await within(groupLink).findByTestId("ProvenanceGrouping-connection-inline-detail");
       await expect(detail).toHaveTextContent("Input A");
       await expect(detail).toHaveTextContent("Output A");
-      await expect(detail).toHaveTextContent("Output B");
     });
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Temperature"));
     await waitFor(() => {
       expect(canvasElement).toHaveTextContent("Temperature: 12 C");
       expect(canvasElement).toHaveTextContent("Temperature: 24 C");
+    });
+    await waitFor(async () => {
+      await expect(await canvas.findAllByTestId(/ProvenanceGrouping-group-left-/)).toHaveLength(2);
     });
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Species"));

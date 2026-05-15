@@ -54,14 +54,15 @@ Connections are many-to-many between items. A single source item can connect to 
 
 ## Grouping Semantics
 
-Grouping is configured per displayed layer. A layer can be ungrouped or grouped by any ordered set of parameter keys.
+Grouping is configured per displayed layer. A layer starts grouped by each entry's complete parameter signature, and can then be grouped by any ordered set of selected parameter keys.
 
 Groups are derived from the selected keys:
 
-- No grouping keys: one group containing all items in the layer.
+- No selected grouping keys: one group for each distinct complete parameter signature.
 - One key: one group for each distinct value.
 - Multiple keys: one group for each distinct ordered tuple of values.
-- Missing values are shown explicitly as `Missing <key>` so items do not disappear.
+- Once a key is selected for grouping, non-selected parameters are ignored for grouping.
+- Missing values for selected keys are shown explicitly as `Missing <key>` so items do not disappear.
 
 The UI displays groups, not raw entries. Entries appear only in drill-in/detail views.
 
