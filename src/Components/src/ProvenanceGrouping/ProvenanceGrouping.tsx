@@ -56,11 +56,13 @@ export type ProvenanceGroupingProps = {
   leftLayerId: string;
   rightLayerId: string;
   groupingByLayer: Record<string, string[]>;
+  parameterRailByKey?: Record<string, ProvenanceSide>;
   selectedSourceGroupId?: string;
   selectedTargetGroupId?: string;
   detail?: ProvenanceDetail;
   error?: string;
-  onToggleGrouping: (layerId: string, key: string) => void;
+  onToggleGrouping: (side: ProvenanceSide, key: string) => void;
+  onMoveParameter: (key: string, side: ProvenanceSide) => void;
   onSelectGroup: (side: ProvenanceSide, groupId: string) => void;
   onOpenDetail: (detail: ProvenanceDetail) => void;
   onAddParameter: (side: ProvenanceSide, groupId: string, key: string, value: string) => void;
@@ -90,6 +92,41 @@ type EditorState = {
   side: ProvenanceSide;
   groupId: string;
   mode: "add" | "update";
+};
+
+type ParameterAvailability = "shared" | "left-only" | "right-only";
+
+type ParameterRailEntry = {
+  key: string;
+  availability: ParameterAvailability;
+  movable: boolean;
+  active: boolean;
+};
+
+type ParameterValueConnector = {
+  value: string;
+  groups: ProvenanceGroup[];
+};
+
+type ValueGroupConnection = {
+  id: string;
+  side: ProvenanceSide;
+  valueNodeId: string;
+  groupNodeId: string;
+};
+
+type RenderedConnectorPath = {
+  id: string;
+  side: ProvenanceSide;
+  path: string;
+  start: { x: number; y: number };
+  end: { x: number; y: number };
+};
+
+type ConnectorOverlay = {
+  width: number;
+  height: number;
+  paths: RenderedConnectorPath[];
 };
 
 const missingValue = (key: string) => `Missing ${key}`;
@@ -127,6 +164,107 @@ export function availableParameterKeys(items: ProvenanceItem[], layerId: string)
     });
 
   return keys;
+}
+
+function keyLookup(keys: string[]): Map<string, string> {
+  return new Map(keys.map((key) => [normalizeKey(key), key]));
+}
+
+function containsKey(keys: string[], key: string): boolean {
+  const normalized = normalizeKey(key);
+  return keys.some((existingKey) => normalizeKey(existingKey) === normalized);
+}
+
+function displayKey(leftKey: string | undefined, rightKey: string | undefined): string {
+  return leftKey ?? rightKey ?? "";
+}
+
+function buildParameterRailEntries(
+  leftKeys: string[],
+  rightKeys: string[],
+  leftGroupingKeys: string[],
+  rightGroupingKeys: string[],
+  placements: Record<string, ProvenanceSide> | undefined,
+): { left: ParameterRailEntry[]; right: ParameterRailEntry[] } {
+  const leftByKey = keyLookup(leftKeys);
+  const rightByKey = keyLookup(rightKeys);
+  const normalizedKeys = Array.from(new Set([...leftByKey.keys(), ...rightByKey.keys()])).sort((left, right) =>
+    displayKey(leftByKey.get(left), rightByKey.get(left)).localeCompare(displayKey(leftByKey.get(right), rightByKey.get(right))),
+  );
+
+  const entries = normalizedKeys.map((normalizedKey) => {
+    const leftKey = leftByKey.get(normalizedKey);
+    const rightKey = rightByKey.get(normalizedKey);
+    const shared = Boolean(leftKey && rightKey);
+    const availability: ParameterAvailability = shared ? "shared" : leftKey ? "left-only" : "right-only";
+    const rail = shared ? placements?.[normalizedKey] ?? "left" : leftKey ? "left" : "right";
+    const key = displayKey(leftKey, rightKey);
+    const active =
+      rail === "left"
+        ? containsKey(leftGroupingKeys, key)
+        : containsKey(leftGroupingKeys, key) && containsKey(rightGroupingKeys, key);
+
+    return {
+      rail,
+      entry: {
+        key,
+        availability,
+        movable: shared,
+        active,
+      },
+    };
+  });
+
+  return {
+    left: entries.filter((entry) => entry.rail === "left").map((entry) => entry.entry),
+    right: entries.filter((entry) => entry.rail === "right").map((entry) => entry.entry),
+  };
+}
+
+function valueConnectorsForKey(
+  items: ProvenanceItem[],
+  layerId: string,
+  groups: ProvenanceGroup[],
+  key: string,
+): ParameterValueConnector[] {
+  const layerItems = items.filter((item) => item.layerId === layerId);
+  const values = new Set(layerItems.map((item) => getParameterValue(item, key) ?? missingValue(key)));
+
+  return Array.from(values)
+    .sort((left, right) => left.localeCompare(right))
+    .map((value) => ({
+      value,
+      groups: groups.filter((group) =>
+        group.items.some((item) => (getParameterValue(item, key) ?? missingValue(key)) === value),
+      ),
+    }));
+}
+
+function valueNodeId(side: ProvenanceSide, layerId: string, key: string, value: string): string {
+  return `value-${side}-${slug(layerId)}-${slug(key)}-${slug(value)}`;
+}
+
+function groupNodeId(side: ProvenanceSide, groupIdValue: string): string {
+  return `group-${side}-${slug(groupIdValue)}`;
+}
+
+function valueGroupConnectionsForRail(
+  side: ProvenanceSide,
+  layerId: string,
+  entries: ParameterRailEntry[],
+  items: ProvenanceItem[],
+  groups: ProvenanceGroup[],
+): ValueGroupConnection[] {
+  return entries.flatMap((entry) =>
+    valueConnectorsForKey(items, layerId, groups, entry.key).flatMap((value) =>
+      value.groups.map((group) => ({
+        id: `${valueNodeId(side, layerId, entry.key, value.value)}-${groupNodeId(side, group.id)}`,
+        side,
+        valueNodeId: valueNodeId(side, layerId, entry.key, value.value),
+        groupNodeId: groupNodeId(side, group.id),
+      })),
+    ),
+  );
 }
 
 function fullParameterSignature(item: ProvenanceItem): ProvenanceGroupPart[] {
@@ -576,92 +714,129 @@ function ParameterRail(props: {
   side: ProvenanceSide;
   layer: ProvenanceLayer;
   items: ProvenanceItem[];
-  keys: string[];
-  activeKeys: string[];
-  detail?: ProvenanceDetail;
-  onToggleGrouping: (layerId: string, key: string) => void;
-  onOpenDetail: (detail: ProvenanceDetail) => void;
+  groups: ProvenanceGroup[];
+  entries: ParameterRailEntry[];
+  onToggleGrouping: (side: ProvenanceSide, key: string) => void;
+  onMoveParameter: (key: string, side: ProvenanceSide) => void;
 }) {
+  const [dragOver, setDragOver] = React.useState(false);
+  const targetSide = props.side === "left" ? "right" : "left";
+
+  const moveLabel = props.side === "left" ? "Move to output rail" : "Move to input rail";
+
   return (
-    <aside className="swt:flex swt:min-w-0 swt:flex-col swt:gap-2">
+    <aside
+      className={[
+        "swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-dashed swt:p-2",
+        dragOver ? "swt:border-primary swt:bg-primary/5" : "swt:border-transparent",
+      ].join(" ")}
+      onDragLeave={() => setDragOver(false)}
+      onDragOver={(event) => {
+        event.preventDefault();
+        event.dataTransfer.dropEffect = "move";
+        setDragOver(true);
+      }}
+      onDrop={(event) => {
+        event.preventDefault();
+        const key = event.dataTransfer.getData("application/x-provenance-parameter");
+        setDragOver(false);
+
+        if (key) {
+          props.onMoveParameter(key, props.side);
+        }
+      }}
+    >
       <div className="swt:text-xs swt:font-semibold swt:uppercase swt:tracking-normal swt:text-base-content/60">
         {props.layer.label} parameters
       </div>
       <div className="swt:flex swt:flex-col swt:gap-2">
-        {props.keys.length === 0 ? (
+        {props.entries.length === 0 ? (
           <div className="swt:rounded swt:border swt:border-dashed swt:border-base-content/20 swt:p-3 swt:text-sm swt:text-base-content/60">
             No parameters
           </div>
         ) : (
-          props.keys.map((key) => {
-            const active = props.activeKeys.includes(key);
-            const expanded =
-              props.detail?.kind === "parameter" &&
-              props.detail.layerId === props.layer.id &&
-              props.detail.key === key;
-            const layerItems = props.items.filter((item) => item.layerId === props.layer.id);
+          props.entries.map((entry) => {
+            const values = valueConnectorsForKey(props.items, props.layer.id, props.groups, entry.key);
 
             return (
               <div
                 className={[
                   "swt:flex swt:flex-col swt:gap-2 swt:rounded swt:border swt:p-2",
-                  active ? "swt:border-primary swt:bg-primary/10" : "swt:border-base-content/10 swt:bg-base-100",
+                  entry.active ? "swt:border-primary swt:bg-primary/10" : "swt:border-base-content/10 swt:bg-base-100",
                 ].join(" ")}
-                data-testid={`ProvenanceGrouping-param-${props.side}-${key}-block`}
-                key={key}
+                data-testid={`ProvenanceGrouping-param-${props.side}-${entry.key}-block`}
+                key={entry.key}
               >
                 <div className="swt:flex swt:items-center swt:gap-2">
                   <button
                     className="swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:text-left swt:text-sm swt:font-medium"
-                    data-testid={`ProvenanceGrouping-param-${props.side}-${key}`}
+                    data-testid={`ProvenanceGrouping-param-${props.side}-${entry.key}`}
+                    draggable={entry.movable}
                     type="button"
-                    onClick={() => props.onToggleGrouping(props.layer.id, key)}
+                    onClick={() => props.onToggleGrouping(props.side, entry.key)}
+                    onDragStart={(event) => {
+                      if (!entry.movable) {
+                        return;
+                      }
+
+                      event.dataTransfer.effectAllowed = "move";
+                      event.dataTransfer.setData("application/x-provenance-parameter", entry.key);
+                    }}
                   >
                     <i
                       className={[
                         "swt:iconify swt:size-4 swt:shrink-0",
-                        active ? "swt:fluent--group-list-24-filled" : "swt:fluent--group-list-24-regular",
+                        entry.active ? "swt:fluent--group-list-24-filled" : "swt:fluent--group-list-24-regular",
                       ].join(" ")}
                     />
-                    <span className="swt:truncate">{key}</span>
+                    <span className="swt:truncate">{entry.key}</span>
+                    <span className="swt:badge swt:badge-outline swt:badge-xs swt:shrink-0">
+                      {entry.availability === "shared"
+                        ? "shared"
+                        : entry.availability === "left-only"
+                          ? "input only"
+                          : "output only"}
+                    </span>
                   </button>
-                  <button
-                    aria-label={expanded ? `Hide ${key} values` : `Show ${key} values`}
-                    className="swt:btn swt:btn-ghost swt:btn-xs swt:btn-square"
-                    data-testid={`ProvenanceGrouping-param-${props.side}-${key}-details`}
-                    type="button"
-                    onClick={() => props.onOpenDetail({ kind: "parameter", layerId: props.layer.id, key })}
-                  >
-                    <i
-                      className={[
-                        "swt:iconify swt:size-4",
-                        expanded
-                          ? "swt:fluent--chevron-up-20-regular"
-                          : "swt:fluent--chevron-down-20-regular",
-                      ].join(" ")}
-                    />
-                  </button>
+                  {entry.movable ? (
+                    <button
+                      aria-label={moveLabel}
+                      className="swt:btn swt:btn-ghost swt:btn-xs swt:btn-square"
+                      data-testid={`ProvenanceGrouping-param-${props.side}-${entry.key}-move`}
+                      title={moveLabel}
+                      type="button"
+                      onClick={() => props.onMoveParameter(entry.key, targetSide)}
+                    >
+                      <i className="swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4" />
+                    </button>
+                  ) : null}
                 </div>
-                {expanded ? (
-                  <div
-                    className="swt:flex swt:max-h-56 swt:flex-col swt:gap-1 swt:overflow-auto swt:rounded swt:bg-base-200 swt:p-2"
-                    data-testid={`ProvenanceGrouping-param-${props.side}-${key}-inline-detail`}
-                  >
-                    {layerItems.map((item) => (
-                      <div
-                        className="swt:grid swt:grid-cols-[minmax(0,1fr)_auto] swt:gap-2 swt:rounded swt:bg-base-100 swt:px-2 swt:py-1 swt:text-xs"
-                        key={`${item.id}-${key}`}
-                      >
-                        <span className="swt:truncate" title={item.name}>
-                          {item.name}
-                        </span>
-                        <span className="swt:font-medium swt:text-base-content/70">
-                          {getParameterValue(item, key) ?? missingValue(key)}
-                        </span>
-                      </div>
-                    ))}
-                  </div>
-                ) : null}
+                <div
+                  className="swt:flex swt:max-h-64 swt:flex-col swt:gap-1 swt:overflow-auto swt:rounded swt:bg-base-200 swt:p-2"
+                  data-testid={`ProvenanceGrouping-param-${props.side}-${entry.key}-values`}
+                >
+                  {values.map((value) => (
+                    <div
+                      className={[
+                        "swt:flex swt:items-center swt:gap-2 swt:rounded swt:bg-base-100 swt:px-2 swt:py-1 swt:text-xs",
+                        props.side === "right" ? "swt:justify-start" : "swt:justify-end",
+                      ].join(" ")}
+                      data-provenance-value-node={valueNodeId(props.side, props.layer.id, entry.key, value.value)}
+                      data-testid={`ProvenanceGrouping-param-${props.side}-${entry.key}-value`}
+                      key={`${entry.key}-${value.value}`}
+                    >
+                      {props.side === "right" ? (
+                        <span className="swt:h-px swt:w-8 swt:shrink-0 swt:bg-base-content/40" />
+                      ) : null}
+                      <span className="swt:badge swt:badge-outline swt:badge-sm swt:max-w-32 swt:truncate">
+                        {value.value}
+                      </span>
+                      {props.side === "left" ? (
+                        <span className="swt:h-px swt:w-8 swt:shrink-0 swt:bg-base-content/40" />
+                      ) : null}
+                    </div>
+                  ))}
+                </div>
               </div>
             );
           })
@@ -708,6 +883,12 @@ function CreateItemControl(props: {
 
 export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactElement {
   const [editor, setEditor] = React.useState<EditorState | undefined>();
+  const mainRef = React.useRef<HTMLElement | null>(null);
+  const [connectorOverlay, setConnectorOverlay] = React.useState<ConnectorOverlay>({
+    width: 0,
+    height: 0,
+    paths: [],
+  });
 
   const leftLayer = findLayer(props.layers, props.leftLayerId);
   const rightLayer = findLayer(props.layers, props.rightLayerId);
@@ -717,7 +898,103 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   const rightGroups = buildGroups(props.items, props.rightLayerId, rightGroupingKeys);
   const leftParameterKeys = availableParameterKeys(props.items, props.leftLayerId);
   const rightParameterKeys = availableParameterKeys(props.items, props.rightLayerId);
+  const parameterRails = buildParameterRailEntries(
+    leftParameterKeys,
+    rightParameterKeys,
+    leftGroupingKeys,
+    rightGroupingKeys,
+    props.parameterRailByKey,
+  );
   const summaries = groupConnectionSummaries(leftGroups, rightGroups, props.connections);
+  const valueGroupConnections = [
+    ...valueGroupConnectionsForRail("left", props.leftLayerId, parameterRails.left, props.items, leftGroups),
+    ...valueGroupConnectionsForRail("right", props.rightLayerId, parameterRails.right, props.items, rightGroups),
+  ];
+
+  React.useLayoutEffect(() => {
+    const container = mainRef.current;
+
+    if (!container) {
+      return;
+    }
+
+    const updateConnectorOverlay = () => {
+      const containerRect = container.getBoundingClientRect();
+      const paths = valueGroupConnections.flatMap((connection) => {
+        const valueNode = container.querySelector<HTMLElement>(
+          `[data-provenance-value-node="${connection.valueNodeId}"]`,
+        );
+        const groupNode = container.querySelector<HTMLElement>(
+          `[data-provenance-group-node="${connection.groupNodeId}"]`,
+        );
+
+        if (!valueNode || !groupNode) {
+          return [];
+        }
+
+        const valueRect = valueNode.getBoundingClientRect();
+        const groupRect = groupNode.getBoundingClientRect();
+        const start =
+          connection.side === "left"
+            ? {
+                x: valueRect.right - containerRect.left + container.scrollLeft,
+                y: valueRect.top - containerRect.top + container.scrollTop + valueRect.height / 2,
+              }
+            : {
+                x: valueRect.left - containerRect.left + container.scrollLeft,
+                y: valueRect.top - containerRect.top + container.scrollTop + valueRect.height / 2,
+              };
+        const end =
+          connection.side === "left"
+            ? {
+                x: groupRect.left - containerRect.left + container.scrollLeft,
+                y: groupRect.top - containerRect.top + container.scrollTop + groupRect.height / 2,
+              }
+            : {
+                x: groupRect.right - containerRect.left + container.scrollLeft,
+                y: groupRect.top - containerRect.top + container.scrollTop + groupRect.height / 2,
+              };
+        const bend = Math.max(48, Math.abs(end.x - start.x) / 2);
+        const controlStartX = connection.side === "left" ? start.x + bend : start.x - bend;
+        const controlEndX = connection.side === "left" ? end.x - bend : end.x + bend;
+
+        return [
+          {
+            id: connection.id,
+            side: connection.side,
+            path: `M ${start.x} ${start.y} C ${controlStartX} ${start.y}, ${controlEndX} ${end.y}, ${end.x} ${end.y}`,
+            start,
+            end,
+          },
+        ];
+      });
+      const nextOverlay = {
+        width: container.scrollWidth,
+        height: container.scrollHeight,
+        paths,
+      };
+
+      setConnectorOverlay((current) =>
+        JSON.stringify(current) === JSON.stringify(nextOverlay) ? current : nextOverlay,
+      );
+    };
+
+    updateConnectorOverlay();
+    container.addEventListener("scroll", updateConnectorOverlay, { passive: true });
+    window.addEventListener("resize", updateConnectorOverlay);
+    const resizeObserver =
+      typeof ResizeObserver === "undefined" ? undefined : new ResizeObserver(updateConnectorOverlay);
+    resizeObserver?.observe(container);
+    Array.from(container.querySelectorAll("[data-provenance-value-node], [data-provenance-group-node]")).forEach(
+      (element) => resizeObserver?.observe(element),
+    );
+
+    return () => {
+      container.removeEventListener("scroll", updateConnectorOverlay);
+      window.removeEventListener("resize", updateConnectorOverlay);
+      resizeObserver?.disconnect();
+    };
+  });
 
   const renderGroup = (side: ProvenanceSide, group: ProvenanceGroup) => {
     const selected =
@@ -731,6 +1008,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           "swt:flex swt:flex-col swt:gap-3 swt:rounded swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm",
           selected ? "swt:border-primary swt:ring-2 swt:ring-primary/20" : "swt:border-base-content/10",
         ].join(" ")}
+        data-provenance-group-node={groupNodeId(side, group.id)}
         data-testid={`ProvenanceGrouping-group-${side}-${group.id}`}
         key={group.id}
       >
@@ -864,19 +1142,52 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         </div>
       ) : null}
 
-      <main className="swt:grid swt:min-h-0 swt:flex-1 swt:grid-cols-1 swt:gap-3 swt:overflow-auto swt:p-3 swt:xl:grid-cols-[220px_minmax(260px,1fr)_220px_minmax(260px,1fr)_220px]">
+      <main
+        className="swt:relative swt:grid swt:min-h-0 swt:flex-1 swt:grid-cols-1 swt:gap-3 swt:overflow-auto swt:p-3 swt:xl:grid-cols-[300px_minmax(300px,1fr)_220px_minmax(300px,1fr)_300px]"
+        ref={mainRef}
+      >
+        <svg
+          aria-hidden="true"
+          className="swt:pointer-events-none swt:absolute swt:left-0 swt:top-0 swt:z-0"
+          data-testid="ProvenanceGrouping-value-connectors"
+          height={connectorOverlay.height}
+          width={connectorOverlay.width}
+        >
+          {connectorOverlay.paths.map((connector) => (
+            <g key={connector.id}>
+              <path
+                d={connector.path}
+                fill="none"
+                stroke={connector.side === "left" ? "rgba(37, 99, 235, 0.42)" : "rgba(5, 150, 105, 0.42)"}
+                strokeLinecap="round"
+                strokeWidth="2"
+              />
+              <circle
+                cx={connector.start.x}
+                cy={connector.start.y}
+                fill={connector.side === "left" ? "rgba(37, 99, 235, 0.65)" : "rgba(5, 150, 105, 0.65)"}
+                r="3"
+              />
+              <circle
+                cx={connector.end.x}
+                cy={connector.end.y}
+                fill={connector.side === "left" ? "rgba(37, 99, 235, 0.65)" : "rgba(5, 150, 105, 0.65)"}
+                r="3"
+              />
+            </g>
+          ))}
+        </svg>
         <ParameterRail
-          activeKeys={leftGroupingKeys}
-          detail={props.detail}
+          entries={parameterRails.left}
+          groups={leftGroups}
           items={props.items}
-          keys={leftParameterKeys}
           layer={leftLayer}
           side="left"
-          onOpenDetail={props.onOpenDetail}
+          onMoveParameter={props.onMoveParameter}
           onToggleGrouping={props.onToggleGrouping}
         />
 
-        <section className="swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
+        <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
           <div className="swt:flex swt:items-center swt:justify-between swt:gap-2">
             <h3 className="swt:text-sm swt:font-semibold">{leftLayer.label} groups</h3>
             <span className="swt:badge swt:badge-outline swt:badge-sm">{leftGroups.length}</span>
@@ -893,7 +1204,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           </div>
         </section>
 
-        <section className="swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:self-stretch">
+        <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:self-stretch">
           <button
             className="swt:btn swt:btn-primary swt:btn-sm"
             data-testid="ProvenanceGrouping-connect-selected"
@@ -1005,7 +1316,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           </div>
         </section>
 
-        <section className="swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
+        <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
           <div className="swt:flex swt:items-center swt:justify-between swt:gap-2">
             <h3 className="swt:text-sm swt:font-semibold">{rightLayer.label} groups</h3>
             <span className="swt:badge swt:badge-outline swt:badge-sm">{rightGroups.length}</span>
@@ -1023,13 +1334,12 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         </section>
 
         <ParameterRail
-          activeKeys={rightGroupingKeys}
-          detail={props.detail}
+          entries={parameterRails.right}
+          groups={rightGroups}
           items={props.items}
-          keys={rightParameterKeys}
           layer={rightLayer}
           side="right"
-          onOpenDetail={props.onOpenDetail}
+          onMoveParameter={props.onMoveParameter}
           onToggleGrouping={props.onToggleGrouping}
         />
       </main>

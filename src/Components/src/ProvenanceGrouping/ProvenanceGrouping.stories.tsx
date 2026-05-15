@@ -23,6 +23,7 @@ type MockModel = {
   leftLayerId: string;
   rightLayerId: string;
   groupingByLayer: Record<string, string[]>;
+  parameterRailByKey: Record<string, Side>;
   selectedSourceGroupId?: string;
   selectedTargetGroupId?: string;
   detail?: ProvenanceDetail;
@@ -146,7 +147,26 @@ function initialModel(): MockModel {
       inputs: [],
       outputs: [],
     },
+    parameterRailByKey: {},
   };
+}
+
+function normalizedKey(key: string): string {
+  return key.trim().toLowerCase();
+}
+
+function hasGroupingKey(keys: string[], key: string): boolean {
+  const normalized = normalizedKey(key);
+  return keys.some((existingKey) => normalizedKey(existingKey) === normalized);
+}
+
+function addGroupingKey(keys: string[], key: string): string[] {
+  return hasGroupingKey(keys, key) ? keys : [...keys, key];
+}
+
+function removeGroupingKey(keys: string[], key: string): string[] {
+  const normalized = normalizedKey(key);
+  return keys.filter((existingKey) => normalizedKey(existingKey) !== normalized);
 }
 
 function findGroup(
@@ -214,18 +234,31 @@ function StatefulMockup() {
 
   const clearError = () => setModel((current) => ({ ...current, error: undefined }));
 
-  const toggleGrouping = (layerId: string, key: string) => {
+  const toggleGrouping = (side: Side, key: string) => {
     setModel((current) => {
-      const currentKeys = current.groupingByLayer[layerId] ?? [];
-      const nextKeys = currentKeys.includes(key)
-        ? currentKeys.filter((existingKey) => existingKey !== key)
-        : [...currentKeys, key];
+      const leftKeys = current.groupingByLayer[current.leftLayerId] ?? [];
+      const rightKeys = current.groupingByLayer[current.rightLayerId] ?? [];
+      const nextLeftKeys =
+        side === "left"
+          ? hasGroupingKey(leftKeys, key)
+            ? removeGroupingKey(leftKeys, key)
+            : addGroupingKey(leftKeys, key)
+          : hasGroupingKey(leftKeys, key) && hasGroupingKey(rightKeys, key)
+            ? removeGroupingKey(leftKeys, key)
+            : addGroupingKey(leftKeys, key);
+      const nextRightKeys =
+        side === "right"
+          ? hasGroupingKey(leftKeys, key) && hasGroupingKey(rightKeys, key)
+            ? removeGroupingKey(rightKeys, key)
+            : addGroupingKey(rightKeys, key)
+          : rightKeys;
 
       return {
         ...current,
         groupingByLayer: {
           ...current.groupingByLayer,
-          [layerId]: nextKeys,
+          [current.leftLayerId]: nextLeftKeys,
+          [current.rightLayerId]: nextRightKeys,
         },
         selectedSourceGroupId: undefined,
         selectedTargetGroupId: undefined,
@@ -233,6 +266,17 @@ function StatefulMockup() {
         error: undefined,
       };
     });
+  };
+
+  const moveParameter = (key: string, side: Side) => {
+    setModel((current) => ({
+      ...current,
+      parameterRailByKey: {
+        ...current.parameterRailByKey,
+        [normalizedKey(key)]: side,
+      },
+      error: undefined,
+    }));
   };
 
   const selectGroup = (side: Side, groupId: string) => {
@@ -384,11 +428,13 @@ function StatefulMockup() {
       leftLayerId={model.leftLayerId}
       rightLayerId={model.rightLayerId}
       groupingByLayer={model.groupingByLayer}
+      parameterRailByKey={model.parameterRailByKey}
       selectedSourceGroupId={model.selectedSourceGroupId}
       selectedTargetGroupId={model.selectedTargetGroupId}
       detail={model.detail}
       error={model.error}
       onToggleGrouping={toggleGrouping}
+      onMoveParameter={moveParameter}
       onSelectGroup={selectGroup}
       onOpenDetail={openDetail}
       onAddParameter={addParameter}
@@ -494,14 +540,6 @@ export const InteractionFlow: Story = {
     await waitFor(() => {
       expect(canvasElement).toHaveTextContent("Species: Arabidopsis");
       expect(canvasElement).toHaveTextContent("Species: Chlamydomonas");
-    });
-
-    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Species-details"));
-    await waitFor(async () => {
-      const parameterBlock = await canvas.findByTestId("ProvenanceGrouping-param-left-Species-block");
-      await expect(parameterBlock).toHaveTextContent("Input A");
-      await expect(parameterBlock).toHaveTextContent("Arabidopsis");
-      expect(canvas.queryByTestId("ProvenanceGrouping-detail-panel")).not.toBeInTheDocument();
     });
 
     const arabidopsis12Group = await canvas.findByTestId(/ProvenanceGrouping-group-left-.*12-C.*Arabidopsis/);

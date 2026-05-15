@@ -70,15 +70,15 @@ The UI displays groups, not raw entries. Entries appear only in drill-in/detail 
 
 The component shows one adjacent layer pair at a time:
 
-- Left parameter block rail for the left layer.
+- Left grouping-control rail for input/shared parameters.
 - Left group column.
 - A center connector area with group-level lines.
 - Right group column.
-- Right parameter block rail for the right layer.
+- Right grouping-control rail for output-only parameters and shared parameters moved there.
 
 The layout should feel like a dense work surface or table/block editor, not a graph view. Group cards or blocks should contain concise labels, item counts, connection status, and available actions. Raw item names and per-entry parameter details are hidden until a group or parameter detail view is opened.
 
-Parameter blocks are grouping controls. Clicking the main block toggles that parameter in the grouping set for that layer. A separate affordance on the block opens detail information for every entry's value for that parameter.
+Parameter blocks are grouping controls. Clicking a block on the left groups the left layer by that parameter. Clicking a block on the right groups both displayed layers by that parameter. Shared parameter blocks can be moved between rails by drag/drop or the move affordance. Each block shows distinct values only; SVG connector lines link each value to the group cards it applies to.
 
 Use `swt:iconify` with fully qualified Fluent icon classes for new icons.
 
