@@ -2,7 +2,7 @@ module Renderer.Components.MainContent.ArcFilePreviewTarget
 
 open Feliz
 open Renderer.Components.ARCHelper
-open Renderer.Components.MainContent.Helper
+open Renderer.Components.MainContent
 open Swate.Components.ArcFileEditor
 open Swate.Components
 open Swate.Components.Shared
@@ -16,7 +16,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
     let setArcFileInMemory (nextArcFile: ArcFiles) =
         promise {
-            match! MainContentHelper.setArcFileInMemory nextArcFile with
+            match! Helper.setArcFileInMemory nextArcFile with
             | Ok() -> ()
             | Error exn ->
                 errorModal.enqueue (
@@ -39,7 +39,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let onSaveArcFile =
         fun _ ->
             promise {
-                match! MainContentHelper.saveArcFile arcFile with
+                match! Helper.saveArcFile arcFile with
                 | Ok() -> ()
                 | Error exn ->
                     errorModal.enqueue (
@@ -64,7 +64,4 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
         )
 
-    let renderTrailingNavbarElements _ =
-        QuickAccessButton.QuickAccessButton("Save", Icons.Save(), onSaveArcFile)
-
-    Main.ArcFileEditor(arcFile, setArcFile, pickFilePaths, trailingNavbarElements = renderTrailingNavbarElements)
+    Main.ArcFileEditor(arcFile, setArcFile, pickFilePaths)

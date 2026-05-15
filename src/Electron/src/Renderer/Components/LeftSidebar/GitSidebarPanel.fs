@@ -12,20 +12,22 @@ let Main () =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
+    let errorCtx = Swate.Components.ErrorModal.Context.useErrorModalCtx ()
 
     React.useEffectOnce (fun () ->
         if not gitVersionCheckStarted then
             gitVersionCheckStarted <- true
 
             Renderer.GitApiClient.checkGitVersions ()
-            |> Promise.map (function
-                | Ok () -> ()
-                | Error message -> Browser.Dom.window.alert message)
+            |> Promise.map (
+                function
+                | Ok() -> ()
+                | Error message -> Browser.Dom.window.alert message
+            )
             |> ignore
     )
 
-    let remoteActionsEnabled =
-        authState.UsableActiveUser().IsSome
+    let remoteActionsEnabled = authState.UsableActiveUser().IsSome
 
     let remoteActionsWarning =
         if remoteActionsEnabled then
@@ -39,8 +41,19 @@ let Main () =
             | "" -> None
             | value -> Some value
 
-    let openArc () =
-        Renderer.Components.NavbarHelper.Selector.openARC null
+    let openArc =
+        fun _ ->
+            promise {
+                let! r = Api.ipcArcVaultApi.openARC ()
+
+                match r with
+                | Error e ->
+                    errorCtx.enqueue (
+                        Swate.Components.ErrorModal.ErrorModalRequest.create (e.Message, title = "Error opening ARC")
+                    )
+                | Ok _ -> ()
+            }
+            |> Promise.start
 
     match gitStateCtx.state.CurrentArcPath with
     | None ->
@@ -60,13 +73,18 @@ let Main () =
                 OnClick = (fun () -> pageStateCtx.setState (Some Renderer.Types.PageState.DataHubBrowser))
             }
         )
-    | Some _ when gitStateCtx.state.RepositoryAvailability = Renderer.Context.GitWorkflow.GitRepositoryAvailability.MissingRepository ->
+    | Some _ when
+        gitStateCtx.state.RepositoryAvailability = Renderer.Context.GitWorkflow.GitRepositoryAvailability.MissingRepository
+        ->
         Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
             title = "Initialize Git for this ARC",
             description = "The selected ARC folder is not a Git repository yet.",
             primaryAction = {
                 Label =
-                    if gitStateCtx.state.BusyOperation = Some Renderer.Context.GitWorkflow.GitBusyOperation.InitializingRepository then
+                    if
+                        gitStateCtx.state.BusyOperation = Some
+                            Renderer.Context.GitWorkflow.GitBusyOperation.InitializingRepository
+                    then
                         "Initializing..."
                     else
                         "Initialize Repository"
@@ -75,8 +93,12 @@ let Main () =
                 OnClick =
                     (fun () ->
                         gitStateCtx.initRepository (
-                            if remoteActionsEnabled then normalizedRemoteProjectName else None
-                        ))
+                            if remoteActionsEnabled then
+                                normalizedRemoteProjectName
+                            else
+                                None
+                        )
+                    )
             },
             extraContent =
                 Html.div [

@@ -37,7 +37,7 @@ let LandingDraftTarget () =
                         Error = None
                 }
 
-                let! saveResult = Helper.MainContentHelper.saveArcFileAndOpen payload.ArcFile
+                let! saveResult = Helper.saveArcFileAndOpen payload.ArcFile
 
                 match saveResult with
                 | Result.Error message ->

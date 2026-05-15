@@ -48,6 +48,8 @@ type IArcVaultsApi = {
     setArcFileInMemory: FileContentDTO -> JS.Promise<Result<unit, exn>>
     /// Applies ARC file changes and persists to disk atomically. In-memory ARC is only committed on successful save.
     applyArcFileAndSave: FileContentDTO -> JS.Promise<Result<unit, exn>>
+    /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
+    getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
@@ -99,12 +101,21 @@ type IGitLabApi = {
     createProject: string -> JS.Promise<Result<ExploreProjectDto, GitLabError>>
 }
 
+/// Two Way Bridge: Renderer <-> Main
+type IAuthApi = {
+    signIn: AuthSignInRequest -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
+    getAuthState: unit -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
+    signOut: unit -> Fable.Core.JS.Promise<Result<unit, exn>>
+    revalidate: unit -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
+    listAccounts: unit -> Fable.Core.JS.Promise<Result<AccountSummary array, exn>>
+    setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
+    removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
+}
+
 /// One Way Bridge: Main -> Renderer
 module MainToRendererIpc =
 
-    type IPathChangeRendererApi = {
-        pathChange: string option -> unit
-    }
+    type IPathChangeRendererApi = { pathChange: string option -> unit }
 
     type IRecentArcsRendererApi = {
         recentARCsUpdate: ARCPointer[] -> unit
@@ -126,6 +137,10 @@ module MainToRendererIpc =
         gitLfsProgressUpdate: GitLfsProgressDto -> unit
     }
 
+    type IHasUnsavedArcChangesRendererApi = {
+        arcUnsavedChangesUpdate: bool -> unit
+    }
+
 // TODO: What should filewatcher do when detecting changes?
 /// One Way Bridge: Main -> Renderer
 type IArcFileWatcherApi = {
@@ -134,14 +149,3 @@ type IArcFileWatcherApi = {
 }
 
 type IMainSaveBeforeQuitApi = { requestSaveBeforeQuit: unit -> unit }
-
-/// Two Way Bridge: Renderer <-> Main
-type IAuthApi = {
-    signIn: AuthSignInRequest -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
-    getAuthState: unit -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
-    signOut: unit -> Fable.Core.JS.Promise<Result<unit, exn>>
-    revalidate: unit -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
-    listAccounts: unit -> Fable.Core.JS.Promise<Result<AccountSummary array, exn>>
-    setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
-    removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
-}

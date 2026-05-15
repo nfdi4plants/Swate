@@ -178,8 +178,8 @@ Vitest.describe("ARC AddAsync", fun () ->
 
             let vault = ArcVault(testWindow ())
             vault.path <- Some arcPath
-            vault.arc <- Some loadedArc
-            vault.hasUnsavedArcChanges <- true
+            vault.SetArc loadedArc
+            vault.SetHasUnsavedArcChanges true
 
             let newAssayRequest =
                 FileContentDTO.fromArcFile(ArcFiles.Assay(ArcAssay("NewAssay")))

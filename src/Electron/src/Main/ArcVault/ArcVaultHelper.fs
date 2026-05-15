@@ -102,18 +102,11 @@ let syncArcStaticHashes (source: ARC) (target: ARC) : unit =
             syncDataMapStaticHash sourceRun.DataMap targetRun.DataMap
         | None -> ()
 
-let tryGetNewTopLevelArcFile (arc: ARC) (dto: FileContentDTO) : ArcFiles option =
-    match FileContentDTO.toArcFile dto with
-    | Some(ArcFiles.Assay assay as arcFile) when arc.ContainsAssay assay.Identifier |> not -> Some arcFile
-    | Some(ArcFiles.Study(study, _) as arcFile) when arc.ContainsStudy study.Identifier |> not -> Some arcFile
-    | Some(ArcFiles.Run run as arcFile) when arc.ContainsRun run.Identifier |> not -> Some arcFile
-    | Some(ArcFiles.Workflow workflow as arcFile) when arc.ContainsWorkflow workflow.Identifier |> not -> Some arcFile
-    | _ -> None
-
-let getAddArcFileEvents (arcFile: ArcFiles) : FileEvent list =
-    arcFile.TryGetRelativePath()
-    |> Option.map (fun path -> [ { EventName = EventName.Add; Path = path } ])
-    |> Option.defaultValue []
+/// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
+let copyArcPreservingStaticHashes (arc: ARC) : ARC =
+    let copiedArc = arc.Copy()
+    syncArcStaticHashes arc copiedArc
+    copiedArc
 
 /// This function should only be used for partial updates to an ARC based on a file content DTO.
 let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, exn> =
@@ -262,3 +255,12 @@ let createFileWatcher (path: string) (usePolling: bool option) =
 
     watcher
 
+open Fable.Electron.Remoting.Main
+
+let sendArcHasUnsavedChangesUpdate (hasUnsavedChanges: bool) (window: BrowserWindow) =
+    let sendMsg =
+        Remoting.createIpc ()
+        |> Remoting.withWindow window
+        |> Remoting.buildProxySender<Swate.Electron.Shared.IPCTypes.MainToRendererIpc.IHasUnsavedArcChangesRendererApi>
+
+    sendMsg.arcUnsavedChangesUpdate hasUnsavedChanges

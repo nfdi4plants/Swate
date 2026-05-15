@@ -100,7 +100,9 @@ type Layout =
                     prop.ariaLabel tooltip
                     prop.className "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
                     prop.children [
-                        Html.i [ prop.className ("swt:iconify " + iconClassName) ]
+                        Html.i [
+                            prop.className ("swt:size-4 swt:iconify " + iconClassName)
+                        ]
                     ]
                     prop.onClick (fun _ -> onClick ())
                 ]

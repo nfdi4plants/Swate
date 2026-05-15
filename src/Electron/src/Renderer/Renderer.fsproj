@@ -19,7 +19,6 @@
     <Compile Include="Context\GitStateContext.fs" />
     <Compile Include="Components\ARCHelper.fs" />
     <Compile Include="Components\InitState.fs" />
-    <Compile Include="Components\Navbar.fs" />
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
@@ -49,6 +48,7 @@
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
+    <Compile Include="Components\Navbar.fs" />
     <Compile Include="App.fs" />
     <Compile Include="Program.fs" />
     <Content Include="tailwind.css" />
