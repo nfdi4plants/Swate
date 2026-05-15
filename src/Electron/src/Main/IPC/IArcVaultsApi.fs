@@ -13,6 +13,7 @@ open Fable.Electron.Main
 open Fable.Core.JsInterop
 open Main
 open Main.ArcMerge
+open Main.ArcVaultHelper
 open Node.Api
 open ARCtrl
 open Swate.Electron.Shared.DTOs.NoteSearchDto
@@ -41,9 +42,7 @@ module ArcPathValidation =
 
     let isWithinRootPath (rootPath: string) (candidatePath: string) =
         let normalizedRootPath =
-            pathDynamic?resolve (rootPath)
-            |> unbox<string>
-            |> normalizePathForComparison
+            pathDynamic?resolve (rootPath) |> unbox<string> |> normalizePathForComparison
 
         let normalizedCandidatePath =
             pathDynamic?resolve (candidatePath)
@@ -110,8 +109,7 @@ let private writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Pro
 }
 
 let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
-    fsPromisesDynamic?readFile (absolutePath, "utf8")
-    |> unbox<JS.Promise<string>>
+    fsPromisesDynamic?readFile (absolutePath, "utf8") |> unbox<JS.Promise<string>>
 
 open ARCtrl.Contract
 
@@ -131,25 +129,24 @@ let private withLoadedArcVault<'T>
     }
 
 let private isSameOrDescendantPathForComparison (path: string) (ancestorPath: string) =
-    let normalize = PathHelpers.normalizePath >> ArcPathValidation.normalizePathForComparison
+    let normalize =
+        PathHelpers.normalizePath >> ArcPathValidation.normalizePathForComparison
+
     let normalizedPath = normalize path
     let normalizedAncestorPath = normalize ancestorPath
 
     not (String.IsNullOrWhiteSpace normalizedPath)
     && not (String.IsNullOrWhiteSpace normalizedAncestorPath)
-    && (normalizedPath = normalizedAncestorPath || normalizedPath.StartsWith(normalizedAncestorPath + "/"))
+    && (normalizedPath = normalizedAncestorPath
+        || normalizedPath.StartsWith(normalizedAncestorPath + "/"))
 
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-    type MergeResult = {
-        Arc: ARC
-    }
+    type MergeResult = { Arc: ARC }
 
     let private normalizeRelativePathForMerge (path: string) =
-        path
-        |> PathHelpers.normalizeRelativePath
-        |> PathHelpers.normalizePath
+        path |> PathHelpers.normalizeRelativePath |> PathHelpers.normalizePath
 
     let private deduplicateEventPaths (paths: string seq) =
         paths
@@ -165,14 +162,14 @@ module ArcDeleteHelper =
         |> deduplicateEventPaths
 
     let buildDeleteUnlinkEvents (deletedPath: string) (preDeleteFileRelativePaths: string seq) : FileEvent list =
-        let primaryPaths = buildPrimaryUnlinkEventPaths deletedPath preDeleteFileRelativePaths
+        let primaryPaths =
+            buildPrimaryUnlinkEventPaths deletedPath preDeleteFileRelativePaths
 
         let effectivePaths =
             if primaryPaths.Length > 0 then
                 primaryPaths
             else
-                ArcDeletePathRules.buildFallbackUnlinkPaths deletedPath
-                |> deduplicateEventPaths
+                ArcDeletePathRules.buildFallbackUnlinkPaths deletedPath |> deduplicateEventPaths
 
         effectivePaths
         |> List.map (fun path -> {
@@ -186,7 +183,8 @@ module ArcDeleteHelper =
             if fileEntry.isDirectory then
                 None
             else
-                tryGetRepoRelativePath arcPath fileEntry.path |> Option.map normalizeRelativePathForMerge
+                tryGetRepoRelativePath arcPath fileEntry.path
+                |> Option.map normalizeRelativePathForMerge
         )
         |> Seq.toList
 
@@ -196,9 +194,10 @@ module ArcDeleteHelper =
         (arcLocal: ARC)
         (reloadedArc: ARC)
         : Result<MergeResult, exn> =
-        let arcLocalForMerge = arcLocal.Copy()
+        let arcLocalForMerge = copyArcPreservingStaticHashes arcLocal
         let unlinkEvents = buildDeleteUnlinkEvents deletedPath preDeleteFileRelativePaths
         let mergedArc = ARC.merge arcLocalForMerge reloadedArc unlinkEvents
+        syncArcStaticHashes arcLocal mergedArc
 
         Ok { Arc = mergedArc }
 
@@ -326,23 +325,24 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                             Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                         |]
+
                         let window = dialogParentFromIpcEvent event
 
-                        let! result = dialog.showOpenDialog (?window = window, properties = properties, defaultPath = arcPath)
+                        let! result =
+                            dialog.showOpenDialog (?window = window, properties = properties, defaultPath = arcPath)
 
                         if result.canceled then
                             return Error(exn "Cancelled")
                         else
-                            let relativePaths =
-                                result.filePaths
-                                |> Array.map (tryGetArcRelativePath arcPath)
+                            let relativePaths = result.filePaths |> Array.map (tryGetArcRelativePath arcPath)
 
                             match relativePaths |> Array.tryFind Result.isError with
                             | Some(Error pathError) -> return Error pathError
                             | _ ->
                                 return
                                     relativePaths
-                                    |> Array.choose (function
+                                    |> Array.choose (
+                                        function
                                         | Ok path when String.IsNullOrWhiteSpace path -> None
                                         | Ok path -> Some path
                                         | Error _ -> None
@@ -357,6 +357,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let properties = [|
                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
                 |]
+
                 let window = dialogParentFromIpcEvent event
 
                 let! result = dialog.showOpenDialog (?window = window, properties = properties)
@@ -377,6 +378,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                     Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                 |]
+
                 let window = dialogParentFromIpcEvent event
 
                 let! result = dialog.showOpenDialog (?window = window, properties = properties)
@@ -396,7 +398,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                 |]
 
-                let filters = [| FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |]) |]
+                let filters = [|
+                    FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |])
+                |]
+
                 let window = dialogParentFromIpcEvent event
 
                 let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
@@ -458,15 +463,15 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun () -> promise {
             try
                 return!
-                    withLoadedArcVault event (fun vault ->
-                        promise {
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
                             match! vault.WriteArc() with
                             | Error saveError -> return Error saveError
                             | Ok() ->
                                 do! vault.RefreshFileTree()
                                 return Ok()
-                        }
-                    )
+                        })
             with e ->
                 return Error e
         }
@@ -474,13 +479,13 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun (request: FileContentDTO) -> promise {
             try
                 return!
-                    withLoadedArcVault event (fun vault ->
-                        promise {
-                            match vault.UpdateArcBy request with
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            match vault.UpdateArcByFileContentDTO request with
                             | Error saveError -> return Error saveError
                             | Ok() -> return Ok()
-                        }
-                    )
+                        })
             with e ->
                 return Error e
         }
@@ -488,15 +493,22 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun (request: FileContentDTO) -> promise {
             try
                 return!
-                    withLoadedArcVault event (fun vault ->
-                        promise {
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
                             match! vault.ApplyArcFileAndSave(request) with
                             | Error saveError -> return Error saveError
                             | Ok() ->
                                 do! vault.RefreshFileTree()
                                 return Ok()
-                        }
-                    )
+                        })
+            with e ->
+                return Error e
+        }
+    getHasUnsavedArcChanges =
+        fun () -> promise {
+            try
+                return! withLoadedArcVault event (fun vault -> promise { return Ok vault.hasUnsavedArcChanges })
             with e ->
                 return Error e
         }
@@ -542,7 +554,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                                         match! ARC.tryLoadAsync arcPath with
                                         | Error loadError ->
-                                            return Error(exn $"Unable to reload ARC after deleting '{normalizedRelativePath}': {loadError}")
+                                            return
+                                                Error(
+                                                    exn
+                                                        $"Unable to reload ARC after deleting '{normalizedRelativePath}': {loadError}"
+                                                )
                                         | Ok reloadedArc ->
                                             match
                                                 ArcDeleteHelper.mergeReloadedArcAfterDelete
@@ -553,8 +569,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             with
                                             | Error mergeError -> return Error mergeError
                                             | Ok mergeResult ->
-                                                vault.arc <- Some mergeResult.Arc
-                                                vault.window.title <- mergeResult.Arc.Identifier
+                                                vault.SetArc mergeResult.Arc
                                                 return Ok()
                                     with deleteError ->
                                         return Error deleteError
@@ -620,7 +635,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         | Error pathError -> return Error pathError
                         | Ok path ->
                             let content = fs.readFileSync (path, "utf8")
-                            let dto = FileContentDTO.create ARCtrl.Contract.DTOType.PlainText content relativePath
+
+                            let dto =
+                                FileContentDTO.create ARCtrl.Contract.DTOType.PlainText content relativePath
+
                             return Ok dto
                     with e ->
                         return Error(exn $"Could not read file {relativePath}: {e.Message}")
@@ -652,8 +670,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                         return Ok successResult
         }
-    cancelGitLfs =
-        fun (requestId: string) -> GitLfs.cancelChannel requestId
+    cancelGitLfs = fun (requestId: string) -> GitLfs.cancelChannel requestId
     resolveCloseRequest =
         fun (decision: IPCTypesHelper.SaveBeforeQuitDecision) -> promise {
             try

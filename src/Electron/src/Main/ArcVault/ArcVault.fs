@@ -21,14 +21,14 @@ type ArcVault(window: BrowserWindow) =
 
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
-    member val arc: ARC option = None with get, set
+    member val arc: ARC option = None with get, private set
+    // This flag is intentionally coarse and can remain true even if later edits restore the previous logical state.
+    //Good workaround, for a missing member 👍 Might even be more performant, than calculating a isDirty flag. On the other hand, it is unable to detect if changes are removed again. For example:
+    //Add Assay 1 -> Set hasUnsavedArcChanges <- true
+    //Remove Assay 1 -> Still true, even tough changes were removed again and it is in its original state.
+    //I am not sure if performance of calculating changes or precision should be more important. Lets see in the future. Maybe you can add this comment as /// comment on this member?
     /// Dirty marker for unsaved in-memory ARC mutations.
-    /// This flag is intentionally coarse and can remain true even if later edits restore the previous logical state.
-    ///Good workaround, for a missing member 👍 Might even be more performant, than calculating a isDirty flag. On the other hand, it is unable to detect if changes are removed again. For example:
-    ///Add Assay 1 -> Set hasUnsavedArcChanges <- true
-    ///Remove Assay 1 -> Still true, even tough changes were removed again and it is in its original state.
-    ///I am not sure if performance of calculating changes or precision should be more important. Lets see in the future. Maybe you can add this comment as /// comment on this member?
-    member val hasUnsavedArcChanges: bool = false with get, set
+    member val hasUnsavedArcChanges: bool = false with get, private set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
@@ -39,6 +39,20 @@ type ArcVault(window: BrowserWindow) =
     member val isCloseRequestPending: bool = false with get, set
     /// Allows a confirmed close to pass through the onClose handler exactly once.
     member val isCloseApproved: bool = false with get, set
+
+    /// This function mutably sets the active ARC in memory without persisting to disk.
+    member this.SetArc(arc: ARC) =
+        this.arc <- Some arc
+        this.window.title <- arc.Identifier
+
+    /// Sets the dirty marker for unsaved in-memory ARC mutations.
+    member this.SetHasUnsavedArcChanges(hasChanges: bool) =
+        /// Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
+        let valueIsChanging = this.hasUnsavedArcChanges <> hasChanges
+        this.hasUnsavedArcChanges <- hasChanges
+
+        if valueIsChanging then
+            sendArcHasUnsavedChangesUpdate hasChanges this.window
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -68,7 +82,14 @@ module ArcVaultExtensions =
                             (fun () ->
                                 promise {
                                     swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
-                                    do! this.LoadArc()
+
+                                    if this.hasUnsavedArcChanges then
+                                        swatelogfn
+                                            this.window.id
+                                            "Skipping ARC reload due to unsaved in-memory ARC changes."
+                                    else
+                                        do! this.LoadArc()
+
                                     sendMsgApi.IsLoadingChanges false
 
                                     match this.path with
@@ -76,11 +97,16 @@ module ArcVaultExtensions =
                                     | Some arcPath ->
                                         let eventPath =
                                             $"{arcPath}\{path}"
-                                                .Replace(ArcPathHelper.PathSeperatorWindows, ArcPathHelper.PathSeperator)
+                                                .Replace(
+                                                    ArcPathHelper.PathSeperatorWindows,
+                                                    ArcPathHelper.PathSeperator
+                                                )
 
                                         match eventName.ToLowerInvariant() with
-                                        | name when name = Chokidar.Events.Add.ToString().ToLowerInvariant()
-                                                    || name = Chokidar.Events.Change.ToString().ToLowerInvariant() ->
+                                        | name when
+                                            name = Chokidar.Events.Add.ToString().ToLowerInvariant()
+                                            || name = Chokidar.Events.Change.ToString().ToLowerInvariant()
+                                            ->
                                             let! changedFile = getFileEntryWithLfsMetadata arcPath eventPath
                                             let nextFileTree = upsertFileEntry changedFile this.fileTree
                                             this.SetFileTree(nextFileTree)
@@ -88,8 +114,10 @@ module ArcVaultExtensions =
                                             let! addedDirectory = getFileEntry eventPath
                                             let nextFileTree = upsertFileEntry addedDirectory this.fileTree
                                             this.SetFileTree(nextFileTree)
-                                        | name when name = Chokidar.Events.Unlink.ToString().ToLowerInvariant()
-                                                    || name = Chokidar.Events.UnlinkDir.ToString().ToLowerInvariant() ->
+                                        | name when
+                                            name = Chokidar.Events.Unlink.ToString().ToLowerInvariant()
+                                            || name = Chokidar.Events.UnlinkDir.ToString().ToLowerInvariant()
+                                            ->
                                             let nextFileTree = removePathAndDescendants eventPath this.fileTree
                                             this.SetFileTree(nextFileTree)
                                         | _ -> ()
@@ -99,30 +127,27 @@ module ArcVaultExtensions =
                                 |> Promise.catch (fun ex ->
                                     swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
                                     sendMsgApi.IsLoadingChanges false
-                                    this.fileWatcherReloadArcTimeout <- None)
+                                    this.fileWatcherReloadArcTimeout <- None
+                                )
                                 |> Promise.start
                             )
                             500
 
                     this.fileWatcherReloadArcTimeout <- Some timeoutId
 
-        /// This function mutably sets the active ARC in memory without persisting to disk.
-        member this.SetArc(arc: ARC) =
-            this.arc <- Some arc
-            this.window.title <- arc.Identifier
-
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
-        member this.UpdateArcBy(request: FileContentDTO) : Result<unit, exn> =
+        member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
             match this.arc with
             | None -> Error(exn "ARC is not loaded.")
             | Some arc ->
-                let normalizedRequest = Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
+                let normalizedRequest =
+                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
                 match updateARCByFileContentDTO arc normalizedRequest with
                 | Error saveError -> Error saveError
                 | Ok newArc ->
                     this.SetArc(newArc)
-                    this.hasUnsavedArcChanges <- true
+                    this.SetHasUnsavedArcChanges true
                     Ok()
 
         /// Writes the active in-memory ARC scaffold to disk using ARCtrl UpdateAsync.
@@ -134,7 +159,7 @@ module ArcVaultExtensions =
                 try
                     try
                         do! arc.UpdateAsync(arcPath)
-                        this.hasUnsavedArcChanges <- false
+                        this.SetHasUnsavedArcChanges false
                         return Ok()
                     with e ->
                         return Error(exn $"Failed to persist ARC to disk: {e.Message}")
@@ -147,27 +172,46 @@ module ArcVaultExtensions =
         /// The in-memory ARC is only replaced after successful persistence.
         member this.ApplyArcFileAndSave(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
-            | Some arcPath, Some arc ->
+            | Some arcPath, Some arcLocal ->
                 let normalizedRequest =
                     Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
-                let workingArc = arc.Copy()
+                this.isBusyWriting <- true
 
-                match updateARCByFileContentDTO workingArc normalizedRequest with
-                | Error updateError -> return Error updateError
-                | Ok updatedArc ->
-                    this.isBusyWriting <- true
+                try
+                    match! ARC.tryLoadAsync arcPath with
+                    | Error loadError -> return Error(exn $"Unable to reload ARC before scoped save: {loadError}")
+                    | Ok arcFromDisk ->
+                        let arcForDiskPersistence = copyArcPreservingStaticHashes arcFromDisk
+                        let arcForInMemoryState = copyArcPreservingStaticHashes arcLocal
 
-                    try
-                        try
-                            do! updatedArc.UpdateAsync(arcPath)
-                            this.SetArc(updatedArc)
-                            this.hasUnsavedArcChanges <- false
-                            return Ok()
-                        with e ->
-                            return Error(exn $"Failed to persist ARC to disk: {e.Message}")
-                    finally
-                        this.isBusyWriting <- false
+                        match
+                            updateARCByFileContentDTO arcForDiskPersistence normalizedRequest,
+                            updateARCByFileContentDTO arcForInMemoryState normalizedRequest
+                        with
+                        | Error updateError, _
+                        | _, Error updateError -> return Error updateError
+                        | Ok updatedArcForDiskPersistence, Ok updatedArcForInMemoryState ->
+                            try
+                                do! updatedArcForDiskPersistence.UpdateAsync(arcPath)
+                                // Carry over the fresh persisted hash baseline so follow-up writes stay scoped.
+                                syncArcStaticHashes updatedArcForDiskPersistence updatedArcForInMemoryState
+
+                                let hasRemainingUnsavedArcChanges =
+                                    updatedArcForInMemoryState.GetUpdateContracts().Length > 0
+
+                                // Preserve a pre-existing dirty marker so scoped add/save does not
+                                // accidentally clear unrelated unsaved in-memory changes.
+                                let nextHasUnsavedArcChanges =
+                                    this.hasUnsavedArcChanges || hasRemainingUnsavedArcChanges
+
+                                this.SetArc(updatedArcForInMemoryState)
+                                this.SetHasUnsavedArcChanges nextHasUnsavedArcChanges
+                                return Ok()
+                            with e ->
+                                return Error(exn $"Failed to persist ARC to disk: {e.Message}")
+                finally
+                    this.isBusyWriting <- false
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
@@ -202,13 +246,13 @@ module ArcVaultExtensions =
                 match! ARC.tryLoadAsync (this.path.Value) with
                 | Error e -> swatefailfn this.window.id $"Unable to load ARC: {e}"
                 | Ok arc ->
-                    this.arc <- Some arc
-                    this.hasUnsavedArcChanges <- false
+                    this.SetArc(arc)
+                    this.SetHasUnsavedArcChanges false
             else
                 swatefailfn this.window.id $"No path set for StartFileWatcher."
         }
 
-        member this.StartFileWatcher() =
+        member private this.StartFileWatcher() =
             if this.path.IsSome then
                 let watcher = createFileWatcher this.path.Value
 
@@ -255,8 +299,8 @@ module ArcVaultExtensions =
 
                 let arc = ARC(identifier)
                 this.path <- Some path
-                this.arc <- Some arc
-                this.hasUnsavedArcChanges <- false
+                this.SetArc(arc)
+                this.SetHasUnsavedArcChanges false
                 this.isBusyWriting <- true
 
                 try
@@ -349,12 +393,13 @@ type ArcVaults() =
                 return Ok()
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
                 swatelogfn windowId "Close request approved by user. Closing without saving."
-                vault.hasUnsavedArcChanges <- false
+                vault.SetHasUnsavedArcChanges false
                 vault.isCloseApproved <- true
                 vault.window.close ()
                 return Ok()
             | SaveBeforeQuitDecision.SaveAndClose ->
                 swatelogfn windowId "Close request approved by user. Closing after main save."
+
                 if vault.hasUnsavedArcChanges then
                     let! persistResult = vault.WriteArc()
 

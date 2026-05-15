@@ -38,8 +38,7 @@ type private Msg =
     | PageStateChanged of PageState option
     | SetLeftSidebarTarget of LeftSidebarPage
 
-let private init () : Model * Cmd<Msg> =
-    Model.Empty, Cmd.none
+let private init () : Model * Cmd<Msg> = Model.Empty, Cmd.none
 
 let private msgName =
     function
@@ -60,10 +59,7 @@ let private resetForClosedArc (model: Model) = {
 
 let private applyArcRootPath (arcRootPath: ArcRootPath) (model: Model) =
     match arcRootPath with
-    | Some _ -> {
-        model with
-            ArcRootPath = arcRootPath
-      }
+    | Some _ -> { model with ArcRootPath = arcRootPath }
     | None -> resetForClosedArc model
 
 let private createGetOpenPathCmd requestVersion liveUpdateVersionAtStart =
@@ -85,9 +81,10 @@ let private update (msg: Msg) (model: Model) : Model * Cmd<Msg> =
                 ArcRootPathRequestVersion = requestVersion
         },
         createGetOpenPathCmd requestVersion model.ArcRootPathLiveUpdateVersion
-    | ArcRootPathSnapshotLoaded(requestVersion, liveUpdateVersionAtStart, Ok arcRootPath)
-        when requestVersion = model.ArcRootPathRequestVersion
-             && liveUpdateVersionAtStart = model.ArcRootPathLiveUpdateVersion ->
+    | ArcRootPathSnapshotLoaded(requestVersion, liveUpdateVersionAtStart, Ok arcRootPath) when
+        requestVersion = model.ArcRootPathRequestVersion
+        && liveUpdateVersionAtStart = model.ArcRootPathLiveUpdateVersion
+        ->
         model |> applyArcRootPath arcRootPath, Cmd.none
     | ArcRootPathSnapshotLoaded(requestVersion, _, _) when requestVersion = model.ArcRootPathRequestVersion ->
         model, Cmd.none
@@ -176,6 +173,8 @@ let Main () =
     let setLeftSidebarTarget =
         React.useCallback ((fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)), [||])
 
+    let isInitializedArcVault = Option.isSome model.ArcRootPath
+
     Context.AppStateContext.AppStateCtx.Provider(
         model.ArcRootPath,
         Renderer.Context.FileStateContext.FileStateCtxProvider(
@@ -193,8 +192,16 @@ let Main () =
                                             CloseWindowController.CloseWindowController.Subscription()
                                         |],
                                     navbar = Renderer.Components.Navbar.Main(),
-                                    leftSidebar = Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget),
-                                    leftActions = LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget)
+                                    ?leftSidebar =
+                                        (if isInitializedArcVault then
+                                             Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget) |> Some
+                                         else
+                                             None),
+                                    ?leftActions =
+                                        (if isInitializedArcVault then
+                                             LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget) |> Some
+                                         else
+                                             None)
                                 )
                             )
                         )

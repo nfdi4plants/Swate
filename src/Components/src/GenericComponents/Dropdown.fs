@@ -36,10 +36,7 @@ type Dropdown =
                 defaultArg dropdownClassName ""
             ]
             prop.children [
-                Html.div [
-
-                    toggle
-                ]
+                toggle
                 if isOpen then
                     Html.ul [
                         prop.tabIndex 0
