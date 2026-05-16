@@ -1,5 +1,5 @@
 [<AutoOpen>]
-module Swate.Components.Primitives.Types
+module Swate.Components.Primitive.Types
 
 [<RequireQualifiedAccess>]
 type DaisyuiSize =

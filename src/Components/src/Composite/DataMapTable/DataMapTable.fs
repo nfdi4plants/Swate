@@ -1,15 +1,18 @@
-namespace Swate.Components
+namespace Swate.Components.Composite.DataMapTable
 
 open Feliz
 open Fable.Core
 open ARCtrl
 open Fable.Core.JsInterop
 open Swate.Components
-open Swate.Components.Table
 open Swate.Components.Shared
-open Swate.Components.AnnotationTable
-open Swate.Components.Primitives
-open Swate.Components.AnnotationTable.Context
+open Swate.Components.Primitive
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Primitive.ContextMenu
+open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.Table
+open Swate.Components.Composite.AnnotationTable
+open Swate.Components.Composite.AnnotationTable.Context
 
 
 module private DataMapTableHelper =

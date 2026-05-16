@@ -1,13 +1,14 @@
-namespace Swate.Components.Table
+namespace Swate.Components.Composite.Table
 
 open Swate.Components
 open Swate.Components.Shared
-open Swate.Components.Table.Context
+open Swate.Components.Composite.Table.Context
+open Swate.Components.Composite.TermSearch
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open ARCtrl
-open Swate.Components.Primitives
+open Swate.Components.Primitive
 
 type ActiveCellProps<'a> = {|
     data: 'a
@@ -224,7 +225,7 @@ type TableCell =
 
         let TermSearch =
             fun (props: ActiveCellProps<Term option>) ->
-                TermSearch.TermSearch.TermSearch(
+                TermSearch.TermSearch(
                     props.data,
                     props.setData,
                     ?parentId = parentId,

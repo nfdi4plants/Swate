@@ -4,7 +4,7 @@ namespace Swate.Components.NoteSearch.FilterLogic
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components.NoteTypes
-open Swate.Components.Primitives
+open Swate.Components.Primitive
 open System
 
 //filters the note list based on the search term and the selected filter options.

@@ -1,5 +1,5 @@
-namespace Swate.Components.ErrorModal
-
+[<AutoOpenAttribute>]
+module Swate.Components.Primitive.ErrorModal.Types
 
 [<RequireQualifiedAccess>]
 type ErrorModalActionStyle =

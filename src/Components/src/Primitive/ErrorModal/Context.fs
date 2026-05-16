@@ -1,4 +1,4 @@
-module Swate.Components.ErrorModal.Context
+module Swate.Components.Primitive.ErrorModal.Context
 
 open Swate.Components
 

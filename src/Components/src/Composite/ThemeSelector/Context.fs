@@ -1,8 +1,8 @@
-module Swate.Components.Theme.Context
+module Swate.Components.Composite.ThemeSelector.Context
 
 open Feliz
 open Swate.Components
-open Swate.Components.Primitives
+open Swate.Components.Composite.ThemeSelector
 
 let ThemeCtx = React.createContext<StateContext<Theme>> ()
 

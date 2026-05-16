@@ -1,5 +1,5 @@
 [<AutoOpenAttribute>]
-module Swate.Components.ReactHelper
+module Swate.Components.ReactHooks
 
 // https://github.com/Shmew/Feliz.UseListener/blob/master/src/Feliz.UseListener/Listener.fs
 

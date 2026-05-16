@@ -1,9 +1,9 @@
-namespace Swate.Components.Theme
+namespace Swate.Components.Composite.ThemeSelector
 
 open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Primitives
+open Swate.Components.Primitive
 
 module private ThemeSelectorHelper =
     [<Literal>]
@@ -66,8 +66,8 @@ open ThemeSelectorHelper
 type ThemeSelector =
 
     [<ReactComponent>]
-    static member private SelectItem(theme: Swate.Components.Types.Theme) =
-        let txt = Swate.Components.Types.Theme.toString theme
+    static member private SelectItem(theme: Theme) =
+        let txt = Theme.toString theme
         Html.option [ prop.value txt; prop.text txt ]
 
     [<ReactComponent(true)>]
@@ -81,11 +81,11 @@ type ThemeSelector =
             (fun () ->
                 let icon =
                     match themeCtx.state with
-                    | Swate.Components.Types.Theme.Sunrise -> AnimatedSun
-                    | Swate.Components.Types.Finster -> AnimatedMoon
-                    | Swate.Components.Types.Planti -> Planti
-                    | Swate.Components.Types.Viola -> Viola
-                    | Swate.Components.Types.Auto -> Browser
+                    | Theme.Sunrise -> AnimatedSun
+                    | Theme.Finster -> AnimatedMoon
+                    | Theme.Planti -> Planti
+                    | Theme.Viola -> Viola
+                    | Theme.Auto -> Browser
 
                 iconRef.current?innerHTML <- icon
                 ()
@@ -98,14 +98,14 @@ type ThemeSelector =
             prop.children [
                 Html.span [ prop.className "swt:label"; prop.ref iconRef ]
                 Html.select [
-                    prop.value (Swate.Components.Types.Theme.toString themeCtx.state)
-                    prop.onChange (fun (e: string) -> themeCtx.setState (Swate.Components.Types.Theme.fromString e))
+                    prop.value (Theme.toString themeCtx.state)
+                    prop.onChange (fun (e: string) -> themeCtx.setState (Theme.fromString e))
                     prop.children [
-                        ThemeSelector.SelectItem Swate.Components.Types.Theme.Sunrise
-                        ThemeSelector.SelectItem Swate.Components.Types.Theme.Finster
-                        ThemeSelector.SelectItem Swate.Components.Types.Theme.Planti
-                        ThemeSelector.SelectItem Swate.Components.Types.Theme.Viola
-                        ThemeSelector.SelectItem Swate.Components.Types.Theme.Auto
+                        ThemeSelector.SelectItem Theme.Sunrise
+                        ThemeSelector.SelectItem Theme.Finster
+                        ThemeSelector.SelectItem Theme.Planti
+                        ThemeSelector.SelectItem Theme.Viola
+                        ThemeSelector.SelectItem Theme.Auto
                     ]
                 ]
             ]

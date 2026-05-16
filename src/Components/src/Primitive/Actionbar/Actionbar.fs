@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.Actionbar
 
 open Browser.Types
 
@@ -7,8 +7,8 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 open Swate.Components
-open Swate.Components.Primitives
-open Swate.Components.Types.Actionbar
+open Swate.Components.Primitive
+open Swate.Components.Primitive.ContextMenu
 
 [<Erase; Mangle(false)>]
 type Actionbar =

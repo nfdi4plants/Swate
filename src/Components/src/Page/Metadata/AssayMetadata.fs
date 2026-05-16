@@ -6,6 +6,7 @@ open Feliz
 open ARCtrl
 open Swate.Components
 open Swate.Components.Metadata
+open Swate.Components.Metadata.FormComponents
 
 [<Erase; Mangle(false)>]
 type AssayMetadata =
@@ -18,8 +19,8 @@ type AssayMetadata =
             LayoutComponents.BoxedField(
                 "Assay Metadata",
                 content = [
-                    FormComponents.TextInput(assay.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
-                    FormComponents.TextInput(
+                    TextInput.TextInput(assay.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
+                    TextInput.TextInput(
                         defaultArg assay.Title "",
                         (fun value ->
                             assay.Title <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -27,7 +28,7 @@ type AssayMetadata =
                         ),
                         label = "Title"
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         defaultArg assay.Description "",
                         (fun value ->
                             assay.Description <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -36,7 +37,7 @@ type AssayMetadata =
                         label = "Description",
                         isArea = true
                     )
-                    FormComponents.OntologyAnnotationInput(
+                    OntologyAnnotationInput.OntologyAnnotationInput(
                         assay.MeasurementType,
                         (fun annotation ->
                             assay.MeasurementType <- annotation
@@ -44,7 +45,7 @@ type AssayMetadata =
                         ),
                         label = "Measurement Type"
                     )
-                    FormComponents.OntologyAnnotationInput(
+                    OntologyAnnotationInput.OntologyAnnotationInput(
                         assay.TechnologyType,
                         (fun annotation ->
                             assay.TechnologyType <- annotation
@@ -52,7 +53,7 @@ type AssayMetadata =
                         ),
                         label = "Technology Type"
                     )
-                    FormComponents.OntologyAnnotationInput(
+                    OntologyAnnotationInput.OntologyAnnotationInput(
                         assay.TechnologyPlatform,
                         (fun annotation ->
                             assay.TechnologyPlatform <- annotation
@@ -60,7 +61,7 @@ type AssayMetadata =
                         ),
                         label = "Technology Platform"
                     )
-                    FormComponents.PersonsInput(
+                    PersonsInput.PersonsInput(
                         assay.Performers,
                         (fun persons ->
                             assay.Performers <- persons
@@ -68,7 +69,7 @@ type AssayMetadata =
                         ),
                         label = "Performers"
                     )
-                    FormComponents.CommentsInput(
+                    CommentsInput.CommentsInput(
                         assay.Comments,
                         (fun comments ->
                             assay.Comments <- comments

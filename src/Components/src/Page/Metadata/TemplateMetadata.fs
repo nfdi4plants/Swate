@@ -4,6 +4,7 @@ open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components
+open Swate.Components.Metadata.FormComponents
 
 [<Erase; Mangle(false)>]
 type TemplateMetadata =
@@ -16,13 +17,13 @@ type TemplateMetadata =
             LayoutComponents.BoxedField(
                 "Template Metadata",
                 content = [
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         template.Id.ToString(),
                         (fun _ -> ()),
                         label = "Identifier",
                         disabled = true
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         template.Name,
                         (fun value ->
                             template.Name <- value
@@ -30,7 +31,7 @@ type TemplateMetadata =
                         ),
                         label = "Name"
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         template.Description,
                         (fun value ->
                             template.Description <- value
@@ -39,7 +40,7 @@ type TemplateMetadata =
                         label = "Description",
                         isArea = true
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         template.Organisation.ToString(),
                         (fun value ->
                             template.Organisation <- Organisation.ofString value
@@ -47,7 +48,7 @@ type TemplateMetadata =
                         ),
                         label = "Organisation"
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         template.Version,
                         (fun value ->
                             template.Version <- value
@@ -55,7 +56,7 @@ type TemplateMetadata =
                         ),
                         label = "Version"
                     )
-                    FormComponents.DateTimeInput(
+                    DateTimeInput.DateTimeInput(
                         template.LastUpdated,
                         (fun value ->
                             template.LastUpdated <- value
@@ -63,7 +64,7 @@ type TemplateMetadata =
                         ),
                         label = "Last Updated"
                     )
-                    FormComponents.OntologyAnnotationsInput(
+                    OntologyAnnotationInput.OntologyAnnotationsInput(
                         template.Tags,
                         (fun annotations ->
                             template.Tags <- annotations
@@ -71,7 +72,7 @@ type TemplateMetadata =
                         ),
                         label = "Tags"
                     )
-                    FormComponents.OntologyAnnotationsInput(
+                    OntologyAnnotationInput.OntologyAnnotationsInput(
                         template.EndpointRepositories,
                         (fun annotations ->
                             template.EndpointRepositories <- annotations
@@ -79,7 +80,7 @@ type TemplateMetadata =
                         ),
                         label = "Endpoint Repositories"
                     )
-                    FormComponents.PersonsInput(
+                    PersonsInput.PersonsInput(
                         template.Authors,
                         (fun persons ->
                             template.Authors <- persons

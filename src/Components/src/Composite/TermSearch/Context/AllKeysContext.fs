@@ -1,4 +1,5 @@
-module Swate.Components.TermSearch.TermSearchAllKeysContext
+[<AutoOpenAttribute>]
+module Swate.Components.Composite.TermSearch.Context.AllKeysContext
 
 open Feliz
 

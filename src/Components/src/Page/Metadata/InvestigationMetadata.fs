@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components
+open Swate.Components.Metadata.FormComponents
 
 [<Erase; Mangle(false)>]
 type InvestigationMetadata =
@@ -17,13 +18,13 @@ type InvestigationMetadata =
             LayoutComponents.BoxedField(
                 "Investigation Metadata",
                 content = [
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         investigation.Identifier,
                         (fun _ -> ()),
                         label = "Identifier",
                         disabled = true
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         defaultArg investigation.Title "",
                         (fun value ->
                             investigation.Title <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -31,7 +32,7 @@ type InvestigationMetadata =
                         ),
                         label = "Title"
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         defaultArg investigation.Description "",
                         (fun value ->
                             investigation.Description <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -40,7 +41,7 @@ type InvestigationMetadata =
                         label = "Description",
                         isArea = true
                     )
-                    FormComponents.PersonsInput(
+                    PersonsInput.PersonsInput(
                         investigation.Contacts,
                         (fun persons ->
                             investigation.Contacts <- persons
@@ -48,7 +49,7 @@ type InvestigationMetadata =
                         ),
                         label = "Contacts"
                     )
-                    FormComponents.PublicationsInput(
+                    PublicationsInput.PublicationsInput(
                         investigation.Publications,
                         (fun publications ->
                             investigation.Publications <- publications
@@ -56,7 +57,7 @@ type InvestigationMetadata =
                         ),
                         label = "Publications"
                     )
-                    FormComponents.DateTimeInput(
+                    DateTimeInput.DateTimeInput(
                         defaultArg investigation.SubmissionDate "",
                         (fun value ->
                             investigation.SubmissionDate <-
@@ -66,7 +67,7 @@ type InvestigationMetadata =
                         ),
                         label = "Submission Date"
                     )
-                    FormComponents.DateTimeInput(
+                    DateTimeInput.DateTimeInput(
                         defaultArg investigation.PublicReleaseDate "",
                         (fun value ->
                             investigation.PublicReleaseDate <-
@@ -76,7 +77,7 @@ type InvestigationMetadata =
                         ),
                         label = "Public Release Date"
                     )
-                    FormComponents.OntologySourceReferencesInput(
+                    OntologySourceReferencesInput.OntologySourceReferencesInput(
                         investigation.OntologySourceReferences,
                         (fun references ->
                             investigation.OntologySourceReferences <- references
@@ -84,7 +85,7 @@ type InvestigationMetadata =
                         ),
                         label = "Ontology Source References"
                     )
-                    FormComponents.CommentsInput(
+                    CommentsInput.CommentsInput(
                         investigation.Comments,
                         (fun comments ->
                             investigation.Comments <- comments

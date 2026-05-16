@@ -1,8 +1,8 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.LayoutComponents
 
 open Feliz
 open Swate.Components
-open Swate.Components.Primitives
+open Swate.Components.Primitive
 
 [<RequireQualifiedAccess>]
 type LayoutComponents =

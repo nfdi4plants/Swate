@@ -1,8 +1,9 @@
-module Swate.Components.TermSearch.TermSearchActiveKeysContext
+[<AutoOpenAttribute>]
+module Swate.Components.Composite.TermSearch.Context.ActiveKeysContext
 
 open Feliz
 open Swate.Components
-open Swate.Components.Types
+open Swate.Components.Composite.TermSearch
 
 type TermSearchActiveKeysContext = {|
     disableDefault: bool

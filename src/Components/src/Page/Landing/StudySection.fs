@@ -2,6 +2,7 @@ namespace Swate.Components.Landing
 
 open Feliz
 open Swate.Components.Metadata
+open Swate.Components.Metadata.FormComponents
 
 [<RequireQualifiedAccess>]
 module StudySection =
@@ -19,24 +20,24 @@ module StudySection =
             prop.className "swt:space-y-3"
             prop.children [
                 BoxedHelperContent (
-                    FormComponents.PublicationsInput(
+                    PublicationsInput.PublicationsInput(
                         draft.Publications,
                         (fun pubs -> setDraft { draft with Publications = pubs }),
                         label = "Publications"
                     )
                 )
-                FormComponents.DateTimeInput(
+                DateTimeInput.DateTimeInput(
                     draft.SubmissionDate,
                     (fun dateText -> setDraft { draft with SubmissionDate = dateText }),
                     label = "Submission Date"
                 )
-                FormComponents.DateTimeInput(
+                DateTimeInput.DateTimeInput(
                     draft.PublicReleaseDate,
                     (fun dateText -> setDraft { draft with PublicReleaseDate = dateText }),
                     label = "Public Release Date"
                 )
                 BoxedHelperContent (
-                    FormComponents.OntologyAnnotationsInput(
+                    OntologyAnnotationInput.OntologyAnnotationsInput(
                         draft.StudyDesignDescriptors,
                         (fun descriptors -> setDraft { draft with StudyDesignDescriptors = descriptors }),
                         label = "Study Design Descriptors"

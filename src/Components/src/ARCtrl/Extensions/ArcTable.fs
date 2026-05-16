@@ -3,7 +3,7 @@ module ARCtrl.ArcTableExtensions
 
 open ARCtrl
 open ArcTableAux
-open Swate.Components.Types
+open Swate.Components
 open ARCtrl.Spreadsheet
 
 type ArcTable with
@@ -11,20 +11,6 @@ type ArcTable with
         let index = (cellIndex.x - 1, cellIndex.y - 1)
         let c = this.GetCellAt(index).GetEmptyCellFixed()
         this.SetCellAt(cellIndex.x - 1, cellIndex.y - 1, c)
-
-
-    member this.ClearSelectedCells(selectHandle: SelectHandle) =
-        let selectedCells = selectHandle.getSelectedCells ()
-        let indices = selectedCells |> Seq.map (fun i -> (i.x - 1, i.y - 1)) |> Seq.toArray
-
-        indices
-        |> Array.iter (fun (ci, ri) ->
-            let tempIndex = (ci, ri)
-            let prev = this.GetCellAt(tempIndex)
-            let next = prev.GetEmptyCellFixed()
-
-            this.SetCellAt(ci, ri, next, true)
-        )
 
     member this.SetCellsAt(cells: (CellCoordinate * CompositeCell)[]) =
         let columns = cells |> Array.groupBy (fun (index, cell) -> index)

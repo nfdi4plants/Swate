@@ -1,10 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.ComboBox
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.Primitives
-
+open Swate.Components
+open Swate.Components.Primitive
 
 [<Erase; Mangle(false)>]
 type ComboBox =

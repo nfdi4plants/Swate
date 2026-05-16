@@ -1,10 +1,12 @@
-namespace Swate.Components.Authentication
+namespace Swate.Components.Composite.Authentication
 
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Authentication.Types
-open Swate.Components.Authentication.Helper
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Primitive.Dropdown
+open Types
+open Helper
 
 
 [<Erase; Mangle(false)>]
@@ -138,11 +140,11 @@ type Authentication =
                                         Authentication.DataHubRadioItem(
                                             dataHub,
                                             radioid,
-                                            Authentication.Helper.Default_DataHub_Collection.Default,
+                                            Helper.Default_DataHub_Collection.Default,
                                             setDataHub,
                                             radioClassName = "swt:radio swt:radio-sm swt:radio-primary"
                                         )
-                                        for dataHubI in Authentication.Helper.Default_DataHub_Collection.Supported do
+                                        for dataHubI in Helper.Default_DataHub_Collection.Supported do
                                             Authentication.DataHubRadioItem(dataHub, radioid, dataHubI, setDataHub)
                                         Authentication.CustomDataHubRadioItem(dataHub, radioid, setDataHub)
                                     ]
@@ -157,7 +159,7 @@ type Authentication =
     [<ReactComponent>]
     static member private NotAuthenticatedView(onSignIn: SignInInformation -> unit, setError: exn option -> unit) =
 
-        let datahubUrl, setDataHubUrl = React.useState Authentication.Helper.Default_DataHub
+        let datahubUrl, setDataHubUrl = React.useState Helper.Default_DataHub
         let pat, setPat = React.useState ""
 
         Html.div [
@@ -193,7 +195,7 @@ type Authentication =
                     prop.testId "GeneratePatLink"
                     prop.className "swt:link swt:link-info swt:text-sm swt:text-center swt:py-2"
                     prop.text "Click here to generate a new GitLab Personal Access Token"
-                    prop.href (Authentication.Helper.GitLabUrls.prefillGitLabPATScopes datahubUrl.Url)
+                    prop.href (Helper.GitLabUrls.prefillGitLabPATScopes datahubUrl.Url)
                     prop.target.blank
                     prop.rel "noopener noreferrer"
                 ]
@@ -349,12 +351,12 @@ type Authentication =
             Name = "John Doe"
             Email = "john-doe@mail.com"
             AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
-            TargetDataHub = Authentication.Helper.Default_DataHub_Url
+            TargetDataHub = Helper.Default_DataHub_Url
         }
 
     static member User =
         {
-            Authentication.Types.AuthStateDto.Empty with
+            Types.AuthStateDto.Empty with
                 ActiveAccount =
                     Some {
                         User = Authentication.ExmpUserInformation

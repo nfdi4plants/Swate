@@ -1,9 +1,10 @@
-namespace Swate.Components.AnnotationTable
+namespace Swate.Components.Composite.AnnotationTable
 
 open Swate.Components
-open Swate.Components.Table
-open Swate.Components.AnnotationTable
-open Swate.Components.AnnotationTable.Context
+open Swate.Components.Primitive.ContextMenu
+open Swate.Components.Composite.Table
+open Swate.Components.Composite.AnnotationTable
+open Swate.Components.Composite.AnnotationTable.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz

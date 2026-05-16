@@ -4,6 +4,7 @@ open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components.Metadata
+open Swate.Components.Metadata.FormComponents
 
 [<RequireQualifiedAccess>]
 module SharedFields =
@@ -32,19 +33,19 @@ module SharedFields =
             onImportPersons: (unit -> JS.Promise<Person[]>) option
         ) =
         React.Fragment [
-            FormComponents.TextInput(
+            TextInput.TextInput(
                 draft.Identifier,
                 (fun value -> setDraft { draft with Identifier = value }),
                 label = "Identifier (Optional)",
                 placeholder = "Auto-generated if empty"
             )
-            FormComponents.TextInput(
+            TextInput.TextInput(
                 draft.Title,
                 (fun value -> setDraft { draft with Title = value }),
                 label = "Title (Required)",
                 placeholder = "Experiment title"
             )
-            FormComponents.TextInput(
+            TextInput.TextInput(
                 draft.Description,
                 (fun value -> setDraft { draft with Description = value }),
                 label = "Description (Required)",
@@ -52,19 +53,19 @@ module SharedFields =
                 placeholder = "Experiment description"
             )
             BoxedHelperField "Involved People" (
-                FormComponents.PersonsInput(
+                PersonsInput.PersonsInput(
                     draft.InvolvedPeople,
                     (fun persons -> setDraft { draft with InvolvedPeople = persons }),
                     ?onImportPersons = onImportPersons
                 )
             )
             BoxedHelperField "Comments" (
-                FormComponents.CommentsInput(
+                CommentsInput.CommentsInput(
                     draft.Comments,
                     (fun comments -> setDraft { draft with Comments = comments })
                 )
             )
-            FormComponents.TextInput(
+            TextInput.TextInput(
                 draft.MainText,
                 (fun value -> setDraft { draft with MainText = value }),
                 label = "Main Text",

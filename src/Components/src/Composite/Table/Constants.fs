@@ -1,4 +1,4 @@
-module Swate.Components.Constants
+module Swate.Components.Composite.Table.Constants
 
 module Table =
 

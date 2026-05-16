@@ -1,9 +1,11 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.Popover
 
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.Primitives.Popover.Context
+open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.Popover.Context
 
 module private PopoverHelper =
 
@@ -334,7 +336,7 @@ type Popover =
                     prop.children c
                 ]
             | None ->
-                Components.CircularExitButton(
+                Primitive.Buttons.Buttons.CircularExitButton(
                     className = (defaultArg className "swt:btn-sm"),
                     props = [
                         prop.type'.button

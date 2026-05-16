@@ -1,8 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.Select
 
 open Fable.Core
 open Feliz
-open Swate.Components.GenericComponents.SelectContext
+open Swate.Components
+open Swate.Components.Primitive.Select.Context
+open Swate.Components.Primitive.Select
 
 [<Erase; Mangle(false)>]
 type Select =

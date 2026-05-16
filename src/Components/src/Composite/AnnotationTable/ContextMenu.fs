@@ -1,4 +1,4 @@
-namespace Swate.Components.AnnotationTable
+namespace Swate.Components.Composite.AnnotationTable
 
 open System
 open System.Text.RegularExpressions
@@ -8,7 +8,9 @@ open Feliz
 
 open Swate.Components
 open Types.AnnotationTableContextMenu
-open Swate.Components.Primitives
+open Swate.Components.Primitive
+open Swate.Components.Primitive.ContextMenu
+open Swate.Components.Composite.Table
 
 /// AnnotationTableContextMenu Components
 type ATCMC =

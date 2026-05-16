@@ -1,102 +1,10 @@
-[<AutoOpenAttribute>]
-module Swate.Components.Types
+[<AutoOpen>]
+module Swate.Components.Composite.TermSearch.Types
 
+open Swate.Components
+open Swate.Components.Shared.Extensions
 open Fable.Core
 open Feliz
-
-type SelectItem<'a> = {| item: 'a; label: string |}
-
-type SelectItemRender<'a> = {|
-    isActive: bool
-    isSelected: bool
-    item: SelectItem<'a>
-|}
-
-type ComboBoxRef = {|
-    focus: unit -> unit
-    close: unit -> unit
-    isOpen: unit -> bool
-|}
-
-
-[<StringEnum(Fable.Core.CaseRules.LowerFirst)>]
-type Theme =
-    | Auto
-    | Sunrise
-    | Finster
-    | Planti
-    | Viola
-
-module Theme =
-    let toString (theme: Theme) =
-        match theme with
-        | Auto -> "auto"
-        | Sunrise -> "light"
-        | Finster -> "dark"
-        | Planti -> "planti"
-        | Viola -> "viola"
-
-    let fromString (theme: string) =
-        match theme with
-        | "auto" -> Auto
-        | "light" -> Sunrise
-        | "dark" -> Finster
-        | "planti" -> Planti
-        | "viola" -> Viola
-        | _ -> Auto // Default to Auto if the string does not match any known theme
-
-type CellCoordinate = {| x: int; y: int |}
-
-type CellCoordinateRange = {|
-    yStart: int
-    yEnd: int
-    xStart: int
-    xEnd: int
-|}
-
-module CellCoordinateRange =
-
-    let count (range: CellCoordinateRange) : int =
-        (range.yEnd - range.yStart + 1) * (range.xEnd - range.xStart + 1)
-
-    let toArray (range: CellCoordinateRange) : ResizeArray<CellCoordinate> =
-        let result = ResizeArray<CellCoordinate>()
-
-        for y in range.yStart .. range.yEnd do
-            for x in range.xStart .. range.xEnd do
-                result.Add({| x = x; y = y |})
-
-        result
-
-    let contains (range: CellCoordinateRange option) (cellCoordinate: CellCoordinate) : bool =
-        if range.IsSome then
-            let coordinates = toArray range.Value
-            coordinates.Contains(cellCoordinate)
-        else
-            false
-
-[<JS.Pojo>]
-type SelectHandle
-    (
-        contains: CellCoordinate -> bool,
-        selectAt: (CellCoordinate * bool) -> unit,
-        clear: unit -> unit,
-        getSelectedCellRange,
-        getSelectedCells,
-        getCount
-    ) =
-    member val contains: CellCoordinate -> bool = contains with get, set
-    member val selectAt: (CellCoordinate * bool) -> unit = selectAt with get, set
-    member val clear: unit -> unit = clear with get, set
-    member val getSelectedCellRange: unit -> CellCoordinateRange option = getSelectedCellRange with get, set
-    member val getSelectedCells: unit -> ResizeArray<CellCoordinate> = getSelectedCells with get, set
-    member val getCount: unit -> int = getCount with get, set
-
-[<JS.Pojo>]
-type TableHandle(focus: unit -> unit, scrollTo: CellCoordinate -> unit, SelectHandle: SelectHandle) =
-    member val focus: unit -> unit = focus with get, set
-    member val scrollTo: CellCoordinate -> unit = scrollTo with get, set
-    member val SelectHandle: SelectHandle = SelectHandle with get, set
 
 [<JS.PojoAttribute>]
 type Term
@@ -210,19 +118,6 @@ module Term =
 type TermSearchStyle(?inputLabel: U2<string, string[]>) =
     member val inputLabel: U2<string, string[]> option = inputLabel with get, set
 
-
-type style =
-    static member resolveStyle(style: U2<string, string[]>) =
-        match style with
-        | U2.Case1 className -> className
-        | U2.Case2 classNames -> classNames |> String.concat " "
-
-    static member resolveStyle(style: U2<string, string[]> option) =
-        match style with
-        | Some(U2.Case1 className) -> className
-        | Some(U2.Case2 classNames) -> classNames |> String.concat " "
-        | None -> null
-
 [<JS.Pojo>]
 type AdvancedSearchOptions
     (setResults: (ResizeArray<Term> -> unit), formRef: IRefValue<unit -> JS.Promise<ResizeArray<Term>>>) =
@@ -248,55 +143,61 @@ type ParentSearchCall = (string * string) -> JS.Promise<ResizeArray<Term>>
 ///
 type AllChildrenSearchCall = string -> JS.Promise<ResizeArray<Term>>
 
-
-module AnnotationTableContextMenu =
+[<AutoOpen>]
+module ARCtrlExtension =
 
     open ARCtrl
 
-    type PasteCases =
-        | AddColumns of
-            {|
-                data: ResizeArray<CompositeColumn>
-                coordinate: CellCoordinate
-                coordinates: CellCoordinate[][]
-            |}
-        | PasteCells of
-            {|
-                data: ResizeArray<CompositeColumn>
-                coordinates: CellCoordinate[][]
-            |}
-        | Unknown of
-            {|
-                data: string[][]
-                headers: CompositeHeader[]
-            |}
+    type OntologyAnnotation with
+        static member from(term: Term) =
+            let comments =
+                ResizeArray [
+                    if term.description.IsSome then
+                        Comment(OntologyAnnotationHelper.DescriptionCommentKey, term.description.Value)
+                    if term.isObsolete.IsSome then
+                        Comment(OntologyAnnotationHelper.IsObsoleteCommentKey, term.isObsolete.Value.ToString())
+                ]
 
-module AnnotationTable =
+            OntologyAnnotation(?name = term.name, ?tsr = term.source, ?tan = term.id, comments = comments)
 
-    open AnnotationTableContextMenu
+        member this.ToTerm() =
+            let href =
+                this.TermAccessionOntobeeUrl |> Option.whereNot System.String.IsNullOrWhiteSpace
 
-    [<RequireQualifiedAccess>]
-    type ModalTypes =
-        | Details of CellCoordinate
-        | Transform of CellCoordinate
-        | Edit of CellCoordinate
-        | PasteCaseUserInput of PasteCases * SelectHandle
-        /// 👀 Uses CellCoordinate to identify if clicked cell is part of selected range
-        | MoveColumn of uiTableIndex: CellCoordinate * arcTableIndex: CellCoordinate
-        | Error of string
-        | UnknownPasteCase of PasteCases
-        | None
+            let description =
+                this.Comments
+                |> Seq.tryFind (fun c -> c.Name = Some OntologyAnnotationHelper.DescriptionCommentKey)
+                |> Option.bind (fun c -> c.Value)
 
-module Actionbar =
+            let isObsolete =
+                this.Comments
+                |> Seq.tryFind (fun c -> c.Name = Some OntologyAnnotationHelper.IsObsoleteCommentKey)
+                |> Option.bind (fun c -> c.Value)
+                |> Option.map System.Boolean.Parse
 
-    type ButtonInfo = {
-        icon: string
-        toolTip: string option
-        onClick: Browser.Types.MouseEvent -> unit
-    } with
+            Term(
+                ?name = this.Name,
+                ?source = this.TermSourceREF,
+                ?id = this.TermAccessionNumber,
+                ?href = href,
+                ?description = description,
+                ?isObsolete = isObsolete
+            )
 
-        static member create(icon: string, toolTip: string, (onClick: Browser.Types.MouseEvent -> unit)) = {
-            icon = icon
-            toolTip = Some toolTip
-            onClick = onClick
-        }
+[<AutoOpen>]
+module TIBTypesExtensions =
+
+    type Api.TIBApi.TIBTypes.SearchApi with
+        /// This function is used to transform TIB term type into the Swate compatible Term type.
+        member this.ToMyTerm() =
+            this.response.docs
+            |> Array.map (fun t ->
+                Term(
+                    t.label,
+                    t.obo_id,
+                    t.description |> String.concat ";",
+                    t.ontology_name,
+                    t.iri,
+                    t.is_obsolete |> Option.defaultValue false
+                )
+            )

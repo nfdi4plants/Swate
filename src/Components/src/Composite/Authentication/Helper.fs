@@ -1,4 +1,4 @@
-module Swate.Components.Authentication.Helper
+module Swate.Components.Composite.Authentication.Helper
 
 open Types
 open Swate.Components
@@ -112,7 +112,7 @@ module GitLabAPI =
 
                 // ---- JSON PARSE ----
                 try
-                    let! gitLabUserInfo = response.json<Authentication.Types.GitLabUser> ()
+                    let! gitLabUserInfo = response.json<Types.GitLabUser> ()
 
                     let userInfo = AuthUserDto.FromGitLabUser gitLabUserInfo signInInfo.GitLabBaseUrl
 

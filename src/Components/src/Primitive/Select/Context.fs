@@ -1,7 +1,6 @@
-module Swate.Components.GenericComponents.SelectContext
+module Swate.Components.Primitive.Select.Context
 
 open Feliz
-
 
 type SelectContextValue = {
     activeIndex: int option

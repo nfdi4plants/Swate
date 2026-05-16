@@ -9,6 +9,7 @@ open Swate.Components.Authentication.Types
 open Swate.Components.Types.Actionbar
 open Swate.Components.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
+open Swate.Components.Primitive
 
 module private DataHubBrowserHelper =
 
@@ -35,6 +36,12 @@ module private DataHubBrowserHelper =
 [<Erase; Mangle(false)>]
 type DataHubBrowser =
 
+    [<ReactComponent>]
+    static member SectionHeading(text: string) =
+        Html.h3 [
+            prop.className "swt:text-sm swt:font-semibold swt:text-base-content/70 swt:uppercase swt:tracking-wide"
+            prop.text text
+        ]
 
     [<ReactComponent>]
     static member private ActionbarButtons(buttonInfos: ButtonInfo[]) =
@@ -566,7 +573,7 @@ type DataHubBrowser =
                 Html.div [
                     prop.className "swt:flex swt:items-center swt:gap-2"
                     prop.children [
-                        DataHubComponents.DataHubComponents.SectionHeading("GitLab Explore")
+                        DataHubBrowser.SectionHeading("GitLab Explore")
                         match onClose with
                         | Some closeFn ->
                             Html.div [

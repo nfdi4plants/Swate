@@ -1,7 +1,9 @@
-module Swate.Components.TermSearch.TermSearchConfigContext
+[<AutoOpenAttribute>]
+module Swate.Components.Composite.TermSearch.Context.ConfigContext
 
 open Feliz
-open Swate.Components.Types
+open Swate.Components
+open Swate.Components.Composite.TermSearch
 
 type TermSearchConfigContext = {
     hasProvider: bool

@@ -1,13 +1,14 @@
-namespace Swate.Components.AnnotationTable
+namespace Swate.Components.Composite.AnnotationTable
 
 open Fable.Core
 open Feliz
 open Browser.Types
 open Swate.Components
 open ARCtrl
+open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.Table
 open Swate.Components.Shared
-open Swate.Components.AnnotationTable
-open Swate.Components.Primitives
+open Swate.Components.Primitive.BaseModal
 
 // 👀 this file is work in progress
 
@@ -225,7 +226,7 @@ type InputField =
             prop.className "swt:flex swt:flex-col swt:gap-2"
             prop.children [
                 Html.label [ prop.className "swt:label"; prop.text label ]
-                TermSearch.TermSearch.TermSearch(
+                TermSearch.TermSearch(
                     v,
                     setter,
                     classNames = TermSearchStyle(U2.Case1 "swt:border-current swt:w-full"),
@@ -293,7 +294,7 @@ type CompositeCellModal =
                     else
                         failwith "At least one set parameter must be set!"
 
-        let body = TermSearch.TermSearch.ModalDetails(tempTerm, setTempTerm, initTerm)
+        let body = TermSearch.ModalDetails(tempTerm, setTempTerm, initTerm)
 
         BaseModal.Modal(
             true,
@@ -326,7 +327,7 @@ type CompositeCellModal =
                     rmv ()
 
         let body =
-            TermSearch.TermSearch.ModalDetails(tempTerm, setTempTerm, initTerm, tempValue, setTempValue, value)
+            TermSearch.ModalDetails(tempTerm, setTempTerm, initTerm, tempValue, setTempValue, value)
 
         BaseModal.Modal(
             true,
@@ -774,7 +775,7 @@ type ContextMenuModals =
             else
                 None
 
-        Swate.Components.BaseModal.Modal(
+        BaseModal.Modal(
             true,
             (fun _ -> rmv ()),
             Html.p (

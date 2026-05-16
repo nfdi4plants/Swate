@@ -1,8 +1,8 @@
-namespace Swate.Components.ErrorModal
+namespace Swate.Components.Primitive.ErrorModal
 
 open Feliz
 open Fable.Core
-open Swate.Components.ErrorModal.Context
+open Context
 
 [<Erase; Mangle(false)>]
 type ErrorModalProvider =

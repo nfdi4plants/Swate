@@ -1,4 +1,4 @@
-namespace Swate.Components.Table
+namespace Swate.Components.Composite.Table
 
 open Fable.Core
 open Swate.Components
@@ -99,8 +99,6 @@ module GridSelect =
                 let yEnd = range.yEnd
                 sprintf "x: %d-%d, y: %d-%d" xStart xEnd yStart yEnd
             | None -> "None"
-
-
 
 open GridSelect
 

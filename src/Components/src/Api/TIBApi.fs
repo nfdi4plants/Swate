@@ -54,22 +54,6 @@ module TIBTypes =
         abstract content: string[]
         abstract numberOfElements: int
 
-[<AutoOpen>]
-module TIBTypesExtensions =
-    type TIBTypes.SearchApi with
-        /// This function is used to transform TIB term type into the Swate compatible Term type.
-        member this.ToMyTerm() =
-            this.response.docs
-            |> Array.map (fun t ->
-                Term(
-                    t.label,
-                    t.obo_id,
-                    t.description |> String.concat ";",
-                    t.ontology_name,
-                    t.iri,
-                    t.is_obsolete |> Option.defaultValue false
-                )
-            )
 
 [<AttachMembers>]
 type TIBApi =
@@ -111,7 +95,7 @@ type TIBApi =
 
             if childrenOf.IsSome && childrenOf_.IsNone then
                 // exit condition should we not find the parent IRI
-                return ResizeArray()
+                return None
             else
                 let queryParams: (string * obj) list = [
                     "q", q
@@ -136,7 +120,7 @@ type TIBApi =
                         requestHeaders [ HttpRequestHeaders.Accept "application/json" ]
                     ]
                     |> Promise.bind (fun response -> response.json<TIBTypes.SearchApi> ())
-                    |> Promise.map (fun searchApi -> searchApi.ToMyTerm() |> ResizeArray)
+                    |> Promise.map Some
         }
 
     static member defaultSearch(q: string, ?rows: int, ?collection: string) =

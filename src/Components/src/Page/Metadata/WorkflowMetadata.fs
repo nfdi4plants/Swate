@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components
+open Swate.Components.Metadata.FormComponents
 
 [<Erase; Mangle(false)>]
 type WorkflowMetadata =
@@ -17,8 +18,8 @@ type WorkflowMetadata =
             LayoutComponents.BoxedField(
                 "Workflow Metadata",
                 content = [
-                    FormComponents.TextInput(workflow.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
-                    FormComponents.TextInput(
+                    TextInput.TextInput(workflow.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
+                    TextInput.TextInput(
                         defaultArg workflow.Title "",
                         (fun value ->
                             workflow.Title <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -26,7 +27,7 @@ type WorkflowMetadata =
                         ),
                         label = "Title"
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         defaultArg workflow.Description "",
                         (fun value ->
                             workflow.Description <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -35,7 +36,7 @@ type WorkflowMetadata =
                         label = "Description",
                         isArea = true
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         defaultArg workflow.Version "",
                         (fun value ->
                             workflow.Version <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -43,7 +44,7 @@ type WorkflowMetadata =
                         ),
                         label = "Version"
                     )
-                    FormComponents.OntologyAnnotationInput(
+                    OntologyAnnotationInput.OntologyAnnotationInput(
                         workflow.WorkflowType,
                         (fun annotation ->
                             workflow.WorkflowType <- annotation
@@ -51,7 +52,7 @@ type WorkflowMetadata =
                         ),
                         label = "Workflow Type"
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         defaultArg workflow.URI "",
                         (fun value ->
                             workflow.URI <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -59,7 +60,7 @@ type WorkflowMetadata =
                         ),
                         label = "URI"
                     )
-                    FormComponents.PersonsInput(
+                    PersonsInput.PersonsInput(
                         workflow.Contacts,
                         (fun persons ->
                             workflow.Contacts <- persons
@@ -67,7 +68,7 @@ type WorkflowMetadata =
                         ),
                         label = "Contacts"
                     )
-                    FormComponents.CommentsInput(
+                    CommentsInput.CommentsInput(
                         workflow.Comments,
                         (fun comments ->
                             workflow.Comments <- comments

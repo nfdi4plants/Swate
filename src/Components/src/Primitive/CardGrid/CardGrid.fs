@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.CardGrid
 
 open Fable.Core
 open Feliz

@@ -1,8 +1,8 @@
-module Swate.Components.Primitives.Popover.Context
+module Swate.Components.Primitive.Popover.Context
 
 open Feliz
 open Swate.Components
-open Swate.Components.Primitives
+open Swate.Components.Primitive
 
 type PopoverContext = {
     isOpen: bool

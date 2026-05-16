@@ -1,13 +1,11 @@
-namespace Swate.Components.Table
+namespace Swate.Components.Composite.Table
 
 open System
 open Swate.Components
-open Swate.Components.Table
-open Swate.Components.Table.Context
+open Swate.Components.Composite.Table.Context
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-
 
 module private TableHelper =
 

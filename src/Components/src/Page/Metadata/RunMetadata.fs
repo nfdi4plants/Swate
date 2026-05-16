@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components
+open Swate.Components.Metadata.FormComponents
 
 [<Erase; Mangle(false)>]
 type RunMetadata =
@@ -17,8 +18,8 @@ type RunMetadata =
             LayoutComponents.BoxedField(
                 "Run Metadata",
                 content = [
-                    FormComponents.TextInput(run.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
-                    FormComponents.TextInput(
+                    TextInput.TextInput(run.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
+                    TextInput.TextInput(
                         defaultArg run.Title "",
                         (fun value ->
                             run.Title <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -26,7 +27,7 @@ type RunMetadata =
                         ),
                         label = "Title"
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         defaultArg run.Description "",
                         (fun value ->
                             run.Description <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -35,7 +36,7 @@ type RunMetadata =
                         label = "Description",
                         isArea = true
                     )
-                    FormComponents.OntologyAnnotationInput(
+                    OntologyAnnotationInput.OntologyAnnotationInput(
                         run.MeasurementType,
                         (fun annotation ->
                             run.MeasurementType <- annotation
@@ -43,7 +44,7 @@ type RunMetadata =
                         ),
                         label = "Measurement Type"
                     )
-                    FormComponents.OntologyAnnotationInput(
+                    OntologyAnnotationInput.OntologyAnnotationInput(
                         run.TechnologyType,
                         (fun annotation ->
                             run.TechnologyType <- annotation
@@ -51,7 +52,7 @@ type RunMetadata =
                         ),
                         label = "Technology Type"
                     )
-                    FormComponents.OntologyAnnotationInput(
+                    OntologyAnnotationInput.OntologyAnnotationInput(
                         run.TechnologyPlatform,
                         (fun annotation ->
                             run.TechnologyPlatform <- annotation
@@ -59,7 +60,7 @@ type RunMetadata =
                         ),
                         label = "Technology Platform"
                     )
-                    FormComponents.CollectionOfStrings(
+                    TextInput.CollectionOfStrings(
                         run.WorkflowIdentifiers,
                         (fun identifiers ->
                             run.WorkflowIdentifiers <- identifiers
@@ -67,7 +68,7 @@ type RunMetadata =
                         ),
                         label = "Workflow Identifiers"
                     )
-                    FormComponents.PersonsInput(
+                    PersonsInput.PersonsInput(
                         run.Performers,
                         (fun persons ->
                             run.Performers <- persons
@@ -75,7 +76,7 @@ type RunMetadata =
                         ),
                         label = "Performers"
                     )
-                    FormComponents.CommentsInput(
+                    CommentsInput.CommentsInput(
                         run.Comments,
                         (fun comments ->
                             run.Comments <- comments

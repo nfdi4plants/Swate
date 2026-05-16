@@ -1,13 +1,13 @@
-namespace Swate.Components.TermSearch
+namespace Swate.Components.Composite.TermSearch
 
 open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.TermSearch.TermSearchAllKeysContext
-open Swate.Components.TermSearch.TermSearchActiveKeysContext
-open Swate.Components.Primitives
+open Swate.Components.Composite.TermSearch.Context
+open Swate.Components.Primitive
 open Swate.Components
+open Swate.Components.Primitive.Select
 
 
 [<Erase; Mangle(false)>]

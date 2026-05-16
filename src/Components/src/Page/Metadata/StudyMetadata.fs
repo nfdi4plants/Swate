@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components
+open Swate.Components.Metadata.FormComponents
 
 [<Erase; Mangle(false)>]
 type StudyMetadata =
@@ -17,8 +18,8 @@ type StudyMetadata =
             LayoutComponents.BoxedField(
                 "Study Metadata",
                 content = [
-                    FormComponents.TextInput(study.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
-                    FormComponents.TextInput(
+                    TextInput.TextInput(study.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
+                    TextInput.TextInput(
                         defaultArg study.Title "",
                         (fun value ->
                             study.Title <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -26,7 +27,7 @@ type StudyMetadata =
                         ),
                         label = "Title"
                     )
-                    FormComponents.TextInput(
+                    TextInput.TextInput(
                         defaultArg study.Description "",
                         (fun value ->
                             study.Description <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -35,7 +36,7 @@ type StudyMetadata =
                         label = "Description",
                         isArea = true
                     )
-                    FormComponents.PersonsInput(
+                    PersonsInput.PersonsInput(
                         study.Contacts,
                         (fun persons ->
                             study.Contacts <- persons
@@ -43,7 +44,7 @@ type StudyMetadata =
                         ),
                         label = "Contacts"
                     )
-                    FormComponents.PublicationsInput(
+                    PublicationsInput.PublicationsInput(
                         study.Publications,
                         (fun publications ->
                             study.Publications <- publications
@@ -51,7 +52,7 @@ type StudyMetadata =
                         ),
                         label = "Publications"
                     )
-                    FormComponents.DateTimeInput(
+                    DateTimeInput.DateTimeInput(
                         defaultArg study.SubmissionDate "",
                         (fun value ->
                             study.SubmissionDate <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -59,7 +60,7 @@ type StudyMetadata =
                         ),
                         label = "Submission Date"
                     )
-                    FormComponents.DateTimeInput(
+                    DateTimeInput.DateTimeInput(
                         defaultArg study.PublicReleaseDate "",
                         (fun value ->
                             study.PublicReleaseDate <- if String.IsNullOrWhiteSpace value then None else Some value
@@ -67,7 +68,7 @@ type StudyMetadata =
                         ),
                         label = "Public Release Date"
                     )
-                    FormComponents.OntologyAnnotationsInput(
+                    OntologyAnnotationInput.OntologyAnnotationsInput(
                         study.StudyDesignDescriptors,
                         (fun annotations ->
                             study.StudyDesignDescriptors <- annotations
@@ -75,7 +76,7 @@ type StudyMetadata =
                         ),
                         label = "Study Design Descriptors"
                     )
-                    FormComponents.CommentsInput(
+                    CommentsInput.CommentsInput(
                         study.Comments,
                         (fun comments ->
                             study.Comments <- comments

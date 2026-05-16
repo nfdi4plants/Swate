@@ -1,4 +1,5 @@
-namespace Swate.Components
+[<AutoOpenAttribute>]
+module Swate.Components.Primitive.ContextMenu.Types
 
 open Fable.Core
 open Feliz

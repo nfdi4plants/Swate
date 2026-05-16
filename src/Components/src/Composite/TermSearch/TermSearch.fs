@@ -1,11 +1,14 @@
-namespace Swate.Components.TermSearch
+namespace Swate.Components.Composite.TermSearch
 
 open Swate.Components.Shared
 open Swate.Components
-open Swate.Components.Primitives
+open Swate.Components.Composite.TermSearch
+open Swate.Components.Primitive
+open Swate.Components.Primitive.ComboBox
+open Swate.Components.Primitive.BaseModal
 open Fable.Core
 open Feliz
-open Swate.Components.TermSearch.TermSearchConfigContext
+open Swate.Components.Composite.TermSearch.Context.ConfigContext
 
 
 module private APIExtentions =

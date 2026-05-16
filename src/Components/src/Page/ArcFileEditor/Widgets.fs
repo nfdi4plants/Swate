@@ -4,11 +4,12 @@ open Feliz
 open Fable.Core
 open ARCtrl
 open Swate.Components
+open Swate.Components.Primitive
 open Swate.Components.ArcFileEditor
 open Swate.Components.Widgets
 open Swate.Components.Widgets.Context
 
-module private MainHelper =
+module private WidgetsHelper =
 
     let widgetTypes = [
         WidgetType.BuildingBlock
@@ -80,7 +81,7 @@ module private MainHelper =
 //     ]
 //     |> Map.ofList
 
-open MainHelper
+open WidgetsHelper
 
 [<Erase; Mangle(false)>]
 type Main =

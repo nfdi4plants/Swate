@@ -1,9 +1,11 @@
-namespace Swate.Components
+namespace Swate.Components.Composite.ArcSelector
 
 open Feliz
 open Fable.Core
 
-open Swate.Components.Types.Actionbar
+open Swate.Components
+open Swate.Components.Primitive.Actionbar
+open Swate.Components.Primitive.Dropdown
 open Swate.Components.Shared
 
 module SelectorHelper =
@@ -182,7 +184,7 @@ type ArcSelector =
                             | Some name -> prop.text name
                             | None -> prop.text "Select an ARC"
                         ]
-                        Swate.Components.Actionbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5"
+                        Actionbar.MaterialIcon "swt:fluent--arrow-fit-height-24-regular swt:size-5"
                     ]
                 ]
 

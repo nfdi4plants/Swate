@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.Navbar
 
 open Feliz
 open Fable.Core

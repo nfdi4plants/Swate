@@ -1,10 +1,12 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.ContextMenu
 
 open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
 open Browser.Types
-open Swate.Components.Primitives
+open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.ContextMenu.Types
 
 [<Erase>]
 [<Mangle(false)>]

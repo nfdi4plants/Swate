@@ -1,14 +1,12 @@
-namespace Swate.Components.TermSearch
+namespace Swate.Components.Composite.TermSearch
 
 open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.Primitives
-open Swate.Components.TermSearch.TermSearchConfigContext
-open Swate.Components.TermSearch.TermSearchAllKeysContext
-open Swate.Components.TermSearch.TermSearchActiveKeysContext
-
+open Swate.Components.Primitive
+open Swate.Components.Composite.TermSearch.Context
+open Swate.Components.Composite.TermSearch
 
 module private TermSearchConfigProviderHelper =
 
@@ -24,8 +22,14 @@ module private TermSearchConfigProviderHelper =
                 for c in collections do
                     let n = TIB_PREFIX + c
 
-                    let query: Swate.Components.Types.SearchCall =
-                        fun (q: string) -> Swate.Components.Api.TIBApi.TIBApi.defaultSearch (q, 10, c)
+                    let query: SearchCall =
+                        fun (q: string) -> 
+                            Swate.Components.Api.TIBApi.TIBApi.defaultSearch (q, 10, c)
+                            |> Promise.map (fun searchApi -> 
+                                match searchApi with
+                                | Some api -> api.ToMyTerm() |> ResizeArray
+                                | None -> ResizeArray()
+                            )
 
                     yield (n, query)
             ]
@@ -34,9 +38,14 @@ module private TermSearchConfigProviderHelper =
                 for c in collections do
                     let n = TIB_PREFIX + c
 
-                    let query: Swate.Components.Types.ParentSearchCall =
+                    let query: ParentSearchCall =
                         fun (parent: string, query: string) ->
                             Swate.Components.Api.TIBApi.TIBApi.searchChildrenOf (query, parent, 10, c)
+                            |> Promise.map (fun searchApi -> 
+                                match searchApi with
+                                | Some api -> api.ToMyTerm() |> ResizeArray
+                                | None -> ResizeArray()
+                            )
 
                     yield (n, query)
             ]
@@ -45,9 +54,14 @@ module private TermSearchConfigProviderHelper =
                 for c in collections do
                     let n = TIB_PREFIX + c
 
-                    let query: Swate.Components.Types.AllChildrenSearchCall =
+                    let query: AllChildrenSearchCall =
                         fun (p: string) ->
                             Swate.Components.Api.TIBApi.TIBApi.searchAllChildrenOf (p, 300, collection = c)
+                            |> Promise.map (fun searchApi -> 
+                                match searchApi with
+                                | Some api -> api.ToMyTerm() |> ResizeArray
+                                | None -> ResizeArray()
+                            )
 
                     yield (n, query)
             ]
@@ -181,7 +195,7 @@ type TermSearchConfigProvider =
                 |]
             )
 
-        TermSearchActiveKeysContext.TermSearchActiveKeysCtx.Provider(
+        ActiveKeysContext.TermSearchActiveKeysCtx.Provider(
             {
                 state = activeKeys
                 setState = setActiveKeys

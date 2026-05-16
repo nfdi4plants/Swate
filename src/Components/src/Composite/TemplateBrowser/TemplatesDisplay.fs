@@ -4,7 +4,7 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Primitives
+open Swate.Components.Primitive
 
 
 module TemplateHelper = Swate.Components.Template.Helper

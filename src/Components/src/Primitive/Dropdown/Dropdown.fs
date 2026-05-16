@@ -1,6 +1,7 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.Dropdown
 
 open Feliz
+open Swate.Components
 
 type Dropdown =
 

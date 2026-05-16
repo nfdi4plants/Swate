@@ -1,4 +1,4 @@
-module Swate.Components.Authentication.Types
+module Swate.Components.Composite.Authentication.Types
 
 type SignInInformation = {
     GitLabBaseUrl: string

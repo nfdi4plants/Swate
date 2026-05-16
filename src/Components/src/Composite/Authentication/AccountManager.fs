@@ -1,4 +1,4 @@
-namespace Swate.Components.Authentication
+namespace Swate.Components.Composite.Authentication
 
 open Fable.Core
 open Feliz

@@ -1,9 +1,9 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.Buttons
 
 open Feliz
-open Swate.Components.Primitives
+open Swate.Components.Primitive
 
-type Components =
+type Buttons =
 
     [<ReactComponent>]
     static member DeleteButton(?children, ?className: string, ?props: IReactProperty list) =

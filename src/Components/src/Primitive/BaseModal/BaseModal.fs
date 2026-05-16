@@ -1,9 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.Primitive.BaseModal
 
 open Feliz
 open Fable.Core
-open Swate.Components.GenericComponents.BaseModalContext
-open Swate.Components.Primitives
+open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.BaseModal.Context
 
 [<Mangle(false); Erase>]
 type BaseModal =
@@ -18,7 +19,7 @@ type BaseModal =
                 prop.id ctx.Value.headerId
             prop.children [
                 children
-                Components.DeleteButton(
+                Buttons.Buttons.DeleteButton(
                     className = "swt:ml-auto swt:btn-sm",
                     props = [ prop.onClick (fun _ -> close ()) ]
                 )

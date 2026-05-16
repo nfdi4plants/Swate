@@ -1,4 +1,4 @@
-module Swate.Components.GenericComponents.BaseModalContext
+module Swate.Components.Primitive.BaseModal.Context
 
 open Feliz
 

@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
+open Swate.Components.Primitive
 open Swate.Components.Widgets.Context
 open Swate.Components.Shared
 open Swate.Components.ArcFileEditor.Types

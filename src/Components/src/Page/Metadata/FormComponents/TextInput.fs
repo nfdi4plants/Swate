@@ -1,14 +1,15 @@
-namespace Swate.Components.Metadata
+namespace Swate.Components.Metadata.FormComponents
 
+open Fable.Core
 open Browser.Types
 open Swate.Components
 open Feliz
 
-[<RequireQualifiedAccess>]
+[<Erase; Mangle(false)>]
 type TextInput =
 
     [<ReactComponent>]
-    static member Entry
+    static member TextInput
         (
             value: string,
             setValue: string -> unit,
@@ -50,10 +51,9 @@ type TextInput =
 
         React.useEffect ((fun () -> setTempValue value), [| box value |])
 
-        let handleChange =
-            fun (text: string) ->
-                setTempValue text
-                startedChange.current <- true
+        let handleChange (text: string) =
+            setTempValue text
+            startedChange.current <- true
 
         let inputClasses = [
             if isJoin then
@@ -106,11 +106,7 @@ type TextInput =
                                     prop.placeholder placeholder.Value
                             ]
                             if rmv.IsSome then
-                                Html.button [
-                                    prop.className "swt:btn swt:btn-error swt:grow-0"
-                                    prop.text "Delete"
-                                    prop.onClick rmv.Value
-                                ]
+                                Helpers.deleteButton rmv.Value
                         ]
                     ]
                 if validationError.IsSome then
@@ -120,3 +116,20 @@ type TextInput =
                     ]
             ]
         ]
+
+    [<ReactComponent>]
+    static member CollectionOfStrings
+        (
+            values: ResizeArray<string>,
+            setValues: ResizeArray<string> -> unit,
+            ?label: string
+        ) =
+        InputSequence.InputSequence(
+            values,
+            (fun () -> ""),
+            setValues,
+            (fun (value, setValue, remove) ->
+                TextInput.TextInput(value, setValue, rmv = remove)
+            ),
+            ?label = label
+        )
