@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Swate.Components.Table
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
+open Swate.Components.Primitives
 open Swate.Components.AnnotationTable.Context
 
 

@@ -2,7 +2,7 @@ namespace Swate.Components.NoteSearch.FilterComponent
 
 open Feliz
 open Swate.Components
-
+open Swate.Components.Primitives
 
 
 module Main =

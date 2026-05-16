@@ -8,6 +8,7 @@ open Feliz
 
 open Swate.Components
 open Types.AnnotationTableContextMenu
+open Swate.Components.Primitives
 
 /// AnnotationTableContextMenu Components
 type ATCMC =

@@ -6,6 +6,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.TermSearch.TermSearchAllKeysContext
 open Swate.Components.TermSearch.TermSearchActiveKeysContext
+open Swate.Components.Primitives
 
 
 [<Erase; Mangle(false)>]

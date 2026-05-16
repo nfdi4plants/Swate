@@ -7,6 +7,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open ARCtrl
+open Swate.Components.Primitives
 
 type ActiveCellProps<'a> = {|
     data: 'a

@@ -7,6 +7,7 @@ open Swate.Components
 open ARCtrl
 open Swate.Components.Shared
 open Swate.Components.AnnotationTable
+open Swate.Components.Primitives
 
 // 👀 this file is work in progress
 

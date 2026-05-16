@@ -1,6 +1,24 @@
 module Swate.Components.Template.Types
 
+open Fable.Core
 open ARCtrl
+
+/// This is a fable StringEnum and can be replaced by any `unbox` string
+[<StringEnum>]
+type FilterTokenType =
+    | Tag
+    | Repository
+    | Name
+    | Author
+    | ORCID
+
+type FilterToken = {|
+    Type: FilterTokenType
+    NameText: string
+    Id: string
+    Payload: obj option
+|}
+
 
 [<RequireQualifiedAccess>]
 type TemplateImportAction =

@@ -3,10 +3,15 @@ namespace Swate.Components.Notes.Editor
 open System
 open ARCtrl
 open Swate.Components.Shared
-open Swate.Components.Landing
 
 [<RequireQualifiedAccess>]
 module NoteConversion =
+
+    let isSafePathSegment (value: string) =
+        not (System.String.IsNullOrWhiteSpace value)
+        && not (value.Contains "/")
+        && not (value.Contains "\\")
+        && not (value.Contains "..")
 
     let private notesRootFolder = "notes"
     let private frontmatterDelimiter = "---"
@@ -134,9 +139,9 @@ module NoteConversion =
         let dateFolder = formatDateFolder dateCreated
 
         if
-            Conversion.isSafePathSegment dateFolder
-            && Conversion.isSafePathSegment targetRef.Name
-            && Conversion.isSafePathSegment protocolName
+            isSafePathSegment dateFolder
+            && isSafePathSegment targetRef.Name
+            && isSafePathSegment protocolName
         then
             Some $"{notesRootFolder}/{folder}/{targetRef.Name}/{dateFolder}/{protocolName}.md"
         else
@@ -146,8 +151,8 @@ module NoteConversion =
         let dateFolder = formatDateFolder dateCreated
 
         if
-            Conversion.isSafePathSegment dateFolder
-            && Conversion.isSafePathSegment protocolName
+            isSafePathSegment dateFolder
+            && isSafePathSegment protocolName
         then
             Some $"{notesRootFolder}/{dateFolder}/{protocolName}.md"
         else

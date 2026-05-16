@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
-import {Entry as TermSearchConfigSetter} from "./TermSearchConfigSetter.fs.js";
-import {TIBQueryProvider as TermSearchConfigProvider} from "./TermSearchConfigProvider.fs.js"
+import {Entry as TermSearchConfigSetter} from "./ConfigSetter.fs.js";
+import {TIBQueryProvider as TermSearchConfigProvider} from "./ConfigProvider.fs.js"
 import React from 'react';
 
 const SETTER_DEBUG_TESTID = "term-search-config-setter"

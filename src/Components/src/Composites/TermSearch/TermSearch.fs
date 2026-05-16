@@ -2,6 +2,7 @@ namespace Swate.Components.TermSearch
 
 open Swate.Components.Shared
 open Swate.Components
+open Swate.Components.Primitives
 open Fable.Core
 open Feliz
 open Swate.Components.TermSearch.TermSearchConfigContext

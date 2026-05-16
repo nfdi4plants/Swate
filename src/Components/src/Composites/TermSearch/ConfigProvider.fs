@@ -4,6 +4,7 @@ open Swate.Components
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components.Primitives
 open Swate.Components.TermSearch.TermSearchConfigContext
 open Swate.Components.TermSearch.TermSearchAllKeysContext
 open Swate.Components.TermSearch.TermSearchActiveKeysContext

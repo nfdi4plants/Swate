@@ -1,5 +1,3 @@
-
-
 module Swate.Components.TermSearch.TermSearchAllKeysContext
 
 open Feliz

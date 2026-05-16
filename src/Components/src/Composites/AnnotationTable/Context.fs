@@ -2,6 +2,7 @@ module Swate.Components.AnnotationTable.Context
 
 open Feliz
 open Swate.Components.Types
+open Swate.Components.Primitives
 
 
 type AnnotationTableContext = {

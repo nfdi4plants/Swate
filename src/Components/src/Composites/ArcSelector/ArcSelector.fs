@@ -13,8 +13,8 @@ module SelectorHelper =
     let comparePaths =
         fun (path1: string) (path2: string) -> normalizePath path1 = normalizePath path2
 
-[<Erase; Mangle(false); ReactComponent>]
-type Selector =
+[<Erase; Mangle(false)>]
+type ArcSelector =
 
     [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member SelectorItem
@@ -147,7 +147,7 @@ type Selector =
 
                 let testId = if debug then Some $"selector-arc-item-{i}" else None
 
-                Selector.SelectorItem(
+                ArcSelector.SelectorItem(
                     arcPointer,
                     onClick,
                     ?testId = testId,
@@ -303,7 +303,7 @@ type Selector =
             if currentlyOpenArcPath = Some arcPointer.path then
                 setCurrentlyOpenArcPath None
 
-        Selector.Main(
+        ArcSelector.Main(
             recentARCs,
             onClick,
             rmvRecentArc,

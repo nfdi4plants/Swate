@@ -4,8 +4,10 @@ open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components.Template.Context
+open Swate.Components.Primitives
+open Swate.Components.Template.Types
 
-module TemplateMocks =
+module private TemplateMocks =
 
     let mkStella () =
         ARCtrl.Person(
@@ -190,25 +192,9 @@ module TemplateMocks =
         )
     |]
 
-module TemplateFilterAux =
+module private TemplateFilterAux =
 
     open System
-
-    /// This is a fable StringEnum and can be replaced by any `unbox` string
-    [<StringEnum>]
-    type FilterTokenType =
-        | Tag
-        | Repository
-        | Name
-        | Author
-        | ORCID
-
-    type FilterToken = {|
-        Type: FilterTokenType
-        NameText: string
-        Id: string
-        Payload: obj option
-    |}
 
     let mkFullAuthorName (author: ARCtrl.Person) =
         [ author.FirstName; author.LastName; author.MidInitials ]
@@ -337,7 +323,7 @@ module TemplateFilterAux =
 type TemplateFilter =
 
     static member TokenBadge
-        (token: TemplateFilterAux.FilterToken, remove: TemplateFilterAux.FilterToken -> unit, ?key: obj)
+        (token: FilterToken, remove: FilterToken -> unit, ?key: obj)
         =
         Html.div [
             prop.className "swt:h-(--size) swt:flex swt:items-center"
@@ -362,10 +348,10 @@ type TemplateFilter =
     [<ReactComponent>]
     static member TemplateSearch
         (
-            availableTokens: ResizeArray<TemplateFilterAux.FilterToken>,
-            tokens: ResizeArray<TemplateFilterAux.FilterToken>,
+            availableTokens: ResizeArray<FilterToken>,
+            tokens: ResizeArray<FilterToken>,
             setTokens:
-                (ResizeArray<TemplateFilterAux.FilterToken> -> ResizeArray<TemplateFilterAux.FilterToken>) -> unit,
+                (ResizeArray<FilterToken> -> ResizeArray<FilterToken>) -> unit,
             ?className: string,
             ?key: obj
         ) =
@@ -376,16 +362,16 @@ type TemplateFilter =
             fun
                 (props:
                     {|
-                        item: TemplateFilterAux.FilterToken
+                        item: FilterToken
                         search: string
                     |}) ->
                 let str = props.search.ToLower()
                 props.item.NameText.ToLower().Contains(str)
 
-        let transformFn = fun (item: TemplateFilterAux.FilterToken) -> item.NameText
+        let transformFn = fun (item: FilterToken) -> item.NameText
 
         let onChangeFn =
-            fun (_: int) (item: TemplateFilterAux.FilterToken) ->
+            fun (_: int) (item: FilterToken) ->
 
                 setInputValue ("")
 
@@ -404,7 +390,7 @@ type TemplateFilter =
                     {|
                         index: int
                         isActive: bool
-                        item: TemplateFilterAux.FilterToken
+                        item: FilterToken
                         props: ResizeArray<IReactProperty>
                     |}) ->
                 Html.li [
@@ -419,15 +405,15 @@ type TemplateFilter =
                             prop.className "swt:flex swt:items-center"
                             prop.children [
                                 match props.item.Type with
-                                | TemplateFilterAux.FilterTokenType.Tag -> Icons.Tag("swt:size-4")
-                                | TemplateFilterAux.FilterTokenType.Repository -> Icons.CloudUpload("swt:size-4")
-                                | TemplateFilterAux.FilterTokenType.Name -> Icons.Header("swt:size-4")
-                                | TemplateFilterAux.FilterTokenType.Author -> Icons.User("swt:size-4")
-                                | TemplateFilterAux.FilterTokenType.ORCID -> Icons.ORCID("swt:size-4")
+                                | FilterTokenType.Tag -> Icons.Tag("swt:size-4")
+                                | FilterTokenType.Repository -> Icons.CloudUpload("swt:size-4")
+                                | FilterTokenType.Name -> Icons.Header("swt:size-4")
+                                | FilterTokenType.Author -> Icons.User("swt:size-4")
+                                | FilterTokenType.ORCID -> Icons.ORCID("swt:size-4")
                             ]
                         ]
                         Html.div props.item.NameText
-                        if props.item.Type = TemplateFilterAux.FilterTokenType.ORCID then
+                        if props.item.Type = FilterTokenType.ORCID then
                             Html.div [
                                 prop.text (TemplateFilterAux.mkFullAuthorName (unbox props.item.Payload: ARCtrl.Person))
                                 prop.className "swt:ml-2 swt:text-xs swt:opacity-60"
@@ -486,7 +472,7 @@ type TemplateFilter =
             ]
             |> String.concat " "
 
-        ComboBox.ComboBox<TemplateFilterAux.FilterToken>(
+        ComboBox.ComboBox<FilterToken>(
             inputValue,
             setInputValue,
             Array.ofSeq availableTokens,
@@ -586,7 +572,7 @@ type TemplateFilter =
         /// This constant is used to display available communities in the community filter
 
         let tokens, setTokens =
-            React.useStateWithUpdater (ResizeArray<TemplateFilterAux.FilterToken>())
+            React.useStateWithUpdater (ResizeArray<FilterToken>())
 
 
         let filter =

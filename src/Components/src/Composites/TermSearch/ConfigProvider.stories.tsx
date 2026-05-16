@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
 import TermSearch from "./TermSearch.fs.js";
 // Use the explicit provider that accepts injected queries
-import { TermSearchConfigProvider as TermSearchConfigProviderComponent } from "./TermSearchConfigProvider.fs.js";
+import { TermSearchConfigProvider as TermSearchConfigProviderComponent } from "./ConfigProvider.fs.js";
 import type { Term } from '../Util/Types.fs.js';
 import React from 'react';
 

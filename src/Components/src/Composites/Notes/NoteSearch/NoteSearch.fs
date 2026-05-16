@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.NoteTypes
+open Swate.Components.Primitives
 
 module InputField =
 
@@ -32,8 +33,6 @@ module InputField =
                                 let value: string = ev.target?value
                                 setSearchTerm value
                                 setStartSearch true
-                                
-
                             )
                         ]
                         Html.div [

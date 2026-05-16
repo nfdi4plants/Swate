@@ -4,6 +4,8 @@ open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
+open Swate.Components.Primitives
+
 
 module TemplateHelper = Swate.Components.Template.Helper
 
@@ -190,7 +192,7 @@ type TemplatesDisplay =
                                     Html.div [
                                         prop.className "swt:flex swt:items-center"
                                         prop.children [
-                                            Swate.Components.Icons.Filter("swt:size-3")
+                                            Icons.Filter("swt:size-3")
                                             Html.span templates.Length
                                         ]
                                     ]

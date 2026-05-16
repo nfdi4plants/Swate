@@ -3,6 +3,7 @@ namespace Swate.Components.Theme
 open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
+open Swate.Components.Primitives
 
 module private ThemeSelectorHelper =
     [<Literal>]

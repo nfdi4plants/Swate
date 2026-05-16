@@ -18,3 +18,13 @@ type DataAnnotatorWidgetServices = {
 type TemplateWidgetServices = {
     loadTemplates: unit -> Async<Result<Template[], string>>
 }
+
+/// <summary>
+/// Is not only used to store position but also size.
+/// </summary>
+type Rect = {
+    X: int
+    Y: int
+} with
+
+    static member init() = { X = 0; Y = 0 }

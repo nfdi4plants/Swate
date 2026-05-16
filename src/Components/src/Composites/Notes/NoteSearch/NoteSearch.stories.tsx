@@ -1,7 +1,7 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
 import { within, expect, userEvent } from "storybook/test";
-import {Entry as NoteSearch } from "./NoteSearchComponent.fs.js";
+import {Entry as NoteSearch } from "./NoteSearch.fs.js";
 
 const meta: Meta<typeof NoteSearch> = {
   title: "Components/NoteSearch",

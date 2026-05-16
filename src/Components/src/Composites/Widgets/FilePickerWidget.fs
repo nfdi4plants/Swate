@@ -6,6 +6,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Shared
+open Swate.Components.Primitives
 open Swate.Components.AnnotationTable.Context
 
 /// This context is designed to be used only internally in this file.

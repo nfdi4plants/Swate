@@ -1,6 +1,7 @@
 module Swate.Components.Layout.RightSidebarContext
 
 open Feliz
+open Swate.Components.Primitives
 
 type RightSidebarState<'A> = {
     isOpen: bool

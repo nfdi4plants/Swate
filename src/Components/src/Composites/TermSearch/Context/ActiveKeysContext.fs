@@ -1,6 +1,7 @@
 module Swate.Components.TermSearch.TermSearchActiveKeysContext
 
 open Feliz
+open Swate.Components.Primitives
 open Swate.Components.Types
 
 type TermSearchActiveKeysContext = {|

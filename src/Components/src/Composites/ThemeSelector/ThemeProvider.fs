@@ -5,6 +5,7 @@ open Fable.Core
 open Browser
 open Fable.React
 open Swate.Components
+open Swate.Components.Primitives
 
 [<Erase; Mangle(false)>]
 type ThemeProvider =
