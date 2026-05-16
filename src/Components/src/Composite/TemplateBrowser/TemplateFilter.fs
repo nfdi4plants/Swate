@@ -3,6 +3,7 @@ namespace Swate.Components
 open Fable.Core
 open Feliz
 open ARCtrl
+open Swate.Components
 open Swate.Components.Template.Context
 open Swate.Components.Primitives
 open Swate.Components.Template.Types

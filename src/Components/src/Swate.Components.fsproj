@@ -64,6 +64,7 @@
   <ItemGroup>
     <None Include="..\README.md" Pack="true" PackagePath="\" />
     <None Include="swateBundleStyle.css" Pack="true" PackagePath="fable/" />
+    <Compile Include="Types\StateContext.fs" />
     <Compile Include="Util\Types.fs" />
     <Compile Include="Util\DateTimeExtensions.fs" />
     <Compile Include="Util\Extensions.fs" />
@@ -186,8 +187,6 @@
     <Compile Include="Composite\Widgets\DataAnnotatorWidget.fs"/>
     <Compile Include="Composite\Widgets\TemplateWidget.fs"/>
     <Compile Include="Composite\Widgets\Widgets.fs"/>
-    <Compile Include="Composite\Widgets\Widgets.fs"/>
-
 
     <Compile Include="Style.fs" />
   </ItemGroup>

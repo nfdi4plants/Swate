@@ -7,6 +7,7 @@ open Feliz
 open Swate.Components.TermSearch.TermSearchAllKeysContext
 open Swate.Components.TermSearch.TermSearchActiveKeysContext
 open Swate.Components.Primitives
+open Swate.Components
 
 
 [<Erase; Mangle(false)>]

@@ -2,7 +2,7 @@ module Swate.Components.Layout.LeftSidebarContext
 
 open Feliz
 open Swate.Components.Types
-open Swate.Components.Primitives
+open Swate.Components
 
 type LeftSidebarCtxState = StateContext<bool>
 
