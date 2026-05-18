@@ -26,7 +26,7 @@
 
 - No selected grouping keys means one visible element per entry, labeled by entry name only.
 - Selecting a grouping parameter ignores non-selected parameters for group identity.
-- Missing selected values do not create `Missing <key>` groups. If grouping is active and an entry has none of the selected keys, it belongs to `Ungrouped`.
+- Missing selected values do not create `Missing <key>` groups. If grouping is active and an entry has none of the selected keys, it remains its own item element labeled by entry name.
 - One entry can have several values for the same parameter key.
 - Grouping duplicates an entry into every group membership it belongs to.
 - A visible group contains memberships, not necessarily unique item IDs.
@@ -136,11 +136,11 @@ function getGroupingValueSets(item: ProvenanceItem, groupingKeys: string[]): Pro
     return values.map((value) => ({ key, value }));
   });
 
-  if (valueSets.every((values) => values.length === 0)) {
-    return [[{ key: "Ungrouped", value: "Ungrouped" }]];
-  }
-
   const usableValueSets = valueSets.filter((values) => values.length > 0);
+
+  if (usableValueSets.length === 0) {
+    return [[]];
+  }
 
   return usableValueSets.reduce<ProvenanceGroupPart[][]>(
     (combinations, values) =>
@@ -417,3 +417,64 @@ Run:
 git add docs/superpowers/specs/2026-05-13-provenance-grouping-design.md docs/superpowers/plans/2026-05-13-provenance-grouping.md src/Components/src/ProvenanceGrouping
 git commit -m "feat: support multi-value provenance grouping"
 ```
+
+## Task 10: Keep Ungrouped Active-Grouping Entries As Individual Items
+
+**Files:**
+- Modify `src/Components/src/ProvenanceGrouping/ProvenanceGrouping.tsx`
+- Modify `src/Components/src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
+
+- [ ] **Step 1: Change active-grouping fallback groups**
+
+When grouping is active and `getGroupingValueSets` returns no selected-key values for an item, `buildGroups` must create a single-item group instead of merging all such entries into `layerId-ungrouped`:
+
+```tsx
+const id = labelParts.length === 0 ? `${layerId}-item-${slug(item.id)}` : groupId(layerId, labelParts);
+const label = labelParts.length === 0 ? item.name : groupLabel(labelParts);
+```
+
+- [ ] **Step 2: Update Storybook assertions**
+
+In `InteractionFlow`, creating a right-layer item while grouped by `Analysis` should show the new item by name and should not show `Missing Analysis`.
+
+## Task 11: Seed New Layers From Selected Groups
+
+**Files:**
+- Modify `src/Components/src/ProvenanceGrouping/ProvenanceGrouping.tsx`
+- Modify `src/Components/src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
+
+- [ ] **Step 1: Support explicit layer pairs and scoped visible items**
+
+Add optional component props:
+
+```tsx
+type ProvenanceLayerPair = {
+  leftLayerId: string;
+  rightLayerId: string;
+};
+
+layerPairs?: ProvenanceLayerPair[];
+visibleItemIdsByLayer?: Record<string, string[]>;
+```
+
+Use `layerPairs` for the pair switcher when present. Use `visibleItemIdsByLayer` to filter the items used for visible grouping, parameter rails, value resolvers, and group connector summaries.
+
+- [ ] **Step 2: Track story layer pairs and pair scopes**
+
+Add story state:
+
+```tsx
+layerPairs: ProvenanceLayerPair[];
+visibleItemIdsByPair: Record<string, Record<string, string[]>>;
+```
+
+The initial pair is `Inputs -> Outputs` with no scope. When adding a layer:
+
+- Prefer the selected right/output group as the source.
+- If no right group is selected, use the selected left/input group.
+- If no group is selected, use all entries from the current right layer.
+- Store the selected source item IDs as the visible scope for the source layer in the new pair.
+
+- [ ] **Step 3: Verify selected group handoff**
+
+Add or update a Storybook play test that selects one output group, clicks `Layer`, and verifies the next pair's left column contains only that selected output entry set.

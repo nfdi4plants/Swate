@@ -13,6 +13,7 @@ import {
   type ProvenanceGroup,
   type ProvenanceItem,
   type ProvenanceLayer,
+  type ProvenanceLayerPair,
 } from "./ProvenanceGrouping";
 
 type Side = "left" | "right";
@@ -21,6 +22,8 @@ type MockModel = {
   layers: ProvenanceLayer[];
   items: ProvenanceItem[];
   connections: ProvenanceConnection[];
+  layerPairs: ProvenanceLayerPair[];
+  visibleItemIdsByPair: Record<string, Record<string, string[]>>;
   leftLayerId: string;
   rightLayerId: string;
   groupingByLayer: Record<string, string[]>;
@@ -145,6 +148,8 @@ function initialModel(): MockModel {
     layers: initialLayers,
     items: initialItems,
     connections: initialConnections,
+    layerPairs: [{ leftLayerId: "inputs", rightLayerId: "outputs" }],
+    visibleItemIdsByPair: {},
     leftLayerId: "inputs",
     rightLayerId: "outputs",
     groupingByLayer: {
@@ -178,6 +183,31 @@ function removeGroupingKey(keys: string[], key: string): string[] {
   return keys.filter((existingKey) => normalizedKey(existingKey) !== normalized);
 }
 
+function pairKey(leftLayerId: string, rightLayerId: string): string {
+  return `${leftLayerId}->${rightLayerId}`;
+}
+
+function currentPairKey(model: MockModel): string {
+  return pairKey(model.leftLayerId, model.rightLayerId);
+}
+
+function currentVisibleItemIdsByLayer(model: MockModel): Record<string, string[]> | undefined {
+  return model.visibleItemIdsByPair[currentPairKey(model)];
+}
+
+function visibleItemsForCurrentPair(model: MockModel): ProvenanceItem[] {
+  const visibleItemIdsByLayer = currentVisibleItemIdsByLayer(model);
+
+  if (!visibleItemIdsByLayer) {
+    return model.items;
+  }
+
+  return model.items.filter((item) => {
+    const visibleIds = visibleItemIdsByLayer[item.layerId];
+    return visibleIds === undefined || visibleIds.includes(item.id);
+  });
+}
+
 function findGroup(
   items: ProvenanceItem[],
   connections: ProvenanceConnection[],
@@ -198,7 +228,8 @@ function findGroup(
 function findVisibleGroup(model: MockModel, side: Side, groupId: string): ProvenanceGroup | undefined {
   const layerId = side === "left" ? model.leftLayerId : model.rightLayerId;
   const connectedLayerId = side === "left" ? model.rightLayerId : model.leftLayerId;
-  return findGroup(model.items, model.connections, layerId, connectedLayerId, side, model.groupingByLayer[layerId] ?? [], groupId);
+  const visibleItems = visibleItemsForCurrentPair(model);
+  return findGroup(visibleItems, model.connections, layerId, connectedLayerId, side, model.groupingByLayer[layerId] ?? [], groupId);
 }
 
 function parameterValueSet(item: ProvenanceItem): Set<string> {
@@ -302,6 +333,24 @@ function uniqueGroupItems(group: ProvenanceGroup): ProvenanceItem[] {
   });
 
   return Array.from(itemsById.values());
+}
+
+function selectedSeedGroup(model: MockModel): { layerId: string; group: ProvenanceGroup } | undefined {
+  if (model.selectedTargetGroupId) {
+    const group = findVisibleGroup(model, "right", model.selectedTargetGroupId);
+    if (group) {
+      return { layerId: model.rightLayerId, group };
+    }
+  }
+
+  if (model.selectedSourceGroupId) {
+    const group = findVisibleGroup(model, "left", model.selectedSourceGroupId);
+    if (group) {
+      return { layerId: model.leftLayerId, group };
+    }
+  }
+
+  return undefined;
 }
 
 function downstreamIds(connections: ProvenanceConnection[], startIds: string[]): Set<string> {
@@ -546,8 +595,25 @@ function StatefulMockup() {
         layerId,
         parameters: [],
       };
+      const activePairKey = currentPairKey(current);
+      const activePairScope = current.visibleItemIdsByPair[activePairKey];
+      const nextVisibleItemIdsByPair =
+        activePairScope?.[layerId] === undefined
+          ? current.visibleItemIdsByPair
+          : {
+              ...current.visibleItemIdsByPair,
+              [activePairKey]: {
+                ...activePairScope,
+                [layerId]: [...activePairScope[layerId], nextItem.id],
+              },
+            };
 
-      return { ...current, items: [...current.items, nextItem], error: undefined };
+      return {
+        ...current,
+        items: [...current.items, nextItem],
+        visibleItemIdsByPair: nextVisibleItemIdsByPair,
+        error: undefined,
+      };
     });
   };
 
@@ -558,11 +624,27 @@ function StatefulMockup() {
         id: `layer-${nextIndex}`,
         label: `Layer ${nextIndex}`,
       };
+      const seed = selectedSeedGroup(current);
+      const seedLayerId = seed?.layerId ?? current.rightLayerId;
+      const seedItemIds = seed ? uniqueGroupItems(seed.group).map((item) => item.id) : undefined;
+      const nextPair = { leftLayerId: seedLayerId, rightLayerId: nextLayer.id };
+      const nextPairKey = pairKey(nextPair.leftLayerId, nextPair.rightLayerId);
+      const nextVisibleItemIdsByPair =
+        seedItemIds === undefined
+          ? current.visibleItemIdsByPair
+          : {
+              ...current.visibleItemIdsByPair,
+              [nextPairKey]: {
+                [seedLayerId]: seedItemIds,
+              },
+            };
 
       return {
         ...current,
         layers: [...current.layers, nextLayer],
-        leftLayerId: current.rightLayerId,
+        layerPairs: [...current.layerPairs, nextPair],
+        visibleItemIdsByPair: nextVisibleItemIdsByPair,
+        leftLayerId: seedLayerId,
         rightLayerId: nextLayer.id,
         groupingByLayer: {
           ...current.groupingByLayer,
@@ -603,6 +685,8 @@ function StatefulMockup() {
       connections={model.connections}
       leftLayerId={model.leftLayerId}
       rightLayerId={model.rightLayerId}
+      layerPairs={model.layerPairs}
+      visibleItemIdsByLayer={currentVisibleItemIdsByLayer(model)}
       groupingByLayer={model.groupingByLayer}
       sortingByLayer={model.sortingByLayer}
       parameterValuesByLayer={model.parameterValuesByLayer}
@@ -755,7 +839,7 @@ export const InteractionFlow: Story = {
     await userEvent.type(canvas.getByTestId("ProvenanceGrouping-create-item-right-input"), "Fresh output");
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-create-item-right-submit"));
     await waitFor(() => {
-      expect(canvasElement).toHaveTextContent("Ungrouped");
+      expect(canvasElement).toHaveTextContent("Fresh output");
       expect(canvasElement).not.toHaveTextContent("Missing Analysis");
     });
 
@@ -813,6 +897,27 @@ export const MultiValueAndConnectionDerivedControls: Story = {
     await userEvent.click(within(replicate2Group).getByTestId("ProvenanceGrouping-group-details"));
     await waitFor(() => {
       expect(replicate2Group).toHaveTextContent("Output B");
+    });
+  },
+};
+
+export const AddLayerFromSelectedOutput: Story = {
+  name: "Add layer from selected output",
+  render: () => <StatefulMockup />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByTestId("ProvenanceGrouping-root")).toBeInTheDocument();
+
+    const outputBGroup = await canvas.findByTestId("ProvenanceGrouping-group-right-outputs-item-output-b");
+    await userEvent.click(within(outputBGroup).getByTestId("ProvenanceGrouping-group-select"));
+    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-add-layer"));
+
+    await waitFor(async () => {
+      await expect(canvasElement).toHaveTextContent("Outputs -> Layer 3");
+      await expect(await canvas.findAllByTestId(/ProvenanceGrouping-group-left-/)).toHaveLength(1);
+      await expect(canvasElement).toHaveTextContent("Output B");
+      await expect(canvasElement).not.toHaveTextContent("Output A");
     });
   },
 };

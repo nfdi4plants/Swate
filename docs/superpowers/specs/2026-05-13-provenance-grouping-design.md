@@ -64,7 +64,7 @@ Groups are derived from the selected keys:
 - One key: one group for each distinct value. If an entry has several values for the key, it appears in every matching group.
 - Multiple keys: one group for each distinct ordered tuple of values. If an entry has several values for one or more selected keys, it contributes one membership for each value combination.
 - Once a key is selected for grouping, non-selected parameters are ignored for grouping.
-- Missing selected keys do not create their own `Missing <key>` category. If grouping is active and an item has none of the selected keys, it appears in a single `Ungrouped` bucket.
+- Missing selected keys do not create their own `Missing <key>` category. If grouping is active and an item has none of the selected keys, it remains a single item element labeled by its entry name instead of being merged into a shared `Ungrouped` bucket.
 - A group contains memberships, not necessarily a unique set of item IDs. The same entry may appear in multiple visible groups when it has multiple relevant values.
 
 The UI displays groups, not raw entries. Entries appear only in drill-in/detail views.
@@ -124,8 +124,9 @@ Creating a new item:
 
 Creating a new layer:
 
-- Adds a downstream layer after the current right layer.
-- Lets the user navigate to the new adjacent pair.
+- Adds a downstream layer after the selected group when a source or target group is selected.
+- Uses the selected target/output group as the new layer's input set when present; otherwise uses the selected source/input group. If nothing is selected, it keeps the previous default of using all entries from the current right layer as the next input set.
+- Lets the user navigate to the new pair.
 - Uses the same item model, so outputs from one step can act as inputs to the next displayed pair.
 
 ## Component Boundary
@@ -191,6 +192,7 @@ Tests are optional during rapid mockup iteration, but verification should includ
 - No selected grouping keys display each entry once by name.
 - Grouping by one and multiple keys.
 - Multi-value grouping duplicates one entry into each matching group.
+- Active grouping keeps entries with no selected-key values as separate item elements.
 - Group connection detail uses actual item-level connections only.
 - Bulk update propagation with overwrite.
 - Complete item-link creation for many-to-many group connections.

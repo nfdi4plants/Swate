@@ -22,6 +22,11 @@ export type ProvenanceLayer = {
   label: string;
 };
 
+export type ProvenanceLayerPair = {
+  leftLayerId: string;
+  rightLayerId: string;
+};
+
 export type ProvenanceGroupPart = {
   key: string;
   value: string;
@@ -62,6 +67,8 @@ export type ProvenanceGroupingProps = {
   connections: ProvenanceConnection[];
   leftLayerId: string;
   rightLayerId: string;
+  layerPairs?: ProvenanceLayerPair[];
+  visibleItemIdsByLayer?: Record<string, string[]>;
   groupingByLayer: Record<string, string[]>;
   sortingByLayer?: Record<string, string | undefined>;
   parameterValuesByLayer?: Record<string, Record<string, string[]>>;
@@ -561,8 +568,8 @@ export function buildGroups(
 
   layerItems.forEach((item) => {
     getGroupingValueSets(item, groupingKeys, valueResolver).forEach((labelParts) => {
-      const isUngrouped = labelParts.length === 0;
-      const id = isUngrouped ? `${layerId}-ungrouped` : groupId(layerId, labelParts);
+      const isSingleItemFallback = labelParts.length === 0;
+      const id = isSingleItemFallback ? `${layerId}-item-${slug(item.id)}` : groupId(layerId, labelParts);
       const existing = groups.get(id);
       const member: ProvenanceGroupMember = {
         item,
@@ -577,7 +584,7 @@ export function buildGroups(
         groups.set(id, {
           id,
           layerId,
-          label: isUngrouped ? "Ungrouped" : groupLabel(labelParts),
+          label: isSingleItemFallback ? item.name : groupLabel(labelParts),
           groupingKeys,
           labelParts,
           members: [member],
@@ -914,8 +921,37 @@ function findLayer(layers: ProvenanceLayer[], layerId: string): ProvenanceLayer 
   return layers.find((layer) => layer.id === layerId) ?? { id: layerId, label: layerId };
 }
 
-function adjacentPairs(layers: ProvenanceLayer[]): Array<[ProvenanceLayer, ProvenanceLayer]> {
-  return layers.slice(0, -1).map((layer, index) => [layer, layers[index + 1]]);
+function adjacentPairs(layers: ProvenanceLayer[]): ProvenanceLayerPair[] {
+  return layers.slice(0, -1).map((layer, index) => ({
+    leftLayerId: layer.id,
+    rightLayerId: layers[index + 1].id,
+  }));
+}
+
+function visibleItemsForLayers(
+  items: ProvenanceItem[],
+  layerIds: string[],
+  visibleItemIdsByLayer: Record<string, string[]> | undefined,
+): ProvenanceItem[] {
+  const layerIdSet = new Set(layerIds);
+
+  return items.filter((item) => {
+    if (!layerIdSet.has(item.layerId)) {
+      return false;
+    }
+
+    const scope = visibleItemIdsByLayer?.[item.layerId];
+    return scope === undefined || scope.includes(item.id);
+  });
+}
+
+function resolvedLayerPairs(
+  layers: ProvenanceLayer[],
+  layerPairs: ProvenanceLayerPair[] | undefined,
+): Array<[ProvenanceLayer, ProvenanceLayer]> {
+  const pairs = layerPairs ?? adjacentPairs(layers);
+
+  return pairs.map((pair) => [findLayer(layers, pair.leftLayerId), findLayer(layers, pair.rightLayerId)]);
 }
 
 function GroupEditor(props: {
@@ -1340,40 +1376,45 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   const rightGroupingKeys = props.groupingByLayer[props.rightLayerId] ?? [];
   const leftParameterValues = parameterValueConfigForLayer(props.parameterValuesByLayer, props.leftLayerId);
   const rightParameterValues = parameterValueConfigForLayer(props.parameterValuesByLayer, props.rightLayerId);
-  const connectionDerivedLeftKeys = connectionDerivedParameterKeys(
+  const visiblePairItems = visibleItemsForLayers(
     props.items,
+    [props.leftLayerId, props.rightLayerId],
+    props.visibleItemIdsByLayer,
+  );
+  const connectionDerivedLeftKeys = connectionDerivedParameterKeys(
+    visiblePairItems,
     props.connections,
     props.leftLayerId,
     props.rightLayerId,
   );
-  const physicalLeftParameterKeys = mergeKeys(availableParameterKeys(props.items, props.leftLayerId), configuredKeys(leftParameterValues));
+  const physicalLeftParameterKeys = mergeKeys(availableParameterKeys(visiblePairItems, props.leftLayerId), configuredKeys(leftParameterValues));
   const leftParameterKeys = mergeKeys(physicalLeftParameterKeys, connectionDerivedLeftKeys);
-  const rightParameterKeys = mergeKeys(availableParameterKeys(props.items, props.rightLayerId), configuredKeys(rightParameterValues));
+  const rightParameterKeys = mergeKeys(availableParameterKeys(visiblePairItems, props.rightLayerId), configuredKeys(rightParameterValues));
   const leftSortOptions = sortOptionsForLayer(leftParameterKeys, leftGroupingKeys);
   const rightSortOptions = sortOptionsForLayer(rightParameterKeys, rightGroupingKeys);
   const leftSortKey = canonicalKey(leftSortOptions, props.sortingByLayer?.[props.leftLayerId]);
   const rightSortKey = canonicalKey(rightSortOptions, props.sortingByLayer?.[props.rightLayerId]);
   const leftValueResolver = createAdjacentValueResolver(
-    props.items,
+    visiblePairItems,
     props.connections,
     props.leftLayerId,
     props.rightLayerId,
     "left",
   );
   const rightValueResolver = createAdjacentValueResolver(
-    props.items,
+    visiblePairItems,
     props.connections,
     props.rightLayerId,
     props.leftLayerId,
     "right",
   );
   const leftGroups = sortGroups(
-    buildGroups(props.items, props.leftLayerId, leftGroupingKeys, leftValueResolver),
+    buildGroups(visiblePairItems, props.leftLayerId, leftGroupingKeys, leftValueResolver),
     leftSortKey,
     leftValueResolver,
   );
   const rightGroups = sortGroups(
-    buildGroups(props.items, props.rightLayerId, rightGroupingKeys, rightValueResolver),
+    buildGroups(visiblePairItems, props.rightLayerId, rightGroupingKeys, rightValueResolver),
     rightSortKey,
     rightValueResolver,
   );
@@ -1399,7 +1440,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
       "left",
       props.leftLayerId,
       parameterRails.left,
-      props.items,
+      visiblePairItems,
       leftGroups,
       leftParameterValues,
       leftValueResolver,
@@ -1408,7 +1449,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
       "right",
       props.rightLayerId,
       parameterRails.right,
-      props.items,
+      visiblePairItems,
       rightGroups,
       rightParameterValues,
       rightValueResolver,
@@ -1714,7 +1755,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           </div>
         </div>
         <div className="swt:flex swt:flex-wrap swt:items-center swt:gap-2">
-          {adjacentPairs(props.layers).map(([left, right]) => {
+          {resolvedLayerPairs(props.layers, props.layerPairs).map(([left, right]) => {
             const active = left.id === props.leftLayerId && right.id === props.rightLayerId;
             return (
               <button
@@ -1913,7 +1954,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         <ParameterRail
           entries={parameterRails.left}
           groups={leftGroups}
-          items={props.items}
+          items={visiblePairItems}
           layer={leftLayer}
           parameterValues={leftParameterValues}
           side="left"
@@ -1995,7 +2036,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         <ParameterRail
           entries={parameterRails.right}
           groups={rightGroups}
-          items={props.items}
+          items={visiblePairItems}
           layer={rightLayer}
           parameterValues={rightParameterValues}
           side="right"
