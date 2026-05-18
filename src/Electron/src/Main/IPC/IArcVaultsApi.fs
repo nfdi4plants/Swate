@@ -416,9 +416,10 @@ module ArcRenameHelper =
                 $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
         | _ -> renameError
 
-    let private validateRenamePathClassification (classification: ArcDeletePathRules.RenamePathClassification) =
+    let private validateRenameSourceClassification (classification: ArcDeletePathRules.RenamePathClassification) =
         match classification with
-        | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget _ -> Ok()
+        | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
+            Ok(zone, identifier, normalizedRelativePath)
         | ArcDeletePathRules.RenamePathClassification.RootTarget ->
             Error(exn "Renaming the ARC root is not allowed.")
         | ArcDeletePathRules.RenamePathClassification.DisallowedTarget _ ->
@@ -435,54 +436,27 @@ module ArcRenameHelper =
         | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
             Error(exn "Renaming generic files or folders is not supported from the ARC file tree.")
 
-    let private tryGetEntityFolderRenameTarget (classification: ArcDeletePathRules.RenamePathClassification) =
-        match classification with
-        | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
-            Some(zone, identifier, normalizedRelativePath)
-        | _ -> None
-
     let tryBuildRenamePlan (request: RenamePathRequest) : Result<RenamePlan, exn> =
         let requestedRelativePath = normalizeRelativePathForComparison request.relativePath
         let sourceClassification = ArcDeletePathRules.classifyRenameTarget requestedRelativePath
 
-        match validateRenamePathClassification sourceClassification with
+        match validateRenameSourceClassification sourceClassification with
         | Error validationError -> Error validationError
-        | Ok() ->
-            let resolvedSourcePath = ArcDeletePathRules.resolveRenameSourcePath requestedRelativePath
-
-            match tryBuildRenameTargetPath resolvedSourcePath request.newName with
+        | Ok(sourceZone, sourceIdentifier, sourcePath) ->
+            match tryBuildRenameTargetPath sourcePath request.newName with
             | Error targetPathError -> Error(exn targetPathError)
             | Ok targetPath ->
-                let targetClassification = ArcDeletePathRules.classifyRenameTarget targetPath
+                let targetIdentifier = PathHelpers.getNameFromPath targetPath
 
-                match validateRenamePathClassification targetClassification with
-                | Error validationError -> Error validationError
-                | Ok() ->
-                    match
-                        tryGetEntityFolderRenameTarget sourceClassification,
-                        tryGetEntityFolderRenameTarget targetClassification
-                    with
-                    | Some(sourceZone, sourceIdentifier, sourcePath), Some(targetZone, targetIdentifier, targetPath) ->
-                        if sourceZone <> targetZone then
-                            Error(
-                                exn
-                                    $"Renamed folder from '{sourcePath}' to '{targetPath}', but ARC identifier sync only supports renames within the same entity zone."
-                            )
-                        else
-                            Ok {
-                                SourcePath = sourcePath
-                                TargetPath = targetPath
-                                SyncPlan = {
-                                    Zone = sourceZone
-                                    OldIdentifier = sourceIdentifier
-                                    NewIdentifier = targetIdentifier
-                                }
-                            }
-                    | _ ->
-                        Error(
-                            exn
-                                $"Renamed folder from '{resolvedSourcePath}' to '{targetPath}', but ARC identifier sync requires validated ARC entity folder paths."
-                        )
+                Ok {
+                    SourcePath = sourcePath
+                    TargetPath = targetPath
+                    SyncPlan = {
+                        Zone = sourceZone
+                        OldIdentifier = sourceIdentifier
+                        NewIdentifier = targetIdentifier
+                    }
+                }
 
     let mergeReloadedArcAfterRename
         (renamePlan: RenamePlan)

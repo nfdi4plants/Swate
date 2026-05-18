@@ -72,9 +72,12 @@ let private loadArcAsync (arcPath: string) : JS.Promise<ARC> = promise {
 }
 
 let private testWindow () =
+    let noopSend: obj = emitJsExpr () "((..._args) => {})"
+
     createObj [
         "id" ==> 0
         "title" ==> ""
+        "webContents" ==> createObj [ "send" ==> noopSend ]
     ]
     |> unbox<BrowserWindow>
 

@@ -3,6 +3,17 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="ArcMerge\MockData.fs" />
+    <Compile Include="ArcMerge\HasInMemoryChanges.test.fs" />
+    <Compile Include="ArcMerge\PathParsing.test.fs" />
+    <Compile Include="ArcMerge\ShortCircuit.test.fs" />
+    <Compile Include="ArcMerge\InvestigationEvents.test.fs" />
+    <Compile Include="ArcMerge\AssayEvents.test.fs" />
+    <Compile Include="ArcMerge\StudyEvents.test.fs" />
+    <Compile Include="ArcMerge\RunEvents.test.fs" />
+    <Compile Include="ArcMerge\WorkflowEvents.test.fs" />
+    <Compile Include="ArcMerge\DataMapEvents.test.fs" />
+    <Compile Include="ArcMerge\EdgeCases.test.fs" />
     <Compile Include="FileTreeCompaction.test.fs" />
     <Compile Include="FileTreeCreator.test.fs" />
     <Compile Include="ArcFileMutationHelper.test.fs" />
