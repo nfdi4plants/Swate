@@ -73,8 +73,8 @@ export type ProvenanceGroupingProps = {
   sortingByLayer?: Record<string, string | undefined>;
   parameterValuesByLayer?: Record<string, Record<string, string[]>>;
   parameterRailByKey?: Record<string, ProvenanceSide>;
-  selectedSourceGroupId?: string;
-  selectedTargetGroupId?: string;
+  selectedSourceGroupIds?: string[];
+  selectedTargetGroupIds?: string[];
   detail?: ProvenanceDetail;
   error?: string;
   onToggleGrouping: (side: ProvenanceSide, key: string) => void;
@@ -84,9 +84,9 @@ export type ProvenanceGroupingProps = {
   onCreateParameterValue: (side: ProvenanceSide, key: string, value: string) => void;
   onAssignParameterValue: (side: ProvenanceSide, key: string, value: string, groupId: string) => void;
   onSelectGroup: (side: ProvenanceSide, groupId: string) => void;
+  onConnectGroups: (sourceGroupId: string, targetGroupId: string) => void;
   onOpenDetail: (detail: ProvenanceDetail) => void;
   onUpdateParameter: (side: ProvenanceSide, groupId: string, key: string, oldValue: string, value: string) => void;
-  onConnectSelectedGroups: () => void;
   onCreateItem: (layerId: string, name: string) => void;
   onAddLayer: () => void;
   onSelectPair: (leftLayerId: string, rightLayerId: string) => void;
@@ -174,6 +174,11 @@ type DraggedParameterValue = {
   side: ProvenanceSide;
   key: string;
   value: string;
+};
+
+type DraggedGroup = {
+  side: ProvenanceSide;
+  groupId: string;
 };
 
 const normalizeKey = (key: string) => key.trim().toLowerCase();
@@ -465,6 +470,21 @@ function readDraggedParameterValue(event: React.DragEvent): DraggedParameterValu
   try {
     const parsed = JSON.parse(rawValue) as DraggedParameterValue;
     return (parsed.side === "left" || parsed.side === "right") && parsed.key && parsed.value ? parsed : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function readDraggedGroup(event: React.DragEvent): DraggedGroup | undefined {
+  const rawValue = event.dataTransfer.getData("application/x-provenance-group");
+
+  if (!rawValue) {
+    return undefined;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue) as DraggedGroup;
+    return (parsed.side === "left" || parsed.side === "right") && parsed.groupId ? parsed : undefined;
   } catch {
     return undefined;
   }
@@ -1418,6 +1438,8 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
     rightSortKey,
     rightValueResolver,
   );
+  const selectedSourceGroupIds = props.selectedSourceGroupIds ?? [];
+  const selectedTargetGroupIds = props.selectedTargetGroupIds ?? [];
   const parameterRails = buildParameterRailEntries(
     physicalLeftParameterKeys,
     rightParameterKeys,
@@ -1619,7 +1641,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
 
   const renderGroup = (side: ProvenanceSide, group: ProvenanceGroup) => {
     const selected =
-      side === "left" ? props.selectedSourceGroupId === group.id : props.selectedTargetGroupId === group.id;
+      side === "left" ? selectedSourceGroupIds.includes(group.id) : selectedTargetGroupIds.includes(group.id);
     const expandedByConnection =
       selectedConnectionSummary !== undefined &&
       (side === "left"
@@ -1639,29 +1661,56 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         ].join(" ")}
         data-provenance-group-node={groupNodeId(side, group.id)}
         data-testid={`ProvenanceGrouping-group-${side}-${group.id}`}
+        draggable
         key={group.id}
+        onDragStart={(event) => {
+          event.dataTransfer.effectAllowed = "linkMove";
+          event.dataTransfer.setData(
+            "application/x-provenance-group",
+            JSON.stringify({ side, groupId: group.id }),
+          );
+        }}
         onDragLeave={() => setDragOverGroup(undefined)}
         onDragOver={(event) => {
           const draggedValue = readDraggedParameterValue(event);
 
-          if (draggedValue?.side !== side) {
+          if (draggedValue?.side === side) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "copy";
+            setDragOverGroup({ side, groupId: group.id });
             return;
           }
 
-          event.preventDefault();
-          event.dataTransfer.dropEffect = "copy";
-          setDragOverGroup({ side, groupId: group.id });
+          const draggedGroup = readDraggedGroup(event);
+
+          if (draggedGroup && draggedGroup.side !== side) {
+            event.preventDefault();
+            event.dataTransfer.dropEffect = "link";
+            setDragOverGroup({ side, groupId: group.id });
+          }
         }}
         onDrop={(event) => {
           const draggedValue = readDraggedParameterValue(event);
           setDragOverGroup(undefined);
 
-          if (draggedValue?.side !== side) {
+          if (draggedValue?.side === side) {
+            event.preventDefault();
+            props.onAssignParameterValue(side, draggedValue.key, draggedValue.value, group.id);
+            return;
+          }
+
+          const draggedGroup = readDraggedGroup(event);
+
+          if (!draggedGroup || draggedGroup.side === side) {
             return;
           }
 
           event.preventDefault();
-          props.onAssignParameterValue(side, draggedValue.key, draggedValue.value, group.id);
+          if (draggedGroup.side === "left") {
+            props.onConnectGroups(draggedGroup.groupId, group.id);
+          } else {
+            props.onConnectGroups(group.id, draggedGroup.groupId);
+          }
         }}
       >
         <div className="swt:flex swt:items-start swt:justify-between swt:gap-3">
@@ -1679,7 +1728,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
               onClick={() => props.onSelectGroup(side, group.id)}
             >
               <i className="swt:iconify swt:fluent--cursor-click-20-regular swt:size-3" />
-              Select
+              {selected ? "Selected" : "Select"}
             </button>
             <button
               aria-label={expanded ? `Hide ${group.label} entries` : `Show ${group.label} entries`}
@@ -1993,17 +2042,10 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           </div>
         </section>
 
-        <section className="swt:pointer-events-none swt:relative swt:z-30 swt:flex swt:min-w-0 swt:flex-col swt:items-center swt:self-stretch">
-          <button
-            className="swt:btn swt:btn-primary swt:btn-sm swt:pointer-events-auto"
-            data-testid="ProvenanceGrouping-connect-selected"
-            type="button"
-            onClick={props.onConnectSelectedGroups}
-          >
-            <i className="swt:iconify swt:fluent--plug-connected-20-regular swt:size-4" />
-            Connect selected
-          </button>
-        </section>
+        <section
+          aria-hidden="true"
+          className="swt:pointer-events-none swt:relative swt:z-30 swt:min-w-0"
+        />
 
         <section className="swt:relative swt:z-10 swt:flex swt:min-w-0 swt:flex-col swt:gap-3">
           <div className="swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2">

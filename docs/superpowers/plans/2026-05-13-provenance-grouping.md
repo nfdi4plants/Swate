@@ -470,11 +470,29 @@ visibleItemIdsByPair: Record<string, Record<string, string[]>>;
 
 The initial pair is `Inputs -> Outputs` with no scope. When adding a layer:
 
-- Prefer the selected right/output group as the source.
-- If no right group is selected, use the selected left/input group.
+- Prefer all selected right/output groups as the source.
+- If no right group is selected, use all selected left/input groups.
 - If no group is selected, use all entries from the current right layer.
 - Store the selected source item IDs as the visible scope for the source layer in the new pair.
 
 - [ ] **Step 3: Verify selected group handoff**
 
-Add or update a Storybook play test that selects one output group, clicks `Layer`, and verifies the next pair's left column contains only that selected output entry set.
+Add or update a Storybook play test that selects several output groups, clicks `Layer`, and verifies the next pair's left column contains only those selected output entry sets.
+
+## Task 12: Multi-Select Layer Seeds And Drag-To-Connect Groups
+
+- [ ] **Step 1: Replace single selected group IDs with selected group ID arrays**
+
+The Storybook mock model should keep `selectedSourceGroupIds` and `selectedTargetGroupIds`. Clicking a group selection button toggles membership in that side's selected set.
+
+- [ ] **Step 2: Seed new layers from all selected groups**
+
+When adding a layer, collect unique item IDs from every selected target group. If no target group is selected, collect unique item IDs from every selected source group. If neither side has selections, keep the existing default of using the current right layer.
+
+- [ ] **Step 3: Remove the connect-selected action**
+
+The reusable component should no longer render the `Connect selected` button. It should expose a group-to-group connection intent callback instead.
+
+- [ ] **Step 4: Connect groups by drag/drop**
+
+Make visible group cards draggable. Dropping a left group on a right group emits `onConnectGroups(leftGroupId, rightGroupId)`. Dropping a right group on a left group emits the same callback with source and target normalized to left-to-right direction.

@@ -97,7 +97,7 @@ Connections are rendered as clickable lines between visible groups only. There i
 
 A line between source group `A` and target group `B` means a complete group link.
 
-The mockup does not expose partial group links. Creating a group link connects all source entries in the source group with all target entries in the target group. Clicking a group connector expands both connected groups and replaces that connector with member-level connector lines between the expanded entries.
+The mockup does not expose partial group links. Creating a group link is done by dragging one visible group onto a group on the opposite side. This connects all source entries in the source group with all target entries in the target group. Clicking a group connector expands both connected groups and replaces that connector with member-level connector lines between the expanded entries.
 
 Creating a group-level connection should create all item-level links between the source and target group. When connecting groups, target items inherit missing source parameters from connected sources. Existing target parameter values are preserved by connection inheritance.
 
@@ -124,8 +124,9 @@ Creating a new item:
 
 Creating a new layer:
 
-- Adds a downstream layer after the selected group when a source or target group is selected.
-- Uses the selected target/output group as the new layer's input set when present; otherwise uses the selected source/input group. If nothing is selected, it keeps the previous default of using all entries from the current right layer as the next input set.
+- Adds a downstream layer after the selected groups when source or target groups are selected.
+- Group selection is a multi-select set, not a single active group.
+- Uses all selected target/output groups as the new layer's input set when present; otherwise uses all selected source/input groups. If nothing is selected, it keeps the previous default of using all entries from the current right layer as the next input set.
 - Lets the user navigate to the new pair.
 - Uses the same item model, so outputs from one step can act as inputs to the next displayed pair.
 
@@ -140,7 +141,7 @@ The reusable component should accept:
 - `connections`
 - selected left and right layer IDs
 - grouping keys per layer
-- selection/detail state where needed
+- selected source and target group ID arrays plus detail state where needed
 - callback props for user intents
 
 The Storybook story should own state with React and provide callbacks that mutate the sample model. This keeps the component reusable while making the mockup genuinely interactive.
