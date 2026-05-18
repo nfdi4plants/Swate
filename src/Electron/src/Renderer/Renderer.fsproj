@@ -55,7 +55,6 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\..\..\Client\Client.fsproj" />
     <ProjectReference Include="..\..\..\Components\src\Swate.Components.fsproj" />
     <ProjectReference Include="..\Swate.Electron.Shared\Swate.Electron.Shared.fsproj" />
   </ItemGroup>

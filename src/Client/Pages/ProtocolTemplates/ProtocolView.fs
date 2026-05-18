@@ -6,6 +6,7 @@ open Feliz
 open ARCtrl
 open Swate.Components.Primitive
 open Swate.Components.Primitive.Buttons
+open Swate.Components.Primitive.LoadingSpinner
 open Swate.Components.Composite.Template
 
 module private TemplatesAux =
@@ -96,11 +97,7 @@ type Templates =
                             ]
                         ]
                         Html.td [
-                            Buttons.CollapseButton(
-                                show,
-                                (fun _ -> setShow (not show)),
-                                classes = "swt:btn-sm"
-                            )
+                            Buttons.CollapseButton(show, (fun _ -> setShow (not show)), classes = "swt:btn-sm")
                         ]
                     ]
                 ]
@@ -173,10 +170,7 @@ type Templates =
                                 Html.th [
                                     Html.div [
                                         prop.className "swt:flex swt:items-center"
-                                        prop.children [
-                                            Icons.Filter("swt:size-3")
-                                            Html.span templates.Length
-                                        ]
+                                        prop.children [ Icons.Filter("swt:size-3"); Html.span templates.Length ]
                                     ]
                                 ]
                                 Html.th "Template Name"
@@ -193,10 +187,7 @@ type Templates =
                                         prop.colSpan TemplatesAux.ColCount
                                         prop.style [ style.textAlign.center ]
                                         prop.children [
-                                            Buttons.LoadingSpinner(
-                                                "Loading templates...",
-                                                size = DaisyuiSize.XL
-                                            )
+                                            LoadingSpinner.LoadingSpinner("Loading templates...", size = DaisyuiSize.XL)
                                         ]
                                     ]
                                 ]
@@ -303,10 +294,7 @@ type Templates =
 
                 Templates.ImportTemplatesBtn(model, dispatch)
 
-                TemplateFilter.TemplateFilter(
-                    model.ProtocolState.Templates,
-                    templateSearchClassName = "swt:grow"
-                )
+                TemplateFilter.TemplateFilter(model.ProtocolState.Templates, templateSearchClassName = "swt:grow")
 
                 TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
                     Templates.DisplayTemplates(filteredTemplates, model, dispatch, ?maxheight = Some(length.px 600))

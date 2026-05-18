@@ -5,12 +5,6 @@ open Fable.Core
 
 open System
 
-module console =
-    let log (a) = Browser.Dom.console.log a
-    let warn (a) = Browser.Dom.console.warn a
-    let error (a) = Browser.Dom.console.error a
-
-
 open System.Collections.Generic
 
 type DebounceStorage() =

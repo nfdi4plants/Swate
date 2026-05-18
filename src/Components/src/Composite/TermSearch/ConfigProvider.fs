@@ -23,9 +23,9 @@ module private TermSearchConfigProviderHelper =
                     let n = TIB_PREFIX + c
 
                     let query: SearchCall =
-                        fun (q: string) -> 
+                        fun (q: string) ->
                             Swate.Components.Api.TIBApi.TIBApi.defaultSearch (q, 10, c)
-                            |> Promise.map (fun searchApi -> 
+                            |> Promise.map (fun searchApi ->
                                 match searchApi with
                                 | Some api -> api.ToMyTerm() |> ResizeArray
                                 | None -> ResizeArray()
@@ -41,7 +41,7 @@ module private TermSearchConfigProviderHelper =
                     let query: ParentSearchCall =
                         fun (parent: string, query: string) ->
                             Swate.Components.Api.TIBApi.TIBApi.searchChildrenOf (query, parent, 10, c)
-                            |> Promise.map (fun searchApi -> 
+                            |> Promise.map (fun searchApi ->
                                 match searchApi with
                                 | Some api -> api.ToMyTerm() |> ResizeArray
                                 | None -> ResizeArray()
@@ -57,7 +57,7 @@ module private TermSearchConfigProviderHelper =
                     let query: AllChildrenSearchCall =
                         fun (p: string) ->
                             Swate.Components.Api.TIBApi.TIBApi.searchAllChildrenOf (p, 300, collection = c)
-                            |> Promise.map (fun searchApi -> 
+                            |> Promise.map (fun searchApi ->
                                 match searchApi with
                                 | Some api -> api.ToMyTerm() |> ResizeArray
                                 | None -> ResizeArray()
@@ -90,7 +90,7 @@ type TermSearchConfigProvider =
                     try
                         let! collections =
                             Api.TIBApi.TIBApi.getCollections ()
-                            |> Promise.catch (fun ex -> console.error "Error fetching TIB collections:" ex)
+                            |> Promise.catch (fun ex -> failwithf "Error fetching TIB collections: %s" ex.Message)
 
                         let collectionSet = Set.ofArray collections.content
 
