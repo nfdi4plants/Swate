@@ -1,4 +1,3 @@
-[<AutoOpenAttribute>]
 module Swate.Components.Primitive.ComboBox.Types
 
 open Fable.Core

@@ -1,4 +1,3 @@
-[<AutoOpenAttribute>]
 module Swate.Components.Composite.Table.Types
 
 open Fable.Core
@@ -22,25 +21,25 @@ type TableState
     member val onBlur = onBlur with get, set
     member val onKeyDown = onKeyDown with get, set
     member val onClick = onClick with get, set
-    with
-        static member init () =
-            TableState(
-                (fun _ ->
-                    console.warn "TableCtx default isActive"
-                    false
-                ),
-                (fun _ ->
-                    console.warn "TableCtx default isOrigin"
-                    false
-                ),
-                (fun _ ->
-                    console.warn "TableCtx default isSelected"
-                    false
-                ),
-                (fun _ _ -> console.warn "TableCtx default onBlur"),
-                (fun _ _ -> console.warn "TableCtx default onKeyDown"),
-                (fun _ _ -> console.warn "TableCtx default onClick")
-            )
+
+    static member init() =
+        TableState(
+            (fun _ ->
+                console.warn "TableCtx default isActive"
+                false
+            ),
+            (fun _ ->
+                console.warn "TableCtx default isOrigin"
+                false
+            ),
+            (fun _ ->
+                console.warn "TableCtx default isSelected"
+                false
+            ),
+            (fun _ _ -> console.warn "TableCtx default onBlur"),
+            (fun _ _ -> console.warn "TableCtx default onKeyDown"),
+            (fun _ _ -> console.warn "TableCtx default onClick")
+        )
 
 [<JS.Pojo>]
 type SelectHandle

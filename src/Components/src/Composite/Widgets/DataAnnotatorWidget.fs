@@ -6,6 +6,7 @@ open Fable.Core
 open Feliz
 open Swate.Components.Shared
 open Swate.Components.Composite.Widgets.Context
+open Swate.Components.Composite.Widgets.Types
 
 module private DataAnnotatorWidgetModel =
 
@@ -759,4 +760,3 @@ type DataAnnotatorWidget =
                     ]
                 ]
             ]
-

@@ -7,7 +7,7 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Template
 open Swate.Components.Composite.Widgets.Context
-
+open Swate.Components.Composite.Widgets.Types
 
 module TemplateTypes = Swate.Components.Composite.Template.Types
 module TemplateActions = Swate.Components.Composite.Template.TemplateActions
@@ -136,4 +136,3 @@ type TemplateWidget =
             (fun () -> services.loadTemplates () |> Async.StartAsPromise),
             TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFile)
         )
-

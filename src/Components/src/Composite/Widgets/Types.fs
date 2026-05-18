@@ -1,5 +1,6 @@
-namespace Swate.Components.Composite.Widgets
+module Swate.Components.Composite.Widgets.Types
 
+open Feliz
 open ARCtrl
 open Fable.Core
 open Swate.Components.Shared
@@ -28,3 +29,10 @@ type Rect = {
 } with
 
     static member init() = { X = 0; Y = 0 }
+
+type WidgetBlock = {
+    prefix: string
+    content: ReactElement
+} with
+
+    static member create prefix content : WidgetBlock = { prefix = prefix; content = content }

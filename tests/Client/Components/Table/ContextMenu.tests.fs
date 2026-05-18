@@ -3,9 +3,11 @@ module Components.Tests.Table.ContextMenu
 open Fable.Mocha
 open ARCtrl
 open Swate.Components
+open Swate.Components.Composite.AnnotationTable.Types
 open global.Swate.Components.Composite.AnnotationTable
 open global.Swate.Components.Composite.AnnotationTable.Types.AnnotationTableContextMenu
 open global.Swate.Components.Composite.Table
+open global.Swate.Components.Composite.Table.Types
 open global.Swate.Components.Primitive.ContextMenu.Types
 open Browser.Types
 
@@ -158,7 +160,11 @@ type TestCases =
 
         TestCases.TriggerMenuItem menuItems.[6] {| x = 1; y = 0 |}
 
-        Expect.equal updatedTable.ColumnCount (originalColumnCount - 1) "Delete column should remove the first data column"
+        Expect.equal
+            updatedTable.ColumnCount
+            (originalColumnCount - 1)
+            "Delete column should remove the first data column"
+
         Expect.equal
             updatedTable.Headers.[0]
             (CompositeHeader.Output IOType.Data)
@@ -182,6 +188,7 @@ type TestCases =
         TestCases.TriggerMenuItem menuItems.[0] {| x = 0; y = 1 |}
 
         Expect.equal updatedTable.RowCount (originalRowCount - 1) "Delete row should remove the first data row"
+
         Expect.equal
             (updatedTable.GetCellAt(0, 0).ToTabStr())
             expectedFirstCellAfterDelete
@@ -207,8 +214,7 @@ type TestCases =
         | Some(AnnotationTable.ModalTypes.MoveColumn(_, arcTableIndex)) ->
             Expect.equal arcTableIndex.x 1 "Move column should target the first header column (1-based UI index)"
             Expect.equal arcTableIndex.y 0 "Move column target should stay on header row"
-        | _ ->
-            failwith "Move column menu entry should open move-column modal"
+        | _ -> failwith "Move column menu entry should open move-column modal"
 
 let Main =
 

@@ -9,8 +9,11 @@ open Swate.Components.Shared
 open Swate.Components.Primitive
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.ContextMenu
-open Swate.Components.Composite.TermSearch
+open Swate.Components.Primitive.ContextMenu.Types
+open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Composite.Table
+open Swate.Components.Composite.Table.Types
+open Swate.Components.Composite.DataMapTable.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.AnnotationTable.Context
 

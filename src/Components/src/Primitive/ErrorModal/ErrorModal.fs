@@ -4,12 +4,13 @@ open Feliz
 open Fable.Core
 open Swate.Components
 open Swate.Components.Primitive.BaseModal
+open Swate.Components.Primitive.ErrorModal.Types
 
 [<Erase; Mangle(false)>]
 type ErrorModal =
 
     [<ReactComponent>]
-    static member ActionButton (action: ErrorModalAction) =
+    static member ActionButton(action: ErrorModalAction) =
         let className =
             match action.Style with
             | ErrorModalActionStyle.Primary -> "swt:btn-primary"
@@ -18,7 +19,7 @@ type ErrorModal =
 
         Html.button [
             prop.className $"swt:btn {className}"
-            prop.onClick (fun _ -> action.OnClick ())
+            prop.onClick (fun _ -> action.OnClick())
             prop.children [
                 if action.IconClassName.IsSome then
                     Html.i [
@@ -29,7 +30,7 @@ type ErrorModal =
         ]
 
     [<ReactComponent>]
-    static member MessageBlock (message: string) =
+    static member MessageBlock(message: string) =
         Html.div [
             prop.className "swt:whitespace-pre-wrap"
             prop.children (
@@ -39,7 +40,7 @@ type ErrorModal =
         ]
 
     [<ReactComponent>]
-    static member DetailsBlock (details: string) =
+    static member DetailsBlock(details: string) =
         Html.details [
             prop.className "swt:collapse swt:collapse-arrow swt:border swt:border-base-300 swt:bg-base-200"
             prop.children [
@@ -60,20 +61,16 @@ type ErrorModal =
         ]
 
     [<ReactComponent>]
-    static member BodyBlock (request: ErrorModalRequest) =
+    static member BodyBlock(request: ErrorModalRequest) =
 
         let details =
             match request.Details with
             | None -> Html.none
-            | Some details ->
-                ErrorModal.DetailsBlock(details)
+            | Some details -> ErrorModal.DetailsBlock(details)
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-3"
-            prop.children [
-                ErrorModal.MessageBlock request.Message
-                details
-            ]
+            prop.children [ ErrorModal.MessageBlock request.Message; details ]
         ]
 
     [<ReactComponent>]

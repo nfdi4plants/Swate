@@ -6,7 +6,9 @@ open Browser.Types
 open Swate.Components
 open ARCtrl
 open Swate.Components.Composite.TermSearch
-open Swate.Components.Composite.Table
+open Swate.Components.Composite.TermSearch.Types
+open Swate.Components.Composite.Table.Types
+open Swate.Components.Composite.AnnotationTable.Types
 open Swate.Components.Shared
 open Swate.Components.Primitive.BaseModal
 

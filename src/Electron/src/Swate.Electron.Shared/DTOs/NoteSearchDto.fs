@@ -2,7 +2,7 @@ module Swate.Electron.Shared.DTOs.NoteSearchDto
 
 open ARCtrl
 open ARCtrl.Json
-open Swate.Components.Composite.NoteTypes
+open Swate.Components.Composite.Notes.Types
 
 type NoteSearchDto = {
     RelativePath: string
@@ -29,26 +29,20 @@ module NoteSearchNoteDto =
             with _ ->
                 None
 
-    let ofNote (note: Note) : NoteSearchDto =
-        {
-            RelativePath = note.RelativePath
-            Title = note.Title
-            Date = note.Date
-            Tags = note.Tags |> Option.map (Seq.map encodeTag >> Seq.toArray)
-            Content = note.Content
-        }
+    let ofNote (note: Note) : NoteSearchDto = {
+        RelativePath = note.RelativePath
+        Title = note.Title
+        Date = note.Date
+        Tags = note.Tags |> Option.map (Seq.map encodeTag >> Seq.toArray)
+        Content = note.Content
+    }
 
-    let toNote (dto: NoteSearchDto) : Note =
-        {
-            RelativePath = dto.RelativePath
-            Title = dto.Title
-            Date = dto.Date
-            Tags =
-                dto.Tags
-                |> Option.map (fun tags ->
-                    tags
-                    |> Array.choose tryDecodeTag
-                    |> ResizeArray
-                )
-            Content = dto.Content
-        }
+    let toNote (dto: NoteSearchDto) : Note = {
+        RelativePath = dto.RelativePath
+        Title = dto.Title
+        Date = dto.Date
+        Tags =
+            dto.Tags
+            |> Option.map (fun tags -> tags |> Array.choose tryDecodeTag |> ResizeArray)
+        Content = dto.Content
+    }

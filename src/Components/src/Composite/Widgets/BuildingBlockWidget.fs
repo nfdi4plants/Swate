@@ -8,7 +8,9 @@ open Swate.Components.Shared
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components.Composite.AnnotationTable.Context
 open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Composite.Widgets.Context
+open Swate.Components.Composite.Widgets.Types
 
 
 module private BuildingBlockWidgetState =
@@ -445,4 +447,3 @@ type BuildingBlockWidget =
                     ]
                 ]
             ]
-

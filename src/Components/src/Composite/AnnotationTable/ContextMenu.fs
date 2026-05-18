@@ -9,8 +9,11 @@ open Feliz
 open Swate.Components
 open Types.AnnotationTableContextMenu
 open Swate.Components.Primitive
-open Swate.Components.Primitive.ContextMenu
+open Swate.Components.Primitive.ContextMenu.Types
+open Swate.Components.Composite.AnnotationTable.Types
 open Swate.Components.Composite.Table
+open Swate.Components.Composite.Table.Types
+
 
 /// AnnotationTableContextMenu Components
 type ATCMC =
@@ -20,7 +23,11 @@ type ATCMC =
         let label = defaultArg label text
 
         {|
-            element = Html.kbd [ prop.className "swt:ml-auto swt:kbd swt:kbd-sm"; prop.text text ]
+            element =
+                Html.kbd [
+                    prop.className "swt:ml-auto swt:kbd swt:kbd-sm"
+                    prop.text text
+                ]
             label = label
         |}
 
@@ -85,8 +92,13 @@ type AnnotationTableContextMenuUtil =
         | header when
             //header with a short length can lead to a problem here, so they must be at least as long as an expected header
             let shortestHeaderLength = headerNames |> Array.minBy String.length |> String.length
+
             headerNames
-            |> Array.exists (fun case -> not (System.String.IsNullOrEmpty header) && case.StartsWith(header) && header.Length >= shortestHeaderLength)
+            |> Array.exists (fun case ->
+                not (System.String.IsNullOrEmpty header)
+                && case.StartsWith(header)
+                && header.Length >= shortestHeaderLength
+            )
             ->
             true
         | _ -> false
@@ -130,12 +142,11 @@ type AnnotationTableContextMenuUtil =
                     |> Array.unzip
 
                 let headers = headers |> Array.concat
-                
+
                 if headers.Length > 0 then
                     let columns =
-                        let body =
-                            cells.[1..]
-                            |> Array.transpose
+                        let body = cells.[1..] |> Array.transpose
+
                         headers
                         |> Array.mapi (fun index header ->
                             if body.Length - 1 >= index then
@@ -378,7 +389,7 @@ type AnnotationTableContextMenuUtil =
                     coordinates = groupedCellCoordinates
                 |}
 
-    static member getValueOfCompositeHeader (compositeHeader: CompositeHeader) =
+    static member getValueOfCompositeHeader(compositeHeader: CompositeHeader) =
         match compositeHeader with
         | CompositeHeader.Component oa -> defaultArg oa.Name (compositeHeader.ToString())
         | CompositeHeader.Characteristic oa -> defaultArg oa.Name (compositeHeader.ToString())
@@ -447,7 +458,7 @@ type AnnotationTableContextMenuUtil =
 
             if targetCell.isUnitized then
                 let _, targetUnit = targetCell.AsUnitized
-                let value = AnnotationTableContextMenuUtil.getValueOfCompositeHeader(currentHeader)
+                let value = AnnotationTableContextMenuUtil.getValueOfCompositeHeader (currentHeader)
                 let newTarget = CompositeCell.createUnitized (value, targetUnit)
                 newTarget
             elif targetCell.isTerm then
@@ -456,12 +467,21 @@ type AnnotationTableContextMenuUtil =
                 newTarget
             elif targetCell.isData then
                 let targetInfo = targetCell.AsData
-                let targetData = AnnotationTableContextMenuUtil.getValueOfCompositeHeader(currentHeader)
-                let newTarget = CompositeCell.createDataFromString(targetData, ?format = targetInfo.Format, ?selectorFormat = targetInfo.SelectorFormat)
+
+                let targetData =
+                    AnnotationTableContextMenuUtil.getValueOfCompositeHeader (currentHeader)
+
+                let newTarget =
+                    CompositeCell.createDataFromString (
+                        targetData,
+                        ?format = targetInfo.Format,
+                        ?selectorFormat = targetInfo.SelectorFormat
+                    )
+
                 newTarget
             else
-                let value = AnnotationTableContextMenuUtil.getValueOfCompositeHeader(currentHeader)
-                CompositeCell.createFreeText(value)
+                let value = AnnotationTableContextMenuUtil.getValueOfCompositeHeader (currentHeader)
+                CompositeCell.createFreeText (value)
 
         //Check amount of selected cells
         //When multiple cells are selected a different handling is required
@@ -482,6 +502,7 @@ type AnnotationTableContextMenuUtil =
                             1
                         else
                             AnnotationTableContextMenuUtil.getIndex (yi, (pasteColumns.data.Item 0).Cells.Count)
+
                     row
                     |> Array.iteri (fun xi coordinate ->
                         let xIndex = AnnotationTableContextMenuUtil.getIndex (xi, pasteColumns.data.Count)
@@ -497,6 +518,7 @@ type AnnotationTableContextMenuUtil =
                                     let cells = (pasteColumns.data.Item xIndex).Cells
                                     let currentCell = cells.[yIndex]
                                     getCorrectTargetForCell currentCell table coordinate 1
+
                             table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
                     )
                 )
@@ -510,6 +532,7 @@ type AnnotationTableContextMenuUtil =
                     else
                         let currentCell = pasteColumns.data.[0].Cells.[0]
                         getCorrectTargetForCell currentCell table coordinate 1
+
                 table.SetCellAt(coordinate.x - 1, coordinate.y - 1, newTarget)
 
         if headerCoordinates.Length > 0 then
@@ -770,10 +793,7 @@ type AnnotationTableContextMenu =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
 
-                        setModal (
-                            AnnotationTable.ModalTypes.MoveColumn(cc, {| x = columnIndex; y = 0 |})
-                            |> Some
-                        )
+                        setModal (AnnotationTable.ModalTypes.MoveColumn(cc, {| x = columnIndex; y = 0 |}) |> Some)
             )
         ]
 
@@ -788,6 +808,7 @@ type AnnotationTableContextMenu =
                 onClick =
                     fun c ->
                         let cc = c.spawnData |> unbox<CellCoordinate>
+
                         AnnotationTableContextMenuUtil.deleteRow (cc, index - 1, table, selectHandle)
                         |> setTable
             )

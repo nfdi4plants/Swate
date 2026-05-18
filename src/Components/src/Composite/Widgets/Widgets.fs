@@ -8,6 +8,7 @@ open Swate.Components.Composite.Widgets.LocalStorage
 open Swate.Components.Composite.Widgets.Context
 open Swate.Components.Composite.TermSearch
 open Swate.Components.Primitive.Buttons
+open Swate.Components.Composite.Widgets.Types
 
 module InitExtensions =
 
@@ -28,7 +29,7 @@ open InitExtensions
 open Fable.Core
 open Fable.Core.JsInterop
 
-module MoveEventListener =
+module private MoveEventListener =
 
     open Fable.Core.JsInterop
 
@@ -120,13 +121,6 @@ module ResizeEventListener =
             // Cleanup function to remove event listener when the component unmounts
             FsReact.createDisposable (fun () -> Browser.Dom.window.removeEventListener ("resize", onResize))
         )
-
-type WidgetBlock = {
-    prefix: string
-    content: ReactElement
-} with
-
-    static member CreateWidgetBlock prefix content : WidgetBlock = { prefix = prefix; content = content }
 
 [<RequireQualifiedAccess>]
 [<Erase; Mangle(false)>]
@@ -603,4 +597,3 @@ type Widget =
             |> Map.ofList
 
         Widget.WidgetController(widgets, children = Widget.EntryControls(widgetTypes))
-

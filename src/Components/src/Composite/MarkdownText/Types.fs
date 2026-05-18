@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.MarkdownText
+module Swate.Components.Composite.MarkdownText.Types
 
 [<RequireQualifiedAccess>]
 type PreviewMode =
@@ -6,19 +6,17 @@ type PreviewMode =
     | Edit
     | Preview
 
-type MarkdownOptions =
-    {
-        Height: int
-        Mode: PreviewMode
-        PreviewClassName: string option
-    }
+type MarkdownOptions = {
+    Height: int
+    Mode: PreviewMode
+    PreviewClassName: string option
+}
 
 [<RequireQualifiedAccess>]
 module MarkdownOptions =
 
-    let defaults =
-        {
-            Height = 360
-            Mode = PreviewMode.Live
-            PreviewClassName = None
-        }
+    let defaults = {
+        Height = 360
+        Mode = PreviewMode.Live
+        PreviewClassName = None
+    }

@@ -1,4 +1,3 @@
-[<AutoOpen>]
 module Swate.Components.Primitive.Actionbar.Types
 
 open Fable.Core

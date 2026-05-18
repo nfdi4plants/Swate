@@ -1,4 +1,5 @@
-namespace Swate.Components.Composite.NoteTypes
+module Swate.Components.Composite.Notes.Types
+
 open ARCtrl
 
 type Note = {

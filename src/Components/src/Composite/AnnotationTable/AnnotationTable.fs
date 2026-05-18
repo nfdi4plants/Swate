@@ -3,7 +3,9 @@ namespace Swate.Components.Composite.AnnotationTable
 open Swate.Components
 open Swate.Components.Primitive.ContextMenu
 open Swate.Components.Composite.Table
+open Swate.Components.Composite.Table.Types
 open Swate.Components.Composite.AnnotationTable
+open Swate.Components.Composite.AnnotationTable.Types
 open Swate.Components.Composite.AnnotationTable.Context
 open Fable.Core
 open Fable.Core.JsInterop

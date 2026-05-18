@@ -1,12 +1,12 @@
 namespace Swate.Components.Composite.Examples
 
 open System
-open Swate.Components.Composite.NoteTypes
+open Swate.Components.Composite.Notes.Types
 open ARCtrl
 
 module noteSearchTests =
 
-    let notes: Swate.Components.Composite.NoteTypes.Note list = [
+    let notes: Note list = [
         {
             RelativePath = "notes/10_02_2026/Grocery_Planning.md"
             Title = "Grocery Planning"
@@ -110,4 +110,3 @@ module noteSearchTests =
                 "My home office setup could use some improvements. A better chair would improve posture during long coding sessions. Cable management is currently a mess. Adding a small plant might make the space more inviting. Proper lighting reduces eye strain. I should reorganize the desk drawers this weekend. A second monitor might increase productivity."
         }
     ]
-

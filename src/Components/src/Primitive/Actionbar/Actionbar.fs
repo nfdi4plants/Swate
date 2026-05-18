@@ -7,8 +7,10 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 open Swate.Components
+open Swate.Components.Primitive.Actionbar.Types
 open Swate.Components.Primitive
 open Swate.Components.Primitive.ContextMenu
+open Swate.Components.Primitive.ContextMenu.Types
 
 [<Erase; Mangle(false)>]
 type Actionbar =

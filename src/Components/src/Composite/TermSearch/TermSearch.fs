@@ -2,9 +2,10 @@ namespace Swate.Components.Composite.TermSearch
 
 open Swate.Components.Shared
 open Swate.Components
-open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Primitive
 open Swate.Components.Primitive.ComboBox
+open Swate.Components.Primitive.ComboBox.Types
 open Swate.Components.Primitive.BaseModal
 open Fable.Core
 open Feliz

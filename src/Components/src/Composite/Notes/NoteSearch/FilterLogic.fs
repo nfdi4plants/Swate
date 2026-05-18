@@ -3,7 +3,7 @@ namespace Swate.Components.Composite.NoteSearch.FilterLogic
 
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Composite.NoteTypes
+open Swate.Components.Composite.Notes.Types
 open Swate.Components.Primitive
 open System
 
@@ -22,9 +22,9 @@ type FuzzySearch =
     static member fuse(filterOption, notes) =
         Fuse(notes |> List.toArray |> Array.map (fun x -> x :> obj), FuzzySearch.fuseOptions (filterOption))
 
-    static member search(searchPattern: string, filterOption: string, notes) : Swate.Components.Composite.NoteTypes.Note list =
+    static member search(searchPattern: string, filterOption: string, notes) : Note list =
         FuzzySearch.fuse(filterOption, notes).search (searchPattern)
-        |> Array.map (fun (result: obj) -> unbox<Swate.Components.Composite.NoteTypes.Note> (result?item))
+        |> Array.map (fun (result: obj) -> unbox<Note> (result?item))
         |> Array.toList
 
 type ExactMatchSearch =
@@ -37,9 +37,7 @@ type ExactMatchSearch =
         else
             haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
 
-    static member search
-        (searchTerm: string, selectedIndices: Set<int>, notes: Swate.Components.Composite.NoteTypes.Note list)
-        : Swate.Components.Composite.NoteTypes.Note list =
+    static member search(searchTerm: string, selectedIndices: Set<int>, notes: Note list) : Note list =
         notes
         |> List.filter (fun note ->
 
@@ -69,4 +67,3 @@ type ExactMatchSearch =
                 // matchesTitle ||
                 matchesContent || matchesTags // If multiple filters are selected, a note matches if it satisfies at least one of the selected criteria.
         )
-

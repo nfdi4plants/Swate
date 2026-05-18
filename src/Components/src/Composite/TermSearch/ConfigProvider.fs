@@ -6,7 +6,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.Primitive
 open Swate.Components.Composite.TermSearch.Context
-open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.TermSearch.Types
 
 module private TermSearchConfigProviderHelper =
 

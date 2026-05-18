@@ -9,7 +9,8 @@ type SelectContextValue = {
     getItemProps: obj -> obj
     handleSelect: int option -> unit
 } with
-    static member init () : SelectContextValue = {
+
+    static member init() : SelectContextValue = {
         activeIndex = None
         selectedIndices = Set.empty
         optionCount = 0

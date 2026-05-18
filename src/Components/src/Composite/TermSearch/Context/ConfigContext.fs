@@ -3,7 +3,7 @@ module Swate.Components.Composite.TermSearch.Context.ConfigContext
 
 open Feliz
 open Swate.Components
-open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.TermSearch.Types
 
 type TermSearchConfigContext = {
     hasProvider: bool
@@ -22,7 +22,7 @@ type TermSearchConfigContext = {
     }
 
 let TermSearchConfigCtx =
-    React.createContext<TermSearchConfigContext>(TermSearchConfigContext.init ())
+    React.createContext<TermSearchConfigContext> (TermSearchConfigContext.init ())
 
 [<Hook>]
 let useTermSearchConfigCtx () = React.useContext TermSearchConfigCtx

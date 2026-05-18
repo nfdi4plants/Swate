@@ -7,6 +7,7 @@ open Fable.Core.JsInterop
 open Feliz
 
 open Swate.Components
+open Swate.Components.Composite.MarkdownText.Types
 open Swate.Components.Composite.MarkdownText.JsBindings
 open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Primitive.LayoutComponents
@@ -618,4 +619,3 @@ flowchart TD
         let value, setValue = React.useState entryInitialValue
 
         TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...", height = 440)
-

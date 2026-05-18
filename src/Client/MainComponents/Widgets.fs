@@ -9,6 +9,7 @@ open ARCtrl
 open BuildingBlock.SearchComponent
 open Swate.Components.Shared
 open Swate.Components.Primitive.Buttons
+open Swate.Components.Composite.Widgets.Types
 
 
 module InitExtensions =
@@ -304,16 +305,16 @@ type Widget =
 
         let activeView =
             match model.SpreadsheetModel.ActiveView with
-            | Spreadsheet.ActiveView.Table _ -> Swate.Components.Composite.Widgets.WidgetHostView.TableView
-            | Spreadsheet.ActiveView.DataMap -> Swate.Components.Composite.Widgets.WidgetHostView.DataMapView
-            | Spreadsheet.ActiveView.Metadata -> Swate.Components.Composite.Widgets.WidgetHostView.MetadataView
+            | Spreadsheet.ActiveView.Table _ -> WidgetHostView.TableView
+            | Spreadsheet.ActiveView.DataMap -> WidgetHostView.DataMapView
+            | Spreadsheet.ActiveView.Metadata -> WidgetHostView.MetadataView
 
         let setArcFileState nextArcFileState =
             match nextArcFileState with
             | Some nextArcFile -> nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
             | None -> ()
 
-        let services: Swate.Components.Composite.Widgets.DataAnnotatorWidgetServices =
+        let services: DataAnnotatorWidgetServices =
             React.useMemo (
                 (fun _ -> {
                     pickTextFiles =

@@ -1,6 +1,7 @@
 module Swate.Components.Primitive.ErrorModal.Context
 
 open Swate.Components
+open Swate.Components.Primitive.ErrorModal.Types
 
 open Feliz
 

@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.Primitive
+open Swate.Components.Primitive.ComboBox.Types
 
 [<Erase; Mangle(false)>]
 type ComboBox =
@@ -140,8 +141,7 @@ type ComboBox =
             fun (index: int) (item: 'a) ->
                 onChange |> Option.iter (fun fn -> fn index item)
                 close ()
-                fluiContext.refs.domReference.current
-                |> Option.iter (fun el -> el.focus ())
+                fluiContext.refs.domReference.current |> Option.iter (fun el -> el.focus ())
 
         let filteredItems =
             items
@@ -213,7 +213,11 @@ type ComboBox =
                     match noResultsRenderer with
                     | Some renderer -> renderer
                     | None ->
-                        fun () -> Html.li [ prop.className "swt:p-4 swt:tracking-wide"; prop.text "No results found." ]
+                        fun () ->
+                            Html.li [
+                                prop.className "swt:p-4 swt:tracking-wide"
+                                prop.text "No results found."
+                            ]
                 ),
                 [| box noResultsRenderer |]
             )
@@ -223,10 +227,7 @@ type ComboBox =
         React.useImperativeHandle (
             unbox comboBoxRef,
             (fun () -> {|
-                focus =
-                    fun () ->
-                        fluiContext.refs.domReference.current
-                        |> Option.iter (fun el -> el.focus ())
+                focus = fun () -> fluiContext.refs.domReference.current |> Option.iter (fun el -> el.focus ())
                 close =
                     fun () ->
                         setOpen false
@@ -250,7 +251,8 @@ type ComboBox =
                             setIsOpen = setOpen
                             setActiveIndex = setActiveIndex
                         |}
-                    ))
+                    )
+                )
                 prop.className [
                     "swt:input swt:group"
                     if labelClassName.IsSome then
@@ -501,7 +503,10 @@ type ComboBox =
                     comboBoxRef = comboBoxRef,
                     inputLeadingVisual = Icons.MagnifyingClass(),
                     inputTrailingVisual =
-                        React.Fragment [ Html.kbd [ prop.className "swt:kbd"; prop.text "/" ]; Icons.ChevronDown() ],
+                        React.Fragment [
+                            Html.kbd [ prop.className "swt:kbd"; prop.text "/" ]
+                            Icons.ChevronDown()
+                        ],
                     onBlur = fun e -> console.log ("ComboBox blurred")
                 )
             ]

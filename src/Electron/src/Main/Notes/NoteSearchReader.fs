@@ -6,7 +6,7 @@ open Fable.Core.JsInterop
 open Swate.Components.Composite.Notes.Editor
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
-open Swate.Components.Composite.NoteTypes
+open Swate.Components.Composite.Notes.Types
 open Swate.Components.Shared
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -21,16 +21,14 @@ let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
 
 let private parseNote (relativePath: string) (content: string) =
     match NoteConversion.tryDecodeMarkdownFrontmatter content with
-    | Some(frontmatter, bodyText) ->
-        {
-            RelativePath = relativePath
-            Title = frontmatter.Title
-            Date = frontmatter.Date
-            Tags = frontmatter.Tags
-            Content = bodyText.Trim()
-        }
-    | None ->
-        failwith $"Note file '{relativePath}' does not contain YAML frontmatter."
+    | Some(frontmatter, bodyText) -> {
+        RelativePath = relativePath
+        Title = frontmatter.Title
+        Date = frontmatter.Date
+        Tags = frontmatter.Tags
+        Content = bodyText.Trim()
+      }
+    | None -> failwith $"Note file '{relativePath}' does not contain YAML frontmatter."
 
 let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<Note[]> = promise {
     let noteEntries =
@@ -45,22 +43,20 @@ let readNotes (arcPath: string) (fileEntries: FileEntry[]) : JS.Promise<Note[]> 
     // Process all note files in parallel, preserving per-file error handling
     let notePromises =
         noteEntries
-        |> Array.map (fun (absolutePath, relativePath) ->
-            promise {
-                try
-                    let! content = readUtf8FileAsync absolutePath
-                    return Some(parseNote relativePath content)
-                with _ ->
-                    // Keep malformed or unreadable files isolated from the rest of the search index.
-                    return None
-            }
-        )
+        |> Array.map (fun (absolutePath, relativePath) -> promise {
+            try
+                let! content = readUtf8FileAsync absolutePath
+                return Some(parseNote relativePath content)
+            with _ ->
+                // Keep malformed or unreadable files isolated from the rest of the search index.
+                return None
+        })
 
     let! notesWithOptions = Fable.Core.JS.Constructors.Promise.all notePromises
 
     return
         notesWithOptions
-        |> fun notesWithOptions -> notesWithOptions :?> Note option []
+        |> fun notesWithOptions -> notesWithOptions :?> Note option[]
         |> Array.choose id
         |> Array.sortByDescending (fun note -> note.Date)
 }

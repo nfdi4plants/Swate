@@ -1,5 +1,7 @@
 module Swate.Components.Primitive.ErrorModal.Helper
 
+open Swate.Components.Primitive.ErrorModal.Types
+
 let reducer (queue: ErrorModalEntry list) (msg: ErrorModalMsg) =
     match msg with
     | Enqueue entry -> queue @ [ entry ]
@@ -35,11 +37,8 @@ let dismissBatch (dismissById: string -> unit) (batch: ErrorModalBatch) =
     dismissById batch.Id
 
 let dismissBatchItemRequest
-    (
-        dismissBatchItem: string -> string -> unit,
-        batch: ErrorModalBatch,
-        request: ErrorModalRequest
-    ) =
+    (dismissBatchItem: string -> string -> unit, batch: ErrorModalBatch, request: ErrorModalRequest)
+    =
     let isLastItem = batch.Errors.Length <= 1
 
     request.OnDismiss |> Option.iter (fun callback -> callback ())
@@ -51,8 +50,7 @@ let dismissBatchItemRequest
 
 let resolveEntryForScopedDismiss (entry: ErrorModalEntry) =
     match entry with
-    | ErrorModalEntry.Single request ->
-        request.OnDismiss |> Option.iter (fun callback -> callback ())
+    | ErrorModalEntry.Single request -> request.OnDismiss |> Option.iter (fun callback -> callback ())
     | ErrorModalEntry.Batch batch ->
         batch.Errors
         |> List.iter (fun request -> request.OnDismiss |> Option.iter (fun callback -> callback ()))

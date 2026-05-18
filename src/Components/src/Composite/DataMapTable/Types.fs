@@ -1,7 +1,6 @@
-[<AutoOpen>]
 module Swate.Components.Composite.DataMapTable.Types
 
-open Swate.Components.Composite.Table
+open Swate.Components.Composite.Table.Types
 
 [<AutoOpen>]
 module ARCtrlExtensions =

@@ -8,7 +8,7 @@ open Swate.Components.Composite.TermSearch.Context
 open Swate.Components.Primitive
 open Swate.Components
 open Swate.Components.Primitive.Select
-
+open Swate.Components.Primitive.Select.Types
 
 [<Erase; Mangle(false)>]
 type TermSearchConfigSetter =

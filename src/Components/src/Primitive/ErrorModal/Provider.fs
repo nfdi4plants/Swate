@@ -4,21 +4,24 @@ open Feliz
 open Fable.Core
 open Context
 
+open Swate.Components.Primitive.ErrorModal.Types
+
 [<Erase; Mangle(false)>]
 type ErrorModalProvider =
 
-    static member private PendingEntryLabel (entry: ErrorModalEntry) =
+    static member private PendingEntryLabel(entry: ErrorModalEntry) =
         match entry with
         | ErrorModalEntry.Single request -> request.Title
         | ErrorModalEntry.Batch batch -> $"{batch.Title} ({batch.Errors.Length} errors)"
 
     [<ReactComponent>]
-    static member private PendingEntriesBox (remainingEntries: ErrorModalEntry list) =
+    static member private PendingEntriesBox(remainingEntries: ErrorModalEntry list) =
         if remainingEntries.IsEmpty then
             Html.none
         else
             Html.div [
-                prop.className "swt:rounded-box swt:border swt:border-error/20 swt:bg-base-200 swt:p-3 swt:flex swt:flex-col swt:gap-2"
+                prop.className
+                    "swt:rounded-box swt:border swt:border-error/20 swt:bg-base-200 swt:p-3 swt:flex swt:flex-col swt:gap-2"
                 prop.children [
                     Html.div [
                         prop.className "swt:flex swt:items-center swt:gap-2"
@@ -46,7 +49,7 @@ type ErrorModalProvider =
             ]
 
     [<ReactComponent>]
-    static member private BulkDismissButton (onClick: unit -> unit) =
+    static member private BulkDismissButton(onClick: unit -> unit) =
         Html.button [
             prop.className "swt:btn swt:btn-neutral"
             prop.text "Dismiss Related Errors"
@@ -55,14 +58,12 @@ type ErrorModalProvider =
 
     [<ReactComponent>]
     static member private RequestCard
-        (
-            dismissBatchItem: string -> string -> unit,
-            batch: ErrorModalBatch,
-            request: ErrorModalRequest
-        ) =
+        (dismissBatchItem: string -> string -> unit, batch: ErrorModalBatch, request: ErrorModalRequest)
+        =
         Html.div [
             prop.key request.Id
-            prop.className "swt:rounded-box swt:border swt:border-error/20 swt:bg-base-100 swt:p-4 swt:flex swt:flex-col swt:gap-3"
+            prop.className
+                "swt:rounded-box swt:border swt:border-error/20 swt:bg-base-100 swt:p-4 swt:flex swt:flex-col swt:gap-3"
             prop.children [
                 Html.div [
                     prop.className "swt:flex swt:items-start swt:gap-3"
@@ -90,8 +91,7 @@ type ErrorModalProvider =
                         Html.button [
                             prop.className "swt:btn swt:btn-primary"
                             prop.text request.DismissLabel
-                            prop.onClick (fun _ ->
-                                Helper.dismissBatchItemRequest(dismissBatchItem, batch, request))
+                            prop.onClick (fun _ -> Helper.dismissBatchItemRequest (dismissBatchItem, batch, request))
                         ]
                     ]
                 ]
@@ -111,6 +111,7 @@ type ErrorModalProvider =
             match currentEntry with
             | Some entry -> Helper.entriesInScope entry.ScopeId queue
             | None -> []
+
         let hasAdditionalScopeEntries = currentScopeEntries.Length > 1
 
         let remainingEntries =
@@ -151,8 +152,7 @@ type ErrorModalProvider =
                                     Html.button [
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.text request.DismissLabel
-                                        prop.onClick (fun _ ->
-                                            Helper.dismissSingleRequest dismissById request)
+                                        prop.onClick (fun _ -> Helper.dismissSingleRequest dismissById request)
                                     ]
                                 ]
                             ]
@@ -204,8 +204,7 @@ type ErrorModalProvider =
                             Html.button [
                                 prop.className "swt:btn swt:btn-primary"
                                 prop.text batch.DismissLabel
-                                prop.onClick (fun _ ->
-                                    Helper.dismissBatch dismissById batch)
+                                prop.onClick (fun _ -> Helper.dismissBatch dismissById batch)
                             ]
                         ]
                     ],
@@ -218,7 +217,9 @@ type ErrorModalProvider =
         let currentEntry = queue |> List.tryHead
 
         let dismissById id = dispatch (DismissById id)
-        let dismissBatchItem batchId itemId = dispatch (DismissBatchItem(batchId, itemId))
+
+        let dismissBatchItem batchId itemId =
+            dispatch (DismissBatchItem(batchId, itemId))
 
         let dismissAll () =
             let targets =
@@ -234,10 +235,8 @@ type ErrorModalProvider =
 
         let dismissCurrent () =
             match currentEntry with
-            | Some(ErrorModalEntry.Single request) ->
-                Helper.dismissSingleRequest dismissById request
-            | Some(ErrorModalEntry.Batch batch) ->
-                Helper.dismissBatch dismissById batch
+            | Some(ErrorModalEntry.Single request) -> Helper.dismissSingleRequest dismissById request
+            | Some(ErrorModalEntry.Batch batch) -> Helper.dismissBatch dismissById batch
             | None -> ()
 
         let contextValue: ErrorModalContext =
@@ -247,11 +246,7 @@ type ErrorModalProvider =
                     queue = queue
                     enqueue = fun request -> dispatch (Enqueue(ErrorModalEntry.Single request))
                     enqueueMany =
-                        fun requests ->
-                            requests
-                            |> List.map ErrorModalEntry.Single
-                            |> EnqueueMany
-                            |> dispatch
+                        fun requests -> requests |> List.map ErrorModalEntry.Single |> EnqueueMany |> dispatch
                     enqueueBatch =
                         fun batch ->
                             if batch.Errors.IsEmpty then
@@ -259,45 +254,30 @@ type ErrorModalProvider =
                             else
                                 dispatch (Enqueue(ErrorModalEntry.Batch batch))
                     report =
-                        fun message ->
-                            dispatch (Enqueue(ErrorModalEntry.Single(ErrorModalRequest.create(message))))
+                        fun message -> dispatch (Enqueue(ErrorModalEntry.Single(ErrorModalRequest.create (message))))
                     dismissCurrent = dismissCurrent
                     dismissById = dismissById
                     dismissBatchItem = dismissBatchItem
                     dismissAll = dismissAll
                 }),
-                [|
-                    box currentEntry
-                    box queue
-                |]
+                [| box currentEntry; box queue |]
             )
 
         ErrorModalCtx.Provider(
             contextValue,
             React.Fragment [
                 children
-                ErrorModalProvider.ErrorModalHost(
-                    currentEntry,
-                    queue,
-                    dismissById,
-                    dismissBatchItem,
-                    dismissAll
-                )
+                ErrorModalProvider.ErrorModalHost(currentEntry, queue, dismissById, dismissBatchItem, dismissAll)
             ]
         )
 
     [<ReactComponent>]
-    static member private EntryContent
-        (
-            showSingle: bool,
-            showQueued: bool,
-            showBatch: bool
-        ) =
+    static member private EntryContent(showSingle: bool, showQueued: bool, showBatch: bool) =
         let errorModal = useErrorModalCtx ()
 
         let enqueueSingle () =
             errorModal.enqueue (
-                ErrorModalRequest.create(
+                ErrorModalRequest.create (
                     "The renderer could not finish the requested operation.",
                     title = "Sample runtime error",
                     details = "This is a sample error used in Storybook."
@@ -306,26 +286,26 @@ type ErrorModalProvider =
 
         let enqueueMultiple () =
             errorModal.enqueueMany [
-                ErrorModalRequest.create("The first queued error.", title = "Queued error 1")
-                ErrorModalRequest.create("The second queued error.", title = "Queued error 2")
+                ErrorModalRequest.create ("The first queued error.", title = "Queued error 1")
+                ErrorModalRequest.create ("The second queued error.", title = "Queued error 2")
             ]
 
         let enqueueBatch () =
             errorModal.enqueueBatch (
-                ErrorModalBatch.create(
+                ErrorModalBatch.create (
                     [
-                        ErrorModalRequest.create(
+                        ErrorModalRequest.create (
                             "The first validation error is visible together with the others.",
                             title = "Visible error 1",
                             details = "Shared detail block for the first item.",
                             dismissLabel = "Dismiss error 1"
                         )
-                        ErrorModalRequest.create(
+                        ErrorModalRequest.create (
                             "The second validation error can be dismissed independently.",
                             title = "Visible error 2",
                             dismissLabel = "Dismiss error 2"
                         )
-                        ErrorModalRequest.create(
+                        ErrorModalRequest.create (
                             "The third validation error is also informational.",
                             title = "Visible error 3",
                             dismissLabel = "Dismiss error 3"
@@ -366,7 +346,7 @@ type ErrorModalProvider =
 
         let enqueueScopedQueue () =
             errorModal.enqueue (
-                ErrorModalRequest.create(
+                ErrorModalRequest.create (
                     "The visible ARC A error should dismiss together with other ARC A entries only.",
                     title = "ARC A error",
                     scopeId = "arc-a"
@@ -374,7 +354,7 @@ type ErrorModalProvider =
             )
 
             errorModal.enqueue (
-                ErrorModalRequest.create(
+                ErrorModalRequest.create (
                     "This queued ARC A error should dismiss together with the visible ARC A entry.",
                     title = "ARC A follow-up error",
                     scopeId = "arc-a"
@@ -382,7 +362,7 @@ type ErrorModalProvider =
             )
 
             errorModal.enqueue (
-                ErrorModalRequest.create(
+                ErrorModalRequest.create (
                     "This ARC B error should remain queued after ARC A related errors are dismissed.",
                     title = "ARC B error",
                     scopeId = "arc-b"

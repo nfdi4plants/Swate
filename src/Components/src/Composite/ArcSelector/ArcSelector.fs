@@ -5,6 +5,7 @@ open Fable.Core
 
 open Swate.Components
 open Swate.Components.Primitive.Actionbar
+open Swate.Components.Primitive.Actionbar.Types
 open Swate.Components.Primitive.Dropdown
 open Swate.Components.Shared
 

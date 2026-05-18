@@ -3,6 +3,7 @@ namespace Swate.Components.Composite.Table
 open System
 open Swate.Components
 open Swate.Components.Composite.Table.Context
+open Swate.Components.Composite.Table.Types
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz

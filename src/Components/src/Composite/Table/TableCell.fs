@@ -3,7 +3,9 @@ namespace Swate.Components.Composite.Table
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Table.Context
+open Swate.Components.Composite.Table.Types
 open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.TermSearch.Types
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -185,7 +187,7 @@ type TableCell =
                     prop.autoFocus true
                     if debug.IsSome && debug.Value then
                         prop.testid ($"active-cell-string-input-{index.y}-{index.x}")
-                    prop.className "swt:rounded-none swt:w-full swt:h-full swt:input swt:!outline-0 swt:!border-0"
+                    prop.className "swt:rounded-none swt:w-full swt:h-full swt:input swt:outline-0! swt:border-0!"
                     prop.defaultValue props.data
                     prop.onChange (fun (e: string) -> props.setData e)
                     prop.onKeyDown props.onKeyDown

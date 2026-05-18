@@ -1,4 +1,3 @@
-[<AutoOpenAttribute>]
 module Swate.Components.Primitive.ErrorModal.Types
 
 [<RequireQualifiedAccess>]

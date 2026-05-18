@@ -1,4 +1,3 @@
-[<AutoOpen>]
 module Swate.Components.Composite.TermSearch.Types
 
 open Swate.Components

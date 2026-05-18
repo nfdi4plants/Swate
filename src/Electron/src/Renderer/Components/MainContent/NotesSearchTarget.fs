@@ -2,7 +2,7 @@ module Renderer.Components.MainContent.NotesSearchTarget
 
 open Feliz
 open Swate.Components.Composite
-open Swate.Components.Composite.NoteTypes
+open Swate.Components.Composite.Notes.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.DTOs.NoteSearchDto
@@ -10,8 +10,8 @@ open Swate.Electron.Shared.DTOs.NoteSearchDto
 [<ReactComponent>]
 let NotesSearchTarget () =
 
-    let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx()
-    let fileTreeCtx = Renderer.Context.FileStateContext.useFileStateCtx()
+    let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let fileTreeCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
     let notes, setNotes = React.useState ([]: Note list)
 
     let isLoading, setIsLoading = React.useState true

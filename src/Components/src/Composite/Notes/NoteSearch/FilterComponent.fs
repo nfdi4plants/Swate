@@ -5,10 +5,11 @@ open Swate.Components
 open Swate.Components.Primitive
 open Swate.Components.Primitive.Select
 open Swate.Components.Primitive.Select.Types
+open Swate.Components.Composite.Notes.Types
 
 
 module Main =
-    let noteSuggestionsList (searchTerm: string, selectedIndices: Set<int>, notes: Swate.Components.Composite.NoteTypes.Note list) =
+    let noteSuggestionsList (searchTerm: string, selectedIndices: Set<int>, notes: Note list) =
         let notesFilteredAfterTitle =
             if Set.contains 0 selectedIndices || Set.isEmpty selectedIndices then
                 Swate.Components.Composite.NoteSearch.FilterLogic.FuzzySearch.search (searchTerm, "Title", notes)
@@ -16,7 +17,11 @@ module Main =
                 []
 
         let notesFilteredAfterRest =
-            Swate.Components.Composite.NoteSearch.FilterLogic.ExactMatchSearch.search (searchTerm, selectedIndices, notes)
+            Swate.Components.Composite.NoteSearch.FilterLogic.ExactMatchSearch.search (
+                searchTerm,
+                selectedIndices,
+                notes
+            )
 
         notesFilteredAfterTitle @ notesFilteredAfterRest
 
@@ -57,4 +62,3 @@ module Main =
                 FloatingUI.Middleware.offset (10)
             |]
         )
-

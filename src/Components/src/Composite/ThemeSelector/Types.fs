@@ -1,4 +1,3 @@
-[<AutoOpen>]
 module Swate.Components.Composite.ThemeSelector.Types
 
 open Fable.Core

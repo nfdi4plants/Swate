@@ -4,7 +4,7 @@ open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.Composite.NoteTypes
+open Swate.Components.Composite.Notes.Types
 open Swate.Components.Primitive
 
 module InputField =
@@ -171,4 +171,3 @@ type SearchComponent =
             None,
             (fun relativePath -> window.alert $"Open note: {relativePath}")
         )
-
