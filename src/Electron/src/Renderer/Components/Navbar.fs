@@ -2,8 +2,15 @@ namespace Renderer.Components
 
 open Feliz
 open Swate.Components
-open Swate.Components.Layout
 open Swate.Components.Shared
+open Swate.Components.Composite.Layout
+open Swate.Components.Composite.ArcSelector
+open Swate.Components.Composite.Authentication.Types
+open Swate.Components.Primitive.Actionbar
+open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 module NavbarHelper =
@@ -42,13 +49,13 @@ module NavbarHelper =
 type private Selector =
 
     static member CreateArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        Actionbar.ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", onClick)
+        ButtonInfo.create ("swt:fluent--document-add-24-regular swt:size-5", "Create a new ARC", onClick)
 
     static member OpenArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        Actionbar.ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
+        ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
 
     static member DownloadArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        Actionbar.ButtonInfo.create (
+        ButtonInfo.create (
             "swt:fluent--cloud-beaker-24-regular swt:size-5",
             "Download ARC from DataHub",
             onClick
@@ -113,7 +120,7 @@ type private Selector =
                 setNewArcModalIsOpen,
                 Renderer.Components.InitState.CreateNewArcModalContent(fun () -> setNewArcModalIsOpen false)
             )
-            Swate.Components.Selector.Main(
+            Swate.Components.Composite.ArcSelector.ArcSelector.Main(
                 recentArcs.state,
                 NavbarHelper.Selector.openArcByPath,
                 rmvRecentArc = NavbarHelper.Selector.rmvRecentArc,
@@ -127,7 +134,7 @@ type private Selector =
 
 module private Authentication =
 
-    open Authentication.Types
+    open Swate.Components.Composite.Authentication.Types
     open Swate.Electron.Shared.AuthTypes
 
     [<ReactComponent>]
@@ -184,7 +191,7 @@ module private Authentication =
             }
             |> Promise.start
 
-        Authentication.Authentication.UserAvatar(
+        Swate.Components.Composite.Authentication.Authentication.UserAvatar(
             authStateCtx,
             onSignIn,
             onLogout,
@@ -199,7 +206,7 @@ type Navbar =
     [<ReactComponent>]
     static member private SaveArcButton() =
 
-        let errorCtx = Swate.Components.ErrorModal.Context.useErrorModalCtx ()
+        let errorCtx = useErrorModalCtx ()
 
         let hasUnsavedChanges =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -218,7 +225,7 @@ type Navbar =
                 onError =
                     fun ex ->
                         errorCtx.enqueue (
-                            Swate.Components.ErrorModal.ErrorModalRequest.create (
+                            ErrorModalRequest.create (
                                 ex.Message,
                                 title = "Error checking for unsaved changes"
                             )
@@ -236,7 +243,7 @@ type Navbar =
                     | Ok _ -> ()
                     | Error ex ->
                         errorCtx.enqueue (
-                            Swate.Components.ErrorModal.ErrorModalRequest.create (
+                            ErrorModalRequest.create (
                                 ex.Message,
                                 title = "Error saving ARC"
                             )
@@ -277,4 +284,4 @@ type Navbar =
                 ]
             ]
 
-        Swate.Components.Navbar.Main(left = left, right = right)
+        Swate.Components.Primitive.Navbar.Navbar.Main(left = left, right = right)

@@ -6,6 +6,7 @@ open ARCtrl
 open Swate.Components.Shared
 open Components
 open Components.Forms
+open Swate.Components
 
 [<ReactComponent>]
 let Main (assay: ArcAssay, setArcAssay: ArcAssay -> unit, model: Model.Model) =

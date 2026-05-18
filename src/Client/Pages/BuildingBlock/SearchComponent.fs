@@ -8,9 +8,11 @@ open Messages
 open ARCtrl
 open Fable.Core
 open Swate.Components
+open Swate.Components.Primitive
 open Swate.Components.Shared
-open Swate.Components.AnnotationTable
-open Swate.Components.AnnotationTable.Context
+open Swate.Components.Composite.AnnotationTable
+open Swate.Components.Composite.AnnotationTable.Context
+open Swate.Components.Composite.TermSearch.Types
 
 
 module SearchComponentHelper =
@@ -45,7 +47,7 @@ type SearchComponent =
         let state = model.AddBuildingBlockState
 
         let mkClasses (isActive: bool) = [
-            "swt:btn swt:join-item swt:border swt:!border-base-content"
+            "swt:btn swt:join-item swt:border swt:border-base-content!"
             if isActive then "swt:btn-primary" else "swt:btn-neutral/50"
         ]
 
@@ -91,7 +93,7 @@ type SearchComponent =
                     prop.children [
                         SearchComponent.termOrUnitizedSwitch (model, dispatch)
                         // helper for setting the body cell type
-                        let setter (termOpt: Swate.Components.Types.Term option) =
+                        let setter (termOpt: Term option) =
                             let oa = termOpt |> Option.map OntologyAnnotation.from
                             let case = oa |> Option.map (fun oa -> !^oa)
                             BuildingBlock.UpdateBodyArg case |> BuildingBlockMsg |> dispatch
@@ -99,11 +101,10 @@ type SearchComponent =
                         let parent = model.AddBuildingBlockState.TryHeaderOA()
                         let input = model.AddBuildingBlockState.TryBodyOA()
 
-                        TermSearch.TermSearch.TermSearch(
+                        Swate.Components.Composite.TermSearch.TermSearch.TermSearch(
                             (input |> Option.map _.ToTerm()),
                             setter,
-                            classNames =
-                                Swate.Components.Types.TermSearchStyle(!^"swt:border-current swt:join-item swt:w-full"),
+                            classNames = TermSearchStyle(!^"swt:border-current swt:join-item swt:w-full"),
                             ?parentId = (parent |> Option.map _.TermAccessionShort)
                         )
                     ]
@@ -126,7 +127,7 @@ type SearchComponent =
                         Dropdown.Main(ui, setUi, model, dispatch)
                         if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
                             Html.input [
-                                prop.className "swt:input swt:join-item swt:flex-grow"
+                                prop.className "swt:input swt:join-item swt:grow"
                                 prop.readOnly false
                                 prop.valueOrDefault (model.AddBuildingBlockState.CommentHeader)
                                 prop.placeholder (CompositeHeaderDiscriminate.Comment.ToString())
@@ -135,7 +136,7 @@ type SearchComponent =
                                 )
                             ]
                         elif state.HeaderCellType.HasOA() then
-                            let setter (termOpt: Swate.Components.Types.Term option) =
+                            let setter (termOpt: Term option) =
                                 let case =
                                     termOpt
                                     |> Option.map (fun term -> term |> (OntologyAnnotation.from >> U2.Case1))
@@ -143,13 +144,10 @@ type SearchComponent =
                                 BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
                             let input = model.AddBuildingBlockState.TryHeaderOA()
 
-                            TermSearch.TermSearch.TermSearch(
+                            Swate.Components.Composite.TermSearch.TermSearch.TermSearch(
                                 (input |> Option.map _.ToTerm()),
                                 setter,
-                                classNames =
-                                    Swate.Components.Types.TermSearchStyle(
-                                        !^"swt:border-current swt:join-item swt:w-full"
-                                    )
+                                classNames = TermSearchStyle(!^"swt:border-current swt:join-item swt:w-full")
                             )
 
                         elif state.HeaderCellType.HasIOType() then

@@ -3,6 +3,9 @@ namespace Modals.ContextMenus
 open ARCtrl
 open Feliz
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.ContextMenu
+open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Shared
 
 type FooterTabs =
@@ -14,11 +17,11 @@ type FooterTabs =
 
         let children =
             fun _ -> [
-                Swate.Components.ContextMenuItem(Html.span "Rename", icon = Icons.PenToSquare(), onClick = rename)
-                Swate.Components.ContextMenuItem(Html.span "Delete", icon = Icons.Delete(), onClick = delete)
+                ContextMenuItem(Html.span "Rename", icon = Icons.PenToSquare(), onClick = rename)
+                ContextMenuItem(Html.span "Delete", icon = Icons.Delete(), onClick = delete)
             ]
 
-        Swate.Components.ContextMenu.ContextMenu(children, ref = tabRef)
+        ContextMenu.ContextMenu(children, ref = tabRef)
 
     static member Plus(dispatch: Messages.Msg -> unit, tabRef) =
         let addTable =
@@ -35,11 +38,11 @@ type FooterTabs =
 
         let children =
             fun _ -> [
-                Swate.Components.ContextMenuItem(Html.text "Add Table", icon = Icons.Table(), onClick = addTable)
+                ContextMenuItem(Html.text "Add Table", icon = Icons.Table(), onClick = addTable)
             // Modals.ContextMenus.Base.Item("Add Datamap", addDataMap >> rmv, Icons.Map())
             ]
 
-        Swate.Components.ContextMenu.ContextMenu(children, ref = tabRef)
+        ContextMenu.ContextMenu(children, ref = tabRef)
 
     [<ReactComponent>]
     static member DataMap(dispatch: Messages.Msg -> unit, tabRef) =
@@ -48,10 +51,10 @@ type FooterTabs =
 
         let children =
             fun _ -> [
-                Swate.Components.ContextMenuItem(Html.text "Delete", icon = Icons.Delete(), onClick = delete)
+                ContextMenuItem(Html.text "Delete", icon = Icons.Delete(), onClick = delete)
             ]
 
-        Swate.Components.ContextMenu.ContextMenu(children, ref = tabRef)
+        ContextMenu.ContextMenu(children, ref = tabRef)
 
 // let mouseY = mouseY - 10
 // Base.Main(mouseX, mouseY, children, dispatch)

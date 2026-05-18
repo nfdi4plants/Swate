@@ -6,7 +6,7 @@ open Feliz
 open Feliz.UseElmish
 
 open Renderer.Types
-open Swate.Components.GitSidebarTypes
+open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
 

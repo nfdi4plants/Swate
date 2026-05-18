@@ -3,15 +3,16 @@ module Renderer.Components.MainContent.ArcFilePreviewTarget
 open Feliz
 open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent
-open Swate.Components.ArcFileEditor
+open Swate.Components.Page.ArcFileEditor
 open Swate.Components
 open Swate.Components.Shared
-open Swate.Components.ErrorModal
+open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
-    let errorModal = ErrorModal.Context.useErrorModalCtx ()
+    let errorModal = useErrorModalCtx ()
     let arcScopeId = useCurrentArcScopeId ()
 
     let setArcFileInMemory (nextArcFile: ArcFiles) =
@@ -64,4 +65,4 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
         )
 
-    Main.ArcFileEditor(arcFile, setArcFile, pickFilePaths)
+    Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(arcFile, setArcFile, pickFilePaths)

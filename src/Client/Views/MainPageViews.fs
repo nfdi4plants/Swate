@@ -3,6 +3,7 @@ namespace View
 open Feliz
 open Messages
 open Swate.Components
+open Swate.Components.Primitive
 
 module private MainPageUtil =
     [<Literal>]

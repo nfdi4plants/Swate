@@ -15,13 +15,13 @@ let View (model: Model) (dispatch: Msg -> unit) =
 
     let enforceLightTheme =
         match model.PersistentStorageState.Host with
-        | Some Swatehost.ARCitect -> Some Swate.Components.Types.Theme.Sunrise
+        | Some Swatehost.ARCitect -> Some Swate.Components.Composite.ThemeSelector.Types.Theme.Sunrise
         | _ -> None
 
     // React.strictMode [
-    Swate.Components.Theme.ThemeProvider.ThemeProvider(
-        Swate.Components.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
-            Swate.Components.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
+    Swate.Components.Composite.ThemeSelector.ThemeProvider.ThemeProvider(
+        Swate.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
+            Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
 
                 Html.div [
                     prop.id "ClientView"
@@ -48,7 +48,7 @@ let View (model: Model) (dispatch: Msg -> unit) =
                                 |> String.concat "\n\n"
 
                             let close = fun b -> UpdateDisplayLogList [] |> DevMsg |> dispatch
-                            Swate.Components.BaseModal.ErrorModalObsolete(true, close, errors)
+                            Swate.Components.Primitive.BaseModal.BaseModal.ErrorModalObsolete(true, close, errors)
                         | _ -> Modals.InteropLogging.Main(model.DevState, dispatch)
                         match model.PageState.IsHome, model.PersistentStorageState.Host with
                         | false, _ -> View.MainPageView.Main(model, dispatch)

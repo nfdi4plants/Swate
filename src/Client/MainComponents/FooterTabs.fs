@@ -4,6 +4,8 @@ open Feliz
 open ARCtrl
 open Model
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.BaseModal
 open Swate.Components.Shared
 
 
@@ -61,7 +63,7 @@ let private dragleave_handler (state, setState) =
 
 [<Literal>]
 let private DragOverClass =
-    "swt:!border swt:!border-dashed swt:!border-base-content"
+    "swt:border! swt:border-dashed! swt:border-base-content!"
 
 [<ReactComponent>]
 let Main (index: int, tables: ArcTables, model: Model, dispatch: Messages.Msg -> unit) =
@@ -283,10 +285,10 @@ let SpreadsheetSelectionFooter (model: Model) dispatch =
                 prop.className
                     "swt:*:[--tab-border-color:var(--color-base-content)] swt:tabs swt:tabs-lift swt:w-full \
                     swt:overflow-x-auto swt:overflow-y-hidden swt:flex swt:flex-row swt:items-center \
-                    swt:justify-start swt:pt-1 swt:*:!border-b-0 swt:*:gap-1 swt:flex-nowrap swt:*:flex-nowrap"
+                    swt:justify-start swt:pt-1 swt:*:border-b-0! swt:*:gap-1 swt:flex-nowrap swt:*:flex-nowrap"
                 prop.children [
                     Html.div [
-                        prop.className "swt:tab swt:max-w-min swt:!px-2"
+                        prop.className "swt:tab swt:max-w-min swt:px-2!"
                         prop.style [ style.custom ("order", -2) ]
                     ]
 

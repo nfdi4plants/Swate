@@ -27,7 +27,7 @@ let Main (diffData: GitDiffViewDataDto) =
             Html.div [
                 prop.className "swt:min-h-0 swt:min-w-0 swt:flex-1 swt:p-4"
                 prop.children [
-                    Swate.Components.GitDiffViewer.Viewer(
+                    Swate.Components.Page.GitDiffViewer.Viewer(
                         wordDiffText = diffData.WordDiffText,
                         previousContent = diffData.PreviousContent,
                         currentContent = diffData.CurrentContent,

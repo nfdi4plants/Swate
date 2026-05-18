@@ -8,7 +8,8 @@ open Swate.Components
 open ARCtrl
 open BuildingBlock.SearchComponent
 open Swate.Components.Shared
-open Swate.Components.Widgets
+open Swate.Components.Primitive.Buttons
+open Swate.Components.Composite.Widgets.Types
 
 
 module InitExtensions =
@@ -252,7 +253,7 @@ type Widget =
                     prop.className
                         "swt:cursor-move swt:flex swt:justify-end swt:bg-linear-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
                     prop.children [
-                        Components.Components.DeleteButton(
+                        Buttons.DeleteButton(
                             className = "swt:btn-ghost swt:bg-primary/30",
                             props = [
                                 prop.onClick (fun e ->
@@ -313,7 +314,7 @@ type Widget =
             | Some nextArcFile -> nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
             | None -> ()
 
-        let services =
+        let services: DataAnnotatorWidgetServices =
             React.useMemo (
                 (fun _ -> {
                     pickTextFiles =
@@ -357,7 +358,7 @@ type Widget =
                         )
                     ]
                     if model.SpreadsheetModel.ArcFile.IsSome then
-                        Swate.Components.Widgets.DataAnnotatorWidget.Main(
+                        Swate.Components.Composite.Widgets.DataAnnotatorWidget.Main(
                             model.SpreadsheetModel.ArcFile.Value,
                             activeView,
                             model.SpreadsheetModel.ActiveView.TryTableIndex,

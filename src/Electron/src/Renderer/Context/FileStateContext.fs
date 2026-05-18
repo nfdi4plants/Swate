@@ -3,6 +3,7 @@ module Renderer.Context.FileStateContext
 open System.Collections.Generic
 open Fable.Core
 open Feliz
+open Swate.Components
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
@@ -10,8 +11,8 @@ open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 type FileState = {
     FileTree: FileEntry[]
     Selection: ArcSelection
-}
-with
+} with
+
     static member init() : FileState = {
         FileTree = [||]
         Selection = ArcSelection.empty
@@ -37,12 +38,11 @@ let FileStateCtx =
     )
 
 [<Hook>]
-let useFileStateCtx() = React.useContext FileStateCtx
+let useFileStateCtx () = React.useContext FileStateCtx
 
 type FileTreeSnapshotLoader = unit -> JS.Promise<Result<Dictionary<string, FileEntry>, exn>>
 
-let private fileTreeFromDictionary (fileTreeDict: Dictionary<string, FileEntry>) =
-    fileTreeDict.Values |> Seq.toArray
+let private fileTreeFromDictionary (fileTreeDict: Dictionary<string, FileEntry>) = fileTreeDict.Values |> Seq.toArray
 
 [<ReactComponent>]
 let FileStateCtxProviderWithFileTreeSnapshot (loadFileTreeSnapshot: FileTreeSnapshotLoader, children: ReactElement) =
@@ -81,13 +81,10 @@ let FileStateCtxProviderWithFileTreeSnapshot (loadFileTreeSnapshot: FileTreeSnap
                 state = fileState
                 fileTreeIsLoading = fileTree.isLoading
                 refreshFileTree = fileTree.refresh
-                setSelection =
-                    fun selection ->
-                        setSelectionState (fun _ -> selection |> ArcSelection.normalize)
+                setSelection = fun selection -> setSelectionState (fun _ -> selection |> ArcSelection.normalize)
                 updateSelection =
                     fun update ->
-                        setSelectionState (fun currentSelection ->
-                            update currentSelection |> ArcSelection.normalize)
+                        setSelectionState (fun currentSelection -> update currentSelection |> ArcSelection.normalize)
             }),
             [| box fileState; box fileTree.isLoading |]
         )

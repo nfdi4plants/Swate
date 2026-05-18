@@ -6,6 +6,7 @@ open Model
 open Messages
 open ARCtrl
 open Swate.Components
+open Swate.Components.Primitive
 open Swate.Components.Shared
 
 
@@ -19,7 +20,7 @@ let FreeTextInputElement (onSubmit: string -> unit) =
             Html.input [
                 prop.placeholder "..."
                 prop.className
-                    "swt:input swt:input-sm swt:join-item swt:grow swt:truncate swt:!rounded-l-[var(--radius-field)] swt:!rounded-r-none"
+                    "swt:input swt:input-sm swt:join-item swt:grow swt:truncate swt:rounded-l-(--radius-field)! swt:rounded-r-none!"
                 prop.onClick (fun e -> e.stopPropagation ())
                 prop.onChange (fun (v: string) -> setInput v)
                 prop.onKeyDown (
@@ -35,7 +36,7 @@ let FreeTextInputElement (onSubmit: string -> unit) =
                     e.stopPropagation ()
                     onSubmit inputS
                 )
-                prop.children [ Icons.Check() ]
+                prop.children [ Swate.Components.Primitive.Icons.Check() ]
             ]
         ]
     ]
@@ -69,7 +70,7 @@ module private DropdownElements =
             prop.children [
                 Html.div [
                     prop.className "swt:flex swt:flex-row swt:justify-between"
-                    prop.children [ Html.span subpage.toString; Icons.ArrowRight() ]
+                    prop.children [ Html.span subpage.toString; Swate.Components.Primitive.Icons.ArrowRight() ]
                 ]
             ]
         ]
@@ -89,7 +90,10 @@ module private DropdownElements =
             )
             prop.children [
                 if hasBack then
-                    Html.a [ prop.className "swt:content-center"; prop.children [ Icons.ArrowLeft() ] ]
+                    Html.a [
+                        prop.className "swt:content-center"
+                        prop.children [ Swate.Components.Primitive.Icons.ArrowLeft() ]
+                    ]
                 annotationsPrinciplesLink
             ]
         ]
@@ -229,10 +233,10 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
         Html.button [
             prop.onClick (fun _ -> setOpen (not isOpen))
             prop.role "button"
-            prop.className "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
+            prop.className "swt:btn swt:btn-primary swt:border swt:border-base-content! swt:join-item swt:flex-nowrap"
             prop.children [
                 Html.span (model.AddBuildingBlockState.HeaderCellType.ToString())
-                Icons.AngleDown()
+                Swate.Components.Primitive.Icons.AngleDown()
             ]
         ],
         [
@@ -244,5 +248,5 @@ let Main (state, setState, model: Model, dispatch: Msg -> unit) =
             | Model.BuildingBlock.DropdownPage.IOTypes iotype ->
                 DropdownElements.dropdownContentIOTypeColumns iotype state setState close model dispatch
         ],
-        style = Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:!min-w-64") ])
+        style = Style.init ("swt:join-item swt:dropdown", Map [ "content", Style.init ("swt:min-w-64!") ])
     )

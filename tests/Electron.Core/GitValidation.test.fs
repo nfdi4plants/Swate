@@ -10,7 +10,7 @@ open Fable.Electron
 open Main.Bindings.Path
 open Main.Bindings.SimpleGit
 open Microsoft.FSharp.Reflection
-open Swate.Components.Authentication.Types
+open Swate.Components.Composite.Authentication.Types
 open Swate.Electron.Shared.AuthTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes

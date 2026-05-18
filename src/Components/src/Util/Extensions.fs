@@ -2,6 +2,18 @@ namespace Swate.Components
 
 open Feliz
 open ARCtrl
+open Fable.Core
+type style =
+    static member resolveStyle(style: U2<string, string[]>) =
+        match style with
+        | U2.Case1 className -> className
+        | U2.Case2 classNames -> classNames |> String.concat " "
+
+    static member resolveStyle(style: U2<string, string[]> option) =
+        match style with
+        | Some(U2.Case1 className) -> className
+        | Some(U2.Case2 classNames) -> classNames |> String.concat " "
+        | None -> null
 
 [<AutoOpen>]
 module Extensions =

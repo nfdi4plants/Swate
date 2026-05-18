@@ -5,6 +5,7 @@ open Model
 open Messages
 open Swate.Components.Shared
 open Swate.Components
+open Swate.Components.Primitive.BaseModal
 
 type ResetTable =
 
@@ -18,7 +19,7 @@ type ResetTable =
                 Spreadsheet.Reset |> SpreadsheetMsg |> dispatch
                 rmv e
 
-        Swate.Components.BaseModal.Modal(
+        BaseModal.Modal(
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text "Attention!",

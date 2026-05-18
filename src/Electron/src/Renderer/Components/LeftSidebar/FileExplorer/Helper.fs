@@ -2,7 +2,7 @@ module Renderer.Components.LeftSidebar.FileExplorer.Helper
 
 open System
 open Swate.Components
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes

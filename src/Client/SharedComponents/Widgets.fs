@@ -3,15 +3,7 @@ module LocalStorage.Widgets
 open Feliz
 open Fable.Core.JsInterop
 
-/// <summary>
-/// Is not only used to store position but also size.
-/// </summary>
-type Rect = {
-    X: int
-    Y: int
-} with
-
-    static member init() = { X = 0; Y = 0 }
+open Swate.Components.Composite.Widgets.Types
 
 open Fable.SimpleJson
 
@@ -69,6 +61,7 @@ module Size =
 
     let load (modalName: string) =
         let key = Key_Prefix + modalName
+
         try
             WebStorage.localStorage.getItem (key) |> Json.parseAs<Rect> |> Some
         with _ ->

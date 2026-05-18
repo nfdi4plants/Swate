@@ -10,6 +10,9 @@ open ARCtrl
 open Swate.Components.Shared
 open Components.Metadata
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
+open Swate.Components.Primitive.LoadingSpinner
 
 type public NavbarState = {
     BurgerActive: bool
@@ -251,15 +254,11 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 oa = oa
             )
 
-        QuickAccessButton.QuickAccessButton(
-            "Create Metadata",
-            React.Fragment [ Icons.CreateMetadata() ],
-            toggleMetdadataModal
-        )
+        Buttons.QuickAccessButton(Icons.CreateMetadata(), "Create Metadata", toggleMetdadataModal)
 
-        QuickAccessButton.QuickAccessButton(
+        Buttons.QuickAccessButton(
+            Icons.CreateAnnotationTable(),
             "Create Annotation Table",
-            React.Fragment [ Icons.CreateAnnotationTable() ],
             (fun (e: Browser.Types.MouseEvent) ->
                 e.preventDefault ()
                 let ctrl = e.metaKey || e.ctrlKey
@@ -268,9 +267,9 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
         )
         match model.PersistentStorageState.Host with
         | Some Swatehost.Excel ->
-            QuickAccessButton.QuickAccessButton(
+            Buttons.QuickAccessButton(
+                Icons.AutoformatTable(),
                 "Autoformat Table",
-                React.Fragment [ Icons.AutoformatTable() ],
                 (fun (e: Browser.Types.MouseEvent) ->
                     e.preventDefault ()
                     let ctrl = not (e.metaKey || e.ctrlKey)
@@ -278,21 +277,19 @@ let private QuickAccessList toggleMetdadataModal model (dispatch: Messages.Msg -
                 )
             )
         | _ -> ()
-        QuickAccessButton.QuickAccessButton(
+        Buttons.QuickAccessButton(
+            Icons.RectifyOntologyTerms(Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString),
             "Rectify Ontology Terms",
-            React.Fragment [
-                Icons.RectifyOntologyTerms(Html.span model.ExcelState.FillHiddenColsStateStore.toReadableString)
-            ],
             (fun _ -> SpreadsheetInterface.RectifyTermColumns |> InterfaceMsg |> dispatch)
         )
-        QuickAccessButton.QuickAccessButton(
+        Buttons.QuickAccessButton(
+            Icons.RemoveBuildingBlock(),
             "Remove Building Block",
-            React.Fragment [ Icons.RemoveBuildingBlock() ],
             (fun _ -> SpreadsheetInterface.RemoveBuildingBlock None |> InterfaceMsg |> dispatch)
         )
-        QuickAccessButton.QuickAccessButton(
+        Buttons.QuickAccessButton(
+            Icons.BuildingBlockInformation(),
             "Get Building Block Information",
-            React.Fragment [ Icons.BuildingBlockInformation() ],
             (fun _ ->
                 promise {
                     let! ontologyAnnotationRes = OfficeInterop.Core.Main.getCompositeColumnDetails ()
@@ -339,7 +336,7 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
             Html.div [
                 prop.className "swt:ml-auto"
                 prop.children [
-                    Components.DeleteButton(
+                    Buttons.DeleteButton(
                         className = "swt:btn-sm swt:btn-error",
                         props = [
                             prop.onClick (fun _ ->

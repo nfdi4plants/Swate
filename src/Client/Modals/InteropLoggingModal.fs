@@ -6,6 +6,7 @@ open Messages
 open Swate.Components.Shared
 open Feliz
 open Swate.Components
+open Swate.Components.Primitive.Buttons
 
 type InteropLogging =
     static member Main(model: DevState, dispatch) =
@@ -26,7 +27,7 @@ type InteropLogging =
                     prop.children [
                         Html.div [
                             prop.className "swt:grow swt:flex swt:justify-end"
-                            prop.children [ Components.DeleteButton(props = [ prop.onClick closeMsg ]) ]
+                            prop.children [ Buttons.DeleteButton(props = [ prop.onClick closeMsg ]) ]
                         ]
                         //Daisy.table [
                         Html.div [

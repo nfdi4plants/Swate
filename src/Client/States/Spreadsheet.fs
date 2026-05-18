@@ -4,9 +4,10 @@ open Swate.Components
 open ARCtrl
 open FileImport
 open Swate.Components.Shared
+open Swate.Components.Composite.TermSearch.Types
 
 
-type ActiveView = Swate.Components.ArcFileEditor.Types.ActiveView
+type ActiveView = Swate.Components.Page.ArcFileEditor.Types.ActiveView
 
 type ColumnType =
     | Main

@@ -4,6 +4,10 @@ open Model
 
 open Feliz
 open ARCtrl
+open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
+open Swate.Components.Primitive.LoadingSpinner
+open Swate.Components.Composite.Template
 
 module private TemplatesAux =
 
@@ -51,7 +55,7 @@ type Templates =
                         if isSelected then
                             isSelectedClass
                         if show then
-                            "swt:!border-transparent" // removes bottom border to indicate relation to details row
+                            "swt:border-transparent!" // removes bottom border to indicate relation to details row
                     ]
                     prop.key "generic"
                     prop.children [
@@ -88,16 +92,12 @@ type Templates =
                         Html.td [
                             Html.p [
                                 prop.title authorStr
-                                prop.className "swt:flex swt:items-center swt:text-xs swt:opacity-60 swt:!line-clamp-3"
+                                prop.className "swt:flex swt:items-center swt:text-xs swt:opacity-60 swt:line-clamp-3!"
                                 prop.text authorStr
                             ]
                         ]
                         Html.td [
-                            Swate.Components.Components.CollapseButton(
-                                show,
-                                (fun _ -> setShow (not show)),
-                                classes = "swt:btn-sm"
-                            )
+                            Buttons.CollapseButton(show, (fun _ -> setShow (not show)), classes = "swt:btn-sm")
                         ]
                     ]
                 ]
@@ -150,7 +150,7 @@ type Templates =
                 |> Messages.ProtocolMsg
                 |> dispatch
             )
-            prop.children [ Swate.Components.Icons.ArrowsRotate() ]
+            prop.children [ Icons.ArrowsRotate() ]
         ]
 
     [<ReactComponent>]
@@ -170,10 +170,7 @@ type Templates =
                                 Html.th [
                                     Html.div [
                                         prop.className "swt:flex swt:items-center"
-                                        prop.children [
-                                            Swate.Components.Icons.Filter("swt:size-3")
-                                            Html.span templates.Length
-                                        ]
+                                        prop.children [ Icons.Filter("swt:size-3"); Html.span templates.Length ]
                                     ]
                                 ]
                                 Html.th "Template Name"
@@ -190,10 +187,7 @@ type Templates =
                                         prop.colSpan TemplatesAux.ColCount
                                         prop.style [ style.textAlign.center ]
                                         prop.children [
-                                            Swate.Components.Components.LoadingSpinner(
-                                                "Loading templates...",
-                                                size = Swate.Components.Types.DaisyuiSize.XL
-                                            )
+                                            LoadingSpinner.LoadingSpinner("Loading templates...", size = DaisyuiSize.XL)
                                         ]
                                     ]
                                 ]
@@ -285,7 +279,7 @@ type Templates =
                             |> Messages.ProtocolMsg
                             |> dispatch
                         )
-                        prop.children [ Swate.Components.Icons.Delete() ]
+                        prop.children [ Icons.Delete() ]
                     ]
             ]
         ]
@@ -295,17 +289,14 @@ type Templates =
 
         React.useEffectOnce (fun _ -> Messages.Protocol.GetAllProtocolsRequest |> Messages.ProtocolMsg |> dispatch)
 
-        Swate.Components.TemplateFilter.TemplateFilterProvider(
+        TemplateFilter.TemplateFilterProvider(
             React.Fragment [
 
                 Templates.ImportTemplatesBtn(model, dispatch)
 
-                Swate.Components.TemplateFilter.TemplateFilter(
-                    model.ProtocolState.Templates,
-                    templateSearchClassName = "swt:grow"
-                )
+                TemplateFilter.TemplateFilter(model.ProtocolState.Templates, templateSearchClassName = "swt:grow")
 
-                Swate.Components.TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
+                TemplateFilter.FilteredTemplateRenderer(fun filteredTemplates ->
                     Templates.DisplayTemplates(filteredTemplates, model, dispatch, ?maxheight = Some(length.px 600))
                 )
             ]

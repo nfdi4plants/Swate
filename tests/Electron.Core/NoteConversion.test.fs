@@ -2,7 +2,7 @@ module ElectronCore.NoteConversionTests
 
 open System
 open ARCtrl
-open Swate.Components.Notes.Editor
+open Swate.Components.Composite.Notes.Editor
 open Vitest
 
 let private mkTag name source accession =

@@ -7,6 +7,7 @@ open ARCtrl
 
 open Model
 open Swate.Components
+open Swate.Components.Primitive.BaseModal
 open Fable.Core.JsInterop
 open BuildingBlock.SearchComponent
 

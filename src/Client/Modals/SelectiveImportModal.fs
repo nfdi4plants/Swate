@@ -9,6 +9,8 @@ open Fable.Core.JsInterop
 open ARCtrl
 open FileImport
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.BaseModal
 open Swate.Components.Shared
 
 
@@ -358,7 +360,7 @@ type SelectiveImportModal =
                 ]
             ]
 
-        Swate.Components.BaseModal.Modal(
+        BaseModal.Modal(
             true,
             (fun _ -> rmv !!()),
             Html.p "Import",
@@ -419,7 +421,7 @@ type SelectiveImportModal =
                 ]
             ]
 
-        Swate.Components.BaseModal.Modal(
+        BaseModal.Modal(
             true,
             (fun _ -> rmv !!()),
             Html.p "Import",

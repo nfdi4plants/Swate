@@ -8,6 +8,8 @@ open Components
 open MainComponents
 open Model
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
 open ARCtrl
 open Swate.Components.Shared
 
@@ -34,7 +36,7 @@ let private FileName (model: Model) =
     | Some _ ->
         Html.div [
             prop.className
-                "swt:text-lg swt:font-bold swt:inline-flex swt:items-center swt:max-w-[125px] swt:px-2 swt:truncate"
+                "swt:text-lg swt:font-bold swt:inline-flex swt:items-center swt:max-w-31.25 swt:px-2 swt:truncate"
             prop.children [
                 Html.span [ prop.className "swt:hidden swt:lg:block"; prop.text txt ]
                 Html.span [
@@ -48,9 +50,9 @@ let private FileName (model: Model) =
 
 let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
     React.Fragment [
-        QuickAccessButton.QuickAccessButton(
-            "Backward",
+        Buttons.QuickAccessButton(
             Icons.Backward(),
+            "Backward",
             (fun _ ->
                 let newPosition = state.HistoryCurrentPosition + 1
                 //let newPosition_clamped = System.Math.Min(newPosition, state.HistoryExistingItemCount)
@@ -62,9 +64,9 @@ let private QuickAccessButtonListStart (state: LocalHistory.Model) dispatch =
             ),
             isDisabled = (state.NextPositionIsValid(state.HistoryCurrentPosition + 1) |> not)
         )
-        QuickAccessButton.QuickAccessButton(
-            "Forward",
+        Buttons.QuickAccessButton(
             Icons.Forward(),
+            "Forward",
             (fun _ ->
                 let newPosition = state.HistoryCurrentPosition - 1
 
@@ -83,9 +85,9 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
         Modals.ResetTable.Main(isOpen = openReset, setIsOpen = setOpenReset, dispatch = dispatch)
         match model.PersistentStorageState.Host with
         | Some Swatehost.Browser ->
-            QuickAccessButton.QuickAccessButton(
-                "Save",
+            Buttons.QuickAccessButton(
                 Icons.Save(),
+                "Save",
                 (fun _ ->
                     match model.PersistentStorageState.Host with
                     | Some(Swatehost.Browser) ->
@@ -99,9 +101,9 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
                 isDisabled = model.SpreadsheetModel.ArcFile.IsNone
             )
 
-            QuickAccessButton.QuickAccessButton(
-                "Reset",
+            Buttons.QuickAccessButton(
                 Icons.Delete(),
+                "Reset",
                 (fun _ -> setOpenReset (not openReset)),
                 color = DaisyuiColors.Error
             )
@@ -109,9 +111,9 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
             NavbarBurger.Main(model, dispatch)
         | Some Swatehost.ARCitect ->
             if autoSaveConfig.IsSome && not autoSaveConfig.Value then
-                QuickAccessButton.QuickAccessButton(
-                    "Save",
+                Buttons.QuickAccessButton(
                     Icons.Save(),
+                    "Save",
                     (fun _ ->
                         match model.PersistentStorageState.Host with
                         | Some(Swatehost.Browser) ->
@@ -131,22 +133,22 @@ let private QuickAccessButtonListEnd (model: Model) dispatch =
 
 let private WidgetNavbarList (model, addWidget: MainComponents.Widget -> unit) =
     let addBuildingBlock =
-        QuickAccessButton.QuickAccessButton(
-            "Add Building Block",
+        Buttons.QuickAccessButton(
             Icons.BuildingBlock(),
+            "Add Building Block",
             (fun _ -> addWidget Widget._BuildingBlock)
         )
 
     let addTemplate =
-        QuickAccessButton.QuickAccessButton("Add Template", Icons.Templates(), (fun _ -> addWidget Widget._Template))
+        Buttons.QuickAccessButton(Icons.Templates(), "Add Template", (fun _ -> addWidget Widget._Template))
 
     let filePicker =
-        QuickAccessButton.QuickAccessButton("File Picker", Icons.FilePicker(), (fun _ -> addWidget Widget._FilePicker))
+        Buttons.QuickAccessButton(Icons.FilePicker(), "File Picker", (fun _ -> addWidget Widget._FilePicker))
 
     let dataAnnotator =
-        QuickAccessButton.QuickAccessButton(
-            "Data Annotator",
+        Buttons.QuickAccessButton(
             Icons.DataAnnotator(),
+            "Data Annotator",
             (fun _ -> addWidget Widget._DataAnnotator),
             classes = "swt:w-min"
         )

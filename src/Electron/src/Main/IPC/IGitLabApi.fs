@@ -3,9 +3,9 @@ module Main.IPC.IGitLabApi
 open System
 open Fable.Core
 open Swate.Electron.Shared.IPCTypes
-open Swate.Components.DataHub.DataHubTypes
+open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
-open Swate.Components.Authentication.Helper
+open Swate.Components.Composite.Authentication.Helper
 open Main.Auth
 
 let private defaultPublicDataHubBaseUrl = Default_DataHub_Url

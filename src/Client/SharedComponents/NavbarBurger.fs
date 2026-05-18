@@ -2,6 +2,7 @@ namespace Components
 
 open Feliz
 open Swate.Components
+open Swate.Components.Primitive
 
 open Browser.Dom
 

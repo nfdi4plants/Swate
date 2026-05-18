@@ -2,6 +2,7 @@ module Renderer.Components.ARCHelper
 
 open System
 open Feliz
+open Swate.Components
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
@@ -56,9 +57,7 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
 }
 
 let runFreeLocalLfsCopy (relativePath: string) = promise {
-    let request: GitLfsFreeLocalCopyRequest = {
-        Path = relativePath
-    }
+    let request: GitLfsFreeLocalCopyRequest = { Path = relativePath }
 
     let! result = Renderer.GitApiClient.gitLfsFreeLocalCopy request
 

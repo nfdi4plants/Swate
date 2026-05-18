@@ -7,7 +7,10 @@ open Model
 open Messages
 open Feliz
 open Swate.Components
-open Swate.Components.Table
+open Swate.Components.Composite.Table
+open Swate.Components.Composite.Table.Types
+open Swate.Components.Primitive
+open Swate.Components.Primitive.BaseModal
 
 module private DataAnnotatorHelper =
 
@@ -54,7 +57,7 @@ module private DataAnnotatorHelper =
                             prop.onClick (fun _ -> setOpen (not isOpen))
                             prop.role.button
                             prop.className
-                                "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
+                                "swt:btn swt:btn-primary swt:border swt:border-base-content! swt:join-item swt:flex-nowrap"
                             prop.children [ Icons.AngleDown() ]
                         ],
                         [
@@ -196,7 +199,10 @@ module private DataAnnotatorHelper =
 
 
     let ModalMangementContainer (children: ReactElement list) =
-        Html.div [ prop.className "swt:flex swt:flex-col swt:gap-4"; prop.children children ]
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-4"
+            prop.children children
+        ]
 
     let DataFileConfigComponent model target setTarget dispatch =
         Html.div [
@@ -238,8 +244,7 @@ module private DataAnnotatorHelper =
             dtrgt: DataTarget option,
             state: Set<DataTarget>,
             setState: (Set<DataTarget> -> Set<DataTarget>) -> unit
-        )
-        =
+        ) =
 
         let isDirectlyActive =
             dtrgt
@@ -370,20 +375,21 @@ type DataAnnotator =
             | Spreadsheet.ActiveView.Table _ ->
                 match targetCol with
                 | TargetColumn.Autodetect ->
-                    match model.SpreadsheetModel.ActiveTable.TryGetInputColumn(), model.SpreadsheetModel.ActiveTable.TryGetOutputColumn() with
+                    match
+                        model.SpreadsheetModel.ActiveTable.TryGetInputColumn(),
+                        model.SpreadsheetModel.ActiveTable.TryGetOutputColumn()
+                    with
                     | Some _, Some _ ->
                         Some "Both Input and Output columns already exist. Select Input or Output explicitly."
-                    | _ ->
-                        None
-                | _ ->
-                    None
-            | _ ->
-                None
+                    | _ -> None
+                | _ -> None
+            | _ -> None
 
     [<ReactComponent>]
     static member private Modal(model: Model, dispatch, rmvFile, rmv, isOpen, setIsOpen) =
         let state, setState: Set<DataTarget> * (((Set<DataTarget> -> Set<DataTarget>) -> unit)) =
             React.useStateWithUpdater (Set.empty<DataTarget>)
+
         let errorMessage, setErrorMessage = React.useState (None: string option)
 
         let (targetCol: TargetColumn), setTargetCol =
@@ -407,7 +413,9 @@ type DataAnnotator =
                     Html.div [
                         prop.className "swt:w-full swt:flex swt:justify-between swt:items-center swt:gap-2"
                         prop.children [
-                            Html.div [ prop.children [ DataAnnotatorButtons.ResetButton model rmvFile ] ]
+                            Html.div [
+                                prop.children [ DataAnnotatorButtons.ResetButton model rmvFile ]
+                            ]
                             Html.div [
                                 prop.className "swt:ml-auto swt:flex swt:gap-2"
                                 prop.style [ style.marginLeft length.auto ]
@@ -422,9 +430,8 @@ type DataAnnotator =
                                         prop.text "Submit"
                                         prop.disabled state.IsEmpty
                                         prop.onClick (fun e ->
-                                            match DataAnnotator.tryValidateSubmit(model, state, targetCol) with
-                                            | Some message ->
-                                                setErrorMessage (Some message)
+                                            match DataAnnotator.tryValidateSubmit (model, state, targetCol) with
+                                            | Some message -> setErrorMessage (Some message)
                                             | None ->
                                                 match model.DataAnnotatorModel.DataFile with
                                                 | Some dtf ->
@@ -449,8 +456,7 @@ type DataAnnotator =
 
                                                     setErrorMessage None
                                                     rmv e
-                                                | None ->
-                                                    setErrorMessage (Some "No file selected.")
+                                                | None -> setErrorMessage (Some "No file selected.")
                                         )
                                     ]
                                 ]
@@ -465,7 +471,7 @@ type DataAnnotator =
                 ]
             ]
 
-        Swate.Components.BaseModal.Modal(
+        BaseModal.Modal(
             isOpen,
             setIsOpen,
             Html.p "Data Annotator",

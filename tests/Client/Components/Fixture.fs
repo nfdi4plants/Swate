@@ -3,7 +3,8 @@ module Fixture
 open ARCtrl
 open Feliz
 open Swate.Components
-open Swate.Components.Table
+open Swate.Components.Composite.Table
+open Swate.Components.Composite.Table.Types
 
 /// <summary>
 /// Creates a mock table with some sample data.

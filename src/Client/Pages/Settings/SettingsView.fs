@@ -9,7 +9,8 @@ open Messages
 open Feliz
 
 open Swate.Components
-open Swate.Components.Theme.Context
+open Swate.Components.Composite.ThemeSelector.Context
+open Swate.Components.Composite.ThemeSelector.Types
 
 type Settings =
 
@@ -98,11 +99,11 @@ type Settings =
             (fun () ->
                 let icon =
                     match themeCtx.state with
-                    | Swate.Components.Types.Theme.Sunrise -> animatedSun
-                    | Swate.Components.Types.Finster -> animatedMoon
-                    | Swate.Components.Types.Planti -> planti
-                    | Swate.Components.Types.Viola -> viola
-                    | Swate.Components.Types.Auto -> browser
+                    | Theme.Sunrise -> animatedSun
+                    | Theme.Finster -> animatedMoon
+                    | Theme.Planti -> planti
+                    | Theme.Viola -> viola
+                    | Theme.Auto -> browser
 
                 iconRef.current?innerHTML <- icon
                 ()
@@ -110,8 +111,8 @@ type Settings =
             [| box themeCtx.state |]
         )
 
-        let mkOption (theme: Swate.Components.Types.Theme) =
-            let txt = Swate.Components.Types.Theme.toString theme
+        let mkOption (theme: Theme) =
+            let txt = Theme.toString theme
             Html.option [ prop.value txt; prop.text txt ]
 
         Settings.SettingColumnElement(
@@ -121,14 +122,14 @@ type Settings =
                 prop.children [
                     Html.label [ prop.className "swt:label"; prop.ref iconRef ]
                     Html.select [
-                        prop.defaultValue (Swate.Components.Types.Theme.toString themeCtx.state)
-                        prop.onChange (fun (e: string) -> themeCtx.setState (Swate.Components.Types.Theme.fromString e))
+                        prop.defaultValue (Theme.toString themeCtx.state)
+                        prop.onChange (fun (e: string) -> themeCtx.setState (Theme.fromString e))
                         prop.children [
-                            mkOption Swate.Components.Types.Theme.Sunrise
-                            mkOption Swate.Components.Types.Theme.Finster
-                            mkOption Swate.Components.Types.Theme.Planti
-                            mkOption Swate.Components.Types.Theme.Viola
-                            mkOption Swate.Components.Types.Theme.Auto
+                            mkOption Theme.Sunrise
+                            mkOption Theme.Finster
+                            mkOption Theme.Planti
+                            mkOption Theme.Viola
+                            mkOption Theme.Auto
                         ]
                     ]
                 ]
@@ -172,7 +173,7 @@ type Settings =
         Components.Forms.Generic.BoxedField(
             "Term Search Configuration",
             content = [
-                Swate.Components.TermSearch.TermSearchConfigSetter.TermSearchConfigSetter !!Renderer
+                Swate.Components.Composite.TermSearch.TermSearchConfigSetter.TermSearchConfigSetter !!Renderer
             ]
         )
 
@@ -182,7 +183,7 @@ type Settings =
             "Display all recorded activities of this session.",
             content = [
                 Html.div [
-                    prop.className "swt:overflow-y-auto swt:max-h-[600px]"
+                    prop.className "swt:overflow-y-auto swt:max-h-150"
                     prop.children [ ActivityLog.Main(model) ]
                 ]
             ]

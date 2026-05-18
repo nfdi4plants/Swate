@@ -2,7 +2,7 @@ module TermSearch
 
 
 open Messages
-open Swate.Components.AnnotationTable
+open Swate.Components.Composite.AnnotationTable
 open Elmish
 open Model
 
@@ -15,7 +15,8 @@ let update (termSearchMsg: TermSearch.Msg) (currentState: TermSearch.Model) : Te
 open Feliz
 open ARCtrl
 open Fable.Core.JsInterop
-open Swate.Components.AnnotationTable.Context
+open Swate.Components.Composite.AnnotationTable.Context
+open Swate.Components.Composite.TermSearch.Types
 
 /// "Fill selected cells with this term" - button //
 [<ReactComponent>]
@@ -33,7 +34,7 @@ let private AddButton (model: Model, dispatch) =
             yStart = x.yStart - 1
             yEnd = x.yEnd - 1
         |})
-        |> unbox<Swate.Components.Types.CellCoordinateRange option>
+        |> unbox<Swate.Components.CellCoordinateRange option>
 
     Html.div [
         prop.className "swt:flex swt:flex-row swt:justify-center"
@@ -66,7 +67,7 @@ let private AddButton (model: Model, dispatch) =
 [<ReactComponent>]
 let Main (model: Model, dispatch) =
     let setTerm =
-        fun (term: Swate.Components.Types.Term option) ->
+        fun (term: Term option) ->
             let term = term |> Option.map OntologyAnnotation.from
             TermSearch.UpdateSelectedTerm term |> TermSearchMsg |> dispatch
 
@@ -88,12 +89,12 @@ let Main (model: Model, dispatch) =
         SidebarComponents.SidebarLayout.Description "Search for an ontology term to fill into the selected field(s)"
 
         SidebarComponents.SidebarLayout.LogicContainer [
-            Swate.Components.TermSearch.TermSearch.TermSearch(
+            Swate.Components.Composite.TermSearch.TermSearch.TermSearch(
                 (model.TermSearchState.SelectedTerm |> Option.map _.ToTerm()),
                 setTerm,
                 autoFocus = true,
                 ?onFocus = excelGetParentTerm,
-                classNames = Swate.Components.Types.TermSearchStyle(!^"swt:input-lg swt:w-full"),
+                classNames = TermSearchStyle(!^"swt:input-lg swt:w-full"),
                 ?parentId = (model.TermSearchState.ParentTerm |> Option.map _.TermAccessionShort)
             )
             AddButton(model, dispatch)

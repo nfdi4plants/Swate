@@ -8,8 +8,10 @@ open Messages
 open Feliz
 open Swate
 open Swate.Components
-open Swate.Components.AnnotationTable
-open Swate.Components.AnnotationTable.Context
+open Swate.Components.Composite.AnnotationTable
+open Swate.Components.Composite.AnnotationTable.Context
+open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
 
 module FilePicker =
 
@@ -104,7 +106,7 @@ type FilePicker =
                 yStart = x.yStart - 1
                 yEnd = x.yEnd - 1
             |})
-            |> unbox<Swate.Components.Types.CellCoordinateRange option>
+            |> unbox<Swate.Components.CellCoordinateRange option>
 
         Html.div [
             prop.className "swt:flex swt:flex-row swt:justify-center swt:gap-2"
@@ -167,7 +169,7 @@ type FilePicker =
         ]
 
     static member private DeleteFromTable (id, fileName) (model: Model) dispatch =
-        Components.Components.DeleteButton(
+        Buttons.DeleteButton(
             props = [
                 prop.onClick (fun _ ->
                     let newList =

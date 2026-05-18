@@ -1,4 +1,4 @@
-module ElectronRenderer.GitWorkflowTests
+﻿module ElectronRenderer.GitWorkflowTests
 
 open System
 open Browser.Dom
@@ -10,7 +10,7 @@ open Feliz
 open Renderer.Context.GitWorkflow
 open Renderer.Types
 open Swate.Components.Api.GitLabApi
-open Swate.Components.GitSidebarTypes
+open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
 open Vitest
 
@@ -1854,7 +1854,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitMergeConflictViewer.Viewer(
+                        Swate.Components.Page.GitMergeConflictViewer.Viewer(
                             mergeConflictContent = "<<<<<<< HEAD\nA\n=======\nB\n>>>>>>> branch\n",
                             defaultResolvedContent = "resolved",
                             onConfirmMerge = (fun _ -> confirmCalls <- confirmCalls + 1),
@@ -1889,7 +1889,7 @@ Vitest.describe (
                                 style.height 480
                             ]
                             prop.children [
-                                Swate.Components.GitDiffViewer.Viewer(
+                                Swate.Components.Page.GitDiffViewer.Viewer(
                                     wordDiffText = buildAddedFileDiff "notes/renderer-large.txt" lines,
                                     previousContent = "",
                                     currentContent = joinLines lines,
@@ -1910,7 +1910,7 @@ Vitest.describe (
             fun () ->
                 let markup =
                     renderToStaticMarkup (
-                        Swate.Components.GitDiffViewer.Viewer(
+                        Swate.Components.Page.GitDiffViewer.Viewer(
                             wordDiffText = "new file mode 100644\n--- /dev/null\n+++ b/notes/draft.txt\n",
                             previousContent = "",
                             currentContent = "Draft line\n",
@@ -1939,7 +1939,7 @@ Vitest.describe (
                                 style.height 520
                             ]
                             prop.children [
-                                Swate.Components.GitMergeConflictViewer.Viewer(
+                                Swate.Components.Page.GitMergeConflictViewer.Viewer(
                                     mergeConflictContent = buildSingleConflictDocument currentLines incomingLines,
                                     testIdPrefix = "renderer-large-merge"
                                 )
@@ -1966,7 +1966,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = status,
                             changedFiles = [||],
                             branchOptions = [| sidebarLocalBranch "feature/local-only" true false |],
@@ -2039,7 +2039,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2095,7 +2095,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2142,7 +2142,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2202,7 +2202,7 @@ Vitest.describe (
                                 style.height 760
                             ]
                             prop.children [
-                                Swate.Components.GitSidebar.Main(
+                                Swate.Components.Page.GitSidebar.Main(
                                     status = {
                                         CurrentBranch = Some "main"
                                         TrackingBranch = Some "origin/main"
@@ -2286,7 +2286,7 @@ Vitest.describe (
                                 style.height 760
                             ]
                             prop.children [
-                                Swate.Components.GitSidebar.Main(
+                                Swate.Components.Page.GitSidebar.Main(
                                     status = {
                                         CurrentBranch = Some "main"
                                         TrackingBranch = Some "origin/main"
@@ -2373,7 +2373,7 @@ Vitest.describe (
                                             prop.className boundedWrapperClasses
                                             prop.style [ style.height (length.percent 100) ]
                                             prop.children [
-                                                Swate.Components.GitSidebar.Main(
+                                                Swate.Components.Page.GitSidebar.Main(
                                                     status = {
                                                         CurrentBranch = Some "main"
                                                         TrackingBranch = Some "origin/main"
@@ -2439,7 +2439,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2492,7 +2492,7 @@ Vitest.describe (
                         Html.div [
                             prop.style [ style.width 340; style.height 760 ]
                             prop.children [
-                                Swate.Components.GitSidebar.Main(
+                                Swate.Components.Page.GitSidebar.Main(
                                     status = {
                                         CurrentBranch = Some "main"
                                         TrackingBranch = Some "origin/main"
@@ -2550,7 +2550,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2614,7 +2614,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2671,7 +2671,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2750,7 +2750,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2826,7 +2826,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2882,7 +2882,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2951,7 +2951,7 @@ Vitest.describe (
 
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
@@ -2994,7 +2994,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Swate.Components.GitSidebar.Main(
+                        Swate.Components.Page.GitSidebar.Main(
                             status = {
                                 CurrentBranch = Some "main"
                                 TrackingBranch = Some "origin/main"
