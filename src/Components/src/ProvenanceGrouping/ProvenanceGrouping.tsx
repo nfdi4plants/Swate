@@ -27,12 +27,19 @@ export type ProvenanceGroupPart = {
   value: string;
 };
 
+export type ProvenanceGroupMember = {
+  item: ProvenanceItem;
+  membershipId: string;
+  groupingValues: ProvenanceGroupPart[];
+};
+
 export type ProvenanceGroup = {
   id: string;
   layerId: string;
   label: string;
   groupingKeys: string[];
   labelParts: ProvenanceGroupPart[];
+  members: ProvenanceGroupMember[];
   items: ProvenanceItem[];
 };
 
@@ -71,7 +78,7 @@ export type ProvenanceGroupingProps = {
   onAssignParameterValue: (side: ProvenanceSide, key: string, value: string, groupId: string) => void;
   onSelectGroup: (side: ProvenanceSide, groupId: string) => void;
   onOpenDetail: (detail: ProvenanceDetail) => void;
-  onUpdateParameter: (side: ProvenanceSide, groupId: string, key: string, value: string) => void;
+  onUpdateParameter: (side: ProvenanceSide, groupId: string, key: string, oldValue: string, value: string) => void;
   onConnectSelectedGroups: () => void;
   onCreateItem: (layerId: string, name: string) => void;
   onAddLayer: () => void;
@@ -105,6 +112,8 @@ type ParameterRailEntry = {
   movable: boolean;
   active: boolean;
 };
+
+type ProvenanceValueResolver = (item: ProvenanceItem, key: string) => string[];
 
 type ParameterValueConnector = {
   value: string;
@@ -171,9 +180,87 @@ const slug = (value: string) =>
 
 const connectionKey = (connection: ProvenanceConnection) => `${connection.sourceId}->${connection.targetId}`;
 
-export function getParameterValue(item: ProvenanceItem, key: string): string | undefined {
+export function getParameterValues(item: ProvenanceItem, key: string): string[] {
   const normalized = normalizeKey(key);
-  return item.parameters.find((parameter) => normalizeKey(parameter.key) === normalized)?.value;
+  return item.parameters
+    .filter((parameter) => normalizeKey(parameter.key) === normalized)
+    .map((parameter) => parameter.value);
+}
+
+export function getParameterValue(item: ProvenanceItem, key: string): string | undefined {
+  return getFirstSortedParameterValue(item, key);
+}
+
+function uniqueValues(values: string[]): string[] {
+  const seen = new Set<string>();
+  const unique: string[] = [];
+
+  values.forEach((value) => {
+    const normalized = value.trim().toLowerCase();
+    if (normalized && !seen.has(normalized)) {
+      seen.add(normalized);
+      unique.push(value);
+    }
+  });
+
+  return unique.sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }));
+}
+
+function getFirstSortedParameterValue(item: ProvenanceItem, key: string): string | undefined {
+  return uniqueValues(getParameterValues(item, key))[0];
+}
+
+function hasParameterValue(item: ProvenanceItem, key: string, value: string): boolean {
+  const normalizedValue = value.trim().toLowerCase();
+  return getParameterValues(item, key).some((candidate) => candidate.trim().toLowerCase() === normalizedValue);
+}
+
+export function addParameterValue(item: ProvenanceItem, key: string, value: string): ProvenanceItem {
+  if (hasParameterValue(item, key, value)) {
+    return item;
+  }
+
+  return {
+    ...item,
+    parameters: [...item.parameters, { key, value }],
+  };
+}
+
+function directValueResolver(item: ProvenanceItem, key: string): string[] {
+  return getParameterValues(item, key);
+}
+
+export function createAdjacentValueResolver(
+  items: ProvenanceItem[],
+  connections: ProvenanceConnection[],
+  layerId: string,
+  connectedLayerId: string,
+  side: ProvenanceSide,
+): ProvenanceValueResolver {
+  const itemById = new Map(items.map((item) => [item.id, item]));
+
+  return (item, key) => {
+    const directValues = getParameterValues(item, key);
+
+    if (item.layerId !== layerId || directValues.length > 0) {
+      return uniqueValues(directValues);
+    }
+
+    const connectedValues = connections.flatMap((connection) => {
+      const connectedId = side === "left"
+        ? connection.sourceId === item.id
+          ? connection.targetId
+          : undefined
+        : connection.targetId === item.id
+          ? connection.sourceId
+          : undefined;
+      const connectedItem = connectedId ? itemById.get(connectedId) : undefined;
+
+      return connectedItem?.layerId === connectedLayerId ? getParameterValues(connectedItem, key) : [];
+    });
+
+    return uniqueValues([...directValues, ...connectedValues]);
+  };
 }
 
 export function availableParameterKeys(items: ProvenanceItem[], layerId: string): string[] {
@@ -191,6 +278,36 @@ export function availableParameterKeys(items: ProvenanceItem[], layerId: string)
         }
       });
     });
+
+  return keys;
+}
+
+function connectionDerivedParameterKeys(
+  items: ProvenanceItem[],
+  connections: ProvenanceConnection[],
+  sourceLayerId: string,
+  targetLayerId: string,
+): string[] {
+  const itemById = new Map(items.map((item) => [item.id, item]));
+  const keys: string[] = [];
+  const seen = new Set<string>();
+
+  connections.forEach((connection) => {
+    const source = itemById.get(connection.sourceId);
+    const target = itemById.get(connection.targetId);
+
+    if (source?.layerId !== sourceLayerId || target?.layerId !== targetLayerId) {
+      return;
+    }
+
+    target.parameters.forEach((parameter) => {
+      const normalized = normalizeKey(parameter.key);
+      if (!seen.has(normalized)) {
+        seen.add(normalized);
+        keys.push(parameter.key);
+      }
+    });
+  });
 
   return keys;
 }
@@ -246,23 +363,35 @@ function displayKey(leftKey: string | undefined, rightKey: string | undefined): 
 function buildParameterRailEntries(
   leftKeys: string[],
   rightKeys: string[],
+  connectionDerivedLeftKeys: string[],
   leftGroupingKeys: string[],
   rightGroupingKeys: string[],
   placements: Record<string, ProvenanceSide> | undefined,
 ): { left: ParameterRailEntry[]; right: ParameterRailEntry[] } {
   const leftByKey = keyLookup(leftKeys);
   const rightByKey = keyLookup(rightKeys);
-  const normalizedKeys = Array.from(new Set([...leftByKey.keys(), ...rightByKey.keys()])).sort((left, right) =>
-    displayKey(leftByKey.get(left), rightByKey.get(left)).localeCompare(displayKey(leftByKey.get(right), rightByKey.get(right))),
+  const connectionDerivedLeftByKey = keyLookup(connectionDerivedLeftKeys);
+  const normalizedKeys = Array.from(
+    new Set([...leftByKey.keys(), ...rightByKey.keys(), ...connectionDerivedLeftByKey.keys()]),
+  ).sort((left, right) =>
+    displayKey(leftByKey.get(left) ?? connectionDerivedLeftByKey.get(left), rightByKey.get(left)).localeCompare(
+      displayKey(leftByKey.get(right) ?? connectionDerivedLeftByKey.get(right), rightByKey.get(right)),
+      undefined,
+      { numeric: true, sensitivity: "base" },
+    ),
   );
 
   const entries = normalizedKeys.map((normalizedKey) => {
     const leftKey = leftByKey.get(normalizedKey);
     const rightKey = rightByKey.get(normalizedKey);
-    const shared = Boolean(leftKey && rightKey);
-    const availability: ParameterAvailability = shared ? "shared" : leftKey ? "left-only" : "right-only";
-    const rail = shared ? placements?.[normalizedKey] ?? "left" : leftKey ? "left" : "right";
-    const key = displayKey(leftKey, rightKey);
+    const derivedLeftKey = connectionDerivedLeftByKey.get(normalizedKey);
+    const leftAvailable = Boolean(leftKey || derivedLeftKey);
+    const rightAvailable = Boolean(rightKey);
+    const shared = leftAvailable && rightAvailable;
+    const availability: ParameterAvailability = shared ? "shared" : leftAvailable ? "left-only" : "right-only";
+    const defaultRail = shared ? (leftKey ? "left" : "right") : leftAvailable ? "left" : "right";
+    const rail = shared ? placements?.[normalizedKey] ?? defaultRail : defaultRail;
+    const key = displayKey(leftKey ?? derivedLeftKey, rightKey);
     const active =
       rail === "left"
         ? containsKey(leftGroupingKeys, key)
@@ -291,21 +420,19 @@ function valueConnectorsForKey(
   groups: ProvenanceGroup[],
   key: string,
   configuredValues: string[],
+  valueResolver: ProvenanceValueResolver = directValueResolver,
 ): ParameterValueConnector[] {
   const layerItems = items.filter((item) => item.layerId === layerId);
   const values = new Set([
     ...configuredValues.filter((value) => value.trim()),
-    ...layerItems.flatMap((item) => {
-      const value = getParameterValue(item, key);
-      return value === undefined ? [] : [value];
-    }),
+    ...layerItems.flatMap((item) => valueResolver(item, key)),
   ]);
 
   return Array.from(values)
-    .sort((left, right) => left.localeCompare(right))
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }))
     .map((value) => ({
       value,
-      groups: groups.filter((group) => group.items.some((item) => getParameterValue(item, key) === value)),
+      groups: groups.filter((group) => group.members.some((member) => valueResolver(member.item, key).includes(value))),
     }));
 }
 
@@ -343,9 +470,10 @@ function valueGroupConnectionsForRail(
   items: ProvenanceItem[],
   groups: ProvenanceGroup[],
   parameterValues: Record<string, string[]>,
+  valueResolver: ProvenanceValueResolver = directValueResolver,
 ): ValueGroupConnection[] {
   return entries.flatMap((entry) =>
-    valueConnectorsForKey(items, layerId, groups, entry.key, parameterValues[entry.key] ?? []).flatMap((value) =>
+    valueConnectorsForKey(items, layerId, groups, entry.key, parameterValues[entry.key] ?? [], valueResolver).flatMap((value) =>
       value.groups.map((group) => ({
         id: `${valueNodeId(side, layerId, entry.key, value.value)}-${groupNodeId(side, group.id)}`,
         side,
@@ -354,25 +482,6 @@ function valueGroupConnectionsForRail(
       })),
     ),
   );
-}
-
-function fullParameterSignature(item: ProvenanceItem): ProvenanceGroupPart[] {
-  const partsByKey = new Map<string, ProvenanceGroupPart>();
-
-  item.parameters.forEach((parameter) => {
-    const key = parameter.key.trim();
-    const value = parameter.value.trim();
-    const normalized = normalizeKey(key);
-
-    if (key && !partsByKey.has(normalized)) {
-      partsByKey.set(normalized, { key, value });
-    }
-  });
-
-  return Array.from(partsByKey.values()).sort((left, right) => {
-    const keyComparison = normalizeKey(left.key).localeCompare(normalizeKey(right.key));
-    return keyComparison !== 0 ? keyComparison : left.value.localeCompare(right.value);
-  });
 }
 
 function groupLabel(labelParts: ProvenanceGroupPart[]): string {
@@ -389,10 +498,40 @@ function groupId(layerId: string, labelParts: ProvenanceGroupPart[]): string {
   }`;
 }
 
+function getGroupingValueSets(
+  item: ProvenanceItem,
+  groupingKeys: string[],
+  valueResolver: ProvenanceValueResolver,
+): ProvenanceGroupPart[][] {
+  if (groupingKeys.length === 0) {
+    return [[]];
+  }
+
+  const valueSets = groupingKeys
+    .map((key) => ({
+      key,
+      values: uniqueValues(valueResolver(item, key)),
+    }))
+    .filter((valueSet) => valueSet.values.length > 0);
+
+  if (valueSets.length === 0) {
+    return [[]];
+  }
+
+  return valueSets.reduce<ProvenanceGroupPart[][]>(
+    (combinations, valueSet) =>
+      combinations.flatMap((combination) =>
+        valueSet.values.map((value) => [...combination, { key: valueSet.key, value }]),
+      ),
+    [[]],
+  );
+}
+
 export function buildGroups(
   items: ProvenanceItem[],
   layerId: string,
   groupingKeys: string[],
+  valueResolver: ProvenanceValueResolver = directValueResolver,
 ): ProvenanceGroup[] {
   const layerItems = items.filter((item) => item.layerId === layerId);
 
@@ -401,55 +540,56 @@ export function buildGroups(
   }
 
   if (groupingKeys.length === 0) {
-    const groups = new Map<string, ProvenanceGroup>();
+    return layerItems
+      .map((item) => {
+        const member: ProvenanceGroupMember = { item, membershipId: item.id, groupingValues: [] };
 
-    layerItems.forEach((item) => {
-      const labelParts = fullParameterSignature(item);
-      const id = groupId(layerId, labelParts);
-      const existing = groups.get(id);
-
-      if (existing) {
-        existing.items.push(item);
-      } else {
-        groups.set(id, {
-          id,
+        return {
+          id: `${layerId}-item-${slug(item.id)}`,
           layerId,
-          label: groupLabel(labelParts),
+          label: item.name,
           groupingKeys: [],
-          labelParts,
+          labelParts: [],
+          members: [member],
           items: [item],
-        });
-      }
-    });
-
-    return Array.from(groups.values()).sort((left, right) => left.label.localeCompare(right.label));
+        };
+      })
+      .sort((left, right) => left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: "base" }));
   }
 
   const groups = new Map<string, ProvenanceGroup>();
 
   layerItems.forEach((item) => {
-    const labelParts = groupingKeys.flatMap((key) => {
-      const value = getParameterValue(item, key);
-      return value === undefined ? [] : [{ key, value }];
-    });
-    const id = labelParts.length === 0 ? `${layerId}-ungrouped` : groupId(layerId, labelParts);
-    const existing = groups.get(id);
+    getGroupingValueSets(item, groupingKeys, valueResolver).forEach((labelParts) => {
+      const isUngrouped = labelParts.length === 0;
+      const id = isUngrouped ? `${layerId}-ungrouped` : groupId(layerId, labelParts);
+      const existing = groups.get(id);
+      const member: ProvenanceGroupMember = {
+        item,
+        membershipId: `${item.id}-${slug(id)}`,
+        groupingValues: labelParts,
+      };
 
-    if (existing) {
-      existing.items.push(item);
-    } else {
-      groups.set(id, {
-        id,
-        layerId,
-        label: labelParts.length === 0 ? "Ungrouped" : groupLabel(labelParts),
-        groupingKeys,
-        labelParts,
-        items: [item],
-      });
-    }
+      if (existing) {
+        existing.members.push(member);
+        existing.items.push(item);
+      } else {
+        groups.set(id, {
+          id,
+          layerId,
+          label: isUngrouped ? "Ungrouped" : groupLabel(labelParts),
+          groupingKeys,
+          labelParts,
+          members: [member],
+          items: [item],
+        });
+      }
+    });
   });
 
-  return Array.from(groups.values()).sort((left, right) => left.label.localeCompare(right.label));
+  return Array.from(groups.values()).sort((left, right) =>
+    left.label.localeCompare(right.label, undefined, { numeric: true, sensitivity: "base" }),
+  );
 }
 
 function compareOptionalValues(left: string | undefined, right: string | undefined): number {
@@ -468,35 +608,59 @@ function compareOptionalValues(left: string | undefined, right: string | undefin
   return left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" });
 }
 
-function compareItemsByParameter(key: string | undefined) {
-  return (left: ProvenanceItem, right: ProvenanceItem): number => {
+function compareMembersByParameter(key: string | undefined, valueResolver: ProvenanceValueResolver) {
+  return (left: ProvenanceGroupMember, right: ProvenanceGroupMember): number => {
     if (!key) {
-      return left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
+      return left.item.name.localeCompare(right.item.name, undefined, { numeric: true, sensitivity: "base" });
     }
 
-    const valueComparison = compareOptionalValues(getParameterValue(left, key), getParameterValue(right, key));
+    const valueComparison = compareOptionalValues(
+      uniqueValues(valueResolver(left.item, key))[0],
+      uniqueValues(valueResolver(right.item, key))[0],
+    );
     return valueComparison !== 0
       ? valueComparison
-      : left.name.localeCompare(right.name, undefined, { numeric: true, sensitivity: "base" });
+      : left.item.name.localeCompare(right.item.name, undefined, { numeric: true, sensitivity: "base" });
   };
 }
 
-function sortGroups(groups: ProvenanceGroup[], sortKey: string | undefined): ProvenanceGroup[] {
+function groupWithMembers(group: ProvenanceGroup, members: ProvenanceGroupMember[]): ProvenanceGroup {
+  return {
+    ...group,
+    members,
+    items: members.map((member) => member.item),
+  };
+}
+
+function groupSortValue(
+  group: ProvenanceGroup,
+  sortKey: string | undefined,
+  valueResolver: ProvenanceValueResolver,
+): string | undefined {
   if (!sortKey) {
-    return groups.map((group) => ({
-      ...group,
-      items: [...group.items].sort(compareItemsByParameter(undefined)),
-    }));
+    return undefined;
+  }
+
+  return group.members
+    .flatMap((member) => valueResolver(member.item, sortKey))
+    .filter((value) => value.trim())
+    .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }))[0];
+}
+
+function sortGroups(
+  groups: ProvenanceGroup[],
+  sortKey: string | undefined,
+  valueResolver: ProvenanceValueResolver = directValueResolver,
+): ProvenanceGroup[] {
+  if (!sortKey) {
+    return groups.map((group) => groupWithMembers(group, [...group.members].sort(compareMembersByParameter(undefined, valueResolver))));
   }
 
   return groups
-    .map((group) => ({
-      ...group,
-      items: [...group.items].sort(compareItemsByParameter(sortKey)),
-    }))
+    .map((group) => groupWithMembers(group, [...group.members].sort(compareMembersByParameter(sortKey, valueResolver))))
     .sort((left, right) => {
-      const leftValue = left.items.length === 0 ? undefined : getParameterValue(left.items[0], sortKey);
-      const rightValue = right.items.length === 0 ? undefined : getParameterValue(right.items[0], sortKey);
+      const leftValue = groupSortValue(left, sortKey, valueResolver);
+      const rightValue = groupSortValue(right, sortKey, valueResolver);
       const valueComparison = compareOptionalValues(leftValue, rightValue);
       return valueComparison !== 0
         ? valueComparison
@@ -510,17 +674,32 @@ function sortOptionsForLayer(parameterKeys: string[], groupingKeys: string[]): s
     .sort((left, right) => left.localeCompare(right, undefined, { numeric: true, sensitivity: "base" }));
 }
 
+function uniqueGroupItems(group: ProvenanceGroup): ProvenanceItem[] {
+  const itemsById = new Map<string, ProvenanceItem>();
+
+  group.members.forEach((member) => {
+    if (!itemsById.has(member.item.id)) {
+      itemsById.set(member.item.id, member.item);
+    }
+  });
+
+  return Array.from(itemsById.values());
+}
+
 export function classifyGroupConnection(
   sourceGroup: ProvenanceGroup,
   targetGroup: ProvenanceGroup,
   connections: ProvenanceConnection[],
 ): ConnectionCoverage {
-  if (sourceGroup.items.length === 0 || targetGroup.items.length === 0) {
+  const sourceItems = uniqueGroupItems(sourceGroup);
+  const targetItems = uniqueGroupItems(targetGroup);
+
+  if (sourceItems.length === 0 || targetItems.length === 0) {
     return "none";
   }
 
-  const sourceIds = new Set(sourceGroup.items.map((item) => item.id));
-  const targetIds = new Set(targetGroup.items.map((item) => item.id));
+  const sourceIds = new Set(sourceItems.map((item) => item.id));
+  const targetIds = new Set(targetItems.map((item) => item.id));
   const links = connections.filter(
     (connection) => sourceIds.has(connection.sourceId) && targetIds.has(connection.targetId),
   );
@@ -560,21 +739,22 @@ function hasParameter(item: ProvenanceItem, key: string): boolean {
   return item.parameters.some((parameter) => normalizeKey(parameter.key) === normalized);
 }
 
-function setParameter(item: ProvenanceItem, key: string, value: string): ProvenanceItem {
-  let replaced = false;
-  const normalized = normalizeKey(key);
-  const parameters = item.parameters.map((parameter) => {
-    if (normalizeKey(parameter.key) !== normalized) {
-      return parameter;
-    }
-
-    replaced = true;
-    return { ...parameter, value };
-  });
+function replaceParameterValue(
+  item: ProvenanceItem,
+  key: string,
+  oldValue: string,
+  newValue: string,
+): ProvenanceItem {
+  const normalizedKey = normalizeKey(key);
+  const normalizedOldValue = oldValue.trim().toLowerCase();
 
   return {
     ...item,
-    parameters: replaced ? parameters : [...parameters, { key, value }],
+    parameters: item.parameters.map((parameter) =>
+      normalizeKey(parameter.key) === normalizedKey && parameter.value.trim().toLowerCase() === normalizedOldValue
+        ? { ...parameter, key, value: newValue }
+        : parameter,
+    ),
   };
 }
 
@@ -583,24 +763,32 @@ export function updateParameterInGroup(
   connections: ProvenanceConnection[],
   group: ProvenanceGroup,
   key: string,
+  oldValue: string,
   value: string,
 ): ModelMutationResult<ProvenanceItem[]> {
   const trimmedKey = key.trim();
+  const trimmedOldValue = oldValue.trim();
   const trimmedValue = value.trim();
 
-  if (!trimmedKey || !trimmedValue) {
-    return { ok: false, error: "Enter both a parameter name and value." };
+  if (!trimmedKey || !trimmedOldValue || !trimmedValue) {
+    return { ok: false, error: "Choose a parameter value and enter its replacement." };
   }
 
   if (!group.items.some((item) => hasParameter(item, trimmedKey))) {
     return { ok: false, error: `Cannot update "${trimmedKey}" because it is not present in the selected group.` };
   }
 
-  const affectedIds = downstreamIds(connections, group.items.map((item) => item.id));
+  if (!group.items.some((item) => hasParameterValue(item, trimmedKey, trimmedOldValue))) {
+    return { ok: false, error: `Cannot update "${trimmedKey}: ${trimmedOldValue}" because it is not present in the selected group.` };
+  }
+
+  const affectedIds = downstreamIds(connections, uniqueGroupItems(group).map((item) => item.id));
 
   return {
     ok: true,
-    value: items.map((item) => (affectedIds.has(item.id) ? setParameter(item, trimmedKey, trimmedValue) : item)),
+    value: items.map((item) =>
+      affectedIds.has(item.id) ? replaceParameterValue(item, trimmedKey, trimmedOldValue, trimmedValue) : item,
+    ),
   };
 }
 
@@ -609,15 +797,18 @@ export function connectGroups(
   sourceGroup: ProvenanceGroup,
   targetGroup: ProvenanceGroup,
 ): ProvenanceConnection[] {
-  if (sourceGroup.items.length === 0 || targetGroup.items.length === 0) {
+  const sourceItems = uniqueGroupItems(sourceGroup);
+  const targetItems = uniqueGroupItems(targetGroup);
+
+  if (sourceItems.length === 0 || targetItems.length === 0) {
     return connections;
   }
 
   const nextConnections = [...connections];
   const existing = new Set(nextConnections.map(connectionKey));
 
-  sourceGroup.items.forEach((source) => {
-    targetGroup.items.forEach((target) => {
+  sourceItems.forEach((source) => {
+    targetItems.forEach((target) => {
       const next = { sourceId: source.id, targetId: target.id };
       const key = connectionKey(next);
 
@@ -629,6 +820,18 @@ export function connectGroups(
   });
 
   return nextConnections;
+}
+
+function connectionMatchesSharedGroupValues(sourceGroup: ProvenanceGroup, targetGroup: ProvenanceGroup): boolean {
+  const targetParts = new Map(targetGroup.labelParts.map((part) => [normalizeKey(part.key), part.value]));
+  const sharedParts = sourceGroup.labelParts.flatMap((sourcePart) => {
+    const targetValue = targetParts.get(normalizeKey(sourcePart.key));
+    return targetValue === undefined ? [] : [{ sourceValue: sourcePart.value, targetValue }];
+  });
+
+  return sharedParts.every(
+    (part) => part.sourceValue.trim().toLowerCase() === part.targetValue.trim().toLowerCase(),
+  );
 }
 
 function groupConnectionSummaries(
@@ -664,6 +867,10 @@ function connectionDetailsForGroups(
   const sourceItems = new Map(sourceGroup.items.map((item) => [item.id, item]));
   const targetItems = new Map(targetGroup.items.map((item) => [item.id, item]));
 
+  if (!connectionMatchesSharedGroupValues(sourceGroup, targetGroup)) {
+    return [];
+  }
+
   return connections
     .flatMap((connection) => {
       const source = sourceItems.get(connection.sourceId);
@@ -690,8 +897,8 @@ function parameterKeysForGroup(group: ProvenanceGroup): string[] {
   const keys: string[] = [];
   const seen = new Set<string>();
 
-  group.items.forEach((item) => {
-    item.parameters.forEach((parameter) => {
+  group.members.forEach((member) => {
+    member.item.parameters.forEach((parameter) => {
       const normalized = normalizeKey(parameter.key);
       if (!seen.has(normalized)) {
         seen.add(normalized);
@@ -717,13 +924,17 @@ function GroupEditor(props: {
   side: ProvenanceSide;
   onStartEditor: (editor: EditorState) => void;
   onCancel: () => void;
-  onSubmit: (side: ProvenanceSide, groupId: string, key: string, value: string) => void;
+  onSubmit: (side: ProvenanceSide, groupId: string, key: string, oldValue: string, value: string) => void;
 }) {
   const active = props.editor?.groupId === props.group.id && props.editor.side === props.side;
   const [keyDraft, setKeyDraft] = React.useState("");
+  const [oldValueDraft, setOldValueDraft] = React.useState("");
   const [valueDraft, setValueDraft] = React.useState("");
   const groupKeys = parameterKeysForGroup(props.group);
   const defaultUpdateKey = groupKeys[0] ?? "";
+  const valueOptions = uniqueValues(
+    props.group.members.flatMap((member) => (keyDraft ? getParameterValues(member.item, keyDraft) : [])),
+  );
 
   React.useEffect(() => {
     if (!active) {
@@ -731,8 +942,19 @@ function GroupEditor(props: {
     }
 
     setKeyDraft(defaultUpdateKey);
+    setOldValueDraft("");
     setValueDraft("");
   }, [active, defaultUpdateKey]);
+
+  React.useEffect(() => {
+    if (!active) {
+      return;
+    }
+
+    if (!valueOptions.some((value) => value === oldValueDraft)) {
+      setOldValueDraft(valueOptions[0] ?? "");
+    }
+  }, [active, oldValueDraft, valueOptions]);
 
   if (!active) {
     if (groupKeys.length === 0) {
@@ -762,7 +984,7 @@ function GroupEditor(props: {
       className="swt:flex swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-base-content/10 swt:bg-base-200 swt:p-2"
       onSubmit={(event) => {
         event.preventDefault();
-        props.onSubmit(props.side, props.group.id, keyDraft, valueDraft);
+        props.onSubmit(props.side, props.group.id, keyDraft, oldValueDraft, valueDraft);
       }}
     >
       <select
@@ -777,10 +999,22 @@ function GroupEditor(props: {
           </option>
         ))}
       </select>
+      <select
+        className="swt:select swt:select-xs swt:w-full"
+        data-testid="ProvenanceGrouping-update-old-value-select"
+        value={oldValueDraft}
+        onChange={(event) => setOldValueDraft(event.currentTarget.value)}
+      >
+        {valueOptions.map((value) => (
+          <option key={value} value={value}>
+            {value}
+          </option>
+        ))}
+      </select>
       <input
         className="swt:input swt:input-xs swt:w-full"
         data-testid="ProvenanceGrouping-param-value-input"
-        placeholder="Value"
+        placeholder="Replacement value"
         value={valueDraft}
         onChange={(event) => setValueDraft(event.currentTarget.value)}
       />
@@ -872,6 +1106,7 @@ function ParameterRail(props: {
   groups: ProvenanceGroup[];
   entries: ParameterRailEntry[];
   parameterValues: Record<string, string[]>;
+  valueResolver: ProvenanceValueResolver;
   onToggleGrouping: (side: ProvenanceSide, key: string) => void;
   onMoveParameter: (key: string, side: ProvenanceSide) => void;
   onCreateParameter: (side: ProvenanceSide, key: string) => void;
@@ -921,6 +1156,7 @@ function ParameterRail(props: {
               props.groups,
               entry.key,
               props.parameterValues[entry.key] ?? [],
+              props.valueResolver,
             );
 
             return (
@@ -1104,17 +1340,47 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
   const rightGroupingKeys = props.groupingByLayer[props.rightLayerId] ?? [];
   const leftParameterValues = parameterValueConfigForLayer(props.parameterValuesByLayer, props.leftLayerId);
   const rightParameterValues = parameterValueConfigForLayer(props.parameterValuesByLayer, props.rightLayerId);
-  const leftParameterKeys = mergeKeys(availableParameterKeys(props.items, props.leftLayerId), configuredKeys(leftParameterValues));
+  const connectionDerivedLeftKeys = connectionDerivedParameterKeys(
+    props.items,
+    props.connections,
+    props.leftLayerId,
+    props.rightLayerId,
+  );
+  const physicalLeftParameterKeys = mergeKeys(availableParameterKeys(props.items, props.leftLayerId), configuredKeys(leftParameterValues));
+  const leftParameterKeys = mergeKeys(physicalLeftParameterKeys, connectionDerivedLeftKeys);
   const rightParameterKeys = mergeKeys(availableParameterKeys(props.items, props.rightLayerId), configuredKeys(rightParameterValues));
   const leftSortOptions = sortOptionsForLayer(leftParameterKeys, leftGroupingKeys);
   const rightSortOptions = sortOptionsForLayer(rightParameterKeys, rightGroupingKeys);
   const leftSortKey = canonicalKey(leftSortOptions, props.sortingByLayer?.[props.leftLayerId]);
   const rightSortKey = canonicalKey(rightSortOptions, props.sortingByLayer?.[props.rightLayerId]);
-  const leftGroups = sortGroups(buildGroups(props.items, props.leftLayerId, leftGroupingKeys), leftSortKey);
-  const rightGroups = sortGroups(buildGroups(props.items, props.rightLayerId, rightGroupingKeys), rightSortKey);
+  const leftValueResolver = createAdjacentValueResolver(
+    props.items,
+    props.connections,
+    props.leftLayerId,
+    props.rightLayerId,
+    "left",
+  );
+  const rightValueResolver = createAdjacentValueResolver(
+    props.items,
+    props.connections,
+    props.rightLayerId,
+    props.leftLayerId,
+    "right",
+  );
+  const leftGroups = sortGroups(
+    buildGroups(props.items, props.leftLayerId, leftGroupingKeys, leftValueResolver),
+    leftSortKey,
+    leftValueResolver,
+  );
+  const rightGroups = sortGroups(
+    buildGroups(props.items, props.rightLayerId, rightGroupingKeys, rightValueResolver),
+    rightSortKey,
+    rightValueResolver,
+  );
   const parameterRails = buildParameterRailEntries(
-    leftParameterKeys,
+    physicalLeftParameterKeys,
     rightParameterKeys,
+    connectionDerivedLeftKeys,
     leftGroupingKeys,
     rightGroupingKeys,
     props.parameterRailByKey,
@@ -1129,7 +1395,15 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
         )
       : undefined;
   const valueGroupConnections = [
-    ...valueGroupConnectionsForRail("left", props.leftLayerId, parameterRails.left, props.items, leftGroups, leftParameterValues),
+    ...valueGroupConnectionsForRail(
+      "left",
+      props.leftLayerId,
+      parameterRails.left,
+      props.items,
+      leftGroups,
+      leftParameterValues,
+      leftValueResolver,
+    ),
     ...valueGroupConnectionsForRail(
       "right",
       props.rightLayerId,
@@ -1137,6 +1411,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
       props.items,
       rightGroups,
       rightParameterValues,
+      rightValueResolver,
     ),
   ];
 
@@ -1352,7 +1627,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           <div className="swt:min-w-0">
             <h3 className="swt:text-sm swt:font-semibold swt:leading-5">{group.label}</h3>
             <div className="swt:mt-1 swt:text-xs swt:text-base-content/60">
-              {group.items.length} {group.items.length === 1 ? "entry" : "entries"}
+              {group.members.length} {group.members.length === 1 ? "entry" : "entries"}
             </div>
           </div>
           <div className="swt:flex swt:shrink-0 swt:gap-1">
@@ -1387,8 +1662,8 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           side={side}
           onCancel={() => setEditor(undefined)}
           onStartEditor={setEditor}
-          onSubmit={(submitSide, groupId, key, value) => {
-            props.onUpdateParameter(submitSide, groupId, key, value);
+          onSubmit={(submitSide, groupId, key, oldValue, value) => {
+            props.onUpdateParameter(submitSide, groupId, key, oldValue, value);
             setEditor(undefined);
           }}
         />
@@ -1397,19 +1672,22 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
             className="swt:flex swt:max-h-64 swt:flex-col swt:gap-2 swt:overflow-auto swt:rounded swt:border swt:border-base-content/10 swt:bg-base-200 swt:p-2"
             data-testid="ProvenanceGrouping-group-inline-detail"
           >
-            {group.items.map((item) => (
+            {group.members.map((member) => (
               <div
                 className="swt:rounded swt:bg-base-100 swt:p-2 swt:text-xs"
-                data-provenance-item-node={itemNodeId(side, item.id)}
-                key={item.id}
+                data-provenance-item-node={itemNodeId(side, member.item.id)}
+                key={member.membershipId}
               >
-                <div className="swt:font-medium">{item.name}</div>
+                <div className="swt:font-medium">{member.item.name}</div>
                 <div className="swt:mt-1 swt:flex swt:flex-wrap swt:gap-1">
-                  {item.parameters.length === 0 ? (
+                  {member.item.parameters.length === 0 ? (
                     <span className="swt:text-base-content/60">No parameters</span>
                   ) : (
-                    item.parameters.map((parameter) => (
-                      <span className="swt:badge swt:badge-outline swt:badge-sm" key={`${item.id}-${parameter.key}`}>
+                    member.item.parameters.map((parameter, parameterIndex) => (
+                      <span
+                        className="swt:badge swt:badge-outline swt:badge-sm"
+                        key={`${member.membershipId}-${parameter.key}-${parameter.value}-${parameterIndex}`}
+                      >
                         {parameter.key}: {parameter.value}
                       </span>
                     ))
@@ -1639,6 +1917,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           layer={leftLayer}
           parameterValues={leftParameterValues}
           side="left"
+          valueResolver={leftValueResolver}
           onCreateParameter={props.onCreateParameter}
           onCreateParameterValue={props.onCreateParameterValue}
           onMoveParameter={props.onMoveParameter}
@@ -1720,6 +1999,7 @@ export function ProvenanceGrouping(props: ProvenanceGroupingProps): React.ReactE
           layer={rightLayer}
           parameterValues={rightParameterValues}
           side="right"
+          valueResolver={rightValueResolver}
           onCreateParameter={props.onCreateParameter}
           onCreateParameterValue={props.onCreateParameterValue}
           onMoveParameter={props.onMoveParameter}

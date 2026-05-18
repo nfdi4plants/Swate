@@ -3,8 +3,10 @@ import type { Meta, StoryObj } from "@storybook/react-vite";
 import { expect, userEvent, waitFor, within } from "storybook/test";
 import {
   ProvenanceGrouping,
+  addParameterValue,
   buildGroups,
   connectGroups,
+  createAdjacentValueResolver,
   updateParameterInGroup,
   type ProvenanceConnection,
   type ProvenanceDetail,
@@ -95,6 +97,7 @@ const initialItems: ProvenanceItem[] = [
     parameters: [
       { key: "Species", value: "Arabidopsis" },
       { key: "Temperature", value: "12 C" },
+      { key: "Replicate", value: "1" },
       { key: "Replicate", value: "2" },
       { key: "Analysis", value: "Mass Spectrometry" },
     ],
@@ -177,38 +180,29 @@ function removeGroupingKey(keys: string[], key: string): string[] {
 
 function findGroup(
   items: ProvenanceItem[],
+  connections: ProvenanceConnection[],
   layerId: string,
+  connectedLayerId: string,
+  side: Side,
   groupingKeys: string[],
   groupId: string,
 ): ProvenanceGroup | undefined {
-  return buildGroups(items, layerId, groupingKeys).find((group) => group.id === groupId);
+  return buildGroups(
+    items,
+    layerId,
+    groupingKeys,
+    createAdjacentValueResolver(items, connections, layerId, connectedLayerId, side),
+  ).find((group) => group.id === groupId);
 }
 
 function findVisibleGroup(model: MockModel, side: Side, groupId: string): ProvenanceGroup | undefined {
   const layerId = side === "left" ? model.leftLayerId : model.rightLayerId;
-  return findGroup(model.items, layerId, model.groupingByLayer[layerId] ?? [], groupId);
+  const connectedLayerId = side === "left" ? model.rightLayerId : model.leftLayerId;
+  return findGroup(model.items, model.connections, layerId, connectedLayerId, side, model.groupingByLayer[layerId] ?? [], groupId);
 }
 
-function parameterMap(item: ProvenanceItem): Map<string, string> {
-  return new Map(item.parameters.map((parameter) => [parameter.key.toLowerCase(), parameter.value]));
-}
-
-function setItemParameter(item: ProvenanceItem, key: string, value: string): ProvenanceItem {
-  const normalized = normalizedKey(key);
-  let replaced = false;
-  const parameters = item.parameters.map((parameter) => {
-    if (normalizedKey(parameter.key) !== normalized) {
-      return parameter;
-    }
-
-    replaced = true;
-    return { ...parameter, key, value };
-  });
-
-  return {
-    ...item,
-    parameters: replaced ? parameters : [...parameters, { key, value }],
-  };
+function parameterValueSet(item: ProvenanceItem): Set<string> {
+  return new Set(item.parameters.map((parameter) => `${normalizedKey(parameter.key)}\u0000${parameter.value.trim().toLowerCase()}`));
 }
 
 function addCatalogParameter(
@@ -258,21 +252,26 @@ function copyMissingSourceParameters(
   targetGroup: ProvenanceGroup,
 ): ProvenanceItem[] {
   const sourceParameters = new Map<string, { key: string; value: string }>();
-  sourceGroup.items.forEach((item) => {
+  const sourceItems = uniqueGroupItems(sourceGroup);
+  const targetItems = uniqueGroupItems(targetGroup);
+
+  sourceItems.forEach((item) => {
     item.parameters.forEach((parameter) => {
-      const normalizedKey = parameter.key.toLowerCase();
-      if (!sourceParameters.has(normalizedKey)) {
-        sourceParameters.set(normalizedKey, parameter);
+      const normalized = `${normalizedKey(parameter.key)}\u0000${parameter.value.trim().toLowerCase()}`;
+      if (!sourceParameters.has(normalized)) {
+        sourceParameters.set(normalized, parameter);
       }
     });
   });
 
+  const sourceIds = new Set(sourceItems.map((item) => item.id));
+  const targetIds = new Set(targetItems.map((item) => item.id));
   const connectedTargetIds = new Set(
     connections
       .filter(
         (connection) =>
-          sourceGroup.items.some((item) => item.id === connection.sourceId) &&
-          targetGroup.items.some((item) => item.id === connection.targetId),
+          sourceIds.has(connection.sourceId) &&
+          targetIds.has(connection.targetId),
       )
       .map((connection) => connection.targetId),
   );
@@ -282,15 +281,27 @@ function copyMissingSourceParameters(
       return item;
     }
 
-    const existing = parameterMap(item);
+    const existing = parameterValueSet(item);
     const inherited = Array.from(sourceParameters.values()).filter(
-      (parameter) => !existing.has(parameter.key.toLowerCase()),
+      (parameter) => !existing.has(`${normalizedKey(parameter.key)}\u0000${parameter.value.trim().toLowerCase()}`),
     );
 
     return inherited.length === 0
       ? item
       : { ...item, parameters: [...item.parameters, ...inherited] };
   });
+}
+
+function uniqueGroupItems(group: ProvenanceGroup): ProvenanceItem[] {
+  const itemsById = new Map<string, ProvenanceItem>();
+
+  group.members.forEach((member) => {
+    if (!itemsById.has(member.item.id)) {
+      itemsById.set(member.item.id, member.item);
+    }
+  });
+
+  return Array.from(itemsById.values());
 }
 
 function downstreamIds(connections: ProvenanceConnection[], startIds: string[]): Set<string> {
@@ -386,6 +397,17 @@ function StatefulMockup() {
       }
 
       const layerId = side === "left" ? current.leftLayerId : current.rightLayerId;
+      const layerCatalog = current.parameterValuesByLayer[layerId] ?? {};
+      const duplicateCatalogKey = Object.keys(layerCatalog).some(
+        (candidate) => normalizedKey(candidate) === normalizedKey(trimmedKey),
+      );
+      const duplicateItemKey = current.items
+        .filter((item) => item.layerId === layerId)
+        .some((item) => item.parameters.some((parameter) => normalizedKey(parameter.key) === normalizedKey(trimmedKey)));
+
+      if (duplicateCatalogKey || duplicateItemKey) {
+        return { ...current, error: `Parameter "${trimmedKey}" already exists. Choose another parameter name.` };
+      }
 
       return {
         ...current,
@@ -427,12 +449,12 @@ function StatefulMockup() {
 
       const affectedIds = downstreamIds(
         current.connections,
-        group.items.map((item) => item.id),
+        uniqueGroupItems(group).map((item) => item.id),
       );
 
       return {
         ...current,
-        items: current.items.map((item) => (affectedIds.has(item.id) ? setItemParameter(item, key, value) : item)),
+        items: current.items.map((item) => (affectedIds.has(item.id) ? addParameterValue(item, key, value) : item)),
         parameterValuesByLayer: addCatalogValue(current.parameterValuesByLayer, layerId, key, value),
         error: undefined,
       };
@@ -475,14 +497,14 @@ function StatefulMockup() {
     });
   };
 
-  const updateParameter = (side: Side, groupId: string, key: string, value: string) => {
+  const updateParameter = (side: Side, groupId: string, key: string, oldValue: string, value: string) => {
     setModel((current) => {
       const group = findVisibleGroup(current, side, groupId);
       if (!group) {
         return { ...current, error: "The selected group no longer exists." };
       }
 
-      const result = updateParameterInGroup(current.items, current.connections, group, key, value);
+      const result = updateParameterInGroup(current.items, current.connections, group, key, oldValue, value);
       return result.ok
         ? { ...current, items: result.value, error: undefined }
         : { ...current, error: result.error };
@@ -763,6 +785,38 @@ export const GroupedConnectionDetails: Story = {
   },
 };
 
+export const MultiValueAndConnectionDerivedControls: Story = {
+  name: "Multi-value and connection-derived controls",
+  render: () => <StatefulMockup />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByTestId("ProvenanceGrouping-root")).toBeInTheDocument();
+
+    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-right-Analysis-move"));
+    await userEvent.click(await canvas.findByTestId("ProvenanceGrouping-param-left-Analysis"));
+    await waitFor(() => {
+      expect(canvasElement).toHaveTextContent("Analysis: Mass Spectrometry");
+      expect(canvasElement).toHaveTextContent("Analysis: LC-MS");
+    });
+
+    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Replicate-move"));
+    await userEvent.click(await canvas.findByTestId("ProvenanceGrouping-param-right-Replicate"));
+
+    const replicate1Group = await canvas.findByTestId(/ProvenanceGrouping-group-right-.*Replicate-1/);
+    const replicate2Group = await canvas.findByTestId(/ProvenanceGrouping-group-right-.*Replicate-2/);
+    await userEvent.click(within(replicate1Group).getByTestId("ProvenanceGrouping-group-details"));
+    await waitFor(() => {
+      expect(replicate1Group).toHaveTextContent("Output B");
+    });
+
+    await userEvent.click(within(replicate2Group).getByTestId("ProvenanceGrouping-group-details"));
+    await waitFor(() => {
+      expect(replicate2Group).toHaveTextContent("Output B");
+    });
+  },
+};
+
 export const SortByNonGroupingParameter: Story = {
   name: "Sort by non-grouping parameter",
   render: () => <StatefulMockup />,
@@ -777,8 +831,7 @@ export const SortByNonGroupingParameter: Story = {
         canvasElement.querySelectorAll('[data-testid^="ProvenanceGrouping-group-left-"] h3'),
       ).map((element) => element.textContent ?? "");
 
-      expect(labels.slice(0, 2).every((label) => label.includes("Temperature: 12 C"))).toBe(true);
-      expect(labels.slice(2).every((label) => label.includes("Temperature: 24 C"))).toBe(true);
+      expect(labels).toEqual(["Input A", "Input B", "Input C", "Input D"]);
     });
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-param-left-Species"));
