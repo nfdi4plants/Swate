@@ -20,7 +20,7 @@
 - Create `src/Components/src/ProvenanceGrouping/Edit.fs`
   - Edit commands, validation, and writeback patch output.
 - Create `src/Components/src/ProvenanceGrouping/Fixtures.fs`
-  - F# sample data for the mockup story and focused manual checks.
+  - F# sample data for the mockup story and loaded-table context checks.
 - Modify `src/Components/src/Swate.Components.fsproj`
   - Add the new `.fs` files in compile order before any component file that consumes them.
 - Later modify the existing Storybook preview
@@ -72,7 +72,11 @@ type ProvenanceTableKind =
     | Study
     | Assay
     | Run
-    | Generated
+
+[<RequireQualifiedAccess>]
+type ProvenanceTableRole =
+    | LoadedTable
+    | PreviousContext
 
 [<RequireQualifiedAccess>]
 type ProvenanceEntryKind =
@@ -113,6 +117,7 @@ type ProvenanceTable =
         Id: ProvenanceTableId
         Name: string
         Kind: ProvenanceTableKind
+        Role: ProvenanceTableRole
         Origin: ProvenanceOrigin
         PreviousTableId: ProvenanceTableId option
     }
@@ -174,6 +179,7 @@ type ProvenancePropertyValue =
 
 type ProvenanceModel =
     {
+        LoadedTableId: ProvenanceTableId
         Tables: Map<ProvenanceTableId, ProvenanceTable>
         Entries: Map<ProvenanceEntryId, ProvenanceEntry>
         Processes: Map<ProvenanceProcessId, ProvenanceProcess>
@@ -199,12 +205,15 @@ Expected: the project compiles with the new type file.
 - Modify `src/Components/src/Swate.Components.fsproj`
 
 - [ ] Define `ImportedEntry`, `ImportedProperty`, `ImportedProcess`, `ImportedTable`, and `ImportResult`.
-- [ ] Implement `fromImportedTables : ImportedTable list -> ImportResult`.
+- [ ] Implement `fromImportedTables : loadedTableId: ProvenanceTableId -> tables: ImportedTable list -> ImportResult`.
+- [ ] Require exactly one imported table with `Role = ProvenanceTableRole.LoadedTable` and make its ID match `loadedTableId`.
+- [ ] Allow any number of imported tables with `Role = ProvenanceTableRole.PreviousContext`.
 - [ ] Generate one item-level `ProvenanceConnection` for each imported process input/output pair.
 - [ ] For process-scoped parameters, default `AssignedEntryIds` to all input and output IDs.
 - [ ] For entry-scoped values, require explicit assigned entries and emit warnings when missing.
 - [ ] Merge repeated entries by ID and accumulate their table IDs.
 - [ ] Preserve every property value occurrence, including repeated values with the same category on the same entry.
+- [ ] Preserve previous-context property values with their original source table/header/process metadata.
 
 Important ARCtrl mapping notes for adapter authors:
 
@@ -233,12 +242,15 @@ Expected: import module compiles and has no ARCtrl imports.
 - [ ] Define `ProvenanceSide`, `GroupingKey`, `DisplayMember`, `DisplayGroup`, and `DisplayConnection`.
 - [ ] Implement selectors:
   - `propertiesForEntry`
+  - `upstreamPropertiesForLoadedEntry`
   - `propertyValuesForEntry`
   - `groupingKeysForSide`
   - `displayGroups`
   - `displayConnections`
   - `sortDisplayGroups`
-- [ ] With no grouping keys, return one display group per entry.
+- [ ] Build visible input and output groups only from the loaded table.
+- [ ] Include previous-context property values for a loaded-table entry when they belong to that entry or to upstream entries connected to it by previous-context processes.
+- [ ] With no grouping keys, return one display group per loaded-table entry.
 - [ ] When grouping by a key, group by actual property values only.
 - [ ] Do not create a "missing" group for entries without the grouped property.
 - [ ] Duplicate an entry into multiple display groups when it has multiple values for the grouped key.
@@ -274,15 +286,15 @@ Expected: grouping module compiles.
 - [ ] Define `ProvenanceTablePatch`.
 - [ ] Define edit command records for:
   - update existing property value
-  - create property value in current scope
+  - create property value in the loaded table
   - assign existing value to group members
   - connect groups
-  - create downstream table from selected entries
+  - create loaded-table layer/process from selected entries
 - [ ] Implement `updatePropertyValue`.
-- [ ] Implement `createPropertyValueInCurrentScope`.
+- [ ] Implement `createPropertyValueInLoadedTable`.
 - [ ] Implement `assignPropertyValueToEntries`.
 - [ ] Implement `connectGroups`.
-- [ ] Implement `createDownstreamTableFromSelection`.
+- [ ] Implement `createLoadedTableLayerFromSelection`.
 
 Patch shape:
 
@@ -325,8 +337,6 @@ type ProvenanceTablePatch =
         processId: ProvenanceProcessId *
         sourceEntryId: ProvenanceEntryId *
         targetEntryId: ProvenanceEntryId
-    | AddTable of ProvenanceTable
-
 type EditResult =
     Result<ProvenanceModel * ProvenanceTablePatch list, EditError>
 ```
@@ -336,11 +346,11 @@ Rules to implement:
 - Existing value edits overwrite existing propagated values on connected outputs when the edited occurrence already exists there.
 - Adding a new property header with an existing name and kind returns `DuplicateHeader`.
 - Adding a new value under an existing header is valid.
-- Current-scope additions are allowed for the loaded table and generated downstream tables.
-- Previous-table additions are allowed only for selected existing entries with compatible process/table context.
-- Previous-table edits must never invent rows, inputs, outputs, or process connections.
+- New property values, headers, connections, and layer/process additions are allowed only in the loaded table.
+- Previous-context property values can be edited only when the selected existing occurrence has compatible process/table context.
+- Previous-context edits must never create property values, headers, rows, inputs, outputs, or process connections.
 - Group-to-group connection commands either create the required item-level connections or return an explicit error.
-- Creating a new downstream layer uses every selected entry, including mixed input and output selections, as the new layer's inputs.
+- Creating a new loaded-table layer/process uses every selected entry, including mixed input and output selections, as the new layer's inputs.
 
 Validation:
 
@@ -367,7 +377,8 @@ Expected: edit module compiles.
   - Input A -> Output B
   - Input B -> Output B
   - Input C -> Output C
-- [ ] Include a mixed selection fixture for downstream layer creation.
+- [ ] Include a previous-context table whose output properties are visible for loaded-table input grouping.
+- [ ] Include a mixed selection fixture for loaded-table layer creation.
 
 Validation:
 
@@ -408,10 +419,12 @@ Manual preview checks:
 - Grouping by a property groups by values and ignores non-grouping properties.
 - Missing values do not create a missing-value group.
 - Entries with multiple values appear in multiple groups.
+- Previous-context property values can be used for grouping loaded-table entries.
+- Adding a new property value writes to the loaded table only.
 - Sorting works inside groups and on individual ungrouped items.
 - Dragging a property value to a group assigns the value to all members.
 - Clicking a group connection line expands both groups and shows only actual item-level connections.
-- New downstream layer uses every selected entry, including mixed input/output selections.
+- New loaded-table layer uses every selected entry, including mixed input/output selections.
 
 ---
 

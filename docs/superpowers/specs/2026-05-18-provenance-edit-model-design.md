@@ -11,14 +11,14 @@ The ARCtrl process list is a semantic reference. The Swate model must not expose
 Build a Swate-owned provenance edit model that can:
 
 - Represent loaded study, assay, or run tables.
-- Represent downstream tables created during the viewer workflow.
+- Represent previous study, assay, or run tables as provenance context for the loaded table.
 - Preserve process-level input/output connections.
 - Preserve repeated property value occurrences.
 - Support grouped table/block display without graph layout.
 - Support bulk edits, connection edits, new layers, sorting, and grouping.
 - Produce explicit writeback patches that a caller can later apply to ARC tables.
 
-The viewer opens from one loaded study, assay, or run table. New additions in that table and later generated tables are allowed. Previous-table edits are allowed only where the selected existing entries already have a compatible backing process/table location.
+The viewer opens one loaded study, assay, or run table. That loaded table provides the visible input and output sides. Previous tables may be imported with it so their provenance properties can be used for grouping and existing-value edits. New additions are written only to the loaded table.
 
 ## ARCtrl Reference Read
 
@@ -124,7 +124,11 @@ type ProvenanceTableKind =
     | Study
     | Assay
     | Run
-    | Generated
+
+[<RequireQualifiedAccess>]
+type ProvenanceTableRole =
+    | LoadedTable
+    | PreviousContext
 
 [<RequireQualifiedAccess>]
 type ProvenanceEntryKind =
@@ -165,6 +169,7 @@ type ProvenanceTable =
         Id: ProvenanceTableId
         Name: string
         Kind: ProvenanceTableKind
+        Role: ProvenanceTableRole
         Origin: ProvenanceOrigin
         PreviousTableId: ProvenanceTableId option
     }
@@ -226,6 +231,7 @@ type ProvenancePropertyValue =
 
 type ProvenanceModel =
     {
+        LoadedTableId: ProvenanceTableId
         Tables: Map<ProvenanceTableId, ProvenanceTable>
         Entries: Map<ProvenanceEntryId, ProvenanceEntry>
         Processes: Map<ProvenanceProcessId, ProvenanceProcess>
@@ -233,6 +239,18 @@ type ProvenanceModel =
         Properties: Map<ProvenancePropertyValueId, ProvenancePropertyValue>
     }
 ```
+
+## Loaded Table And Previous Context
+
+The model has exactly one loaded table per viewer session.
+
+- The loaded table is the only table whose inputs and outputs are rendered as the main editable left/right sides.
+- Previous tables are imported as provenance context. They can contribute property values to grouping controls and display groups when their entries or processes are upstream of the loaded table entries.
+- Previous context properties keep their original `Source.TableId`, `HeaderName`, `HeaderKind`, and `ProcessId`.
+- Existing previous-context values can be edited only when their source points to an existing compatible process/table location.
+- New property values, new headers, new connections, and new layer/process additions are written only to the loaded table.
+
+This is not a "focused table among many equivalent tables" model. The loaded table is the edit target; previous tables are retained provenance context.
 
 ## Property Semantics
 
@@ -322,6 +340,7 @@ type ImportedTable =
         Id: ProvenanceTableId
         Name: string
         Kind: ProvenanceTableKind
+        Role: ProvenanceTableRole
         Origin: ProvenanceOrigin
         PreviousTableId: ProvenanceTableId option
         Processes: ImportedProcess list
@@ -332,6 +351,8 @@ type ImportResult =
         Model: ProvenanceModel
         Warnings: string list
     }
+
+val fromImportedTables : loadedTableId: ProvenanceTableId -> tables: ImportedTable list -> ImportResult
 ```
 
 An ARCtrl caller can map `Process list` to these records before calling the model import function:
@@ -347,6 +368,8 @@ An ARCtrl caller can map `Process list` to these records before calling the mode
 ## Grouping Projection
 
 The display layer is derived from the normalized model.
+
+Only the loaded table creates the main input and output display groups. Previous context tables do not create additional visible table columns by themselves. Their property values are projected onto loaded-table entries through shared entries and upstream process connections so they can be used for grouping, sorting, parameter controls, and existing-value editing.
 
 ```fsharp
 module Swate.Components.ProvenanceGrouping.Grouping
@@ -397,6 +420,7 @@ Grouping behavior:
 - Missing values do not create a "missing" group.
 - Non-grouped properties are ignored for group identity.
 - Sorting by a non-grouped property sorts members inside groups. With no groups, it sorts the individual item groups.
+- A group's available property values may include values sourced from previous context tables, but only if they are upstream provenance for the loaded-table entry.
 
 Connection behavior:
 
@@ -430,29 +454,30 @@ Existing value edits:
 - Produce an update patch.
 - If this is a change to an existing parameter value, connected outputs that already carry the propagated occurrence are overwritten.
 
-New value creation in current scope:
+New value creation in the loaded table:
 
-- Allowed in the loaded table and generated downstream tables.
+- Allowed only in the loaded table.
 - Creates new property occurrences.
 - If the requested header already exists, add values under that header.
 - If the requested header does not exist, add the header and values.
 - If the user asks to create a new property header with a duplicate name and kind, return an explicit duplicate-header error.
 
-Previous-table edits:
+Previous-context edits:
 
 - Allowed only for existing entries with a compatible source table and process context.
 - Must not invent rows, inputs, outputs, or process connections in previous tables.
 - If the selected entries do not share a valid backing process/table location, return an explicit error.
+- Must never create a new property value or new header in a previous table.
 
 Connection edits:
 
 - The model stores item-level connections.
-- Dragging group-to-group creates all item-level connections required by that operation or returns an error if the operation cannot be represented without partial state.
+- Dragging group-to-group creates all item-level connections required in the loaded table or returns an error if the operation cannot be represented without partial state.
 - Fan-in and fan-out are allowed: one input may connect to many outputs, and one output may connect to many inputs.
 
 Layer creation:
 
-- Creating a downstream layer uses the current selection as the new layer's inputs.
+- Creating a new layer/process inside the loaded table uses the current selection as the new layer's inputs.
 - The selection may contain a mix of entries currently shown on input and output sides.
 - If nothing is selected, the UI may use the current right-side outputs as the default, but this is a UI policy rather than a model requirement.
 
@@ -503,7 +528,6 @@ type ProvenanceTablePatch =
         processId: ProvenanceProcessId *
         sourceEntryId: ProvenanceEntryId *
         targetEntryId: ProvenanceEntryId
-    | AddTable of ProvenanceTable
 
 type EditResult =
     Result<ProvenanceModel * ProvenanceTablePatch list, EditError>
@@ -516,6 +540,6 @@ Patch application remains outside the reusable component. It may use ARCtrl, ano
 - No direct ARCtrl types in the public Swate model.
 - No graph visualization.
 - No row index or column position in the normalized source model.
-- No creation of new entries in previous tables.
+- No creation of new property values, entries, rows, or connections in previous context tables.
 - No automatic ontology lookup.
 - No production ARC writeback implementation in the first model pass.
