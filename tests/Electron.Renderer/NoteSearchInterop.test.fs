@@ -3,7 +3,7 @@ module ElectronRenderer.NoteSearchInteropTests
 open System
 open ARCtrl
 open ARCtrl.Json
-open Swate.Components.NoteTypes
+open Swate.Components.Composite.NoteTypes
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Vitest
 
@@ -23,7 +23,7 @@ let private expectTag (tag: OntologyAnnotation) (expectedName: string) (expected
     Vitest.expect(tag.TermSourceREF).toEqual(expectedSource)
     Vitest.expect(tag.TermAccessionNumber).toEqual(expectedAccession)
 
-let private expectTagsCount (count: int) (note: Swate.Components.NoteTypes.Note) =
+let private expectTagsCount (count: int) (note: Note) =
     match note.Tags with
     | Some tags -> Vitest.expect(tags.Count).toBe(count)
     | None -> failwith "Expected tags to be present."

@@ -1,4 +1,4 @@
-namespace Swate.Components.Widgets
+namespace Swate.Components.Composite.Widgets
 
 open ARCtrl
 open Fable.Core
@@ -7,7 +7,8 @@ open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Shared
 open Swate.Components.Primitive
-open Swate.Components.AnnotationTable.Context
+open Swate.Components.Primitive.Buttons
+open Swate.Components.Composite.AnnotationTable.Context
 
 /// This context is designed to be used only internally in this file.
 module private FilePickerWidgetContext =
@@ -453,7 +454,7 @@ type FilePickerWidget =
             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-sm"
             prop.children [
                 if isLoading then
-                    Components.LoadingSpinner("Loading Paths...", DaisyuiSize.LG)
+                    Buttons.LoadingSpinner("Loading Paths...", DaisyuiSize.LG)
                 else if hasPaths then
                     let canInsert = hasActiveTableView && selectedCells.IsSome && hasPaths
 

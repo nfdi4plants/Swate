@@ -1,12 +1,13 @@
-namespace Swate.Components.ArcFileEditor
+namespace Swate.Components.Page.ArcFileEditor
 
 open Feliz
 open Fable.Core
 open ARCtrl
-open Swate.Components.ArcFileEditor.Types
+open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Shared
 open Swate.Components
 open Swate.Components.JsBindings
+open Swate.Components.Primitive.ContextMenu.Types
 open Fable.Core.JsInterop
 
 module private ArcFileFooterTabsHelper =
@@ -241,7 +242,7 @@ type ArcFileFooterTabs =
 
                 match activeView with
                 | Some(ActiveView.Table index) -> [
-                    Swate.Components.ContextMenuItem(
+                    ContextMenuItem(
                         Html.span "Rename Table",
                         icon =
                             Html.i [
@@ -249,7 +250,7 @@ type ArcFileFooterTabs =
                             ],
                         onClick = rename index
                     )
-                    Swate.Components.ContextMenuItem(
+                    ContextMenuItem(
                         Html.span "Delete Table",
                         icon =
                             Html.i [
@@ -261,7 +262,11 @@ type ArcFileFooterTabs =
                 | _ -> []
 
 
-        Swate.Components.ContextMenu.ContextMenu(children, ref = elementRef, onSpawn = ContextMenu.onSpawn elementRef)
+        Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
+            children,
+            ref = elementRef,
+            onSpawn = ContextMenu.onSpawn elementRef
+        )
 
     [<ReactComponent>]
     static member DragAndDropContainer(tableIds: ResizeArray<string>, handleDragEnd, children: ReactElement) =
@@ -514,3 +519,4 @@ type ArcFileFooterTabs =
                 ]
             ]
         ]
+

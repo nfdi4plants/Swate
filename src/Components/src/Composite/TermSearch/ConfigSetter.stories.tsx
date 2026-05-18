@@ -9,7 +9,7 @@ const SETTER_DEBUG_TESTID = "term-search-config-setter"
 const SETTER_TRIGGER_TESTID = "term-search-config-setter-tib-trigger"
 
 const meta = {
-  title: "Components/TermSearch/TermSearchConfigSetter",
+  title: "Composite Components/TermSearch/TermSearchConfigSetter",
   tags: ["autodocs"],
   parameters: {
     // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout

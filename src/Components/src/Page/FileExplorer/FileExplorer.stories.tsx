@@ -10,7 +10,7 @@ import {
   FileTree_createFile,
   FileTree_createFolder,
 } from "./Types.fs.js";
-import { ofArray } from "../fable_modules/fable-library-ts.5.0.0-alpha.21/List.ts";
+import { ofArray } from "../../fable_modules/fable-library-ts.5.0.0-alpha.21/List.ts";
 
 const arcCreateItems = [
   { label: "Add Study", path: "studies/NewStudy/isa.study.xlsx" },
@@ -36,7 +36,6 @@ const InMemoryCreateFileExplorer = () => {
                   item.label,
                   "swt:fluent--document-add-24-regular",
                   () => setPendingPath(item.path),
-                  undefined,
                   undefined,
                 ),
             ),
@@ -152,7 +151,7 @@ const LfsContextMenuFileExplorer = () => {
 };
 
 const meta: Meta<typeof FileExplorerExample> = {
-  title: "Components/FileExplorer",
+  title: "Page Components/FileExplorer",
   component: FileExplorerExample,
   parameters: {
     layout: "fullscreen",

@@ -20,7 +20,7 @@ const FullSizeArcEditor = () => {
 
 
 const meta = {
-  title: 'Components/ArcFileEditor',
+  title: 'Page Components/ArcFileEditor',
   tags: ['autodocs'],
   parameters: {
     layout: 'fullscreen',

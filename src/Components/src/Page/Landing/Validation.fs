@@ -1,4 +1,4 @@
-namespace Swate.Components.Landing
+namespace Swate.Components.Page.Landing
 
 open System
 open System.Text.RegularExpressions

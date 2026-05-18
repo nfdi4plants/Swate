@@ -3,7 +3,7 @@ module Main.Auth.AuthService
 open System
 open Fable.Core
 open Swate.Electron.Shared.AuthTypes
-open Swate.Components.Authentication.Types
+open Swate.Components.Composite.Authentication.Types
 
 // ── Types ────────────────────────────────────────────────────────────
 

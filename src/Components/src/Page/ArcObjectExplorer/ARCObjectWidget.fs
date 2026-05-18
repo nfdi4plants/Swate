@@ -1,11 +1,15 @@
-namespace Swate.Components.ARCObjectExplorer
+namespace Swate.Components.Page.ARCObjectExplorer
 
 open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.Primitive
-open Swate.Components.FileExplorer.Types
-open Swate.Components.ARCObjectExplorer.Types
+open Swate.Components.Primitive.Select
+open Swate.Components.Primitive.Select.Types
+open Swate.Components.Primitive.ComboBox
+open Swate.Components.Primitive.Navbar
+open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Page.ARCObjectExplorer.Types
 
 module private ARCObjectWidgetHelper =
 
@@ -191,7 +195,7 @@ type ARCObjectWidget =
             prop.children [
                 Icons.Filter("swt:size-4")
                 Html.span [
-                    prop.className "swt:max-w-[12rem] swt:truncate"
+                    prop.className "swt:max-w-48 swt:truncate"
                     prop.text summary
                 ]
             ]
@@ -320,7 +324,7 @@ type ARCObjectWidget =
         Html.div [
             prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100"
             prop.children [
-                Swate.Components.Navbar.Main(
+                Swate.Components.Primitive.Navbar.Navbar.Main(
                     left =
                         Html.div [
                             prop.className "swt:flex swt:flex-col swt:justify-center swt:min-w-0"
@@ -567,7 +571,7 @@ type ARCObjectWidget =
                                                             prop.text (itemTypeLabel selectedItem.Item)
                                                         ]
                                                         Html.span [
-                                                            prop.className "swt:text-sm swt:font-semibold swt:break-words"
+                                                            prop.className "swt:text-sm swt:font-semibold swt:wrap-break-word"
                                                             prop.text selectedItem.Item.Name
                                                         ]
                                                     ]
@@ -648,3 +652,5 @@ type ARCObjectWidget =
                 ]
             ]
         ]
+
+

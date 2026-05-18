@@ -3,10 +3,10 @@ module Renderer.Components.MainContent.DataHubBrowserTarget
 open System
 open Feliz
 open Swate.Components
-open Swate.Components.DataHub
-open Swate.Components.DataHub.DataHubTypes
+open Swate.Components.Page.DataHub
+open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
-open Swate.Components.Types.Actionbar
+open Swate.Components.Primitive.Actionbar.Types
 open Swate.Electron.Shared.GitTypes
 
 module DataHubBrowserHelper =
@@ -94,7 +94,7 @@ let DataHubBrowserTarget () =
     Html.div [
         prop.className "swt:size-full swt:flex swt:flex-col"
         prop.children [
-            GitSidebar.OperationStatusNotice(
+            Swate.Components.Page.GitSidebar.OperationStatusNotice(
                 ?runStatus = runStatus,
                 ?errorNotice = gitStateCtx.state.ErrorNotice,
                 ?warningNotice = gitStateCtx.state.WarningNotice,
@@ -104,7 +104,7 @@ let DataHubBrowserTarget () =
             Html.div [
                 prop.className "swt:px-2 swt:pt-2"
                 prop.children [
-                    GitSidebar.DownloadLargeFilesToggle(
+                    Swate.Components.Page.GitSidebar.DownloadLargeFilesToggle(
                         gitStateCtx.state.DownloadLargeFiles,
                         isCloneBusy,
                         gitStateCtx.saveDownloadLargeFiles,

@@ -10,6 +10,9 @@ open ARCtrl
 open Swate.Components.Shared
 open Components.Metadata
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
+open Swate.Components.Primitive.QuickAccessButton
 
 type public NavbarState = {
     BurgerActive: bool
@@ -339,7 +342,7 @@ let NavbarComponent (model: Model) (dispatch: Messages.Msg -> unit) =
             Html.div [
                 prop.className "swt:ml-auto"
                 prop.children [
-                    Components.DeleteButton(
+                    Buttons.DeleteButton(
                         className = "swt:btn-sm swt:btn-error",
                         props = [
                             prop.onClick (fun _ ->

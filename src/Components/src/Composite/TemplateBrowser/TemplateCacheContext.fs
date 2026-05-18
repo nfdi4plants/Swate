@@ -1,8 +1,8 @@
-module Swate.Components.Template.TemplateCacheContext
+module Swate.Components.Composite.Template.TemplateCacheContext
 
 open Feliz
 open ARCtrl
-open Swate.Components.Template.Types
+open Swate.Components.Composite.Template.Types
 
 type TemplateCacheContext = {
     Templates: Template[]
@@ -21,3 +21,4 @@ let TemplateCacheCtx =
 
 [<Hook>]
 let useTemplateCacheCtx () = React.useContext TemplateCacheCtx
+

@@ -133,7 +133,7 @@ const BareContentPopoverExample = () => (
 );
 
 const meta = {
-  title: "Components/GenericComponents/Popover",
+  title: "Primitive Components/Popover",
   tags: ["autodocs"],
   parameters: {
     layout: "centered",

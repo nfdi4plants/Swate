@@ -1,10 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.Composite
 
 open Browser.Dom
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.NoteTypes
+open Swate.Components.Composite.NoteTypes
 open Swate.Components.Primitive
 
 module InputField =
@@ -171,3 +171,4 @@ type SearchComponent =
             None,
             (fun relativePath -> window.alert $"Open note: {relativePath}")
         )
+

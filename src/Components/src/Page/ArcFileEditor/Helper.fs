@@ -1,8 +1,8 @@
-module Swate.Components.ArcFileEditor.Helper
+module Swate.Components.Page.ArcFileEditor.Helper
 
 open ARCtrl
 open Swate.Components.Shared
-open Swate.Components.ArcFileEditor.Types
+open Swate.Components.Page.ArcFileEditor.Types
 
 [<Literal>]
 let NewTablePrefix = "New Table"
@@ -27,3 +27,4 @@ let tryGetAddRowsTarget (activeView: ActiveView, arcFileState: ArcFiles) =
         |> Option.map (snd >> AddRowsTarget.Table)
     | ActiveView.DataMap -> arcFileState.TryGetDataMap() |> Option.map AddRowsTarget.DataMap
     | ActiveView.Metadata -> None
+

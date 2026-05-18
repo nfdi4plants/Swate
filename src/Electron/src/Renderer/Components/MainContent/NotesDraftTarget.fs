@@ -1,7 +1,7 @@
 module Renderer.Components.MainContent.NotesDraftTarget
 
 open Feliz
-open Swate.Components.Notes.Editor
+open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper

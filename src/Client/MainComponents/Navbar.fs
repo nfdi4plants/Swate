@@ -8,6 +8,8 @@ open Components
 open MainComponents
 open Model
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.QuickAccessButton
 open ARCtrl
 open Swate.Components.Shared
 
@@ -34,7 +36,7 @@ let private FileName (model: Model) =
     | Some _ ->
         Html.div [
             prop.className
-                "swt:text-lg swt:font-bold swt:inline-flex swt:items-center swt:max-w-[125px] swt:px-2 swt:truncate"
+                "swt:text-lg swt:font-bold swt:inline-flex swt:items-center swt:max-w-31.25 swt:px-2 swt:truncate"
             prop.children [
                 Html.span [ prop.className "swt:hidden swt:lg:block"; prop.text txt ]
                 Html.span [

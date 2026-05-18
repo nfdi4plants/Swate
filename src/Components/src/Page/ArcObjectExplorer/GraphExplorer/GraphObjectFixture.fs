@@ -1,7 +1,7 @@
-module Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
+module Swate.Components.Page.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
 
-open Swate.Components.FileExplorer.Types
-open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
 
 module private GraphObjectFixtureHelper =
 
@@ -559,3 +559,4 @@ let fakeGraphModels() =
 
 let fakeGraphObjects() =
     GraphObjectFixtureHelper.fakeGraphObjects ()
+

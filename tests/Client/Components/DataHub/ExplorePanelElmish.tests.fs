@@ -4,8 +4,11 @@ open Fable.Core
 open Fable.Mocha
 open Swate.Components
 open Swate.Components.Api.GitLabApi
-open Swate.Components.DataHub
-open Swate.Components.DataHub.DataHubTypes
+open Swate.Components.Page.DataHub
+open Swate.Components.Page.DataHub.DataHubTypes
+
+module DataHubBrowserModel = Swate.Components.Page.DataHub.DataHubBrowserModel
+module MockData = Swate.Components.Page.MockData.DataHub
 
 let private noopLoadRepos (_: ExploreLoadRequest) = promise { return Ok ExploreLoadResult.empty }
 
@@ -55,8 +58,8 @@ let Main =
         testCase "LoadReposResponse Ok updates repos pagination and groups"
         <| fun _ ->
             let initial, _ = DataHubBrowserModel.init None
-            let expectedRepos = MockData.DataHub.mostStarred |> Array.truncate 2
-            let expectedGroups = MockData.DataHub.groups |> Array.truncate 2
+            let expectedRepos = MockData.mostStarred |> Array.truncate 2
+            let expectedGroups = MockData.groups |> Array.truncate 2
 
             let loaded: ExploreLoadResult = {
                 Repos = expectedRepos
@@ -95,7 +98,7 @@ let Main =
                 initial with
                     LatestReposFetchID = Some guid
                     IsLoading = true
-                    Repos = MockData.DataHub.yourRepos |> Array.truncate 1
+                    Repos = MockData.yourRepos |> Array.truncate 1
                     Pagination = Some(mkPageMeta 1)
             }
 
@@ -114,7 +117,7 @@ let Main =
         testCase "YourOrganisations fallback selects first group"
         <| fun _ ->
             let initial, _ = DataHubBrowserModel.init None
-            let expectedFirstGroup = MockData.DataHub.groups[0]
+            let expectedFirstGroup = MockData.groups[0]
             let guid = System.Guid.NewGuid()
 
             let seeded = {
@@ -128,7 +131,7 @@ let Main =
             let loaded: ExploreLoadResult = {
                 Repos = [||]
                 Pagination = None
-                Groups = MockData.DataHub.groups
+                Groups = MockData.groups
                 GroupsLoaded = true
                 GroupsLoadError = None
             }

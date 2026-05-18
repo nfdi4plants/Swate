@@ -1,10 +1,11 @@
-namespace Swate.Components.Metadata
+namespace Swate.Components.Page.Metadata
 
 open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components
-open Swate.Components.Metadata.FormComponents
+open Swate.Components.Primitive.LayoutComponents
+open Swate.Components.Page.Metadata.FormComponents
 
 [<Erase; Mangle(false)>]
 type TemplateMetadata =
@@ -57,10 +58,13 @@ type TemplateMetadata =
                         label = "Version"
                     )
                     DateTimeInput.DateTimeInput(
-                        template.LastUpdated,
+                        template.LastUpdated.ToString("yyyy-MM-ddTHH:mm"),
                         (fun value ->
-                            template.LastUpdated <- value
-                            setTemplate template
+                            match System.DateTime.TryParse(value) with
+                            | true, parsed ->
+                                template.LastUpdated <- parsed
+                                setTemplate template
+                            | false, _ -> ()
                         ),
                         label = "Last Updated"
                     )
@@ -91,3 +95,4 @@ type TemplateMetadata =
                 ]
             )
         ]
+

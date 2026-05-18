@@ -3,7 +3,7 @@ import { within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
 import { Entry as AuthenticationEntry } from './Authentication.fs.js';
 
 const meta = {
-  title: 'Components/Authentication',
+  title: 'Composite Components/Authentication',
   tags: ['autodocs'],
   component: AuthenticationEntry,
 } satisfies Meta<typeof AuthenticationEntry>;

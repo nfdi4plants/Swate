@@ -1,4 +1,4 @@
-namespace Swate.Components.MarkdownText
+namespace Swate.Components.Composite.MarkdownText
 
 [<RequireQualifiedAccess>]
 type PreviewMode =

@@ -2,8 +2,8 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.ARCHelper
 open Swate.Components
-open Swate.Components.ErrorModal
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes

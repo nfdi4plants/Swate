@@ -3,8 +3,9 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.ErrorModal
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Renderer.Components.LeftSidebar.FileExplorer.Types

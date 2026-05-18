@@ -1,10 +1,10 @@
-namespace Swate.Components.Landing
+namespace Swate.Components.Page.Landing
 
 open Fable.Core
 open Feliz
 open ARCtrl
-open Swate.Components.Metadata
-open Swate.Components.Metadata.FormComponents
+open Swate.Components.Page.Metadata
+open Swate.Components.Page.Metadata.FormComponents
 
 [<RequireQualifiedAccess>]
 module SharedFields =
@@ -91,3 +91,4 @@ module SharedFields =
                 ]
             ]
         ]
+

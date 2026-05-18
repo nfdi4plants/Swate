@@ -7,7 +7,7 @@ open Expecto
 #endif
 
 open ARCtrl
-open Swate.Components.Landing
+open Swate.Components.Page.Landing
 open Swate.Components.Shared
 
 let private mkPerson (firstName: string) (lastName: string) =

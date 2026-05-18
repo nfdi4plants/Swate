@@ -1,4 +1,4 @@
-namespace Swate.Components.MarkdownText.Plugins
+namespace Swate.Components.Composite.MarkdownText.Plugins
 
 [<RequireQualifiedAccess>]
 module PluginRegistry =

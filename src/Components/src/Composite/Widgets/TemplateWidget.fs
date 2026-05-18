@@ -1,17 +1,17 @@
-namespace Swate.Components.Widgets
+namespace Swate.Components.Composite.Widgets
 
 open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.Shared
-open Swate.Components.Template
-open Swate.Components.Widgets.Context
+open Swate.Components.Composite.Template
+open Swate.Components.Composite.Widgets.Context
 
 
-module TemplateTypes = Swate.Components.Template.Types
-module TemplateActions = Swate.Components.Template.TemplateActions
-module TemplateCacheContext = Swate.Components.Template.TemplateCacheContext
+module TemplateTypes = Swate.Components.Composite.Template.Types
+module TemplateActions = Swate.Components.Composite.Template.TemplateActions
+module TemplateCacheContext = Swate.Components.Composite.Template.TemplateCacheContext
 
 [<Erase; Mangle(false)>]
 type TemplateWidget =
@@ -136,3 +136,4 @@ type TemplateWidget =
             (fun () -> services.loadTemplates () |> Async.StartAsPromise),
             TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFile)
         )
+

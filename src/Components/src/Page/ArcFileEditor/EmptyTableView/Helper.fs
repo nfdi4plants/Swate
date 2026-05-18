@@ -1,4 +1,4 @@
-module Swate.Components.ArcFileEditor.EmptyTableView.Helper
+module Swate.Components.Page.ArcFileEditor.EmptyTableView.Helper
 
 open ARCtrl
 open Swate.Components

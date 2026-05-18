@@ -1,4 +1,4 @@
-namespace Swate.Components.Metadata.FormComponents
+namespace Swate.Components.Page.Metadata.FormComponents
 
 open Browser.Types
 open Fable.Core
@@ -6,6 +6,8 @@ open Feliz
 open ARCtrl
 
 open Swate.Components
+open Swate.Components.Composite.TermSearch
+open Swate.Components.Primitive.LayoutComponents
 
 [<Erase; Mangle(false)>]
 type OntologyAnnotationInput =
@@ -56,7 +58,7 @@ type OntologyAnnotationInput =
                 Html.div [
                     prop.className "swt:w-full swt:flex swt:gap-2 swt:relative"
                     prop.children [
-                        TermSearch.TermSearch.TermSearch(
+                        TermSearch.TermSearch(
                             term,
                             setTermWrapper,
                             ?parentId = (parent |> Option.map _.TermAccessionShort),

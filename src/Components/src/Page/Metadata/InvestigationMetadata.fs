@@ -1,11 +1,12 @@
-namespace Swate.Components.Metadata
+namespace Swate.Components.Page.Metadata
 
 open System
 open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components
-open Swate.Components.Metadata.FormComponents
+open Swate.Components.Primitive.LayoutComponents
+open Swate.Components.Page.Metadata.FormComponents
 
 [<Erase; Mangle(false)>]
 type InvestigationMetadata =
@@ -96,3 +97,4 @@ type InvestigationMetadata =
                 ]
             )
         ]
+

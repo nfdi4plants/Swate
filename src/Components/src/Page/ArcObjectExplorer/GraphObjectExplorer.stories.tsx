@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Entry as GraphObjectExplorerEntry } from './GraphExplorer/GraphObjectExplorer.fs.js';
 
 const meta = {
-  title: 'Components/ARCObjectExplorer/GraphModel',
+  title: 'Page Components/ARCObjectExplorer/GraphModel',
   tags: ['autodocs'],
   parameters: {
     layout: 'fullscreen',

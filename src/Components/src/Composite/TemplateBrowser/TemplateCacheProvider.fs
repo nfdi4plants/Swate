@@ -1,4 +1,4 @@
-namespace Swate.Components.Template
+namespace Swate.Components.Composite.Template
 
 open System
 open ARCtrl
@@ -7,10 +7,10 @@ open Fable.Core
 open Feliz
 open Feliz.UseElmish
 open Swate.Components
-open Swate.Components.Template.Types
+open Swate.Components.Composite.Template.Types
 
-module TemplateHelper = Swate.Components.Template.Helper
-module TemplateCacheCtx = Swate.Components.Template.TemplateCacheContext
+module TemplateHelper = Swate.Components.Composite.Template.Helper
+module TemplateCacheCtx = Swate.Components.Composite.Template.TemplateCacheContext
 
 module private TemplateCacheProviderHelper =
 
@@ -127,3 +127,4 @@ type TemplateCacheProvider =
         }
 
         TemplateCacheCtx.TemplateCacheCtx.Provider(contextValue, children)
+

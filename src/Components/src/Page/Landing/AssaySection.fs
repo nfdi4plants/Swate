@@ -1,8 +1,8 @@
-namespace Swate.Components.Landing
+namespace Swate.Components.Page.Landing
 
 open Feliz
-open Swate.Components.Metadata
-open Swate.Components.Metadata.FormComponents
+open Swate.Components.Page.Metadata
+open Swate.Components.Page.Metadata.FormComponents
 
 [<RequireQualifiedAccess>]
 module AssaySection =
@@ -29,3 +29,4 @@ module AssaySection =
                 )
             ]
         ]
+

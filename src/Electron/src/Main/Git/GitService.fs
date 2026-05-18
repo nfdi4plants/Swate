@@ -5,7 +5,7 @@ open System.IO
 open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.GitSidebarTypes
+open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.Node
 open Main.Bindings.Filesystem

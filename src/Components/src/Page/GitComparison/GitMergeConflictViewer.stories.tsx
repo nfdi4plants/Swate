@@ -193,7 +193,7 @@ function ExternalReplacementHarness({
 }
 
 const meta = {
-  title: "Components/GitComparison/GitMergeConflictViewer",
+  title: "Page Components/GitComparison/GitMergeConflictViewer",
   component: GitMergeConflictViewerComponent,
   tags: ["autodocs"],
   parameters: {

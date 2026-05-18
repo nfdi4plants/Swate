@@ -1,10 +1,13 @@
-namespace Swate.Components.Notes.Editor
+namespace Swate.Components.Composite.Notes.Editor
 
 open System
 open ARCtrl
 open Feliz
 open Swate.Components
-open Swate.Components.MarkdownText
+open Swate.Components.Shared
+open Swate.Components.Composite.MarkdownText
+open Swate.Components.Composite.TermSearch
+open Swate.Components.Primitive.LayoutComponents
 
 [<RequireQualifiedAccess>]
 module NoteFormFields =
@@ -105,7 +108,7 @@ module NoteFormFields =
             ]
             Html.div [
                 prop.testId "notes-date-field"
-                prop.className "swt:fieldset swt:w-full swt:max-w-[9rem]"
+                prop.className "swt:fieldset swt:w-full swt:max-w-36"
                 prop.children [
                     LayoutComponents.FieldTitle "Date Created (Required)"
                     Html.input [
@@ -127,7 +130,7 @@ module NoteFormFields =
                     Html.div [
                         prop.className "swt:w-full swt:relative"
                         prop.children [
-                            TermSearch.TermSearch.TermSearch(
+                            TermSearch.TermSearch(
                                 currentTagTerm,
                                 setCurrentTagTermAndRef,
                                 onTermSelect = (fun selectedTerm -> addTagFromTerm (Some selectedTerm)),
@@ -187,3 +190,4 @@ module NoteFormFields =
                 ]
             ]
         ]
+

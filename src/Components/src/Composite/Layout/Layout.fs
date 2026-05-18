@@ -1,9 +1,10 @@
-namespace Swate.Components.Layout
+namespace Swate.Components.Composite.Layout
 
 open Feliz
 open Fable.Core
 open Swate.Components
 open Swate.Components.Primitive
+open Swate.Components.Primitive.Navbar
 
 module private Mocks =
 
@@ -13,8 +14,8 @@ module private Mocks =
         | Settings
         | Info
 
-open Swate.Components.Layout.LeftSidebarContext
-open Swate.Components.Layout.RightSidebarContext
+open Swate.Components.Composite.Layout.LeftSidebarContext
+open Swate.Components.Composite.Layout.RightSidebarContext
 
 module private LayoutHelper =
 
@@ -596,3 +597,4 @@ type Layout =
             },
             leftSidebarDefaultOpen = true
         )
+

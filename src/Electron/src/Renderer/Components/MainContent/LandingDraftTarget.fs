@@ -1,7 +1,7 @@
 module Renderer.Components.MainContent.LandingDraftTarget
 
 open Feliz
-open Swate.Components.Landing
+open Swate.Components.Page.Landing
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper

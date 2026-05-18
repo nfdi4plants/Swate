@@ -1,17 +1,16 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, screen, userEvent, waitFor, within } from 'storybook/test';
-import Layout from "../Layout/Layout.fs.js";
-import { Entry } from './Selector.fs.js';
+import { Entry as ArcSelector } from './ArcSelector.fs.js';
 
 const meta = {
-  title: "Components/ArcSelector",
+  title: "Composite Components/ArcSelector",
   tags: ["autodocs"],
   parameters: {
     // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout
     layout: 'fullscreen',
   },
-  component: Layout,
-} satisfies Meta<typeof Layout>;
+  component: ArcSelector,
+} satisfies Meta<typeof ArcSelector>;
 
 export default meta;
 
@@ -19,17 +18,13 @@ type Story = StoryObj<typeof meta>;
 
 export const DisplaySelector: Story = {
   args: {
-    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      < Entry debug={true} />
-    </div>
+    debug: true
   }
 };
 
 export const ClickingArcPointerUpdatesActiveArc: Story = {
   args: {
-    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      <Entry debug={true} />
-    </div>
+    debug: true
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -48,9 +43,7 @@ export const ClickingArcPointerUpdatesActiveArc: Story = {
 
 export const ClickingArcPointerClosesDropdown: Story = {
   args: {
-    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      <Entry debug={true} />
-    </div>
+    debug: true
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -73,9 +66,8 @@ export const ClickingArcPointerClosesDropdown: Story = {
 
 export const ClickingActionbarButtonClosesDropdown: Story = {
   args: {
-    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      <Entry maxNumberActionbar={3} debug={true} />
-    </div>
+    maxNumberActionbar: 3,
+    debug: true
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -99,9 +91,8 @@ export const ClickingActionbarButtonClosesDropdown: Story = {
 
 export const RestButtonShowsOptionsAndOptionsClickable: Story = {
   args: {
-    children: <div className="swt:flex swt:items-center swt:justify-center swt:h-full">
-      <Entry maxNumberActionbar={3} debug={true} />
-    </div>
+    maxNumberActionbar: 3,
+    debug: true
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);

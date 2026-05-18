@@ -8,7 +8,7 @@ import {
 } from "./Provider.fs.js";
 
 const meta = {
-  title: "Components/ErrorModal",
+  title: "Primitive Components/ErrorModal",
   tags: ["autodocs"],
   parameters: {
     layout: 'centered',

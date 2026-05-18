@@ -4,7 +4,7 @@ import React from 'react';
 import Table from "./Table.fs.js";
 
 const meta: Meta<typeof Table> = {
-  title: "Components/VirtualTable/SafariStyleCheck",
+  title: "Composite Components/Table/SafariStyleCheck",
   component: Table,
   parameters: {
     layout: 'fullscreen',

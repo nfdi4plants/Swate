@@ -38,7 +38,7 @@ let Main (mergeData: GitMergeConflictViewDataDto) =
                     prop.text "Applying merge resolution..."
                 ]
 
-            Swate.Components.GitMergeConflictViewer.Viewer(
+            Swate.Components.Page.GitMergeConflictViewer.Viewer(
                 mergeConflictContent = mergeData.MergeConflictContent,
                 currentTitle = mergeData.Path,
                 resolvedTitle = mergeData.Path,

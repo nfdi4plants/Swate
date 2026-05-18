@@ -1,10 +1,10 @@
-module Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectExplorerTreeData
+module Swate.Components.Page.ARCObjectExplorer.GraphExplorer.GraphObjectExplorerTreeData
 
 open System
-open Swate.Components.ARCObjectExplorer
-open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.Page.ARCObjectExplorer
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
 open Swate.Components.Shared
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 
 
 let private groupItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Group
@@ -391,3 +391,4 @@ let flattenNestedChildrenOnParentLevel (items: FileItem list) =
         |> flattenItem
         |> fst
         |> normalizeTreeForGraphView)
+

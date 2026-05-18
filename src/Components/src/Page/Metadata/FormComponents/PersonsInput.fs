@@ -1,4 +1,4 @@
-namespace Swate.Components.Metadata.FormComponents
+namespace Swate.Components.Page.Metadata.FormComponents
 
 open Browser.Types
 open Fable.Core
@@ -7,6 +7,7 @@ open Feliz
 open ARCtrl
 
 open Swate.Components
+open Swate.Components.Primitive.LayoutComponents
 
 [<RequireQualifiedAccess>]
 type private AsyncState<'T> =

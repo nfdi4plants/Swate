@@ -1,13 +1,14 @@
-namespace Swate.Components.Widgets
+namespace Swate.Components.Composite.Widgets
 
 open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.Shared
-open Swate.Components.AnnotationTable
-open Swate.Components.AnnotationTable.Context
-open Swate.Components.Widgets.Context
+open Swate.Components.Composite.AnnotationTable
+open Swate.Components.Composite.AnnotationTable.Context
+open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.Widgets.Context
 
 
 module private BuildingBlockWidgetState =
@@ -212,7 +213,7 @@ type BuildingBlockWidget =
                     prop.onChange (fun (value: string) -> setState { state with CommentHeader = value })
                 ]
             elif state.HeaderCellType.HasOA() then
-                TermSearch.TermSearch.TermSearch(
+                TermSearch.TermSearch(
                     (state.TryHeaderOA() |> Option.map (fun oa -> oa.ToTerm())),
                     setHeaderTerm,
                     classNames = TermSearchStyle(U2.Case1 "swt:border-current swt:join-item swt:w-full")
@@ -294,7 +295,7 @@ type BuildingBlockWidget =
                                     }
                                 )
                             ]
-                            TermSearch.TermSearch.TermSearch(
+                            TermSearch.TermSearch(
                                 (state.TryBodyOA() |> Option.map (fun oa -> oa.ToTerm())),
                                 setBodyTerm,
                                 classNames = TermSearchStyle(U2.Case1 "swt:border-current swt:w-full"),
@@ -444,3 +445,4 @@ type BuildingBlockWidget =
                     ]
                 ]
             ]
+

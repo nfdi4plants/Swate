@@ -1,4 +1,4 @@
-namespace Swate.Components.ARCObjectExplorer
+namespace Swate.Components.Page.ARCObjectExplorer
 
 open System
 open Fable.Core
@@ -6,8 +6,8 @@ open Feliz
 open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
-open Swate.Components.ARCObjectExplorer.Model
-open Swate.Components.Metadata
+open Swate.Components.Page.ARCObjectExplorer.Model
+open Swate.Components.Page.Metadata
 
 type private ArcObjectPropertyValue =
     | Text of string
@@ -588,3 +588,4 @@ type ArcObjectExplorerContent =
                         | None -> Html.none
                 ]
             ]
+

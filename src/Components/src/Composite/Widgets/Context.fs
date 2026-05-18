@@ -1,4 +1,4 @@
-module Swate.Components.Widgets.Context
+module Swate.Components.Composite.Widgets.Context
 
 open Fable.Core
 open Feliz

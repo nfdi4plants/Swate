@@ -2,7 +2,7 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import { Entry as LandingEntry } from './Landing.fs.js';
 
 const meta = {
-  title: 'Components/Landing',
+  title: 'Page Components/Landing',
   tags: ['autodocs'],
   parameters: {
     layout: 'fullscreen',

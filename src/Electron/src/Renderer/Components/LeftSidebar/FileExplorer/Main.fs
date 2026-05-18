@@ -3,7 +3,10 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.ErrorModal
+open Swate.Components.Primitive.Actionbar
+open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 
 module private FileExplorerHelper =
     open Swate.Electron.Shared.FileIOHelper
@@ -107,7 +110,7 @@ type Main =
     static member Main() =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
-        let errorModalCtx = ErrorModal.Context.useErrorModalCtx ()
+        let errorModalCtx = useErrorModalCtx ()
 
         let copyArcPathToClipboard =
             copyArcPathToClipboard (fun ex ->
@@ -143,19 +146,19 @@ type Main =
                         prop.testId "left-sidebar-file-explorer-toolbar"
                         prop.className "swt:flex swt:shrink-0 swt:justify-center swt:bg-base-100"
                         prop.children [
-                            Swate.Components.Actionbar.Main(
+                            Swate.Components.Primitive.Actionbar.Actionbar.Main(
                                 [|
-                                    Actionbar.ButtonInfo.create (
+                                    ButtonInfo.create (
                                         "swt:fluent--book-open-24-regular swt:size-5",
                                         "Lab book view",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.LandingDraftPage)
                                     )
-                                    Actionbar.ButtonInfo.create (
+                                    ButtonInfo.create (
                                         "swt:fluent--document-add-24-regular swt:size-5",
                                         "Create Note",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage)
                                     )
-                                    Actionbar.ButtonInfo.create (
+                                    ButtonInfo.create (
                                         "swt:fluent--document-search-24-regular swt:size-5",
                                         "Note Search",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
@@ -165,7 +168,7 @@ type Main =
                             )
                         ]
                     ]
-                    Swate.Components.ArcVaultActions.ArcVaultActions.ArcVaultActions(
+                    Swate.Components.Composite.ArcVaultActions.ArcVaultActions.ArcVaultActions(
                         path,
                         copyArcPathToClipboard,
                         openArcFolderInFileExplorer

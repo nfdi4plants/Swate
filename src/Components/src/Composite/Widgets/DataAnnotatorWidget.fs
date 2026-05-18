@@ -1,11 +1,11 @@
-namespace Swate.Components.Widgets
+namespace Swate.Components.Composite.Widgets
 
 open System
 open ARCtrl
 open Fable.Core
 open Feliz
 open Swate.Components.Shared
-open Swate.Components.Widgets.Context
+open Swate.Components.Composite.Widgets.Context
 
 module private DataAnnotatorWidgetModel =
 
@@ -759,3 +759,4 @@ type DataAnnotatorWidget =
                     ]
                 ]
             ]
+

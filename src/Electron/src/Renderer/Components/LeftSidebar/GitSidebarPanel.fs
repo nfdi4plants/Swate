@@ -1,6 +1,8 @@
 module Renderer.Components.LeftSidebar.GitSidebarPanel
 
 open Feliz
+open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 
 let mutable private gitVersionCheckStarted = false
 
@@ -12,7 +14,7 @@ let Main () =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
-    let errorCtx = Swate.Components.ErrorModal.Context.useErrorModalCtx ()
+    let errorCtx = useErrorModalCtx ()
 
     React.useEffectOnce (fun () ->
         if not gitVersionCheckStarted then
@@ -49,7 +51,7 @@ let Main () =
                 match r with
                 | Error e ->
                     errorCtx.enqueue (
-                        Swate.Components.ErrorModal.ErrorModalRequest.create (e.Message, title = "Error opening ARC")
+                        ErrorModalRequest.create (e.Message, title = "Error opening ARC")
                     )
                 | Ok _ -> ()
             }
@@ -131,7 +133,7 @@ let Main () =
             ?infoText = remoteActionsWarning
         )
     | Some _ ->
-        Swate.Components.GitSidebar.Main(
+        Swate.Components.Page.GitSidebar.Main(
             status = gitStateCtx.state.Status,
             changedFiles = gitStateCtx.state.ChangedFiles,
             branchOptions = gitStateCtx.state.BranchOptions,

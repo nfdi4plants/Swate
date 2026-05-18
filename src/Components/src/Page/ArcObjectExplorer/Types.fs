@@ -1,7 +1,7 @@
-module Swate.Components.ARCObjectExplorer.Types
+module Swate.Components.Page.ARCObjectExplorer.Types
 
-open Swate.Components.FileExplorer
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.FileExplorer
+open Swate.Components.Page.FileExplorer.Types
 
 type ARCObjectExplorerVisibleItem = {
     Item: FileItem
@@ -26,3 +26,4 @@ type ARCObjectExplorerItems = {
     ContextItems: ARCObjectExplorerContextItem list
     Sections: ARCObjectExplorerSection list
 }
+

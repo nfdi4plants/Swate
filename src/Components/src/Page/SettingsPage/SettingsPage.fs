@@ -4,7 +4,10 @@ open Feliz
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components
-open Swate.Components.Theme.Context
+open Swate.Components.Primitive.LayoutComponents
+open Swate.Components.Composite.ThemeSelector
+open Swate.Components.Composite.ThemeSelector.Context
+open Swate.Components.Composite.TermSearch
 
 [<Erase; Mangle(false)>]
 type SettingsPage =
@@ -36,7 +39,7 @@ type SettingsPage =
             content = [
                 SettingsPage.SettingColumnElement(
                     "Theme",
-                    Theme.ThemeSelector.ThemeSelector(),
+                    ThemeSelector.ThemeSelector(),
                     description =
                         Html.p [
                             prop.className "swt:mt-1 swt:text-sm swt:text-base-content/70"
@@ -52,7 +55,7 @@ type SettingsPage =
         LayoutComponents.BoxedField(
             "Term Search Configuration",
             content = [
-                Swate.Components.TermSearch.TermSearchConfigSetter.TermSearchConfigSetter(fun props ->
+                TermSearchConfigSetter.TermSearchConfigSetter(fun props ->
                     SettingsPage.SettingColumnElement(
                         props.title,
                         props.settingElement,
@@ -73,6 +76,7 @@ type SettingsPage =
 
     [<ReactComponent>]
     static member Entry() =
-        Theme.ThemeProvider.ThemeProvider(
-            TermSearch.TermSearchConfigProvider.TIBQueryProvider(SettingsPage.SettingsPage())
+        ThemeProvider.ThemeProvider(
+            TermSearchConfigProvider.TIBQueryProvider(SettingsPage.SettingsPage())
         )
+

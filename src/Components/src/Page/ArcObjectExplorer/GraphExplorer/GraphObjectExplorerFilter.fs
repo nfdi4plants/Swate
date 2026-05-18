@@ -1,8 +1,9 @@
-module Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectExplorerFilter
+module Swate.Components.Page.ARCObjectExplorer.GraphExplorer.GraphObjectExplorerFilter
 
 open Swate.Components
+open Swate.Components.Primitive.Select.Types
 open Swate.Components.Shared
-open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
 
 
 let private whitelistedGraphKinds =
@@ -329,3 +330,4 @@ let filterNodesBySemanticKinds
             []
 
     nodes |> List.collect (loop true None false)
+

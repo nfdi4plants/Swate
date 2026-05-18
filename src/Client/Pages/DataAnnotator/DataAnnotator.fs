@@ -7,7 +7,9 @@ open Model
 open Messages
 open Feliz
 open Swate.Components
-open Swate.Components.Table
+open Swate.Components.Composite.Table
+open Swate.Components.Primitive
+open Swate.Components.Primitive.BaseModal
 
 module private DataAnnotatorHelper =
 
@@ -54,7 +56,7 @@ module private DataAnnotatorHelper =
                             prop.onClick (fun _ -> setOpen (not isOpen))
                             prop.role.button
                             prop.className
-                                "swt:btn swt:btn-primary swt:border swt:!border-base-content swt:join-item swt:flex-nowrap"
+                                "swt:btn swt:btn-primary swt:border swt:border-base-content! swt:join-item swt:flex-nowrap"
                             prop.children [ Icons.AngleDown() ]
                         ],
                         [
@@ -465,7 +467,7 @@ type DataAnnotator =
                 ]
             ]
 
-        Swate.Components.BaseModal.Modal(
+        BaseModal.Modal(
             isOpen,
             setIsOpen,
             Html.p "Data Annotator",

@@ -3,7 +3,7 @@ import { within, expect, userEvent } from 'storybook/test';
 import { ARCObjectExplorer } from './ARCObjectExplorer.fs.js';
 
 const meta = {
-  title: 'Components/ARCObjectExplorer',
+  title: 'Page Components/ARCObjectExplorer',
   tags: ['autodocs'],
   parameters: {
     layout: 'fullscreen',

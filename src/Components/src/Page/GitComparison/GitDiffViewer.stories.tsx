@@ -92,7 +92,7 @@ const largeDiffWordDiffText = buildAddedFileWordDiffText(
 );
 
 const meta = {
-  title: "Components/GitComparison/GitDiffViewer",
+  title: "Page Components/GitComparison/GitDiffViewer",
   component: GitDiffViewerComponent,
   tags: ["autodocs"],
   parameters: {
@@ -106,7 +106,7 @@ const meta = {
   },
   decorators: [
     (Story) => (
-      <div className="swt:h-[80vh] swt:min-h-[48rem] swt:bg-base-200 swt:p-6">
+      <div className="swt:h-[80vh] swt:min-h-192 swt:bg-base-200 swt:p-6">
         <Story />
       </div>
     ),

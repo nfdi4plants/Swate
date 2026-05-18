@@ -49,7 +49,7 @@ const mockAllChildrenSearch = async (parentId: string): Promise<Term[]> => {
 const LOCAL_STORAGE_KEY = 'swate-termsearchconfig-ctx-mock';
 
 const meta = {
-  title: "Components/TermSearch/TermSearchConfigProvider",
+  title: "Composite Components/TermSearch/TermSearchConfigProvider",
   tags: ["autodocs"],
   parameters: {
     // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout

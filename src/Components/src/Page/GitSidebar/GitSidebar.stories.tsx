@@ -4,7 +4,7 @@ import { expect, fireEvent, fn, userEvent, waitFor, within } from "storybook/tes
 import { Main as GitSidebarComponent } from "./GitSidebar.fs.js";
 import {
   FSharpResult$2_Ok,
-} from "../fable_modules/fable-library-ts.5.0.0-alpha.21/Result.ts";
+} from "../../fable_modules/fable-library-ts.5.0.0-alpha.21/Result.ts";
 
 const noop = () => {};
 const noopWithArg = (_arg: unknown) => {};
@@ -161,7 +161,7 @@ function StatefulSidebar(
 }
 
 const meta = {
-  title: "Components/GitSidebar/GitSidebar",
+  title: "Page Components/GitSidebar",
   component: GitSidebarComponent,
   tags: ["autodocs"],
   parameters: {

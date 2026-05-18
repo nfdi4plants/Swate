@@ -27,14 +27,14 @@ function renderTable(args: TableOptionalProps) {
   };
 
   return (
-    <div className="swt:h-[600px]">
+    <div className="swt:h-150">
       <Table {...args} arcTable={table} setArcTable={setTableWithLog} />
     </div>
   );
 }
 
 const meta = {
-  title: "Components/AnnotationTable",
+  title: "Composite Components/AnnotationTable",
   tags: ["autodocs"],
   component: Table,
 } satisfies Meta<typeof Table>;

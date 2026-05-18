@@ -5,7 +5,9 @@ open Feliz
 open Fable.Core
 open Renderer.Components.ARCHelper
 open Swate.Components
-open Swate.Components.ErrorModal
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
@@ -20,7 +22,7 @@ type CloseWindowController =
         ) =
 
         let modalIsOpen, setModalIsOpen = React.useState false
-        let errorModal = ErrorModal.Context.useErrorModalCtx ()
+        let errorModal = useErrorModalCtx ()
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
         let enqueueCloseError (title: string) (saveError: exn) =

@@ -1,14 +1,19 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { screen, fn, within, expect, userEvent, waitFor, fireEvent } from 'storybook/test';
 import TermSearch from "./TermSearch.fs.js";
-import * as Provider from "./TermSearchConfigProvider.fs.js";
-import { TIBApi } from '../Api/TIBApi.fs.js';
+import * as Provider from "./ConfigProvider.fs.js";
+import { TIBApi } from '../../Api/TIBApi.fs.js';
 import React from 'react';
-import type { Term } from '../Util/Types.fs.js';
+import {
+  Swate_Components_Api_TIBApi_TIBTypes_SearchApi__SearchApi_ToMyTerm as toMyTerm,
+  type Term,
+} from './Types.fs.js';
 
 const TERMSEARCH_INPUT_TESTID = 'term-search-input'
 
 const TERMSEARCH_DETAILSMODAL_TESTID = 'modal_termsearch_details_modal'
+
+const toTerms = (searchApi: any): Term[] => (searchApi ? Array.from(toMyTerm(searchApi)) : []);
 
 function renderTermSearch(args: any) {
   const [term, setTerm] = React.useState(undefined as Term | undefined);
@@ -28,7 +33,7 @@ function renderTermSearch(args: any) {
 };
 
 const meta = {
-  title: "Components/TermSearch",
+  title: "Composite Components/TermSearch",
   tags: ["autodocs"],
   parameters: {
     // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout
@@ -130,13 +135,25 @@ export const TIBSearch: Story = {
     disableDefaultParentSearch: true,
     disableDefaultAllChildrenSearch: true,
     termSearchQueries: [
-      ["tib_search", (query) => TIBApi.defaultSearch(query, 10, "DataPLANT")]
+      [
+        "tib_search",
+        (query): Promise<Term[]> =>
+          TIBApi.defaultSearch(query, 10, "DataPLANT").then((searchApi) => toTerms(searchApi)),
+      ]
     ],
     parentSearchQueries: [
-      ["tib_search", ([parentId, query]) => TIBApi.searchChildrenOf(query, parentId, 10, "DataPLANT")]
+      [
+        "tib_search",
+        ([parentId, query]): Promise<Term[]> =>
+          TIBApi.searchChildrenOf(query, parentId, 10, "DataPLANT").then((searchApi) => toTerms(searchApi)),
+      ]
     ],
     allChildrenSearchQueries: [
-      ["tib_search", (parentId) => TIBApi.searchAllChildrenOf(parentId, 500, "DataPLANT")]
+      [
+        "tib_search",
+        (parentId): Promise<Term[]> =>
+          TIBApi.searchAllChildrenOf(parentId, 500, "DataPLANT").then((searchApi) => toTerms(searchApi)),
+      ]
     ]
   },
   play: async ({ args, canvasElement }) => {

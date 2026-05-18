@@ -8,7 +8,7 @@ open Swate.Components
 open ARCtrl
 open BuildingBlock.SearchComponent
 open Swate.Components.Shared
-open Swate.Components.Widgets
+open Swate.Components.Primitive.Buttons
 
 
 module InitExtensions =
@@ -252,7 +252,7 @@ type Widget =
                     prop.className
                         "swt:cursor-move swt:flex swt:justify-end swt:bg-linear-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
                     prop.children [
-                        Components.Components.DeleteButton(
+                        Buttons.DeleteButton(
                             className = "swt:btn-ghost swt:bg-primary/30",
                             props = [
                                 prop.onClick (fun e ->
@@ -304,16 +304,16 @@ type Widget =
 
         let activeView =
             match model.SpreadsheetModel.ActiveView with
-            | Spreadsheet.ActiveView.Table _ -> WidgetHostView.TableView
-            | Spreadsheet.ActiveView.DataMap -> WidgetHostView.DataMapView
-            | Spreadsheet.ActiveView.Metadata -> WidgetHostView.MetadataView
+            | Spreadsheet.ActiveView.Table _ -> Swate.Components.Composite.Widgets.WidgetHostView.TableView
+            | Spreadsheet.ActiveView.DataMap -> Swate.Components.Composite.Widgets.WidgetHostView.DataMapView
+            | Spreadsheet.ActiveView.Metadata -> Swate.Components.Composite.Widgets.WidgetHostView.MetadataView
 
         let setArcFileState nextArcFileState =
             match nextArcFileState with
             | Some nextArcFile -> nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
             | None -> ()
 
-        let services =
+        let services: Swate.Components.Composite.Widgets.DataAnnotatorWidgetServices =
             React.useMemo (
                 (fun _ -> {
                     pickTextFiles =
@@ -357,7 +357,7 @@ type Widget =
                         )
                     ]
                     if model.SpreadsheetModel.ArcFile.IsSome then
-                        Swate.Components.Widgets.DataAnnotatorWidget.Main(
+                        Swate.Components.Composite.Widgets.DataAnnotatorWidget.Main(
                             model.SpreadsheetModel.ArcFile.Value,
                             activeView,
                             model.SpreadsheetModel.ActiveView.TryTableIndex,

@@ -26,14 +26,14 @@ type QuickAccessButton =
                 "swt:btn swt:btn-ghost swt:btn-square swt:btn-transparent swt:bg-transparent swt:border-none swt:shadow-none"
 
                 match color with
-                | Some DaisyuiColors.Primary -> "swt:hover:!text-primary"
-                | Some DaisyuiColors.Secondary -> "swt:hover:!text-secondary"
-                | Some DaisyuiColors.Accent -> "swt:hover:!text-accent"
-                | Some DaisyuiColors.Error -> "swt:hover:!text-error"
-                | Some DaisyuiColors.Info -> "swt:hover:!text-info"
-                | Some DaisyuiColors.Success -> "swt:hover:!text-success"
-                | Some DaisyuiColors.Warning -> "swt:hover:!text-warning"
-                | None -> "swt:hover:!text-primary"
+                | Some DaisyuiColors.Primary -> "swt:hover:text-primary!"
+                | Some DaisyuiColors.Secondary -> "swt:hover:text-secondary!"
+                | Some DaisyuiColors.Accent -> "swt:hover:text-accent!"
+                | Some DaisyuiColors.Error -> "swt:hover:text-error!"
+                | Some DaisyuiColors.Info -> "swt:hover:text-info!"
+                | Some DaisyuiColors.Success -> "swt:hover:text-success!"
+                | Some DaisyuiColors.Warning -> "swt:hover:text-warning!"
+                | None -> "swt:hover:text-primary!"
 
                 if classes.IsSome then
                     classes.Value

@@ -1,4 +1,4 @@
-module Swate.Components.Metadata.FormComponents.Helpers
+module Swate.Components.Page.Metadata.FormComponents.Helpers
 
 open Browser.Types
 open Feliz

@@ -1,9 +1,10 @@
-module Swate.Components.DataHub.DataHubBrowserModel
+module Swate.Components.Page.DataHub.DataHubBrowserModel
 
 open Fable.Core
 open Swate.Components
+open Swate.Components.Composite.Authentication.Types
 open Swate.Components.Api.GitLabApi
-open Swate.Components.DataHub.DataHubTypes
+open Swate.Components.Page.DataHub.DataHubTypes
 open Elmish
 
 type Msg =
@@ -49,7 +50,7 @@ let private buildRequest (state: State) : ExploreLoadRequest = {
     IsAuthenticated = state.IsAuthenticated
 }
 
-let init (user: Authentication.Types.AuthUserDto option) =
+let init (user: AuthUserDto option) =
     let state = {
         LatestReposFetchID = None
         Tab = ExploreTab.All
@@ -196,3 +197,4 @@ let update (loadRepos: ExploreLoadRequest -> JS.Promise<Result<ExploreLoadResult
                     IsLoading = false
             },
             Cmd.none
+

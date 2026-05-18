@@ -1,9 +1,10 @@
-namespace Swate.Components.MarkdownText.Plugins
+namespace Swate.Components.Composite.MarkdownText.Plugins
 
 open Browser.Types
 open Feliz
 
 open Swate.Components
+open Swate.Components.Primitive.BaseModal
 
 [<RequireQualifiedAccess>]
 module MarkdownPluginPromptModal =

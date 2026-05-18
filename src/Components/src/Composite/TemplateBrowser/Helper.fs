@@ -1,9 +1,9 @@
-module Swate.Components.Template.Helper
+module Swate.Components.Composite.Template.Helper
 
 open System
 open ARCtrl
 open Swate.Components.Shared
-open Swate.Components.Template.Types
+open Swate.Components.Composite.Template.Types
 
 
 let toFullAuthorName (author: Person) =
@@ -166,3 +166,4 @@ let updateTables
 
         existing
     | None -> failwith "Error! Can only append information if metadata sheet exists!"
+

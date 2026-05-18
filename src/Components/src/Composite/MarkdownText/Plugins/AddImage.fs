@@ -1,9 +1,9 @@
-namespace Swate.Components.MarkdownText.Plugins
+namespace Swate.Components.Composite.MarkdownText.Plugins
 
 open System
 open Fable.Core.JsInterop
 open Feliz
-open Swate.Components.MarkdownText.JsBindings
+open Swate.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 module AddImage =
@@ -77,3 +77,4 @@ module AddImage =
         Enabled = true
         Prompt = Some prompt
     }
+

@@ -3,10 +3,10 @@ module Main.NoteSearchReader
 open System
 open Fable.Core
 open Fable.Core.JsInterop
-open Swate.Components.Notes.Editor
+open Swate.Components.Composite.Notes.Editor
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
-open Swate.Components.NoteTypes
+open Swate.Components.Composite.NoteTypes
 open Swate.Components.Shared
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"

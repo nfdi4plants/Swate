@@ -3,7 +3,7 @@ import { within, screen, expect, userEvent, waitFor } from 'storybook/test';
 import { Entry as TextInputWithMarkdownEntry } from './TextInputWithMarkdown.fs.js';
 
 const meta = {
-  title: 'Components/TextInputWithMarkdown',
+  title: 'Composite Components/TextInputWithMarkdown',
   tags: ['autodocs'],
   parameters: {
     layout: 'fullscreen',

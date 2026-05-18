@@ -1,7 +1,8 @@
-module Swate.Components.ARCObjectExplorer.KindFilter
+module Swate.Components.Page.ARCObjectExplorer.KindFilter
 
 open Swate.Components
-open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.Primitive.Select.Types
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
 
 let private createOption(label: string) : SelectItem<string> = {|
     label = label
@@ -40,3 +41,4 @@ let selectedLabels (options: SelectItem<string>[]) (selectedKindIndices: Set<int
         |> Array.tryItem index
         |> Option.map (fun option -> option.item))
     |> Set.ofSeq
+

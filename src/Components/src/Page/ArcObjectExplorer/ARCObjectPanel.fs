@@ -1,4 +1,4 @@
-namespace Swate.Components.ARCObjectExplorer
+namespace Swate.Components.Page.ARCObjectExplorer
 
 open System
 open Fable.Core

@@ -65,12 +65,12 @@ type LayoutComponents =
     static member Collapse (title: ReactElement seq) (content: ReactElement seq) =
         Html.div [
             prop.className
-                "swt:collapse swt:collapse-plus swt:grow swt:border swt:has-[:checked]:border-transparent swt:has-[:checked]:bg-base-200"
+                "swt:collapse swt:collapse-plus swt:grow swt:border swt:has-checked:border-transparent swt:has-checked:bg-base-200"
             prop.children [
                 Html.input [ prop.type'.checkbox; prop.className "peer" ]
                 Html.div [
                     prop.className
-                        "swt:collapse-title swt:after:text-primary swt:@md/main:after:!size-4 swt:@md/main:after:text-xl swt:flex swt:gap-4"
+                        "swt:collapse-title swt:after:text-primary swt:@md/main:after:size-4! swt:@md/main:after:text-xl swt:flex swt:gap-4"
                     prop.children title
                 ]
                 Html.div [

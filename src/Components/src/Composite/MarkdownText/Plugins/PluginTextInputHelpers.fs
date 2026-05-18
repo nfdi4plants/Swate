@@ -1,11 +1,11 @@
-namespace Swate.Components.MarkdownText.Plugins
+namespace Swate.Components.Composite.MarkdownText.Plugins
 
 open System
 open Browser.Types
 open Fable.Core
 open Fable.Core.JsInterop
 
-open Swate.Components.MarkdownText.JsBindings
+open Swate.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 module PluginTextInputHelpers =
@@ -160,3 +160,4 @@ module PluginTextInputHelpers =
     let tryFindPluginForCommand (activePlugins: MarkdownToolbarPlugin list) (command: ICommand) =
         activePlugins
         |> List.tryFind (fun plugin -> plugin.Command.keyCommand = command.keyCommand)
+

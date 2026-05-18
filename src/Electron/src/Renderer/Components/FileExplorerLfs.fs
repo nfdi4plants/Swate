@@ -1,8 +1,8 @@
 module Renderer.Components.FileExplorerLfs
 
 open Fable.Core
-open Swate.Components.ErrorModal
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
 
 type FileTreeNodeLfsState = {
@@ -51,7 +51,7 @@ let createToggleLfsMark
             enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
         | None -> ()
 
-    Swate.Components.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark setError runToggle
+    Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark setError runToggle
 
 let createFreeLocalLfsCopy
     (enqueueErrorModal: ErrorModalRequest -> unit)
@@ -64,7 +64,7 @@ let createFreeLocalLfsCopy
             enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS cleanup failed", ?scopeId = arcScopeId))
         | None -> ()
 
-    Swate.Components.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy setError runCleanup
+    Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy setError runCleanup
 
 let withLfsContextMenuItems
     (item: FileItem)
@@ -73,7 +73,7 @@ let withLfsContextMenuItems
     (baseItems: ContextMenuItem list)
     : ContextMenuItem list =
     baseItems
-    @ Swate.Components.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark (Some freeLocalLfsCopy)
+    @ Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark (Some freeLocalLfsCopy)
 
 let createContextMenuItems
     (enqueueErrorModal: ErrorModalRequest -> unit)

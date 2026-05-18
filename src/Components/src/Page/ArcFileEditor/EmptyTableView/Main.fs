@@ -1,4 +1,4 @@
-namespace Swate.Components.ArcFileEditor.EmptyTableView
+namespace Swate.Components.Page.ArcFileEditor.EmptyTableView
 
 open Feliz
 open ARCtrl
@@ -6,8 +6,9 @@ open Fable.Core
 
 open Swate.Components
 open Swate.Components.Primitive
+open Swate.Components.Primitive.CardGrid
 open Swate.Components.Shared
-open Swate.Components.ArcFileEditor.EmptyTableView.Helper
+open Swate.Components.Page.ArcFileEditor.EmptyTableView.Helper
 
 [<RequireQualifiedAccess>]
 type private ModalState =
@@ -102,3 +103,4 @@ type Main =
                 )
             ]
         ]
+

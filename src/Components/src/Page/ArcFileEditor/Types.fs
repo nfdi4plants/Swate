@@ -1,9 +1,9 @@
-module Swate.Components.ArcFileEditor.Types
+module Swate.Components.Page.ArcFileEditor.Types
 
 open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
-open Swate.Components.Widgets
+open Swate.Components.Composite.Widgets
 
 type AddRowsTarget =
     | Table of ArcTable
@@ -58,3 +58,4 @@ type ArcFileEditorHeaderProps = {
     arcFile: ArcFiles
     activeView: ActiveView
 }
+

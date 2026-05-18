@@ -1,4 +1,4 @@
-namespace Swate.Components.Notes.Editor
+namespace Swate.Components.Composite.Notes.Editor
 
 open System
 open ARCtrl

@@ -3,8 +3,10 @@ module Components.Tests.Table.ContextMenu
 open Fable.Mocha
 open ARCtrl
 open Swate.Components
-open Swate.Components.AnnotationTable
-open AnnotationTableContextMenu
+open global.Swate.Components.Composite.AnnotationTable
+open global.Swate.Components.Composite.AnnotationTable.Types.AnnotationTableContextMenu
+open global.Swate.Components.Composite.Table
+open global.Swate.Components.Primitive.ContextMenu.Types
 open Browser.Types
 
 
@@ -20,7 +22,7 @@ type TestCases =
             (fun _ -> 0)
         )
 
-    static member private TriggerMenuItem (item: Swate.Components.ContextMenuItem) (spawnData: CellCoordinate) =
+    static member private TriggerMenuItem (item: ContextMenuItem) (spawnData: CellCoordinate) =
         item.onClick
         |> Option.iter (fun onClick ->
             onClick {|

@@ -90,7 +90,7 @@ function PreviewHarness({ createInitialDraft }: PreviewHarnessProps) {
 }
 
 const meta = {
-  title: 'Components/Notes/Editor',
+  title: 'Composite Components/Notes/Editor',
   tags: ['autodocs'],
   parameters: {
     layout: 'fullscreen',

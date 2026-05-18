@@ -1,4 +1,4 @@
-namespace Swate.Components.Widgets
+namespace Swate.Components.Composite.Widgets
 
 open ARCtrl
 open Fable.Core

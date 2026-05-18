@@ -1,9 +1,10 @@
-namespace Swate.Components.Metadata.FormComponents
+namespace Swate.Components.Page.Metadata.FormComponents
 
 open Fable.Core
 open System
 open Swate.Components
 open Feliz
+open Swate.Components.Primitive.LayoutComponents
 
 [<Erase; Mangle(false)>]
 type DateTimeInput =
@@ -37,10 +38,3 @@ type DateTimeInput =
             ]
         ]
 
-    [<ReactComponent>]
-    static member DateTimeInput(inputValue: DateTime, setter: DateTime -> unit, ?label: string) =
-        DateTimeInput.DateTimeInput(
-            inputValue.ToString("yyyy-MM-ddTHH:mm"),
-            (fun value -> DateTime.Parse(value) |> setter),
-            ?label = label
-        )

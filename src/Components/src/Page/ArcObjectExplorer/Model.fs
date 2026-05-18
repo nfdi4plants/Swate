@@ -1,9 +1,9 @@
-module Swate.Components.ARCObjectExplorer.Model
+module Swate.Components.Page.ARCObjectExplorer.Model
 
 open System
 open Swate.Components.Shared
-open Swate.Components.FileExplorer.Types
-open Swate.Components.ARCObjectExplorer.KindFilter
+open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Page.ARCObjectExplorer.KindFilter
 
 type ResolvedSelection = {
     ItemId: string
@@ -187,3 +187,4 @@ let create
         SearchItems = searchItems
         Selection = resolvedSelection
     }
+

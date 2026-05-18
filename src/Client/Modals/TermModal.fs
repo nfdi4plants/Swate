@@ -4,6 +4,8 @@ open Swate.Components.Shared.Database
 open Feliz
 open ARCtrl
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.BaseModal
 open Swate.Components.Shared
 
 
@@ -73,7 +75,7 @@ type TermModal =
                 ]
             ]
 
-        Swate.Components.BaseModal.Modal(
+        BaseModal.Modal(
             isOpen,
             setIsOpen,
             Html.p headerElement,

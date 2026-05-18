@@ -1,4 +1,4 @@
-namespace Swate.Components.MarkdownText.JsBindings
+namespace Swate.Components.Composite.MarkdownText.JsBindings
 
 open Fable.Core
 

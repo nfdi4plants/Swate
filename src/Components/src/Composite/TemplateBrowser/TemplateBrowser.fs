@@ -1,11 +1,11 @@
-namespace Swate.Components.Template
+namespace Swate.Components.Composite.Template
 
 open Fable.Core
 open Feliz
 open ARCtrl
 open Swate.Components
-open Swate.Components.Template
-open Swate.Components.Template.Types
+open Swate.Components.Composite.Template
+open Swate.Components.Composite.Template.Types
 
 [<Erase; Mangle(false)>]
 type TemplateBrowser =
@@ -82,3 +82,4 @@ type TemplateBrowser =
                 )
             ]
         )
+

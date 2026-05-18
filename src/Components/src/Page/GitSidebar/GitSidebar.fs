@@ -1,11 +1,15 @@
-namespace Swate.Components
+namespace Swate.Components.Page
 
 open System
 open Browser.Types
 open Fable.Core
 open Feliz
+open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.Popover
+open Swate.Components.Primitive.BaseModal
 
-open Swate.Components.GitSidebarTypes
+open Swate.Components.Page.GitSidebarTypes
 
 module private GitSidebarInternal =
 
@@ -256,7 +260,7 @@ type GitSidebar =
                                         "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
-                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
                                     prop.text (
                                         GitSidebarInternal.progressText progress
                                         |> function
@@ -282,7 +286,7 @@ type GitSidebar =
                                     prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
-                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
                                     prop.text notice
                                 ]
                             ]
@@ -306,7 +310,7 @@ type GitSidebar =
                                     prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
-                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
                                     prop.text message
                                 ]
                             ]
@@ -331,7 +335,7 @@ type GitSidebar =
                                         "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
-                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
                                     prop.text message
                                 ]
                             ]
@@ -369,14 +373,14 @@ type GitSidebar =
                     prop.children [
                         Html.span [
                             prop.className
-                                "swt:min-w-0 swt:break-words swt:text-sm swt:font-medium swt:[overflow-wrap:anywhere]"
+                                "swt:min-w-0 swt:wrap-break-word swt:text-sm swt:font-medium"
                             prop.text (defaultArg label "Download Large Files")
                         ]
                         match description with
                         | Some text ->
                             Html.span [
                                 prop.className
-                                    "swt:min-w-0 swt:break-words swt:text-xs swt:text-base-content/70 swt:[overflow-wrap:anywhere]"
+                                    "swt:min-w-0 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
                                 prop.text text
                             ]
                         | None -> Html.none
@@ -565,7 +569,7 @@ type GitSidebar =
                                                 "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
                                         ]
                                         Html.span [
-                                            prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                            prop.className "swt:min-w-0 swt:wrap-anywhere"
                                             prop.text $"Tracking {trackingBranch}"
                                         ]
                                     ]
@@ -583,7 +587,7 @@ type GitSidebar =
                                             ]
                                             Html.span [
                                                 prop.className
-                                                    "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                                    "swt:min-w-0 swt:wrap-anywhere"
                                                 prop.text
                                                     $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
                                             ]
@@ -617,7 +621,7 @@ type GitSidebar =
                 ]
                 Html.p [
                     prop.className
-                        "swt:mt-2 swt:break-words swt:text-xs swt:text-base-content/70 swt:[overflow-wrap:anywhere]"
+                        "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
                     prop.text
                         "Files larger than this limit are automatically re-staged through Git LFS during save operations."
                 ]
@@ -626,7 +630,7 @@ type GitSidebar =
                     prop.children [
                         Html.label [
                             prop.className
-                                "swt:flex swt:min-w-[10rem] swt:flex-1 swt:flex-col swt:gap-2 swt:@max-xs:min-w-0"
+                                "swt:flex swt:min-w-40 swt:flex-1 swt:flex-col swt:gap-2 swt:@max-xs:min-w-0"
                             prop.children [
                                 Html.span [
                                     prop.className "swt:text-xs swt:font-medium swt:text-base-content/70"
@@ -666,7 +670,7 @@ type GitSidebar =
                 ]
                 Html.div [
                     prop.className
-                        "swt:mt-2 swt:break-words swt:text-xs swt:text-base-content/60 swt:[overflow-wrap:anywhere]"
+                        "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/60"
                     prop.text "Threshold setting: 1-100 MB. This does not cap LFS-tracked file size."
                 ]
             ]
@@ -717,7 +721,7 @@ type GitSidebar =
                                         "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
-                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
                                     prop.text warning
                                 ]
                             ]
@@ -898,7 +902,7 @@ type GitSidebar =
                             "swt:mt-2 swt:flex swt:min-w-0 swt:flex-wrap swt:items-center swt:justify-between swt:gap-2 swt:text-xs swt:text-base-content/60"
                         prop.children [
                             Html.span [
-                                prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                prop.className "swt:min-w-0 swt:wrap-anywhere"
                                 prop.text (
                                     if props.MarkedCount = 1 then
                                         "1 file marked to save"
@@ -908,12 +912,12 @@ type GitSidebar =
                             ]
                             if not props.CanEditCommit && props.HasConflicts then
                                 Html.span [
-                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
                                     prop.text "Saving files is disabled while conflicts remain."
                                 ]
                             elif not props.CanEditCommit && props.Status.IsClean then
                                 Html.span [
-                                    prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
                                     prop.text "No changes available to save."
                                 ]
                             else
@@ -986,7 +990,7 @@ type GitSidebar =
                                                                 ]
                                                                 Html.span [
                                                                     prop.className
-                                                                        "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                                                        "swt:min-w-0 swt:wrap-anywhere"
                                                                     prop.text localCommitLabel
                                                                 ]
                                                             ]
@@ -1205,7 +1209,7 @@ type GitSidebar =
                     if props.ChangedFiles.Length = 0 then
                         Html.div [
                             prop.className
-                                "swt:mt-2 swt:min-w-0 swt:break-words swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60 swt:[overflow-wrap:anywhere] swt:@max-xs:px-2"
+                                "swt:mt-2 swt:min-w-0 swt:wrap-break-word swt:rounded-box swt:border swt:border-dashed swt:border-base-content/15 swt:bg-base-200/40 swt:px-4 swt:py-6 swt:text-sm swt:text-base-content/60 swt:@max-xs:px-2"
                             prop.text "No changed files. Your repository is in sync."
                         ]
                     else
@@ -1877,7 +1881,7 @@ type GitSidebar =
                                             "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
                                     ]
                                     Html.span [
-                                        prop.className "swt:min-w-0 swt:break-words swt:[overflow-wrap:anywhere]"
+                                        prop.className "swt:min-w-0 swt:wrap-anywhere"
                                         prop.text "Resolve all conflicted files before pushing."
                                     ]
                                 ]
@@ -1927,3 +1931,5 @@ type GitSidebar =
                 )
             ]
         ]
+
+

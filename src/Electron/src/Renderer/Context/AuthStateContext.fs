@@ -3,7 +3,7 @@ module Renderer.Context.AuthStateContext
 open Feliz
 open Swate.Electron.Shared.AuthTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Components.Authentication.Types
+open Swate.Components.Composite.Authentication.Types
 
 
 module private Helper =

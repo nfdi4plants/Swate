@@ -1,9 +1,9 @@
-module Swate.Components.ARCObjectExplorer.GraphExplorer.GraphExplorerNodes
+module Swate.Components.Page.ARCObjectExplorer.GraphExplorer.GraphExplorerNodes
 
 open System
 open Swate.Components.Shared
-open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.Page.FileExplorer.Types
 
 
 type private ProcessEndpointValue =
@@ -1434,3 +1434,4 @@ let toArcExplorerNodesWithMeta (model: ARCGraph) =
 
 let toArcExplorerNodes (model: ARCGraph) =
     toArcExplorerNodesWithMeta model |> fst
+

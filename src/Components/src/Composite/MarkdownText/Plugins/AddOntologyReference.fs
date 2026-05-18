@@ -1,11 +1,11 @@
-namespace Swate.Components.MarkdownText.Plugins
+namespace Swate.Components.Composite.MarkdownText.Plugins
 
 open System
 open Fable.Core.JsInterop
 open Feliz
 open ARCtrl
 
-open Swate.Components.MarkdownText.JsBindings
+open Swate.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 module AddOntologyReference =
@@ -110,3 +110,4 @@ module AddOntologyReference =
             Enabled = true
             Prompt = Some prompt
         }
+

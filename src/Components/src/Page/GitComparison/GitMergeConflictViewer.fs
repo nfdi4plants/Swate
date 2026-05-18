@@ -1,4 +1,4 @@
-namespace Swate.Components
+namespace Swate.Components.Page
 
 open System.Globalization
 open Browser.Dom

@@ -1,4 +1,4 @@
-namespace Swate.Components.MarkdownText
+namespace Swate.Components.Composite.MarkdownText
 
 open System
 open Browser.Types
@@ -7,8 +7,9 @@ open Fable.Core.JsInterop
 open Feliz
 
 open Swate.Components
-open Swate.Components.MarkdownText.JsBindings
-open Swate.Components.MarkdownText.Plugins
+open Swate.Components.Composite.MarkdownText.JsBindings
+open Swate.Components.Composite.MarkdownText.Plugins
+open Swate.Components.Primitive.LayoutComponents
 
 [<RequireQualifiedAccess>]
 module private MarkdownCommands =
@@ -617,3 +618,4 @@ flowchart TD
         let value, setValue = React.useState entryInitialValue
 
         TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...", height = 440)
+

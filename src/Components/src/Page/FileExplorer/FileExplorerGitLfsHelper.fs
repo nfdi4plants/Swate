@@ -1,7 +1,7 @@
-module Swate.Components.FileExplorer.FileExplorerGitLfsHelper
+module Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper
 
 open Fable.Core
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 
 let toggleLfsMark
         (setError: string option -> unit)
@@ -101,3 +101,4 @@ let contextMenuItems
                 Disabled = Some true
             }
         ]
+

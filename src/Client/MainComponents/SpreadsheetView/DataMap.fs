@@ -8,6 +8,7 @@ open Messages
 open Swate.Components.Shared
 
 open Swate.Components
+open Swate.Components.Composite.DataMapTable
 
 let Main (model: Model, dispatch: Msg -> unit) =
 

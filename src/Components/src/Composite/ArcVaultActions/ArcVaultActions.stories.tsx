@@ -3,7 +3,7 @@ import { expect, screen, userEvent, waitFor, within, fn } from 'storybook/test';
 import { Entry } from './ArcVaultActions.fs.js';
 
 const meta = {
-  title: "Components/ArcVaultActions",
+  title: "Composite Components/ArcVaultActions",
   tags: ["autodocs"],
   parameters: {
     // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout

@@ -1,4 +1,4 @@
-namespace Swate.Components.GitSidebarTypes
+namespace Swate.Components.Page.GitSidebarTypes
 
 open System
 open Fable.Core

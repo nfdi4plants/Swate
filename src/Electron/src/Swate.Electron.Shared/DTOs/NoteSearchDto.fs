@@ -2,7 +2,7 @@ module Swate.Electron.Shared.DTOs.NoteSearchDto
 
 open ARCtrl
 open ARCtrl.Json
-open Swate.Components.NoteTypes
+open Swate.Components.Composite.NoteTypes
 
 type NoteSearchDto = {
     RelativePath: string

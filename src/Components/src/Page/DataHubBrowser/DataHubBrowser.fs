@@ -1,15 +1,19 @@
-namespace Swate.Components.DataHub
+namespace Swate.Components.Page.DataHub
 
 open Fable.Core
 open Elmish
 open Feliz
 open Feliz.UseElmish
 open Swate.Components
-open Swate.Components.Authentication.Types
-open Swate.Components.Types.Actionbar
-open Swate.Components.DataHub.DataHubTypes
+open Swate.Components.Composite.Authentication
+open Swate.Components.Composite.Authentication.Types
+open Swate.Components.Primitive.Actionbar
+open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
+open Swate.Components.Page.MockData.DataHub
 
 module private DataHubBrowserHelper =
 
@@ -427,7 +431,7 @@ type DataHubBrowser =
     [<ReactComponent>]
     static member ExplorePanel
         (
-            accounts: Swate.Components.Authentication.Types.AuthStateDto,
+            accounts: Swate.Components.Composite.Authentication.Types.AuthStateDto,
             loaders: ExploreLoaders,
             ?reloadTrigger: int,
             ?onRender: (ExploreProjectDto -> unit),
@@ -579,7 +583,7 @@ type DataHubBrowser =
                             Html.div [
                                 prop.className "swt:ml-auto"
                                 prop.children [
-                                    Components.DeleteButton(props = [ prop.onClick closeFn ])
+                                    Buttons.DeleteButton(props = [ prop.onClick closeFn ])
                                 ]
                             ]
                         | None -> Html.none
@@ -675,7 +679,7 @@ type DataHubBrowser =
     [<ReactComponent>]
     static member Entry() =
         let accounts, setAccounts =
-            React.useState (Authentication.Types.AuthStateDto.Empty: Authentication.Types.AuthStateDto)
+            React.useState (AuthStateDto.Empty: AuthStateDto)
 
         let mockUser: AccountSummary = {
             User = {
@@ -692,14 +696,14 @@ type DataHubBrowser =
         let login () =
             setAccounts (
                 {
-                    Authentication.Types.AuthStateDto.Empty with
+                    AuthStateDto.Empty with
                         ActiveAccount = Some mockUser
                         StoredAccounts = [| mockUser |]
                 }
             )
 
         let logout () =
-            setAccounts Authentication.Types.AuthStateDto.Empty
+            setAccounts AuthStateDto.Empty
 
         let reloadTrigger = 0
 
@@ -757,9 +761,9 @@ type DataHubBrowser =
 
         let allRepos =
             [|
-                yield! MockData.DataHub.yourRepos
-                yield! MockData.DataHub.mostStarred
-                for kvp in MockData.DataHub.orgRepos do
+                yield! yourRepos
+                yield! mostStarred
+                for kvp in orgRepos do
                     yield! kvp.Value
             |]
             |> Array.distinctBy (fun p -> p.id)
@@ -849,8 +853,8 @@ type DataHubBrowser =
 
             let source =
                 match query.Visibility with
-                | Some "public" -> MockData.DataHub.mostStarred |> Array.filter isPublicRepo
-                | _ -> MockData.DataHub.mostStarred
+                | Some "public" -> mostStarred |> Array.filter isPublicRepo
+                | _ -> mostStarred
 
             let filtered =
                 source
@@ -877,7 +881,7 @@ type DataHubBrowser =
             do! Promise.sleep delayMs
 
             let filtered =
-                MockData.DataHub.yourRepos
+                yourRepos
                 |> filterRepos cleanedSearchTerm
                 |> sortReposByProjectSort query.OrderBy query.Sort
 
@@ -898,7 +902,7 @@ type DataHubBrowser =
 
             do! Promise.sleep 250
 
-            let pageItems, pageMeta = paginate MockData.DataHub.groups query.Page query.PerPage
+            let pageItems, pageMeta = paginate groups query.Page query.PerPage
 
             return
                 Ok {
@@ -918,7 +922,7 @@ type DataHubBrowser =
             do! Promise.sleep delayMs
 
             let source =
-                MockData.DataHub.orgRepos
+                orgRepos
                 |> Map.tryFind query.GroupId
                 |> Option.defaultValue [||]
 
@@ -1247,3 +1251,4 @@ type DataHubBrowser =
                 DataHubBrowser.ExplorePanel(accounts, loaders, reloadTrigger, projectActionBtns = btnInfo)
             ]
         ]
+

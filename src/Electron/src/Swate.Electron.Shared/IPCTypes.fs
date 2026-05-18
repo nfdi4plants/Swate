@@ -3,8 +3,8 @@ module Swate.Electron.Shared.IPCTypes
 
 open Fable.Core
 open Swate.Components.Api.GitLabApi
-open Swate.Components.Authentication.Types
-open Swate.Components.DataHub.DataHubTypes
+open Swate.Components.Composite.Authentication.Types
+open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 open AuthTypes

@@ -4,7 +4,7 @@ import { within, expect, userEvent, waitFor } from "storybook/test";
 import { Entry as DataHubBrowserEntry } from "./DataHubBrowser.fs.js";
 
 const meta: Meta<typeof DataHubBrowserEntry> = {
-  title: "Components/DataHubBrowser",
+  title: "Page Components/DataHubBrowser",
   component: DataHubBrowserEntry,
   tags: ["autodocs"],
   parameters: {

@@ -12,6 +12,11 @@ open ARCtrl
 open Fetch
 open ARCtrl.Json
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.Buttons
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Composite.TermSearch
+open Swate.Components.Composite.TermSearch.Types
 open Components
 open Swate.Components.Shared
 
@@ -390,7 +395,7 @@ module Helper =
                             //alert.error
                             prop.className "swt:alert"
                             prop.children [
-                                Components.DeleteButton(props = [ prop.onClick back ])
+                                Buttons.DeleteButton(props = [ prop.onClick back ])
                                 Html.div error.Message
                             ]
                         ]
@@ -505,7 +510,7 @@ type FormComponents =
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [
-                Swate.Components.BaseModal.ErrorModalObsolete(
+                BaseModal.ErrorModalObsolete(
                     error.IsSome,
                     (fun _ -> setError None),
                     error |> Option.defaultValue ""
@@ -760,7 +765,7 @@ type FormComponents =
                 Html.div [
                     prop.className "swt:w-full swt:flex swt:gap-2 swt:relative"
                     prop.children [
-                        TermSearch.TermSearch.TermSearch(
+                        TermSearch.TermSearch(
                             tempValue,
                             setTempValueWrapper,
                             ?parentId = (parent |> Option.map _.TermAccessionShort),

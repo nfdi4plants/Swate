@@ -4,7 +4,7 @@ import { within, expect, userEvent } from "storybook/test";
 import {Entry as NoteSearch } from "./NoteSearch.fs.js";
 
 const meta: Meta<typeof NoteSearch> = {
-  title: "Components/NoteSearch",
+  title: "Composite Components/NoteSearch",
   component: NoteSearch,
   parameters: {
     layout: "fullscreen",

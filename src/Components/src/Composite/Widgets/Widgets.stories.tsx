@@ -5,7 +5,7 @@ import { Entry as WidgetsEntry } from './Widgets.fs.js';
 const ACTIVE_ORDER_PREFIX = 'Active order:';
 
 const meta = {
-  title: 'Components/Widgets',
+  title: 'Composite Components/Widgets',
   tags: ['autodocs'],
   parameters: {
     layout: 'fullscreen',

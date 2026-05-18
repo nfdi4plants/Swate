@@ -1,11 +1,13 @@
-namespace Swate.Components.ArcFileEditor.EmptyTableView
+namespace Swate.Components.Page.ArcFileEditor.EmptyTableView
 
 open Feliz
 open Fable.Core
 open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
-open Swate.Components.ArcFileEditor.EmptyTableView
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Composite.Widgets
+open Swate.Components.Page.ArcFileEditor.EmptyTableView
 
 [<Erase; Mangle(false)>]
 type Modals =
@@ -29,7 +31,7 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select a building block",
             // TODO: This does not correctly mirror look from Client/
-            children = Widgets.BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFileAndClose),
+            children = BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFileAndClose),
             className = "swt:max-w-3xl"
         )
 
@@ -52,7 +54,7 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select template(s)",
             children =
-                Swate.Components.Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFileAndClose),
+                Swate.Components.Composite.Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFileAndClose),
             className = "swt:flex swt:min-w-fit"
         )
 
@@ -189,3 +191,4 @@ type Modals =
                 ],
             className = "swt:max-w-3xl"
         )
+

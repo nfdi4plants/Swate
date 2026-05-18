@@ -1,9 +1,8 @@
-module Swate.Components.Template.Context
+module Swate.Components.Composite.Template.Context
 
 open ARCtrl
 open Feliz
 open Swate.Components
-open Swate.Components.Types
 
 let FilteredTemplateCtx =
     React.createContext<StateContext<Template[]>> ({ state = [||]; setState = fun _ -> () })

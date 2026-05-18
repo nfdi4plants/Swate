@@ -1,6 +1,6 @@
-module Swate.Components.MockData.DataHub
+module Swate.Components.Page.MockData.DataHub
 
-open Swate.Components.DataHub.DataHubTypes
+open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
 
 
@@ -161,3 +161,4 @@ let orgRepos: Map<int, ExploreProjectDto array> =
             }
         |]
     |]
+

@@ -1,11 +1,13 @@
-namespace Swate.Components.Widgets
+namespace Swate.Components.Composite.Widgets
 
 open Feliz
 open Browser.Types
 open Swate
 open Swate.Components
-open Swate.Components.Widgets.LocalStorage
-open Swate.Components.Widgets.Context
+open Swate.Components.Composite.Widgets.LocalStorage
+open Swate.Components.Composite.Widgets.Context
+open Swate.Components.Composite.TermSearch
+open Swate.Components.Primitive.Buttons
 
 module InitExtensions =
 
@@ -266,7 +268,7 @@ type Widget =
                     prop.className
                         "swt:cursor-move swt:flex swt:justify-end swt:bg-linear-to-br swt:from-primary swt:to-base-200 swt:rounded-lg"
                     prop.children [
-                        Components.Components.DeleteButton(
+                        Buttons.DeleteButton(
                             className = "swt:btn-ghost swt:bg-primary/30",
                             props = [
                                 prop.onMouseDown (fun e -> e.stopPropagation ())
@@ -502,7 +504,7 @@ type Widget =
                             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-80"
                             prop.children [
                                 Html.h3 [ prop.className "swt:font-bold"; prop.text "Template POC" ]
-                                TermSearch.TermSearch.TermSearch(term, setTerm)
+                                TermSearch.TermSearch(term, setTerm)
                                 Html.span [
                                     prop.className "swt:text-xs swt:opacity-70"
                                     prop.textf
@@ -601,3 +603,4 @@ type Widget =
             |> Map.ofList
 
         Widget.WidgetController(widgets, children = Widget.EntryControls(widgetTypes))
+

@@ -1,4 +1,4 @@
-namespace Swate.Components.ArcFileEditor
+namespace Swate.Components.Page.ArcFileEditor
 
 open ARCtrl
 open Fable.Core
@@ -6,10 +6,12 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.Primitive
-open Swate.Components.Widgets.Context
+open Swate.Components.Primitive.Navbar
+open Swate.Components.Composite.Widgets.Context
+open Swate.Components.Composite.DataMapTable
 open Swate.Components.Shared
-open Swate.Components.ArcFileEditor.Types
-open Swate.Components.AnnotationTable
+open Swate.Components.Page.ArcFileEditor.Types
+open Swate.Components.Composite.AnnotationTable
 
 type private AddRowsFooterViewProps = {
     rowsToAdd: int
@@ -29,7 +31,7 @@ type private LazyComponents =
     static member LazyBuildingBlockWidget
         (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
         =
-        Widgets.BuildingBlockWidget.Main(
+        Swate.Components.Composite.Widgets.BuildingBlockWidget.Main(
             arcFile = arcFile,
             activeTableIndex = activeTableIndex,
             setArcFile = setArcFile
@@ -37,7 +39,7 @@ type private LazyComponents =
 
     [<ReactLazyComponent>]
     static member LazyTemplateWidget(arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit) =
-        Widgets.TemplateWidget.TemplateWidget(
+        Swate.Components.Composite.Widgets.TemplateWidget.TemplateWidget(
             arcFile = arcFile,
             activeTableIndex = activeTableIndex,
             setArcFile = setArcFile
@@ -51,7 +53,7 @@ type private LazyComponents =
             setArcFile: ArcFiles -> unit,
             onPickPaths: unit -> Fable.Core.JS.Promise<string[]>
         ) =
-        Widgets.FilePickerWidget.Main(
+        Swate.Components.Composite.Widgets.FilePickerWidget.Main(
             arcFile = arcFile,
             activeTableIndex = activeTableIndex,
             setArcFile = setArcFile,
@@ -60,7 +62,7 @@ type private LazyComponents =
 
     [<ReactLazyComponent>]
     static member LazyArcFileMetadata(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
-        Metadata.ArcFileMetadata.ArcFileMetadata(arcFile = arcFile, setArcFile = setArcFile)
+        Swate.Components.Page.Metadata.ArcFileMetadata.ArcFileMetadata(arcFile = arcFile, setArcFile = setArcFile)
 
 [<Erase; Mangle(false)>]
 type Main =
@@ -297,7 +299,7 @@ type Main =
                         prop.className "swt:shrink-0 swt:border-b swt:border-base-300"
                         prop.children [
                             Navbar.Main(
-                                left = Swate.Components.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
+                                left = Swate.Components.Page.ArcFileEditor.Widgets.Main.WidgetToggleBtns(),
                                 right = trailingNavbarElement
                             )
                         ]
@@ -361,7 +363,7 @@ type Main =
                                 prop.children [ ArcFileContentViewMemo ]
                             ]
                             AddRowsFooterMemo
-                            ArcFileEditor.ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
+                            ArcFileFooterTabs.Main(arcFile, activeView, setActiveView, setArcFile)
                         ]
                     ]
                 ),
@@ -375,7 +377,7 @@ type Main =
             )
 
         AnnotationTableContextProvider.AnnotationTableContextProvider(
-            Swate.Components.ArcFileEditor.Widgets.Main.Widgets(
+            Swate.Components.Page.ArcFileEditor.Widgets.Main.Widgets(
                 content,
                 widgetElements.buildingBlock,
                 widgetElements.template,
@@ -474,11 +476,11 @@ type Main =
             |]
         }
 
-
-        Template.TemplateCacheProvider.TemplateCacheProvider(
+        Swate.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
             loadTemplates,
             React.Fragment [
                 ColumnCountTestDisplay()
                 Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
             ]
         )
+

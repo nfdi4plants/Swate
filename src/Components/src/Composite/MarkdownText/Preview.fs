@@ -1,11 +1,11 @@
-namespace Swate.Components.MarkdownText
+namespace Swate.Components.Composite.MarkdownText
 
 open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
 
-open Swate.Components.MarkdownText.JsBindings
+open Swate.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 module Preview =
@@ -111,3 +111,4 @@ module Preview =
     let components = createObj [ "code" ==> CodeRenderer ]
 
     let rehypePlugins: obj[] = [| ReactMDEditor.rehypeSanitize |]
+

@@ -1,12 +1,12 @@
-namespace Swate.Components.ARCObjectExplorer.GraphExplorer
+namespace Swate.Components.Page.ARCObjectExplorer.GraphExplorer
 
 open Fable.Core
 open Feliz
 open Swate.Components.Shared
-open Swate.Components.ARCObjectExplorer
-open Swate.Components.ARCObjectExplorer.Model
-open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.ARCObjectExplorer
+open Swate.Components.Page.ARCObjectExplorer.Model
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.Page.FileExplorer.Types
 
 module private GraphObjectExplorerHelper =
 
@@ -212,7 +212,7 @@ type GraphObjectExplorer =
             )
 
         let treePane =
-            Swate.Components.FileExplorer.FileExplorer.FileExplorer(
+            Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                 initialItems = treePaneItems,
                 ?selectedItemId = Some(selectedItemId viewModel),
                 onItemClick =
@@ -268,3 +268,4 @@ type GraphObjectExplorer =
 
             ]
         ]
+

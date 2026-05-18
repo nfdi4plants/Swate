@@ -1,4 +1,4 @@
-namespace Swate.Components.Metadata.FormComponents
+namespace Swate.Components.Page.Metadata.FormComponents
 
 open System
 open Browser.Types
@@ -8,6 +8,8 @@ open Feliz
 
 open Swate.Components
 open Swate.Components.Primitive
+open Swate.Components.Primitive.BaseModal
+open Swate.Components.Primitive.LayoutComponents
 open Swate.Components.JsBindings
 
 [<Erase; Mangle(false)>]

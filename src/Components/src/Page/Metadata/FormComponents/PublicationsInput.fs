@@ -1,4 +1,4 @@
-namespace Swate.Components.Metadata.FormComponents
+namespace Swate.Components.Page.Metadata.FormComponents
 
 open Fable.Core
 open Browser.Types
@@ -6,6 +6,7 @@ open Feliz
 open ARCtrl
 
 open Swate.Components
+open Swate.Components.Primitive.LayoutComponents
 
 module private PublicationsInputHelper =
 

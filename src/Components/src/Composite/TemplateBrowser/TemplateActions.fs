@@ -1,7 +1,7 @@
-module Swate.Components.Template.TemplateActions
+module Swate.Components.Composite.Template.TemplateActions
 
 open ARCtrl
-open Swate.Components.Template.Types
+open Swate.Components.Composite.Template.Types
 
 /// Syncs the selected template IDs with the currently loaded templates, removing any IDs that no longer exist in the loaded templates.
 let syncSelectedTemplateIds
@@ -134,3 +134,4 @@ let buildSelectiveImportConfig
             ImportTables = importTablesConfig
             DeselectedColumns = deselectedColumns
     }
+

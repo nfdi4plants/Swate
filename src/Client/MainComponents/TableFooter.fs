@@ -4,6 +4,7 @@ open Feliz
 open Fable.Core.JsInterop
 
 open Swate.Components
+open Swate.Components.Primitive
 
 open Messages
 
@@ -41,7 +42,7 @@ let Main (dispatch: Messages.Msg -> unit) =
                             setState_rows init_RowsToAdd
                             Spreadsheet.AddRows state_rows |> SpreadsheetMsg |> dispatch
                         )
-                        prop.children [ Icons.Plus() ]
+                        prop.children [ Swate.Components.Primitive.Icons.Plus() ]
                     ]
                 ]
             ]

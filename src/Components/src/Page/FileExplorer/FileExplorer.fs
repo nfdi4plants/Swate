@@ -1,7 +1,9 @@
-namespace Swate.Components.FileExplorer
+namespace Swate.Components.Page.FileExplorer
 
 open Swate.Components
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Primitive.ContextMenu
+open Swate.Components.Primitive.ContextMenu.Types
+open Swate.Components.Page.FileExplorer.Types
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
@@ -24,7 +26,7 @@ module private FileExplorerHelper =
             (model: FileExplorerLogic.Model)
             (onItemClick: (FileItem -> unit) option)
             (dispatch: FileExplorerLogic.Msg -> unit)
-        : Swate.Components.FileExplorer.Types.ContextMenuItem list =
+        : Swate.Components.Page.FileExplorer.Types.ContextMenuItem list =
         let canExpandDirectory =
             match item.Children with
             | Some children -> not (List.isEmpty children)
@@ -35,7 +37,7 @@ module private FileExplorerHelper =
                 {
                     Label = "Open"
                     Icon = "swt:fluent--open-24-regular"
-                    OnClick = fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch
+                    OnClick = fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch
                     Disabled = None
                 }
 
@@ -68,7 +70,7 @@ module private FileExplorerHelper =
             (item: FileItem)
             (model: FileExplorerLogic.Model)
             (onItemClick: (FileItem -> unit) option)
-            (onContextMenu: (FileItem -> Swate.Components.FileExplorer.Types.ContextMenuItem list) option)
+            (onContextMenu: (FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem list) option)
             (dispatch: FileExplorerLogic.Msg -> unit)
         =
         let customItems =
@@ -76,7 +78,7 @@ module private FileExplorerHelper =
 
         defaultContextMenuItems item model onItemClick dispatch @ customItems
 
-    let toComponentMenuItem (item: Swate.Components.FileExplorer.Types.ContextMenuItem) =
+    let toComponentMenuItem (item: Swate.Components.Page.FileExplorer.Types.ContextMenuItem) =
         let isDisabled = defaultArg item.Disabled false
         let className =
             if isDisabled then
@@ -84,7 +86,7 @@ module private FileExplorerHelper =
             else
                 ""
 
-        Swate.Components.ContextMenuItem(
+        ContextMenuItem(
             text = Html.span [ prop.className className; prop.text item.Label ],
             icon =
                 Html.i [
@@ -111,10 +113,10 @@ type FileExplorer =
         (
             ?initialItems: FileItem list,
             ?onItemClick: FileItem -> unit,
-            ?onContextMenu: FileItem -> Swate.Components.FileExplorer.Types.ContextMenuItem list,
+            ?onContextMenu: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem list,
             ?canCreateItem: FileItem -> bool,
             ?onCreateItem: FileItem -> unit,
-            ?getItemActions: FileItem -> Swate.Components.FileExplorer.Types.ContextMenuItem list,
+            ?getItemActions: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem list,
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
@@ -155,7 +157,7 @@ type FileExplorer =
         let handleDirectorySelection (item: FileItem) (ev: Browser.Types.MouseEvent) =
             ev.preventDefault ()
             ev.stopPropagation ()
-            Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch
+            Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch
 
         let handleDirectoryArrowToggle (item: FileItem) (isExpanded: bool) =
             let willExpand = not isExpanded
@@ -268,7 +270,7 @@ type FileExplorer =
                     rowHighlightClass,
                     selectedNameClass,
                     getItemIconClass,
-                    (fun () -> Swate.Components.FileExplorer.Helper.handleItemClick item onItemClick dispatch),
+                    (fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch),
                     itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem
@@ -377,3 +379,4 @@ module FileExplorerExample =
                 )
             ]
         ]
+

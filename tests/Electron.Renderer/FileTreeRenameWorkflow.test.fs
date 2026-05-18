@@ -6,7 +6,7 @@ open Feliz
 open ARCtrl
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
@@ -192,7 +192,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
 
             let! container, cleanup =
                 renderToBody (
-                    Swate.Components.FileExplorer.FileExplorer.FileExplorer(
+                    Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                         initialItems = items,
                         getItemActions = RenameWorkflow.renameContextMenuItems onRenameItem
                     )

@@ -1,9 +1,10 @@
-namespace Swate.Components.Metadata.FormComponents
+namespace Swate.Components.Page.Metadata.FormComponents
 
 open Fable.Core
 open Browser.Types
 open Swate.Components
 open Feliz
+open Swate.Components.Primitive.LayoutComponents
 
 [<Erase; Mangle(false)>]
 type TextInput =

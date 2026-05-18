@@ -1,4 +1,4 @@
-module Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+module Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
 
 open Fable.Core
 open Swate.Components.Shared

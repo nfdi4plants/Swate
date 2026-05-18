@@ -1,4 +1,4 @@
-namespace Swate.Components.Template
+namespace Swate.Components.Composite.Template
 
 open ARCtrl
 open Fable.Core
@@ -7,7 +7,7 @@ open Swate.Components
 open Swate.Components.Primitive
 
 
-module TemplateHelper = Swate.Components.Template.Helper
+module TemplateHelper = Swate.Components.Composite.Template.Helper
 
 module private TemplatesDisplayHelper =
 
@@ -108,7 +108,7 @@ type TemplatesDisplay =
                             ]
                         ]
                         Html.td [
-                            Swate.Components.Components.CollapseButton(
+                                    Buttons.Buttons.CollapseButton(
                                 showDetails,
                                 setShowDetails,
                                 classes = "swt:btn-sm",
@@ -213,7 +213,7 @@ type TemplatesDisplay =
                                         prop.colSpan TemplatesDisplayHelper.ColCount
                                         prop.style [ style.textAlign.center ]
                                         prop.children [
-                                            Components.LoadingSpinner("Loading templates...", size = DaisyuiSize.XL)
+                                            Buttons.Buttons.LoadingSpinner("Loading templates...", size = DaisyuiSize.XL)
                                         ]
                                     ]
                                 ]
@@ -251,3 +251,4 @@ type TemplatesDisplay =
                 ]
             ]
         ]
+

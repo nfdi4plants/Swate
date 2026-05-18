@@ -1,8 +1,10 @@
-namespace Swate.Components
+namespace Swate.Components.Page
 
 open Browser.Types
 open Fable.Core
 open Feliz
+open Swate.Components
+open Swate.Components.ReactHooks
 
 module internal GitTextComparisonRendering =
 
@@ -149,7 +151,7 @@ module internal GitTextComparisonRendering =
                 prop.custom ("data-index", props.Index)
                 prop.ref (fun element -> props.MeasureElementRef(Option.ofObj element))
                 prop.className
-                    "swt:absolute swt:left-0 swt:grid swt:w-full swt:min-w-[58rem] swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
+                    "swt:absolute swt:left-0 swt:grid swt:w-full swt:min-w-232 swt:grid-cols-2 swt:divide-x swt:divide-base-content/10"
                 prop.style [
                     style.top 0
                     style.left 0
@@ -267,7 +269,7 @@ module internal GitTextComparisonRendering =
                         prop.className "swt:overflow-hidden"
                         prop.children [
                             Html.div [
-                                prop.className "swt:min-w-[58rem]"
+                                prop.className "swt:min-w-232"
                                 prop.style [ style.custom ("width", headerContentWidth) ]
                                 prop.children [
                                     Html.div [
@@ -302,7 +304,7 @@ module internal GitTextComparisonRendering =
                                 if virtualContentTestId.IsSome then
                                     prop.testId virtualContentTestId.Value
                                 prop.ref bodyContentRef
-                                prop.className "swt:relative swt:w-full swt:min-w-[58rem]"
+                                prop.className "swt:relative swt:w-full swt:min-w-232"
                                 prop.style [ style.height (rowVirtualizer.getTotalSize ()) ]
                                 prop.children [
                                     for virtualItem in virtualItems do

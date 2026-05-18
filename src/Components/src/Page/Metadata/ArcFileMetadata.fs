@@ -1,4 +1,4 @@
-namespace Swate.Components.Metadata
+namespace Swate.Components.Page.Metadata
 
 open System
 open Feliz

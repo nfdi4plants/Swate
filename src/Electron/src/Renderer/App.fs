@@ -7,8 +7,8 @@ open Feliz.UseElmish
 open Renderer.Components
 open Renderer.Types
 open Swate.Components
-open Swate.Components.Layout
-open Swate.Components.ErrorModal
+open Swate.Components.Composite.Layout
+open Swate.Components.Primitive.ErrorModal
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
@@ -128,7 +128,7 @@ let private subscribe (_model: Model) : Sub<Msg> = [
 
 [<ReactComponent>]
 let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget) =
-    let leftSidebarCtx = Swate.Components.Layout.LeftSidebarContext.useLeftSidebarCtx ()
+    let leftSidebarCtx = Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let toggleTarget target =
         if leftSidebarTarget = target then
@@ -184,7 +184,7 @@ let Main () =
                 ErrorModalProvider.ErrorModalProvider(
                     Renderer.Context.AuthStateContext.Provider(
                         Renderer.Context.GitStateContext.GitStateCtxProvider(
-                            AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
+                            Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
                                 Layout.Main(
                                     children =
                                         React.Fragment [|

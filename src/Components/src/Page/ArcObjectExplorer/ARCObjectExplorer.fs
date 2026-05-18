@@ -1,8 +1,8 @@
-namespace Swate.Components.ARCObjectExplorer
+namespace Swate.Components.Page.ARCObjectExplorer
 
 open Fable.Core
 open Feliz
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 
 module private ARCObjectExplorerHelper =
 
@@ -169,7 +169,7 @@ type ARCObjectExplorer =
             )
 
         let treePane =
-            Swate.Components.FileExplorer.FileExplorer.FileExplorer(
+            Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                 initialItems = filteredItems,
                 ?selectedItemId = Some visibleSelectedId,
                 onItemClick = (fun item -> setSelectedId item.Id),
@@ -254,3 +254,4 @@ type ARCObjectExplorer =
                 ]
 
         ARCObjectWidget.Main(navbar = navbar, treePane = treePane, explorerPane = explorerPane, detailsPane = detailsPane)
+

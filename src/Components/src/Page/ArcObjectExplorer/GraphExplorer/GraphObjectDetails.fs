@@ -1,9 +1,9 @@
-namespace Swate.Components.ARCObjectExplorer.GraphExplorer
+namespace Swate.Components.Page.ARCObjectExplorer.GraphExplorer
 
 open Fable.Core
 open Feliz
-open Swate.Components.ARCObjectExplorer
-open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.Page.ARCObjectExplorer
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
 open Swate.Components.Shared
 
 type private GraphDetailValue =
@@ -251,3 +251,4 @@ type GraphObjectDetails =
                     caseExamplesSection
                 ]
             ]
+

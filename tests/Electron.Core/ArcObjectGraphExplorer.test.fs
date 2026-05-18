@@ -2,13 +2,13 @@ module ElectronCore.ArcObjectGraphExplorerTests
 
 open System
 open Swate.Components.Shared
-open Swate.Components.ARCObjectExplorer
-open Swate.Components.ARCObjectExplorer.GraphExplorer
-open Swate.Components.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
-open Swate.Components.ARCObjectExplorer.GraphExplorer.GraphExplorerNodes
-open Swate.Components.ARCObjectExplorer.GraphExplorer.Model
-open Swate.Components.FileExplorer
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.ARCObjectExplorer
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.GraphObjectFixture
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.GraphExplorerNodes
+open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
+open Swate.Components.Page.FileExplorer
+open Swate.Components.Page.FileExplorer.Types
 open Vitest
 
 type private EndpointValue =
@@ -1496,7 +1496,7 @@ Vitest.describe("ToArcExplorerNodes graph conversion", fun () ->
         Vitest.expect(allLayerNodeIds.Contains selectedStudy.id).toBe(false)
 
         let viewModel =
-            Swate.Components.ARCObjectExplorer.Model.create
+            Swate.Components.Page.ARCObjectExplorer.Model.create
                 filteredNodes
                 (ArcSelection.forExplorerNode selectedStudy.id None)
                 KindFilter.arcObjectExplorerOptions

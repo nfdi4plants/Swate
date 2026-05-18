@@ -3,6 +3,8 @@ namespace MainComponents
 open Feliz
 open EmptyTableModals
 open Swate.Components
+open Swate.Components.Primitive
+open Swate.Components.Primitive.CardGrid
 open Model
 open ARCtrl
 
@@ -78,28 +80,28 @@ type EmptyTableElement =
             Html.div [
                 prop.className "swt:flex swt:justify-center swt:h-full swt:items-center"
                 prop.children [
-                    CardGrid.CardGrid(
+                    Swate.Components.Primitive.CardGrid.CardGrid.CardGrid(
                         React.Fragment [
-                            CardGrid.CardGridButton(
-                                Icons.Templates(),
+                            Swate.Components.Primitive.CardGrid.CardGrid.CardGridButton(
+                                Swate.Components.Primitive.Icons.Templates(),
                                 "Start with template!",
                                 "Select a full template as a starting point.",
                                 fun _ -> Modals.Templates |> Some |> setModal
                             )
-                            CardGrid.CardGridButton(
-                                Icons.BuildingBlock(),
+                            Swate.Components.Primitive.CardGrid.CardGrid.CardGridButton(
+                                Swate.Components.Primitive.Icons.BuildingBlock(),
                                 "Start from scratch!",
                                 "Select a building block as a starting point.",
                                 fun _ -> Modals.BuildingBlock |> Some |> setModal
                             )
-                            CardGrid.CardGridButton(
-                                Icons.BasicTable(),
+                            Swate.Components.Primitive.CardGrid.CardGrid.CardGridButton(
+                                Swate.Components.Primitive.Icons.BasicTable(),
                                 "Create basic table!",
                                 "Create a table with columns: Input, Protocol, Output.",
                                 fun _ -> EmptyTableElement.createMinimalTable (model, dispatch)
                             )
-                            CardGrid.CardGridButton(
-                                Icons.OutputColumn(),
+                            Swate.Components.Primitive.CardGrid.CardGrid.CardGridButton(
+                                Swate.Components.Primitive.Icons.OutputColumn(),
                                 "Utilize prior output!",
                                 "Select an output column of one table as new input column.",
                                 (fun _ -> Modals.PreviousTableSelect |> Some |> setModal),

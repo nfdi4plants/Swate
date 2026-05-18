@@ -5,7 +5,7 @@ import {LayoutBtn, LeftSidebarToggleBtn, RightSidebarToggleBtn} from "./Layout.f
 import { Main as NavbarMain } from '../GenericComponents/Navbar.fs.js';
 
 const meta = {
-  title: "Components/Layout/Layout",
+  title: "Composite Components/Layout",
   tags: ["autodocs"],
   parameters: {
     // Optional parameter to center the component in the Canvas. More info: https://storybook.js.org/docs/configure/story-layout

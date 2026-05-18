@@ -1,8 +1,8 @@
-namespace Swate.Components.MarkdownText.Plugins
+namespace Swate.Components.Composite.MarkdownText.Plugins
 
 open Browser.Types
 open Fable.Core
-open Swate.Components.MarkdownText.JsBindings
+open Swate.Components.Composite.MarkdownText.JsBindings
 
 [<RequireQualifiedAccess>]
 type MarkdownPromptInputMode =
@@ -47,3 +47,4 @@ type MarkdownToolbarPlugin =
         Enabled: bool
         Prompt: MarkdownPromptPlugin option
     }
+

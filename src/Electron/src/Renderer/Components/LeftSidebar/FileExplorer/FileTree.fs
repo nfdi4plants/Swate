@@ -3,8 +3,9 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 open Renderer.Components.ARCHelper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
-open Swate.Components.ErrorModal
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -46,7 +47,7 @@ type FileTree =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
-        let errorModal = ErrorModal.Context.useErrorModalCtx ()
+        let errorModal = useErrorModalCtx ()
         let arcScopeId = useCurrentArcScopeId ()
 
         let pendingCreateKind, setPendingCreateKind =
@@ -375,7 +376,7 @@ type FileTree =
                 Html.div [
                     prop.className "swt:w-full"
                     prop.children [
-                        Swate.Components.FileExplorer.FileExplorer.FileExplorer(
+                        Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
                             onDirectoryArrowToggle = handleDirectoryArrowToggle,

@@ -1,8 +1,8 @@
-namespace Swate.Components.ARCObjectExplorer
+namespace Swate.Components.Page.ARCObjectExplorer
 
 
 open Swate.Components.Shared
-open Swate.Components.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 
 type ARCObjectFixture =
 
@@ -701,4 +701,5 @@ type ARCObjectFixture =
             ]
         ]
         |> Map.ofList
+
 
