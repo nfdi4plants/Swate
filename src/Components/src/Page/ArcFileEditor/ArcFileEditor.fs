@@ -61,6 +61,13 @@ type private LazyComponents =
         )
 
     [<ReactLazyComponent>]
+    static member LazyDataAnnotator(setAnnotationInput, onError) =
+        Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotatorWidget.Main(
+            setAnnotationInput,
+            onError
+        )
+
+    [<ReactLazyComponent>]
     static member LazyArcFileMetadata(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
         Swate.Components.Page.Metadata.ArcFileMetadata.ArcFileMetadata(arcFile = arcFile, setArcFile = setArcFile)
 
@@ -253,8 +260,12 @@ type Main =
             setArcFile: ArcFiles -> unit,
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
-            ?startingActiveView: ActiveView
+            ?startingActiveView: ActiveView,
+            ?onError: string -> unit
         ) =
+
+        let onError = defaultArg onError (fun errorMsg -> console.error("Error in ArcFileEditor: " + errorMsg))
+
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
 
@@ -326,6 +337,14 @@ type Main =
                             LazyComponents.LazyFilePickerWidget(arcFile, activeTableIndex, setArcFile, pickPaths),
                             "Loading File Picker Widget..."
                         )
+                    dataAnnotator =
+                        Main.LazyLoaderWithMessage(
+                            LazyComponents.LazyDataAnnotator(
+                                Helper.applyDataAnnotatorInputToArcFile(activeView, arcFile, setArcFile, onError),
+                                onError = onError
+                            ),
+                            "Loading Data Annotator Widget..."
+                        )
                 |}),
                 [|
                     box arcFile
@@ -381,7 +400,8 @@ type Main =
                 content,
                 widgetElements.buildingBlock,
                 widgetElements.template,
-                widgetElements.filePicker
+                widgetElements.filePicker,
+                widgetElements.dataAnnotator
             )
         )
 
@@ -415,6 +435,8 @@ type Main =
                         startAssay.AddTable(fullerTable)
                     else
                         startAssay.AddTable(ArcTable.init (sprintf "Table %i" i))
+
+                startAssay.DataMap <- Some(ARCtrl.DataMap.init ())
 
                 startAssay
             )
@@ -483,4 +505,3 @@ type Main =
                 Main.ArcFileEditor(arcFile, setArcFile, pickPathsMockFn, startingActiveView = ActiveView.Table 0)
             ]
         )
-
