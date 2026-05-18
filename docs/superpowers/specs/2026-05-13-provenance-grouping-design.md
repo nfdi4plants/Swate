@@ -52,21 +52,24 @@ The initial story data contains two layers. When a new layer is added, the previ
 
 Connections are many-to-many between items. A single source item can connect to multiple target items, and a single target item can connect to multiple source items.
 
+`Parameters` is a list, not a map. One item can have several values for the same parameter key, for example `Replicate: 1` and `Replicate: 2` on a derived output that came from different connected inputs. Helper code must expose parameter lookup as a list of values; any single-value lookup is only a display or sorting convenience and must not imply uniqueness.
+
 ## Grouping Semantics
 
-Grouping is configured per displayed layer. A layer starts grouped by each entry's complete parameter signature, and can then be grouped by any ordered set of selected parameter keys.
+Grouping is configured per displayed layer. With no selected grouping keys, each entry is displayed once as a single element labeled by its name only. Selecting one or more grouping keys switches the layer to value-bucket display.
 
 Groups are derived from the selected keys:
 
-- No selected grouping keys: one group for each distinct complete parameter signature.
-- One key: one group for each distinct value.
-- Multiple keys: one group for each distinct ordered tuple of values.
+- No selected grouping keys: one element for each entry, labeled by entry name.
+- One key: one group for each distinct value. If an entry has several values for the key, it appears in every matching group.
+- Multiple keys: one group for each distinct ordered tuple of values. If an entry has several values for one or more selected keys, it contributes one membership for each value combination.
 - Once a key is selected for grouping, non-selected parameters are ignored for grouping.
-- Missing selected keys are ignored for grouping rather than becoming their own `Missing <key>` category. If an item has none of the selected keys, it appears in a single `Ungrouped` bucket.
+- Missing selected keys do not create their own `Missing <key>` category. If grouping is active and an item has none of the selected keys, it appears in a single `Ungrouped` bucket.
+- A group contains memberships, not necessarily a unique set of item IDs. The same entry may appear in multiple visible groups when it has multiple relevant values.
 
 The UI displays groups, not raw entries. Entries appear only in drill-in/detail views.
 
-Each displayed layer can also be sorted by one non-grouping parameter. The sort applies to the visible group cards by the selected parameter's first sorted member value, and to the entries shown inside expanded groups. When grouping is still at the initial one-signature-per-entry state, the same sort orders those single-entry groups.
+Each displayed layer can also be sorted by one non-grouping parameter. The sort applies to the visible group cards by the selected parameter's first sorted member value, and to the entries shown inside expanded groups. If an item has several values for the sort key, use its first normalized sorted value for ordering without removing any other values. When no grouping is active, the same sort orders the single-entry elements.
 
 ## Layout
 
@@ -81,6 +84,8 @@ The component shows one adjacent layer pair at a time:
 The layout should feel like a dense work surface or table/block editor, not a graph view. Group cards or blocks should contain concise labels, item counts, connection status, and available actions. Raw item names and per-entry parameter details are hidden until a group or parameter detail view is opened.
 
 Parameter blocks are grouping controls. Clicking a block on the left groups the left layer by that parameter. Clicking a block on the right groups both displayed layers by that parameter. Shared parameter blocks can be moved between rails by drag/drop or the move affordance. Each block shows distinct values only; SVG connector lines link each value to the group cards it applies to.
+
+Parameter/value controls are side-aware but connection-aware. A property value that exists only on outputs can move to, or be shown on, the input side when connected items make that value relevant to the input-side grouping or sorting context.
 
 Users can add parameters to either rail and add candidate values to those parameters. Candidate values appear as draggable value rows even before they are assigned to any group. Dragging a value onto a group assigns that parameter value to every item in the group. A group can still show multiple values for a parameter when those values already exist among its member items before grouping by a different parameter.
 
@@ -103,14 +108,14 @@ Bulk edits happen through group-level controls and parameter rails.
 Adding a parameter value from a rail:
 
 - Adds the value as a candidate in the parameter block.
-- Applies to every item in the drop target group when dragged onto a group.
+- Appends the key/value to every item membership in the drop target group when dragged onto a group, unless that exact key/value already exists on the item.
 - Propagates through the full downstream chain.
 
 Updating an existing parameter:
 
-- Applies to every item in the selected group.
+- Targets a concrete key/value instance in the selected group.
 - Propagates through the full downstream chain.
-- Overwrites the same parameter key in connected descendants.
+- Replaces the targeted value in connected descendants without collapsing other values for the same parameter key.
 
 Creating a new item:
 
@@ -155,6 +160,7 @@ Create a story with sample data that includes:
 - Two starting layers: `Inputs` and `Outputs`.
 - Input items with shared and varying `Species`, `Temperature`, and `Replicate`.
 - Output items with inherited parameters plus extra `Analysis`.
+- At least one output with repeated values for the same key, such as `Replicate: 1` and `Replicate: 2`, so grouping duplicates the output into multiple groups.
 - Some unconnected outputs.
 - At least one many-to-many connection.
 
@@ -180,10 +186,12 @@ Errors should not silently mutate state.
 
 ## Testing
 
-Test the pure helper logic before relying on the UI:
+Tests are optional during rapid mockup iteration, but verification should include the pure helper behavior and a browser smoke check before calling an implementation ready:
 
-- Grouping by zero, one, and multiple keys.
-- Group connection full-coverage detection.
+- No selected grouping keys display each entry once by name.
+- Grouping by one and multiple keys.
+- Multi-value grouping duplicates one entry into each matching group.
+- Group connection detail uses actual item-level connections only.
 - Bulk update propagation with overwrite.
 - Complete item-link creation for many-to-many group connections.
 
