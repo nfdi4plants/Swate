@@ -5,7 +5,7 @@ open Fable.Core
 open ARCtrl
 open Swate.Components
 open Swate.Components.Primitive
-open Swate.Components.Primitive.QuickAccessButton
+open Swate.Components.Primitive.Buttons
 open Swate.Components.Page.ArcFileEditor
 open Swate.Components.Composite.Widgets
 open Swate.Components.Composite.Widgets.Context
@@ -94,9 +94,9 @@ type Main =
 
         let tooltip = if isOpen then $"Close {label}" else $"Open {label}"
 
-        QuickAccessButton.QuickAccessButton(
-            tooltip,
+        Buttons.QuickAccessButton(
             icon,
+            tooltip,
             (fun _ -> toggle ()),
             classes = (if isOpen then "swt:!text-primary" else "")
         )

@@ -2,10 +2,10 @@ import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, userEvent, within } from 'storybook/test';
 import {
-  Buttons_DeleteButton_1619F1BE as DeleteButton,
-  Buttons_CircularExitButton_1619F1BE as CircularExitButton,
-  Buttons_CollapseButton_33396676 as CollapseButton,
-  Buttons_LoadingSpinner_10ACE0F3 as LoadingSpinner,
+  DeleteButton,
+  CircularExitButton,
+  CollapseButton,
+  QuickAccessButton,
 } from './Buttons.fs.js';
 
 const ButtonsExample = () => {
@@ -17,9 +17,11 @@ const ButtonsExample = () => {
         <DeleteButton />
         <CircularExitButton />
         <CollapseButton isCollapsed={isCollapsed} setIsCollapsed={setIsCollapsed} />
+        <QuickAccessButton title="Quick Access" onclick={() => console.log('Quick Access clicked')} >
+            <span aria-hidden="true">Q</span>
+        </QuickAccessButton>
       </div>
       <span>Collapsed: {isCollapsed ? 'yes' : 'no'}</span>
-      <LoadingSpinner text="Loading data" />
     </div>
   );
 };
@@ -48,6 +50,5 @@ export const Basic: Story = {
     await userEvent.click(checkbox);
 
     expect(canvas.getByText('Collapsed: yes')).toBeInTheDocument();
-    expect(canvas.getByText(/loading data/i)).toBeInTheDocument();
   },
 };

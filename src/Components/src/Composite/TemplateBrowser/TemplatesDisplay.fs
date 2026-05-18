@@ -5,6 +5,7 @@ open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.Primitive
+open Swate.Components.Primitive.LoadingSpinner
 
 
 module TemplateHelper = Swate.Components.Composite.Template.Helper
@@ -213,7 +214,7 @@ type TemplatesDisplay =
                                         prop.colSpan TemplatesDisplayHelper.ColCount
                                         prop.style [ style.textAlign.center ]
                                         prop.children [
-                                            Buttons.Buttons.LoadingSpinner("Loading templates...", size = DaisyuiSize.XL)
+                                            LoadingSpinner.LoadingSpinner("Loading templates...", size = DaisyuiSize.XL)
                                         ]
                                     ]
                                 ]
