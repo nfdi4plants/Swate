@@ -355,26 +355,51 @@ function toggleSelection(ids: string[], groupId: string): string[] {
   return ids.includes(groupId) ? ids.filter((id) => id !== groupId) : [...ids, groupId];
 }
 
-function selectedSeedGroups(model: MockModel): { layerId: string; groups: ProvenanceGroup[] } | undefined {
+type SelectedSeedGroups = {
+  sourceGroups: ProvenanceGroup[];
+  targetGroups: ProvenanceGroup[];
+};
+
+function selectedSeedGroups(model: MockModel): SelectedSeedGroups {
   const targetGroups = model.selectedTargetGroupIds.flatMap((groupId) => {
     const group = findVisibleGroup(model, "right", groupId);
     return group ? [group] : [];
   });
-
-  if (targetGroups.length > 0) {
-    return { layerId: model.rightLayerId, groups: targetGroups };
-  }
 
   const sourceGroups = model.selectedSourceGroupIds.flatMap((groupId) => {
     const group = findVisibleGroup(model, "left", groupId);
     return group ? [group] : [];
   });
 
-  if (sourceGroups.length > 0) {
-    return { layerId: model.leftLayerId, groups: sourceGroups };
-  }
+  return { sourceGroups, targetGroups };
+}
 
-  return undefined;
+function nextGeneratedLayerNumber(layers: ProvenanceLayer[]): number {
+  const existingNumbers = layers.flatMap((layer) => {
+    const match = /^layer-(\d+)$/.exec(layer.id);
+    return match ? [Number(match[1])] : [];
+  });
+
+  return Math.max(2, ...existingNumbers) + 1;
+}
+
+function safeIdPart(value: string): string {
+  return (
+    value
+      .trim()
+      .replace(/[^A-Za-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "item"
+  );
+}
+
+function copyItemsIntoLayer(items: ProvenanceItem[], layerId: string): ProvenanceItem[] {
+  return items.map((item, itemIndex) => ({
+    id: `${layerId}-${itemIndex + 1}-${safeIdPart(item.id)}`,
+    name: item.name,
+    layerId,
+    parameters: item.parameters.map((parameter) => ({ ...parameter })),
+  }));
 }
 
 function clearSelection(): Pick<MockModel, "selectedSourceGroupIds" | "selectedTargetGroupIds"> {
@@ -647,14 +672,36 @@ function StatefulMockup() {
 
   const addLayer = () => {
     setModel((current) => {
-      const nextIndex = current.layers.length + 1;
+      const nextIndex = nextGeneratedLayerNumber(current.layers);
       const nextLayer: ProvenanceLayer = {
         id: `layer-${nextIndex}`,
         label: `Layer ${nextIndex}`,
       };
       const seed = selectedSeedGroups(current);
-      const seedLayerId = seed?.layerId ?? current.rightLayerId;
-      const seedItemIds = seed ? uniqueItemsForGroups(seed.groups).map((item) => item.id) : undefined;
+      const hasSourceSeed = seed.sourceGroups.length > 0;
+      const hasTargetSeed = seed.targetGroups.length > 0;
+      const hasMixedSeed = hasSourceSeed && hasTargetSeed;
+      const selectedSeedItems = hasMixedSeed
+        ? uniqueItemsForGroups([...seed.sourceGroups, ...seed.targetGroups])
+        : hasTargetSeed
+          ? uniqueItemsForGroups(seed.targetGroups)
+          : hasSourceSeed
+            ? uniqueItemsForGroups(seed.sourceGroups)
+            : undefined;
+      const selectionLayer: ProvenanceLayer | undefined = hasMixedSeed
+        ? { id: `selection-${nextIndex}`, label: `Selection ${nextIndex}` }
+        : undefined;
+      const copiedSelectionItems =
+        selectionLayer && selectedSeedItems ? copyItemsIntoLayer(selectedSeedItems, selectionLayer.id) : [];
+      const selectedExistingSeedLayerId = hasTargetSeed
+        ? current.rightLayerId
+        : hasSourceSeed
+          ? current.leftLayerId
+          : current.rightLayerId;
+      const seedLayerId = selectionLayer?.id ?? selectedExistingSeedLayerId;
+      const seedItemIds = selectionLayer
+        ? copiedSelectionItems.map((item) => item.id)
+        : selectedSeedItems?.map((item) => item.id);
       const nextPair = { leftLayerId: seedLayerId, rightLayerId: nextLayer.id };
       const nextPairKey = pairKey(nextPair.leftLayerId, nextPair.rightLayerId);
       const nextVisibleItemIdsByPair =
@@ -669,21 +716,25 @@ function StatefulMockup() {
 
       return {
         ...current,
-        layers: [...current.layers, nextLayer],
+        layers: selectionLayer ? [...current.layers, selectionLayer, nextLayer] : [...current.layers, nextLayer],
+        items: copiedSelectionItems.length === 0 ? current.items : [...current.items, ...copiedSelectionItems],
         layerPairs: [...current.layerPairs, nextPair],
         visibleItemIdsByPair: nextVisibleItemIdsByPair,
         leftLayerId: seedLayerId,
         rightLayerId: nextLayer.id,
         groupingByLayer: {
           ...current.groupingByLayer,
+          ...(selectionLayer ? { [selectionLayer.id]: [] } : {}),
           [nextLayer.id]: [],
         },
         sortingByLayer: {
           ...current.sortingByLayer,
+          ...(selectionLayer ? { [selectionLayer.id]: undefined } : {}),
           [nextLayer.id]: undefined,
         },
         parameterValuesByLayer: {
           ...current.parameterValuesByLayer,
+          ...(selectionLayer ? { [selectionLayer.id]: {} } : {}),
           [nextLayer.id]: {},
         },
         ...clearSelection(),
@@ -875,7 +926,9 @@ export const InteractionFlow: Story = {
 
     await userEvent.click(canvas.getByTestId("ProvenanceGrouping-add-layer"));
     await waitFor(() => {
-      expect(canvasElement).toHaveTextContent("Outputs -> Layer 3");
+      expect(canvasElement).toHaveTextContent("Selection 3 -> Layer 3");
+      expect(canvasElement).toHaveTextContent("Input C");
+      expect(canvasElement).toHaveTextContent("Output E");
     });
   },
 };
@@ -950,6 +1003,31 @@ export const AddLayerFromSelectedOutput: Story = {
       await expect(await canvas.findAllByTestId(/ProvenanceGrouping-group-left-/)).toHaveLength(2);
       await expect(canvasElement).toHaveTextContent("Output B");
       await expect(canvasElement).toHaveTextContent("Output C");
+      await expect(canvasElement).not.toHaveTextContent("Output A");
+    });
+  },
+};
+
+export const AddLayerFromMixedSelection: Story = {
+  name: "Add layer from mixed selection",
+  render: () => <StatefulMockup />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByTestId("ProvenanceGrouping-root")).toBeInTheDocument();
+
+    const inputAGroup = await canvas.findByTestId("ProvenanceGrouping-group-left-inputs-item-input-a");
+    const outputBGroup = await canvas.findByTestId("ProvenanceGrouping-group-right-outputs-item-output-b");
+    await userEvent.click(within(inputAGroup).getByTestId("ProvenanceGrouping-group-select"));
+    await userEvent.click(within(outputBGroup).getByTestId("ProvenanceGrouping-group-select"));
+    await userEvent.click(canvas.getByTestId("ProvenanceGrouping-add-layer"));
+
+    await waitFor(async () => {
+      await expect(canvasElement).toHaveTextContent("Selection 3 -> Layer 3");
+      await expect(await canvas.findAllByTestId(/ProvenanceGrouping-group-left-/)).toHaveLength(2);
+      await expect(canvasElement).toHaveTextContent("Input A");
+      await expect(canvasElement).toHaveTextContent("Output B");
+      await expect(canvasElement).not.toHaveTextContent("Input B");
       await expect(canvasElement).not.toHaveTextContent("Output A");
     });
   },

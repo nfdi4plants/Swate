@@ -126,7 +126,7 @@ Creating a new layer:
 
 - Adds a downstream layer after the selected groups when source or target groups are selected.
 - Group selection is a multi-select set, not a single active group.
-- Uses all selected target/output groups as the new layer's input set when present; otherwise uses all selected source/input groups. If nothing is selected, it keeps the previous default of using all entries from the current right layer as the next input set.
+- Uses every selected group as the next input set. If the selected groups all come from one displayed layer, that layer is scoped to those selected entries. If the selected groups mix source and target layers, the story materializes a combined selection layer containing copies of the selected entries and uses that as the next input layer. If nothing is selected, it keeps the previous default of using all entries from the current right layer as the next input set.
 - Lets the user navigate to the new pair.
 - Uses the same item model, so outputs from one step can act as inputs to the next displayed pair.
 

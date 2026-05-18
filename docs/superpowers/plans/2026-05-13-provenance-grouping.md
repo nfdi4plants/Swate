@@ -487,7 +487,7 @@ The Storybook mock model should keep `selectedSourceGroupIds` and `selectedTarge
 
 - [ ] **Step 2: Seed new layers from all selected groups**
 
-When adding a layer, collect unique item IDs from every selected target group. If no target group is selected, collect unique item IDs from every selected source group. If neither side has selections, keep the existing default of using the current right layer.
+When adding a layer, collect unique item IDs from every selected group. If the selections come from one side, scope that existing layer to the selected item IDs. If selections mix source and target groups, create a combined selection layer with copied entries from both sides and use that as the left layer of the next pair. If neither side has selections, keep the existing default of using the current right layer.
 
 - [ ] **Step 3: Remove the connect-selected action**
 
