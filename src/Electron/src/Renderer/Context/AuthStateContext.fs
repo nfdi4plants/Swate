@@ -1,6 +1,7 @@
 module Renderer.Context.AuthStateContext
 
 open Feliz
+open Swate.Components
 open Swate.Electron.Shared.AuthTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Components.Composite.Authentication.Types

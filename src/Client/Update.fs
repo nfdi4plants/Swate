@@ -7,6 +7,7 @@ open Swate.Components.Shared
 open Routing
 open Messages
 open Model
+open Swate.Components
 
 open LocalStorage.AutosaveConfig
 
@@ -270,32 +271,20 @@ module History =
                     ARCitect.api.Save(ArcFilesDiscriminate.Study, ArcStudy.toJsonString 0 study, None)
                     |> Promise.start
                 | Some(ArcFiles.Investigation inv) ->
-                    ARCitect.api.Save(
-                        ArcFilesDiscriminate.Investigation,
-                        ArcInvestigation.toJsonString 0 inv,
-                        None
-                    )
+                    ARCitect.api.Save(ArcFilesDiscriminate.Investigation, ArcInvestigation.toJsonString 0 inv, None)
                     |> Promise.start
                 | Some(ArcFiles.Run run) ->
                     ARCitect.api.Save(ArcFilesDiscriminate.Run, ArcRun.toJsonString 0 run, None)
                     |> Promise.start
                 | Some(ArcFiles.Workflow workflow) ->
-                    ARCitect.api.Save(
-                        ArcFilesDiscriminate.Workflow,
-                        ArcWorkflow.toJsonString 0 workflow,
-                        None
-                    )
+                    ARCitect.api.Save(ArcFilesDiscriminate.Workflow, ArcWorkflow.toJsonString 0 workflow, None)
                     |> Promise.start
                 | Some(ArcFiles.Template template) ->
                     ARCitect.api.Save(ArcFilesDiscriminate.Template, Template.toJsonString 0 template, None)
                     |> Promise.start
                 | Some(ArcFiles.DataMap(parent, datamap)) ->
                     if parent.IsSome then
-                        ARCitect.api.Save(
-                            ArcFilesDiscriminate.DataMap,
-                            DataMap.toJsonString 0 datamap,
-                            parent
-                        )
+                        ARCitect.api.Save(ArcFilesDiscriminate.DataMap, DataMap.toJsonString 0 datamap, parent)
                         |> Promise.start
                     else
                         failwith "No datamap parent is available"

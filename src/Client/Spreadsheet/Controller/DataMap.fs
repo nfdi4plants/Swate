@@ -2,6 +2,7 @@ module Spreadsheet.Controller.DataMap
 
 
 open ARCtrl
+open Swate.Components
 open Swate.Components.Shared
 
 
