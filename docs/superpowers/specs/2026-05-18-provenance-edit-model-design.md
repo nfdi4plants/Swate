@@ -1,326 +1,521 @@
 # Provenance Edit Model Design
 
+## Correction Scope
+
+This design is for Swate's F#/Fable component library. The production model belongs in `.fs` files under `src/Components/src/ProvenanceGrouping`, with Storybook only acting as the browser preview layer.
+
+The ARCtrl process list is a semantic reference. The Swate model must not expose ARCtrl types as its public model because the same model must accept several import sources later.
+
 ## Purpose
 
-Build a Swate-owned provenance edit model that can power the grouped provenance UI and later write changes back to ARC tables. The model must be independent from ARCtrl runtime types. ARCtrl's `ARC.Process list` is a reference for shape and semantics, but the reusable component and model helpers should work with plain Swate data.
+Build a Swate-owned provenance edit model that can:
 
-The model must support conversion from several inputs:
+- Represent loaded study, assay, or run tables.
+- Represent downstream tables created during the viewer workflow.
+- Preserve process-level input/output connections.
+- Preserve repeated property value occurrences.
+- Support grouped table/block display without graph layout.
+- Support bulk edits, connection edits, new layers, sorting, and grouping.
+- Produce explicit writeback patches that a caller can later apply to ARC tables.
 
-- Loaded assay tables.
-- Loaded study tables.
-- Loaded run tables.
-- Mock/story data.
-- Future plain DTOs that can describe table processes, entries, connections, and property values.
+The viewer opens from one loaded study, assay, or run table. New additions in that table and later generated tables are allowed. Previous-table edits are allowed only where the selected existing entries already have a compatible backing process/table location.
 
-The first real viewer session always starts from a loaded assay, study, or run table. Editing must support that loaded table and any downstream tables created during the viewer workflow.
+## ARCtrl Reference Read
 
-## ARCtrl Reference
+The reference behavior comes from these ARCtrl files:
 
-ARCtrl `Process` rows provide the reference semantics:
+- `C:\Users\carol\source\repos\ARCtrl\src\Core\Process\Process.fs`
+  - `Process` has `Name`, `ParameterValues`, `Inputs`, and `Outputs`.
+  - `Process.getParameterValues` reads process parameters.
+  - `Process.getInputCharacteristicValues` reads characteristics from inputs.
+  - `Process.getOutputCharacteristicValues` reads characteristics from outputs.
+  - `Process.getFactorValues` reads factors from process outputs.
+- `C:\Users\carol\source\repos\ARCtrl\src\Core\Process\ProcessInput.fs`
+  - `ProcessInput = Source | Sample | Data | Material`.
+  - Inputs have `TryName`.
+  - Source, sample, and material inputs can carry characteristics.
+  - Data inputs do not carry characteristics.
+- `C:\Users\carol\source\repos\ARCtrl\src\Core\Process\ProcessOutput.fs`
+  - `ProcessOutput = Sample | Data | Material`.
+  - Outputs have `TryName`.
+  - Sample and material outputs can carry characteristics.
+  - Sample outputs can carry factors.
+  - Data and material outputs do not carry factors.
+- `C:\Users\carol\source\repos\ARCtrl\src\Core\Process\ProcessParameterValue.fs`
+  - Process parameters have `Category`, `Value`, and `Unit`.
+  - As `IPropertyValue`, their additional type is `ProcessParameterValue`.
+- `C:\Users\carol\source\repos\ARCtrl\src\Core\Process\MaterialAttributeValue.fs`
+  - Characteristics have `Category`, `Value`, and `Unit`.
+  - As `IPropertyValue`, their additional type is `MaterialAttributeValue`.
+- `C:\Users\carol\source\repos\ARCtrl\src\Core\Process\FactorValue.fs`
+  - Factors have `Category`, `Value`, and `Unit`.
+  - As `IPropertyValue`, their additional type is `FactorValue`.
+- `C:\Users\carol\source\repos\ARCtrl\src\Core\Value.fs`
+  - Values are `Ontology`, `Int`, `Float`, or `Name`.
+- `C:\Users\carol\source\repos\ARCtrl\src\Core\Table\CompositeHeader.fs`
+  - Relevant table headers are `Input`, `Output`, `Characteristic`, `Factor`, `Parameter`, and `Component`.
+- `C:\Users\carol\source\repos\ARCtrl\src\ARCtrl\Conversion\Process.fs`
+  - Table rows are converted to processes.
+  - `CompositeHeader.Parameter` becomes process parameter values.
+  - `CompositeHeader.Characteristic` becomes characteristics on process inputs.
+  - `CompositeHeader.Factor` becomes factors on process outputs.
+  - `processToRows` later writes processes back by aligning inputs and outputs as table rows.
 
-- A process has a name. For tables, this normally corresponds to the table name, with row numbering for multi-row tables.
-- A process has inputs and outputs.
-- A process has process parameter values.
-- Characteristics belong to material-like input or output entries.
-- Factors belong to output sample-like entries.
-- Property values have category, value, and unit.
+The Swate model keeps the same concepts, but does not copy the ARCtrl object model.
 
-The Swate model must not directly expose or depend on `ARCtrl.Process`, `ProcessInput`, `ProcessOutput`, `ProcessParameterValue`, `MaterialAttributeValue`, or `FactorValue`. Adapters may read those types outside the reusable component boundary and then create plain Swate model objects.
+## Component Boundary
 
-## Core Approach
+The reusable model lives in `src/Components`.
 
-Use a normalized graph plus occurrence-level property values.
+Recommended files:
 
-The model should not be a table-row snapshot. It should also not copy ARCtrl's object model. Instead it should make these concepts explicit:
+- `src/Components/src/ProvenanceGrouping/Types.fs`
+- `src/Components/src/ProvenanceGrouping/Import.fs`
+- `src/Components/src/ProvenanceGrouping/Grouping.fs`
+- `src/Components/src/ProvenanceGrouping/Edit.fs`
+- `src/Components/src/ProvenanceGrouping/Fixtures.fs`
 
-- Tables are editable scopes.
-- Entries are named provenance objects, such as sources, samples, data, and materials.
-- Processes connect entries inside a table.
-- Connections are explicit input-to-output links scoped by a process.
-- Property values are individual occurrences with table, process, input, output, owner, and writeback metadata.
+These are non-component F# files, so their modules follow the component design rule:
 
-This model keeps grouping efficient while preserving enough provenance to write back edits later.
-
-## Types
-
-```ts
-export type ProvenanceTableKind = "study" | "assay" | "run" | "generated";
-
-export type ProvenanceEntryKind = "source" | "sample" | "data" | "material" | "unknown";
-
-export type ProvenancePropertyKind = "characteristic" | "factor" | "parameter" | "component";
-
-export type ProvenanceAssignmentScope = "entry" | "process";
-
-export type ProvenanceValueKind = "text" | "integer" | "float" | "term";
+```fsharp
+module Swate.Components.ProvenanceGrouping.Types
 ```
 
-```ts
-export type ProvenanceTerm = {
-  name: string;
-  termSource?: string;
-  termAccession?: string;
-};
+The public model must not use `ARCtrl.Process.Process`, `ProcessInput`, `ProcessOutput`, `ProcessParameterValue`, `MaterialAttributeValue`, or `FactorValue` in its signatures. ARCtrl-specific conversion can exist outside this core model, or as a thin adapter that returns plain import DTOs before entering the model.
 
-export type ProvenanceValue = {
-  text: string;
-  kind: ProvenanceValueKind;
-  term?: ProvenanceTerm;
-};
-```
+## Model Principles
 
-```ts
-export type ProvenanceTable = {
-  id: string;
-  name: string;
-  kind: ProvenanceTableKind;
-  origin: "loaded" | "created";
-  previousTableId?: string;
-};
-```
+Use a normalized process model plus property value occurrences.
 
-```ts
-export type ProvenanceEntry = {
-  id: string;
-  name: string;
-  kind: ProvenanceEntryKind;
-  tableIds: string[];
-};
-```
+The model is not a table snapshot. It stores:
 
-```ts
-export type ProvenanceProcess = {
-  id: string;
-  tableId: string;
-  tableName: string;
-  inputIds: string[];
-  outputIds: string[];
-  origin: "loaded" | "created";
-};
-```
+- Tables as edit scopes.
+- Entries as named source/sample/data/material objects.
+- Processes as table-scoped rows or row-like process occurrences.
+- Connections as explicit input-to-output links in a process.
+- Property values as occurrences, not as a map keyed by header.
 
-```ts
-export type ProvenanceConnection = {
-  id: string;
-  tableId: string;
-  processId: string;
-  sourceEntryId: string;
-  targetEntryId: string;
-  origin: "loaded" | "created";
-};
-```
+Repeated values are valid. One entry may have multiple values for the same property category. When such a property is used for grouping, the entry appears in each group that matches one of its values.
 
-Property value source tracking is table and header based. It intentionally does not store table row or column position.
+If no grouping is applied, entries remain individual display items and only show their names. Ungrouped entries are not collapsed into a single group.
 
-```ts
-export type ProvenancePropertySource = {
-  tableId: string;
-  tableName: string;
-  headerName: string;
-  headerKind: ProvenancePropertyKind;
-  processId?: string;
-  origin: "loaded" | "created";
-};
-```
+Missing a grouping property is not a group category. If an entry has no value for the active grouping property, it remains an individual item for that grouping layer.
 
-Rows are implied by the process plus input/output IDs. Existing columns can be found by `headerName` and `headerKind`; column position is not part of the model. If an adapter later cannot disambiguate several matching cells for the same header and old value, it must return an explicit writeback error rather than guessing.
+## F# Core Types
 
-```ts
-export type ProvenancePropertyValue = {
-  id: string;
-  kind: ProvenancePropertyKind;
-  assignmentScope: ProvenanceAssignmentScope;
-  tableId: string;
-  tableName: string;
-  processId?: string;
-  inputIds: string[];
-  outputIds: string[];
-  assignedEntryIds: string[];
-  category: ProvenanceTerm;
-  value: ProvenanceValue;
-  unit?: ProvenanceTerm;
-  source: ProvenancePropertySource;
-};
-```
+Use aliases for IDs to keep the model ergonomic in Fable and simple to serialize.
 
-```ts
-export type ProvenanceModel = {
-  tables: ProvenanceTable[];
-  entries: ProvenanceEntry[];
-  processes: ProvenanceProcess[];
-  connections: ProvenanceConnection[];
-  properties: ProvenancePropertyValue[];
-};
-```
+```fsharp
+module Swate.Components.ProvenanceGrouping.Types
 
-## Property Ownership
+type ProvenanceTableId = string
+type ProvenanceProcessId = string
+type ProvenanceEntryId = string
+type ProvenanceConnectionId = string
+type ProvenancePropertyValueId = string
 
-Every property value needs process context and grouping ownership.
+[<RequireQualifiedAccess>]
+type ProvenanceOrigin =
+    | Loaded
+    | Created
 
-For a process parameter:
+[<RequireQualifiedAccess>]
+type ProvenanceTableKind =
+    | Study
+    | Assay
+    | Run
+    | Generated
 
-- `assignmentScope` is `"process"`.
-- `processId` points to the process.
-- `inputIds` and `outputIds` are copied from the process.
-- `assignedEntryIds` contains the entries that should expose the value for grouping, usually the process inputs and outputs.
+[<RequireQualifiedAccess>]
+type ProvenanceEntryKind =
+    | Source
+    | Sample
+    | Data
+    | Material
+    | Unknown
 
-For a characteristic:
+[<RequireQualifiedAccess>]
+type ProvenancePropertyKind =
+    | Characteristic
+    | Factor
+    | Parameter
+    | Component
 
-- `assignmentScope` is `"entry"`.
-- `assignedEntryIds` contains the input or output entry that owns the characteristic.
-- `inputIds` and `outputIds` still describe the process context where this value was observed.
+[<RequireQualifiedAccess>]
+type ProvenanceAssignmentScope =
+    | Entry
+    | Process
 
-For a factor:
-
-- `assignmentScope` is `"entry"`.
-- `assignedEntryIds` contains the output entry that owns the factor.
-- `inputIds` and `outputIds` describe the process context.
-
-Components may be imported for completeness because ARCtrl exposes them in process conversion, but the first UI iteration does not need component editing.
-
-## Editing Rules
-
-### Existing Values
-
-Editing an existing property value targets `property.id`.
-
-The edit may change:
-
-- `category`
-- `value`
-- `unit`
-
-The change set must retain:
-
-- `source.tableId`
-- `source.headerName`
-- `source.headerKind`
-- `processId`
-- `inputIds`
-- `outputIds`
-- `assignedEntryIds`
-
-When writing back, the adapter finds the existing row from the process and connected input/output IDs, and finds the column by header name and property kind. Column position is irrelevant.
-
-### New Values In Current Scope
-
-Creating completely new property values is allowed in the current edit scope. Current scope means:
-
-- The loaded table that opened the viewer.
-- A table created during the current viewer workflow.
-
-The command creates new `ProvenancePropertyValue` occurrences with `source.origin = "created"`. If the header does not exist, the writeback patch may request a new header. If the header exists, the writeback patch may request new cells under that header.
-
-Creating a new property header with a duplicate name and kind should return an error. Adding a new value occurrence under an existing header is allowed.
-
-### New Values In Previous Tables
-
-Adding new property values to previous tables is allowed only for already existing entries with relevant connections in those previous tables.
-
-The model must reject the action when:
-
-- The selected entry is not present in the target previous table.
-- There is no process in the target previous table connecting the relevant input/output entries.
-- The action would require inventing new inputs or outputs in a previous table.
-
-The error should explain that previous-table edits require existing connected entries.
-
-### New Tables
-
-New downstream tables created after the loaded table are editable scopes. They may contain created processes, created connections, and created property values. New property additions in those tables are allowed.
-
-## Grouping And Display
-
-The grouped UI should derive its current `ProvenanceItem`-like view from the normalized model.
-
-For a displayed layer/table:
-
-- Entry cards come from `entries`.
-- Grouping values come from `properties` where `assignedEntryIds` includes the entry ID.
-- Connection-derived values can be derived through `connections` and process context.
-- Repeated values are preserved because `properties` is a list of occurrences.
-
-The UI adapter should expose table sides as display layers. For example, a loaded assay table can produce `assay-table:inputs` and `assay-table:outputs` layers while both still point back to the same editable `ProvenanceTable`.
-
-No grouping helper should collapse property values into a map keyed only by category name.
-
-## Adapter Boundary
-
-Adapters convert external data into `ProvenanceModel` and convert accepted edit commands into writeback patches.
-
-```ts
-export type ProvenanceImportResult = {
-  model: ProvenanceModel;
-  warnings: string[];
-};
-
-export type ProvenanceWritePatch = {
-  tablePatches: ProvenanceTablePatch[];
-  errors: string[];
-};
-```
-
-The reusable component should not know whether the adapter came from ARCtrl, a table DTO, or story data.
-
-For ARCtrl-based callers, conversion should happen outside the component:
-
-1. Read assay, study, or run tables with ARCtrl.
-2. Convert their Process list or process-like DTOs into plain Swate import objects.
-3. Build `ProvenanceModel`.
-4. Let the UI edit the Swate model.
-5. Convert edit commands into table patches.
-6. Apply patches with the caller's table implementation.
-
-## Writeback Patch Shape
-
-Writeback should be patch based, not direct mutation.
-
-```ts
-export type ProvenanceTablePatch =
-  | {
-      kind: "updatePropertyValue";
-      tableId: string;
-      processId: string;
-      headerName: string;
-      headerKind: ProvenancePropertyKind;
-      inputIds: string[];
-      outputIds: string[];
-      oldValue: ProvenanceValue;
-      newValue: ProvenanceValue;
-      unit?: ProvenanceTerm;
+type ProvenanceTerm =
+    {
+        Name: string
+        TermSource: string option
+        TermAccession: string option
     }
-  | {
-      kind: "addPropertyValue";
-      tableId: string;
-      processId: string;
-      headerName: string;
-      headerKind: ProvenancePropertyKind;
-      inputIds: string[];
-      outputIds: string[];
-      assignedEntryIds: string[];
-      value: ProvenanceValue;
-      unit?: ProvenanceTerm;
+
+[<RequireQualifiedAccess>]
+type ProvenanceValue =
+    | Text of string
+    | Integer of int
+    | Float of float
+    | Term of ProvenanceTerm
+
+type ProvenanceTable =
+    {
+        Id: ProvenanceTableId
+        Name: string
+        Kind: ProvenanceTableKind
+        Origin: ProvenanceOrigin
+        PreviousTableId: ProvenanceTableId option
     }
-  | {
-      kind: "addTable";
-      table: ProvenanceTable;
+
+type ProvenanceEntry =
+    {
+        Id: ProvenanceEntryId
+        Name: string
+        Kind: ProvenanceEntryKind
+        TableIds: ProvenanceTableId list
     }
-  | {
-      kind: "addProcessConnection";
-      tableId: string;
-      processId: string;
-      sourceEntryId: string;
-      targetEntryId: string;
-    };
+
+type ProvenanceProcess =
+    {
+        Id: ProvenanceProcessId
+        TableId: ProvenanceTableId
+        TableName: string
+        InputIds: ProvenanceEntryId list
+        OutputIds: ProvenanceEntryId list
+        Origin: ProvenanceOrigin
+    }
+
+type ProvenanceConnection =
+    {
+        Id: ProvenanceConnectionId
+        TableId: ProvenanceTableId
+        ProcessId: ProvenanceProcessId
+        SourceEntryId: ProvenanceEntryId
+        TargetEntryId: ProvenanceEntryId
+        Origin: ProvenanceOrigin
+    }
+
+type ProvenancePropertySource =
+    {
+        TableId: ProvenanceTableId
+        TableName: string
+        HeaderName: string
+        HeaderKind: ProvenancePropertyKind
+        ProcessId: ProvenanceProcessId option
+        Origin: ProvenanceOrigin
+    }
+
+type ProvenancePropertyValue =
+    {
+        Id: ProvenancePropertyValueId
+        Kind: ProvenancePropertyKind
+        AssignmentScope: ProvenanceAssignmentScope
+        TableId: ProvenanceTableId
+        TableName: string
+        ProcessId: ProvenanceProcessId option
+        InputIds: ProvenanceEntryId list
+        OutputIds: ProvenanceEntryId list
+        AssignedEntryIds: ProvenanceEntryId list
+        Category: ProvenanceTerm
+        Value: ProvenanceValue
+        Unit: ProvenanceTerm option
+        Source: ProvenancePropertySource
+    }
+
+type ProvenanceModel =
+    {
+        Tables: Map<ProvenanceTableId, ProvenanceTable>
+        Entries: Map<ProvenanceEntryId, ProvenanceEntry>
+        Processes: Map<ProvenanceProcessId, ProvenanceProcess>
+        Connections: Map<ProvenanceConnectionId, ProvenanceConnection>
+        Properties: Map<ProvenancePropertyValueId, ProvenancePropertyValue>
+    }
 ```
 
-Patch application is outside the reusable component. It may use ARCtrl, table DTOs, or another backing model.
+## Property Semantics
+
+Process parameters:
+
+- Map from ARCtrl `Process.ParameterValues`.
+- `Kind = ProvenancePropertyKind.Parameter`.
+- `AssignmentScope = ProvenanceAssignmentScope.Process`.
+- `AssignedEntryIds` normally includes the process inputs and outputs so grouping can expose the value on both sides.
+- `InputIds` and `OutputIds` preserve the process context.
+
+Characteristics:
+
+- Map from `ProcessInput.tryGetCharacteristicValues` and `ProcessOutput.tryGetCharacteristicValues`.
+- `Kind = ProvenancePropertyKind.Characteristic`.
+- `AssignmentScope = ProvenanceAssignmentScope.Entry`.
+- `AssignedEntryIds` contains the owning input or output entry.
+- Process context is still preserved via `ProcessId`, `InputIds`, and `OutputIds`.
+
+Factors:
+
+- Map from `ProcessOutput.tryGetFactorValues`.
+- `Kind = ProvenancePropertyKind.Factor`.
+- `AssignmentScope = ProvenanceAssignmentScope.Entry`.
+- `AssignedEntryIds` contains the owning output sample entry.
+
+Components:
+
+- Map from `CompositeHeader.Component` when available.
+- Included for completeness, but the first UI pass does not need component editing.
+
+## Source Tracking
+
+Source tracking is table/header/process based:
+
+- `TableId`
+- `TableName`
+- `HeaderName`
+- `HeaderKind`
+- `ProcessId`
+- `Origin`
+
+The model intentionally does not store row index or column position.
+
+Rows are implied by process ID plus the relevant input/output IDs. Existing columns are located by `HeaderName` and `HeaderKind`. Column position does not matter. If writeback cannot disambiguate a target cell from those fields, the writeback adapter must return an explicit error instead of guessing.
+
+## Import Boundary
+
+The core import API accepts plain F# records, not ARCtrl types.
+
+```fsharp
+module Swate.Components.ProvenanceGrouping.Import
+
+open Swate.Components.ProvenanceGrouping.Types
+
+type ImportedEntry =
+    {
+        Id: ProvenanceEntryId
+        Name: string
+        Kind: ProvenanceEntryKind
+    }
+
+type ImportedProperty =
+    {
+        Id: ProvenancePropertyValueId
+        Kind: ProvenancePropertyKind
+        AssignmentScope: ProvenanceAssignmentScope
+        AssignedEntryIds: ProvenanceEntryId list option
+        HeaderName: string
+        Category: ProvenanceTerm
+        Value: ProvenanceValue
+        Unit: ProvenanceTerm option
+    }
+
+type ImportedProcess =
+    {
+        Id: ProvenanceProcessId
+        InputIds: ProvenanceEntryId list
+        OutputIds: ProvenanceEntryId list
+        Inputs: ImportedEntry list
+        Outputs: ImportedEntry list
+        Properties: ImportedProperty list
+    }
+
+type ImportedTable =
+    {
+        Id: ProvenanceTableId
+        Name: string
+        Kind: ProvenanceTableKind
+        Origin: ProvenanceOrigin
+        PreviousTableId: ProvenanceTableId option
+        Processes: ImportedProcess list
+    }
+
+type ImportResult =
+    {
+        Model: ProvenanceModel
+        Warnings: string list
+    }
+```
+
+An ARCtrl caller can map `Process list` to these records before calling the model import function:
+
+- `Process.Name` or caller table name -> `ImportedTable.Name`.
+- Process row identity -> `ImportedProcess.Id`.
+- `Process.Inputs` -> `ImportedEntry` plus `InputIds`.
+- `Process.Outputs` -> `ImportedEntry` plus `OutputIds`.
+- `Process.ParameterValues` -> `ImportedProperty` with `Kind = Parameter`.
+- Input/output `MaterialAttributeValue` -> `ImportedProperty` with `Kind = Characteristic`.
+- Output `FactorValue` -> `ImportedProperty` with `Kind = Factor`.
+
+## Grouping Projection
+
+The display layer is derived from the normalized model.
+
+```fsharp
+module Swate.Components.ProvenanceGrouping.Grouping
+
+open Swate.Components.ProvenanceGrouping.Types
+
+[<RequireQualifiedAccess>]
+type ProvenanceSide =
+    | Inputs
+    | Outputs
+
+type GroupingKey =
+    {
+        Kind: ProvenancePropertyKind
+        Name: string
+    }
+
+type DisplayMember =
+    {
+        EntryId: ProvenanceEntryId
+        EntryName: string
+        PropertyValueIds: ProvenancePropertyValueId list
+    }
+
+type DisplayGroup =
+    {
+        Id: string
+        TableId: ProvenanceTableId
+        Side: ProvenanceSide
+        GroupingValues: (GroupingKey * ProvenanceValue) list
+        Members: DisplayMember list
+    }
+
+type DisplayConnection =
+    {
+        Id: string
+        SourceGroupId: string
+        TargetGroupId: string
+        ConnectionIds: ProvenanceConnectionId list
+    }
+```
+
+Grouping behavior:
+
+- With no grouping keys, each entry is one display group with one member.
+- Grouping by one or more keys groups entries by their actual values.
+- Multiple values for the same key duplicate the entry into multiple display groups.
+- Missing values do not create a "missing" group.
+- Non-grouped properties are ignored for group identity.
+- Sorting by a non-grouped property sorts members inside groups. With no groups, it sorts the individual item groups.
+
+Connection behavior:
+
+- The model stores individual `ProvenanceConnection` values.
+- The view aggregates those into group-level `DisplayConnection` lines.
+- A group line must never be expanded as a Cartesian product.
+- Clicking a group line expands both connected groups and shows only the individual connections listed by `ConnectionIds`.
+
+This prevents the previous bug where an output species group expanded to all-to-all item links even though the source data only contained specific connections.
+
+## Parameter Value Controls
+
+Grouping controls are generated from property occurrences.
+
+- Values shared by both current sides, or present only on the input side, appear on the left by default.
+- Values present only on outputs appear on the right by default.
+- Shared values can be dragged between left and right control areas.
+- Controls show unique property values, not one chip per occurrence.
+- Each property value control connects to the display groups it applies to by rendered connector lines, not by a text list.
+
+If a value is dragged onto a group, all members of that group receive that value. Multiple values for the same property category may coexist on the same entry.
+
+If an output-only value is assigned to input entries through this interaction, it becomes part of those input entries' property occurrences in the current edit scope.
+
+## Edit Rules
+
+Existing value edits:
+
+- Target an existing `ProvenancePropertyValueId`.
+- Preserve source table/header/process context.
+- Produce an update patch.
+- If this is a change to an existing parameter value, connected outputs that already carry the propagated occurrence are overwritten.
+
+New value creation in current scope:
+
+- Allowed in the loaded table and generated downstream tables.
+- Creates new property occurrences.
+- If the requested header already exists, add values under that header.
+- If the requested header does not exist, add the header and values.
+- If the user asks to create a new property header with a duplicate name and kind, return an explicit duplicate-header error.
+
+Previous-table edits:
+
+- Allowed only for existing entries with a compatible source table and process context.
+- Must not invent rows, inputs, outputs, or process connections in previous tables.
+- If the selected entries do not share a valid backing process/table location, return an explicit error.
+
+Connection edits:
+
+- The model stores item-level connections.
+- Dragging group-to-group creates all item-level connections required by that operation or returns an error if the operation cannot be represented without partial state.
+- Fan-in and fan-out are allowed: one input may connect to many outputs, and one output may connect to many inputs.
+
+Layer creation:
+
+- Creating a downstream layer uses the current selection as the new layer's inputs.
+- The selection may contain a mix of entries currently shown on input and output sides.
+- If nothing is selected, the UI may use the current right-side outputs as the default, but this is a UI policy rather than a model requirement.
+
+## Patch Output
+
+Edits return patches; they do not mutate ARC tables directly.
+
+```fsharp
+module Swate.Components.ProvenanceGrouping.Edit
+
+open Swate.Components.ProvenanceGrouping.Types
+
+[<RequireQualifiedAccess>]
+type EditError =
+    | PropertyNotFound of ProvenancePropertyValueId
+    | ProcessNotFound of ProvenanceProcessId
+    | TableNotFound of ProvenanceTableId
+    | MissingProcessContext of ProvenancePropertyValueId
+    | DuplicateHeader of tableId: ProvenanceTableId * headerKind: ProvenancePropertyKind * headerName: string
+    | PreviousTableRequiresExistingConnectedEntries of tableId: ProvenanceTableId
+    | PartialGroupConnectionNotAllowed of sourceGroupId: string * targetGroupId: string
+
+[<RequireQualifiedAccess>]
+type ProvenanceTablePatch =
+    | UpdatePropertyValue of
+        tableId: ProvenanceTableId *
+        processId: ProvenanceProcessId *
+        headerKind: ProvenancePropertyKind *
+        headerName: string *
+        inputIds: ProvenanceEntryId list *
+        outputIds: ProvenanceEntryId list *
+        assignedEntryIds: ProvenanceEntryId list *
+        oldValue: ProvenanceValue *
+        newValue: ProvenanceValue *
+        unit: ProvenanceTerm option
+    | AddPropertyValue of
+        tableId: ProvenanceTableId *
+        processId: ProvenanceProcessId *
+        headerKind: ProvenancePropertyKind *
+        headerName: string *
+        inputIds: ProvenanceEntryId list *
+        outputIds: ProvenanceEntryId list *
+        assignedEntryIds: ProvenanceEntryId list *
+        value: ProvenanceValue *
+        unit: ProvenanceTerm option
+    | AddProcessConnection of
+        tableId: ProvenanceTableId *
+        processId: ProvenanceProcessId *
+        sourceEntryId: ProvenanceEntryId *
+        targetEntryId: ProvenanceEntryId
+    | AddTable of ProvenanceTable
+
+type EditResult =
+    Result<ProvenanceModel * ProvenanceTablePatch list, EditError>
+```
+
+Patch application remains outside the reusable component. It may use ARCtrl, another table model, or a test fixture.
 
 ## Non-Goals
 
-- No direct ARCtrl dependency inside `src/Components/src/ProvenanceGrouping`.
-- No table row or column position in the normalized edit model.
+- No direct ARCtrl types in the public Swate model.
+- No graph visualization.
+- No row index or column position in the normalized source model.
 - No creation of new entries in previous tables.
 - No automatic ontology lookup.
-- No production writeback implementation in the first model pass.
-- No graph visualization.
+- No production ARC writeback implementation in the first model pass.

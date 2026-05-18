@@ -1,1097 +1,445 @@
 # Provenance Edit Model Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+**Goal:** Add a Swate-owned F#/Fable provenance edit model that can import process-like table data, power the grouped provenance UI, and return table/header based writeback patches.
 
-**Goal:** Add a Swate-owned normalized provenance edit model that can import process-like data, power the grouped provenance UI, and produce table/header-based writeback patches.
+**Architecture:** Implement the model as pure F# modules under `src/Components/src/ProvenanceGrouping`. The model has no React dependency and no ARCtrl types in its public signatures. Storybook remains the browser preview shell; the state and edit behavior live in F#.
 
-**Architecture:** Keep the model independent from ARCtrl runtime types. Implement pure TypeScript model types and helpers under `src/Components/src/ProvenanceGrouping`, then adapt the existing mockup to derive its display props from the normalized model. Use Storybook play tests as the available component-package verification path.
-
-**Tech Stack:** TypeScript, React Storybook, Vitest browser project via Storybook, existing Swate Components package scripts.
+**Reference:** The design follows ARCtrl `Process` semantics from `C:\Users\carol\source\repos\ARCtrl`: process parameters live on `Process.ParameterValues`, characteristics live on process inputs/outputs, and factors live on sample outputs.
 
 ---
 
 ## File Structure
 
-- Create `src/Components/src/ProvenanceGrouping/ProvenanceModel.ts`
-  - Owns normalized model types, import DTO types, selectors, validation helpers, edit command functions, and patch types.
-  - Has no React imports and no ARCtrl imports.
-- Create `src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx`
-  - Test-only Storybook story that renders a small status element and uses `play` functions to verify pure model behavior.
-- Modify `src/Components/src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
-  - Later bridge the existing interactive mockup sample data through `ProvenanceModel` instead of maintaining a separate mock-only shape.
-- Modify `src/Components/src/index.js`
-  - Export the model helpers only after they are stable enough for package users. This can be delayed until Task 5.
-- Modify `docs/superpowers/specs/2026-05-18-provenance-edit-model-design.md`
-  - Keep it in sync if implementation reveals a naming issue.
+- Create `src/Components/src/ProvenanceGrouping/Types.fs`
+  - Public model types, IDs, property value occurrences, connections, and patch-independent primitives.
+- Create `src/Components/src/ProvenanceGrouping/Import.fs`
+  - Plain import DTOs and `fromImportedTables`.
+  - No ARCtrl types in public signatures.
+- Create `src/Components/src/ProvenanceGrouping/Grouping.fs`
+  - Selectors and grouped display projections used by the component/story.
+- Create `src/Components/src/ProvenanceGrouping/Edit.fs`
+  - Edit commands, validation, and writeback patch output.
+- Create `src/Components/src/ProvenanceGrouping/Fixtures.fs`
+  - F# sample data for the mockup story and focused manual checks.
+- Modify `src/Components/src/Swate.Components.fsproj`
+  - Add the new `.fs` files in compile order before any component file that consumes them.
+- Later modify the existing Storybook preview
+  - Keep the visual Storybook shell as browser-facing preview code.
+  - Source all sample data and edit behavior from the compiled F# modules.
 
-## Task 1: Add Core Model Types And Import Builder
+Compile order in `Swate.Components.fsproj` should be:
+
+```xml
+<Compile Include="ProvenanceGrouping\Types.fs" />
+<Compile Include="ProvenanceGrouping\Import.fs" />
+<Compile Include="ProvenanceGrouping\Grouping.fs" />
+<Compile Include="ProvenanceGrouping\Edit.fs" />
+<Compile Include="ProvenanceGrouping\Fixtures.fs" />
+```
+
+---
+
+## Task 1: Add F# Core Types
 
 **Files:**
-- Create: `src/Components/src/ProvenanceGrouping/ProvenanceModel.ts`
-- Create: `src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx`
-
-- [ ] **Step 1: Add a failing Storybook model invariant story**
-
-Create `src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx`:
-
-```tsx
-import React from "react";
-import type { Meta, StoryObj } from "@storybook/react-vite";
-import { expect } from "storybook/test";
-import { createProvenanceModelFromTables, type ProvenanceImportTable } from "./ProvenanceModel";
-
-const sourceTables: ProvenanceImportTable[] = [
-  {
-    id: "assay-table",
-    name: "Assay Table",
-    kind: "assay",
-    origin: "loaded",
-    processes: [
-      {
-        id: "assay-table/process/0",
-        inputIds: ["input-a"],
-        outputIds: ["output-a"],
-        inputs: [{ id: "input-a", name: "Input A", kind: "sample" }],
-        outputs: [{ id: "output-a", name: "Output A", kind: "data" }],
-        properties: [
-          {
-            id: "assay-table/process/0/parameter/temperature",
-            kind: "parameter",
-            assignmentScope: "process",
-            headerName: "Temperature",
-            category: { name: "Temperature" },
-            value: { text: "12 C", kind: "text" },
-          },
-          {
-            id: "assay-table/process/0/factor/analysis",
-            kind: "factor",
-            assignmentScope: "entry",
-            assignedEntryIds: ["output-a"],
-            headerName: "Analysis",
-            category: { name: "Analysis" },
-            value: { text: "Mass Spectrometry", kind: "text" },
-          },
-        ],
-      },
-    ],
-  },
-];
-
-const meta = {
-  title: "Components/ProvenanceModel",
-  tags: ["autodocs"],
-  render: () => <div data-testid="ProvenanceModel-root">Provenance model invariants</div>,
-} satisfies Meta;
-
-export default meta;
-type Story = StoryObj<typeof meta>;
-
-export const ImportModel: Story = {
-  name: "Import model",
-  play: async () => {
-    const result = createProvenanceModelFromTables(sourceTables);
-    expect(result.warnings).toEqual([]);
-    expect(result.model.tables).toHaveLength(1);
-    expect(result.model.entries.map((entry) => entry.id).sort()).toEqual(["input-a", "output-a"]);
-    expect(result.model.processes[0].tableName).toBe("Assay Table");
-    expect(result.model.connections).toEqual([
-      {
-        id: "assay-table/process/0/input-a/output-a",
-        tableId: "assay-table",
-        processId: "assay-table/process/0",
-        sourceEntryId: "input-a",
-        targetEntryId: "output-a",
-        origin: "loaded",
-      },
-    ]);
-    expect(result.model.properties).toHaveLength(2);
-    expect(result.model.properties[0]).toMatchObject({
-      tableId: "assay-table",
-      tableName: "Assay Table",
-      processId: "assay-table/process/0",
-      inputIds: ["input-a"],
-      outputIds: ["output-a"],
-      assignedEntryIds: ["input-a", "output-a"],
-      source: {
-        tableId: "assay-table",
-        tableName: "Assay Table",
-        headerName: "Temperature",
-        headerKind: "parameter",
-        processId: "assay-table/process/0",
-        origin: "loaded",
-      },
-    });
-  },
-};
-```
-
-- [ ] **Step 2: Run the failing story test**
-
-Run:
-
-```powershell
-npm run test:run -- ProvenanceModel
-```
-
-Expected: fail because `./ProvenanceModel` does not exist.
-
-- [ ] **Step 3: Add model types and import builder**
-
-Create `src/Components/src/ProvenanceGrouping/ProvenanceModel.ts`:
-
-```ts
-export type ProvenanceTableKind = "study" | "assay" | "run" | "generated";
-export type ProvenanceEntryKind = "source" | "sample" | "data" | "material" | "unknown";
-export type ProvenancePropertyKind = "characteristic" | "factor" | "parameter" | "component";
-export type ProvenanceAssignmentScope = "entry" | "process";
-export type ProvenanceValueKind = "text" | "integer" | "float" | "term";
-
-export type ProvenanceTerm = {
-  name: string;
-  termSource?: string;
-  termAccession?: string;
-};
-
-export type ProvenanceValue = {
-  text: string;
-  kind: ProvenanceValueKind;
-  term?: ProvenanceTerm;
-};
-
-export type ProvenanceTable = {
-  id: string;
-  name: string;
-  kind: ProvenanceTableKind;
-  origin: "loaded" | "created";
-  previousTableId?: string;
-};
-
-export type ProvenanceEntry = {
-  id: string;
-  name: string;
-  kind: ProvenanceEntryKind;
-  tableIds: string[];
-};
-
-export type ProvenanceProcess = {
-  id: string;
-  tableId: string;
-  tableName: string;
-  inputIds: string[];
-  outputIds: string[];
-  origin: "loaded" | "created";
-};
-
-export type ProvenanceConnection = {
-  id: string;
-  tableId: string;
-  processId: string;
-  sourceEntryId: string;
-  targetEntryId: string;
-  origin: "loaded" | "created";
-};
-
-export type ProvenancePropertySource = {
-  tableId: string;
-  tableName: string;
-  headerName: string;
-  headerKind: ProvenancePropertyKind;
-  processId?: string;
-  origin: "loaded" | "created";
-};
-
-export type ProvenancePropertyValue = {
-  id: string;
-  kind: ProvenancePropertyKind;
-  assignmentScope: ProvenanceAssignmentScope;
-  tableId: string;
-  tableName: string;
-  processId?: string;
-  inputIds: string[];
-  outputIds: string[];
-  assignedEntryIds: string[];
-  category: ProvenanceTerm;
-  value: ProvenanceValue;
-  unit?: ProvenanceTerm;
-  source: ProvenancePropertySource;
-};
-
-export type ProvenanceModel = {
-  tables: ProvenanceTable[];
-  entries: ProvenanceEntry[];
-  processes: ProvenanceProcess[];
-  connections: ProvenanceConnection[];
-  properties: ProvenancePropertyValue[];
-};
-
-export type ProvenanceImportEntry = {
-  id: string;
-  name: string;
-  kind: ProvenanceEntryKind;
-};
-
-export type ProvenanceImportProperty = {
-  id: string;
-  kind: ProvenancePropertyKind;
-  assignmentScope: ProvenanceAssignmentScope;
-  assignedEntryIds?: string[];
-  headerName: string;
-  category: ProvenanceTerm;
-  value: ProvenanceValue;
-  unit?: ProvenanceTerm;
-};
-
-export type ProvenanceImportProcess = {
-  id: string;
-  inputIds: string[];
-  outputIds: string[];
-  inputs: ProvenanceImportEntry[];
-  outputs: ProvenanceImportEntry[];
-  properties: ProvenanceImportProperty[];
-};
-
-export type ProvenanceImportTable = {
-  id: string;
-  name: string;
-  kind: ProvenanceTableKind;
-  origin: "loaded" | "created";
-  previousTableId?: string;
-  processes: ProvenanceImportProcess[];
-};
-
-export type ProvenanceImportResult = {
-  model: ProvenanceModel;
-  warnings: string[];
-};
-
-const unique = <T,>(values: T[]): T[] => Array.from(new Set(values));
-
-export function createProvenanceModelFromTables(tables: ProvenanceImportTable[]): ProvenanceImportResult {
-  const entriesById = new Map<string, ProvenanceEntry>();
-  const processes: ProvenanceProcess[] = [];
-  const connections: ProvenanceConnection[] = [];
-  const properties: ProvenancePropertyValue[] = [];
-  const warnings: string[] = [];
-
-  tables.forEach((table) => {
-    table.processes.forEach((process) => {
-      [...process.inputs, ...process.outputs].forEach((entry) => {
-        const existing = entriesById.get(entry.id);
-        entriesById.set(entry.id, {
-          id: entry.id,
-          name: existing?.name ?? entry.name,
-          kind: existing?.kind ?? entry.kind,
-          tableIds: unique([...(existing?.tableIds ?? []), table.id]),
-        });
-      });
-
-      processes.push({
-        id: process.id,
-        tableId: table.id,
-        tableName: table.name,
-        inputIds: process.inputIds,
-        outputIds: process.outputIds,
-        origin: table.origin,
-      });
-
-      process.inputIds.forEach((sourceEntryId) => {
-        process.outputIds.forEach((targetEntryId) => {
-          connections.push({
-            id: `${process.id}/${sourceEntryId}/${targetEntryId}`,
-            tableId: table.id,
-            processId: process.id,
-            sourceEntryId,
-            targetEntryId,
-            origin: table.origin,
-          });
-        });
-      });
-
-      process.properties.forEach((property) => {
-        const assignedEntryIds =
-          property.assignedEntryIds ??
-          (property.assignmentScope === "process" ? unique([...process.inputIds, ...process.outputIds]) : []);
-
-        if (property.assignmentScope === "entry" && assignedEntryIds.length === 0) {
-          warnings.push(`Property "${property.id}" has entry assignment scope but no assigned entries.`);
-        }
-
-        properties.push({
-          id: property.id,
-          kind: property.kind,
-          assignmentScope: property.assignmentScope,
-          tableId: table.id,
-          tableName: table.name,
-          processId: process.id,
-          inputIds: process.inputIds,
-          outputIds: process.outputIds,
-          assignedEntryIds,
-          category: property.category,
-          value: property.value,
-          unit: property.unit,
-          source: {
-            tableId: table.id,
-            tableName: table.name,
-            headerName: property.headerName,
-            headerKind: property.kind,
-            processId: process.id,
-            origin: table.origin,
-          },
-        });
-      });
-    });
-  });
-
-  return {
-    model: {
-      tables: tables.map(({ processes: _processes, ...table }) => table),
-      entries: Array.from(entriesById.values()),
-      processes,
-      connections,
-      properties,
-    },
-    warnings,
-  };
-}
-```
-
-- [ ] **Step 4: Run the story test**
-
-Run:
-
-```powershell
-npm run test:run -- ProvenanceModel
-```
-
-Expected: pass with `1 passed`.
-
-- [ ] **Step 5: Commit**
-
-```powershell
-git add src/Components/src/ProvenanceGrouping/ProvenanceModel.ts src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx
-git commit -m "feat: add provenance edit model"
-```
-
-## Task 2: Add Property Selectors For Grouping
-
-**Files:**
-- Modify: `src/Components/src/ProvenanceGrouping/ProvenanceModel.ts`
-- Modify: `src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx`
-
-- [ ] **Step 1: Add failing selector coverage**
-
-Append this story to `ProvenanceModel.stories.tsx`:
-
-```tsx
-import { getPropertiesForEntry, getPropertyValuesForEntry } from "./ProvenanceModel";
-
-export const EntryPropertySelectors: Story = {
-  name: "Entry property selectors",
-  play: async () => {
-    const result = createProvenanceModelFromTables(sourceTables);
-
-    expect(getPropertiesForEntry(result.model, "input-a").map((property) => property.category.name)).toEqual([
-      "Temperature",
-    ]);
-    expect(getPropertiesForEntry(result.model, "output-a").map((property) => property.category.name)).toEqual([
-      "Temperature",
-      "Analysis",
-    ]);
-    expect(getPropertyValuesForEntry(result.model, "output-a", "Analysis")).toEqual(["Mass Spectrometry"]);
-  },
-};
-```
-
-Expected initial failure: named exports do not exist.
-
-- [ ] **Step 2: Implement selectors**
-
-Append to `ProvenanceModel.ts`:
-
-```ts
-const normalizeName = (value: string): string => value.trim().toLowerCase();
-
-export function getPropertiesForEntry(model: ProvenanceModel, entryId: string): ProvenancePropertyValue[] {
-  return model.properties.filter((property) => property.assignedEntryIds.includes(entryId));
-}
-
-export function getPropertyValuesForEntry(model: ProvenanceModel, entryId: string, categoryName: string): string[] {
-  const normalizedCategory = normalizeName(categoryName);
-  return getPropertiesForEntry(model, entryId)
-    .filter((property) => normalizeName(property.category.name) === normalizedCategory)
-    .map((property) => property.value.text);
-}
-
-export function getPropertyCategoriesForTable(model: ProvenanceModel, tableId: string): string[] {
-  return unique(
-    model.properties
-      .filter((property) => property.tableId === tableId)
-      .map((property) => property.category.name)
-      .filter((name) => name.trim().length > 0),
-  ).sort((left, right) => left.localeCompare(right));
-}
-```
-
-- [ ] **Step 3: Run selector tests**
-
-Run:
-
-```powershell
-npm run test:run -- ProvenanceModel
-```
-
-Expected: pass with `2 passed`.
-
-- [ ] **Step 4: Commit**
-
-```powershell
-git add src/Components/src/ProvenanceGrouping/ProvenanceModel.ts src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx
-git commit -m "feat: add provenance property selectors"
-```
-
-## Task 3: Add Edit Commands And Patch Output
-
-**Files:**
-- Modify: `src/Components/src/ProvenanceGrouping/ProvenanceModel.ts`
-- Modify: `src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx`
-
-- [ ] **Step 1: Add failing edit command stories**
-
-Append this import and stories to `ProvenanceModel.stories.tsx`:
-
-```tsx
-import {
-  createPropertyValueInScope,
-  updatePropertyValue,
-  validatePreviousTablePropertyTarget,
-} from "./ProvenanceModel";
-
-export const UpdateExistingProperty: Story = {
-  name: "Update existing property",
-  play: async () => {
-    const result = createProvenanceModelFromTables(sourceTables);
-    const update = updatePropertyValue(result.model, {
-      propertyId: "assay-table/process/0/parameter/temperature",
-      value: { text: "16 C", kind: "text" },
-    });
-
-    expect(update.ok).toBe(true);
-    if (!update.ok) return;
-    expect(update.model.properties.find((property) => property.id === "assay-table/process/0/parameter/temperature")?.value.text).toBe("16 C");
-    expect(update.patches).toEqual([
-      {
-        kind: "updatePropertyValue",
-        tableId: "assay-table",
-        processId: "assay-table/process/0",
-        headerName: "Temperature",
-        headerKind: "parameter",
-        inputIds: ["input-a"],
-        outputIds: ["output-a"],
-        oldValue: { text: "12 C", kind: "text" },
-        newValue: { text: "16 C", kind: "text" },
-        unit: undefined,
-      },
-    ]);
-  },
-};
-
-export const CreateCurrentScopeProperty: Story = {
-  name: "Create current scope property",
-  play: async () => {
-    const result = createProvenanceModelFromTables(sourceTables);
-    const create = createPropertyValueInScope(result.model, {
-      tableId: "assay-table",
-      processId: "assay-table/process/0",
-      kind: "parameter",
-      assignmentScope: "process",
-      headerName: "Instrument",
-      category: { name: "Instrument" },
-      value: { text: "Orbitrap", kind: "text" },
-    });
-
-    expect(create.ok).toBe(true);
-    if (!create.ok) return;
-    expect(create.model.properties.some((property) => property.category.name === "Instrument")).toBe(true);
-    expect(create.patches[0]).toMatchObject({
-      kind: "addPropertyValue",
-      tableId: "assay-table",
-      processId: "assay-table/process/0",
-      headerName: "Instrument",
-      headerKind: "parameter",
-      inputIds: ["input-a"],
-      outputIds: ["output-a"],
-      assignedEntryIds: ["input-a", "output-a"],
-      value: { text: "Orbitrap", kind: "text" },
-    });
-  },
-};
-
-export const RejectPreviousTableWithoutConnection: Story = {
-  name: "Reject previous table without connection",
-  play: async () => {
-    const result = createProvenanceModelFromTables(sourceTables);
-    expect(validatePreviousTablePropertyTarget(result.model, "missing-table", ["input-a"])).toEqual({
-      ok: false,
-      error: "Previous-table edits require existing connected entries in the target table.",
-    });
-  },
-};
-```
-
-- [ ] **Step 2: Implement edit command result and patches**
-
-Append to `ProvenanceModel.ts`:
-
-```ts
-export type ProvenanceTablePatch =
-  | {
-      kind: "updatePropertyValue";
-      tableId: string;
-      processId: string;
-      headerName: string;
-      headerKind: ProvenancePropertyKind;
-      inputIds: string[];
-      outputIds: string[];
-      oldValue: ProvenanceValue;
-      newValue: ProvenanceValue;
-      unit?: ProvenanceTerm;
-    }
-  | {
-      kind: "addPropertyValue";
-      tableId: string;
-      processId: string;
-      headerName: string;
-      headerKind: ProvenancePropertyKind;
-      inputIds: string[];
-      outputIds: string[];
-      assignedEntryIds: string[];
-      value: ProvenanceValue;
-      unit?: ProvenanceTerm;
-    };
-
-export type ProvenanceEditResult =
-  | { ok: true; model: ProvenanceModel; patches: ProvenanceTablePatch[] }
-  | { ok: false; error: string };
-
-export type UpdatePropertyValueCommand = {
-  propertyId: string;
-  category?: ProvenanceTerm;
-  value: ProvenanceValue;
-  unit?: ProvenanceTerm;
-};
-
-export function updatePropertyValue(model: ProvenanceModel, command: UpdatePropertyValueCommand): ProvenanceEditResult {
-  const property = model.properties.find((candidate) => candidate.id === command.propertyId);
-
-  if (!property) {
-    return { ok: false, error: "The selected property value no longer exists." };
-  }
-
-  if (!property.processId) {
-    return { ok: false, error: "The selected property value is missing process context." };
-  }
-
-  const nextProperty: ProvenancePropertyValue = {
-    ...property,
-    category: command.category ?? property.category,
-    value: command.value,
-    unit: command.unit,
-  };
-
-  return {
-    ok: true,
-    model: {
-      ...model,
-      properties: model.properties.map((candidate) => (candidate.id === property.id ? nextProperty : candidate)),
-    },
-    patches: [
-      {
-        kind: "updatePropertyValue",
-        tableId: property.tableId,
-        processId: property.processId,
-        headerName: property.source.headerName,
-        headerKind: property.source.headerKind,
-        inputIds: property.inputIds,
-        outputIds: property.outputIds,
-        oldValue: property.value,
-        newValue: command.value,
-        unit: command.unit,
-      },
-    ],
-  };
-}
-
-export type CreatePropertyValueCommand = {
-  tableId: string;
-  processId: string;
-  kind: ProvenancePropertyKind;
-  assignmentScope: ProvenanceAssignmentScope;
-  assignedEntryIds?: string[];
-  headerName: string;
-  category: ProvenanceTerm;
-  value: ProvenanceValue;
-  unit?: ProvenanceTerm;
-};
-
-export function createPropertyValueInScope(
-  model: ProvenanceModel,
-  command: CreatePropertyValueCommand,
-): ProvenanceEditResult {
-  const table = model.tables.find((candidate) => candidate.id === command.tableId);
-  const process = model.processes.find((candidate) => candidate.id === command.processId && candidate.tableId === command.tableId);
-
-  if (!table || !process) {
-    return { ok: false, error: "The selected edit scope no longer exists." };
-  }
-
-  const assignedEntryIds =
-    command.assignedEntryIds ??
-    (command.assignmentScope === "process" ? unique([...process.inputIds, ...process.outputIds]) : []);
-
-  if (command.assignmentScope === "entry" && assignedEntryIds.length === 0) {
-    return { ok: false, error: "Entry-scoped property values need at least one assigned entry." };
-  }
-
-  const propertyId = `${command.processId}/${command.kind}/${command.headerName}/${model.properties.length + 1}`;
-  const property: ProvenancePropertyValue = {
-    id: propertyId,
-    kind: command.kind,
-    assignmentScope: command.assignmentScope,
-    tableId: table.id,
-    tableName: table.name,
-    processId: process.id,
-    inputIds: process.inputIds,
-    outputIds: process.outputIds,
-    assignedEntryIds,
-    category: command.category,
-    value: command.value,
-    unit: command.unit,
-    source: {
-      tableId: table.id,
-      tableName: table.name,
-      headerName: command.headerName,
-      headerKind: command.kind,
-      processId: process.id,
-      origin: "created",
-    },
-  };
-
-  return {
-    ok: true,
-    model: { ...model, properties: [...model.properties, property] },
-    patches: [
-      {
-        kind: "addPropertyValue",
-        tableId: table.id,
-        processId: process.id,
-        headerName: command.headerName,
-        headerKind: command.kind,
-        inputIds: process.inputIds,
-        outputIds: process.outputIds,
-        assignedEntryIds,
-        value: command.value,
-        unit: command.unit,
-      },
-    ],
-  };
-}
-
-export type ValidationResult = { ok: true } | { ok: false; error: string };
-
-export function validatePreviousTablePropertyTarget(
-  model: ProvenanceModel,
-  tableId: string,
-  selectedEntryIds: string[],
-): ValidationResult {
-  const table = model.tables.find((candidate) => candidate.id === tableId);
-  if (!table) {
-    return {
-      ok: false,
-      error: "Previous-table edits require existing connected entries in the target table.",
-    };
-  }
-
-  const connectedEntryIds = new Set(
-    model.connections
-      .filter((connection) => connection.tableId === tableId)
-      .flatMap((connection) => [connection.sourceEntryId, connection.targetEntryId]),
-  );
-  const allSelectedEntriesConnected = selectedEntryIds.every((entryId) => connectedEntryIds.has(entryId));
-
-  return allSelectedEntriesConnected
-    ? { ok: true }
-    : {
-        ok: false,
-        error: "Previous-table edits require existing connected entries in the target table.",
-      };
-}
-```
-
-- [ ] **Step 3: Run edit command tests**
-
-Run:
-
-```powershell
-npm run test:run -- ProvenanceModel
-```
-
-Expected: pass with `5 passed`.
-
-- [ ] **Step 4: Commit**
-
-```powershell
-git add src/Components/src/ProvenanceGrouping/ProvenanceModel.ts src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx
-git commit -m "feat: add provenance edit commands"
-```
-
-## Task 4: Bridge Normalized Model To Existing Grouping Props
-
-**Files:**
-- Modify: `src/Components/src/ProvenanceGrouping/ProvenanceModel.ts`
-- Modify: `src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx`
-- Modify: `src/Components/src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx`
-
-- [ ] **Step 1: Add failing bridge story**
-
-Append this import and story to `ProvenanceModel.stories.tsx`:
-
-```tsx
-import { toGroupingItems, toGroupingConnections } from "./ProvenanceModel";
-
-export const GroupingBridge: Story = {
-  name: "Grouping bridge",
-  play: async () => {
-    const result = createProvenanceModelFromTables(sourceTables);
-    expect(toGroupingItems(result.model, "assay-table", "inputs")).toEqual([
-      {
-        id: "input-a",
-        name: "Input A",
-        layerId: "assay-table:inputs",
-        parameters: [{ key: "Temperature", value: "12 C" }],
-      },
-    ]);
-    expect(toGroupingItems(result.model, "assay-table", "outputs")).toEqual([
-      {
-        id: "output-a",
-        name: "Output A",
-        layerId: "assay-table:outputs",
-        parameters: [
-          { key: "Temperature", value: "12 C" },
-          { key: "Analysis", value: "Mass Spectrometry" },
-        ],
-      },
-    ]);
-    expect(toGroupingConnections(result.model)).toEqual([{ sourceId: "input-a", targetId: "output-a" }]);
-  },
-};
-```
-
-- [ ] **Step 2: Implement bridge functions**
-
-Append to `ProvenanceModel.ts`:
-
-```ts
-export type ProvenanceGroupingParameter = {
-  key: string;
-  value: string;
-};
-
-export type ProvenanceGroupingItem = {
-  id: string;
-  name: string;
-  layerId: string;
-  parameters: ProvenanceGroupingParameter[];
-};
-
-export type ProvenanceGroupingConnection = {
-  sourceId: string;
-  targetId: string;
-};
-
-export type ProvenanceGroupingTableSide = "inputs" | "outputs";
-
-export function groupingLayerId(tableId: string, side: ProvenanceGroupingTableSide): string {
-  return `${tableId}:${side}`;
-}
-
-export function toGroupingItems(
-  model: ProvenanceModel,
-  tableId: string,
-  side: ProvenanceGroupingTableSide,
-): ProvenanceGroupingItem[] {
-  const tableProcesses = model.processes.filter((process) => process.tableId === tableId);
-  const roleEntryIds = new Set(
-    tableProcesses.flatMap((process) => (side === "inputs" ? process.inputIds : process.outputIds)),
-  );
-
-  return model.entries
-    .filter((entry) => roleEntryIds.has(entry.id))
-    .map((entry) => ({
-      id: entry.id,
-      name: entry.name,
-      layerId: groupingLayerId(tableId, side),
-      parameters: getPropertiesForEntry(model, entry.id)
-        .filter((property) => property.tableId === tableId)
-        .map((property) => ({ key: property.category.name, value: property.value.text })),
-    }));
-}
-
-export function toGroupingConnections(model: ProvenanceModel): ProvenanceGroupingConnection[] {
-  return model.connections.map((connection) => ({
-    sourceId: connection.sourceEntryId,
-    targetId: connection.targetEntryId,
-  }));
-}
-```
-
-- [ ] **Step 3: Run bridge tests**
-
-Run:
-
-```powershell
-npm run test:run -- ProvenanceModel
-```
-
-Expected: pass with `6 passed`.
-
-- [ ] **Step 4: Prepare the interactive story to use the bridge**
-
-Modify `src/Components/src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx` by importing the bridge types and functions near the existing imports:
-
-```ts
-import {
-  createProvenanceModelFromTables,
-  toGroupingConnections,
-  toGroupingItems,
-  type ProvenanceImportTable,
-} from "./ProvenanceModel";
-```
-
-Do not replace every mock mutation in this task. Add a small internal conversion helper next to `initialModel`:
-
-```ts
-function initialNormalizedModel() {
-  const source: ProvenanceImportTable[] = [
+- Create `src/Components/src/ProvenanceGrouping/Types.fs`
+- Modify `src/Components/src/Swate.Components.fsproj`
+
+- [ ] Create `Types.fs` with module `Swate.Components.ProvenanceGrouping.Types`.
+- [ ] Add ID aliases, table/entry/process/connection/property records, and the normalized `ProvenanceModel`.
+- [ ] Use `Map<id, record>` for model collections so lookups are explicit and duplicate IDs are rejected by construction during import.
+- [ ] Keep property values as occurrences, not as a single value per header.
+- [ ] Add source tracking as table/header/process metadata, without row index or column position.
+
+Initial type skeleton:
+
+```fsharp
+module Swate.Components.ProvenanceGrouping.Types
+
+type ProvenanceTableId = string
+type ProvenanceProcessId = string
+type ProvenanceEntryId = string
+type ProvenanceConnectionId = string
+type ProvenancePropertyValueId = string
+
+[<RequireQualifiedAccess>]
+type ProvenanceOrigin =
+    | Loaded
+    | Created
+
+[<RequireQualifiedAccess>]
+type ProvenanceTableKind =
+    | Study
+    | Assay
+    | Run
+    | Generated
+
+[<RequireQualifiedAccess>]
+type ProvenanceEntryKind =
+    | Source
+    | Sample
+    | Data
+    | Material
+    | Unknown
+
+[<RequireQualifiedAccess>]
+type ProvenancePropertyKind =
+    | Characteristic
+    | Factor
+    | Parameter
+    | Component
+
+[<RequireQualifiedAccess>]
+type ProvenanceAssignmentScope =
+    | Entry
+    | Process
+
+type ProvenanceTerm =
     {
-      id: "inputs-outputs",
-      name: "Inputs to Outputs",
-      kind: "assay",
-      origin: "loaded",
-      processes: initialConnections.map((connection, index) => {
-        const input = initialItems.find((item) => item.id === connection.sourceId);
-        const output = initialItems.find((item) => item.id === connection.targetId);
-        if (!input || !output) {
-          throw new Error(`Missing fixture connection entry ${connection.sourceId} -> ${connection.targetId}`);
-        }
-        return {
-          id: `inputs-outputs/process/${index}`,
-          inputIds: [input.id],
-          outputIds: [output.id],
-          inputs: [{ id: input.id, name: input.name, kind: "sample" }],
-          outputs: [{ id: output.id, name: output.name, kind: "data" }],
-          properties: [
-            ...input.parameters.map((parameter, parameterIndex) => ({
-              id: `inputs-outputs/process/${index}/input/${input.id}/${parameter.key}/${parameterIndex}`,
-              kind: "characteristic" as const,
-              assignmentScope: "entry" as const,
-              assignedEntryIds: [input.id],
-              headerName: parameter.key,
-              category: { name: parameter.key },
-              value: { text: parameter.value, kind: "text" as const },
-            })),
-            ...output.parameters.map((parameter, parameterIndex) => ({
-              id: `inputs-outputs/process/${index}/output/${output.id}/${parameter.key}/${parameterIndex}`,
-              kind: parameter.key === "Analysis" ? ("factor" as const) : ("characteristic" as const),
-              assignmentScope: "entry" as const,
-              assignedEntryIds: [output.id],
-              headerName: parameter.key,
-              category: { name: parameter.key },
-              value: { text: parameter.value, kind: "text" as const },
-            })),
-          ],
-        };
-      }),
-    },
-  ];
+        Name: string
+        TermSource: string option
+        TermAccession: string option
+    }
 
-  return createProvenanceModelFromTables(source).model;
-}
+[<RequireQualifiedAccess>]
+type ProvenanceValue =
+    | Text of string
+    | Integer of int
+    | Float of float
+    | Term of ProvenanceTerm
+
+type ProvenanceTable =
+    {
+        Id: ProvenanceTableId
+        Name: string
+        Kind: ProvenanceTableKind
+        Origin: ProvenanceOrigin
+        PreviousTableId: ProvenanceTableId option
+    }
+
+type ProvenanceEntry =
+    {
+        Id: ProvenanceEntryId
+        Name: string
+        Kind: ProvenanceEntryKind
+        TableIds: ProvenanceTableId list
+    }
+
+type ProvenanceProcess =
+    {
+        Id: ProvenanceProcessId
+        TableId: ProvenanceTableId
+        TableName: string
+        InputIds: ProvenanceEntryId list
+        OutputIds: ProvenanceEntryId list
+        Origin: ProvenanceOrigin
+    }
+
+type ProvenanceConnection =
+    {
+        Id: ProvenanceConnectionId
+        TableId: ProvenanceTableId
+        ProcessId: ProvenanceProcessId
+        SourceEntryId: ProvenanceEntryId
+        TargetEntryId: ProvenanceEntryId
+        Origin: ProvenanceOrigin
+    }
+
+type ProvenancePropertySource =
+    {
+        TableId: ProvenanceTableId
+        TableName: string
+        HeaderName: string
+        HeaderKind: ProvenancePropertyKind
+        ProcessId: ProvenanceProcessId option
+        Origin: ProvenanceOrigin
+    }
+
+type ProvenancePropertyValue =
+    {
+        Id: ProvenancePropertyValueId
+        Kind: ProvenancePropertyKind
+        AssignmentScope: ProvenanceAssignmentScope
+        TableId: ProvenanceTableId
+        TableName: string
+        ProcessId: ProvenanceProcessId option
+        InputIds: ProvenanceEntryId list
+        OutputIds: ProvenanceEntryId list
+        AssignedEntryIds: ProvenanceEntryId list
+        Category: ProvenanceTerm
+        Value: ProvenanceValue
+        Unit: ProvenanceTerm option
+        Source: ProvenancePropertySource
+    }
+
+type ProvenanceModel =
+    {
+        Tables: Map<ProvenanceTableId, ProvenanceTable>
+        Entries: Map<ProvenanceEntryId, ProvenanceEntry>
+        Processes: Map<ProvenanceProcessId, ProvenanceProcess>
+        Connections: Map<ProvenanceConnectionId, ProvenanceConnection>
+        Properties: Map<ProvenancePropertyValueId, ProvenancePropertyValue>
+    }
 ```
 
-Use this helper only in a new story first, not in `InteractiveMockup`.
-
-- [ ] **Step 5: Add a non-invasive normalized story**
-
-Append a new story that verifies the bridge can feed the existing component:
-
-```tsx
-export const NormalizedModelPreview: Story = {
-  name: "Normalized model preview",
-  render: () => {
-    const model = initialNormalizedModel();
-    return (
-      <ProvenanceGrouping
-        layers={[
-          { id: "inputs-outputs:inputs", label: "Inputs" },
-          { id: "inputs-outputs:outputs", label: "Outputs" },
-        ]}
-        items={[
-          ...toGroupingItems(model, "inputs-outputs", "inputs"),
-          ...toGroupingItems(model, "inputs-outputs", "outputs"),
-        ]}
-        connections={toGroupingConnections(model)}
-        leftLayerId="inputs-outputs:inputs"
-        rightLayerId="inputs-outputs:outputs"
-        groupingByLayer={{ "inputs-outputs:inputs": [], "inputs-outputs:outputs": [] }}
-        onToggleGrouping={() => undefined}
-        onSortLayer={() => undefined}
-        onMoveParameter={() => undefined}
-        onCreateParameter={() => undefined}
-        onCreateParameterValue={() => undefined}
-        onAssignParameterValue={() => undefined}
-        onSelectGroup={() => undefined}
-        onConnectGroups={() => undefined}
-        onOpenDetail={() => undefined}
-        onUpdateParameter={() => undefined}
-        onCreateItem={() => undefined}
-        onAddLayer={() => undefined}
-        onSelectPair={() => undefined}
-        onDismissError={() => undefined}
-      />
-    );
-  },
-};
-```
-
-- [ ] **Step 6: Run story tests**
-
-Run:
+- [ ] Run:
 
 ```powershell
-npm run test:run -- ProvenanceModel ProvenanceGrouping
+dotnet build src/Components/src/Swate.Components.fsproj
 ```
 
-Expected: both story files pass.
+Expected: the project compiles with the new type file.
 
-- [ ] **Step 7: Commit**
+---
 
-```powershell
-git add src/Components/src/ProvenanceGrouping/ProvenanceModel.ts src/Components/src/ProvenanceGrouping/ProvenanceModel.stories.tsx src/Components/src/ProvenanceGrouping/ProvenanceGrouping.stories.tsx
-git commit -m "feat: bridge provenance model to grouping view"
-```
-
-## Task 5: Export Stable Model API
+## Task 2: Add Plain Import Builder
 
 **Files:**
-- Modify: `src/Components/src/index.js`
+- Create `src/Components/src/ProvenanceGrouping/Import.fs`
+- Modify `src/Components/src/Swate.Components.fsproj`
 
-- [ ] **Step 1: Export the model helpers**
+- [ ] Define `ImportedEntry`, `ImportedProperty`, `ImportedProcess`, `ImportedTable`, and `ImportResult`.
+- [ ] Implement `fromImportedTables : ImportedTable list -> ImportResult`.
+- [ ] Generate one item-level `ProvenanceConnection` for each imported process input/output pair.
+- [ ] For process-scoped parameters, default `AssignedEntryIds` to all input and output IDs.
+- [ ] For entry-scoped values, require explicit assigned entries and emit warnings when missing.
+- [ ] Merge repeated entries by ID and accumulate their table IDs.
+- [ ] Preserve every property value occurrence, including repeated values with the same category on the same entry.
 
-Modify `src/Components/src/index.js`:
+Important ARCtrl mapping notes for adapter authors:
 
-```js
-export { ProvenanceGrouping } from './ProvenanceGrouping/ProvenanceGrouping';
-export {
-  createProvenanceModelFromTables,
-  getPropertiesForEntry,
-  getPropertyValuesForEntry,
-  getPropertyCategoriesForTable,
-  updatePropertyValue,
-  createPropertyValueInScope,
-  validatePreviousTablePropertyTarget,
-  toGroupingItems,
-  toGroupingConnections,
-} from './ProvenanceGrouping/ProvenanceModel';
-```
+- `Process.ParameterValues` maps to imported properties with `Kind = Parameter` and `AssignmentScope = Process`.
+- Input/output `MaterialAttributeValue` maps to imported properties with `Kind = Characteristic` and `AssignmentScope = Entry`.
+- Output `FactorValue` maps to imported properties with `Kind = Factor` and `AssignmentScope = Entry`.
+- `Value.Ontology`, `Value.Int`, `Value.Float`, and `Value.Name` map to `ProvenanceValue.Term`, `Integer`, `Float`, and `Text`.
+- `CompositeHeader.Parameter`, `Characteristic`, `Factor`, and `Component` map to `ProvenancePropertyKind`.
 
-If the existing file has other exports, preserve them and add only the new export block.
-
-- [ ] **Step 2: Build declarations**
-
-Run:
+Validation after implementation:
 
 ```powershell
-npm run build
+dotnet build src/Components/src/Swate.Components.fsproj
 ```
 
-Expected: command exits 0. Existing generated Fable declaration diagnostics may still print; verify no diagnostics reference `ProvenanceModel.ts`.
+Expected: import module compiles and has no ARCtrl imports.
 
-- [ ] **Step 3: Commit**
+---
 
-```powershell
-git add src/Components/src/index.js
-git commit -m "feat: export provenance edit model"
-```
-
-## Task 6: Final Verification
+## Task 3: Add Grouping And Sorting Projection
 
 **Files:**
-- Verify only.
+- Create `src/Components/src/ProvenanceGrouping/Grouping.fs`
+- Modify `src/Components/src/Swate.Components.fsproj`
 
-- [ ] **Step 1: Run focused Storybook tests**
+- [ ] Define `ProvenanceSide`, `GroupingKey`, `DisplayMember`, `DisplayGroup`, and `DisplayConnection`.
+- [ ] Implement selectors:
+  - `propertiesForEntry`
+  - `propertyValuesForEntry`
+  - `groupingKeysForSide`
+  - `displayGroups`
+  - `displayConnections`
+  - `sortDisplayGroups`
+- [ ] With no grouping keys, return one display group per entry.
+- [ ] When grouping by a key, group by actual property values only.
+- [ ] Do not create a "missing" group for entries without the grouped property.
+- [ ] Duplicate an entry into multiple display groups when it has multiple values for the grouped key.
+- [ ] Sort members inside groups by a selected non-grouping parameter.
+- [ ] When no grouping exists, sort the individual item groups by the selected parameter.
+- [ ] Aggregate group-level connectors from actual `ProvenanceConnection` IDs only.
+- [ ] On line expansion, return only the individual connections represented by that group line, never an all-to-all expansion.
 
-Run:
+Key behavior to verify manually in fixtures:
+
+- Input A connects to Output A and Output B.
+- Input B connects to Output B.
+- Input C connects to Output C.
+- If outputs are grouped by species, expanding the species group line shows only the original item connections.
+
+Validation:
 
 ```powershell
-npm run test:run -- ProvenanceModel ProvenanceGrouping
+dotnet build src/Components/src/Swate.Components.fsproj
 ```
 
-Expected: all tests in `ProvenanceModel.stories.tsx` and `ProvenanceGrouping.stories.tsx` pass.
+Expected: grouping module compiles.
 
-- [ ] **Step 2: Run build**
+---
 
-Run:
+## Task 4: Add Edit Commands And Patches
+
+**Files:**
+- Create `src/Components/src/ProvenanceGrouping/Edit.fs`
+- Modify `src/Components/src/Swate.Components.fsproj`
+
+- [ ] Define `EditError`.
+- [ ] Define `ProvenanceTablePatch`.
+- [ ] Define edit command records for:
+  - update existing property value
+  - create property value in current scope
+  - assign existing value to group members
+  - connect groups
+  - create downstream table from selected entries
+- [ ] Implement `updatePropertyValue`.
+- [ ] Implement `createPropertyValueInCurrentScope`.
+- [ ] Implement `assignPropertyValueToEntries`.
+- [ ] Implement `connectGroups`.
+- [ ] Implement `createDownstreamTableFromSelection`.
+
+Patch shape:
+
+```fsharp
+[<RequireQualifiedAccess>]
+type EditError =
+    | PropertyNotFound of ProvenancePropertyValueId
+    | ProcessNotFound of ProvenanceProcessId
+    | TableNotFound of ProvenanceTableId
+    | MissingProcessContext of ProvenancePropertyValueId
+    | DuplicateHeader of tableId: ProvenanceTableId * headerKind: ProvenancePropertyKind * headerName: string
+    | PreviousTableRequiresExistingConnectedEntries of tableId: ProvenanceTableId
+    | PartialGroupConnectionNotAllowed of sourceGroupId: string * targetGroupId: string
+
+[<RequireQualifiedAccess>]
+type ProvenanceTablePatch =
+    | UpdatePropertyValue of
+        tableId: ProvenanceTableId *
+        processId: ProvenanceProcessId *
+        headerKind: ProvenancePropertyKind *
+        headerName: string *
+        inputIds: ProvenanceEntryId list *
+        outputIds: ProvenanceEntryId list *
+        assignedEntryIds: ProvenanceEntryId list *
+        oldValue: ProvenanceValue *
+        newValue: ProvenanceValue *
+        unit: ProvenanceTerm option
+    | AddPropertyValue of
+        tableId: ProvenanceTableId *
+        processId: ProvenanceProcessId *
+        headerKind: ProvenancePropertyKind *
+        headerName: string *
+        inputIds: ProvenanceEntryId list *
+        outputIds: ProvenanceEntryId list *
+        assignedEntryIds: ProvenanceEntryId list *
+        value: ProvenanceValue *
+        unit: ProvenanceTerm option
+    | AddProcessConnection of
+        tableId: ProvenanceTableId *
+        processId: ProvenanceProcessId *
+        sourceEntryId: ProvenanceEntryId *
+        targetEntryId: ProvenanceEntryId
+    | AddTable of ProvenanceTable
+
+type EditResult =
+    Result<ProvenanceModel * ProvenanceTablePatch list, EditError>
+```
+
+Rules to implement:
+
+- Existing value edits overwrite existing propagated values on connected outputs when the edited occurrence already exists there.
+- Adding a new property header with an existing name and kind returns `DuplicateHeader`.
+- Adding a new value under an existing header is valid.
+- Current-scope additions are allowed for the loaded table and generated downstream tables.
+- Previous-table additions are allowed only for selected existing entries with compatible process/table context.
+- Previous-table edits must never invent rows, inputs, outputs, or process connections.
+- Group-to-group connection commands either create the required item-level connections or return an explicit error.
+- Creating a new downstream layer uses every selected entry, including mixed input and output selections, as the new layer's inputs.
+
+Validation:
 
 ```powershell
-npm run build
+dotnet build src/Components/src/Swate.Components.fsproj
 ```
 
-Expected: exit 0. Existing generated declaration diagnostics may print; none should reference `ProvenanceModel.ts` or the new story.
+Expected: edit module compiles.
 
-- [ ] **Step 3: Check diff**
+---
 
-Run:
+## Task 5: Add F# Fixtures For Preview Data
+
+**Files:**
+- Create `src/Components/src/ProvenanceGrouping/Fixtures.fs`
+- Modify `src/Components/src/Swate.Components.fsproj`
+
+- [ ] Move the current mock scenario into F# fixtures.
+- [ ] Include repeated property values for the same entry.
+- [ ] Include values present only on outputs that can be assigned to inputs.
+- [ ] Include fan-out and fan-in connections.
+- [ ] Include the known connector case:
+  - Input A -> Output A
+  - Input A -> Output B
+  - Input B -> Output B
+  - Input C -> Output C
+- [ ] Include a mixed selection fixture for downstream layer creation.
+
+Validation:
 
 ```powershell
-git diff --check
-git status --short
+dotnet build src/Components/src/Swate.Components.fsproj
 ```
 
-Expected: `git diff --check` reports no whitespace errors. `git status --short` is clean after the final commit.
+Expected: fixtures compile and can be imported by the preview layer.
 
-- [ ] **Step 4: Manual Storybook smoke check**
+---
 
-Start Storybook if it is not already running:
+## Task 6: Wire The Browser Preview To F# State
+
+**Files:**
+- Modify the existing `src/Components/src/ProvenanceGrouping` Storybook preview files.
+
+- [ ] Keep the browser preview broad/resizable.
+- [ ] Replace mock-only data logic with calls into F# fixtures and grouping/edit modules.
+- [ ] Keep direct element expansion for parameter values and connection lines.
+- [ ] Display parameter value controls as draggable value controls with connector lines to groups.
+- [ ] Remove UI actions that conflict with the model:
+  - no "connect selected" button
+  - no partial-connection action
+  - no parameter add button on individual input/output groups
+- [ ] Ensure group connection line expansion calls the F# selector that returns actual item-level connections.
+- [ ] Ensure new layer creation uses the full mixed selection.
+
+Validation:
 
 ```powershell
 npm run storybook
 ```
 
-Open:
+Manual preview checks:
 
-```text
-http://127.0.0.1:6006/?path=/story/components-provenancemodel--import-model
-http://127.0.0.1:6006/?path=/story/components-provenancegrouping--normalized-model-preview
+- The provenance story renders full width or resizable.
+- No grouping shows individual entry items.
+- Grouping by a property groups by values and ignores non-grouping properties.
+- Missing values do not create a missing-value group.
+- Entries with multiple values appear in multiple groups.
+- Sorting works inside groups and on individual ungrouped items.
+- Dragging a property value to a group assigns the value to all members.
+- Clicking a group connection line expands both groups and shows only actual item-level connections.
+- New downstream layer uses every selected entry, including mixed input/output selections.
+
+---
+
+## Task 7: Final Verification
+
+- [ ] Run:
+
+```powershell
+dotnet build src/Components/src/Swate.Components.fsproj
 ```
 
-Expected: both stories render without an error overlay.
+- [ ] Run the component package build if the preview was rewired:
 
-## Self-Review
+```powershell
+npm run build
+```
 
-Spec coverage:
+- [ ] Run:
 
-- Normalized model independent from ARCtrl: Task 1.
-- Table/header based source tracking without row/column position: Task 1 and Task 3 patch shape.
-- Existing value edits: Task 3.
-- New property values in current scope: Task 3.
-- Previous table guard requiring existing connected entries: Task 3.
-- New downstream table support: model fields in Task 1 and generated table path in Task 3 patch structure.
-- Grouping bridge for current mockup: Task 4.
+```powershell
+git diff --check
+```
 
-Placeholder scan:
+- [ ] Manually inspect that the new F# files have the correct module names and are listed in the `.fsproj` compile order.
 
-- No placeholder markers or unspecified implementation steps remain.
+Expected outcome:
 
-Type consistency:
-
-- `ProvenancePropertyKind`, `ProvenancePropertyValue`, `ProvenanceImportTable`, `ProvenanceTablePatch`, and bridge type names are consistent across tasks.
+- The normalized model and edit commands are implemented in F#.
+- The model is independent of ARCtrl public types.
+- The ARCtrl process semantics are documented and preserved through the import DTO mapping.
+- The browser preview is still viewable through Storybook, but the data model is no longer mock-only browser state.
