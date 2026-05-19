@@ -10,6 +10,7 @@ open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Import
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Shared.ProvenanceGrouping.Edit
+open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 
 let private term name =
     {
@@ -320,10 +321,47 @@ let editTests =
                 failwithf "Expected one AddLoadedConnection patch, got %A" other
     ]
 
+let fixtureTests =
+    testList "Fixtures" [
+        testCase "sampleModel includes loaded names and previous collapsed value" <| fun _ ->
+            let model = sampleModel ()
+
+            Expect.equal model.InputSets.["input-a"].Name "Input A" "Fixture should expose actual loaded input name."
+            Expect.equal model.OutputSets.["output-b"].Name "Output B" "Fixture should expose actual loaded output name."
+
+            let previousValues =
+                model.InputSets.["input-a"].PropertyValueIds
+                |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
+                |> List.filter (fun value -> value.Source |> Option.exists (fun source -> source.TableName = "previous-study-table"))
+
+            Expect.isNonEmpty previousValues "Fixture should include collapsed previous-context property value."
+
+        testCase "sampleModel connections are loaded set pairs" <| fun _ ->
+            let model = sampleModel ()
+
+            let pairs =
+                model.Connections
+                |> Map.toList
+                |> List.map (fun (_, connection) -> connection.InputSetId, connection.OutputSetId)
+                |> List.sort
+
+            Expect.equal
+                pairs
+                [
+                    "input-a", "output-a"
+                    "input-a", "output-b"
+                    "input-b", "output-b"
+                    "input-c", "output-c"
+                    "input-d", "output-d"
+                ]
+                "Fixture should preserve exact loaded input/output set connections."
+    ]
+
 let tests =
     testList "ProvenanceGrouping" [
         typeTests
         importTests
         groupingTests
         editTests
+        fixtureTests
     ]
