@@ -142,25 +142,10 @@ type DataAnnotatorWidget =
             columnIndex: int,
             content: string,
             dtrgt: DataTarget option,
-            state: Set<DataTarget>,
-            setState: (Set<DataTarget> -> Set<DataTarget>) -> unit
+            isDirectlyActive: bool,
+            isActive: bool,
+            toggleTarget: DataTarget -> unit
         ) =
-
-        let isDirectlyActive =
-            dtrgt
-            |> Option.map (fun dtrgt -> state.Contains dtrgt)
-            |> Option.defaultValue false
-
-        let isActive =
-            dtrgt
-            |> Option.map (
-                function
-                | DataTarget.Column _
-                | DataTarget.Row _ -> isDirectlyActive
-                | DataTarget.Cell(ci, ri) -> state.Contains(DataTarget.Column ci) || state.Contains(DataTarget.Row ri)
-            )
-            |> Option.defaultValue false
-
         TableCell.BaseCell(
             rowIndex,
             columnIndex,
@@ -168,14 +153,7 @@ type DataAnnotatorWidget =
              | Some dtrgt ->
                  Html.div [
                      prop.className "swt:w-full swt:h-full swt:flex swt:items-center swt:px-2 swt:py-1 swt:truncate"
-                     prop.onClick (fun _ ->
-                         setState (fun (currentState: Set<DataTarget>) ->
-                             if currentState.Contains dtrgt then
-                                 currentState.Remove dtrgt
-                             else
-                                 currentState.Add dtrgt
-                         )
-                     )
+                     prop.onClick (fun _ -> toggleTarget dtrgt)
                      prop.children [
                          if isDirectlyActive then
                              Html.div [
@@ -198,60 +176,124 @@ type DataAnnotatorWidget =
     static member private Table
         (file: ParsedDataFile, state: Set<DataTarget>, setState: (Set<DataTarget> -> Set<DataTarget>) -> unit)
         =
-        let headerRow =
-            file.HeaderRow
-            |> Option.map (fun headerRow ->
-                let data = [
-                    (0, 0, "", None, state, setState)
-                    for ci in 0 .. headerRow.Length - 1 do
-                        (0, ci, file.HeaderRow.Value.[ci], (DataTarget.Column ci |> Some), state, setState)
-                ]
-
-                data
+        let toggleTarget =
+            React.useCallback (
+                (fun (target: DataTarget) ->
+                    setState (fun (currentState: Set<DataTarget>) ->
+                        if currentState.Contains target then
+                            currentState.Remove target
+                        else
+                            currentState.Add target
+                    )
+                ),
+                [| box setState |]
             )
 
-        let bodyRows = [|
-            for ri in 0 .. file.BodyRows.Length - 1 do
-                let row = file.BodyRows.[ri]
+        let selectedRows, selectedColumns, selectedCells: Set<int> * Set<int> * Set<int * int> =
+            React.useMemo (
+                (fun () ->
+                    state
+                    |> Seq.fold
+                        (fun (rows, cols, cells) target ->
+                            match target with
+                            | DataTarget.Row rowIndex -> (rows.Add rowIndex, cols, cells)
+                            | DataTarget.Column columnIndex -> (rows, cols.Add columnIndex, cells)
+                            | DataTarget.Cell(columnIndex, rowIndex) ->
+                                (rows, cols, cells.Add((columnIndex, rowIndex)))
+                        )
+                        (Set.empty<int>, Set.empty<int>, Set.empty<int * int>)
+                ),
+                [| box state |]
+            )
 
-                [
-                    (ri, 0, (string ri), (DataTarget.Row ri |> Some), state, setState)
-                    for ci in 0 .. row.Length - 1 do
-                        (ri, ci, row.[ci], (DataTarget.Cell(ci, ri) |> Some), state, setState)
-                ]
-        |]
+        let hasHeader = file.HeaderRow.IsSome
 
-        let getDefault (index: CellCoordinate) =
-            (index.y, index.x, "<placeholder>", None, state, setState)
+        let bodyMaxColumnCount =
+            React.useMemo (
+                (fun () -> file.BodyRows |> Array.fold (fun count row -> max count row.Length) 0),
+                [| box file |]
+            )
 
-        let colCount = bodyRows |> Array.map (fun row -> row.Length) |> Array.max
+        let headerColumnCount =
+            file.HeaderRow |> Option.map _.Length |> Option.defaultValue 0
+
+        let bodyRowCount = file.BodyRows.Length
+        let rowCount = max 1 (bodyRowCount + if hasHeader then 1 else 0)
+        let columnCount = max 1 (max headerColumnCount bodyMaxColumnCount + 1)
 
         let tableRef = React.useRef<TableHandle> (null)
+
+        let getBodyRowIndex (virtualRowIndex: int) =
+            if hasHeader then virtualRowIndex - 1 else virtualRowIndex
+
+        let mkCell (rowIndex: int) (columnIndex: int) (content: string) (target: DataTarget option) =
+            let isDirectlyActive =
+                match target with
+                | Some(DataTarget.Row targetRowIndex) -> selectedRows.Contains targetRowIndex
+                | Some(DataTarget.Column targetColumnIndex) -> selectedColumns.Contains targetColumnIndex
+                | Some(DataTarget.Cell(targetColumnIndex, targetRowIndex)) ->
+                    selectedCells.Contains((targetColumnIndex, targetRowIndex))
+                | None -> false
+
+            let isInheritedActive =
+                match target with
+                | Some(DataTarget.Cell(targetColumnIndex, targetRowIndex)) ->
+                    selectedColumns.Contains targetColumnIndex
+                    || selectedRows.Contains targetRowIndex
+                | _ -> false
+
+            DataAnnotatorWidget.TableCellButton(
+                rowIndex,
+                columnIndex,
+                content,
+                target,
+                isDirectlyActive,
+                isDirectlyActive || isInheritedActive,
+                toggleTarget
+            )
 
         Html.div [
             prop.className "swt:overflow-hidden swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[80%]"
             prop.children [
                 Table.Table(
-                    file.BodyRows.Length,
-                    colCount,
+                    rowCount,
+                    columnCount,
                     (fun index ->
-                        if index.y = 0 && file.HeaderRow.IsSome then
-                            // Header Row
-                            let content =
-                                headerRow
-                                |> Option.bind (fun x -> x |> List.tryItem index.x)
-                                |> Option.defaultValue (getDefault index)
-                            // let content = headerRow.Value.[index.x]
-                            DataAnnotatorWidget.TableCellButton content
+                        if index.x = 0 then
+                            if hasHeader && index.y = 0 then
+                                mkCell index.y index.x "" None
+                            else
+                                let bodyRowIndex = getBodyRowIndex index.y
+
+                                if bodyRowIndex < 0 || bodyRowIndex >= bodyRowCount then
+                                    mkCell index.y index.x "" None
+                                else
+                                    mkCell index.y index.x (string bodyRowIndex) (Some(DataTarget.Row bodyRowIndex))
+                        elif hasHeader && index.y = 0 then
+                            let dataColumnIndex = index.x - 1
+
+                            let headerValue =
+                                file.HeaderRow |> Option.bind (fun row -> row |> Array.tryItem dataColumnIndex)
+
+                            match headerValue with
+                            | Some value -> mkCell index.y index.x value (Some(DataTarget.Column dataColumnIndex))
+                            | None -> mkCell index.y index.x "" None
                         else
-                            // Body Row
-                            let input =
-                                bodyRows
-                                |> Array.tryItem (index.y)
-                                |> Option.bind (fun row -> row |> List.tryItem index.x)
-                                |> Option.defaultValue (getDefault index)
-                            // let input = bodyRows.[index.y].[index.x]
-                            DataAnnotatorWidget.TableCellButton input
+                            let bodyRowIndex = getBodyRowIndex index.y
+                            let dataColumnIndex = index.x - 1
+
+                            if bodyRowIndex < 0 || bodyRowIndex >= bodyRowCount then
+                                mkCell index.y index.x "" None
+                            else
+                                let cellValue =
+                                    file.BodyRows
+                                    |> Array.tryItem bodyRowIndex
+                                    |> Option.bind (fun row -> row |> Array.tryItem dataColumnIndex)
+
+                                match cellValue with
+                                | Some value ->
+                                    mkCell index.y index.x value (Some(DataTarget.Cell(dataColumnIndex, bodyRowIndex)))
+                                | None -> mkCell index.y index.x "" None
 
                     ),
                     (fun _ -> Html.div []),
@@ -618,6 +660,6 @@ type DataAnnotatorWidget =
                   DataFile = Some _
                   ParsedFile = Some _
               },
-              true -> DataAnnotatorWidget.Modal(model, dispatch, showModal, setShowModal, setAnnotationInput)
+              true -> DataAnnotatorWidget.Modal(model, dispatch, showModal, setShowModal, submit)
             | _, _ -> Html.none
         ]
