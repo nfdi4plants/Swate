@@ -59,6 +59,22 @@ Vitest.describe("ARC AddArcFileAsync", fun () ->
             Vitest.expect(reloadedArc.ContainsAssay("New Assay")).toBe(true)
         }))
 
+    Vitest.test("vault add rejects duplicate entities", fun () ->
+        withTempArc (fun arc -> arc.AddAssay(ArcAssay("ExistingAssay"))) (fun arcPath -> promise {
+            let! loadedArc = loadArcAsync arcPath
+            let vault = ArcVault(testWindow ())
+            vault.path <- Some arcPath
+            vault.SetArc loadedArc
+
+            let request =
+                FileContentDTO.fromArcFile(ArcFiles.Assay(ArcAssay("ExistingAssay")))
+                |> expectSome <| "Expected duplicate assay DTO."
+
+            match! vault.AddArcFile request with
+            | Ok() -> failwith "Expected duplicate entity add to fail."
+            | Error error -> Vitest.expect(error.Message).toContain("already contains assay")
+        }))
+
     Vitest.test("adds a study and creates the canonical study file", fun () ->
         withTempArc ignore (fun arcPath -> promise {
             let! arc = loadArcAsync arcPath

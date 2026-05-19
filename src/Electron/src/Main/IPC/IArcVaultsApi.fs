@@ -17,6 +17,7 @@ open Main.ArcMerge
 open Main.ArcVaultHelper
 open Node.Api
 open ARCtrl
+open ARC
 open Swate.Electron.Shared.DTOs.NoteSearchDto
 
 
@@ -182,6 +183,47 @@ let private renameWithRetriesAsync
 
 open ARCtrl.Contract
 
+let private tryResolveArcFileByPath (relativePath: string) (arc: ARC) =
+    arc.TryArcFileByPath(relativePath, arc)
+
+let private entityKindForZone =
+    function
+    | ArcDeletePathRules.AddZone.Assays -> "assay"
+    | ArcDeletePathRules.AddZone.Studies -> "study"
+    | ArcDeletePathRules.AddZone.Workflows -> "workflow"
+    | ArcDeletePathRules.AddZone.Runs -> "run"
+
+let private arcFileMatchesEntity zone identifier =
+    function
+    | ArcFiles.Assay assay ->
+        zone = ArcDeletePathRules.AddZone.Assays
+        && PathHelpers.pathsEqual assay.Identifier identifier
+    | ArcFiles.Study(study, _) ->
+        zone = ArcDeletePathRules.AddZone.Studies
+        && PathHelpers.pathsEqual study.Identifier identifier
+    | ArcFiles.Workflow workflow ->
+        zone = ArcDeletePathRules.AddZone.Workflows
+        && PathHelpers.pathsEqual workflow.Identifier identifier
+    | ArcFiles.Run run ->
+        zone = ArcDeletePathRules.AddZone.Runs
+        && PathHelpers.pathsEqual run.Identifier identifier
+    | ArcFiles.Investigation _
+    | ArcFiles.DataMap _
+    | ArcFiles.Template _ -> false
+
+let private tryEnsureArcEntityResolved zone identifier relativePath arc =
+    match tryResolveArcFileByPath relativePath arc with
+    | Some arcFile when arcFileMatchesEntity zone identifier arcFile -> Ok()
+    | _ ->
+        Error(
+            exn
+                $"ARC does not contain {entityKindForZone zone} with identifier '{identifier}'."
+        )
+
+let private canonicalEntityFilePath zone identifier =
+    ArcDeletePathRules.buildCanonicalEntityPaths zone identifier
+    |> List.head
+
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
     (operation: ArcVault -> JS.Promise<Result<'T, exn>>)
@@ -228,12 +270,12 @@ module ArcDeleteHelper =
     let private tryGetEntityDeleteTarget relativePath =
         match ArcDeletePathRules.classifyDeleteTarget relativePath with
         | ArcDeletePathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
-            Ok(zone, identifier, normalizedRelativePath)
+            Ok(zone, identifier, normalizedRelativePath, canonicalEntityFilePath zone identifier)
         | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
             ArcDeletePathRules.CanonicalArcFileTarget.EntityFile(zone, identifier),
             normalizedRelativePath
           ) ->
-            Ok(zone, identifier, normalizedRelativePath)
+            Ok(zone, identifier, normalizedRelativePath, normalizedRelativePath)
         | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
             ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile _,
             _
@@ -254,7 +296,7 @@ module ArcDeleteHelper =
         promise {
             match tryGetEntityDeleteTarget relativePath with
             | Error validationError -> return Error validationError
-            | Ok(zone, identifier, normalizedRelativePath) ->
+            | Ok(zone, identifier, normalizedRelativePath, canonicalFilePath) ->
                 try
                     match! ARC.tryLoadAsync arcPath with
                     | Error errors ->
@@ -264,17 +306,20 @@ module ArcDeleteHelper =
                                     $"Could not load ARC from disk before deleting '{normalizedRelativePath}': {formatContractErrors errors}"
                             )
                     | Ok diskArc ->
-                        match! removeFromDiskAsync zone identifier arcPath diskArc with
-                        | Error errors ->
-                            return
-                                Error(
-                                    exn
-                                        $"Could not delete ARC entity at '{normalizedRelativePath}': {formatContractErrors errors}"
-                                )
-                        | Ok _ ->
-                            removeFromMemory zone identifier arc
-                            arc.UpdateFileSystem()
-                            return Ok arc
+                        match tryEnsureArcEntityResolved zone identifier canonicalFilePath diskArc with
+                        | Error resolutionError -> return Error resolutionError
+                        | Ok() ->
+                            match! removeFromDiskAsync zone identifier arcPath diskArc with
+                            | Error errors ->
+                                return
+                                    Error(
+                                        exn
+                                            $"Could not delete ARC entity at '{normalizedRelativePath}': {formatContractErrors errors}"
+                                    )
+                            | Ok _ ->
+                                removeFromMemory zone identifier arc
+                                arc.UpdateFileSystem()
+                                return Ok arc
                 with deleteError ->
                     return
                         Error(
@@ -348,27 +393,30 @@ module ArcRenameHelper =
         | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
             Error(exn "Renaming generic files or folders uses the generic filesystem rename path.")
 
-    let tryBuildRenamePlan (request: RenamePathRequest) : Result<RenamePlan, exn> =
+    let tryBuildRenamePlan (arc: ARC) (request: RenamePathRequest) : Result<RenamePlan, exn> =
         let requestedRelativePath = normalizeRelativePathForComparison request.relativePath
         let sourceClassification = ArcDeletePathRules.classifyRenameTarget requestedRelativePath
 
         match validateEntityRenameSourceClassification sourceClassification with
         | Error validationError -> Error validationError
         | Ok(sourceZone, sourceIdentifier, sourcePath) ->
-            match tryBuildRenameTargetPath sourcePath request.newName with
-            | Error targetPathError -> Error(exn targetPathError)
-            | Ok targetPath ->
-                let targetIdentifier = PathHelpers.getNameFromPath targetPath
+            match tryEnsureArcEntityResolved sourceZone sourceIdentifier (canonicalEntityFilePath sourceZone sourceIdentifier) arc with
+            | Error resolutionError -> Error resolutionError
+            | Ok() ->
+                match tryBuildRenameTargetPath sourcePath request.newName with
+                | Error targetPathError -> Error(exn targetPathError)
+                | Ok targetPath ->
+                    let targetIdentifier = PathHelpers.getNameFromPath targetPath
 
-                Ok {
-                    SourcePath = sourcePath
-                    TargetPath = targetPath
-                    SyncPlan = {
-                        Zone = sourceZone
-                        OldIdentifier = sourceIdentifier
-                        NewIdentifier = targetIdentifier
+                    Ok {
+                        SourcePath = sourcePath
+                        TargetPath = targetPath
+                        SyncPlan = {
+                            Zone = sourceZone
+                            OldIdentifier = sourceIdentifier
+                            NewIdentifier = targetIdentifier
+                        }
                     }
-                }
 
     let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
         match tryGetNodeErrorCode renameError with
@@ -948,24 +996,24 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
                                 return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
                             | _ ->
-                                match ArcRenameHelper.tryBuildRenamePlan request with
-                                | Error validationError -> return Error validationError
-                                | Ok renamePlan ->
-                                    match tryResolveArcRelativePath arcPath renamePlan.TargetPath with
-                                    | Error pathError -> return Error pathError
-                                    | Ok targetAbsolutePath ->
-                                        let! targetExists = pathExistsAsync targetAbsolutePath
+                                match vault.arc with
+                                | None -> return Error(exn "ARC is not loaded.")
+                                | Some arcLocal ->
+                                    match ArcRenameHelper.tryBuildRenamePlan arcLocal request with
+                                    | Error validationError -> return Error validationError
+                                    | Ok renamePlan ->
+                                        match tryResolveArcRelativePath arcPath renamePlan.TargetPath with
+                                        | Error pathError -> return Error pathError
+                                        | Ok targetAbsolutePath ->
+                                            let! targetExists = pathExistsAsync targetAbsolutePath
 
-                                        if targetExists then
-                                            return
-                                                Error(
-                                                    exn
-                                                        $"Cannot rename '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}' because the destination already exists."
-                                                )
-                                        else
-                                            match vault.arc with
-                                            | None -> return Error(exn "ARC is not loaded.")
-                                            | Some arcLocal ->
+                                            if targetExists then
+                                                return
+                                                    Error(
+                                                        exn
+                                                            $"Cannot rename '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}' because the destination already exists."
+                                                    )
+                                            else
                                                 let wasBusyWriting = vault.isBusyWriting
                                                 vault.isBusyWriting <- true
 

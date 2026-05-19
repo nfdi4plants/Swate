@@ -8,9 +8,10 @@ open Swate.Components.Shared
 
 type ARC with
 
-    member this.TryArcFileByPath(split, arc) =
+    member this.TryArcFileByPath(path: string, arc) =
+        let splitPath = path |> PathHelpers.normalizeCanonicalRelativePath |> split
 
-        match split with
+        match splitPath with
         | InvestigationPath _ ->
             ArcFiles.Investigation arc |> Some
         | AssayPath p ->
@@ -37,7 +38,7 @@ type ARC with
             let run = arc.TryGetRun identifier
             run |> Option.map ArcFiles.Run
         | DatamapPath _ ->
-            match split with
+            match splitPath with
             | [| AssaysFolderName; anyAssayName; DataMapFileName |] ->
                 let assay = arc.TryGetAssay(Identifier.Assay.identifierFromFileName anyAssayName)
 
