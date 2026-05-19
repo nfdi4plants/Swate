@@ -183,11 +183,6 @@ let private convertWithoutPreviousContext () =
         }
         (arcFixture ())
 
-let private expectOk result =
-    match result with
-    | Ok value -> value
-    | Error error -> failwithf "Expected Ok, got %A" error
-
 let private expectText expected value =
     match value with
     | ProvenanceValue.Text actual -> Expect.equal actual expected "Expected text value."
@@ -198,7 +193,7 @@ let private expectText expected value =
 let tests =
     testList "ProvenanceGrouping ARCtrl converter" [
         testCase "converts loaded input and output names into first-class sets" <| fun _ ->
-            let result = convertWithPreviousContext () |> expectOk
+            let result = convertWithPreviousContext ()
 
             let inputNames =
                 result.Model.InputSets
@@ -216,7 +211,7 @@ let tests =
             Expect.equal outputNames [ "extract-a"; "extract-b" ] "Loaded outputs should come from loaded output cells."
 
         testCase "omits previous context when IncludePreviousContext is false" <| fun _ ->
-            let result = convertWithoutPreviousContext () |> expectOk
+            let result = convertWithoutPreviousContext ()
 
             let previousValues =
                 result.Model.PropertyValues
@@ -231,7 +226,7 @@ let tests =
             Expect.isEmpty previousValues "No property values from non-loaded tables should appear when previous context is excluded."
 
         testCase "converts loaded row input-to-output connections" <| fun _ ->
-            let result = convertWithPreviousContext () |> expectOk
+            let result = convertWithPreviousContext ()
 
             let connectionPairs =
                 result.Model.Connections
@@ -252,7 +247,7 @@ let tests =
                 "Each loaded row should produce a loaded input/output connection."
 
         testCase "attaches loaded property values to loaded sets" <| fun _ ->
-            let result = convertWithPreviousContext () |> expectOk
+            let result = convertWithPreviousContext ()
 
             let sampleA =
                 result.Model.InputSets
@@ -287,7 +282,7 @@ let tests =
             expectText "R1" replicate.Value
 
         testCase "collapses previous table context into property values on loaded inputs" <| fun _ ->
-            let result = convertWithPreviousContext () |> expectOk
+            let result = convertWithPreviousContext ()
 
             let sampleA =
                 result.Model.InputSets
@@ -300,17 +295,14 @@ let tests =
                 |> List.map (fun id -> result.Model.PropertyValues.[id])
                 |> List.find (fun value -> value.Header.Category.Name = "Organism")
 
-            let locations = result.Index.PropertyValueLocations.[organism.Id]
-            let location = locations |> List.exactlyOne
-
             expectText "Plant" organism.Value
-            Expect.equal locations.Length 1 "A single previous-context source should produce one writeback slot."
+            let location = result.Index.PropertyValueLocations.[organism.Id]
             Expect.equal location.Table.Scope ArcTableScope.Study "Collapsed previous value should remember study scope."
             Expect.equal location.Table.ParentIdentifier "study-1" "Collapsed previous value should remember parent identifier."
             Expect.equal location.Table.TableName "study-table" "Collapsed previous value should remember source table."
             Expect.equal location.OutputNames [ "sample-a" ] "Collapsed previous value should remember where it pointed to."
 
-        testCase "converter collapses identical equal loaded values but keeps all ARCtrl writeback slots" <| fun _ ->
+        testCase "identical duplicate loaded values collapse to one model value and one representative writeback location" <| fun _ ->
             let result =
                 fromLoadedArc
                     {
@@ -318,7 +310,6 @@ let tests =
                         IncludePreviousContext = false
                     }
                     (arcFixtureWithDuplicateTemperatureColumns ())
-                |> expectOk
 
             let sampleA =
                 result.Model.InputSets
@@ -333,11 +324,10 @@ let tests =
 
             Expect.equal temperatures.Length 1 "Equal duplicate loaded values should collapse into one model value."
 
-            let writebackSlots = result.Index.PropertyValueLocations.[temperatures.Head.Id]
-            Expect.equal writebackSlots.Length 2 "All underlying duplicate source columns should remain available for writeback."
-            Expect.equal (writebackSlots |> List.choose (fun slot -> slot.ColumnIndex) |> List.sort) [ 0; 1 ] "The duplicate source columns should remain distinguishable in the adapter sidecar."
+            let writebackLocation = result.Index.PropertyValueLocations.[temperatures.Head.Id]
+            Expect.equal writebackLocation.Table.TableName "assay-table" "A representative writeback location should still be preserved."
 
-        testCase "collapsed previous-context duplicates keep multiple writeback slots" <| fun _ ->
+        testCase "collapsed previous-context duplicates keep one representative writeback slot" <| fun _ ->
             let result =
                 fromLoadedArc
                     {
@@ -345,7 +335,6 @@ let tests =
                         IncludePreviousContext = true
                     }
                     (arcFixtureWithDuplicatePreviousColumns ())
-                |> expectOk
 
             let sampleA =
                 result.Model.InputSets
@@ -358,12 +347,12 @@ let tests =
                 |> List.map (fun id -> result.Model.PropertyValues.[id])
                 |> List.find (fun value -> value.Header.Category.Name = "Organism")
 
-            let slots = result.Index.PropertyValueLocations.[organism.Id]
+            let location = result.Index.PropertyValueLocations.[organism.Id]
 
-            Expect.equal slots.Length 2 "Collapsed previous-context duplicates should keep both concrete source locations."
+            Expect.equal location.Table.TableName "study-table" "Collapsed previous-context duplicates should keep a representative source location."
 
         testCase "keeps ARCtrl table locations in the sidecar index" <| fun _ ->
-            let result = convertWithPreviousContext () |> expectOk
+            let result = convertWithPreviousContext ()
 
             let sampleA =
                 result.Model.InputSets
@@ -406,7 +395,6 @@ let tests =
                         IncludePreviousContext = false
                     }
                     arc
-                |> expectOk
 
             let inputNames =
                 result.Model.InputSets
@@ -446,7 +434,6 @@ let tests =
                         IncludePreviousContext = false
                     }
                     arc
-                |> expectOk
 
             let outputNames =
                 result.Model.OutputSets
@@ -457,4 +444,23 @@ let tests =
             Expect.equal outputNames [ "extract-a"; "extract-b" ] "Real output cells should still load as first-class sets."
             Expect.equal result.Model.InputSets.Count 0 "Missing input columns must not create synthetic input sets."
             Expect.equal result.Model.Connections.Count 0 "One-sided loaded tables must not synthesize connections."
+
+        testCase "missing table lookup surfaces the ARCtrl exception instead of a converter-owned error DU" <| fun _ ->
+            let missing =
+                {
+                    Scope = ArcTableScope.Assay
+                    ParentIdentifier = "assay-1"
+                    TableName = "missing-table"
+                }
+
+            Expect.throws
+                (fun () ->
+                    fromLoadedArc
+                        {
+                            LoadedTable = missing
+                            IncludePreviousContext = false
+                        }
+                        (arcFixture ())
+                    |> ignore)
+                "Missing table lookup should be delegated to ARCtrl."
     ]

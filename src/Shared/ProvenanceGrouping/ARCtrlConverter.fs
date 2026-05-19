@@ -39,18 +39,6 @@ type ArcProvenanceConverterOptions =
         IncludePreviousContext: bool
     }
 
-/// Conversion failures that prevent a usable `ProvenanceModel` from being created.
-[<RequireQualifiedAccess>]
-type ArcProvenanceConversionError =
-    /// No table matched the requested location.
-    | LoadedTableNotFound of ArcTableLocation
-    /// More than one table matched the requested location.
-    | LoadedTableAmbiguous of ArcTableLocation * int
-    /// The selected table has no populated input endpoint cells.
-    | LoadedTableHasNoInputs of ArcTableLocation
-    /// The selected table has no populated output endpoint cells.
-    | LoadedTableHasNoOutputs of ArcTableLocation
-
 /// ARCtrl location of a loaded endpoint.
 /// The endpoint role is resolved by checking whether the ID lives in `model.InputSets` or `model.OutputSets`.
 type ArcEndpointLocation =
@@ -108,7 +96,7 @@ type ArcProvenanceIndex =
         /// Locations of first-class loaded inputs and outputs.
         EndpointLocations: Map<ProvenanceSetId, ArcEndpointLocation>
         /// Locations of loaded and collapsed property value occurrences.
-        PropertyValueLocations: Map<ProvenancePropertyValueId, ArcWritebackLocation list>
+        PropertyValueLocations: Map<ProvenancePropertyValueId, ArcWritebackLocation>
         /// Locations of loaded-table input/output connections.
         ConnectionLocations: Map<ProvenanceConnectionId, ArcConnectionLocation>
     }
@@ -156,36 +144,21 @@ type internal ConvertState =
         OutputSets: Map<ProvenanceSetId, ProvenanceSet>
         Connections: Map<ProvenanceConnectionId, ProvenanceConnection>
         EndpointLocations: Map<ProvenanceSetId, ArcEndpointLocation>
-        PropertyValueLocations: Map<ProvenancePropertyValueId, ArcWritebackLocation list>
+        PropertyValueLocations: Map<ProvenancePropertyValueId, ArcWritebackLocation>
         ConnectionLocations: Map<ProvenanceConnectionId, ArcConnectionLocation>
         Warnings: string list
     }
 
 module internal TableLookup =
 
-    let private refsForLocation (location: ArcTableLocation) (arc: ARC) =
-        let withLocation tables =
-            tables
-            |> Seq.map (fun table ->
-                {
-                    Location = location
-                    Table = table
-                })
-            |> Seq.toList
-
+    let getTable (location: ArcTableLocation) (arc: ARC) : ArcTable =
         match location.Scope with
         | ArcTableScope.Study ->
-            arc.TryGetStudy(location.ParentIdentifier)
-            |> Option.map (fun study -> study.Tables |> withLocation)
-            |> Option.defaultValue []
+            arc.GetStudy(location.ParentIdentifier).GetTable(location.TableName)
         | ArcTableScope.Assay ->
-            arc.TryGetAssay(location.ParentIdentifier)
-            |> Option.map (fun assay -> assay.Tables |> withLocation)
-            |> Option.defaultValue []
+            arc.GetAssay(location.ParentIdentifier).GetTable(location.TableName)
         | ArcTableScope.Run ->
-            arc.TryGetRun(location.ParentIdentifier)
-            |> Option.map (fun run -> run.Tables |> withLocation)
-            |> Option.defaultValue []
+            arc.GetRun(location.ParentIdentifier).GetTable(location.TableName)
 
     let allTables (arc: ARC) =
         [
@@ -228,19 +201,6 @@ module internal TableLookup =
                             Table = table
                         }
         ]
-
-    let findTable (location: ArcTableLocation) (arc: ARC) : Result<TableRef, ArcProvenanceConversionError> =
-        let matches =
-            refsForLocation location arc
-            |> List.filter (fun tableRef -> tableRef.Table.Name = location.TableName)
-
-        match matches with
-        | [] ->
-            Error(ArcProvenanceConversionError.LoadedTableNotFound location)
-        | [ tableRef ] ->
-            Ok tableRef
-        | many ->
-            Error(ArcProvenanceConversionError.LoadedTableAmbiguous(location, many.Length))
 
 module internal Normalize =
 
@@ -316,20 +276,6 @@ module internal Normalize =
                 }
         | _ ->
             None
-
-    let inputHeader (table: ArcTable) =
-        table.Headers
-        |> Seq.tryPick (fun header ->
-            match header with
-            | CompositeHeader.Input _ -> ioHeaderFromHeader header
-            | _ -> None)
-
-    let outputHeader (table: ArcTable) =
-        table.Headers
-        |> Seq.tryPick (fun header ->
-            match header with
-            | CompositeHeader.Output _ -> ioHeaderFromHeader header
-            | _ -> None)
 
     let private propertyHeader kind (category: OntologyAnnotation option) =
         category
@@ -426,6 +372,20 @@ module internal Normalize =
             $"{baseText}:unit:{unit.Name}:{termSource}:{termAccession}"
         | None ->
             baseText
+
+module internal RealColumns =
+
+    type RealTableShape =
+        {
+            InputHeader: ProvenanceIOHeader option
+            OutputHeader: ProvenanceIOHeader option
+        }
+
+    let shape (table: ArcTable) =
+        {
+            InputHeader = table.TryGetInputColumn() |> Option.bind (fun column -> Normalize.ioHeaderFromHeader column.Header)
+            OutputHeader = table.TryGetOutputColumn() |> Option.bind (fun column -> Normalize.ioHeaderFromHeader column.Header)
+        }
 
 module internal Dedup =
 
@@ -602,18 +562,11 @@ module internal Dedup =
         )
 
     let private addPropertyLocation propertyValueId location map =
-        let existing =
+        match map |> Map.tryFind propertyValueId with
+        | Some _ ->
             map
-            |> Map.tryFind propertyValueId
-            |> Option.defaultValue []
-
-        let next =
-            if existing |> List.contains location then
-                existing
-            else
-                existing @ [ location ]
-
-        map |> Map.add propertyValueId next
+        | None ->
+            map |> Map.add propertyValueId location
 
     let addCandidateProperty (candidate: CandidatePropertyValue) (state: ConvertState) =
         let targetInputSetIds = candidate.TargetInputSetIds |> List.distinct
@@ -667,22 +620,12 @@ module internal Dedup =
 
 module internal LoadedTable =
 
-    let processPairs (location: ArcTableLocation) (proc: Process) =
+    let processPairs (proc: Process) =
         let inputs = proc.Inputs |> Option.defaultValue []
         let outputs = proc.Outputs |> Option.defaultValue []
         let pairCount = min inputs.Length outputs.Length
 
-        let warning =
-            if inputs.Length <> outputs.Length then
-                let processName = proc.Name |> Option.defaultValue "<unnamed>"
-                Some $"Process '{processName}' in table '{location.TableName}' had {inputs.Length} inputs and {outputs.Length} outputs; only {pairCount} aligned pair(s) were converted."
-            else
-                None
-
-        let pairs =
-            List.zip (inputs |> List.truncate pairCount) (outputs |> List.truncate pairCount)
-
-        pairs, warning
+        List.zip (inputs |> List.truncate pairCount) (outputs |> List.truncate pairCount)
 
     let pairContext (location: ArcTableLocation) (proc: Process) (input: ProcessInput) (output: ProcessOutput) : ProcessPairContext =
         {
@@ -760,68 +703,56 @@ module internal LoadedTable =
     let private pairCandidates pair inputSetId outputSetId (proc: Process) (input: ProcessInput) (output: ProcessOutput) =
         let targetInputSetIds = inputSetId |> Option.toList
         let targetOutputSetIds = outputSetId |> Option.toList
+        let inputValueTargetIds = if List.isEmpty targetInputSetIds then targetOutputSetIds else targetInputSetIds
+        let outputValueTargetIds = if List.isEmpty targetOutputSetIds then targetInputSetIds else targetOutputSetIds
+        let parameterInputTargetIds, parameterOutputTargetIds =
+            match targetInputSetIds, targetOutputSetIds with
+            | [], outputs -> [], outputs
+            | inputs, [] -> inputs, []
+            | inputs, outputs -> inputs, outputs
 
-        inputCharacteristicCandidates pair targetInputSetIds input
-        @ outputCharacteristicCandidates pair targetOutputSetIds output
-        @ outputFactorCandidates pair targetOutputSetIds output
-        @ processParameterCandidates pair targetInputSetIds targetOutputSetIds proc
-        @ processComponentCandidates pair targetInputSetIds targetOutputSetIds proc
+        inputCharacteristicCandidates pair inputValueTargetIds input
+        @ outputCharacteristicCandidates pair outputValueTargetIds output
+        @ outputFactorCandidates pair outputValueTargetIds output
+        @ processParameterCandidates pair parameterInputTargetIds parameterOutputTargetIds proc
+        @ processComponentCandidates pair parameterInputTargetIds parameterOutputTargetIds proc
 
-    let convert (location: ArcTableLocation) (table: ArcTable) : Result<ConvertState, ArcProvenanceConversionError> =
-        match Normalize.inputHeader table, Normalize.outputHeader table with
-        | None, _ ->
-            Error(ArcProvenanceConversionError.LoadedTableHasNoInputs location)
-        | _, None ->
-            Error(ArcProvenanceConversionError.LoadedTableHasNoOutputs location)
-        | Some inputHeader, Some outputHeader ->
-            let state =
-                table.GetProcesses()
-                |> List.fold (fun (currentState: ConvertState) proc ->
-                    let pairs, warning = processPairs location proc
+    let convert (location: ArcTableLocation) (table: ArcTable) : ConvertState =
+        let shape = RealColumns.shape table
 
-                    let currentState =
-                        warning
-                        |> Option.map (fun warning -> { currentState with Warnings = warning :: currentState.Warnings })
-                        |> Option.defaultValue currentState
+        table.GetProcesses()
+        |> List.fold (fun (currentState: ConvertState) proc ->
+            processPairs proc
+            |> List.fold (fun pairState (input, output) ->
+                let pair = pairContext location proc input output
 
-                    pairs
-                    |> List.fold (fun pairState (input, output) ->
-                        let pair = pairContext location proc input output
+                let inputSetId, pairState =
+                    match shape.InputHeader, pair.InputName with
+                    | Some inputHeader, Some inputName ->
+                        let inputSetId, pairState = Dedup.ensureInputSet location inputHeader inputName pairState
+                        Some inputSetId, pairState
+                    | _ ->
+                        None, pairState
 
-                        let inputSetId, pairState =
-                            match pair.InputName with
-                            | Some inputName ->
-                                let inputSetId, pairState = Dedup.ensureInputSet location inputHeader inputName pairState
-                                Some inputSetId, pairState
-                            | None ->
-                                None, pairState
+                let outputSetId, pairState =
+                    match shape.OutputHeader, pair.OutputName with
+                    | Some outputHeader, Some outputName ->
+                        let outputSetId, pairState = Dedup.ensureOutputSet location outputHeader outputName pairState
+                        Some outputSetId, pairState
+                    | _ ->
+                        None, pairState
 
-                        let outputSetId, pairState =
-                            match pair.OutputName with
-                            | Some outputName ->
-                                let outputSetId, pairState = Dedup.ensureOutputSet location outputHeader outputName pairState
-                                Some outputSetId, pairState
-                            | None ->
-                                None, pairState
+                let pairState =
+                    match inputSetId, pair.InputName, outputSetId, pair.OutputName with
+                    | Some inputSetId, Some inputName, Some outputSetId, Some outputName ->
+                        Dedup.addConnection location proc.Name inputSetId inputName outputSetId outputName pairState
+                    | _ ->
+                        pairState
 
-                        let pairState =
-                            match inputSetId, pair.InputName, outputSetId, pair.OutputName with
-                            | Some inputSetId, Some inputName, Some outputSetId, Some outputName ->
-                                Dedup.addConnection location proc.Name inputSetId inputName outputSetId outputName pairState
-                            | _ ->
-                                pairState
-
-                        pairCandidates pair inputSetId outputSetId proc input output
-                        |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) pairState
-                    ) currentState
-                ) Dedup.emptyState
-
-            if state.InputSets.IsEmpty then
-                Error(ArcProvenanceConversionError.LoadedTableHasNoInputs location)
-            elif state.OutputSets.IsEmpty then
-                Error(ArcProvenanceConversionError.LoadedTableHasNoOutputs location)
-            else
-                Ok state
+                pairCandidates pair inputSetId outputSetId proc input output
+                |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) pairState
+            ) currentState
+        ) Dedup.emptyState
 
 module internal PreviousContext =
 
@@ -833,106 +764,83 @@ module internal PreviousContext =
         |> Map.ofList
 
     let attach (loadedLocation: ArcTableLocation) (arc: ARC) (state: ConvertState) =
-        let allPairs, warnings =
-            TableLookup.allTables arc
-            |> List.filter (fun tableRef -> tableRef.Location <> loadedLocation)
-            |> List.fold (fun (pairState, warningState) tableRef ->
-                tableRef.Table.GetProcesses()
-                |> List.fold (fun (currentPairs, currentWarnings) proc ->
-                    let pairs, warning = LoadedTable.processPairs tableRef.Location proc
+        if state.InputSets.IsEmpty then
+            state
+        else
+            let pairs =
+                TableLookup.allTables arc
+                |> List.filter (fun tableRef -> tableRef.Location <> loadedLocation)
+                |> List.collect (fun tableRef ->
+                    tableRef.Table.GetProcesses()
+                    |> List.collect (fun proc ->
+                        LoadedTable.processPairs proc
+                        |> List.map (fun (input, output) ->
+                            LoadedTable.pairContext tableRef.Location proc input output, proc, input)))
 
-                    let currentPairs =
-                        currentPairs
-                        @ (
-                            pairs
-                            |> List.map (fun (input, output) ->
-                                LoadedTable.pairContext tableRef.Location proc input output, proc, input)
-                        )
+            let rec walk frontier visited currentState =
+                let matches =
+                    pairs
+                    |> List.choose (fun (pair, proc, input) ->
+                        let pairKey =
+                            Normalize.stableId (
+                                Normalize.locationParts pair.Location
+                                @ [
+                                    pair.ProcessName |> Option.defaultValue ""
+                                    pair.InputName |> Option.defaultValue ""
+                                    pair.OutputName |> Option.defaultValue ""
+                                ]
+                            )
 
-                    let currentWarnings =
-                        match warning with
-                        | Some warning -> currentWarnings @ [ warning ]
-                        | None -> currentWarnings
+                        match pair.OutputName with
+                        | Some outputName when not (Set.contains pairKey visited) ->
+                            frontier
+                            |> Map.tryFind outputName
+                            |> Option.map (fun targetSetIds -> pairKey, pair, proc, input, targetSetIds)
+                        | _ ->
+                            None)
 
-                    currentPairs, currentWarnings
-                ) (pairState, warningState)
-            ) ([], [])
+                match matches with
+                | [] ->
+                    currentState
+                | _ ->
+                    let nextState, nextFrontier, nextVisited =
+                        matches
+                        |> List.fold (fun (foldState, foldFrontier, foldVisited) (pairKey, pair, proc, input, targetSetIds) ->
+                            let targetInputSetIds = targetSetIds |> Set.toList
 
-        let initialState =
-            warnings
-            |> List.fold (fun (currentState: ConvertState) warning -> { currentState with Warnings = warning :: currentState.Warnings }) state
+                            let foldState =
+                                LoadedTable.inputCharacteristicCandidates pair targetInputSetIds input
+                                @ LoadedTable.processParameterCandidates pair targetInputSetIds [] proc
+                                @ LoadedTable.processComponentCandidates pair targetInputSetIds [] proc
+                                |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) foldState
 
-        let pairs = allPairs
+                            let foldFrontier =
+                                match pair.InputName with
+                                | Some inputName ->
+                                    let existing =
+                                        foldFrontier
+                                        |> Map.tryFind inputName
+                                        |> Option.defaultValue Set.empty
 
-        let rec walk frontier visited currentState =
-            let matches =
-                pairs
-                |> List.choose (fun (pair, proc, input) ->
-                    let pairKey =
-                        Normalize.stableId (
-                            Normalize.locationParts pair.Location
-                            @ [
-                                pair.ProcessName |> Option.defaultValue ""
-                                pair.InputName |> Option.defaultValue ""
-                                pair.OutputName |> Option.defaultValue ""
-                            ]
-                        )
-
-                    match pair.OutputName with
-                    | Some outputName when not (Set.contains pairKey visited) ->
-                        frontier
-                        |> Map.tryFind outputName
-                        |> Option.map (fun targetSetIds -> pairKey, pair, proc, input, targetSetIds)
-                    | _ ->
-                        None)
-
-            match matches with
-            | [] ->
-                currentState
-            | _ ->
-                let nextState, nextFrontier, nextVisited =
-                    matches
-                    |> List.fold (fun (foldState, foldFrontier, foldVisited) (pairKey, pair, proc, input, targetSetIds) ->
-                        let targetInputSetIds = targetSetIds |> Set.toList
-
-                        let foldState =
-                            LoadedTable.inputCharacteristicCandidates pair targetInputSetIds input
-                            @ LoadedTable.processParameterCandidates pair targetInputSetIds [] proc
-                            @ LoadedTable.processComponentCandidates pair targetInputSetIds [] proc
-                            |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) foldState
-
-                        let foldFrontier =
-                            match pair.InputName with
-                            | Some inputName ->
-                                let existing =
+                                    foldFrontier |> Map.add inputName (Set.union existing targetSetIds)
+                                | None ->
                                     foldFrontier
-                                    |> Map.tryFind inputName
-                                    |> Option.defaultValue Set.empty
 
-                                foldFrontier |> Map.add inputName (Set.union existing targetSetIds)
-                            | None ->
-                                foldFrontier
+                            foldState, foldFrontier, Set.add pairKey foldVisited
+                        ) (currentState, frontier, visited)
 
-                        foldState, foldFrontier, Set.add pairKey foldVisited
-                    ) (currentState, frontier, visited)
+                    walk nextFrontier nextVisited nextState
 
-                walk nextFrontier nextVisited nextState
+            walk (loadedInputFrontier state) Set.empty state
 
-        walk (loadedInputFrontier initialState) Set.empty initialState
+let fromLoadedArc (options: ArcProvenanceConverterOptions) (arc: ARC) : ArcProvenanceConversionResult =
+    let loadedTable = TableLookup.getTable options.LoadedTable arc
+    let state = LoadedTable.convert options.LoadedTable loadedTable
 
-let fromLoadedArc (options: ArcProvenanceConverterOptions) (arc: ARC) : Result<ArcProvenanceConversionResult, ArcProvenanceConversionError> =
-    match TableLookup.findTable options.LoadedTable arc with
-    | Error error ->
-        Error error
-    | Ok loaded ->
-        match LoadedTable.convert loaded.Location loaded.Table with
-        | Error error ->
-            Error error
-        | Ok state ->
-            let state =
-                if options.IncludePreviousContext then
-                    PreviousContext.attach loaded.Location arc state
-                else
-                    state
+    let state =
+        if options.IncludePreviousContext then
+            PreviousContext.attach options.LoadedTable arc state
+        else
+            state
 
-            Ok(Dedup.toResult loaded.Location state)
+    Dedup.toResult options.LoadedTable state
