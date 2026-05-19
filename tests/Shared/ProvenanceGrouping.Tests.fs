@@ -9,6 +9,7 @@ open Expecto
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Import
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
+open Swate.Components.Shared.ProvenanceGrouping.Edit
 
 let private term name =
     {
@@ -255,9 +256,74 @@ let groupingTests =
             Expect.equal representedIds [ "connection-a"; "connection-b"; "connection-c"; "connection-d" ] "Display lines should represent real loaded connections only."
     ]
 
+let editTests =
+    testList "Edit" [
+        testCase "updatePropertyValue preserves collapsed source anchor" <| fun _ ->
+            let model = validImportedModel ()
+
+            match updatePropertyValue "pv-species-arabidopsis-a" (ProvenanceValue.Text "A. thaliana") None model with
+            | Ok(nextModel, [ ProvenanceTablePatch.UpdatePropertyValue(propertyValueId, source, _, newValue, _) ]) ->
+                Expect.equal propertyValueId "pv-species-arabidopsis-a" "Patch should identify edited occurrence."
+                Expect.equal source.InputNames [ "Input A" ] "Patch should preserve source input name."
+                Expect.equal newValue (ProvenanceValue.Text "A. thaliana") "Patch should carry edited value."
+                Expect.equal nextModel.PropertyValues.["pv-species-arabidopsis-a"].Value (ProvenanceValue.Text "A. thaliana") "Model should update the occurrence."
+            | other ->
+                failwithf "Expected one UpdatePropertyValue patch, got %A" other
+
+        testCase "createLoadedPropertyValue adds occurrence to target loaded set" <| fun _ ->
+            let model = validImportedModel ()
+            let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
+
+            let command =
+                {
+                    Target = ProvenancePropertyTarget.InputSets [ "input-c" ]
+                    CopiedFrom = None
+                    Header = treatment
+                    Value = ProvenanceValue.Text "Drought"
+                    Unit = None
+                }
+
+            match createLoadedPropertyValue command model with
+            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedPropertyValue(target, copiedFrom, header, value, _) ]) ->
+                Expect.equal target (ProvenancePropertyTarget.InputSets [ "input-c" ]) "Patch should target the loaded input set."
+                Expect.equal copiedFrom None "New value should not be copied from another occurrence."
+                Expect.equal header treatment "Patch should carry the requested header."
+                Expect.equal value (ProvenanceValue.Text "Drought") "Patch should carry the requested value."
+                Expect.equal (nextModel.InputSets.["input-c"].PropertyValueIds.Length) 1 "Target input set should point to the new value."
+            | other ->
+                failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
+
+        testCase "copyPropertyValueToLoadedTarget copies previous value to existing loaded connection" <| fun _ ->
+            let model = validImportedModel ()
+
+            match copyPropertyValueToLoadedTarget "pv-species-arabidopsis-a" (ProvenancePropertyTarget.Connections [ "connection-d" ]) model with
+            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedPropertyValue(target, copiedFrom, _, value, _) ]) ->
+                Expect.equal target (ProvenancePropertyTarget.Connections [ "connection-d" ]) "Patch should target the existing loaded connection."
+                Expect.equal copiedFrom (Some "pv-species-arabidopsis-a") "Patch should preserve copied source occurrence."
+                Expect.equal value (ProvenanceValue.Text "Arabidopsis") "Patch should copy the value."
+                Expect.isTrue (nextModel.InputSets.["input-c"].PropertyValueIds.Length > model.InputSets.["input-c"].PropertyValueIds.Length) "Connection input set should point to the copied loaded occurrence."
+                Expect.isTrue (nextModel.OutputSets.["output-c"].PropertyValueIds.Length > model.OutputSets.["output-c"].PropertyValueIds.Length) "Connection output set should point to the copied loaded occurrence."
+            | other ->
+                failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
+
+        testCase "connectSets creates a loaded input output connection" <| fun _ ->
+            let model = validImportedModel ()
+
+            match connectSets "input-c" "output-a" None model with
+            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedConnection(tableName, processName, inputSetId, outputSetId) ]) ->
+                Expect.equal tableName "assay-table" "Patch should target loaded table."
+                Expect.equal processName None "Caller may create a connection without assigning a process name yet."
+                Expect.equal inputSetId "input-c" "Patch should keep input set."
+                Expect.equal outputSetId "output-a" "Patch should keep output set."
+                Expect.isTrue (nextModel.Connections |> Map.exists (fun _ connection -> connection.InputSetId = "input-c" && connection.OutputSetId = "output-a")) "Model should contain new connection."
+            | other ->
+                failwithf "Expected one AddLoadedConnection patch, got %A" other
+    ]
+
 let tests =
     testList "ProvenanceGrouping" [
         typeTests
         importTests
         groupingTests
+        editTests
     ]

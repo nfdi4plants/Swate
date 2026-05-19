@@ -30,6 +30,7 @@
     <Compile Include="ProvenanceGrouping\Types.fs" />
     <Compile Include="ProvenanceGrouping\Import.fs" />
     <Compile Include="ProvenanceGrouping\Grouping.fs" />
+    <Compile Include="ProvenanceGrouping\Edit.fs" />
     <Compile Include="ArcExplorerNode.fs" />
     <Compile Include="Shared.fs" />
   </ItemGroup>
