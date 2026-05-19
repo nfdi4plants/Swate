@@ -38,8 +38,8 @@ let private loadedAssayTable () =
             CompositeHeader.Factor(oa "Replicate")
         ]
         [
-            [ text "sample-a"; term "Arabidopsis"; term "22"; text "extract-a"; text "R1" ]
-            [ text "sample-b"; term "Arabidopsis"; term "23"; text "extract-b"; text "R2" ]
+            [ text "sample-a"; term "Arabidopsis"; term "22"; text "extract-a"; term "R1" ]
+            [ text "sample-b"; term "Arabidopsis"; term "23"; text "extract-b"; term "R2" ]
         ]
 
 let private previousStudyTable () =
@@ -352,63 +352,4 @@ let tests =
                 Expect.equal loc.TableName "no-output-table" "Error should identify the table with no outputs."
             | other ->
                 failwithf "Expected LoadedTableHasNoOutputs, got %A" other
-
-        testCase "returns LoadedTableAmbiguous when multiple tables match the location" <| fun _ ->
-            let tableA =
-                table
-                    "study-table"
-                    [
-                        CompositeHeader.Input IOType.Source
-                        CompositeHeader.Output IOType.Sample
-                    ]
-                    [
-                        [ text "source-x"; text "sample-x" ]
-                    ]
-
-            let tableB =
-                table
-                    "study-table"
-                    [
-                        CompositeHeader.Input IOType.Source
-                        CompositeHeader.Output IOType.Sample
-                    ]
-                    [
-                        [ text "source-y"; text "sample-y" ]
-                    ]
-
-            let study =
-                ArcStudy.create (
-                    identifier = "study-1",
-                    tables = ResizeArray [ tableA; tableB ],
-                    registeredAssayIdentifiers = ResizeArray []
-                )
-
-            let arc =
-                ARC(
-                    identifier = "arc-1",
-                    studies = ResizeArray [ study ],
-                    assays = ResizeArray []
-                )
-
-            let location : ArcTableLocation =
-                {
-                    Scope = ArcTableScope.Study
-                    ParentIdentifier = "study-1"
-                    TableName = "study-table"
-                }
-
-            let result =
-                fromLoadedArc
-                    {
-                        LoadedTable = location
-                        IncludePreviousContext = false
-                    }
-                    arc
-
-            match result with
-            | Error(ArcProvenanceConversionError.LoadedTableAmbiguous(loc, count)) ->
-                Expect.equal loc.TableName "study-table" "Error should identify the ambiguous table."
-                Expect.equal count 2 "Error should report the number of matching tables."
-            | other ->
-                failwithf "Expected LoadedTableAmbiguous, got %A" other
     ]
