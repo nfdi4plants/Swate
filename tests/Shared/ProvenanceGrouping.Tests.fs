@@ -284,6 +284,44 @@ let groupingTests =
             Expect.equal representedIds [ "connection-a"; "connection-b"; "connection-c"; "connection-d" ] "Display lines should represent real loaded connections only."
     ]
 
+let private sourceFromLoadedMembershipModel () =
+    let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+    let pvId = "pv-species-a"
+    let setAId = "input-a"
+    let setBId = "output-a"
+    let connId = "connection-a"
+
+    fromImportedProvenance
+        {
+            LoadedTableName = "assay-table"
+            PropertyValues =
+                [
+                    {
+                        Id = pvId
+                        Header = species
+                        Value = ProvenanceValue.Text "Arabidopsis"
+                        Unit = None
+                        Source = None
+                    }
+                ]
+            InputSets =
+                [
+                    importedSet setAId "assay-table" inputHeader "Input A" [ pvId ]
+                ]
+            OutputSets =
+                [
+                    importedSet setBId "assay-table" outputHeader "Output A" [ pvId ]
+                ]
+            Connections =
+                [
+                    importedConnection connId "assay-table" (Some "assay-process") setAId setBId
+                ]
+        }
+        |> fun result -> result.Model
+
 let editTests =
     testList "Edit" [
         testCase "updatePropertyValue preserves collapsed source anchor" <| fun _ ->
@@ -346,6 +384,19 @@ let editTests =
                 Expect.isTrue (nextModel.Connections |> Map.exists (fun _ connection -> connection.InputSetId = "input-c" && connection.OutputSetId = "output-a")) "Model should contain new connection."
             | other ->
                 failwithf "Expected one AddLoadedConnection patch, got %A" other
+
+        testCase "updatePropertyValue finds anchor from loaded set membership when Source is None" <| fun _ ->
+            let model = sourceFromLoadedMembershipModel ()
+
+            match updatePropertyValue "pv-species-a" (ProvenanceValue.Text "A. thaliana") None model with
+            | Ok(nextModel, [ ProvenanceTablePatch.UpdatePropertyValue(propertyValueId, source, _, newValue, _) ]) ->
+                Expect.equal propertyValueId "pv-species-a" "Patch should identify edited occurrence."
+                Expect.equal source.InputNames [ "Input A" ] "Source should derive input names from loaded set membership."
+                Expect.equal source.OutputNames [ "Output A" ] "Source should derive output names from loaded set membership."
+                Expect.equal newValue (ProvenanceValue.Text "A. thaliana") "Patch should carry edited value."
+                Expect.isSome nextModel.PropertyValues.["pv-species-a"].Source "Model should persist the derived source anchor."
+            | other ->
+                failwithf "Expected one UpdatePropertyValue patch, got %A" other
     ]
 
 let fixtureTests =
