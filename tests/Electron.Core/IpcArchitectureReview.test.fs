@@ -3,7 +3,9 @@ module ElectronCore.IpcArchitectureReviewTests
 open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
+open Fable.Electron.Main
 open Main.Bindings.Path
+open Main.ArcVault
 open Main.IPC.ArcVaultsApi
 open Main.ArcMerge
 open Swate.Components.Shared
@@ -54,6 +56,33 @@ let private removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
     return ()
 }
 
+let private expectLoadedArc (result: Result<ARC, string[]>) =
+    match result with
+    | Ok arc -> arc
+    | Error errors -> failwith (errors |> String.concat "\n")
+
+let private loadArcAsync (arcPath: string) : JS.Promise<ARC> = promise {
+    let! loaded = ARC.tryLoadAsync arcPath
+    return expectLoadedArc loaded
+}
+
+let private testWindow () =
+    let noopSend: obj = emitJsExpr () "((..._args) => {})"
+
+    createObj [
+        "id" ==> 0
+        "title" ==> ""
+        "webContents" ==> createObj [ "send" ==> noopSend ]
+    ]
+    |> unbox<BrowserWindow>
+
+let private watcherEvent arcPath eventName relativePath : ArcVaultFileSystemEvent =
+    {
+        EventName = eventName
+        RelativePath = relativePath
+        AbsolutePath = join [| arcPath; relativePath |]
+    }
+
 let private withTempArc (seedArc: ARC -> unit) (testBody: string -> JS.Promise<unit>) : JS.Promise<unit> = promise {
     let! rootPath = createTempDirectoryAsync ()
     let arcPath = join [| rootPath; "arc" |]
@@ -69,7 +98,7 @@ let private withTempArc (seedArc: ARC -> unit) (testBody: string -> JS.Promise<u
         return raise error
 }
 
-let private assertEntityFolderRenameSync
+let private assertEntityFolderRenameSyncOnLoadedArc
     (zoneFolder: string)
     (oldIdentifier: string)
     (newIdentifier: string)
@@ -96,14 +125,16 @@ let private assertEntityFolderRenameSync
                 Vitest.expect(renamePlan.TargetPath).toBe(targetRelativePath)
                 renamePlan
 
-        match! ArcRenameHelper.syncRenamedEntityIdentifierOnDisk arcPath renamePlan with
+        let! reloadedBeforeSync = loadArcAsync arcPath
+
+        match! ArcRenameHelper.syncRenamedEntityIdentifierOnLoadedArc arcPath renamePlan reloadedBeforeSync with
         | Error syncError -> return failwith syncError.Message
-        | Ok() ->
-            match! ARC.tryLoadAsync arcPath with
-            | Error loadError -> return failwith $"Expected ARC reload to succeed after rename sync: {loadError}"
-            | Ok reloadedArc ->
-                assertReloadedArc reloadedArc
-                return ()
+        | Ok syncedArc ->
+            assertReloadedArc syncedArc
+
+            let! reloadedAfterSync = loadArcAsync arcPath
+            assertReloadedArc reloadedAfterSync
+            return ()
     })
 
 Vitest.describe("IPC architecture review fixes", fun () ->
@@ -150,46 +181,158 @@ Vitest.describe("IPC architecture review fixes", fun () ->
             expectSourceContains gitLfsSource "Remoting.buildProxySender<IGitLfsProgressRendererApi>"
         })
 
-    Vitest.test("Arc vault IPC contract and implementation expose deletePath", fun () ->
+    Vitest.test("Arc vault IPC contract and implementation expose watcher-driven filetree mutations", fun () ->
         promise {
             let! ipcTypesSource = sourcePath [| "Swate.Electron.Shared"; "IPCTypes.fs" |] |> readUtf8FileAsync
             let! arcVaultApiSource = sourcePath [| "Main"; "IPC"; "IArcVaultsApi.fs" |] |> readUtf8FileAsync
+            let! arcVaultSource = sourcePath [| "Main"; "ArcVault"; "ArcVault.fs" |] |> readUtf8FileAsync
 
+            expectSourceContains ipcTypesSource "addArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>"
             expectSourceContains ipcTypesSource "deletePath: string -> JS.Promise<Result<unit, exn>>"
-            expectSourceContains arcVaultApiSource "deletePath ="
-            expectSourceContains arcVaultApiSource "ArcDeletePathRules.isDeletePathAllowed"
-            expectSourceContains arcVaultApiSource "do! vault.RefreshFileTree()"
-            expectSourceContains arcVaultApiSource "runArcDiskMutation"
-            expectSourceContains arcVaultApiSource "ArcDeleteHelper.mergeReloadedArcAfterDelete"
-            expectSourceContains arcVaultApiSource "ARC.merge"
-            expectSourceContains arcVaultApiSource "ArcDeletePathRules.buildFallbackUnlinkPaths"
-            expectSourceContainsInOrder
-                arcVaultApiSource
-                [|
-                    "fsPromisesDynamic?rm"
-                    "runArcDiskMutation"
-                    "ArcDeleteHelper.mergeReloadedArcAfterDelete"
-                |]
-            expectSourceContainsInOrder
-                arcVaultApiSource
-                [|
-                    "let private runArcDiskMutation"
-                    "do! vault.RefreshFileTree()"
-                    "match! postReloadArcMutation reloadedArc"
-                    "match mergeReloadedArc postMutationArc"
-                |]
-        })
-
-    Vitest.test("Arc vault IPC contract and implementation expose renamePath", fun () ->
-        promise {
-            let! ipcTypesSource = sourcePath [| "Swate.Electron.Shared"; "IPCTypes.fs" |] |> readUtf8FileAsync
-            let! fileIoTypesSource = sourcePath [| "Swate.Electron.Shared"; "FileIOTypes.fs" |] |> readUtf8FileAsync
-
-            expectSourceContains fileIoTypesSource "type RenamePathRequest = {"
-            expectSourceContains fileIoTypesSource "relativePath: string"
-            expectSourceContains fileIoTypesSource "newName: string"
             expectSourceContains ipcTypesSource "renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>"
+            expectSourceContains arcVaultApiSource "addArcFile ="
+            expectSourceContains arcVaultApiSource "deletePath ="
+            expectSourceContains arcVaultApiSource "renamePath ="
+            expectSourceContains arcVaultApiSource "ArcDeletePathRules.isDeletePathAllowed"
+            expectSourceContains arcVaultApiSource "ArcDeleteHelper.mergeReloadedArcAfterDelete"
+            expectSourceContains arcVaultApiSource "ArcRenameHelper.mergeReloadedArcAfterRename"
+            expectSourceContains arcVaultApiSource "vault.RegisterPendingArcFileTreeMutation"
+            expectSourceContains arcVaultSource "member this.ApplyFileWatcherEvents"
+            expectSourceContains arcVaultSource "ARC.merge arcLocal reloadedArc events"
+            expectSourceContains arcVaultSource "pendingArcFileTreeMutation"
+            expectSourceContainsInOrder
+                arcVaultApiSource
+                [|
+                    "addArcFile ="
+                    "vault.AddArcFile request"
+                    "deletePath ="
+                    "vault.RegisterPendingArcFileTreeMutation"
+                    "fsPromisesDynamic?rm"
+                |]
+            expectSourceContainsInOrder
+                arcVaultApiSource
+                [|
+                    "renamePath ="
+                    "vault.RegisterPendingArcFileTreeMutation"
+                    "renameWithRetriesAsync"
+                |]
         })
+
+    Vitest.test("watcher ARC merge handles add, change, and unlink events while preserving dirty local state", fun () ->
+        withTempArc (fun arc -> arc.AddAssay(ArcAssay("ExistingAssay", title = "Initial title"))) (fun arcPath -> promise {
+            let! loadedArc = loadArcAsync arcPath
+            loadedArc.Title <- Some "Unsaved local investigation title"
+
+            let vault = ArcVault(testWindow ())
+            vault.path <- Some arcPath
+            vault.SetArc loadedArc
+            vault.SetHasUnsavedArcChanges true
+
+            let! diskArcForAdd = loadArcAsync arcPath
+            diskArcForAdd.AddAssay(ArcAssay("DiskAssay", title = "Added on disk"))
+            do! diskArcForAdd.UpdateAsync arcPath
+
+            do!
+                vault.ApplyFileWatcherEvents [
+                    watcherEvent arcPath "add" "assays/DiskAssay/isa.assay.xlsx"
+                ]
+
+            let afterAdd = vault.arc.Value
+            Vitest.expect(afterAdd.ContainsAssay("DiskAssay")).toBe(true)
+            Vitest.expect(afterAdd.Title).toEqual(Some "Unsaved local investigation title")
+
+            let! diskArcForChange = loadArcAsync arcPath
+            diskArcForChange.GetAssay("DiskAssay").Title <- Some "Changed on disk"
+            do! diskArcForChange.UpdateAsync arcPath
+
+            do!
+                vault.ApplyFileWatcherEvents [
+                    watcherEvent arcPath "change" "assays/DiskAssay/isa.assay.xlsx"
+                ]
+
+            let afterChange = vault.arc.Value
+            Vitest.expect(afterChange.GetAssay("DiskAssay").Title).toEqual(Some "Changed on disk")
+            Vitest.expect(afterChange.Title).toEqual(Some "Unsaved local investigation title")
+
+            let! diskArcForDelete = loadArcAsync arcPath
+            diskArcForDelete.RemoveAssay("ExistingAssay")
+            do! diskArcForDelete.UpdateAsync arcPath
+
+            do!
+                vault.ApplyFileWatcherEvents [
+                    watcherEvent arcPath "unlink" "assays/ExistingAssay/isa.assay.xlsx"
+                ]
+
+            let afterDelete = vault.arc.Value
+            Vitest.expect(afterDelete.ContainsAssay("ExistingAssay")).toBe(false)
+            Vitest.expect(afterDelete.Title).toEqual(Some "Unsaved local investigation title")
+            Vitest.expect(vault.hasUnsavedArcChanges).toBe(true)
+        }))
+
+    Vitest.test("pending watcher rename mutation syncs identifiers and preserves dirty local entity state", fun () ->
+        withTempArc
+            (fun arc ->
+                arc.InitStudy("StudyA") |> ignore
+                arc.InitAssay("OldAssay") |> ignore
+                arc.RegisterAssay("StudyA", "OldAssay"))
+            (fun arcPath -> promise {
+                let! loadedArc = loadArcAsync arcPath
+                loadedArc.GetAssay("OldAssay").Title <- Some "Unsaved assay title"
+
+                let vault = ArcVault(testWindow ())
+                vault.path <- Some arcPath
+                vault.SetArc loadedArc
+                vault.SetHasUnsavedArcChanges true
+
+                let sourceAbsolutePath = join [| arcPath; "assays"; "OldAssay" |]
+                let targetAbsolutePath = join [| arcPath; "assays"; "NewAssay" |]
+                let! _ = fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath) |> unbox<JS.Promise<obj>>
+
+                let renamePlan =
+                    match
+                        ArcRenameHelper.tryBuildRenamePlan {
+                            relativePath = "assays/OldAssay"
+                            newName = "NewAssay"
+                        }
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok renamePlan -> renamePlan
+
+                vault.RegisterPendingArcFileTreeMutation {
+                    Description = "rename test"
+                    MergeReloadedArc =
+                        fun arcLocal reloadedArc _ -> promise {
+                            match!
+                                ArcRenameHelper.syncRenamedEntityIdentifierOnLoadedArc
+                                    arcPath
+                                    renamePlan
+                                    reloadedArc
+                            with
+                            | Error syncError -> return Error syncError
+                            | Ok syncedArc ->
+                                return
+                                    ArcRenameHelper.mergeReloadedArcAfterRename
+                                        renamePlan
+                                        arcLocal
+                                        syncedArc
+                        }
+                }
+
+                do!
+                    vault.ApplyFileWatcherEvents [
+                        watcherEvent arcPath "unlink" "assays/OldAssay/isa.assay.xlsx"
+                        watcherEvent arcPath "add" "assays/NewAssay/isa.assay.xlsx"
+                    ]
+
+                let mergedArc = vault.arc.Value
+                Vitest.expect(mergedArc.ContainsAssay("OldAssay")).toBe(false)
+                Vitest.expect(mergedArc.ContainsAssay("NewAssay")).toBe(true)
+                Vitest.expect(mergedArc.GetAssay("NewAssay").Title).toEqual(Some "Unsaved assay title")
+
+                let study = mergedArc.GetStudy("StudyA")
+                Vitest.expect(study.RegisteredAssayIdentifiers |> Seq.contains "OldAssay").toBe(false)
+                Vitest.expect(study.RegisteredAssayIdentifiers |> Seq.contains "NewAssay").toBe(true)
+            }))
 
     Vitest.test("Git LFS storage management is exposed through IGitApi only", fun () ->
         promise {
@@ -235,8 +378,8 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
 
         match result with
         | Error error -> failwith error.Message
-        | Ok mergeResult ->
-            Vitest.expect(mergeResult.Arc.TryGetAssay "AssayMergeA" |> Option.isSome).toBe(true)
+        | Ok mergedArc ->
+            Vitest.expect(mergedArc.TryGetAssay "AssayMergeA" |> Option.isSome).toBe(true)
     )
 
     Vitest.test("entity unlink event removes the targeted entity", fun () ->
@@ -254,8 +397,8 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
 
         match result with
         | Error error -> failwith error.Message
-        | Ok mergeResult ->
-            Vitest.expect(mergeResult.Arc.ContainsAssay("My Assay")).toBe(false)
+        | Ok mergedArc ->
+            Vitest.expect(mergedArc.ContainsAssay("My Assay")).toBe(false)
     )
 
     Vitest.test("datamap unlink clears DataMap but keeps entity fields", fun () ->
@@ -277,9 +420,9 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
 
         match result with
         | Error error -> failwith error.Message
-        | Ok mergeResult ->
-            Vitest.expect(mergeResult.Arc.Assays.[0].Title).toEqual(Some "Local assay title")
-            Vitest.expect(mergeResult.Arc.Assays.[0].DataMap).toEqual(None)
+        | Ok mergedArc ->
+            Vitest.expect(mergedArc.Assays.[0].Title).toEqual(Some "Local assay title")
+            Vitest.expect(mergedArc.Assays.[0].DataMap).toEqual(None)
 
     )
 
@@ -295,8 +438,8 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
 
         match result with
         | Error error -> failwith error.Message
-        | Ok mergeResult ->
-            Vitest.expect(mergeResult.Arc.ContainsAssay("My Assay")).toBe(false)
+        | Ok mergedArc ->
+            Vitest.expect(mergedArc.ContainsAssay("My Assay")).toBe(false)
     )
 
     Vitest.test("mergeReloadedArcAfterDelete preserves hash baseline so unaffected entities do not get rewritten", fun () ->
@@ -317,11 +460,11 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
 
         match result with
         | Error error -> failwith error.Message
-        | Ok mergeResult ->
-            Vitest.expect(mergeResult.Arc.ContainsAssay("AssayDelete")).toBe(false)
-            Vitest.expect(mergeResult.Arc.ContainsAssay("AssayKeep")).toBe(true)
+        | Ok mergedArc ->
+            Vitest.expect(mergedArc.ContainsAssay("AssayDelete")).toBe(false)
+            Vitest.expect(mergedArc.ContainsAssay("AssayKeep")).toBe(true)
 
-            let followUpContracts = mergeResult.Arc.GetUpdateContracts()
+            let followUpContracts = mergedArc.GetUpdateContracts()
             Vitest.expect(followUpContracts.Length).toBe(0)
     )
 
@@ -347,8 +490,8 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
         Vitest.expect(helperFallbackPaths).toEqual(sharedFallbackPaths)
     )
 
-    Vitest.test("syncRenamedEntityIdentifierOnDisk updates assay identifier after assay folder rename", fun () ->
-        assertEntityFolderRenameSync
+    Vitest.test("syncRenamedEntityIdentifierOnLoadedArc updates assay identifier after assay folder rename", fun () ->
+        assertEntityFolderRenameSyncOnLoadedArc
             "assays"
             "OldAssay"
             "NewAssay"
@@ -358,8 +501,8 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
                 Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe(true))
     )
 
-    Vitest.test("syncRenamedEntityIdentifierOnDisk updates study identifier after study folder rename", fun () ->
-        assertEntityFolderRenameSync
+    Vitest.test("syncRenamedEntityIdentifierOnLoadedArc updates study identifier after study folder rename", fun () ->
+        assertEntityFolderRenameSyncOnLoadedArc
             "studies"
             "OldStudy"
             "NewStudy"
@@ -369,8 +512,8 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
                 Vitest.expect(reloadedArc.ContainsStudy("NewStudy")).toBe(true))
     )
 
-    Vitest.test("syncRenamedEntityIdentifierOnDisk updates run identifier after run folder rename", fun () ->
-        assertEntityFolderRenameSync
+    Vitest.test("syncRenamedEntityIdentifierOnLoadedArc updates run identifier after run folder rename", fun () ->
+        assertEntityFolderRenameSyncOnLoadedArc
             "runs"
             "OldRun"
             "NewRun"
@@ -380,8 +523,8 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
                 Vitest.expect(reloadedArc.ContainsRun("NewRun")).toBe(true))
     )
 
-    Vitest.test("syncRenamedEntityIdentifierOnDisk updates workflow identifier after workflow folder rename", fun () ->
-        assertEntityFolderRenameSync
+    Vitest.test("syncRenamedEntityIdentifierOnLoadedArc updates workflow identifier after workflow folder rename", fun () ->
+        assertEntityFolderRenameSyncOnLoadedArc
             "workflows"
             "OldWorkflow"
             "NewWorkflow"
@@ -391,8 +534,8 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
                 Vitest.expect(reloadedArc.ContainsWorkflow("NewWorkflow")).toBe(true))
     )
 
-    Vitest.test("syncRenamedEntityIdentifierOnDisk updates study assay registrations when an assay is renamed", fun () ->
-        assertEntityFolderRenameSync
+    Vitest.test("syncRenamedEntityIdentifierOnLoadedArc updates study assay registrations when an assay is renamed", fun () ->
+        assertEntityFolderRenameSyncOnLoadedArc
             "assays"
             "OldAssay"
             "NewAssay"
@@ -477,15 +620,15 @@ Vitest.describe("ArcDeleteHelper merge and validation", fun () ->
 
         match ArcRenameHelper.mergeReloadedArcAfterRename renamePlan localArc reloadedArc with
         | Error error -> failwith error.Message
-        | Ok mergeResult ->
-            Vitest.expect(mergeResult.Arc.ContainsAssay("OldAssay")).toBe(false)
-            Vitest.expect(mergeResult.Arc.ContainsAssay("NewAssay")).toBe(true)
+        | Ok mergedArc ->
+            Vitest.expect(mergedArc.ContainsAssay("OldAssay")).toBe(false)
+            Vitest.expect(mergedArc.ContainsAssay("NewAssay")).toBe(true)
 
-            let renamedAssay = mergeResult.Arc.GetAssay("NewAssay")
+            let renamedAssay = mergedArc.GetAssay("NewAssay")
             Vitest.expect(renamedAssay.Title).toEqual(Some "Unsaved assay title")
             Vitest.expect(renamedAssay.DataMap.IsSome).toBe(true)
 
-            let study = mergeResult.Arc.GetStudy("StudyA")
+            let study = mergedArc.GetStudy("StudyA")
             Vitest.expect(study.RegisteredAssayIdentifiers |> Seq.contains "OldAssay").toBe(false)
             Vitest.expect(study.RegisteredAssayIdentifiers |> Seq.contains "NewAssay").toBe(true)
     )

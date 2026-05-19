@@ -46,8 +46,8 @@ type IArcVaultsApi = {
     saveArcFile: unit -> JS.Promise<Result<unit, exn>>
     /// Applies ARC file changes to the active vault's in-memory ARC without writing to disk.
     setArcFileInMemory: FileContentDTO -> JS.Promise<Result<unit, exn>>
-    /// Applies ARC file changes and persists to disk atomically. In-memory ARC is only committed on successful save.
-    applyArcFileAndSave: FileContentDTO -> JS.Promise<Result<unit, exn>>
+    /// Adds a new ARC entity from the file tree. The file watcher performs the follow-up merge and file-tree update.
+    addArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>

@@ -173,11 +173,10 @@ Vitest.describe("ARC AddAsync", fun () ->
             Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe(true)
         }))
 
-    Vitest.test("ApplyArcFileAndSave adds new entities and updates existing entities through the same IPC-facing path", fun () ->
+    Vitest.test("AddArcFile uses the scoped ARC add path without persisting unrelated dirty in-memory edits", fun () ->
         withTempArc (fun arc -> arc.AddAssay(ArcAssay("ExistingAssay", title = "Old title"))) (fun arcPath -> promise {
             let! loadedArc = loadArcAsync arcPath
-            let dirtyAssay = loadedArc.GetAssay("ExistingAssay")
-            dirtyAssay.Title <- Some "Unsaved local title"
+            loadedArc.GetAssay("ExistingAssay").Title <- Some "Unsaved local title"
 
             let vault = ArcVault(testWindow ())
             vault.path <- Some arcPath
@@ -188,28 +187,17 @@ Vitest.describe("ARC AddAsync", fun () ->
                 FileContentDTO.fromArcFile(ArcFiles.Assay(ArcAssay("NewAssay")))
                 |> expectSome <| "Expected new assay DTO."
 
-            match! vault.ApplyArcFileAndSave newAssayRequest with
+            match! vault.AddArcFile newAssayRequest with
             | Error error -> failwith error.Message
             | Ok() -> ()
 
             let! reloadedAfterAdd = loadArcAsync arcPath
             Vitest.expect(reloadedAfterAdd.ContainsAssay("NewAssay")).toBe(true)
             Vitest.expect(reloadedAfterAdd.GetAssay("ExistingAssay").Title).toEqual(Some "Old title")
+
+            let inMemoryArc = vault.arc |> expectSome <| "Expected vault ARC."
+            Vitest.expect(inMemoryArc.ContainsAssay("NewAssay")).toBe(true)
+            Vitest.expect(inMemoryArc.GetAssay("ExistingAssay").Title).toEqual(Some "Unsaved local title")
             Vitest.expect(vault.hasUnsavedArcChanges).toBe(true)
-
-            let updatedExistingAssay = ArcAssay("ExistingAssay", title = "Updated title")
-
-            let existingAssayRequest =
-                FileContentDTO.fromArcFile(ArcFiles.Assay updatedExistingAssay)
-                |> expectSome <| "Expected existing assay DTO."
-
-            match! vault.ApplyArcFileAndSave existingAssayRequest with
-            | Error error -> failwith error.Message
-            | Ok() -> ()
-
-            let! reloadedArc = loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe(true)
-            Vitest.expect(reloadedArc.GetAssay("ExistingAssay").Title).toEqual(Some "Updated title")
-            Vitest.expect(vault.hasUnsavedArcChanges).toBe(false)
         }))
 )

@@ -22,14 +22,6 @@ open Swate.Electron.Shared.DTOs.NoteSearchDto
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
-let private processDynamic: obj = emitJsExpr () "process"
-
-let private isWindowsPlatform () =
-    try
-        let platform = processDynamic?platform |> unbox<string>
-        platform = "win32"
-    with _ ->
-        false
 
 [<RequireQualifiedAccess>]
 module ArcPathValidation =
@@ -187,84 +179,8 @@ let private withLoadedArcVault<'T>
             | _ -> return Error(exn "ARC is not loaded.")
     }
 
-type private ArcMutationMergeResult = {
-    Arc: ARC
-}
-
-let private applyArcMutationMergeResult (vault: ArcVault) (mergeResult: ArcMutationMergeResult) =
-    vault.SetArc mergeResult.Arc
-
-let private passthroughReloadedArc (reloadedArc: ARC) : JS.Promise<Result<ARC, exn>> =
-    promise { return Ok reloadedArc }
-
-let private runArcDiskMutation
-    (vault: ArcVault)
-    (reloadErrorContext: string)
-    (diskMutation: unit -> JS.Promise<Result<unit, exn>>)
-    (postReloadArcMutation: ARC -> JS.Promise<Result<ARC, exn>>)
-    (mergeReloadedArc: ARC -> Result<ArcMutationMergeResult, exn>)
-    : JS.Promise<Result<unit, exn>> =
-    promise {
-        vault.isBusyWriting <- true
-
-        try
-            let! diskMutationResult = diskMutation ()
-
-            match diskMutationResult with
-            | Error diskMutationError -> return Error diskMutationError
-            | Ok() ->
-                do! vault.RefreshFileTree()
-
-                match! ARC.tryLoadAsync vault.path.Value with
-                | Error loadError -> return Error(exn $"Unable to reload ARC after {reloadErrorContext}: {loadError}")
-                | Ok reloadedArc ->
-                    match! postReloadArcMutation reloadedArc with
-                    | Error postReloadError -> return Error postReloadError
-                    | Ok postMutationArc ->
-                        match mergeReloadedArc postMutationArc with
-                        | Error mergeError -> return Error mergeError
-                        | Ok mergeResult ->
-                            applyArcMutationMergeResult vault mergeResult
-                            return Ok()
-        finally
-            vault.isBusyWriting <- false
-    }
-
-let private runRenameOperationSafely
-    (operation: unit -> JS.Promise<Result<unit, exn>>)
-    : JS.Promise<Result<unit, exn>> =
-    promise {
-        try
-            return! operation ()
-        with operationError ->
-            return Error operationError
-    }
-
-let private runWithRenameScopedPolling
-    (vault: ArcVault)
-    (operation: unit -> JS.Promise<Result<unit, exn>>)
-    : JS.Promise<Result<unit, exn>> =
-    promise {
-        let useScopedPolling = isWindowsPlatform () && vault.watcher.IsSome
-
-        if useScopedPolling |> not then
-            return! runRenameOperationSafely operation
-        else
-            do! vault.StopFileWatcher()
-            vault.StartFileWatcher(usePolling = true)
-
-            let! operationResult = runRenameOperationSafely operation
-
-            do! vault.StopFileWatcher()
-            vault.StartFileWatcher()
-
-            return operationResult
-    }
-
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
-
-    type MergeResult = { Arc: ARC }
 
     let private normalizeRelativePathForMerge (path: string) =
         path |> PathHelpers.normalizeRelativePath |> PathHelpers.normalizePath
@@ -316,13 +232,13 @@ module ArcDeleteHelper =
         (preDeleteFileRelativePaths: string seq)
         (arcLocal: ARC)
         (reloadedArc: ARC)
-        : Result<MergeResult, exn> =
+        : Result<ARC, exn> =
         let arcLocalForMerge = copyArcPreservingStaticHashes arcLocal
         let unlinkEvents = buildDeleteUnlinkEvents deletedPath preDeleteFileRelativePaths
         let mergedArc = ARC.merge arcLocalForMerge reloadedArc unlinkEvents
         syncArcStaticHashes arcLocal mergedArc
 
-        Ok { Arc = mergedArc }
+        Ok mergedArc
 
 [<RequireQualifiedAccess>]
 module ArcRenameHelper =
@@ -339,10 +255,6 @@ module ArcRenameHelper =
         SyncPlan: IdentifierRenameSyncPlan
     }
 
-    type MergeResult = {
-        Arc: ARC
-    }
-
     let private normalizeRelativePathForComparison (path: string) =
         path
         |> PathHelpers.normalizeCanonicalRelativePath
@@ -357,31 +269,6 @@ module ArcRenameHelper =
             arc.RenameWorkflow(syncPlan.OldIdentifier, syncPlan.NewIdentifier)
         | ArcDeletePathRules.AddZone.Runs ->
             arc.RenameRun(syncPlan.OldIdentifier, syncPlan.NewIdentifier)
-
-    let syncRenamedEntityIdentifierOnDisk
-        (arcPath: string)
-        (renamePlan: RenamePlan)
-        : JS.Promise<Result<unit, exn>> =
-        promise {
-            match! ARC.tryLoadAsync arcPath with
-            | Error loadError ->
-                return
-                    Error(
-                        exn
-                            $"Renamed folder from '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}', but could not reload ARC for identifier sync: {loadError}"
-                    )
-            | Ok reloadedArc ->
-                try
-                    applyIdentifierRenameSyncPlan reloadedArc renamePlan.SyncPlan
-                    do! reloadedArc.UpdateAsync arcPath
-                    return Ok()
-                with syncError ->
-                    return
-                        Error(
-                            exn
-                                $"Renamed folder from '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}', but failed to sync ARC identifier from '{renamePlan.SyncPlan.OldIdentifier}' to '{renamePlan.SyncPlan.NewIdentifier}': {syncError.Message}"
-                        )
-        }
 
     let syncRenamedEntityIdentifierOnLoadedArc
         (arcPath: string)
@@ -462,7 +349,7 @@ module ArcRenameHelper =
         (renamePlan: RenamePlan)
         (arcLocal: ARC)
         (reloadedArc: ARC)
-        : Result<MergeResult, exn> =
+        : Result<ARC, exn> =
         try
             let arcLocalForMerge =
                 if arcLocal.hasInMemoryChanges() then
@@ -473,7 +360,7 @@ module ArcRenameHelper =
                     arcLocal
 
             let mergedArc = ARC.merge arcLocalForMerge reloadedArc []
-            Ok { Arc = mergedArc }
+            Ok mergedArc
         with mergeError ->
             Error(
                 exn
@@ -768,19 +655,13 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    applyArcFileAndSave =
+    addArcFile =
         fun (request: FileContentDTO) -> promise {
             try
                 return!
                     withLoadedArcVault
                         event
-                        (fun vault -> promise {
-                            match! vault.ApplyArcFileAndSave(request) with
-                            | Error saveError -> return Error saveError
-                            | Ok() ->
-                                do! vault.RefreshFileTree()
-                                return Ok()
-                        })
+                        (fun vault -> promise { return! vault.AddArcFile request })
             with e ->
                 return Error e
         }
@@ -798,7 +679,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault event (fun vault ->
                         promise {
                             let arcPath = vault.path.Value
-                            let arcLocal = vault.arc.Value
                             let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
 
                             if ArcDeletePathRules.isDeletePathAllowed normalizedRelativePath |> not then
@@ -811,37 +691,43 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match tryResolveArcRelativePath arcPath normalizedRelativePath with
                                 | Error pathError -> return Error pathError
                                 | Ok absolutePath ->
+                                    let! preDeleteFileEntries =
+                                        if vault.fileTree.Count > 0 then
+                                            promise { return vault.fileTree.Values |> Seq.toList }
+                                        else
+                                            promise {
+                                                let! entries = getFileEntries arcPath
+                                                return entries |> Array.toList
+                                            }
+
                                     let preDeleteFileRelativePaths =
-                                        ArcDeleteHelper.getPreDeleteFileRelativePaths arcPath vault.fileTree.Values
+                                        ArcDeleteHelper.getPreDeleteFileRelativePaths arcPath preDeleteFileEntries
 
-                                    let deleteDiskMutation () =
-                                        promise {
-                                            try
-                                                let! _ =
-                                                    fsPromisesDynamic?rm (
-                                                        absolutePath,
-                                                        createObj [ "recursive" ==> true; "force" ==> false ]
-                                                    )
-                                                    |> unbox<JS.Promise<obj>>
+                                    vault.RegisterPendingArcFileTreeMutation {
+                                        Description = $"delete '{normalizedRelativePath}'"
+                                        MergeReloadedArc =
+                                            fun arcLocal reloadedArc _ -> promise {
+                                                return
+                                                    ArcDeleteHelper.mergeReloadedArcAfterDelete
+                                                        normalizedRelativePath
+                                                        preDeleteFileRelativePaths
+                                                        arcLocal
+                                                        reloadedArc
+                                            }
+                                    }
 
-                                                return Ok()
-                                            with deleteError ->
-                                                return Error deleteError
-                                        }
+                                    try
+                                        let! _ =
+                                            fsPromisesDynamic?rm (
+                                                absolutePath,
+                                                createObj [ "recursive" ==> true; "force" ==> false ]
+                                            )
+                                            |> unbox<JS.Promise<obj>>
 
-                                    return!
-                                        runArcDiskMutation
-                                            vault
-                                            $"deleting '{normalizedRelativePath}'"
-                                            deleteDiskMutation
-                                            passthroughReloadedArc
-                                            (fun reloadedArc ->
-                                                ArcDeleteHelper.mergeReloadedArcAfterDelete
-                                                    normalizedRelativePath
-                                                    preDeleteFileRelativePaths
-                                                    arcLocal
-                                                    reloadedArc
-                                                |> Result.map (fun mergeResult -> { Arc = mergeResult.Arc }))
+                                        return Ok()
+                                    with deleteError ->
+                                        vault.ClearPendingArcFileTreeMutation()
+                                        return Error deleteError
                         }
                     )
             with e ->
@@ -854,7 +740,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault event (fun vault ->
                         promise {
                             let arcPath = vault.path.Value
-                            let arcLocal = vault.arc.Value
 
                             match ArcRenameHelper.tryBuildRenamePlan request with
                             | Error validationError -> return Error validationError
@@ -866,38 +751,52 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 | Error pathError, _
                                 | _, Error pathError -> return Error pathError
                                 | Ok sourceAbsolutePath, Ok targetAbsolutePath ->
-                                    let renameDiskMutation () =
-                                        promise {
-                                            let! renameResult =
-                                                renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
+                                    vault.RegisterPendingArcFileTreeMutation {
+                                        Description =
+                                            $"rename '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}'"
+                                        MergeReloadedArc =
+                                            fun arcLocal reloadedArc _ -> promise {
+                                                let! syncedArcResult =
+                                                    promise {
+                                                        let wasBusyWriting = vault.isBusyWriting
+                                                        vault.isBusyWriting <- true
 
-                                            match renameResult with
-                                            | Ok() -> return Ok()
-                                            | Error renameError ->
-                                                return
-                                                    Error(
-                                                        ArcRenameHelper.mapRenameDiskError
-                                                            renamePlan.SourcePath
-                                                            renamePlan.TargetPath
-                                                            renameError
-                                                    )
-                                        }
+                                                        try
+                                                            return!
+                                                                ArcRenameHelper.syncRenamedEntityIdentifierOnLoadedArc
+                                                                    arcPath
+                                                                    renamePlan
+                                                                    reloadedArc
+                                                        finally
+                                                            vault.isBusyWriting <- wasBusyWriting
+                                                    }
 
-                                    return!
-                                        runWithRenameScopedPolling
-                                            vault
-                                            (fun () ->
-                                                runArcDiskMutation
-                                                    vault
-                                                    $"renaming '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}'"
-                                                    renameDiskMutation
-                                                    (ArcRenameHelper.syncRenamedEntityIdentifierOnLoadedArc arcPath renamePlan)
-                                                    (fun reloadedArc ->
+                                                match syncedArcResult with
+                                                | Error syncError -> return Error syncError
+                                                | Ok syncedArc ->
+                                                    return
                                                         ArcRenameHelper.mergeReloadedArcAfterRename
                                                             renamePlan
                                                             arcLocal
-                                                            reloadedArc
-                                                        |> Result.map (fun mergeResult -> { Arc = mergeResult.Arc })))
+                                                            syncedArc
+                                            }
+                                    }
+
+                                    let! renameResult =
+                                        renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
+
+                                    match renameResult with
+                                    | Ok() -> return Ok()
+                                    | Error renameError ->
+                                        vault.ClearPendingArcFileTreeMutation()
+
+                                        return
+                                            Error(
+                                                ArcRenameHelper.mapRenameDiskError
+                                                    renamePlan.SourcePath
+                                                    renamePlan.TargetPath
+                                                    renameError
+                                            )
                         }
                     )
             with e ->
