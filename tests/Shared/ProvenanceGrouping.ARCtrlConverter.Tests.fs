@@ -239,7 +239,7 @@ let tests =
             Expect.equal endpointLocation.Table.TableName "assay-table" "Loaded endpoint should remember table name."
             Expect.equal endpointLocation.Name "sample-a" "Endpoint location should keep the actual loaded input name."
 
-        testCase "returns a conversion error when the selected table is missing" <| fun _ ->
+        testCase "returns LoadedTableNotFound when the selected table is missing" <| fun _ ->
             let missing : ArcTableLocation =
                 {
                     Scope = ArcTableScope.Assay
@@ -260,4 +260,155 @@ let tests =
                 Expect.equal location missing "Missing table error should echo the requested location."
             | other ->
                 failwithf "Expected LoadedTableNotFound, got %A" other
+
+        testCase "returns LoadedTableHasNoInputs when the table has no input endpoint cells" <| fun _ ->
+            let noInputTable =
+                table
+                    "no-input-table"
+                    [
+                        CompositeHeader.Output IOType.Sample
+                        CompositeHeader.Characteristic(oa "Species")
+                    ]
+                    [
+                        [ text "output-x"; term "Arabidopsis" ]
+                    ]
+
+            let assay =
+                ArcAssay.create (
+                    identifier = "assay-1",
+                    tables = ResizeArray [ noInputTable ]
+                )
+
+            let arc =
+                ARC(
+                    identifier = "arc-1",
+                    studies = ResizeArray [],
+                    assays = ResizeArray [ assay ]
+                )
+
+            let location : ArcTableLocation =
+                {
+                    Scope = ArcTableScope.Assay
+                    ParentIdentifier = "assay-1"
+                    TableName = "no-input-table"
+                }
+
+            let result =
+                fromLoadedArc
+                    {
+                        LoadedTable = location
+                        IncludePreviousContext = false
+                    }
+                    arc
+
+            match result with
+            | Error(ArcProvenanceConversionError.LoadedTableHasNoInputs loc) ->
+                Expect.equal loc.TableName "no-input-table" "Error should identify the table with no inputs."
+            | other ->
+                failwithf "Expected LoadedTableHasNoInputs, got %A" other
+
+        testCase "returns LoadedTableHasNoOutputs when the table has no output endpoint cells" <| fun _ ->
+            let noOutputTable =
+                table
+                    "no-output-table"
+                    [
+                        CompositeHeader.Input IOType.Sample
+                        CompositeHeader.Characteristic(oa "Species")
+                    ]
+                    [
+                        [ text "input-x"; term "Arabidopsis" ]
+                    ]
+
+            let assay =
+                ArcAssay.create (
+                    identifier = "assay-1",
+                    tables = ResizeArray [ noOutputTable ]
+                )
+
+            let arc =
+                ARC(
+                    identifier = "arc-1",
+                    studies = ResizeArray [],
+                    assays = ResizeArray [ assay ]
+                )
+
+            let location : ArcTableLocation =
+                {
+                    Scope = ArcTableScope.Assay
+                    ParentIdentifier = "assay-1"
+                    TableName = "no-output-table"
+                }
+
+            let result =
+                fromLoadedArc
+                    {
+                        LoadedTable = location
+                        IncludePreviousContext = false
+                    }
+                    arc
+
+            match result with
+            | Error(ArcProvenanceConversionError.LoadedTableHasNoOutputs loc) ->
+                Expect.equal loc.TableName "no-output-table" "Error should identify the table with no outputs."
+            | other ->
+                failwithf "Expected LoadedTableHasNoOutputs, got %A" other
+
+        testCase "returns LoadedTableAmbiguous when multiple tables match the location" <| fun _ ->
+            let tableA =
+                table
+                    "study-table"
+                    [
+                        CompositeHeader.Input IOType.Source
+                        CompositeHeader.Output IOType.Sample
+                    ]
+                    [
+                        [ text "source-x"; text "sample-x" ]
+                    ]
+
+            let tableB =
+                table
+                    "study-table"
+                    [
+                        CompositeHeader.Input IOType.Source
+                        CompositeHeader.Output IOType.Sample
+                    ]
+                    [
+                        [ text "source-y"; text "sample-y" ]
+                    ]
+
+            let study =
+                ArcStudy.create (
+                    identifier = "study-1",
+                    tables = ResizeArray [ tableA; tableB ],
+                    registeredAssayIdentifiers = ResizeArray []
+                )
+
+            let arc =
+                ARC(
+                    identifier = "arc-1",
+                    studies = ResizeArray [ study ],
+                    assays = ResizeArray []
+                )
+
+            let location : ArcTableLocation =
+                {
+                    Scope = ArcTableScope.Study
+                    ParentIdentifier = "study-1"
+                    TableName = "study-table"
+                }
+
+            let result =
+                fromLoadedArc
+                    {
+                        LoadedTable = location
+                        IncludePreviousContext = false
+                    }
+                    arc
+
+            match result with
+            | Error(ArcProvenanceConversionError.LoadedTableAmbiguous(loc, count)) ->
+                Expect.equal loc.TableName "study-table" "Error should identify the ambiguous table."
+                Expect.equal count 2 "Error should report the number of matching tables."
+            | other ->
+                failwithf "Expected LoadedTableAmbiguous, got %A" other
     ]
