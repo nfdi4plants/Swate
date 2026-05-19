@@ -158,6 +158,55 @@ let groupingTests =
 
             Expect.equal outputBGroupCount 2 "Output B should appear once for each repeated replicate value."
 
+        testCase "grouping collapses identical equal values for one set into one display member" <| fun _ ->
+            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-rep-1a" replicate (ProvenanceValue.Text "1") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output A" ]))
+                        propertyValue "pv-rep-1b" replicate (ProvenanceValue.Text "1") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output A" ]))
+                    ]
+                    []
+                    [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-rep-1a"; "pv-rep-1b" ]
+                    ]
+                    []
+
+            let groups = displayGroups built ProvenanceSide.Output [ { Header = replicate } ]
+            let members = groups |> List.collect (fun group -> group.Members)
+
+            Expect.equal groups.Length 1 "Identical equal values should collapse into one output group."
+            Expect.equal members.Length 1 "The output set should appear once in the collapsed group."
+            Expect.equal members.Head.PropertyValueIds [ "pv-rep-1a"; "pv-rep-1b" ] "Collapsed display membership should keep all underlying property value IDs."
+
+        testCase "grouping keeps equal text with different units separate" <| fun _ ->
+            let temperature = propertyHeader ProvenancePropertyKind.Parameter "Temperature"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+
+            let celsius = term "C"
+            let fahrenheit = term "F"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-temp-c" temperature (ProvenanceValue.Integer 12) (Some celsius) (Some(anchor "assay-table" (Some "assay-process") temperature [ "Input A" ] []))
+                        propertyValue "pv-temp-f" temperature (ProvenanceValue.Integer 12) (Some fahrenheit) (Some(anchor "assay-table" (Some "assay-process") temperature [ "Input B" ] []))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-temp-c" ]
+                        inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-temp-f" ]
+                    ]
+                    []
+                    []
+
+            let groups = displayGroups built ProvenanceSide.Input [ { Header = temperature } ]
+
+            Expect.equal groups.Length 2 "Values with the same scalar value but different units must not collapse."
+
         testCase "displayConnections expands to represented loaded set pairs only" <| fun _ ->
             let model = validModel ()
             let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"

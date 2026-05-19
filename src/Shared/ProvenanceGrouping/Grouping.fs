@@ -14,12 +14,19 @@ type DisplayMember =
         PropertyValueIds: ProvenancePropertyValueId list
     }
 
+type DisplayGroupingValue =
+    {
+        Key: GroupingKey
+        Value: ProvenanceValue
+        Unit: ProvenanceTerm option
+    }
+
 type DisplayGroup =
     {
         Id: string
         TableName: ProvenanceTableName
         Side: ProvenanceSide
-        GroupingValues: (GroupingKey * ProvenanceValue) list
+        GroupingValues: DisplayGroupingValue list
         Members: DisplayMember list
     }
 
@@ -34,12 +41,20 @@ type DisplayConnection =
 let private mapValues map =
     map |> Map.toList |> List.map snd
 
-let private valueText value =
-    match value with
-    | ProvenanceValue.Text value -> value
-    | ProvenanceValue.Integer value -> string value
-    | ProvenanceValue.Float value -> string value
-    | ProvenanceValue.Term term -> term.Name
+let private valueText (value: ProvenanceValue) (unit: ProvenanceTerm option) =
+    let text =
+        match value with
+        | ProvenanceValue.Text value -> value
+        | ProvenanceValue.Integer value -> string value
+        | ProvenanceValue.Float value -> string value
+        | ProvenanceValue.Term term -> term.Name
+
+    match unit with
+    | Some unit -> $"{text} {unit.Name}"
+    | None -> text
+
+let private groupingValueText (groupingValue: DisplayGroupingValue) =
+    sprintf "%s=%s" groupingValue.Key.Header.Category.Name (valueText groupingValue.Value groupingValue.Unit)
 
 let private sideText side =
     match side with
@@ -64,7 +79,9 @@ let private setPropertyValues (model: ProvenanceModel) (set: ProvenanceSet) =
 let private valuesForKey model set key =
     setPropertyValues model set
     |> List.filter (fun propertyValue -> propertyValue.Header = key.Header)
-    |> List.map (fun propertyValue -> key, propertyValue.Value, propertyValue.Id)
+    |> List.groupBy (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
+    |> List.map (fun ((value, unit), propertyValues) ->
+        key, value, unit, propertyValues |> List.map (fun propertyValue -> propertyValue.Id))
 
 let private combinations values =
     let rec loop collected remaining =
@@ -83,12 +100,12 @@ let private displayMember (set: ProvenanceSet) propertyValueIds =
         PropertyValueIds = propertyValueIds
     }
 
-let private groupId side values fallbackSetId =
+let private groupId side (values: DisplayGroupingValue list) fallbackSetId =
     match values with
     | [] -> sprintf "%s:%s" (sideText side) fallbackSetId
     | _ ->
         values
-        |> List.map (fun (key, value) -> sprintf "%s=%s" key.Header.Category.Name (valueText value))
+        |> List.map groupingValueText
         |> String.concat "|"
         |> sprintf "%s:%s" (sideText side)
 
@@ -120,11 +137,16 @@ let displayGroups (model: ProvenanceModel) side groupingKeys =
                         for combination in combinations keyValues do
                             let groupingValues =
                                 combination
-                                |> List.map (fun (key, value, _) -> key, value)
+                                |> List.map (fun (key, value, unit, _) ->
+                                    {
+                                        Key = key
+                                        Value = value
+                                        Unit = unit
+                                    })
 
                             let propertyValueIds =
                                 combination
-                                |> List.map (fun (_, _, propertyValueId) -> propertyValueId)
+                                |> List.collect (fun (_, _, _, propertyValueIds) -> propertyValueIds)
 
                             yield groupId side groupingValues set.Id, set.TableName, groupingValues, displayMember set propertyValueIds
             ]
