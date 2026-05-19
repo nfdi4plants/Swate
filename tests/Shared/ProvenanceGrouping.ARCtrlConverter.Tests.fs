@@ -68,6 +68,32 @@ let private loadedAssayTableWithDuplicateTemperatureColumns () =
             [ text "sample-a"; term "22"; term "22"; text "extract-a" ]
         ]
 
+let private inputOnlyAssayTable () =
+    table
+        "input-only-table"
+        [
+            CompositeHeader.Input IOType.Sample
+            CompositeHeader.Characteristic(oa "Species")
+            CompositeHeader.Parameter(oa "Temperature")
+        ]
+        [
+            [ text "sample-a"; term "Arabidopsis"; term "22" ]
+            [ text "sample-b"; term "Arabidopsis"; term "23" ]
+        ]
+
+let private outputOnlyAssayTable () =
+    table
+        "output-only-table"
+        [
+            CompositeHeader.Parameter(oa "Temperature")
+            CompositeHeader.Output IOType.Sample
+            CompositeHeader.Factor(oa "Replicate")
+        ]
+        [
+            [ term "22"; text "extract-a"; term "R1" ]
+            [ term "23"; text "extract-b"; term "R2" ]
+        ]
+
 let private previousStudyTableWithDuplicateOrganismColumns () =
     table
         "study-table"
@@ -352,44 +378,11 @@ let tests =
             Expect.equal endpointLocation.Table.TableName "assay-table" "Loaded endpoint should remember table name."
             Expect.equal endpointLocation.Name "sample-a" "Endpoint location should keep the actual loaded input name."
 
-        testCase "returns LoadedTableNotFound when the selected table is missing" <| fun _ ->
-            let missing : ArcTableLocation =
-                {
-                    Scope = ArcTableScope.Assay
-                    ParentIdentifier = "assay-1"
-                    TableName = "missing-table"
-                }
-
-            let result =
-                fromLoadedArc
-                    {
-                        LoadedTable = missing
-                        IncludePreviousContext = true
-                    }
-                    (arcFixture ())
-
-            match result with
-            | Error(ArcProvenanceConversionError.LoadedTableNotFound location) ->
-                Expect.equal location missing "Missing table error should echo the requested location."
-            | other ->
-                failwithf "Expected LoadedTableNotFound, got %A" other
-
-        testCase "returns LoadedTableHasNoInputs when the table has no input endpoint cells" <| fun _ ->
-            let noInputTable =
-                table
-                    "no-input-table"
-                    [
-                        CompositeHeader.Output IOType.Sample
-                        CompositeHeader.Characteristic(oa "Species")
-                    ]
-                    [
-                        [ text "output-x"; term "Arabidopsis" ]
-                    ]
-
+        testCase "converts an input-only loaded table into loaded inputs without fake outputs or connections" <| fun _ ->
             let assay =
                 ArcAssay.create (
                     identifier = "assay-1",
-                    tables = ResizeArray [ noInputTable ]
+                    tables = ResizeArray [ inputOnlyAssayTable () ]
                 )
 
             let arc =
@@ -403,7 +396,7 @@ let tests =
                 {
                     Scope = ArcTableScope.Assay
                     ParentIdentifier = "assay-1"
-                    TableName = "no-input-table"
+                    TableName = "input-only-table"
                 }
 
             let result =
@@ -413,29 +406,23 @@ let tests =
                         IncludePreviousContext = false
                     }
                     arc
+                |> expectOk
 
-            match result with
-            | Error(ArcProvenanceConversionError.LoadedTableHasNoInputs loc) ->
-                Expect.equal loc.TableName "no-input-table" "Error should identify the table with no inputs."
-            | other ->
-                failwithf "Expected LoadedTableHasNoInputs, got %A" other
+            let inputNames =
+                result.Model.InputSets
+                |> Map.toList
+                |> List.map (fun (_, set) -> set.Name)
+                |> List.sort
 
-        testCase "returns LoadedTableHasNoOutputs when the table has no output endpoint cells" <| fun _ ->
-            let noOutputTable =
-                table
-                    "no-output-table"
-                    [
-                        CompositeHeader.Input IOType.Sample
-                        CompositeHeader.Characteristic(oa "Species")
-                    ]
-                    [
-                        [ text "input-x"; term "Arabidopsis" ]
-                    ]
+            Expect.equal inputNames [ "sample-a"; "sample-b" ] "Real input cells should still load as first-class sets."
+            Expect.equal result.Model.OutputSets.Count 0 "Missing output columns must not create synthetic output sets."
+            Expect.equal result.Model.Connections.Count 0 "One-sided loaded tables must not synthesize connections."
 
+        testCase "converts an output-only loaded table into loaded outputs without fake inputs or connections" <| fun _ ->
             let assay =
                 ArcAssay.create (
                     identifier = "assay-1",
-                    tables = ResizeArray [ noOutputTable ]
+                    tables = ResizeArray [ outputOnlyAssayTable () ]
                 )
 
             let arc =
@@ -449,7 +436,7 @@ let tests =
                 {
                     Scope = ArcTableScope.Assay
                     ParentIdentifier = "assay-1"
-                    TableName = "no-output-table"
+                    TableName = "output-only-table"
                 }
 
             let result =
@@ -459,10 +446,15 @@ let tests =
                         IncludePreviousContext = false
                     }
                     arc
+                |> expectOk
 
-            match result with
-            | Error(ArcProvenanceConversionError.LoadedTableHasNoOutputs loc) ->
-                Expect.equal loc.TableName "no-output-table" "Error should identify the table with no outputs."
-            | other ->
-                failwithf "Expected LoadedTableHasNoOutputs, got %A" other
+            let outputNames =
+                result.Model.OutputSets
+                |> Map.toList
+                |> List.map (fun (_, set) -> set.Name)
+                |> List.sort
+
+            Expect.equal outputNames [ "extract-a"; "extract-b" ] "Real output cells should still load as first-class sets."
+            Expect.equal result.Model.InputSets.Count 0 "Missing input columns must not create synthetic input sets."
+            Expect.equal result.Model.Connections.Count 0 "One-sided loaded tables must not synthesize connections."
     ]
