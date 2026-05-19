@@ -172,9 +172,12 @@ type ProvenanceModel =
         /// Shared property value occurrence store.
         PropertyValues: Map<ProvenancePropertyValueId, ProvenancePropertyValue>
         /// First-class loaded input endpoints, keyed by `ProvenanceSet.Id`.
+        /// May be empty when the loaded table currently has only outputs.
         InputSets: Map<ProvenanceSetId, ProvenanceSet>
         /// First-class loaded output endpoints, keyed by `ProvenanceSet.Id`.
+        /// May be empty when the loaded table currently has only inputs.
         OutputSets: Map<ProvenanceSetId, ProvenanceSet>
         /// Editable loaded-table connections.
+        /// May be empty for one-sided loaded tables.
         Connections: Map<ProvenanceConnectionId, ProvenanceConnection>
     }

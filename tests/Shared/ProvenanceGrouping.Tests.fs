@@ -341,6 +341,82 @@ let editTests =
             | other ->
                 failwithf "Expected a no-op duplicate copy, got %A" other
 
+        testCase "createLoadedSet adds the missing output side to an input-only loaded model" <| fun _ ->
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    []
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" []
+                    ]
+                    []
+                    []
+
+            match createLoadedSet { Side = ProvenanceSide.Output; Header = outputHeader; Name = "Output A" } built with
+            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedSet(side, tableName, header, name) ]) ->
+                Expect.equal side ProvenanceSide.Output "Patch should carry the created side."
+                Expect.equal tableName "assay-table" "Patch should target the loaded table."
+                Expect.equal header outputHeader "Patch should preserve the created header."
+                Expect.equal name "Output A" "Patch should preserve the created name."
+                Expect.equal nextModel.OutputSets.Count 1 "The missing output side should be created."
+            | other ->
+                failwithf "Expected AddLoadedSet patch, got %A" other
+
+        testCase "createLoadedSet is a no-op when the same loaded endpoint already exists" <| fun _ ->
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    []
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" []
+                    ]
+                    []
+                    []
+
+            match createLoadedSet { Side = ProvenanceSide.Input; Header = inputHeader; Name = "Input A" } built with
+            | Ok(nextModel, []) ->
+                Expect.equal nextModel built "Creating an already-existing loaded endpoint should be a no-op."
+            | other ->
+                failwithf "Expected no-op duplicate create, got %A" other
+
+        testCase "connectSets works after the missing side was created on a partial model" <| fun _ ->
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    []
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" []
+                    ]
+                    []
+                    []
+
+            let created =
+                match createLoadedSet { Side = ProvenanceSide.Output; Header = outputHeader; Name = "Output A" } built with
+                | Ok(nextModel, _) -> nextModel
+                | Error error -> failwithf "Unexpected createLoadedSet error: %A" error
+
+            let createdOutputId =
+                created.OutputSets
+                |> Map.toList
+                |> List.exactlyOne
+                |> fst
+
+            match connectSets "input-a" createdOutputId None created with
+            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedConnection(_, _, inputSetId, outputSetId) ]) ->
+                Expect.equal inputSetId "input-a" "Connection patch should target the existing loaded input."
+                Expect.equal outputSetId createdOutputId "Connection patch should target the created loaded output."
+                Expect.equal nextModel.Connections.Count 1 "The partial model should become connectable after creating the missing side."
+            | other ->
+                failwithf "Expected AddLoadedConnection patch, got %A" other
+
         testCase "connectSets creates a loaded input output connection" <| fun _ ->
             let model = validModel ()
 

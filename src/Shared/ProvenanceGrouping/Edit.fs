@@ -27,6 +27,11 @@ type ProvenanceTablePatch =
         oldValue: ProvenanceValue *
         newValue: ProvenanceValue *
         unit: ProvenanceTerm option
+    | AddLoadedSet of
+        side: ProvenanceSide *
+        tableName: ProvenanceTableName *
+        header: ProvenanceIOHeader *
+        name: string
     | AddLoadedPropertyValue of
         target: ProvenancePropertyTarget *
         copiedFrom: ProvenancePropertyValueId option *
@@ -48,6 +53,13 @@ type CreateLoadedPropertyValueCommand =
         Unit: ProvenanceTerm option
     }
 
+type CreateLoadedSetCommand =
+    {
+        Side: ProvenanceSide
+        Header: ProvenanceIOHeader
+        Name: string
+    }
+
 type EditResult =
     Result<ProvenanceModel * ProvenanceTablePatch list, EditError>
 
@@ -67,6 +79,18 @@ let private nextConnectionId (model: ProvenanceModel) =
         if model.Connections.ContainsKey id then loop (index + 1) else id
 
     loop (model.Connections.Count + 1)
+
+let private nextSetId side (model: ProvenanceModel) =
+    let prefix, sets =
+        match side with
+        | ProvenanceSide.Input -> "input-set", model.InputSets
+        | ProvenanceSide.Output -> "output-set", model.OutputSets
+
+    let rec loop index =
+        let id = $"{prefix}-{index}"
+        if sets.ContainsKey id then loop (index + 1) else id
+
+    loop 1
 
 let private loadedSet (model: ProvenanceModel) (set: ProvenanceSet) =
     if set.TableName = model.LoadedTableName then
@@ -215,6 +239,50 @@ let private tryFindEquivalentLoadedPropertyValue
             Some propertyValueId
         | _ ->
             None)
+
+let createLoadedSet (command: CreateLoadedSetCommand) (model: ProvenanceModel) : EditResult =
+    let existing =
+        match command.Side with
+        | ProvenanceSide.Input ->
+            model.InputSets
+            |> Map.tryFindKey (fun _ set ->
+                set.TableName = model.LoadedTableName
+                && set.Header = command.Header
+                && set.Name = command.Name)
+        | ProvenanceSide.Output ->
+            model.OutputSets
+            |> Map.tryFindKey (fun _ set ->
+                set.TableName = model.LoadedTableName
+                && set.Header = command.Header
+                && set.Name = command.Name)
+
+    match existing with
+    | Some _ ->
+        Ok(model, [])
+    | None ->
+        let id = nextSetId command.Side model
+
+        let loadedSet : ProvenanceSet =
+            {
+                Id = id
+                TableName = model.LoadedTableName
+                Header = command.Header
+                Name = command.Name
+                PropertyValueIds = []
+            }
+
+        let nextModel =
+            match command.Side with
+            | ProvenanceSide.Input ->
+                { model with InputSets = model.InputSets |> Map.add id loadedSet }
+            | ProvenanceSide.Output ->
+                { model with OutputSets = model.OutputSets |> Map.add id loadedSet }
+
+        Ok(
+            nextModel,
+            [
+                ProvenanceTablePatch.AddLoadedSet(command.Side, model.LoadedTableName, command.Header, command.Name)
+            ])
 
 let updatePropertyValue propertyValueId newValue newUnit (model: ProvenanceModel) : EditResult =
     match model.PropertyValues.TryFind propertyValueId with
