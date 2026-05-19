@@ -73,9 +73,10 @@ let private toSet (set: ImportedSet) : ProvenanceSet =
 
 let private mapImportedSets (loadedTableName: ProvenanceTableName) (sets: ImportedSet list) : Map<ProvenanceSetId, ProvenanceSet> =
     sets
-    |> List.filter (fun set -> set.TableName = loadedTableName)
-    |> List.map (fun set -> set.Id, toSet set)
-    |> Map.ofList
+    |> List.fold (fun map set ->
+        if set.TableName = loadedTableName then map |> Map.add set.Id (toSet set)
+        else map
+    ) Map.empty
 
 let private skippedSetWarnings loadedTableName label (sets: ImportedSet list) =
     sets
@@ -107,8 +108,7 @@ let private validateConnection (inputSets: Map<_, ProvenanceSet>) (outputSets: M
 let fromImportedProvenance (imported: ImportedProvenance) : ImportResult =
     let propertyValues : Map<ProvenancePropertyValueId, ProvenancePropertyValue> =
         imported.PropertyValues
-        |> List.map (fun propertyValue -> propertyValue.Id, toPropertyValue propertyValue)
-        |> Map.ofList
+        |> List.fold (fun map propertyValue -> map |> Map.add propertyValue.Id (toPropertyValue propertyValue)) Map.empty
 
     let inputSets : Map<ProvenanceSetId, ProvenanceSet> = mapImportedSets imported.LoadedTableName imported.InputSets
     let outputSets : Map<ProvenanceSetId, ProvenanceSet> = mapImportedSets imported.LoadedTableName imported.OutputSets
@@ -119,7 +119,7 @@ let fromImportedProvenance (imported: ImportedProvenance) : ImportResult =
 
     let connections : Map<ProvenanceConnectionId, ProvenanceConnection> =
         loadedConnections
-        |> List.map (fun connection ->
+        |> List.fold (fun map connection ->
             let nextConnection : ProvenanceConnection =
                 {
                     Id = connection.Id
@@ -129,8 +129,8 @@ let fromImportedProvenance (imported: ImportedProvenance) : ImportResult =
                     OutputSetId = connection.OutputSetId
                 }
 
-            connection.Id, nextConnection)
-        |> Map.ofList
+            map |> Map.add connection.Id nextConnection
+        ) Map.empty
 
     let warnings =
         [
