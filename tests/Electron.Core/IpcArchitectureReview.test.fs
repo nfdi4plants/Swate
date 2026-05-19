@@ -3,7 +3,6 @@ module ElectronCore.IpcArchitectureReviewTests
 open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
-open Fable.Electron.Main
 open Main.Bindings.Path
 open Main.ArcVault
 open Main.IPC.ArcVaultsApi
@@ -14,7 +13,6 @@ open ARCtrl
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private osDynamic: obj = importAll "os"
 
 let private readUtf8FileAsync (path: string) : JS.Promise<string> =
     fsPromisesDynamic?readFile (path, "utf8") |> unbox<JS.Promise<string>>
@@ -39,42 +37,14 @@ let private expectSourceContainsInOrder (sourceText: string) (snippets: string[]
         Vitest.expect(snippetIndex >= 0, $"Expected source to contain (in order): {snippet}").toBe(true)
         searchStartIndex <- snippetIndex + snippet.Length
 
-let private createTempDirectoryAsync () : JS.Promise<string> =
-    let prefix =
-        join [|
-            osDynamic?tmpdir () |> unbox<string>
-            "swate-ipc-rename-sync-"
-        |]
+let private loadArcAsync = TestHelpers.loadArcAsync
+let private testWindow = TestHelpers.testWindow
+let private withTempArc = TestHelpers.withTempArcWith "swate-ipc-rename-sync-" "RenameSyncArc"
 
-    fsPromisesDynamic?mkdtemp (prefix) |> unbox<JS.Promise<string>>
-
-let private removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
-    let! _ =
-        fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
-        |> unbox<JS.Promise<obj>>
-
+let private renamePathAsync sourceAbsolutePath targetAbsolutePath : JS.Promise<unit> = promise {
+    let! _ = fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath) |> unbox<JS.Promise<obj>>
     return ()
 }
-
-let private expectLoadedArc (result: Result<ARC, string[]>) =
-    match result with
-    | Ok arc -> arc
-    | Error errors -> failwith (errors |> String.concat "\n")
-
-let private loadArcAsync (arcPath: string) : JS.Promise<ARC> = promise {
-    let! loaded = ARC.tryLoadAsync arcPath
-    return expectLoadedArc loaded
-}
-
-let private testWindow () =
-    let noopSend: obj = emitJsExpr () "((..._args) => {})"
-
-    createObj [
-        "id" ==> 0
-        "title" ==> ""
-        "webContents" ==> createObj [ "send" ==> noopSend ]
-    ]
-    |> unbox<BrowserWindow>
 
 let private watcherEvent arcPath eventName relativePath : ArcVaultFileSystemEvent =
     {
@@ -82,21 +52,6 @@ let private watcherEvent arcPath eventName relativePath : ArcVaultFileSystemEven
         RelativePath = relativePath
         AbsolutePath = join [| arcPath; relativePath |]
     }
-
-let private withTempArc (seedArc: ARC -> unit) (testBody: string -> JS.Promise<unit>) : JS.Promise<unit> = promise {
-    let! rootPath = createTempDirectoryAsync ()
-    let arcPath = join [| rootPath; "arc" |]
-
-    try
-        let arc = ARC("RenameSyncArc")
-        seedArc arc
-        do! arc.WriteAsync arcPath
-        do! testBody arcPath
-        do! removeDirectoryAsync rootPath
-    with error ->
-        do! removeDirectoryAsync rootPath
-        return raise error
-}
 
 let private assertEntityFolderRenameSyncOnLoadedArc
     (zoneFolder: string)
@@ -111,7 +66,7 @@ let private assertEntityFolderRenameSyncOnLoadedArc
         let sourceAbsolutePath = join [| arcPath; zoneFolder; oldIdentifier |]
         let targetAbsolutePath = join [| arcPath; zoneFolder; newIdentifier |]
 
-        let! _ = fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath) |> unbox<JS.Promise<obj>>
+        do! renamePathAsync sourceAbsolutePath targetAbsolutePath
 
         let renamePlan =
             match
@@ -188,9 +143,11 @@ Vitest.describe("IPC architecture review fixes", fun () ->
             let! arcVaultSource = sourcePath [| "Main"; "ArcVault"; "ArcVault.fs" |] |> readUtf8FileAsync
 
             expectSourceContains ipcTypesSource "addArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>"
+            expectSourceContains ipcTypesSource "createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>"
             expectSourceContains ipcTypesSource "deletePath: string -> JS.Promise<Result<unit, exn>>"
             expectSourceContains ipcTypesSource "renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>"
             expectSourceContains arcVaultApiSource "addArcFile ="
+            expectSourceContains arcVaultApiSource "createFileSystemItem ="
             expectSourceContains arcVaultApiSource "deletePath ="
             expectSourceContains arcVaultApiSource "renamePath ="
             expectSourceContains arcVaultApiSource "ArcDeletePathRules.isDeletePathAllowed"
@@ -205,6 +162,8 @@ Vitest.describe("IPC architecture review fixes", fun () ->
                 [|
                     "addArcFile ="
                     "vault.AddArcFile request"
+                    "createFileSystemItem ="
+                    "ArcFileSystemHelper.createFileSystemItemOnDisk"
                     "deletePath ="
                     "vault.RegisterPendingArcFileTreeMutation"
                     "fsPromisesDynamic?rm"
@@ -286,7 +245,7 @@ Vitest.describe("IPC architecture review fixes", fun () ->
 
                 let sourceAbsolutePath = join [| arcPath; "assays"; "OldAssay" |]
                 let targetAbsolutePath = join [| arcPath; "assays"; "NewAssay" |]
-                let! _ = fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath) |> unbox<JS.Promise<obj>>
+                do! renamePathAsync sourceAbsolutePath targetAbsolutePath
 
                 let renamePlan =
                     match

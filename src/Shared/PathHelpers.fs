@@ -143,6 +143,7 @@ module ArcDeletePathRules =
         | GenericTarget of normalizedRelativePath: string
 
     let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
+    let private disallowedGenericPathSegments = [ ".git" ]
 
     let private normalizeRelativePath (path: string) =
         path
@@ -197,6 +198,18 @@ module ArcDeletePathRules =
         else
             None
 
+    let private isCanonicalArcFileName (fileName: string) =
+        PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.InvestigationFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.StudyFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.AssayFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.WorkflowFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.RunFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.DataMapFileName
+
+    let private containsDisallowedGenericPathSegment (segments: string[]) =
+        segments
+        |> Array.exists (fun segment -> disallowedGenericPathSegments |> List.exists (fun blocked -> PathHelpers.pathsEqual segment blocked))
+
     /// Parses canonical ARC file targets from the tail of a path and supports absolute paths.
     let tryParseCanonicalArcFileTarget (path: string) =
         path
@@ -250,12 +263,30 @@ module ArcDeletePathRules =
                     | Some target -> DeletePathClassification.CanonicalFileTarget(target, normalizedRelativePath)
                     | None -> DeletePathClassification.DisallowedTarget normalizedRelativePath
 
+    let isGenericFileSystemTargetAllowed (relativePath: string) =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+
+        if
+            String.IsNullOrWhiteSpace normalizedRelativePath
+            || PathHelpers.containsPathTraversalSegments normalizedRelativePath
+            || PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+        then
+            false
+        else
+            let segments = normalizedRelativePath |> splitPathSegments
+
+            segments.Length >= 3
+            && (tryParseZone segments.[0]).IsSome
+            && (segments |> containsDisallowedGenericPathSegment |> not)
+            && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
+
     let isDeletePathAllowed (relativePath: string) =
         match classifyDeleteTarget relativePath with
         | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, _)
         | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.DataMapFile _, _)
-        | DeletePathClassification.EntityFolderTarget _
-        | DeletePathClassification.AddZoneDescendantTarget _ -> true
+        | DeletePathClassification.EntityFolderTarget _ -> true
+        | DeletePathClassification.AddZoneDescendantTarget(_, normalizedRelativePath) ->
+            isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
 
     let private canonicalEntityFilePath zone identifier =
@@ -328,7 +359,26 @@ module ArcDeletePathRules =
     let isRenamePathAllowed (relativePath: string) =
         match classifyRenameTarget relativePath with
         | RenamePathClassification.EntityFolderTarget _ -> true
+        | RenamePathClassification.GenericTarget normalizedRelativePath ->
+            isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
+
+    let isGenericFileSystemParentAllowed (relativePath: string) =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+
+        if
+            String.IsNullOrWhiteSpace normalizedRelativePath
+            || PathHelpers.containsPathTraversalSegments normalizedRelativePath
+            || PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+        then
+            false
+        else
+            let segments = normalizedRelativePath |> splitPathSegments
+
+            segments.Length >= 2
+            && (tryParseZone segments.[0]).IsSome
+            && (segments |> containsDisallowedGenericPathSegment |> not)
+            && (segments.Length = 2 || isGenericFileSystemTargetAllowed normalizedRelativePath)
 
     let resolveRenameSourcePath (relativePath: string) =
         match classifyRenameTarget relativePath with

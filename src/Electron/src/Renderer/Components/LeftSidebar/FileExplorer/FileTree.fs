@@ -11,11 +11,9 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Feliz
 open Fable.Core
-open Fable.Core.JsInterop
 open ARCtrl
 open Types
 open Helper
-open FileTreeRenameHelper
 
 module private FileTreeHelper =
 
@@ -53,7 +51,11 @@ type FileTree =
         let pendingCreateKind, setPendingCreateKind =
             React.useState<ArcExplorerNodeKind option> None
 
+        let pendingFileSystemCreateDraft, setPendingFileSystemCreateDraft =
+            React.useState<FileSystemCreateDraft option> None
+
         let pendingRenameDraft, setPendingRenameDraft = React.useState<ArcRenameDraft option> None
+        let isCreatingFileSystemItem, setIsCreatingFileSystemItem = React.useState false
         let isRenaming, setIsRenaming = React.useState false
         let pendingDeleteItem, setPendingDeleteItem = React.useState<FileItem option> None
         let isDeleting, setIsDeleting = React.useState false
@@ -81,7 +83,7 @@ type FileTree =
             |]
         )
 
-        let fileTree =
+        let fileTree : FileTreeNode option =
             React.useMemo (
                 (fun () ->
                     match effectiveFileTree with
@@ -219,7 +221,14 @@ type FileTree =
 
         let closeCreateModal () = setPendingCreateKind None
 
+        let closeFileSystemCreateModal () =
+            setPendingFileSystemCreateDraft None
+
         let openCreateModal kind = setPendingCreateKind (Some kind)
+
+        let openFileSystemCreateModal kind item =
+            if canCreateFileSystemItemIn item then
+                setPendingFileSystemCreateDraft (Some { Parent = item; Kind = kind })
 
         let closeDeleteModal () =
             setPendingDeleteItem None
@@ -233,7 +242,7 @@ type FileTree =
         let requestRenameItem =
             FileTreeRenameWorkflow.requestRenameItem setPendingRenameDraft errorModal.enqueue arcScopeId
 
-        let rootPath = fileTree |> Option.map (fun tree -> tree.path)
+        let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
         let inlineCreateKindForItem item =
             match rootPath with
@@ -248,6 +257,11 @@ type FileTree =
 
         let applyCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file", ?scopeId = arcScopeId))
+
+        let applyFileSystemCreateError errorMessage =
+            errorModal.enqueue (
+                ErrorModalRequest.create (errorMessage, title = "Could not create file or folder", ?scopeId = arcScopeId)
+            )
 
         let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> =
             promise {
@@ -293,6 +307,52 @@ type FileTree =
                 |> Promise.catch (fun exn -> applyCreateError exn.Message)
                 |> Promise.start
 
+        let createFileSystemItem (name: string) =
+            match pendingFileSystemCreateDraft with
+            | None -> closeFileSystemCreateModal ()
+            | Some draft ->
+                match tryGetItemRelativePath draft.Parent with
+                | None -> applyFileSystemCreateError "Could not resolve the selected folder path."
+                | Some parentPath ->
+                    setIsCreatingFileSystemItem true
+
+                    promise {
+                        let! createResult =
+                            Api.ipcArcVaultApi.createFileSystemItem {
+                                parentPath = parentPath
+                                name = name
+                                kind = draft.Kind
+                            }
+
+                        match createResult with
+                        | Error exn -> applyFileSystemCreateError exn.Message
+                        | Ok createdPath ->
+                            let selectedPath = PathHelpers.normalizePath createdPath
+                            fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                            match draft.Kind with
+                            | FileSystemItemKind.File ->
+                                let! openResult = Api.ipcArcVaultApi.openFile selectedPath
+
+                                match openResult with
+                                | Ok dto ->
+                                    dto
+                                    |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                    |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                | Error _ ->
+                                    FileContentDTO.create ARCtrl.Contract.DTOType.PlainText "" selectedPath
+                                    |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                    |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                            | FileSystemItemKind.Folder ->
+                                setLoadedDirectoryPaths (fun current -> current.Add selectedPath)
+                                pageStateCtx.setState None
+
+                            closeFileSystemCreateModal ()
+                    }
+                    |> Promise.catch (fun exn -> applyFileSystemCreateError exn.Message)
+                    |> Promise.map (fun _ -> setIsCreatingFileSystemItem false)
+                    |> Promise.start
+
         let arcCreateContextMenuItems (item: FileItem) =
             if item.IsDirectory then
                 arcCreateKinds
@@ -306,6 +366,18 @@ type FileTree =
             else
                 []
 
+        let fileSystemCreateContextMenuItems (item: FileItem) =
+            if canCreateFileSystemItemIn item then
+                fileSystemCreateKinds
+                |> List.map (fun kind -> {
+                    Label = $"New {fileSystemCreateKindLabel kind}"
+                    Icon = fileSystemCreateKindIcon kind
+                    OnClick = fun () -> openFileSystemCreateModal kind item
+                    Disabled = None
+                })
+            else
+                []
+
         let deleteContextMenuItems =
             FileTreeDeleteWorkflow.deleteContextMenuItems requestDeleteItem
 
@@ -313,7 +385,10 @@ type FileTree =
             FileTreeRenameWorkflow.renameContextMenuItems requestRenameItem
 
         let baseContextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item @ renameContextMenuItems item @ deleteContextMenuItems item
+            arcCreateContextMenuItems item
+            @ fileSystemCreateContextMenuItems item
+            @ renameContextMenuItems item
+            @ deleteContextMenuItems item
 
         let createContextMenuItems =
             Renderer.Components.FileExplorerLfs.createContextMenuItems
@@ -347,6 +422,21 @@ type FileTree =
                 kind = activeCreateKind,
                 close = closeCreateModal,
                 submit = createArcEntry
+            )
+
+        let activeFileSystemCreateKind =
+            pendingFileSystemCreateDraft
+            |> Option.map _.Kind
+            |> Option.defaultValue FileSystemItemKind.File
+
+        let fileSystemCreateModal =
+            CreateFileSystemItemModal.Main(
+                isOpen = pendingFileSystemCreateDraft.IsSome,
+                kind = activeFileSystemCreateKind,
+                parentName = (pendingFileSystemCreateDraft |> Option.map _.Parent.Name),
+                close = closeFileSystemCreateModal,
+                submit = createFileSystemItem,
+                isCreating = isCreatingFileSystemItem
             )
 
         let deleteConfirmModal =
@@ -393,6 +483,7 @@ type FileTree =
                     ]
                 ]
                 arcCreateModal
+                fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
             ]
@@ -400,6 +491,7 @@ type FileTree =
             React.Fragment [
                 FileTree.EmptyFileTreePlaceholder()
                 arcCreateModal
+                fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
             ]

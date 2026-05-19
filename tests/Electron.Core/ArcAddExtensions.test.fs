@@ -1,9 +1,6 @@
 module ElectronCore.ArcAddExtensionsTests
 
 open Fable.Core
-open Fable.Core.JsInterop
-open Fable.Electron
-open Fable.Electron.Main
 open Main.ArcMerge
 open Main.ArcVault
 open Main.Bindings.Path
@@ -13,73 +10,15 @@ open ARCtrl
 open ARCtrl.Contract
 open Vitest
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private osDynamic: obj = importAll "os"
-
-let private expectLoadedArc (result: Result<ARC, string[]>) =
-    match result with
-    | Ok arc -> arc
-    | Error errors -> failwith (errors |> String.concat "\n")
-
 let private expectSome (value: 'T option) (message: string) : 'T =
     match value with
     | Some value -> value
     | None -> failwith message
 
-let private createTempDirectoryAsync () : JS.Promise<string> =
-    let prefix =
-        join [|
-            osDynamic?tmpdir () |> unbox<string>
-            "swate-addasync-"
-        |]
-
-    fsPromisesDynamic?mkdtemp (prefix) |> unbox<JS.Promise<string>>
-
-let private removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
-    let! _ =
-        fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
-        |> unbox<JS.Promise<obj>>
-
-    return ()
-}
-
-let private pathExistsAsync (path: string) : JS.Promise<bool> = promise {
-    try
-        let! _ = fsPromisesDynamic?access (path) |> unbox<JS.Promise<obj>>
-        return true
-    with _ ->
-        return false
-}
-
-let private withTempArc (seedArc: ARC -> unit) (testBody: string -> JS.Promise<unit>) : JS.Promise<unit> = promise {
-    let! rootPath = createTempDirectoryAsync ()
-    let arcPath = join [| rootPath; "arc" |]
-
-    try
-        let arc = ARC("AddAsyncArc")
-        seedArc arc
-        do! arc.WriteAsync arcPath
-        do! testBody arcPath
-        do! removeDirectoryAsync rootPath
-    with error ->
-        do! removeDirectoryAsync rootPath
-        return raise error
-}
-
-let private loadArcAsync (arcPath: string) : JS.Promise<ARC> = promise {
-    let! loaded = ARC.tryLoadAsync arcPath
-    return expectLoadedArc loaded
-}
-
-let private testWindow () =
-    let noopSend: obj = emitJsExpr () "((..._args) => {})"
-
-    createObj [
-        "id" ==> 0
-        "title" ==> ""
-        "webContents" ==> createObj [ "send" ==> noopSend ]
-    ]
-    |> unbox<BrowserWindow>
+let private pathExistsAsync = TestHelpers.pathExistsAsync
+let private loadArcAsync = TestHelpers.loadArcAsync
+let private testWindow = TestHelpers.testWindow
+let private withTempArc = TestHelpers.withTempArcWith "swate-addasync-" "AddAsyncArc"
 
 Vitest.describe("ARC AddAsync", fun () ->
     Vitest.test("adds an assay and creates the canonical assay file", fun () ->

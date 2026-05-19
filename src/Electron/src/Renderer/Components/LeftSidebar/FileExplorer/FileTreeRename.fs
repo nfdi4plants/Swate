@@ -141,85 +141,22 @@ type FileTreeRename =
             ?isRenaming: bool
         ) =
 
-        let renameName, setRenameName = React.useState (initialName |> Option.defaultValue "")
         let isRenaming = defaultArg isRenaming false
 
-        React.useEffect (
-            (fun () -> setRenameName (initialName |> Option.defaultValue "")),
-            [| box initialName; box isOpen |]
-        )
-
-        let setIsOpen isOpen =
-            if not isOpen then
-                close ()
-
         let displayName = itemName |> Option.defaultValue "this item"
-        let normalizedNameResult = normalizeRenameName renameName
-        let isValid = normalizedNameResult |> Result.isOk
 
-        let submitIfValid () =
-            match normalizeRenameName renameName with
-            | Ok normalizedName -> submit normalizedName
-            | Error _ -> ()
-
-        let footer =
-            Html.div [
-                prop.className "swt:flex swt:gap-2 swt:justify-end swt:w-full"
-                prop.children [
-                    Html.button [
-                        prop.className "swt:btn swt:btn-ghost"
-                        prop.disabled isRenaming
-                        prop.onClick (fun _ -> close ())
-                        prop.text "Cancel"
-                    ]
-                    Html.button [
-                        prop.className "swt:btn swt:btn-primary"
-                        prop.disabled ((not isValid) || isRenaming)
-                        prop.onClick (fun _ -> submitIfValid ())
-                        prop.children [
-                            if isRenaming then
-                                Html.span [ prop.text "Renaming..." ]
-                            else
-                                Html.span [ prop.text "Rename" ]
-                        ]
-                    ]
-                ]
-            ]
-
-        let content =
-            Html.fieldSet [
-                prop.className "swt:fieldset"
-                prop.children [
-                    Html.legend [
-                        prop.className "swt:fieldset-legend"
-                        prop.text "New name"
-                    ]
-                    Html.label [
-                        prop.className "swt:input swt:w-full"
-                        prop.children [
-                            Html.input [
-                                prop.autoFocus true
-                                prop.disabled isRenaming
-                                prop.value renameName
-                                prop.onChange setRenameName
-                                prop.onKeyDown (key.enter, fun _ -> submitIfValid ())
-                            ]
-                        ]
-                    ]
-                    Html.p [
-                        prop.hidden isValid
-                        prop.className "swt:text-error swt:text-sm"
-                        prop.text "Name is required and must not contain path separators."
-                    ]
-                ]
-            ]
-
-        BaseModal.Modal(
+        FileExplorerNameInputModal.Main(
             isOpen = isOpen,
-            setIsOpen = setIsOpen,
-            header = Html.text "Rename Item",
-            description = Html.text $"Rename '{displayName}' in the current ARC.",
-            children = content,
-            footer = footer,
+            title = "Rename Item",
+            description = $"Rename '{displayName}' in the current ARC.",
+            fieldLabel = "New name",
+            initialValue = (initialName |> Option.defaultValue ""),
+            close = close,
+            submit = submit,
+            validate = normalizeRenameName,
+            submitLabel = "Rename",
+            validationMessage = "Name is required and must not contain path separators.",
+            isBusy = isRenaming,
+            busyLabel = "Renaming...",
             debug = "arc-rename"
         )

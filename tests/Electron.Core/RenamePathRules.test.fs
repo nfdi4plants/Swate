@@ -26,10 +26,56 @@ Vitest.describe("RenamePathRules", fun () ->
         Vitest.expect(result).toEqual(Error "Rename target is identical to the current path.")
     )
 
-    Vitest.test("ArcDeletePathRules.isRenamePathAllowed only allows entity folders", fun () ->
+    Vitest.test("ArcDeletePathRules.isRenamePathAllowed allows entity folders and safe generic descendants", fun () ->
         Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay").toBe(true)
         Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe(false)
-        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe(false)
+        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe(true)
+    )
+
+    Vitest.test("generic filesystem targets are limited to safe non-canonical entity descendants", fun () ->
+        let allowedTargets = [
+            "assays/AssayA/protocols/protocol.md"
+            "studies/StudyA/resources"
+            "workflows/WorkflowA/scripts/workflow.cwl"
+            "runs/RunA/data.txt"
+        ]
+
+        allowedTargets
+        |> List.iter (fun path -> Vitest.expect(ArcDeletePathRules.isGenericFileSystemTargetAllowed path).toBe(true))
+
+        let rejectedTargets = [
+            ""
+            "assays"
+            "assays/AssayA"
+            "assays/AssayA/isa.assay.xlsx"
+            "assays/AssayA/isa.datamap.xlsx"
+            "assays/AssayA/readme.md"
+            "assays/AssayA/.git/config"
+            "../assays/AssayA/custom.txt"
+            "notes/custom.md"
+        ]
+
+        rejectedTargets
+        |> List.iter (fun path -> Vitest.expect(ArcDeletePathRules.isGenericFileSystemTargetAllowed path).toBe(false))
+    )
+
+    Vitest.test("generic filesystem parents include entity folders and safe generic folders", fun () ->
+        Vitest.expect(ArcDeletePathRules.isGenericFileSystemParentAllowed "assays/AssayA").toBe(true)
+        Vitest.expect(ArcDeletePathRules.isGenericFileSystemParentAllowed "assays/AssayA/protocols").toBe(true)
+        Vitest.expect(ArcDeletePathRules.isGenericFileSystemParentAllowed "assays").toBe(false)
+        Vitest.expect(ArcDeletePathRules.isGenericFileSystemParentAllowed "notes").toBe(false)
+    )
+
+    Vitest.test("tryBuildGenericFileSystemChildPath validates parent and name", fun () ->
+        match tryBuildGenericFileSystemChildPath "assays/AssayA" " protocol.md " with
+        | Ok targetPath -> Vitest.expect(targetPath).toBe("assays/AssayA/protocol.md")
+        | Error errorMessage -> failwith errorMessage
+
+        Vitest.expect(tryBuildGenericFileSystemChildPath "assays" "protocol.md")
+            .toEqual(Error "Generic file and folder creation is only allowed inside ARC entity folders.")
+
+        Vitest.expect(tryBuildGenericFileSystemChildPath "assays/AssayA" "isa.assay.xlsx")
+            .toEqual(Error "Generic file and folder targets must be non-canonical descendants inside ARC entity folders.")
     )
 )
 

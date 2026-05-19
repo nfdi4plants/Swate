@@ -1,40 +1,52 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
-open Renderer.Components.ARCHelper
-open Swate.Components
 open Swate.Components.Primitive.BaseModal
-open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.RenamePathRules
 open Feliz
 open Fable.Core
-open Fable.Core.JsInterop
 open ARCtrl
 open Helper
 
-[<Erase; Mangle(false)>]
-type CreateArcFileModal =
+type FileExplorerNameInputModal =
 
     [<ReactComponent>]
     static member Main
-        (isOpen: bool, kind: ArcExplorerNodeKind, close: unit -> unit, submit: ArcExplorerNodeKind -> string -> unit)
-        =
+        (
+            isOpen: bool,
+            title: string,
+            description: string,
+            fieldLabel: string,
+            initialValue: string,
+            close: unit -> unit,
+            submit: string -> unit,
+            validate: string -> Result<string, string>,
+            submitLabel: string,
+            validationMessage: string,
+            ?isBusy: bool,
+            ?busyLabel: string,
+            ?debug: string
+        ) =
 
-        let identifier, setIdentifier = React.useState (arcCreateKindDefaultIdentifier kind)
+        let value, setValue = React.useState initialValue
+        let isBusy = defaultArg isBusy false
+        let busyLabel = defaultArg busyLabel submitLabel
+        let debug = defaultArg debug "file-explorer-name-input"
 
-        React.useEffect ((fun () -> setIdentifier (arcCreateKindDefaultIdentifier kind)), [| box kind |])
+        React.useEffect ((fun () -> setValue initialValue), [| box initialValue; box isOpen; box title |])
 
         let setIsOpen isOpen =
             if not isOpen then
                 close ()
 
-        let label = ArcExplorerNodeKind.label kind
-        let isValid = isArcCreateIdentifierValid identifier
+        let validationResult = validate value
+        let isValid = validationResult |> Result.isOk
 
         let submitIfValid () =
-            if isValid then
-                submit kind identifier
+            match validationResult with
+            | Ok normalizedValue -> submit normalizedValue
+            | Error _ -> ()
 
         let footer =
             Html.div [
@@ -42,14 +54,15 @@ type CreateArcFileModal =
                 prop.children [
                     Html.button [
                         prop.className "swt:btn swt:btn-ghost"
+                        prop.disabled isBusy
                         prop.onClick (fun _ -> close ())
                         prop.text "Cancel"
                     ]
                     Html.button [
                         prop.className "swt:btn swt:btn-primary"
-                        prop.disabled (not isValid)
+                        prop.disabled ((not isValid) || isBusy)
                         prop.onClick (fun _ -> submitIfValid ())
-                        prop.text $"Create {label}"
+                        prop.text (if isBusy then busyLabel else submitLabel)
                     ]
                 ]
             ]
@@ -60,15 +73,16 @@ type CreateArcFileModal =
                 prop.children [
                     Html.legend [
                         prop.className "swt:fieldset-legend"
-                        prop.text "Identifier"
+                        prop.text fieldLabel
                     ]
                     Html.label [
                         prop.className "swt:input swt:w-full"
                         prop.children [
                             Html.input [
                                 prop.autoFocus true
-                                prop.value identifier
-                                prop.onChange setIdentifier
+                                prop.disabled isBusy
+                                prop.value value
+                                prop.onChange setValue
                                 prop.onKeyDown (key.enter, fun _ -> submitIfValid ())
                             ]
                         ]
@@ -76,7 +90,7 @@ type CreateArcFileModal =
                     Html.p [
                         prop.hidden isValid
                         prop.className "swt:text-error swt:text-sm"
-                        prop.text arcCreateIdentifierError
+                        prop.text validationMessage
                     ]
                 ]
             ]
@@ -84,9 +98,72 @@ type CreateArcFileModal =
         BaseModal.Modal(
             isOpen = isOpen,
             setIsOpen = setIsOpen,
-            header = Html.text $"Add {label}",
-            description = Html.text $"Create a new {label.ToLowerInvariant()} in the current ARC.",
+            header = Html.text title,
+            description = Html.text description,
             children = content,
             footer = footer,
+            debug = debug
+        )
+
+[<Erase; Mangle(false)>]
+type CreateArcFileModal =
+
+    [<ReactComponent>]
+    static member Main
+        (isOpen: bool, kind: ArcExplorerNodeKind, close: unit -> unit, submit: ArcExplorerNodeKind -> string -> unit)
+        =
+
+        let label = ArcExplorerNodeKind.label kind
+
+        FileExplorerNameInputModal.Main(
+            isOpen = isOpen,
+            title = $"Add {label}",
+            description = $"Create a new {label.ToLowerInvariant()} in the current ARC.",
+            fieldLabel = "Identifier",
+            initialValue = (arcCreateKindDefaultIdentifier kind),
+            close = close,
+            submit = (fun identifier -> submit kind identifier),
+            validate = (fun identifier ->
+                if isArcCreateIdentifierValid identifier then
+                    Ok identifier
+                else
+                    Error arcCreateIdentifierError),
+            submitLabel = $"Create {label}",
+            validationMessage = arcCreateIdentifierError,
             debug = "arc-create"
+        )
+
+type CreateFileSystemItemModal =
+
+    [<ReactComponent>]
+    static member Main
+        (
+            isOpen: bool,
+            kind: FileSystemItemKind,
+            parentName: string option,
+            close: unit -> unit,
+            submit: string -> unit,
+            ?isCreating: bool
+        ) =
+
+        let isCreating = defaultArg isCreating false
+
+        let label = fileSystemCreateKindLabel kind
+        let actionLabel = $"Create {label}"
+        let parentDisplayName = parentName |> Option.defaultValue "this folder"
+
+        FileExplorerNameInputModal.Main(
+            isOpen = isOpen,
+            title = actionLabel,
+            description = $"Create a new {label.ToLowerInvariant()} in '{parentDisplayName}'.",
+            fieldLabel = "Name",
+            initialValue = "",
+            close = close,
+            submit = submit,
+            validate = validateRenameName,
+            submitLabel = actionLabel,
+            validationMessage = "Name is required and must not contain path separators.",
+            isBusy = isCreating,
+            busyLabel = "Creating...",
+            debug = "file-system-create"
         )

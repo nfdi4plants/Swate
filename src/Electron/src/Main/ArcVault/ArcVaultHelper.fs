@@ -210,6 +210,12 @@ let createWindow () = promise {
     return window
 }
 
+let shouldUsePollingByDefault (platform: string) =
+    System.String.Equals(platform, "win32", System.StringComparison.OrdinalIgnoreCase)
+
+let private currentNodePlatform () : string =
+    emitJsExpr () "process.platform" |> unbox<string>
+
 let createFileWatcher (path: string) (usePolling: bool option) =
 
     let ignoreFn =
@@ -230,7 +236,8 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             else
                 false
 
-    let usePolling = defaultArg usePolling false
+    // Native Windows file events can keep handles that block app-initiated folder renames.
+    let usePolling = defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
 
     let watcherOptions =
         if usePolling then

@@ -55,3 +55,37 @@ let tryBuildRenameTargetPath (sourcePath: string) (newName: string) =
                 Error "Rename target is identical to the current path."
             else
                 Ok targetPath
+
+let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
+    let normalizedParentPath = normalizeRelativePath parentPath
+
+    if ArcDeletePathRules.isGenericFileSystemParentAllowed normalizedParentPath |> not then
+        Error "Generic file and folder creation is only allowed inside ARC entity folders."
+    else
+        match validateRenameName name with
+        | Error validationError -> Error validationError
+        | Ok normalizedName ->
+            let targetPath =
+                if String.IsNullOrWhiteSpace normalizedParentPath then
+                    normalizedName
+                else
+                    $"{normalizedParentPath}/{normalizedName}"
+
+            if ArcDeletePathRules.isGenericFileSystemTargetAllowed targetPath then
+                Ok targetPath
+            else
+                Error "Generic file and folder targets must be non-canonical descendants inside ARC entity folders."
+
+let tryBuildGenericFileSystemRenameTargetPath (sourcePath: string) (newName: string) =
+    let normalizedSourcePath = normalizeRelativePath sourcePath
+
+    if ArcDeletePathRules.isGenericFileSystemTargetAllowed normalizedSourcePath |> not then
+        Error "Generic file and folder rename is only allowed for non-canonical descendants inside ARC entity folders."
+    else
+        match tryBuildRenameTargetPath normalizedSourcePath newName with
+        | Error validationError -> Error validationError
+        | Ok targetPath ->
+            if ArcDeletePathRules.isGenericFileSystemTargetAllowed targetPath then
+                Ok targetPath
+            else
+                Error "Generic file and folder rename targets must stay inside ARC entity folders and must not target canonical ARC files."

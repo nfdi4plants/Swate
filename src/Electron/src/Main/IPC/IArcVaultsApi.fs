@@ -111,6 +111,24 @@ let private writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Pro
 let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
     fsPromisesDynamic?readFile (absolutePath, "utf8") |> unbox<JS.Promise<string>>
 
+let private pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
+    try
+        let! _ = fsPromisesDynamic?access (absolutePath) |> unbox<JS.Promise<obj>>
+        return true
+    with _ ->
+        return false
+}
+
+let private isDirectoryAsync (absolutePath: string) : JS.Promise<bool> = promise {
+    let! stats = fsPromisesDynamic?stat (absolutePath) |> unbox<JS.Promise<obj>>
+    return stats?isDirectory () |> unbox<bool>
+}
+
+let private mkdirAsync (directoryPath: string) : JS.Promise<unit> = promise {
+    let! _ = fsPromisesDynamic?mkdir (directoryPath) |> unbox<JS.Promise<obj>>
+    return ()
+}
+
 let private tryGetNodeErrorCode (error: exn) : string option =
     try
         error?code |> unbox<string> |> Option.ofObj
@@ -303,7 +321,7 @@ module ArcRenameHelper =
                 $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
         | _ -> renameError
 
-    let private validateRenameSourceClassification (classification: ArcDeletePathRules.RenamePathClassification) =
+    let private validateEntityRenameSourceClassification (classification: ArcDeletePathRules.RenamePathClassification) =
         match classification with
         | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
             Ok(zone, identifier, normalizedRelativePath)
@@ -321,13 +339,13 @@ module ArcRenameHelper =
         | ArcDeletePathRules.RenamePathClassification.CanonicalDataMapFileTarget _ ->
             Error(exn "Renaming canonical ARC files is not supported. Rename the containing ARC entity folder instead.")
         | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
-            Error(exn "Renaming generic files or folders is not supported from the ARC file tree.")
+            Error(exn "Renaming generic files or folders uses the generic filesystem rename path.")
 
     let tryBuildRenamePlan (request: RenamePathRequest) : Result<RenamePlan, exn> =
         let requestedRelativePath = normalizeRelativePathForComparison request.relativePath
         let sourceClassification = ArcDeletePathRules.classifyRenameTarget requestedRelativePath
 
-        match validateRenameSourceClassification sourceClassification with
+        match validateEntityRenameSourceClassification sourceClassification with
         | Error validationError -> Error validationError
         | Ok(sourceZone, sourceIdentifier, sourcePath) ->
             match tryBuildRenameTargetPath sourcePath request.newName with
@@ -366,6 +384,135 @@ module ArcRenameHelper =
                 exn
                     $"Unable to merge renamed ARC entity from '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}': {mergeError.Message}"
             )
+
+[<RequireQualifiedAccess>]
+module ArcFileSystemHelper =
+
+    type CreateFileSystemItemPlan = {
+        ParentPath: string
+        TargetPath: string
+        Kind: FileSystemItemKind
+    }
+
+    type GenericRenamePlan = {
+        SourcePath: string
+        TargetPath: string
+    }
+
+    let private normalizeRelativePathForComparison (path: string) =
+        path
+        |> PathHelpers.normalizeCanonicalRelativePath
+
+    let private resolveArcRelativePathPair arcPath firstRelativePath secondRelativePath =
+        match
+            tryResolveArcRelativePath arcPath firstRelativePath,
+            tryResolveArcRelativePath arcPath secondRelativePath
+        with
+        | Error pathError, _
+        | _, Error pathError -> Error pathError
+        | Ok firstAbsolutePath, Ok secondAbsolutePath -> Ok(firstAbsolutePath, secondAbsolutePath)
+
+    let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
+        let! targetExists = pathExistsAsync targetAbsolutePath
+
+        if targetExists then
+            return Error(exn errorMessage)
+        else
+            return Ok()
+    }
+
+    let private createTargetAsync kind targetAbsolutePath =
+        match kind with
+        | FileSystemItemKind.File -> writeUtf8FileAsync targetAbsolutePath ""
+        | FileSystemItemKind.Folder -> mkdirAsync targetAbsolutePath
+
+    let tryBuildCreateFileSystemItemPlan
+        (request: CreateFileSystemItemRequest)
+        : Result<CreateFileSystemItemPlan, exn> =
+        match tryBuildGenericFileSystemChildPath request.parentPath request.name with
+        | Error validationError -> Error(exn validationError)
+        | Ok targetPath ->
+            Ok {
+                ParentPath = PathHelpers.normalizeCanonicalRelativePath request.parentPath
+                TargetPath = targetPath
+                Kind = request.kind
+            }
+
+    let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<GenericRenamePlan, exn> =
+        let requestedRelativePath = normalizeRelativePathForComparison request.relativePath
+
+        match tryBuildGenericFileSystemRenameTargetPath requestedRelativePath request.newName with
+        | Error validationError -> Error(exn validationError)
+        | Ok targetPath ->
+            Ok {
+                SourcePath = requestedRelativePath
+                TargetPath = targetPath
+            }
+
+    let createFileSystemItemOnDisk
+        (arcPath: string)
+        (request: CreateFileSystemItemRequest)
+        : JS.Promise<Result<string, exn>> =
+        promise {
+            match tryBuildCreateFileSystemItemPlan request with
+            | Error validationError -> return Error validationError
+            | Ok plan ->
+                match resolveArcRelativePathPair arcPath plan.ParentPath plan.TargetPath with
+                | Error pathError -> return Error pathError
+                | Ok(parentAbsolutePath, targetAbsolutePath) ->
+                    try
+                        let! parentIsDirectory = isDirectoryAsync parentAbsolutePath
+
+                        if parentIsDirectory |> not then
+                            return Error(exn $"Cannot create item because '{plan.ParentPath}' is not a folder.")
+                        else
+                            let! targetCheck =
+                                ensureTargetDoesNotExist
+                                    targetAbsolutePath
+                                    $"A file or folder already exists at '{plan.TargetPath}'."
+
+                            match targetCheck with
+                            | Error conflictError -> return Error conflictError
+                            | Ok() ->
+                                do! createTargetAsync plan.Kind targetAbsolutePath
+                                return Ok plan.TargetPath
+                    with createError ->
+                        return Error createError
+        }
+
+    let renameGenericFileSystemItemOnDisk
+        (arcPath: string)
+        (request: RenamePathRequest)
+        : JS.Promise<Result<unit, exn>> =
+        promise {
+            match tryBuildGenericRenamePlan request with
+            | Error validationError -> return Error validationError
+            | Ok genericRenamePlan ->
+                match resolveArcRelativePathPair arcPath genericRenamePlan.SourcePath genericRenamePlan.TargetPath with
+                | Error pathError -> return Error pathError
+                | Ok(sourceAbsolutePath, targetAbsolutePath) ->
+                    let! targetCheck =
+                        ensureTargetDoesNotExist
+                            targetAbsolutePath
+                            $"Cannot rename '{genericRenamePlan.SourcePath}' to '{genericRenamePlan.TargetPath}' because the destination already exists."
+
+                    match targetCheck with
+                    | Error conflictError -> return Error conflictError
+                    | Ok() ->
+                        let! renameResult =
+                            renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
+
+                        match renameResult with
+                        | Ok() -> return Ok()
+                        | Error renameError ->
+                            return
+                                Error(
+                                    ArcRenameHelper.mapRenameDiskError
+                                        genericRenamePlan.SourcePath
+                                        genericRenamePlan.TargetPath
+                                        renameError
+                                )
+        }
 
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
@@ -665,6 +812,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    createFileSystemItem =
+        fun (request: CreateFileSystemItemRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault event (fun vault -> promise {
+                        return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
+                    })
+            with e ->
+                return Error e
+        }
     getHasUnsavedArcChanges =
         fun () -> promise {
             try
@@ -741,62 +898,66 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         promise {
                             let arcPath = vault.path.Value
 
-                            match ArcRenameHelper.tryBuildRenamePlan request with
-                            | Error validationError -> return Error validationError
-                            | Ok renamePlan ->
-                                match
-                                    tryResolveArcRelativePath arcPath renamePlan.SourcePath,
-                                    tryResolveArcRelativePath arcPath renamePlan.TargetPath
-                                with
-                                | Error pathError, _
-                                | _, Error pathError -> return Error pathError
-                                | Ok sourceAbsolutePath, Ok targetAbsolutePath ->
-                                    vault.RegisterPendingArcFileTreeMutation {
-                                        Description =
-                                            $"rename '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}'"
-                                        MergeReloadedArc =
-                                            fun arcLocal reloadedArc _ -> promise {
-                                                let! syncedArcResult =
-                                                    promise {
-                                                        let wasBusyWriting = vault.isBusyWriting
-                                                        vault.isBusyWriting <- true
+                            match ArcDeletePathRules.classifyRenameTarget request.relativePath with
+                            | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
+                                return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
+                            | _ ->
+                                match ArcRenameHelper.tryBuildRenamePlan request with
+                                | Error validationError -> return Error validationError
+                                | Ok renamePlan ->
+                                    match
+                                        tryResolveArcRelativePath arcPath renamePlan.SourcePath,
+                                        tryResolveArcRelativePath arcPath renamePlan.TargetPath
+                                    with
+                                    | Error pathError, _
+                                    | _, Error pathError -> return Error pathError
+                                    | Ok sourceAbsolutePath, Ok targetAbsolutePath ->
+                                        vault.RegisterPendingArcFileTreeMutation {
+                                            Description =
+                                                $"rename '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}'"
+                                            MergeReloadedArc =
+                                                fun arcLocal reloadedArc _ -> promise {
+                                                    let! syncedArcResult =
+                                                        promise {
+                                                            let wasBusyWriting = vault.isBusyWriting
+                                                            vault.isBusyWriting <- true
 
-                                                        try
-                                                            return!
-                                                                ArcRenameHelper.syncRenamedEntityIdentifierOnLoadedArc
-                                                                    arcPath
-                                                                    renamePlan
-                                                                    reloadedArc
-                                                        finally
-                                                            vault.isBusyWriting <- wasBusyWriting
-                                                    }
+                                                            try
+                                                                return!
+                                                                    ArcRenameHelper.syncRenamedEntityIdentifierOnLoadedArc
+                                                                        arcPath
+                                                                        renamePlan
+                                                                        reloadedArc
+                                                            finally
+                                                                vault.isBusyWriting <- wasBusyWriting
+                                                        }
 
-                                                match syncedArcResult with
-                                                | Error syncError -> return Error syncError
-                                                | Ok syncedArc ->
-                                                    return
-                                                        ArcRenameHelper.mergeReloadedArcAfterRename
-                                                            renamePlan
-                                                            arcLocal
-                                                            syncedArc
-                                            }
-                                    }
+                                                    match syncedArcResult with
+                                                    | Error syncError -> return Error syncError
+                                                    | Ok syncedArc ->
+                                                        return
+                                                            ArcRenameHelper.mergeReloadedArcAfterRename
+                                                                renamePlan
+                                                                arcLocal
+                                                                syncedArc
+                                                }
+                                        }
 
-                                    let! renameResult =
-                                        renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
+                                        let! renameResult =
+                                            renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
 
-                                    match renameResult with
-                                    | Ok() -> return Ok()
-                                    | Error renameError ->
-                                        vault.ClearPendingArcFileTreeMutation()
+                                        match renameResult with
+                                        | Ok() -> return Ok()
+                                        | Error renameError ->
+                                            vault.ClearPendingArcFileTreeMutation()
 
-                                        return
-                                            Error(
-                                                ArcRenameHelper.mapRenameDiskError
-                                                    renamePlan.SourcePath
-                                                    renamePlan.TargetPath
-                                                    renameError
-                                            )
+                                            return
+                                                Error(
+                                                    ArcRenameHelper.mapRenameDiskError
+                                                        renamePlan.SourcePath
+                                                        renamePlan.TargetPath
+                                                        renameError
+                                                )
                         }
                     )
             with e ->
