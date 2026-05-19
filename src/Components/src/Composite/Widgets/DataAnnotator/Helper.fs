@@ -43,6 +43,59 @@ let tryGetTargetHeader (table: ArcTable) (targetColumn: TargetColumn) =
         | None, Some _ -> Ok(CompositeHeader.Input IOType.Data)
         | Some _, Some _ -> Error "Both Input and Output columns already exist. Select Input or Output explicitly."
 
+let private targetColumnToHeader (targetColumn: TargetColumn) =
+    match targetColumn with
+    | TargetColumn.Input -> CompositeHeader.Input IOType.Data
+    | TargetColumn.Output -> CompositeHeader.Output IOType.Data
+    | TargetColumn.Autodetect -> CompositeHeader.Output IOType.Data
+
+let private tryGetExistingTargetColumn (table: ArcTable) (targetColumn: TargetColumn) =
+    match targetColumn with
+    | TargetColumn.Input -> table.TryGetInputColumn()
+    | TargetColumn.Output -> table.TryGetOutputColumn()
+    | TargetColumn.Autodetect -> None
+
+let private isSomeNonEmptyString = Option.exists (String.IsNullOrWhiteSpace >> not)
+
+let private isDataContextNonEmpty (dataContext: DataContext) =
+    isSomeNonEmptyString dataContext.FilePath
+    || isSomeNonEmptyString dataContext.Selector
+    || isSomeNonEmptyString dataContext.Format
+    || isSomeNonEmptyString dataContext.SelectorFormat
+
+let private isCompositeCellNonEmpty (cell: CompositeCell) =
+    cell.GetContentSwate() |> Array.exists (String.IsNullOrWhiteSpace >> not)
+
+let private findLastNonEmptyDataCellIndex (cells: ResizeArray<CompositeCell>) =
+    let mutable lastNonEmptyIndex = -1
+
+    for index in 0 .. cells.Count - 1 do
+        if isCompositeCellNonEmpty cells.[index] then
+            lastNonEmptyIndex <- index
+
+    lastNonEmptyIndex
+
+let private findLastNonEmptyDataContextIndex (dataMap: DataMap) =
+    let mutable lastNonEmptyIndex = -1
+
+    for index in 0 .. dataMap.DataContexts.Count - 1 do
+        if isDataContextNonEmpty dataMap.DataContexts.[index] then
+            lastNonEmptyIndex <- index
+
+    lastNonEmptyIndex
+
+let private clearDataContextData (dataContext: DataContext) =
+    dataContext.FilePath <- None
+    dataContext.Selector <- None
+    dataContext.Format <- None
+    dataContext.SelectorFormat <- None
+
+let private tryGetTableWriteHeader (table: ArcTable) (targetColumn: TargetColumn) (writeMode: WriteMode) =
+    match targetColumn, writeMode with
+    | TargetColumn.Autodetect, WriteMode.Append -> Error "Append mode requires selecting Input or Output explicitly."
+    | TargetColumn.Autodetect, WriteMode.Replace -> tryGetTargetHeader table targetColumn
+    | _ -> Ok(targetColumnToHeader targetColumn)
+
 let private mkDataCell (fileName: string) (fileType: string) (selector: string) =
     let data = Data()
     data.FilePath <- Some fileName
@@ -56,49 +109,82 @@ let private mkEmptyDataCell () =
     CompositeCell.createData data
 
 let applyToTable (table: ArcTable) (input: AnnotationInput) =
-    match tryGetTargetHeader table input.TargetColumn with
-    | Error errorMessage -> Error errorMessage
-    | Ok header ->
+    match input.Target with
+    | AnnotationTarget.DataMap _ -> Error "DataMap target cannot be applied to a table destination."
+    | AnnotationTarget.Table(targetColumn, writeMode) ->
+        match tryGetTableWriteHeader table targetColumn writeMode with
+        | Error errorMessage -> Error errorMessage
+        | Ok header ->
+            try
+                let existingColumn = tryGetExistingTargetColumn table targetColumn
+
+                let startRowIndex =
+                    match writeMode, existingColumn with
+                    | WriteMode.Append, Some column -> findLastNonEmptyDataCellIndex column.Cells + 1
+                    | WriteMode.Append, None -> 0
+                    | WriteMode.Replace, _ -> 0
+
+                let targetRowCount =
+                    System.Math.Max(table.RowCount, startRowIndex + input.Selectors.Length)
+
+                if targetRowCount > table.RowCount && table.ColumnCount > 0 then
+                    table.AddRowsEmpty(targetRowCount - table.RowCount)
+
+                let selectorEndExclusive = startRowIndex + input.Selectors.Length
+
+                let values =
+                    [|
+                        for rowIndex in 0 .. targetRowCount - 1 do
+                            if rowIndex >= startRowIndex && rowIndex < selectorEndExclusive then
+                                let selectorIndex = rowIndex - startRowIndex
+                                mkDataCell input.FileName input.FileType input.Selectors.[selectorIndex]
+                            else
+                                match writeMode, existingColumn with
+                                | WriteMode.Append, Some column when rowIndex < column.Cells.Count ->
+                                    column.Cells.[rowIndex]
+                                | _ -> mkEmptyDataCell ()
+                    |]
+                    |> ResizeArray
+
+                table.AddColumn(header, values, forceReplace = true)
+                Ok input.Selectors.Length
+            with exceptionValue ->
+                Error exceptionValue.Message
+
+let applyToDataMap (dataMap: DataMap) (input: AnnotationInput) =
+    match input.Target with
+    | AnnotationTarget.Table _ -> Error "Table target cannot be applied to a DataMap destination."
+    | AnnotationTarget.DataMap writeMode ->
         try
-            if table.ColumnCount > 0 && input.Selectors.Length > table.RowCount then
-                table.AddRowsEmpty(input.Selectors.Length - table.RowCount)
+            let startIndex =
+                match writeMode with
+                | WriteMode.Replace -> 0
+                | WriteMode.Append -> findLastNonEmptyDataContextIndex dataMap + 1
 
-            let targetRowCount = System.Math.Max(table.RowCount, input.Selectors.Length)
+            let requiredCount = startIndex + input.Selectors.Length
 
-            let values =
-                [|
-                    for rowIndex in 0 .. targetRowCount - 1 do
-                        if rowIndex < input.Selectors.Length then
-                            mkDataCell input.FileName input.FileType input.Selectors.[rowIndex]
-                        else
-                            mkEmptyDataCell ()
-                |]
-                |> ResizeArray
+            if requiredCount > dataMap.DataContexts.Count then
+                let toAdd =
+                    Array.init (requiredCount - dataMap.DataContexts.Count) (fun _ -> DataContext())
 
-            table.AddColumn(header, values, forceReplace = true)
+                dataMap.DataContexts.AddRange toAdd
+
+            if writeMode = WriteMode.Replace then
+                for index in requiredCount .. dataMap.DataContexts.Count - 1 do
+                    clearDataContextData dataMap.DataContexts.[index]
+
+            for selectorOffset in 0 .. input.Selectors.Length - 1 do
+                let targetIndex = startIndex + selectorOffset
+                let selector = input.Selectors.[selectorOffset]
+                let dataContext = dataMap.DataContexts.[targetIndex]
+                dataContext.FilePath <- Some input.FileName
+                dataContext.Selector <- Some selector
+                dataContext.Format <- Some input.FileType
+                dataContext.SelectorFormat <- Some URLs.Data.SelectorFormat.csv
+
             Ok input.Selectors.Length
         with exceptionValue ->
             Error exceptionValue.Message
-
-let applyToDataMap (dataMap: DataMap) (input: AnnotationInput) =
-    try
-        if input.Selectors.Length > dataMap.DataContexts.Count then
-            let toAdd =
-                Array.init (input.Selectors.Length - dataMap.DataContexts.Count) (fun _ -> DataContext())
-
-            dataMap.DataContexts.AddRange toAdd
-
-        for index in 0 .. input.Selectors.Length - 1 do
-            let selector = input.Selectors.[index]
-            let dataContext = dataMap.DataContexts.[index]
-            dataContext.FilePath <- Some input.FileName
-            dataContext.Selector <- Some selector
-            dataContext.Format <- Some input.FileType
-            dataContext.SelectorFormat <- Some URLs.Data.SelectorFormat.csv
-
-        Ok input.Selectors.Length
-    with exceptionValue ->
-        Error exceptionValue.Message
 
 let DefaultSeparatorOptions: (string * string)[] = [|
     "\\t", "Tab (\\t)"

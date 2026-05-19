@@ -1,6 +1,7 @@
 module Swate.Components.Composite.Widgets.DataAnnotator.Types
 
 open System
+open ARCtrl
 
 [<RequireQualifiedAccess>]
 type TargetColumn =
@@ -14,11 +15,31 @@ type TargetColumn =
         | "output" -> TargetColumn.Output
         | _ -> TargetColumn.Autodetect
 
+[<RequireQualifiedAccess>]
+type WriteMode =
+    | Replace
+    | Append
+
+    static member fromString(value: string) =
+        match value.ToLowerInvariant() with
+        | "append" -> WriteMode.Append
+        | _ -> WriteMode.Replace
+
+[<RequireQualifiedAccess>]
+type AnnotationTarget =
+    | Table of targetColumn: TargetColumn * writeMode: WriteMode
+    | DataMap of writeMode: WriteMode
+
+[<RequireQualifiedAccess>]
+type AnnotationDestination =
+    | Table of ArcTable
+    | DataMap of DataMap
+
 type AnnotationInput = {
     Selectors: string[]
     FileName: string
     FileType: string
-    TargetColumn: TargetColumn
+    Target: AnnotationTarget
 }
 
 [<RequireQualifiedAccess>]

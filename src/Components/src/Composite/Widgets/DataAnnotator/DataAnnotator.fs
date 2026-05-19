@@ -417,15 +417,20 @@ type DataAnnotatorWidget =
         ]
 
     [<ReactComponent>]
-    static member private UpdateTargetColumn(current: TargetColumn, setTarget) =
+    static member private UpdateTargetColumn(current: TargetColumn, writeMode: WriteMode, setTarget) =
         let mkOption (target) =
             Html.option [ prop.value (string target); prop.text (string target) ]
 
         let infoText =
-            match current with
-            | TargetColumn.Autodetect -> "Creates missing Input or Output column, if both exist submit will fail!"
-            | TargetColumn.Input -> "Create Input column, will overwrite!"
-            | TargetColumn.Output -> "Create Output column, will overwrite!"
+            match current, writeMode with
+            | TargetColumn.Autodetect, WriteMode.Replace ->
+                "Auto-selects missing Input or Output column. Fails when both exist."
+            | TargetColumn.Input, WriteMode.Replace -> "Replace Input data values from the first row."
+            | TargetColumn.Output, WriteMode.Replace -> "Replace Output data values from the first row."
+            | TargetColumn.Input, WriteMode.Append -> "Append after last non-empty Input data value."
+            | TargetColumn.Output, WriteMode.Append -> "Append after last non-empty Output data value."
+            | TargetColumn.Autodetect, WriteMode.Append ->
+                "Autodetect is not available in append mode. Select Input or Output."
 
         Html.div [
             prop.className "swt:tooltip swt:tooltip-bottom"
@@ -438,10 +443,11 @@ type DataAnnotatorWidget =
                         Html.select [
                             prop.className "swt:select swt:join-item swt:min-w-fit"
                             prop.title infoText
-                            prop.defaultValue (string current)
+                            prop.value (string current)
                             prop.onChange (fun (e: string) -> TargetColumn.fromString e |> setTarget)
                             prop.children [
-                                mkOption TargetColumn.Autodetect
+                                if writeMode = WriteMode.Replace then
+                                    mkOption TargetColumn.Autodetect
                                 mkOption TargetColumn.Input
                                 mkOption TargetColumn.Output
                             ]
@@ -452,18 +458,47 @@ type DataAnnotatorWidget =
         ]
 
     [<ReactComponent>]
-    static member private DataFileConfigComponent(model, target, setTarget, dispatch) =
+    static member private UpdateWriteMode(current: WriteMode, setWriteMode) =
+        let mkOption (mode: WriteMode) =
+            Html.option [ prop.value (string mode); prop.text (string mode) ]
+
+        let infoText =
+            match current with
+            | WriteMode.Replace -> "Replace existing annotation values from the first row."
+            | WriteMode.Append -> "Append new annotation values after the last non-empty value."
+
+        Html.div [
+            prop.className "swt:tooltip swt:tooltip-bottom"
+            prop.custom ("data-tip", infoText)
+            prop.children [
+                Html.select [
+                    prop.className "swt:select swt:join-item swt:min-w-fit"
+                    prop.title infoText
+                    prop.value (string current)
+                    prop.onChange (fun (e: string) -> WriteMode.fromString e |> setWriteMode)
+                    prop.children [ mkOption WriteMode.Replace; mkOption WriteMode.Append ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member private DataFileConfigComponent
+        (model, destination: AnnotationDestination, target, setTarget, writeMode, setWriteMode, dispatch)
+        =
         Html.div [
             prop.className "swt:flex swt:flex-row swt:gap-4"
             prop.children [
                 DataAnnotatorWidget.UpdateSeparatorButton dispatch
                 DataAnnotatorWidget.UpdateIsHeaderCheckbox(model, dispatch)
-                DataAnnotatorWidget.UpdateTargetColumn(target, setTarget)
+                match destination with
+                | AnnotationDestination.Table _ -> DataAnnotatorWidget.UpdateTargetColumn(target, writeMode, setTarget)
+                | AnnotationDestination.DataMap _ -> Html.none
+                DataAnnotatorWidget.UpdateWriteMode(writeMode, setWriteMode)
             ]
         ]
 
     [<ReactComponent>]
-    static member private Modal(model: Model, dispatch, isOpen, setIsOpen, submit) =
+    static member private Modal(destination: AnnotationDestination, model: Model, dispatch, isOpen, setIsOpen, submit) =
         let state, setState: Set<DataTarget> * (((Set<DataTarget> -> Set<DataTarget>) -> unit)) =
             React.useStateWithUpdater (Set.empty<DataTarget>)
 
@@ -472,10 +507,28 @@ type DataAnnotatorWidget =
         let (targetCol: TargetColumn), setTargetCol =
             React.useState (TargetColumn.Autodetect)
 
+        let writeMode, setWriteMode = React.useState WriteMode.Replace
+
+        React.useEffect (
+            (fun () ->
+                if writeMode = WriteMode.Append && targetCol = TargetColumn.Autodetect then
+                    setTargetCol TargetColumn.Output
+            ),
+            [| box writeMode; box targetCol |]
+        )
+
         let modalActivity =
             Html.div [
                 prop.children [
-                    DataAnnotatorWidget.DataFileConfigComponent(model, targetCol, setTargetCol, dispatch)
+                    DataAnnotatorWidget.DataFileConfigComponent(
+                        model,
+                        destination,
+                        targetCol,
+                        setTargetCol,
+                        writeMode,
+                        setWriteMode,
+                        dispatch
+                    )
                     DataAnnotatorWidget.FileMetadataComponent model.DataFile.Value
                 ]
             ]
@@ -502,7 +555,7 @@ type DataAnnotatorWidget =
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.text "Submit"
                                         prop.disabled state.IsEmpty
-                                        prop.onClick (fun e ->
+                                        prop.onClick (fun _ ->
                                             // match DataAnnotator.tryValidateSubmit (model, state, targetCol) with
                                             // | Some message -> setErrorMessage (Some message)
                                             // | None ->
@@ -518,14 +571,25 @@ type DataAnnotatorWidget =
                                                 let name = dtf.DataFileName
                                                 let dt = dtf.DataFileType
 
+                                                let target =
+                                                    match destination with
+                                                    | AnnotationDestination.Table _ ->
+                                                        AnnotationTarget.Table(targetCol, writeMode)
+                                                    | AnnotationDestination.DataMap _ ->
+                                                        AnnotationTarget.DataMap(writeMode)
+
                                                 let input: AnnotationInput = {
                                                     Selectors = selectors
                                                     FileName = name
                                                     FileType = dt
-                                                    TargetColumn = targetCol
+                                                    Target = target
                                                 }
 
-                                                submit input
+                                                match submit input with
+                                                | Ok _ ->
+                                                    setErrorMessage None
+                                                    setIsOpen false
+                                                | Error message -> setErrorMessage (Some message)
                                             | None -> setErrorMessage (Some "No file selected.")
                                         )
                                     ]
@@ -552,7 +616,12 @@ type DataAnnotatorWidget =
         )
 
     [<ReactComponent(true)>]
-    static member Main(setAnnotationInput: AnnotationInput -> unit, ?onError: string -> unit) =
+    static member Main
+        (
+            destination: AnnotationDestination,
+            setAnnotationInput: AnnotationInput -> Result<int, string>,
+            ?onError: string -> unit
+        ) =
 
         let onError =
             defaultArg onError (fun message -> console.error ("DataAnnotatorWidget error: " + message))
@@ -596,15 +665,14 @@ type DataAnnotatorWidget =
             fun (input: AnnotationInput) ->
                 match model with
                 | {
-                      DataFile = Some loadedDataFile
-                      ParsedFile = Some currentParsedFile
+                      DataFile = Some _
+                      ParsedFile = Some _
                   } ->
                     try
                         setAnnotationInput input
-                        setShowModal false
                     with exceptionValue ->
-                        onError exceptionValue.Message
-                | _ -> onError "Load a file first."
+                        Error exceptionValue.Message
+                | _ -> Error "Load a file first."
 
         React.Fragment [
 
@@ -622,6 +690,6 @@ type DataAnnotatorWidget =
                   DataFile = Some _
                   ParsedFile = Some _
               },
-              true -> DataAnnotatorWidget.Modal(model, dispatch, showModal, setShowModal, submit)
+              true -> DataAnnotatorWidget.Modal(destination, model, dispatch, showModal, setShowModal, submit)
             | _, _ -> Html.none
         ]

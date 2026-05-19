@@ -12,6 +12,7 @@ open Swate.Components.Composite.DataMapTable
 open Swate.Components.Shared
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
+open Swate.Components.Composite.Widgets.DataAnnotator.Types
 
 type private AddRowsFooterViewProps = {
     rowsToAdd: int
@@ -61,8 +62,9 @@ type private LazyComponents =
         )
 
     [<ReactLazyComponent>]
-    static member LazyDataAnnotator(setAnnotationInput, onError) =
+    static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
         Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotatorWidget.Main(
+            destination,
             setAnnotationInput,
             onError
         )
@@ -264,7 +266,8 @@ type Main =
             ?onError: string -> unit
         ) =
 
-        let onError = defaultArg onError (fun errorMsg -> console.error("Error in ArcFileEditor: " + errorMsg))
+        let onError =
+            defaultArg onError (fun errorMsg -> console.error ("Error in ArcFileEditor: " + errorMsg))
 
         let activeView, setActiveView =
             React.useState (startingActiveView |> Option.defaultValue ActiveView.Metadata)
@@ -338,16 +341,25 @@ type Main =
                             "Loading File Picker Widget..."
                         )
                     dataAnnotator =
-                        Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyDataAnnotator(
-                                Helper.applyDataAnnotatorInputToArcFile(activeView, arcFile, setArcFile, onError),
-                                onError = onError
-                            ),
-                            "Loading Data Annotator Widget..."
-                        )
+                        match Helper.tryGetDataAnnotatorDestination (activeView, arcFile) with
+                        | Ok destination ->
+                            Main.LazyLoaderWithMessage(
+                                LazyComponents.LazyDataAnnotator(
+                                    destination,
+                                    Helper.applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile),
+                                    onError = onError
+                                ),
+                                "Loading Data Annotator Widget..."
+                            )
+                        | Error message ->
+                            Html.div [
+                                prop.className "swt:p-3 swt:text-sm swt:opacity-70"
+                                prop.text message
+                            ]
                 |}),
                 [|
                     box arcFile
+                    box activeView
                     box activeTableIndex
                     box setArcFile
                     pickPaths
