@@ -182,6 +182,33 @@ let importTests =
             Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "missing-pv")) "Missing property value should warn."
             Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "previous-connection")) "Skipped previous connection should warn."
             Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "missing-input")) "Dangling loaded connection should warn."
+
+        testCase "fromImportedProvenance warns on duplicate IDs and empty loaded table name" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+
+            let imported =
+                {
+                    LoadedTableName = ""
+                    PropertyValues =
+                        [
+                            propertyValue "pv-dup" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
+                            propertyValue "pv-dup" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
+                        ]
+                    InputSets =
+                        [
+                            importedSet "dup-set" "assay-table" inputHeader "Input A" [ "pv-dup" ]
+                            importedSet "dup-set" "assay-table" inputHeader "Input B" [ "pv-dup" ]
+                        ]
+                    OutputSets = []
+                    Connections = []
+                }
+
+            let result = fromImportedProvenance imported
+
+            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "LoadedTableName is empty")) "Empty LoadedTableName should warn."
+            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "Duplicate property value id 'pv-dup'")) "Duplicate property value ID should warn."
+            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "Duplicate input set id 'dup-set'")) "Duplicate input set ID should warn."
     ]
 
 let private validImportedModel () =
