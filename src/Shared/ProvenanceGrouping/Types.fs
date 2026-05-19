@@ -14,8 +14,8 @@ type ProvenanceSetId = string
 /// Swate-local stable ID for one loaded input-to-output connection.
 type ProvenanceConnectionId = string
 
-/// Swate-local stable ID for one property value occurrence.
-/// Repeated equal values must have separate IDs.
+/// Swate-local stable ID for one normalized editable property value in the model.
+/// Adapters may collapse exact duplicate source occurrences and track multiplicity in source-specific sidecars.
 type ProvenancePropertyValueId = string
 
 /// Which collection or display side a projection/helper should use.
@@ -113,8 +113,8 @@ type ProvenanceWritebackAnchor =
         OutputNames: string list
     }
 
-/// One concrete key/value occurrence.
-/// Sets point to these occurrences; repeated equal values remain separate records.
+/// One concrete editable key/value in the normalized model.
+/// Distinct values must remain distinct; exact duplicate source occurrences may collapse when they are not meaningfully distinguishable in the source-agnostic core model.
 type ProvenancePropertyValue =
     {
         /// Stable Swate-local ID for this occurrence.

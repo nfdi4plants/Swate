@@ -248,6 +248,50 @@ let editTests =
             | other ->
                 failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
 
+        testCase "createLoadedPropertyValue is a no-op when an identical loaded value already exists on the same target" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-species-a" species (ProvenanceValue.Text "Arabidopsis") None (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-species-a" ]
+                    ]
+                    []
+                    []
+
+            match createLoadedPropertyValue { Target = ProvenancePropertyTarget.InputSets [ "input-a" ]; CopiedFrom = None; Header = species; Value = ProvenanceValue.Text "Arabidopsis"; Unit = None } built with
+            | Ok(nextModel, []) ->
+                Expect.equal nextModel built "An exact duplicate loaded value should not create a second model value."
+            | other ->
+                failwithf "Expected a no-op duplicate create, got %A" other
+
+        testCase "copyPropertyValueToLoadedTarget is a no-op when the target already has an identical value" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-species-a" species (ProvenanceValue.Text "Arabidopsis") None (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-species-a" ]
+                    ]
+                    []
+                    []
+
+            match copyPropertyValueToLoadedTarget "pv-species-a" (ProvenancePropertyTarget.InputSets [ "input-a" ]) built with
+            | Ok(nextModel, []) ->
+                Expect.equal nextModel built "Copying an identical loaded value onto the same target should be a no-op."
+            | other ->
+                failwithf "Expected a no-op duplicate copy, got %A" other
+
         testCase "connectSets creates a loaded input output connection" <| fun _ ->
             let model = validModel ()
 
