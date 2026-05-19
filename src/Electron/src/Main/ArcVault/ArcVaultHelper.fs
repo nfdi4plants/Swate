@@ -1,16 +1,21 @@
 module Main.ArcVaultHelper
 
 
+open System
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
+open ARCtrl.Contract
 open Fable.Electron
+open Fable.Core
 open Fable.Core.JsInterop
 open Main
 open Main.ArcMerge
 open Main.Bindings
 open Node.Api
+
+let private fsPromisesDynamic: obj = importAll "fs/promises"
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
@@ -64,6 +69,31 @@ let private syncDataMapStaticHash (sourceDataMap: DataMap option) (targetDataMap
     match sourceDataMap, targetDataMap with
     | Some sourceDataMap, Some targetDataMap -> targetDataMap.StaticHash <- sourceDataMap.StaticHash
     | _ -> ()
+
+let private baselineDataMapStaticHash (dataMap: DataMap option) =
+    dataMap |> Option.iter (fun dm -> dm.StaticHash <- cleanDataMapStaticHash dm)
+
+/// Sets the current loaded ARC state as the clean in-memory baseline.
+let baselineArcStaticHashes (arc: ARC) : unit =
+    arc.License |> Option.iter (fun license -> license.StaticHash <- license.GetHashCode())
+
+    for study in arc.Studies do
+        study.StaticHash <- study.GetLightHashCode()
+        baselineDataMapStaticHash study.DataMap
+
+    for assay in arc.Assays do
+        assay.StaticHash <- assay.GetLightHashCode()
+        baselineDataMapStaticHash assay.DataMap
+
+    for workflow in arc.Workflows do
+        workflow.StaticHash <- workflow.GetLightHashCode()
+        baselineDataMapStaticHash workflow.DataMap
+
+    for run in arc.Runs do
+        run.StaticHash <- run.GetLightHashCode()
+        baselineDataMapStaticHash run.DataMap
+
+    arc.StaticHash <- arc.GetLightHashCode()
 
 /// Syncs static hashes from source ARC to target ARC for matching entities.
 /// This keeps ARCtrl update contract generation scoped to actual changes.
@@ -187,6 +217,131 @@ let swatelogfn id fmt =
 
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
+
+type private CanonicalArcFileRepairSpec = {
+    CollectionFolder: string
+    FileName: string
+    CreateContracts: string -> Contract[]
+}
+
+let private canonicalArcFileRepairSpecs = [|
+    {
+        CollectionFolder = "assays"
+        FileName = "isa.assay.xlsx"
+        CreateContracts = fun identifier -> (ArcAssay.init identifier).ToCreateContract(false)
+    }
+    {
+        CollectionFolder = "studies"
+        FileName = "isa.study.xlsx"
+        CreateContracts = fun identifier -> (ArcStudy.init identifier).ToCreateContract(false)
+    }
+    {
+        CollectionFolder = "workflows"
+        FileName = "isa.workflow.xlsx"
+        CreateContracts = fun identifier -> (ArcWorkflow.init identifier).ToCreateContract(false)
+    }
+    {
+        CollectionFolder = "runs"
+        FileName = "isa.run.xlsx"
+        CreateContracts = fun identifier -> (ArcRun.init identifier).ToCreateContract(false)
+    }
+|]
+
+let private isZeroByteZipReadError (errors: string[]) =
+    errors
+    |> Array.exists (fun error ->
+        let normalizedError = error.ToLowerInvariant()
+        normalizedError.Contains("error reading contract")
+        && normalizedError.Contains("data length = 0")
+    )
+
+let private tryReadDirectoryAsync (directoryPath: string) = promise {
+    try
+        let! entries = fsPromisesDynamic?readdir (directoryPath) |> unbox<JS.Promise<string[]>>
+        return entries
+    with _ ->
+        return [||]
+}
+
+let private tryGetFileSizeAsync (filePath: string) = promise {
+    try
+        let! stats = fsPromisesDynamic?stat (filePath) |> unbox<JS.Promise<obj>>
+        return Some(stats?size |> unbox<float>)
+    with _ ->
+        return None
+}
+
+let private repairZeroByteCanonicalArcFile
+    (windowId: int)
+    (arcPath: string)
+    (spec: CanonicalArcFileRepairSpec)
+    (identifier: string)
+    =
+    promise {
+        let relativePath =
+            ARCtrl.ArcPathHelper.combineMany [|
+                spec.CollectionFolder
+                identifier
+                spec.FileName
+            |]
+
+        let absolutePath = path.join (arcPath, spec.CollectionFolder, identifier, spec.FileName)
+        let! fileSize = tryGetFileSizeAsync absolutePath
+
+        match fileSize with
+        | Some size when size = 0.0 ->
+            swatelogfn windowId "Repairing zero-byte ARC workbook: %s" relativePath
+            let! repairResult = fullFillContractBatchAsync arcPath (spec.CreateContracts identifier)
+
+            match repairResult with
+            | Ok _ -> return true
+            | Error errors ->
+                swatelogfn
+                    windowId
+                    "Unable to repair zero-byte ARC workbook '%s': %s"
+                    relativePath
+                    (errors |> Array.map string |> String.concat "\n")
+
+                return false
+        | _ -> return false
+    }
+
+let private repairZeroByteCanonicalArcFiles (windowId: int) (arcPath: string) = promise {
+    let mutable repairedAny = false
+
+    for spec in canonicalArcFileRepairSpecs do
+        let collectionPath = path.join (arcPath, spec.CollectionFolder)
+        let! identifiers = tryReadDirectoryAsync collectionPath
+
+        for identifier in identifiers do
+            let! repaired = repairZeroByteCanonicalArcFile windowId arcPath spec identifier
+            repairedAny <- repairedAny || repaired
+
+    return repairedAny
+}
+
+let tryLoadArcWithZeroByteRepair (windowId: int) (arcPath: string) = promise {
+    let! loadResult = ARC.tryLoadAsync arcPath
+
+    match loadResult with
+    | Ok arc ->
+        baselineArcStaticHashes arc
+        return Ok arc
+    | Error errors when isZeroByteZipReadError errors ->
+        let! repairedAny = repairZeroByteCanonicalArcFiles windowId arcPath
+
+        if repairedAny then
+            let! retryLoadResult = ARC.tryLoadAsync arcPath
+
+            match retryLoadResult with
+            | Ok arc ->
+                baselineArcStaticHashes arc
+                return Ok arc
+            | Error errors -> return Error errors
+        else
+            return Error errors
+    | Error errors -> return Error errors
+}
 
 let createWindow () = promise {
     printfn "[Swate] Creating new window"

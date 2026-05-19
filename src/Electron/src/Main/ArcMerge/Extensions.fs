@@ -5,9 +5,23 @@ open ARCtrl
 [<AutoOpen>]
 module ArcMergeExtensions =
 
+    //Used to handle intiated but empty datamaps that have a StaticHash of 0, which would otherwise be indistinguishable from unchanged datamaps
+    let private cleanEmptyDataMapStaticHash = System.Int32.MinValue
+
+    let cleanDataMapStaticHash (dataMap: DataMap) =
+        let hash = dataMap.GetHashCode()
+
+        if hash = 0 then
+            cleanEmptyDataMapStaticHash
+        else
+            hash
+
     type DataMap with
         member this.hasInMemoryChanges() : bool =
-            this.StaticHash = 0 || this.StaticHash <> this.GetHashCode()
+            if this.StaticHash = cleanEmptyDataMapStaticHash then
+                this.GetHashCode() <> 0
+            else
+                this.StaticHash = 0 || this.StaticHash <> this.GetHashCode()
 
     type ArcAssay with
         member this.hasInMemoryChanges() =

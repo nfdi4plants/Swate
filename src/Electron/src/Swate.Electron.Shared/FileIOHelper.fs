@@ -332,8 +332,6 @@ module FileContentDTO =
             create dtoType.fileType json dtoType.path |> Some
         | None -> None
 
-
-
     let fromArcByPath (path: string) (arc: ARC) =
         let split = ARCtrl.ArcPathHelper.split path
         let exportFormat = DEFAULT_JSON_EXPORT_FORMAT

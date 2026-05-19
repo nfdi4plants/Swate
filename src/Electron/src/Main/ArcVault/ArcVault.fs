@@ -24,11 +24,6 @@ type ArcVaultFileSystemEvent = {
     AbsolutePath: string
 }
 
-type PendingArcFileTreeMutation = {
-    Description: string
-    MergeReloadedArc: ARC -> ARC -> FileEvent list -> JS.Promise<Result<ARC, exn>>
-}
-
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
 /// </summary>
@@ -49,7 +44,6 @@ type ArcVault(window: BrowserWindow) =
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
-    member val pendingArcFileTreeMutation: PendingArcFileTreeMutation option = None with get, set
     /// Indicates whether the vault is currently busy writing changes to disk.
     /// This should disable reloads from the file watcher.
     member val isBusyWriting: bool = false with get, set
@@ -64,19 +58,15 @@ type ArcVault(window: BrowserWindow) =
         this.window.title <- arc.Identifier
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
-    member this.SetHasUnsavedArcChanges(hasChanges: bool) =
+    member this.RefreshHasUnsavedArcChangesFlag() =
         /// Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
-        let valueIsChanging = this.hasUnsavedArcChanges <> hasChanges
-        this.hasUnsavedArcChanges <- hasChanges
+        if this.arc.IsSome then
+            let hasNewChanges = this.arc.Value.hasInMemoryChanges()
+            let valueIsChanging = this.hasUnsavedArcChanges <> hasNewChanges
+            this.hasUnsavedArcChanges <- hasNewChanges
 
-        if valueIsChanging then
-            sendArcHasUnsavedChangesUpdate hasChanges this.window
-
-    member this.RegisterPendingArcFileTreeMutation(mutation: PendingArcFileTreeMutation) =
-        this.pendingArcFileTreeMutation <- Some mutation
-
-    member this.ClearPendingArcFileTreeMutation() =
-        this.pendingArcFileTreeMutation <- None
+            if valueIsChanging then
+                sendArcHasUnsavedChangesUpdate hasNewChanges this.window
 
 [<AutoOpen>]
 module ArcVaultExtensions =
@@ -161,28 +151,20 @@ module ArcVaultExtensions =
                         "Unable to reload ARC after file watcher event: %s"
                         (loadError |> Array.map string |> String.concat "\n")
                 | Ok reloadedArc ->
-                    let pendingMutation = this.pendingArcFileTreeMutation
-                    this.pendingArcFileTreeMutation <- None
-
                     let! mergeResult =
-                        match pendingMutation with
-                        | Some mutation ->
-                            swatelogfn this.window.id "Applying pending filetree mutation: %s" mutation.Description
-                            mutation.MergeReloadedArc arcLocal reloadedArc events
-                        | None ->
-                            promise {
-                                try
-                                    return Ok(ARC.merge arcLocal reloadedArc events)
-                                with mergeError ->
-                                    return Error mergeError
-                            }
+                        promise {
+                            try
+                                return Ok(ARC.merge arcLocal reloadedArc events)
+                            with mergeError ->
+                                return Error mergeError
+                        }
 
                     match mergeResult with
                     | Error mergeError ->
                         swatelogfn this.window.id "Unable to merge ARC after file watcher event: %s" mergeError.Message
                     | Ok mergedArc ->
                         this.SetArc mergedArc
-                        this.SetHasUnsavedArcChanges(mergedArc.hasInMemoryChanges())
+                        this.RefreshHasUnsavedArcChangesFlag()
             | Some _, None -> do! this.LoadArc()
             | None, _ -> ()
         }
@@ -225,56 +207,55 @@ module ArcVaultExtensions =
                     this.SetFileTree(nextFileTree)
         }
 
-        member this.ApplyFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
+        member this.TriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
             let arcEvents = toArcMergeEvents events
             do! this.ApplyWatcherArcMerge arcEvents
-            do! this.ApplyWatcherFileTreeEvents events
         }
 
-        member private this._ScheduleReloadArc(sendMsgApi: IArcFileWatcherApi) =
+        member private this._FileEventController(sendMsgApi: IArcFileWatcherApi) =
 
             fun (eventName: string) (path: string) ->
-                if this.isBusyWriting then
-                    swatelogfn this.window.id "Skipping ARC reload due to busy writing."
-                    sendMsgApi.IsLoadingChanges false
-                else
-                    swatelogfn this.window.id "File change detected: %s on %s" eventName path
 
-                    this.path
-                    |> Option.iter (fun arcPath ->
-                        let watcherEvent = buildWatcherEvent arcPath eventName path
-                        this.fileWatcherPendingEvents.Add watcherEvent
-                    )
+                swatelogfn this.window.id "File change detected: %s on %s" eventName path
 
-                    match this.fileWatcherReloadArcTimeout with
-                    | Some timeoutId ->
-                        Fable.Core.JS.clearTimeout timeoutId
-                        this.fileWatcherReloadArcTimeout <- None
-                    | None -> sendMsgApi.IsLoadingChanges true
+                this.path
+                |> Option.iter (fun arcPath ->
+                    let watcherEvent = buildWatcherEvent arcPath eventName path
+                    this.fileWatcherPendingEvents.Add watcherEvent
+                )
 
-                    let timeoutId =
-                        Fable.Core.JS.setTimeout
-                            (fun () ->
-                                promise {
-                                    swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
-                                    let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
-                                    this.fileWatcherPendingEvents.Clear()
+                match this.fileWatcherReloadArcTimeout with
+                | Some timeoutId ->
+                    Fable.Core.JS.clearTimeout timeoutId
+                    this.fileWatcherReloadArcTimeout <- None
+                | None -> sendMsgApi.IsLoadingChanges true
 
-                                    do! this.ApplyFileWatcherEvents pendingEvents
+                let timeoutId =
+                    Fable.Core.JS.setTimeout
+                        (fun () ->
+                            promise {
+                                swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
+                                let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
+                                this.fileWatcherPendingEvents.Clear()
 
-                                    this.fileWatcherReloadArcTimeout <- None
-                                    sendMsgApi.IsLoadingChanges false
-                                }
-                                |> Promise.catch (fun ex ->
-                                    swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
-                                    sendMsgApi.IsLoadingChanges false
-                                    this.fileWatcherReloadArcTimeout <- None
-                                )
-                                |> Promise.start
+                                do! this.ApplyWatcherFileTreeEvents pendingEvents
+
+                                if not this.isBusyWriting then
+                                    do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingEvents
+
+                                this.fileWatcherReloadArcTimeout <- None
+                                sendMsgApi.IsLoadingChanges false
+                            }
+                            |> Promise.catch (fun ex ->
+                                swatelogfn this.window.id "Scheduled ARC reload failed: %s" ex.Message
+                                sendMsgApi.IsLoadingChanges false
+                                this.fileWatcherReloadArcTimeout <- None
                             )
-                            500
+                            |> Promise.start
+                        )
+                        500
 
-                    this.fileWatcherReloadArcTimeout <- Some timeoutId
+                this.fileWatcherReloadArcTimeout <- Some timeoutId
 
         /// Applies an ARC content DTO to the in-memory ARC and marks the vault dirty.
         member this.UpdateArcByFileContentDTO(request: FileContentDTO) : Result<unit, exn> =
@@ -288,7 +269,7 @@ module ArcVaultExtensions =
                 | Error saveError -> Error saveError
                 | Ok newArc ->
                     this.SetArc(newArc)
-                    this.SetHasUnsavedArcChanges true
+                    this.RefreshHasUnsavedArcChangesFlag()
                     Ok()
 
         /// Writes the active in-memory ARC scaffold to disk using ARCtrl UpdateAsync.
@@ -300,7 +281,7 @@ module ArcVaultExtensions =
                 try
                     try
                         do! arc.UpdateAsync(arcPath)
-                        this.SetHasUnsavedArcChanges false
+                        this.RefreshHasUnsavedArcChangesFlag()
                         return Ok()
                     with e ->
                         return Error(exn $"Failed to persist ARC to disk: {e.Message}")
@@ -320,31 +301,19 @@ module ArcVaultExtensions =
                 match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
                 | None -> return Error(exn $"Unsupported file type for adding: {normalizedRequest.fileType}")
                 | Some arcFile ->
-                    match! ARC.tryLoadAsync arcPath with
-                    | Error loadError -> return Error(exn $"Unable to reload ARC before add: {loadError}")
-                    | Ok arcFromDisk ->
-                        let diskWorkingArc = copyArcPreservingStaticHashes arcFromDisk
-
-                        match! diskWorkingArc.TryAddAsync(arcPath, arcFile) with
-                        | Error errors ->
-                            return
-                                Error(
-                                    exn(
-                                        errors
-                                        |> Array.map string
-                                        |> String.concat "\n"
-                                    )
+                    match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
+                    | Error errors ->
+                        return
+                            Error(
+                                exn(
+                                    errors
+                                    |> Array.map string
+                                    |> String.concat "\n"
                                 )
-                        | Ok _ ->
-                            let inMemoryWorkingArc = copyArcPreservingStaticHashes arcLocal
-
-                            match updateARCByFileContentDTO inMemoryWorkingArc normalizedRequest with
-                            | Error updateError -> return Error updateError
-                            | Ok updatedInMemoryArc ->
-                                syncArcStaticHashes diskWorkingArc updatedInMemoryArc
-                                this.SetArc updatedInMemoryArc
-                                this.SetHasUnsavedArcChanges(updatedInMemoryArc.hasInMemoryChanges())
-                                return Ok()
+                            )
+                    | Ok _ ->
+                        this.SetArc arcLocal
+                        return Ok()
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
@@ -376,13 +345,17 @@ module ArcVaultExtensions =
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
-                match! ARC.tryLoadAsync (this.path.Value) with
-                | Error e -> swatefailfn this.window.id $"Unable to load ARC: {e}"
+                match! tryLoadArcWithZeroByteRepair this.window.id this.path.Value with
+                | Error e ->
+                    swatefailfn
+                        this.window.id
+                        "Unable to load ARC: %s"
+                        (e |> Array.map string |> String.concat "\n")
                 | Ok arc ->
                     this.SetArc(arc)
-                    this.SetHasUnsavedArcChanges false
+                    this.RefreshHasUnsavedArcChangesFlag()
             else
-                swatefailfn this.window.id $"No path set for StartFileWatcher."
+                swatefailfn this.window.id "No path set for StartFileWatcher."
         }
 
         member this.StartFileWatcher(?usePolling: bool) =
@@ -397,10 +370,10 @@ module ArcVaultExtensions =
                         |> Remoting.withWindow this.window
                         |> Remoting.buildProxySender<IArcFileWatcherApi>
 
-                    watcher.on (Chokidar.Events.All, this._ScheduleReloadArc sendMsgApi) |> ignore
+                    watcher.on (Chokidar.Events.All, this._FileEventController sendMsgApi) |> ignore
                     this.watcher <- Some watcher
             else
-                swatefailfn this.window.id $"No path set for StartFileWatcher."
+                swatefailfn this.window.id "No path set for StartFileWatcher."
 
         member this.StopFileWatcher() = promise {
             match this.watcher with
@@ -449,7 +422,7 @@ module ArcVaultExtensions =
                 let arc = ARC(identifier)
                 this.path <- Some path
                 this.SetArc(arc)
-                this.SetHasUnsavedArcChanges false
+                this.RefreshHasUnsavedArcChangesFlag()
                 this.isBusyWriting <- true
 
                 try
@@ -519,7 +492,7 @@ type ArcVaults() =
 
     member this.DisposeVault(id: int) =
         match this.Vaults.TryGetValue(id) with
-        | false, _ -> swatefailfn id $"Failed to remove vault."
+        | false, _ -> swatefailfn id "Failed to remove vault."
         | true, vault ->
             vault.StopFileWatcher() |> Promise.start
             this.Vaults.Remove(id) |> ignore
@@ -542,7 +515,7 @@ type ArcVaults() =
                 return Ok()
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
                 swatelogfn windowId "Close request approved by user. Closing without saving."
-                vault.SetHasUnsavedArcChanges false
+                vault.RefreshHasUnsavedArcChangesFlag()
                 vault.isCloseApproved <- true
                 vault.window.close ()
                 return Ok()
@@ -599,7 +572,7 @@ type ArcVaults() =
         this.OnCloseWindow(window, vault, id)
 
         window.focus ()
-        swatelogfn id $"Register window"
+        swatelogfn id "Register window"
 
         return id
     }
@@ -614,7 +587,7 @@ type ArcVaults() =
         this.OnCloseWindow(window, vault, id)
 
         window.focus ()
-        swatelogfn id $"Register window"
+        swatelogfn id "Register window"
 
         return id
     }
@@ -630,7 +603,7 @@ type ArcVaults() =
         this.OnCloseWindow(window, vault, id)
 
         window.focus ()
-        swatelogfn id $"Register window"
+        swatelogfn id "Register window"
 
         return id
     }

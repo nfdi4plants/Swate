@@ -53,6 +53,12 @@ let private renameItemOrFail arcPath request = promise {
     | Ok() -> return ()
 }
 
+let private deleteItemOrFail arcPath relativePath = promise {
+    match! ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath relativePath with
+    | Error error -> return failwith error.Message
+    | Ok() -> return ()
+}
+
 let private expectRelativePathExists arcPath relativePath expected = promise {
     let! exists = TestHelpers.pathExistsAsync (absoluteArcPath arcPath relativePath)
     Vitest.expect(exists).toBe(expected)
@@ -104,5 +110,17 @@ Vitest.describe("ArcFileSystemHelper generic filesystem operations", fun () ->
             with
             | Ok _ -> failwith "Expected generic rename conflict to fail."
             | Error error -> Vitest.expect(error.Message).toContain("destination already exists")
+        }))
+
+    Vitest.test("deletes generic files while leaving the ARC entity intact", fun () ->
+        withAssayArc (fun arcPath -> promise {
+            let! createdFilePath = createItemOrFail arcPath (createFileRequest "protocol.md")
+            do! expectRelativePathExists arcPath createdFilePath true
+
+            do! deleteItemOrFail arcPath createdFilePath
+            do! expectRelativePathExists arcPath createdFilePath false
+
+            let! reloadedArc = TestHelpers.loadArcAsync arcPath
+            Vitest.expect(reloadedArc.ContainsAssay("AssayA")).toBe(true)
         }))
 )

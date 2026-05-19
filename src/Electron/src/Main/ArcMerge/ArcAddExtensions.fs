@@ -17,52 +17,60 @@ module ArcAddExtensions =
 
     type ARC with
 
-        member this.GetAssayAddContracts(assay: ArcAssay) =
+        member this.GetAssayAddContracts(assay: ArcAssay, ?includeUpdateContractsFlag: bool) =
             failIfEntityExists "assay" assay.Identifier (this.ContainsAssay assay.Identifier)
             this.AddAssay(assay)
             this.UpdateFileSystem()
-            this.GetUpdateContracts(skipUpdateFS = true)
+            match includeUpdateContractsFlag with
+            | Some true -> this.GetUpdateContracts(skipUpdateFS = true)
+            | _ -> assay.ToCreateContract(true)
 
-        member this.GetStudyAddContracts(study: ArcStudy) =
+        member this.GetStudyAddContracts(study: ArcStudy, ?includeUpdateContractsFlag: bool) =
             failIfEntityExists "study" study.Identifier (this.ContainsStudy study.Identifier)
             this.AddStudy(study)
             this.UpdateFileSystem()
-            this.GetUpdateContracts(skipUpdateFS = true)
+            match includeUpdateContractsFlag with
+            | Some true -> this.GetUpdateContracts(skipUpdateFS = true)
+            | _ -> study.ToCreateContract(true)
 
-        member this.GetRunAddContracts(run: ArcRun) =
+        member this.GetRunAddContracts(run: ArcRun, ?includeUpdateContractsFlag: bool) =
             failIfEntityExists "run" run.Identifier (this.ContainsRun run.Identifier)
             this.AddRun(run)
             this.UpdateFileSystem()
-            this.GetUpdateContracts(skipUpdateFS = true)
+            match includeUpdateContractsFlag with
+            | Some true -> this.GetUpdateContracts(skipUpdateFS = true)
+            | _ -> run.ToCreateContract(true)
 
-        member this.GetWorkflowAddContracts(workflow: ArcWorkflow) =
+        member this.GetWorkflowAddContracts(workflow: ArcWorkflow, ?includeUpdateContractsFlag: bool) =
             failIfEntityExists "workflow" workflow.Identifier (this.ContainsWorkflow workflow.Identifier)
             this.AddWorkflow(workflow)
             this.UpdateFileSystem()
-            this.GetUpdateContracts(skipUpdateFS = true)
+            match includeUpdateContractsFlag with
+            | Some true -> this.GetUpdateContracts(skipUpdateFS = true)
+            | _ -> workflow.ToCreateContract(true)
 
-        member this.GetAddContracts(arcFile: ArcFiles) =
+        member this.GetAddContracts(arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) =
             match arcFile with
-            | ArcFiles.Assay assay -> this.GetAssayAddContracts assay
-            | ArcFiles.Study(study, _) -> this.GetStudyAddContracts study
-            | ArcFiles.Run run -> this.GetRunAddContracts run
-            | ArcFiles.Workflow workflow -> this.GetWorkflowAddContracts workflow
+            | ArcFiles.Assay assay -> this.GetAssayAddContracts(assay, ?includeUpdateContractsFlag = includeUpdateContractsFlag)
+            | ArcFiles.Study(study, _) -> this.GetStudyAddContracts(study, ?includeUpdateContractsFlag = includeUpdateContractsFlag)
+            | ArcFiles.Run run -> this.GetRunAddContracts(run, ?includeUpdateContractsFlag = includeUpdateContractsFlag)
+            | ArcFiles.Workflow workflow -> this.GetWorkflowAddContracts(workflow, ?includeUpdateContractsFlag = includeUpdateContractsFlag)
             | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
             | ArcFiles.DataMap _ -> failwith "Adding datamap files is not supported."
             | ArcFiles.Template _ -> failwith "Adding template files is not supported."
-
-        member this.TryAddAsync(arcPath: string, arcFile: ArcFiles) =
+            
+        member this.TryAddArcFileAsync(arcPath: string, arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) =
             crossAsync {
                 try
-                    let contracts = this.GetAddContracts arcFile
+                    let contracts = this.GetAddContracts(arcFile, ?includeUpdateContractsFlag = includeUpdateContractsFlag)
                     return! fullFillContractBatchAsync arcPath contracts
                 with error ->
                     return Error [| error.Message |]
             }
 
-        member this.AddAsync(arcPath: string, arcFile: ArcFiles) =
+        member this.AddArcFileAsync(arcPath: string, arcFile: ArcFiles) =
             crossAsync {
-                let! result = this.TryAddAsync(arcPath, arcFile)
+                let! result = this.TryAddArcFileAsync(arcPath, arcFile)
 
                 match result with
                 | Ok _ -> ()
