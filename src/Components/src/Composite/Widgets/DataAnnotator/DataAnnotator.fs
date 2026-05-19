@@ -303,37 +303,6 @@ type DataAnnotatorWidget =
         ]
 
     [<ReactComponent>]
-    static member private FileControllerElements
-        (pickFile: Browser.Types.File -> JS.Promise<unit>, dataFile: DataFile option, reset: unit -> unit)
-        =
-
-        let inputRef = React.useInputRef ()
-
-        Html.div [
-            prop.className "swt:flex swt:flex-wrap swt:gap-2"
-            prop.children [
-                Html.input [
-                    prop.ref inputRef
-                    prop.type'.file
-                    prop.className "swt:file-input swt:w-full"
-                    prop.onChange (fun (file: Browser.Types.File) -> promise { do! pickFile file } |> Promise.start)
-                ]
-                Html.button [
-                    prop.className "swt:btn swt:btn-outline swt:btn-sm"
-                    prop.disabled dataFile.IsNone
-                    prop.text "Reset"
-                    prop.onClick (fun _ ->
-                        if inputRef.current.IsSome then
-                            inputRef.current.Value.value <- null
-
-                        reset ()
-                    )
-                ]
-            ]
-        ]
-
-
-    [<ReactComponent>]
     static member private UpdateSeparatorDropdownElement(text: string, setSeperator) =
         Html.li [
             Html.a [
@@ -365,8 +334,7 @@ type DataAnnotatorWidget =
                     Html.button [
                         prop.onClick (fun _ -> setOpen (not isOpen))
                         prop.role.button
-                        prop.className
-                            "swt:btn swt:btn-primary swt:border swt:border-base-content! swt:join-item swt:flex-nowrap"
+                        prop.className "swt:btn swt:btn-primary swt:join-item swt:flex-nowrap"
                         prop.children [ Primitive.Icons.AngleDown() ]
                     ],
                     React.Fragment [
@@ -519,18 +487,16 @@ type DataAnnotatorWidget =
 
         let modalActivity =
             Html.div [
-                prop.children [
-                    DataAnnotatorWidget.DataFileConfigComponent(
-                        model,
-                        destination,
-                        targetCol,
-                        setTargetCol,
-                        writeMode,
-                        setWriteMode,
-                        dispatch
-                    )
-                    DataAnnotatorWidget.FileMetadataComponent model.DataFile.Value
-                ]
+                DataAnnotatorWidget.DataFileConfigComponent(
+                    model,
+                    destination,
+                    targetCol,
+                    setTargetCol,
+                    writeMode,
+                    setWriteMode,
+                    dispatch
+                )
+                DataAnnotatorWidget.FileMetadataComponent model.DataFile.Value
             ]
 
         let content = DataAnnotatorWidget.Table(model.ParsedFile.Value, state, setState)
@@ -610,9 +576,10 @@ type DataAnnotatorWidget =
             setIsOpen,
             Html.p "Data Annotator",
             content,
-            className = "swt:max-w-none",
             modalActions = modalActivity,
-            footer = footer
+            footer = footer,
+            className = "swt:max-w-none",
+            modalActionsClassName = "swt:z-999"
         )
 
     [<ReactComponent(true)>]
