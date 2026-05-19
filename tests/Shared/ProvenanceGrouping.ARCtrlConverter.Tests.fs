@@ -55,11 +55,70 @@ let private previousStudyTable () =
             [ text "source-b"; term "Plant"; text "sample-b" ]
         ]
 
+let private loadedAssayTableWithDuplicateTemperatureColumns () =
+    table
+        "assay-table"
+        [
+            CompositeHeader.Input IOType.Sample
+            CompositeHeader.Parameter(oa "Temperature")
+            CompositeHeader.Parameter(oa "Temperature")
+            CompositeHeader.Output IOType.Sample
+        ]
+        [
+            [ text "sample-a"; term "22"; term "22"; text "extract-a" ]
+        ]
+
+let private previousStudyTableWithDuplicateOrganismColumns () =
+    table
+        "study-table"
+        [
+            CompositeHeader.Input IOType.Source
+            CompositeHeader.Characteristic(oa "Organism")
+            CompositeHeader.Characteristic(oa "Organism")
+            CompositeHeader.Output IOType.Sample
+        ]
+        [
+            [ text "source-a"; term "Plant"; term "Plant"; text "sample-a" ]
+        ]
+
 let private arcFixture () =
     let study =
         ArcStudy.create (
             identifier = "study-1",
             tables = ResizeArray [ previousStudyTable () ],
+            registeredAssayIdentifiers = ResizeArray [ "assay-1" ]
+        )
+
+    let assay =
+        ArcAssay.create (
+            identifier = "assay-1",
+            tables = ResizeArray [ loadedAssayTable () ]
+        )
+
+    ARC(
+        identifier = "arc-1",
+        studies = ResizeArray [ study ],
+        assays = ResizeArray [ assay ]
+    )
+
+let private arcFixtureWithDuplicateTemperatureColumns () =
+    let assay =
+        ArcAssay.create (
+            identifier = "assay-1",
+            tables = ResizeArray [ loadedAssayTableWithDuplicateTemperatureColumns () ]
+        )
+
+    ARC(
+        identifier = "arc-1",
+        studies = ResizeArray [],
+        assays = ResizeArray [ assay ]
+    )
+
+let private arcFixtureWithDuplicatePreviousColumns () =
+    let study =
+        ArcStudy.create (
+            identifier = "study-1",
+            tables = ResizeArray [ previousStudyTableWithDuplicateOrganismColumns () ],
             registeredAssayIdentifiers = ResizeArray [ "assay-1" ]
         )
 
@@ -215,13 +274,67 @@ let tests =
                 |> List.map (fun id -> result.Model.PropertyValues.[id])
                 |> List.find (fun value -> value.Header.Category.Name = "Organism")
 
-            let location = result.Index.PropertyValueLocations.[organism.Id]
+            let locations = result.Index.PropertyValueLocations.[organism.Id]
+            let location = locations |> List.exactlyOne
 
             expectText "Plant" organism.Value
+            Expect.equal locations.Length 1 "A single previous-context source should produce one writeback slot."
             Expect.equal location.Table.Scope ArcTableScope.Study "Collapsed previous value should remember study scope."
             Expect.equal location.Table.ParentIdentifier "study-1" "Collapsed previous value should remember parent identifier."
             Expect.equal location.Table.TableName "study-table" "Collapsed previous value should remember source table."
             Expect.equal location.OutputNames [ "sample-a" ] "Collapsed previous value should remember where it pointed to."
+
+        testCase "converter collapses identical equal loaded values but keeps all ARCtrl writeback slots" <| fun _ ->
+            let result =
+                fromLoadedArc
+                    {
+                        LoadedTable = loadedTable
+                        IncludePreviousContext = false
+                    }
+                    (arcFixtureWithDuplicateTemperatureColumns ())
+                |> expectOk
+
+            let sampleA =
+                result.Model.InputSets
+                |> Map.toSeq
+                |> Seq.map snd
+                |> Seq.find (fun set -> set.Name = "sample-a")
+
+            let temperatures =
+                sampleA.PropertyValueIds
+                |> List.map (fun id -> result.Model.PropertyValues.[id])
+                |> List.filter (fun value -> value.Header.Category.Name = "Temperature")
+
+            Expect.equal temperatures.Length 1 "Equal duplicate loaded values should collapse into one model value."
+
+            let writebackSlots = result.Index.PropertyValueLocations.[temperatures.Head.Id]
+            Expect.equal writebackSlots.Length 2 "All underlying duplicate source columns should remain available for writeback."
+            Expect.equal (writebackSlots |> List.choose (fun slot -> slot.ColumnIndex) |> List.sort) [ 0; 1 ] "The duplicate source columns should remain distinguishable in the adapter sidecar."
+
+        testCase "collapsed previous-context duplicates keep multiple writeback slots" <| fun _ ->
+            let result =
+                fromLoadedArc
+                    {
+                        LoadedTable = loadedTable
+                        IncludePreviousContext = true
+                    }
+                    (arcFixtureWithDuplicatePreviousColumns ())
+                |> expectOk
+
+            let sampleA =
+                result.Model.InputSets
+                |> Map.toSeq
+                |> Seq.map snd
+                |> Seq.find (fun set -> set.Name = "sample-a")
+
+            let organism =
+                sampleA.PropertyValueIds
+                |> List.map (fun id -> result.Model.PropertyValues.[id])
+                |> List.find (fun value -> value.Header.Category.Name = "Organism")
+
+            let slots = result.Index.PropertyValueLocations.[organism.Id]
+
+            Expect.equal slots.Length 2 "Collapsed previous-context duplicates should keep both concrete source locations."
 
         testCase "keeps ARCtrl table locations in the sidecar index" <| fun _ ->
             let result = convertWithPreviousContext () |> expectOk

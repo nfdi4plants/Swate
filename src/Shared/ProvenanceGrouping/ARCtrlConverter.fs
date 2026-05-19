@@ -2,6 +2,9 @@ module Swate.Components.Shared.ProvenanceGrouping.ARCtrlConverter
 
 open System
 open ARCtrl
+open ARCtrl.Process
+open ARCtrl.Process.ColumnIndex
+open ARCtrl.Process.Conversion
 open Swate.Components.Shared.ProvenanceGrouping.Types
 
 /// ARC table container that owns the selected or source table.
@@ -61,7 +64,7 @@ type ArcEndpointLocation =
     }
 
 /// ARCtrl location of a property value occurrence for later writeback.
-/// This mirrors `ProvenanceWritebackAnchor` and adds full ARC table location.
+/// This mirrors `ProvenanceWritebackAnchor`, adds full ARC table location, and preserves column identity when ARCtrl provides it.
 type ArcWritebackLocation =
     {
         /// Study, assay, or run table containing this property value.
@@ -74,6 +77,8 @@ type ArcWritebackLocation =
         InputNames: string list
         /// Output names that identify the row/process context.
         OutputNames: string list
+        /// Adapter-side column identity when ARCtrl preserves it.
+        ColumnIndex: int option
     }
 
 /// ARCtrl location of a loaded input-to-output connection.
@@ -103,7 +108,7 @@ type ArcProvenanceIndex =
         /// Locations of first-class loaded inputs and outputs.
         EndpointLocations: Map<ProvenanceSetId, ArcEndpointLocation>
         /// Locations of loaded and collapsed property value occurrences.
-        PropertyValueLocations: Map<ProvenancePropertyValueId, ArcWritebackLocation>
+        PropertyValueLocations: Map<ProvenancePropertyValueId, ArcWritebackLocation list>
         /// Locations of loaded-table input/output connections.
         ConnectionLocations: Map<ProvenanceConnectionId, ArcConnectionLocation>
     }
@@ -119,758 +124,815 @@ type ArcProvenanceConversionResult =
         Warnings: string list
     }
 
-[<RequireQualifiedAccess>]
-type private LoadedRole =
-    | Input
-    | Output
-
-[<RequireQualifiedAccess>]
-type private PropertyTarget =
-    | Inputs
-    | Outputs
-    | Both
-
-type private TableRef =
+type internal TableRef =
     {
         Location: ArcTableLocation
         Table: ArcTable
     }
 
-type private EndpointColumn =
+type internal ProcessPairContext =
     {
-        Index: int
-        Header: ProvenanceIOHeader
-        Role: LoadedRole
-    }
-
-type private PropertyColumn =
-    {
-        Index: int
-        Header: ProvenancePropertyHeader
-        Target: PropertyTarget
-    }
-
-type private RowContext =
-    {
-        Key: string
-        RowIndex: int
         Location: ArcTableLocation
-        TableName: string
-        ProcessName: string option
-        InputNames: string list
-        OutputNames: string list
-        InputSetIds: ProvenanceSetId list
-        OutputSetIds: ProvenanceSetId list
+        ProcessName: ProvenanceProcessName option
+        InputName: string option
+        OutputName: string option
     }
 
-type private ConvertState =
+type internal CandidatePropertyValue =
+    {
+        Header: ProvenancePropertyHeader
+        Value: ProvenanceValue
+        Unit: ProvenanceTerm option
+        Source: ProvenanceWritebackAnchor option
+        TargetInputSetIds: ProvenanceSetId list
+        TargetOutputSetIds: ProvenanceSetId list
+        WritebackLocation: ArcWritebackLocation
+    }
+
+type internal ConvertState =
     {
         PropertyValues: Map<ProvenancePropertyValueId, ProvenancePropertyValue>
         InputSets: Map<ProvenanceSetId, ProvenanceSet>
         OutputSets: Map<ProvenanceSetId, ProvenanceSet>
         Connections: Map<ProvenanceConnectionId, ProvenanceConnection>
         EndpointLocations: Map<ProvenanceSetId, ArcEndpointLocation>
-        PropertyValueLocations: Map<ProvenancePropertyValueId, ArcWritebackLocation>
+        PropertyValueLocations: Map<ProvenancePropertyValueId, ArcWritebackLocation list>
         ConnectionLocations: Map<ProvenanceConnectionId, ArcConnectionLocation>
-        PropertyCounters: Map<string, int>
         Warnings: string list
     }
 
-let private emptyState =
-    {
-        PropertyValues = Map.empty
-        InputSets = Map.empty
-        OutputSets = Map.empty
-        Connections = Map.empty
-        EndpointLocations = Map.empty
-        PropertyValueLocations = Map.empty
-        ConnectionLocations = Map.empty
-        PropertyCounters = Map.empty
-        Warnings = []
-    }
+module internal TableLookup =
 
-let private trimToOption (value: string) =
-    if isNull value then
-        None
-    else
-        let trimmed = value.Trim()
-        if String.IsNullOrWhiteSpace trimmed then None else Some trimmed
+    let private refsForLocation (location: ArcTableLocation) (arc: ARC) =
+        let withLocation tables =
+            tables
+            |> Seq.map (fun table ->
+                {
+                    Location = location
+                    Table = table
+                })
+            |> Seq.toList
 
-let private optionText (value: string option) =
-    value |> Option.bind trimToOption
+        match location.Scope with
+        | ArcTableScope.Study ->
+            arc.TryGetStudy(location.ParentIdentifier)
+            |> Option.map (fun study -> study.Tables |> withLocation)
+            |> Option.defaultValue []
+        | ArcTableScope.Assay ->
+            arc.TryGetAssay(location.ParentIdentifier)
+            |> Option.map (fun assay -> assay.Tables |> withLocation)
+            |> Option.defaultValue []
+        | ArcTableScope.Run ->
+            arc.TryGetRun(location.ParentIdentifier)
+            |> Option.map (fun run -> run.Tables |> withLocation)
+            |> Option.defaultValue []
 
-let private slug (value: string) =
-    value.ToLowerInvariant()
-    |> Seq.map (fun ch -> if Char.IsLetterOrDigit ch then ch else '-')
-    |> Seq.toArray
-    |> String
-    |> fun text -> text.Trim('-')
+    let allTables (arc: ARC) =
+        [
+            for study in arc.Studies do
+                for table in study.Tables do
+                    yield
+                        {
+                            Location =
+                                {
+                                    Scope = ArcTableScope.Study
+                                    ParentIdentifier = study.Identifier
+                                    TableName = table.Name
+                                }
+                            Table = table
+                        }
 
-let private stableId parts =
-    parts
-    |> List.choose trimToOption
-    |> List.map slug
-    |> String.concat "--"
+            for assay in arc.Assays do
+                for table in assay.Tables do
+                    yield
+                        {
+                            Location =
+                                {
+                                    Scope = ArcTableScope.Assay
+                                    ParentIdentifier = assay.Identifier
+                                    TableName = table.Name
+                                }
+                            Table = table
+                        }
 
-let private scopeText scope =
-    match scope with
-    | ArcTableScope.Study -> "study"
-    | ArcTableScope.Assay -> "assay"
-    | ArcTableScope.Run -> "run"
+            for run in arc.Runs do
+                for table in run.Tables do
+                    yield
+                        {
+                            Location =
+                                {
+                                    Scope = ArcTableScope.Run
+                                    ParentIdentifier = run.Identifier
+                                    TableName = table.Name
+                                }
+                            Table = table
+                        }
+        ]
 
-let private locationParts location =
-    [
-        scopeText location.Scope
-        location.ParentIdentifier
-        location.TableName
-    ]
+    let findTable (location: ArcTableLocation) (arc: ARC) : Result<TableRef, ArcProvenanceConversionError> =
+        let matches =
+            refsForLocation location arc
+            |> List.filter (fun tableRef -> tableRef.Table.Name = location.TableName)
 
-let private tableRefs (arc: ARC) =
-    [
-        for study in arc.Studies do
-            for table in study.Tables do
-                yield
-                    {
-                        Location =
-                            {
-                                Scope = ArcTableScope.Study
-                                ParentIdentifier = study.Identifier
-                                TableName = table.Name
-                            }
-                        Table = table
-                    }
+        match matches with
+        | [] ->
+            Error(ArcProvenanceConversionError.LoadedTableNotFound location)
+        | [ tableRef ] ->
+            Ok tableRef
+        | many ->
+            Error(ArcProvenanceConversionError.LoadedTableAmbiguous(location, many.Length))
 
-        for assay in arc.Assays do
-            for table in assay.Tables do
-                yield
-                    {
-                        Location =
-                            {
-                                Scope = ArcTableScope.Assay
-                                ParentIdentifier = assay.Identifier
-                                TableName = table.Name
-                            }
-                        Table = table
-                    }
+module internal Normalize =
 
-        for run in arc.Runs do
-            for table in run.Tables do
-                yield
-                    {
-                        Location =
-                            {
-                                Scope = ArcTableScope.Run
-                                ParentIdentifier = run.Identifier
-                                TableName = table.Name
-                            }
-                        Table = table
-                    }
-    ]
-
-let private findTable (location: ArcTableLocation) (refs: TableRef list) : Result<TableRef, ArcProvenanceConversionError> =
-    let matches =
-        refs
-        |> List.filter (fun tableRef -> tableRef.Location = location)
-
-    match matches with
-    | [] -> Error(ArcProvenanceConversionError.LoadedTableNotFound location)
-    | [ tableRef ] -> Ok tableRef
-    | many -> Error(ArcProvenanceConversionError.LoadedTableAmbiguous(location, many.Length))
-
-let private processName (table: ArcTable) rowIndex =
-    if table.RowCount = 1 then
-        Some table.Name
-    else
-        Some $"{table.Name}_{rowIndex}"
-
-let private termFromOntology (oa: OntologyAnnotation) : ProvenanceTerm =
-    {
-        Name = oa.NameText
-        TermSource = optionText oa.TermSourceREF
-        TermAccession = optionText oa.TermAccessionNumber
-    }
-
-let private termIsEmpty (term: ProvenanceTerm) =
-    String.IsNullOrWhiteSpace term.Name
-    && term.TermSource.IsNone
-    && term.TermAccession.IsNone
-
-let private ioKindFromARCtrl (ioType: IOType) =
-    match ioType with
-    | IOType.Source -> ProvenanceIOKind.Source
-    | IOType.Sample -> ProvenanceIOKind.Sample
-    | IOType.Data -> ProvenanceIOKind.Data
-    | IOType.Material -> ProvenanceIOKind.Material
-    | IOType.FreeText text -> ProvenanceIOKind.FreeText text
-    | _ -> ProvenanceIOKind.Unknown
-
-let private ioHeaderFromARCtrl role (ioType: IOType) : ProvenanceIOHeader =
-    let text =
-        match role with
-        | LoadedRole.Input -> ioType.asInput
-        | LoadedRole.Output -> ioType.asOutput
-
-    {
-        Kind = ioKindFromARCtrl ioType
-        Text = text
-    }
-
-let private propertyHeaderFromARCtrl (header: CompositeHeader) : ProvenancePropertyHeader option =
-    match header with
-    | CompositeHeader.Characteristic category ->
-        Some
-            {
-                Kind = ProvenancePropertyKind.Characteristic
-                Category = termFromOntology category
-            }
-    | CompositeHeader.Factor category ->
-        Some
-            {
-                Kind = ProvenancePropertyKind.Factor
-                Category = termFromOntology category
-            }
-    | CompositeHeader.Parameter category ->
-        Some
-            {
-                Kind = ProvenancePropertyKind.Parameter
-                Category = termFromOntology category
-            }
-    | CompositeHeader.Component category ->
-        Some
-            {
-                Kind = ProvenancePropertyKind.Component
-                Category = termFromOntology category
-            }
-    | _ ->
-        None
-
-let private cellText (cell: CompositeCell) =
-    match cell with
-    | CompositeCell.FreeText value -> trimToOption value
-    | CompositeCell.Term term -> trimToOption term.NameText
-    | CompositeCell.Unitized(value, _) -> trimToOption value
-    | CompositeCell.Data data -> trimToOption data.NameText
-
-let private propertyValueFromCell (cell: CompositeCell) : (ProvenanceValue * ProvenanceTerm option) option =
-    match cell with
-    | CompositeCell.FreeText value ->
-        trimToOption value
-        |> Option.map (fun value -> ProvenanceValue.Text value, None)
-    | CompositeCell.Term term ->
-        let converted = termFromOntology term
-        if termIsEmpty converted then
+    let trimToOption (value: string) =
+        if isNull value then
             None
         else
-            Some(ProvenanceValue.Term converted, None)
-    | CompositeCell.Unitized(value, unit) ->
-        trimToOption value
-        |> Option.map (fun value ->
-            let unitTerm = termFromOntology unit
-            let normalizedUnit = if termIsEmpty unitTerm then None else Some unitTerm
-            ProvenanceValue.Text value, normalizedUnit
-        )
-    | CompositeCell.Data data ->
-        trimToOption data.NameText
-        |> Option.map (fun value -> ProvenanceValue.Text value, None)
+            let trimmed = value.Trim()
+            if String.IsNullOrWhiteSpace trimmed then None else Some trimmed
 
-let private nearestEndpointRoleBefore (headers: ResizeArray<CompositeHeader>) columnIndex =
-    headers
-    |> Seq.indexed
-    |> Seq.takeWhile (fun (index, _) -> index < columnIndex)
-    |> Seq.choose (fun (_, header) ->
+    let optionText (value: string option) =
+        value |> Option.bind trimToOption
+
+    let slug (value: string) =
+        value.ToLowerInvariant()
+        |> Seq.map (fun ch -> if Char.IsLetterOrDigit ch then ch else '-')
+        |> Seq.toArray
+        |> String
+        |> fun text -> text.Trim('-')
+
+    let stableId parts =
+        parts
+        |> List.choose trimToOption
+        |> List.map slug
+        |> String.concat "--"
+
+    let scopeText scope =
+        match scope with
+        | ArcTableScope.Study -> "study"
+        | ArcTableScope.Assay -> "assay"
+        | ArcTableScope.Run -> "run"
+
+    let locationParts location =
+        [
+            scopeText location.Scope
+            location.ParentIdentifier
+            location.TableName
+        ]
+
+    let termFromOntology (oa: OntologyAnnotation) : ProvenanceTerm =
+        {
+            Name = oa.NameText
+            TermSource = optionText oa.TermSourceREF
+            TermAccession = optionText oa.TermAccessionNumber
+        }
+
+    let termIsEmpty (term: ProvenanceTerm) =
+        String.IsNullOrWhiteSpace term.Name
+        && term.TermSource.IsNone
+        && term.TermAccession.IsNone
+
+    let termOptionFromOntology (oa: OntologyAnnotation option) =
+        oa
+        |> Option.map termFromOntology
+        |> Option.filter (termIsEmpty >> not)
+
+    let ioKindFromARCtrl (ioType: IOType) =
+        match ioType with
+        | IOType.Source -> ProvenanceIOKind.Source
+        | IOType.Sample -> ProvenanceIOKind.Sample
+        | IOType.Data -> ProvenanceIOKind.Data
+        | IOType.Material -> ProvenanceIOKind.Material
+        | IOType.FreeText text -> ProvenanceIOKind.FreeText text
+
+    let ioHeaderFromHeader (header: CompositeHeader) : ProvenanceIOHeader option =
         match header with
-        | CompositeHeader.Input _ -> Some LoadedRole.Input
-        | CompositeHeader.Output _ -> Some LoadedRole.Output
-        | _ -> None
-    )
-    |> Seq.tryLast
-
-let private propertyTarget (headers: ResizeArray<CompositeHeader>) columnIndex (propertyHeader: ProvenancePropertyHeader) =
-    match propertyHeader.Kind with
-    | ProvenancePropertyKind.Characteristic ->
-        match nearestEndpointRoleBefore headers columnIndex with
-        | Some LoadedRole.Input -> PropertyTarget.Inputs
-        | Some LoadedRole.Output -> PropertyTarget.Outputs
-        | None -> PropertyTarget.Both
-    | ProvenancePropertyKind.Factor ->
-        PropertyTarget.Outputs
-    | ProvenancePropertyKind.Parameter
-    | ProvenancePropertyKind.Component ->
-        PropertyTarget.Both
-
-let private endpointColumns (table: ArcTable) : EndpointColumn list =
-    table.Headers
-    |> Seq.indexed
-    |> Seq.choose (fun (index, header) ->
-        match header with
-        | CompositeHeader.Input ioType ->
-            Some
-                {
-                    Index = index
-                    Header = ioHeaderFromARCtrl LoadedRole.Input ioType
-                    Role = LoadedRole.Input
-                }
+        | CompositeHeader.Input ioType
         | CompositeHeader.Output ioType ->
             Some
                 {
-                    Index = index
-                    Header = ioHeaderFromARCtrl LoadedRole.Output ioType
-                    Role = LoadedRole.Output
+                    Kind = ioKindFromARCtrl ioType
+                    Text = header.ToString()
                 }
         | _ ->
             None
-    )
-    |> Seq.toList
 
-let private propertyColumns (table: ArcTable) : PropertyColumn list =
-    table.Headers
-    |> Seq.indexed
-    |> Seq.choose (fun (index, header) ->
-        propertyHeaderFromARCtrl header
-        |> Option.map (fun propertyHeader ->
+    let inputHeader (table: ArcTable) =
+        table.Headers
+        |> Seq.tryPick (fun header ->
+            match header with
+            | CompositeHeader.Input _ -> ioHeaderFromHeader header
+            | _ -> None)
+
+    let outputHeader (table: ArcTable) =
+        table.Headers
+        |> Seq.tryPick (fun header ->
+            match header with
+            | CompositeHeader.Output _ -> ioHeaderFromHeader header
+            | _ -> None)
+
+    let private propertyHeader kind (category: OntologyAnnotation option) =
+        category
+        |> termOptionFromOntology
+        |> Option.map (fun category ->
             {
-                Index = index
-                Header = propertyHeader
-                Target = propertyTarget table.Headers index propertyHeader
-            }
-        )
-    )
-    |> Seq.toList
+                Kind = kind
+                Category = category
+            })
 
-let private rowEndpointNames (table: ArcTable) role rowIndex (endpointColumns: EndpointColumn list) =
-    endpointColumns
-    |> List.choose (fun column ->
-        if column.Role = role then
-            table.GetCellAt(column.Index, rowIndex)
-            |> cellText
-            |> Option.map (fun name -> column.Header, name)
-        else
+    let characteristicHeader (value: MaterialAttributeValue) =
+        value.Category
+        |> Option.bind (fun category -> category.CharacteristicType)
+        |> propertyHeader ProvenancePropertyKind.Characteristic
+
+    let factorHeader (value: FactorValue) =
+        value.Category
+        |> Option.bind (fun category -> category.FactorType)
+        |> propertyHeader ProvenancePropertyKind.Factor
+
+    let parameterHeader (value: ProcessParameterValue) =
+        value.Category
+        |> Option.bind (fun category -> category.ParameterName)
+        |> propertyHeader ProvenancePropertyKind.Parameter
+
+    let componentHeader (value: Component) =
+        value.ComponentType
+        |> propertyHeader ProvenancePropertyKind.Component
+
+    let normalizeUnit unit =
+        unit
+        |> termOptionFromOntology
+
+    let provenanceValue (value: Value option) (unit: OntologyAnnotation option) : (ProvenanceValue * ProvenanceTerm option) option =
+        let normalizedUnit = normalizeUnit unit
+
+        match value with
+        | Some(Value.Name text) ->
+            trimToOption text
+            |> Option.map (fun text -> ProvenanceValue.Text text, normalizedUnit)
+        | Some(Value.Int value) ->
+            Some(ProvenanceValue.Integer value, normalizedUnit)
+        | Some(Value.Float value) ->
+            Some(ProvenanceValue.Float value, normalizedUnit)
+        | Some(Value.Ontology term) ->
+            let normalized = termFromOntology term
+            if termIsEmpty normalized then
+                None
+            else
+                Some(ProvenanceValue.Term normalized, None)
+        | None ->
             None
-    )
 
-let private addEndpoint (location: ArcTableLocation) role (header: ProvenanceIOHeader) name (state: ConvertState) =
-    let roleText =
-        match role with
-        | LoadedRole.Input -> "input"
-        | LoadedRole.Output -> "output"
+    let pairInputNames (pair: ProcessPairContext) =
+        pair.InputName |> Option.toList
 
-    let id =
-        stableId (
+    let pairOutputNames (pair: ProcessPairContext) =
+        pair.OutputName |> Option.toList
+
+    let sourceAnchor (pair: ProcessPairContext) header : ProvenanceWritebackAnchor =
+        {
+            TableName = pair.Location.TableName
+            ProcessName = pair.ProcessName
+            Header = header
+            InputNames = pairInputNames pair
+            OutputNames = pairOutputNames pair
+        }
+
+    let writebackLocation (pair: ProcessPairContext) header columnIndex : ArcWritebackLocation =
+        {
+            Table = pair.Location
+            ProcessName = pair.ProcessName
+            Header = header
+            InputNames = pairInputNames pair
+            OutputNames = pairOutputNames pair
+            ColumnIndex = columnIndex
+        }
+
+    let valueIdentityText value unit =
+        let baseText =
+            match value with
+            | ProvenanceValue.Text value -> $"text:{value}"
+            | ProvenanceValue.Integer value -> $"int:{value}"
+            | ProvenanceValue.Float value -> $"float:{value}"
+            | ProvenanceValue.Term term ->
+                let termSource = defaultArg term.TermSource ""
+                let termAccession = defaultArg term.TermAccession ""
+                $"term:{term.Name}:{termSource}:{termAccession}"
+
+        match unit with
+        | Some unit ->
+            let termSource = defaultArg unit.TermSource ""
+            let termAccession = defaultArg unit.TermAccession ""
+            $"{baseText}:unit:{unit.Name}:{termSource}:{termAccession}"
+        | None ->
+            baseText
+
+module internal Dedup =
+
+    let emptyState : ConvertState =
+        {
+            PropertyValues = Map.empty
+            InputSets = Map.empty
+            OutputSets = Map.empty
+            Connections = Map.empty
+            EndpointLocations = Map.empty
+            PropertyValueLocations = Map.empty
+            ConnectionLocations = Map.empty
+            Warnings = []
+        }
+
+    let private appendWarning warning (state: ConvertState) =
+        { state with Warnings = warning :: state.Warnings }
+
+    let private setId role location header name =
+        Normalize.stableId (
             [
                 "set"
-                roleText
+                role
             ]
-            @ locationParts location
+            @ Normalize.locationParts location
             @ [
                 header.Text
                 name
             ]
         )
 
-    let set : ProvenanceSet =
-        {
-            Id = id
-            TableName = location.TableName
-            Header = header
-            Name = name
-            PropertyValueIds = []
-        }
+    let ensureInputSet (location: ArcTableLocation) (header: ProvenanceIOHeader) name (state: ConvertState) =
+        let id = setId "input" location header name
 
-    let endpointLocation : ArcEndpointLocation =
-        {
-            Table = location
-            Header = header
-            Name = name
-        }
+        let existing =
+            state.InputSets
+            |> Map.tryFind id
+            |> Option.defaultValue
+                {
+                    Id = id
+                    TableName = location.TableName
+                    Header = header
+                    Name = name
+                    PropertyValueIds = []
+                }
 
-    match role with
-    | LoadedRole.Input ->
+        let endpointLocation : ArcEndpointLocation =
+            {
+                Table = location
+                Header = header
+                Name = name
+            }
+
         id,
         {
             state with
-                InputSets = state.InputSets |> Map.add id (state.InputSets |> Map.tryFind id |> Option.defaultValue set)
+                InputSets = state.InputSets |> Map.add id existing
                 EndpointLocations = state.EndpointLocations |> Map.add id endpointLocation
         }
-    | LoadedRole.Output ->
+
+    let ensureOutputSet (location: ArcTableLocation) (header: ProvenanceIOHeader) name (state: ConvertState) =
+        let id = setId "output" location header name
+
+        let existing =
+            state.OutputSets
+            |> Map.tryFind id
+            |> Option.defaultValue
+                {
+                    Id = id
+                    TableName = location.TableName
+                    Header = header
+                    Name = name
+                    PropertyValueIds = []
+                }
+
+        let endpointLocation : ArcEndpointLocation =
+            {
+                Table = location
+                Header = header
+                Name = name
+            }
+
         id,
         {
             state with
-                OutputSets = state.OutputSets |> Map.add id (state.OutputSets |> Map.tryFind id |> Option.defaultValue set)
+                OutputSets = state.OutputSets |> Map.add id existing
                 EndpointLocations = state.EndpointLocations |> Map.add id endpointLocation
         }
 
-let private addConnection (location: ArcTableLocation) (row: RowContext) inputSetId inputName outputSetId outputName (state: ConvertState) =
-    let id =
-        stableId (
-            [
-                "connection"
-            ]
-            @ locationParts location
-            @ [
-                row.ProcessName |> Option.defaultValue ""
-                inputSetId
-                outputSetId
-            ]
-        )
+    let addConnection
+        (location: ArcTableLocation)
+        processName
+        inputSetId
+        inputName
+        outputSetId
+        outputName
+        (state: ConvertState)
+        =
+        let id =
+            Normalize.stableId (
+                [
+                    "connection"
+                ]
+                @ Normalize.locationParts location
+                @ [
+                    processName |> Option.defaultValue ""
+                    inputSetId
+                    outputSetId
+                ]
+            )
 
-    let connection : ProvenanceConnection =
+        let connection : ProvenanceConnection =
+            {
+                Id = id
+                TableName = location.TableName
+                ProcessName = processName
+                InputSetId = inputSetId
+                OutputSetId = outputSetId
+            }
+
+        let connectionLocation : ArcConnectionLocation =
+            {
+                Table = location
+                ProcessName = processName
+                InputSetId = inputSetId
+                OutputSetId = outputSetId
+                InputName = inputName
+                OutputName = outputName
+            }
+
         {
-            Id = id
-            TableName = location.TableName
-            ProcessName = row.ProcessName
-            InputSetId = inputSetId
-            OutputSetId = outputSetId
+            state with
+                Connections = state.Connections |> Map.add id connection
+                ConnectionLocations = state.ConnectionLocations |> Map.add id connectionLocation
         }
 
-    let connectionLocation : ArcConnectionLocation =
-        {
-            Table = location
-            ProcessName = row.ProcessName
-            InputSetId = inputSetId
-            OutputSetId = outputSetId
-            InputName = inputName
-            OutputName = outputName
-        }
-
-    {
-        state with
-            Connections = state.Connections |> Map.add id connection
-            ConnectionLocations = state.ConnectionLocations |> Map.add id connectionLocation
-    }
-
-let private attachProperty setId propertyValueId (state: ConvertState) =
-    match state.InputSets |> Map.tryFind setId with
-    | Some set ->
-        let nextSet =
+    let private attachPropertyValueId propertyValueId (set: ProvenanceSet) =
+        if set.PropertyValueIds |> List.contains propertyValueId then
+            set
+        else
             { set with PropertyValueIds = set.PropertyValueIds @ [ propertyValueId ] }
 
-        { state with InputSets = state.InputSets |> Map.add setId nextSet }
-    | None ->
-        match state.OutputSets |> Map.tryFind setId with
-        | Some set ->
-            let nextSet =
-                { set with PropertyValueIds = set.PropertyValueIds @ [ propertyValueId ] }
+    let private attachToSetMap propertyValueId setIds sets =
+        setIds
+        |> List.distinct
+        |> List.fold (fun currentSets setId ->
+            currentSets
+            |> Map.change setId (Option.map (attachPropertyValueId propertyValueId))) sets
 
-            { state with OutputSets = state.OutputSets |> Map.add setId nextSet }
-        | None ->
-            { state with Warnings = $"Skipped property attachment for missing set '{setId}'." :: state.Warnings }
+    let private propertyValueId (candidate: CandidatePropertyValue) =
+        let inputNames =
+            candidate.Source
+            |> Option.map (fun source -> source.InputNames)
+            |> Option.defaultValue candidate.WritebackLocation.InputNames
 
-let private nextPropertyId (location: ArcTableLocation) (row: RowContext) (header: ProvenancePropertyHeader) value (state: ConvertState) =
-    let valueText =
-        match value with
-        | ProvenanceValue.Text text -> text
-        | ProvenanceValue.Integer number -> string number
-        | ProvenanceValue.Float number -> string number
-        | ProvenanceValue.Term term -> term.Name
+        let outputNames =
+            candidate.Source
+            |> Option.map (fun source -> source.OutputNames)
+            |> Option.defaultValue candidate.WritebackLocation.OutputNames
 
-    let key =
-        stableId (
+        Normalize.stableId (
             [
                 "property"
             ]
-            @ locationParts location
+            @ Normalize.locationParts candidate.WritebackLocation.Table
             @ [
-                row.ProcessName |> Option.defaultValue ""
-                header.Kind.ToString()
-                header.Category.Name
-                String.concat "|" row.InputNames
-                String.concat "|" row.OutputNames
-                valueText
+                candidate.WritebackLocation.ProcessName |> Option.defaultValue ""
+                string candidate.Header.Kind
+                candidate.Header.Category.Name
+                String.concat "|" inputNames
+                String.concat "|" outputNames
+                Normalize.valueIdentityText candidate.Value candidate.Unit
             ]
         )
 
-    let index =
-        state.PropertyCounters
-        |> Map.tryFind key
-        |> Option.defaultValue 0
+    let private addPropertyLocation propertyValueId location map =
+        let existing =
+            map
+            |> Map.tryFind propertyValueId
+            |> Option.defaultValue []
 
-    let id = stableId [ key; string index ]
+        let next =
+            if existing |> List.contains location then
+                existing
+            else
+                existing @ [ location ]
 
-    id,
-    {
-        state with
-            PropertyCounters = state.PropertyCounters |> Map.add key (index + 1)
-    }
+        map |> Map.add propertyValueId next
 
-let private addProperty (location: ArcTableLocation) (row: RowContext) (header: ProvenancePropertyHeader) value unit (targetSetIds: ProvenanceSetId list) (state: ConvertState) =
-    match targetSetIds with
-    | [] ->
-        { state with Warnings = $"Skipped property '{header.Category.Name}' because no loaded endpoint target was available." :: state.Warnings }
-    | _ ->
-        let id, state = nextPropertyId location row header value state
+    let addCandidateProperty (candidate: CandidatePropertyValue) (state: ConvertState) =
+        let targetInputSetIds = candidate.TargetInputSetIds |> List.distinct
+        let targetOutputSetIds = candidate.TargetOutputSetIds |> List.distinct
 
-        let anchor : ProvenanceWritebackAnchor =
-            {
-                TableName = location.TableName
-                ProcessName = row.ProcessName
-                Header = header
-                InputNames = row.InputNames
-                OutputNames = row.OutputNames
-            }
+        match targetInputSetIds, targetOutputSetIds with
+        | [], [] ->
+            appendWarning $"Skipped property '{candidate.Header.Category.Name}' because no loaded endpoint target was available." state
+        | _ ->
+            let id = propertyValueId candidate
 
-        let propertyValue : ProvenancePropertyValue =
-            {
-                Id = id
-                Header = header
-                Value = value
-                Unit = unit
-                Source = Some anchor
-            }
+            let propertyValue : ProvenancePropertyValue =
+                state.PropertyValues
+                |> Map.tryFind id
+                |> Option.defaultValue
+                    {
+                        Id = id
+                        Header = candidate.Header
+                        Value = candidate.Value
+                        Unit = candidate.Unit
+                        Source = candidate.Source
+                    }
 
-        let writebackLocation : ArcWritebackLocation =
-            {
-                Table = location
-                ProcessName = row.ProcessName
-                Header = header
-                InputNames = row.InputNames
-                OutputNames = row.OutputNames
-            }
-
-        let state =
             {
                 state with
                     PropertyValues = state.PropertyValues |> Map.add id propertyValue
-                    PropertyValueLocations = state.PropertyValueLocations |> Map.add id writebackLocation
+                    InputSets = state.InputSets |> attachToSetMap id targetInputSetIds
+                    OutputSets = state.OutputSets |> attachToSetMap id targetOutputSetIds
+                    PropertyValueLocations = state.PropertyValueLocations |> addPropertyLocation id candidate.WritebackLocation
             }
 
-        targetSetIds
-        |> List.distinct
-        |> List.fold (fun nextState setId -> attachProperty setId id nextState) state
+    let toResult (loadedTable: ArcTableLocation) (state: ConvertState) : ArcProvenanceConversionResult =
+        {
+            Model =
+                {
+                    LoadedTableName = loadedTable.TableName
+                    PropertyValues = state.PropertyValues
+                    InputSets = state.InputSets
+                    OutputSets = state.OutputSets
+                    Connections = state.Connections
+                }
+            Index =
+                {
+                    LoadedTable = loadedTable
+                    EndpointLocations = state.EndpointLocations
+                    PropertyValueLocations = state.PropertyValueLocations
+                    ConnectionLocations = state.ConnectionLocations
+                }
+            Warnings = List.rev state.Warnings
+        }
 
-let private targetSetIds (row: RowContext) target =
-    match target with
-    | PropertyTarget.Inputs -> row.InputSetIds
-    | PropertyTarget.Outputs -> row.OutputSetIds
-    | PropertyTarget.Both -> row.InputSetIds @ row.OutputSetIds
+module internal LoadedTable =
 
-let private loadedRows (location: ArcTableLocation) (table: ArcTable) (endpointColumns: EndpointColumn list) (initialState: ConvertState) =
-    [ 0 .. table.RowCount - 1 ]
-    |> List.mapFold (fun state rowIndex ->
-        let inputNames = rowEndpointNames table LoadedRole.Input rowIndex endpointColumns
-        let outputNames = rowEndpointNames table LoadedRole.Output rowIndex endpointColumns
+    let processPairs (location: ArcTableLocation) (proc: Process) =
+        let inputs = proc.Inputs |> Option.defaultValue []
+        let outputs = proc.Outputs |> Option.defaultValue []
+        let pairCount = min inputs.Length outputs.Length
 
-        let inputIds, state =
-            inputNames
-            |> List.mapFold (fun currentState (header, name) -> addEndpoint location LoadedRole.Input header name currentState) state
+        let warning =
+            if inputs.Length <> outputs.Length then
+                let processName = proc.Name |> Option.defaultValue "<unnamed>"
+                Some $"Process '{processName}' in table '{location.TableName}' had {inputs.Length} inputs and {outputs.Length} outputs; only {pairCount} aligned pair(s) were converted."
+            else
+                None
 
-        let outputIds, state =
-            outputNames
-            |> List.mapFold (fun currentState (header, name) -> addEndpoint location LoadedRole.Output header name currentState) state
+        let pairs =
+            List.zip (inputs |> List.truncate pairCount) (outputs |> List.truncate pairCount)
 
-        let row : RowContext =
-            {
-                Key = stableId (locationParts location @ [ string rowIndex ])
-                RowIndex = rowIndex
-                Location = location
-                TableName = location.TableName
-                ProcessName = processName table rowIndex
-                InputNames = inputNames |> List.map snd
-                OutputNames = outputNames |> List.map snd
-                InputSetIds = inputIds
-                OutputSetIds = outputIds
-            }
+        pairs, warning
 
-        row, state
-    ) initialState
+    let pairContext (location: ArcTableLocation) (proc: Process) (input: ProcessInput) (output: ProcessOutput) : ProcessPairContext =
+        {
+            Location = location
+            ProcessName = proc.Name
+            InputName = Normalize.trimToOption input.Name
+            OutputName = Normalize.trimToOption output.Name
+        }
 
-let private addLoadedConnections (location: ArcTableLocation) (rows: RowContext list) (state: ConvertState) =
-    rows
-    |> List.fold (fun currentState row ->
-        let inputPairs = List.zip row.InputSetIds row.InputNames
-        let outputPairs = List.zip row.OutputSetIds row.OutputNames
+    let private candidate pair targetInputSetIds targetOutputSetIds header value unit columnIndex : CandidatePropertyValue =
+        {
+            Header = header
+            Value = value
+            Unit = unit
+            Source = Some(Normalize.sourceAnchor pair header)
+            TargetInputSetIds = targetInputSetIds
+            TargetOutputSetIds = targetOutputSetIds
+            WritebackLocation = Normalize.writebackLocation pair header columnIndex
+        }
 
-        [ for inputSetId, inputName in inputPairs do
-            for outputSetId, outputName in outputPairs do
-                inputSetId, inputName, outputSetId, outputName ]
-        |> List.fold (fun nestedState (inputSetId, inputName, outputSetId, outputName) ->
-            addConnection location row inputSetId inputName outputSetId outputName nestedState
-        ) currentState
-    ) state
+    let inputCharacteristicCandidates pair targetInputSetIds (input: ProcessInput) =
+        input
+        |> ProcessInput.tryGetCharacteristicValues
+        |> Option.defaultValue []
+        |> List.choose (fun value ->
+            Normalize.characteristicHeader value
+            |> Option.bind (fun header ->
+                Normalize.provenanceValue value.Value value.Unit
+                |> Option.map (fun (propertyValue, unit) ->
+                    candidate pair targetInputSetIds [] header propertyValue unit (tryGetCharacteristicColumnIndex value))))
 
-let private addPropertiesFromTable (location: ArcTableLocation) (table: ArcTable) (rows: RowContext list) (propertyColumns: PropertyColumn list) (state: ConvertState) =
-    rows
-    |> List.fold (fun currentState row ->
-        propertyColumns
-        |> List.fold (fun nestedState column ->
-            table.GetCellAt(column.Index, row.RowIndex)
-            |> propertyValueFromCell
-            |> Option.map (fun (value, unitTerm) ->
-                let applicableSetIds = targetSetIds row column.Target
-                addProperty location row column.Header value unitTerm applicableSetIds nestedState
-            )
-            |> Option.defaultValue nestedState
-        ) currentState
-    ) state
+    let private outputCharacteristicCandidates pair targetOutputSetIds (output: ProcessOutput) =
+        output
+        |> ProcessOutput.tryGetCharacteristicValues
+        |> Option.defaultValue []
+        |> List.choose (fun value ->
+            Normalize.characteristicHeader value
+            |> Option.bind (fun header ->
+                Normalize.provenanceValue value.Value value.Unit
+                |> Option.map (fun (propertyValue, unit) ->
+                    candidate pair [] targetOutputSetIds header propertyValue unit (tryGetCharacteristicColumnIndex value))))
 
-type private PreviousRow =
-    {
-        Key: string
-        Location: ArcTableLocation
-        ProcessName: string option
-        InputNames: string list
-        OutputNames: string list
-        Values: (ProvenancePropertyHeader * ProvenanceValue * ProvenanceTerm option) list
-    }
+    let private outputFactorCandidates pair targetOutputSetIds (output: ProcessOutput) =
+        output
+        |> ProcessOutput.tryGetFactorValues
+        |> Option.defaultValue []
+        |> List.choose (fun value ->
+            Normalize.factorHeader value
+            |> Option.bind (fun header ->
+                Normalize.provenanceValue value.Value value.Unit
+                |> Option.map (fun (propertyValue, unit) ->
+                    candidate pair [] targetOutputSetIds header propertyValue unit (tryGetFactorColumnIndex value))))
 
-let private previousRows (loadedLocation: ArcTableLocation) (tableRefs: TableRef list) : PreviousRow list =
-    tableRefs
-    |> List.filter (fun tableRef -> tableRef.Location <> loadedLocation)
-    |> List.collect (fun (tableRef: TableRef) ->
-        let table = tableRef.Table
-        let endpoints = endpointColumns table
-        let properties = propertyColumns table
+    let processParameterCandidates pair targetInputSetIds targetOutputSetIds (proc: Process) =
+        proc.ParameterValues
+        |> Option.defaultValue []
+        |> List.choose (fun value ->
+            Normalize.parameterHeader value
+            |> Option.bind (fun header ->
+                Normalize.provenanceValue value.Value value.Unit
+                    |> Option.map (fun (propertyValue, unit) ->
+                        candidate pair targetInputSetIds targetOutputSetIds header propertyValue unit (tryGetParameterColumnIndex value))))
 
-        [ for rowIndex in 0 .. table.RowCount - 1 do
-            let inputNames =
-                rowEndpointNames table LoadedRole.Input rowIndex endpoints
-                |> List.map snd
+    let processComponentCandidates pair targetInputSetIds targetOutputSetIds (proc: Process) =
+        proc.ExecutesProtocol
+        |> Option.bind (fun protocol -> protocol.Components)
+        |> Option.defaultValue []
+        |> List.choose (fun value ->
+            Normalize.componentHeader value
+            |> Option.bind (fun header ->
+                Normalize.provenanceValue value.ComponentValue value.ComponentUnit
+                    |> Option.map (fun (propertyValue, unit) ->
+                        candidate pair targetInputSetIds targetOutputSetIds header propertyValue unit (tryGetComponentIndex value))))
 
-            let outputNames =
-                rowEndpointNames table LoadedRole.Output rowIndex endpoints
-                |> List.map snd
+    let private pairCandidates pair inputSetId outputSetId (proc: Process) (input: ProcessInput) (output: ProcessOutput) =
+        let targetInputSetIds = inputSetId |> Option.toList
+        let targetOutputSetIds = outputSetId |> Option.toList
 
-            let values =
-                properties
-                |> List.choose (fun column ->
-                    table.GetCellAt(column.Index, rowIndex)
-                    |> propertyValueFromCell
-                    |> Option.map (fun (value, unitTerm) -> column.Header, value, unitTerm)
-                )
+        inputCharacteristicCandidates pair targetInputSetIds input
+        @ outputCharacteristicCandidates pair targetOutputSetIds output
+        @ outputFactorCandidates pair targetOutputSetIds output
+        @ processParameterCandidates pair targetInputSetIds targetOutputSetIds proc
+        @ processComponentCandidates pair targetInputSetIds targetOutputSetIds proc
 
-            if values.Length > 0 && outputNames.Length > 0 then
-                yield
-                    {
-                        Key = stableId (locationParts tableRef.Location @ [ string rowIndex ])
-                        Location = tableRef.Location
-                        ProcessName = processName table rowIndex
-                        InputNames = inputNames
-                        OutputNames = outputNames
-                        Values = values
-                    }
-        ]
-    )
+    let convert (location: ArcTableLocation) (table: ArcTable) : Result<ConvertState, ArcProvenanceConversionError> =
+        match Normalize.inputHeader table, Normalize.outputHeader table with
+        | None, _ ->
+            Error(ArcProvenanceConversionError.LoadedTableHasNoInputs location)
+        | _, None ->
+            Error(ArcProvenanceConversionError.LoadedTableHasNoOutputs location)
+        | Some inputHeader, Some outputHeader ->
+            let state =
+                table.GetProcesses()
+                |> List.fold (fun (currentState: ConvertState) proc ->
+                    let pairs, warning = processPairs location proc
 
-let private attachPreviousContext (loadedLocation: ArcTableLocation) (tableRefs: TableRef list) (state: ConvertState) =
-    let loadedInputFrontier =
+                    let currentState =
+                        warning
+                        |> Option.map (fun warning -> { currentState with Warnings = warning :: currentState.Warnings })
+                        |> Option.defaultValue currentState
+
+                    pairs
+                    |> List.fold (fun pairState (input, output) ->
+                        let pair = pairContext location proc input output
+
+                        let inputSetId, pairState =
+                            match pair.InputName with
+                            | Some inputName ->
+                                let inputSetId, pairState = Dedup.ensureInputSet location inputHeader inputName pairState
+                                Some inputSetId, pairState
+                            | None ->
+                                None, pairState
+
+                        let outputSetId, pairState =
+                            match pair.OutputName with
+                            | Some outputName ->
+                                let outputSetId, pairState = Dedup.ensureOutputSet location outputHeader outputName pairState
+                                Some outputSetId, pairState
+                            | None ->
+                                None, pairState
+
+                        let pairState =
+                            match inputSetId, pair.InputName, outputSetId, pair.OutputName with
+                            | Some inputSetId, Some inputName, Some outputSetId, Some outputName ->
+                                Dedup.addConnection location proc.Name inputSetId inputName outputSetId outputName pairState
+                            | _ ->
+                                pairState
+
+                        pairCandidates pair inputSetId outputSetId proc input output
+                        |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) pairState
+                    ) currentState
+                ) Dedup.emptyState
+
+            if state.InputSets.IsEmpty then
+                Error(ArcProvenanceConversionError.LoadedTableHasNoInputs location)
+            elif state.OutputSets.IsEmpty then
+                Error(ArcProvenanceConversionError.LoadedTableHasNoOutputs location)
+            else
+                Ok state
+
+module internal PreviousContext =
+
+    let private loadedInputFrontier (state: ConvertState) =
         state.InputSets
         |> Map.toList
         |> List.groupBy (fun (_, set) -> set.Name)
         |> List.map (fun (name, sets) -> name, sets |> List.map fst |> Set.ofList)
         |> Map.ofList
 
-    let rows = previousRows loadedLocation tableRefs
+    let attach (loadedLocation: ArcTableLocation) (arc: ARC) (state: ConvertState) =
+        let allPairs, warnings =
+            TableLookup.allTables arc
+            |> List.filter (fun tableRef -> tableRef.Location <> loadedLocation)
+            |> List.fold (fun (pairState, warningState) tableRef ->
+                tableRef.Table.GetProcesses()
+                |> List.fold (fun (currentPairs, currentWarnings) proc ->
+                    let pairs, warning = LoadedTable.processPairs tableRef.Location proc
 
-    let rec walk frontier visited currentState =
-        let matches =
-            rows
-            |> List.choose (fun row ->
-                if Set.contains row.Key visited then
-                    None
-                else
-                    let matchingTargets =
-                        row.OutputNames
-                        |> List.choose (fun outputName -> frontier |> Map.tryFind outputName)
+                    let currentPairs =
+                        currentPairs
+                        @ (
+                            pairs
+                            |> List.map (fun (input, output) ->
+                                LoadedTable.pairContext tableRef.Location proc input output, proc, input)
+                        )
 
-                    let targetIds =
-                        match matchingTargets with
-                        | [] -> Set.empty
-                        | targets -> Set.unionMany targets
+                    let currentWarnings =
+                        match warning with
+                        | Some warning -> currentWarnings @ [ warning ]
+                        | None -> currentWarnings
 
-                    if Set.isEmpty targetIds then
-                        None
-                    else
-                        Some(row, targetIds)
-            )
+                    currentPairs, currentWarnings
+                ) (pairState, warningState)
+            ) ([], [])
 
-        match matches with
-        | [] ->
-            currentState
-        | _ ->
-            let nextState, nextFrontier, nextVisited =
-                matches
-                |> List.fold (fun (foldState, foldFrontier, foldVisited) (row, targetIds) ->
-                    let rowContext : RowContext =
-                        {
-                            Key = row.Key
-                            RowIndex = -1
-                            Location = row.Location
-                            TableName = row.Location.TableName
-                            ProcessName = row.ProcessName
-                            InputNames = row.InputNames
-                            OutputNames = row.OutputNames
-                            InputSetIds = Set.toList targetIds
-                            OutputSetIds = []
-                        }
+        let initialState =
+            warnings
+            |> List.fold (fun (currentState: ConvertState) warning -> { currentState with Warnings = warning :: currentState.Warnings }) state
 
-                    let updatedState =
-                        row.Values
-                        |> List.fold (fun rowState (header, value, unitTerm) ->
-                            addProperty row.Location rowContext header value unitTerm (Set.toList targetIds) rowState
-                        ) foldState
+        let pairs = allPairs
 
-                    let updatedFrontier =
-                        row.InputNames
-                        |> List.fold (fun frontierState inputName ->
-                            let existing =
-                                frontierState
-                                |> Map.tryFind inputName
-                                |> Option.defaultValue Set.empty
+        let rec walk frontier visited currentState =
+            let matches =
+                pairs
+                |> List.choose (fun (pair, proc, input) ->
+                    let pairKey =
+                        Normalize.stableId (
+                            Normalize.locationParts pair.Location
+                            @ [
+                                pair.ProcessName |> Option.defaultValue ""
+                                pair.InputName |> Option.defaultValue ""
+                                pair.OutputName |> Option.defaultValue ""
+                            ]
+                        )
 
-                            frontierState |> Map.add inputName (Set.union existing targetIds)
-                        ) foldFrontier
+                    match pair.OutputName with
+                    | Some outputName when not (Set.contains pairKey visited) ->
+                        frontier
+                        |> Map.tryFind outputName
+                        |> Option.map (fun targetSetIds -> pairKey, pair, proc, input, targetSetIds)
+                    | _ ->
+                        None)
 
-                    updatedState, updatedFrontier, Set.add row.Key foldVisited
-                ) (currentState, frontier, visited)
+            match matches with
+            | [] ->
+                currentState
+            | _ ->
+                let nextState, nextFrontier, nextVisited =
+                    matches
+                    |> List.fold (fun (foldState, foldFrontier, foldVisited) (pairKey, pair, proc, input, targetSetIds) ->
+                        let targetInputSetIds = targetSetIds |> Set.toList
 
-            walk nextFrontier nextVisited nextState
+                        let foldState =
+                            LoadedTable.inputCharacteristicCandidates pair targetInputSetIds input
+                            @ LoadedTable.processParameterCandidates pair targetInputSetIds [] proc
+                            @ LoadedTable.processComponentCandidates pair targetInputSetIds [] proc
+                            |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) foldState
 
-    walk loadedInputFrontier Set.empty state
+                        let foldFrontier =
+                            match pair.InputName with
+                            | Some inputName ->
+                                let existing =
+                                    foldFrontier
+                                    |> Map.tryFind inputName
+                                    |> Option.defaultValue Set.empty
+
+                                foldFrontier |> Map.add inputName (Set.union existing targetSetIds)
+                            | None ->
+                                foldFrontier
+
+                        foldState, foldFrontier, Set.add pairKey foldVisited
+                    ) (currentState, frontier, visited)
+
+                walk nextFrontier nextVisited nextState
+
+        walk (loadedInputFrontier initialState) Set.empty initialState
 
 let fromLoadedArc (options: ArcProvenanceConverterOptions) (arc: ARC) : Result<ArcProvenanceConversionResult, ArcProvenanceConversionError> =
-    let refs = tableRefs arc
-
-    match findTable options.LoadedTable refs with
+    match TableLookup.findTable options.LoadedTable arc with
     | Error error ->
         Error error
     | Ok loaded ->
-        let loadedEndpointColumns = endpointColumns loaded.Table
-        let loadedPropertyColumns = propertyColumns loaded.Table
-
-        let rows, state = loadedRows loaded.Location loaded.Table loadedEndpointColumns emptyState
-        let state = addLoadedConnections loaded.Location rows state
-        let state = addPropertiesFromTable loaded.Location loaded.Table rows loadedPropertyColumns state
-
-        if state.InputSets.IsEmpty then
-            Error(ArcProvenanceConversionError.LoadedTableHasNoInputs loaded.Location)
-        elif state.OutputSets.IsEmpty then
-            Error(ArcProvenanceConversionError.LoadedTableHasNoOutputs loaded.Location)
-        else
+        match LoadedTable.convert loaded.Location loaded.Table with
+        | Error error ->
+            Error error
+        | Ok state ->
             let state =
                 if options.IncludePreviousContext then
-                    attachPreviousContext loaded.Location refs state
+                    PreviousContext.attach loaded.Location arc state
                 else
                     state
 
-            let model : ProvenanceModel =
-                {
-                    LoadedTableName = loaded.Location.TableName
-                    PropertyValues = state.PropertyValues
-                    InputSets = state.InputSets
-                    OutputSets = state.OutputSets
-                    Connections = state.Connections
-                }
-
-            let index : ArcProvenanceIndex =
-                {
-                    LoadedTable = loaded.Location
-                    EndpointLocations = state.EndpointLocations
-                    PropertyValueLocations = state.PropertyValueLocations
-                    ConnectionLocations = state.ConnectionLocations
-                }
-
-            Ok
-                {
-                    Model = model
-                    Index = index
-                    Warnings = List.rev state.Warnings
-                }
+            Ok(Dedup.toResult loaded.Location state)
