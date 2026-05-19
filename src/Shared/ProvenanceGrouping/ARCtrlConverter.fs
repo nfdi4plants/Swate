@@ -302,6 +302,7 @@ let private ioKindFromARCtrl (ioType: IOType) =
     | IOType.Data -> ProvenanceIOKind.Data
     | IOType.Material -> ProvenanceIOKind.Material
     | IOType.FreeText text -> ProvenanceIOKind.FreeText text
+    | _ -> ProvenanceIOKind.Unknown
 
 let private ioHeaderFromARCtrl role (ioType: IOType) : ProvenanceIOHeader =
     let text =
