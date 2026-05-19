@@ -14,7 +14,7 @@ open Swate.Components.Composite.Widgets.Context
 open Swate.Components.Composite.Widgets.DataAnnotator.Types
 open Swate.Components.Composite.Widgets.DataAnnotator.Helper
 
-module DataAnnotatorWidgetModel =
+module private DataAnnotatorWidgetModel =
 
     type Model = {
         DataFile: DataFile option

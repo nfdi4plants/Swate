@@ -10,7 +10,10 @@ open BuildingBlock.SearchComponent
 open Swate.Components.Shared
 open Swate.Components.Primitive.Buttons
 open Swate.Components.Composite.Widgets.Types
-
+open Swate.Components.Composite.Widgets.DataAnnotator
+open Swate.Components.Composite.Widgets.DataAnnotator.Types
+open Swate.Components.Composite.Widgets.DataAnnotator.Helper
+open Swate.Components.Page.ArcFileEditor.Helper
 
 module InitExtensions =
 
@@ -298,75 +301,32 @@ type Widget =
 
     [<ReactComponent>]
     static member DataAnnotator(model: Model, dispatch, rmv) =
-        let inputRef = React.useInputRef ()
 
         let pendingPickResolve =
             React.useRef (None: (Result<ImportedTextFile[], string> -> unit) option)
 
-        let activeView =
-            match model.SpreadsheetModel.ActiveView with
-            | Spreadsheet.ActiveView.Table _ -> WidgetHostView.TableView
-            | Spreadsheet.ActiveView.DataMap -> WidgetHostView.DataMapView
-            | Spreadsheet.ActiveView.Metadata -> WidgetHostView.MetadataView
-
-        let setArcFileState nextArcFileState =
-            match nextArcFileState with
-            | Some nextArcFile -> nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-            | None -> ()
-
-        let services: DataAnnotatorWidgetServices =
-            React.useMemo (
-                (fun _ -> {
-                    pickTextFiles =
-                        fun () ->
-                            Promise.create (fun resolve _ ->
-                                pendingPickResolve.current <- Some resolve
-
-                                match inputRef.current with
-                                | Some input ->
-                                    input.value <- ""
-                                    input.click ()
-                                | None ->
-                                    pendingPickResolve.current <- None
-                                    resolve (Result.Error "Browser file input is unavailable.")
-                            )
-                }),
-                [||]
-            )
+        let setArcFile nextArcFile =
+            nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
 
         let content =
-            Html.div [
-                prop.className "swt:min-w-80"
-                prop.children [
-                    Html.input [
-                        prop.type'.file
-                        prop.className "swt:hidden"
-                        prop.accept ".csv,.tsv,.txt,text/csv,text/tab-separated-values,text/plain"
-                        prop.ref inputRef
-                        prop.onChange (fun (file: Browser.Types.File) ->
-                            promise {
-                                let! content = file.text ()
-
-                                pendingPickResolve.current
-                                |> Option.iter (fun resolve ->
-                                    resolve (Result.Ok [| { Name = file.name; Content = content } |])
-                                )
-
-                                pendingPickResolve.current <- None
-                            }
-                            |> Promise.start
-                        )
-                    ]
-                    if model.SpreadsheetModel.ArcFile.IsSome then
-                        Swate.Components.Composite.Widgets.DataAnnotatorWidget.Main(
-                            model.SpreadsheetModel.ArcFile.Value,
-                            activeView,
-                            model.SpreadsheetModel.ActiveView.TryTableIndex,
-                            (Some >> setArcFileState),
-                            services
-                        )
+            match model.SpreadsheetModel.ArcFile with
+            | None ->
+                Html.div [
+                    prop.className "swt:p-3 swt:text-sm swt:opacity-70"
+                    prop.text "Load an ArcFile to use the Data Annotator."
                 ]
-            ]
+            | Some arcFile ->
+                match tryGetDataAnnotatorDestination (model.SpreadsheetModel.ActiveView, arcFile) with
+                | Result.Ok destination ->
+                    Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotatorWidget.Main(
+                        destination,
+                        applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile)
+                    )
+                | Result.Error message ->
+                    Html.div [
+                        prop.className "swt:p-3 swt:text-sm swt:opacity-70"
+                        prop.text message
+                    ]
 
         let prefix = WidgetLiterals.DataAnnotator
         Widget.Base(content, prefix, rmv, prefix)

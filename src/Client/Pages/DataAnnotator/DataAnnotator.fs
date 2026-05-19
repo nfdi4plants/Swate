@@ -355,8 +355,7 @@ module private DataAnnotatorHelper =
 
                     ),
                     (fun _ -> Html.div []),
-                    tableRef,
-                    annotator = true
+                    tableRef
                 )
             ]
         ]

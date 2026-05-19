@@ -101,6 +101,7 @@ type Main =
                     box buildingBlockWidget
                     box templateWidget
                     box filePickerWidget
+                    box dataAnnotatorWidget
                 |]
             )
 
