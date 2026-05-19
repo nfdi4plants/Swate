@@ -4,9 +4,9 @@
 
 **Goal:** Add a Swate-owned F#/Fable provenance edit model where loaded input/output sets are first-class named items, sets point to property value occurrences, and collapsed previous-context values keep writeback anchors.
 
-**Architecture:** Add pure F# modules under `src/Components/src/ProvenanceGrouping` for types, import validation, grouping projection, edit patches, and fixtures. Keep ARCtrl out of public signatures. A later adapter may translate ARCtrl `ProcessInput.Name`, `ProcessOutput.Name`, process names, and headers into these plain Swate records.
+**Architecture:** Add pure F# modules under `src/Shared/ProvenanceGrouping` and compile them through `src/Shared/Swate.Components.Core.fsproj` for types, import validation, grouping projection, edit patches, and fixtures. Keep ARCtrl out of public signatures. A later adapter may translate ARCtrl `ProcessInput.Name`, `ProcessOutput.Name`, process names, and headers into these plain Swate records.
 
-**Tech Stack:** F# / Fable, `Map`, `Result`, Expecto shared tests, existing Swate Components project.
+**Tech Stack:** F# / Fable, `Map`, `Result`, Expecto shared tests, `Swate.Components.Core` shared project, existing Swate Components consumer build.
 
 **Spec:** `docs/superpowers/specs/2026-05-18-provenance-edit-model-design.md`
 
@@ -16,20 +16,26 @@
 
 | File | Responsibility | Action |
 |---|---|---|
-| `src/Components/src/ProvenanceGrouping/Types.fs` | Public loaded-set/property-value model types | Create |
-| `src/Components/src/ProvenanceGrouping/Import.fs` | Plain DTO import and validation into `ProvenanceModel` | Create |
-| `src/Components/src/ProvenanceGrouping/Grouping.fs` | Pure grouping and display connection projection | Create |
-| `src/Components/src/ProvenanceGrouping/Edit.fs` | Edit commands and writeback patch production | Create |
-| `src/Components/src/ProvenanceGrouping/Fixtures.fs` | Reusable sample provenance model for tests and preview adapters | Create |
-| `src/Components/src/Swate.Components.fsproj` | Compile new F# files in dependency order | Modify |
+| `src/Shared/ProvenanceGrouping/Types.fs` | Public loaded-set/property-value model types | Create |
+| `src/Shared/ProvenanceGrouping/Import.fs` | Plain DTO import and validation into `ProvenanceModel` | Create |
+| `src/Shared/ProvenanceGrouping/Grouping.fs` | Pure grouping and display connection projection | Create |
+| `src/Shared/ProvenanceGrouping/Edit.fs` | Edit commands and writeback patch production | Create |
+| `src/Shared/ProvenanceGrouping/Fixtures.fs` | Reusable sample provenance model for tests and preview adapters | Create |
+| `src/Shared/Swate.Components.Core.fsproj` | Compile new F# files in dependency order | Modify |
 | `tests/Shared/ProvenanceGrouping.Tests.fs` | Shared tests for import, grouping, edit, and fixtures | Create |
 | `tests/Shared/Shared.Tests.fsproj` | Compile the new shared test file | Modify |
 | `tests/Shared/Shared.Tests.fs` | Add the new test list to the suite | Modify |
 
+## Branch Structure Notes
+
+- `epic/SwateApp` moved reusable component UI into `src/Components/src/Primitive`, `src/Components/src/Composite`, and `src/Components/src/Page`.
+- The old root `src/Components/src/ProvenanceGrouping` mockup folder is gone on `epic/SwateApp`; do not recreate it for these pure model modules.
+- `src/Shared/Swate.Components.Core.fsproj` is the current Fable-compatible shared core package referenced by `src/Components/src/Swate.Components.fsproj` and by shared tests.
+
 ## Scope Boundaries
 
 - This plan implements the F# model and fixtures only.
-- This plan does not replace `src/Components/src/ProvenanceGrouping/ProvenanceGrouping.tsx` or `ProvenanceGrouping.stories.tsx`.
+- This plan does not recreate the removed root `src/Components/src/ProvenanceGrouping` UI mockup or add a new `src/Components/src/Composite/ProvenanceGrouping` component.
 - This plan does not add ARCtrl adapter code.
 - This plan does not add public process IDs, row indices, column indices, previous-table set lists, or previous-table connection lists.
 
@@ -55,8 +61,8 @@
 ### Task 1: Add the loaded-set public type model
 
 **Files:**
-- Create: `src/Components/src/ProvenanceGrouping/Types.fs`
-- Modify: `src/Components/src/Swate.Components.fsproj`
+- Create: `src/Shared/ProvenanceGrouping/Types.fs`
+- Modify: `src/Shared/Swate.Components.Core.fsproj`
 - Create: `tests/Shared/ProvenanceGrouping.Tests.fs`
 - Modify: `tests/Shared/Shared.Tests.fsproj`
 - Modify: `tests/Shared/Shared.Tests.fs`
@@ -74,7 +80,7 @@ open Fable.Mocha
 open Expecto
 #endif
 
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 let private term name =
     {
@@ -183,10 +189,10 @@ Expected: build fails with an error like `FS0039: The namespace 'ProvenanceGroup
 
 - [ ] **Step 5: Create `Types.fs`**
 
-Create `src/Components/src/ProvenanceGrouping/Types.fs`:
+Create `src/Shared/ProvenanceGrouping/Types.fs`:
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Types
+module Swate.Components.Shared.ProvenanceGrouping.Types
 
 /// Name of a study, assay, or run table as known by the caller.
 type ProvenanceTableName = string
@@ -368,9 +374,9 @@ type ProvenanceModel =
     }
 ```
 
-- [ ] **Step 6: Register `Types.fs` in the component project**
+- [ ] **Step 6: Register `Types.fs` in the shared core project**
 
-In `src/Components/src/Swate.Components.fsproj`, insert this compile item after `GenericComponents\Navbar.fs` and before `ARCSelector\Selector.fs`:
+In `src/Shared/Swate.Components.Core.fsproj`, insert this compile item after `<Compile Include="Types.fs" />` and before `<Compile Include="ArcExplorerNode.fs" />`:
 
 ```xml
 <Compile Include="ProvenanceGrouping\Types.fs" />
@@ -389,8 +395,8 @@ Expected: build succeeds.
 - [ ] **Step 8: Commit**
 
 ```powershell
-git add src/Components/src/ProvenanceGrouping/Types.fs src/Components/src/Swate.Components.fsproj tests/Shared/ProvenanceGrouping.Tests.fs tests/Shared/Shared.Tests.fsproj tests/Shared/Shared.Tests.fs
-git commit -m "feat(provenance): add loaded endpoint edit types"
+git add src/Shared/ProvenanceGrouping/Types.fs src/Shared/Swate.Components.Core.fsproj tests/Shared/ProvenanceGrouping.Tests.fs tests/Shared/Shared.Tests.fsproj tests/Shared/Shared.Tests.fs
+git commit -m "add loaded endpoint edit types"
 ```
 
 ---
@@ -400,16 +406,16 @@ git commit -m "feat(provenance): add loaded endpoint edit types"
 ### Task 2: Import plain DTOs into the loaded-set model
 
 **Files:**
-- Create: `src/Components/src/ProvenanceGrouping/Import.fs`
-- Modify: `src/Components/src/Swate.Components.fsproj`
+- Create: `src/Shared/ProvenanceGrouping/Import.fs`
+- Modify: `src/Shared/Swate.Components.Core.fsproj`
 - Modify: `tests/Shared/ProvenanceGrouping.Tests.fs`
 
 - [ ] **Step 1: Add failing import tests**
 
-In `tests/Shared/ProvenanceGrouping.Tests.fs`, add this `open` after the existing `open Swate.Components.ProvenanceGrouping.Types`:
+In `tests/Shared/ProvenanceGrouping.Tests.fs`, add this `open` after the existing `open Swate.Components.Shared.ProvenanceGrouping.Types`:
 
 ```fsharp
-open Swate.Components.ProvenanceGrouping.Import
+open Swate.Components.Shared.ProvenanceGrouping.Import
 ```
 
 Then add these helpers and tests before `let tests =`:
@@ -541,12 +547,12 @@ Expected: build fails with an error like `FS0039: The namespace or module 'Impor
 
 - [ ] **Step 3: Create `Import.fs`**
 
-Create `src/Components/src/ProvenanceGrouping/Import.fs`:
+Create `src/Shared/ProvenanceGrouping/Import.fs`:
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Import
+module Swate.Components.Shared.ProvenanceGrouping.Import
 
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 type ImportedPropertyValue =
     {
@@ -716,7 +722,7 @@ let fromImportedProvenance (imported: ImportedProvenance) : ImportResult =
 
 - [ ] **Step 4: Register `Import.fs`**
 
-In `src/Components/src/Swate.Components.fsproj`, add this line immediately after `ProvenanceGrouping\Types.fs`:
+In `src/Shared/Swate.Components.Core.fsproj`, add this line immediately after `ProvenanceGrouping\Types.fs`:
 
 ```xml
 <Compile Include="ProvenanceGrouping\Import.fs" />
@@ -735,8 +741,8 @@ Expected: build succeeds.
 - [ ] **Step 6: Commit**
 
 ```powershell
-git add src/Components/src/ProvenanceGrouping/Import.fs src/Components/src/Swate.Components.fsproj tests/Shared/ProvenanceGrouping.Tests.fs
-git commit -m "feat(provenance): import loaded provenance sets"
+git add src/Shared/ProvenanceGrouping/Import.fs src/Shared/Swate.Components.Core.fsproj tests/Shared/ProvenanceGrouping.Tests.fs
+git commit -m "import loaded provenance sets"
 ```
 
 ---
@@ -746,8 +752,8 @@ git commit -m "feat(provenance): import loaded provenance sets"
 ### Task 3: Derive display groups and exact display connections
 
 **Files:**
-- Create: `src/Components/src/ProvenanceGrouping/Grouping.fs`
-- Modify: `src/Components/src/Swate.Components.fsproj`
+- Create: `src/Shared/ProvenanceGrouping/Grouping.fs`
+- Modify: `src/Shared/Swate.Components.Core.fsproj`
 - Modify: `tests/Shared/ProvenanceGrouping.Tests.fs`
 
 - [ ] **Step 1: Add failing grouping tests**
@@ -755,7 +761,7 @@ git commit -m "feat(provenance): import loaded provenance sets"
 Add this `open` near the top of `tests/Shared/ProvenanceGrouping.Tests.fs`:
 
 ```fsharp
-open Swate.Components.ProvenanceGrouping.Grouping
+open Swate.Components.Shared.ProvenanceGrouping.Grouping
 ```
 
 Add this helper and test list before `let tests =`:
@@ -853,12 +859,12 @@ Expected: build fails with an error like `FS0039: The namespace or module 'Group
 
 - [ ] **Step 3: Create `Grouping.fs`**
 
-Create `src/Components/src/ProvenanceGrouping/Grouping.fs`:
+Create `src/Shared/ProvenanceGrouping/Grouping.fs`:
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Grouping
+module Swate.Components.Shared.ProvenanceGrouping.Grouping
 
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 type GroupingKey =
     {
@@ -1037,7 +1043,7 @@ let displayConnections (model: ProvenanceModel) inputGroups outputGroups =
 
 - [ ] **Step 4: Register `Grouping.fs`**
 
-In `src/Components/src/Swate.Components.fsproj`, add this line immediately after `ProvenanceGrouping\Import.fs`:
+In `src/Shared/Swate.Components.Core.fsproj`, add this line immediately after `ProvenanceGrouping\Import.fs`:
 
 ```xml
 <Compile Include="ProvenanceGrouping\Grouping.fs" />
@@ -1056,8 +1062,8 @@ Expected: build succeeds.
 - [ ] **Step 6: Commit**
 
 ```powershell
-git add src/Components/src/ProvenanceGrouping/Grouping.fs src/Components/src/Swate.Components.fsproj tests/Shared/ProvenanceGrouping.Tests.fs
-git commit -m "feat(provenance): group loaded sets by property values"
+git add src/Shared/ProvenanceGrouping/Grouping.fs src/Shared/Swate.Components.Core.fsproj tests/Shared/ProvenanceGrouping.Tests.fs
+git commit -m "group loaded sets by property values"
 ```
 
 ---
@@ -1067,8 +1073,8 @@ git commit -m "feat(provenance): group loaded sets by property values"
 ### Task 4: Add loaded edits and collapsed value update patches
 
 **Files:**
-- Create: `src/Components/src/ProvenanceGrouping/Edit.fs`
-- Modify: `src/Components/src/Swate.Components.fsproj`
+- Create: `src/Shared/ProvenanceGrouping/Edit.fs`
+- Modify: `src/Shared/Swate.Components.Core.fsproj`
 - Modify: `tests/Shared/ProvenanceGrouping.Tests.fs`
 
 - [ ] **Step 1: Add failing edit tests**
@@ -1076,7 +1082,7 @@ git commit -m "feat(provenance): group loaded sets by property values"
 Add this `open` near the top of `tests/Shared/ProvenanceGrouping.Tests.fs`:
 
 ```fsharp
-open Swate.Components.ProvenanceGrouping.Edit
+open Swate.Components.Shared.ProvenanceGrouping.Edit
 ```
 
 Add this test list before `let tests =`:
@@ -1170,12 +1176,12 @@ Expected: build fails with an error like `FS0039: The namespace or module 'Edit'
 
 - [ ] **Step 3: Create `Edit.fs`**
 
-Create `src/Components/src/ProvenanceGrouping/Edit.fs`:
+Create `src/Shared/ProvenanceGrouping/Edit.fs`:
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Edit
+module Swate.Components.Shared.ProvenanceGrouping.Edit
 
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 [<RequireQualifiedAccess>]
 type EditError =
@@ -1459,7 +1465,7 @@ let connectSets inputSetId outputSetId processName model : EditResult =
 
 - [ ] **Step 4: Register `Edit.fs`**
 
-In `src/Components/src/Swate.Components.fsproj`, add this line immediately after `ProvenanceGrouping\Grouping.fs`:
+In `src/Shared/Swate.Components.Core.fsproj`, add this line immediately after `ProvenanceGrouping\Grouping.fs`:
 
 ```xml
 <Compile Include="ProvenanceGrouping\Edit.fs" />
@@ -1478,8 +1484,8 @@ Expected: build succeeds.
 - [ ] **Step 6: Commit**
 
 ```powershell
-git add src/Components/src/ProvenanceGrouping/Edit.fs src/Components/src/Swate.Components.fsproj tests/Shared/ProvenanceGrouping.Tests.fs
-git commit -m "feat(provenance): edit loaded sets and collapsed values"
+git add src/Shared/ProvenanceGrouping/Edit.fs src/Shared/Swate.Components.Core.fsproj tests/Shared/ProvenanceGrouping.Tests.fs
+git commit -m "edit loaded sets and collapsed values"
 ```
 
 ---
@@ -1489,8 +1495,8 @@ git commit -m "feat(provenance): edit loaded sets and collapsed values"
 ### Task 5: Add a reusable fixture and verify F# and Fable builds
 
 **Files:**
-- Create: `src/Components/src/ProvenanceGrouping/Fixtures.fs`
-- Modify: `src/Components/src/Swate.Components.fsproj`
+- Create: `src/Shared/ProvenanceGrouping/Fixtures.fs`
+- Modify: `src/Shared/Swate.Components.Core.fsproj`
 - Modify: `tests/Shared/ProvenanceGrouping.Tests.fs`
 
 - [ ] **Step 1: Add failing fixture tests**
@@ -1498,7 +1504,7 @@ git commit -m "feat(provenance): edit loaded sets and collapsed values"
 Add this `open` near the top of `tests/Shared/ProvenanceGrouping.Tests.fs`:
 
 ```fsharp
-open Swate.Components.ProvenanceGrouping.Fixtures
+open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 ```
 
 Add this test list before `let tests =`:
@@ -1565,12 +1571,12 @@ Expected: build fails with an error like `FS0039: The namespace or module 'Fixtu
 
 - [ ] **Step 3: Create `Fixtures.fs`**
 
-Create `src/Components/src/ProvenanceGrouping/Fixtures.fs`:
+Create `src/Shared/ProvenanceGrouping/Fixtures.fs`:
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Fixtures
+module Swate.Components.Shared.ProvenanceGrouping.Fixtures
 
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 let term name =
     {
@@ -1690,7 +1696,7 @@ let sampleModel () =
 
 - [ ] **Step 4: Register `Fixtures.fs`**
 
-In `src/Components/src/Swate.Components.fsproj`, add this line immediately after `ProvenanceGrouping\Edit.fs`:
+In `src/Shared/Swate.Components.Core.fsproj`, add this line immediately after `ProvenanceGrouping\Edit.fs`:
 
 ```xml
 <Compile Include="ProvenanceGrouping\Fixtures.fs" />
@@ -1706,7 +1712,17 @@ dotnet build tests\Shared\Shared.Tests.fsproj
 
 Expected: build succeeds.
 
-- [ ] **Step 6: Run component verification**
+- [ ] **Step 6: Run shared core verification**
+
+Run:
+
+```powershell
+dotnet build src\Shared\Swate.Components.Core.fsproj
+```
+
+Expected: build succeeds.
+
+- [ ] **Step 7: Run component consumer verification**
 
 Run:
 
@@ -1714,9 +1730,9 @@ Run:
 dotnet build src\Components\src\Swate.Components.fsproj
 ```
 
-Expected: build succeeds.
+Expected: build succeeds, proving `Swate.Components` consumes the new shared core modules through its existing project reference.
 
-- [ ] **Step 7: Run Fable generation verification**
+- [ ] **Step 8: Run Fable generation verification**
 
 Run:
 
@@ -1724,13 +1740,13 @@ Run:
 dotnet fable src\Components\src\Swate.Components.fsproj --outDir src\Components\dist\fable
 ```
 
-Expected: Fable completes and generated files for `ProvenanceGrouping/Types.fs`, `Import.fs`, `Grouping.fs`, `Edit.fs`, and `Fixtures.fs` appear under the generated output used by the command.
+Expected: Fable completes through the Components project reference and generated files for `src/Shared/ProvenanceGrouping/Types.fs`, `Import.fs`, `Grouping.fs`, `Edit.fs`, and `Fixtures.fs` appear under the generated output used by the command.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```powershell
-git add src/Components/src/ProvenanceGrouping/Fixtures.fs src/Components/src/Swate.Components.fsproj tests/Shared/ProvenanceGrouping.Tests.fs
-git commit -m "test(provenance): add loaded provenance fixture"
+git add src/Shared/ProvenanceGrouping/Fixtures.fs src/Shared/Swate.Components.Core.fsproj tests/Shared/ProvenanceGrouping.Tests.fs
+git commit -m "add loaded provenance fixture"
 ```
 
 ---
@@ -1748,6 +1764,7 @@ git commit -m "test(provenance): add loaded provenance fixture"
 - There is no `ProvenanceOrigin` field in the core model; new/imported state is represented by patches and caller session state.
 - There is no `ProcessId`, row index, or column index in public model types.
 - `dotnet build tests\Shared\Shared.Tests.fsproj` succeeds.
+- `dotnet build src\Shared\Swate.Components.Core.fsproj` succeeds.
 - `dotnet build src\Components\src\Swate.Components.fsproj` succeeds.
 - Fable generation succeeds for the new modules.
 
@@ -1762,7 +1779,7 @@ rg -n "T[B]D|T[O]DO|implement[ ]later|fill[ ]in|appropriate[ ]error|handle[ ]edg
 Expected: no output.
 
 ```powershell
-rg -n "Provenance[O]rigin|O[r]igin[ ]=|O[r]igin:|Entry[I]ds|Entry[P]airs|Process[I]d|row[ ]index|column[ ]index|previous-table[ ]set|previous-table[ ]connection" src\Components\src\ProvenanceGrouping tests\Shared\ProvenanceGrouping.Tests.fs
+rg -n "Provenance[O]rigin|O[r]igin[ ]=|O[r]igin:|Entry[I]ds|Entry[P]airs|Process[I]d|row[ ]index|column[ ]index|previous-table[ ]set|previous-table[ ]connection" src\Shared\ProvenanceGrouping tests\Shared\ProvenanceGrouping.Tests.fs
 ```
 
 Expected: no output except prose comments if a later worker added explanatory comments.

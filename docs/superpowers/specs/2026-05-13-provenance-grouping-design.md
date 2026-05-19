@@ -8,14 +8,16 @@ The component helps users inspect and edit provenance entities by grouped parame
 
 ## Placement
 
-Create a new component folder:
+Create a new composite component folder if this mockup UI is reintroduced:
 
-`src/Components/src/ProvenanceGrouping`
+`src/Components/src/Composite/ProvenanceGrouping`
+
+The pure provenance edit model and source adapters live separately under `src/Shared/ProvenanceGrouping` and are compiled by `src/Shared/Swate.Components.Core.fsproj`. The component folder should contain only reusable UI, UI-local helper code, and Storybook files.
 
 The implementation should follow `docs/ReactComponentDesign.md`:
 
 - PascalCase component files.
-- Public shared types in a separate `Types.fs`.
+- UI props and UI-local public types in a separate `Types.fs`; reusable domain model types come from `Swate.Components.Shared.ProvenanceGrouping`.
 - Pure grouping and propagation helpers outside the component class.
 - A colocated `ProvenanceGrouping.stories.tsx`.
 - No imports from `src/Client`, Electron renderer state, or app workflow code.

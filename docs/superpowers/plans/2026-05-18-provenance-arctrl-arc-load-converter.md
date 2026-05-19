@@ -4,11 +4,11 @@
 
 **Goal:** Add an ARCtrl adapter that converts an already loaded `ARCtrl.ARC` from `ARC.load` into the Swate provenance core model plus ARCtrl-specific writeback lookup metadata.
 
-**Architecture:** Keep `Swate.Components.ProvenanceGrouping.Types` source-agnostic. Add one ARCtrl-specific converter module that accepts `ARCtrl.ARC` and a selected study/assay/run table location, builds first-class loaded input/output sets, loaded input-to-output connections, loaded property values, and collapsed previous-context property values. Return a sidecar index containing only stable ARCtrl table locations and source names needed for later writeback; do not store ARCtrl object references, row indices, or column indices in the core model or sidecar API.
+**Architecture:** Keep `Swate.Components.Shared.ProvenanceGrouping.Types` source-agnostic. Add one ARCtrl-specific converter module under `src/Shared/ProvenanceGrouping` that accepts `ARCtrl.ARC` and a selected study/assay/run table location, builds first-class loaded input/output sets, loaded input-to-output connections, loaded property values, and collapsed previous-context property values. Return a sidecar index containing only stable ARCtrl table locations and source names needed for later writeback; do not store ARCtrl object references, row indices, or column indices in the core model or sidecar API.
 
-**Tech Stack:** F# / Fable-compatible Components project, ARCtrl `ARC`, `ArcStudy`, `ArcAssay`, `ArcRun`, `ArcTable`, `CompositeHeader`, `CompositeCell`, `Map`, `Result`, Expecto shared tests.
+**Tech Stack:** F# / Fable-compatible `Swate.Components.Core` shared project, ARCtrl `ARC`, `ArcStudy`, `ArcAssay`, `ArcRun`, `ArcTable`, `CompositeHeader`, `CompositeCell`, `Map`, `Result`, Expecto shared tests.
 
-**Depends On:** `docs/superpowers/plans/2026-05-18-provenance-edit-model.md` must be implemented first because this plan consumes `Swate.Components.ProvenanceGrouping.Types.ProvenanceModel`.
+**Depends On:** `docs/superpowers/plans/2026-05-18-provenance-edit-model.md` must be implemented first because this plan consumes `Swate.Components.Shared.ProvenanceGrouping.Types.ProvenanceModel`.
 
 **Reference Read:** Local ARCtrl reference at `C:\Users\jonat\source\repos\ARCtrl`.
 
@@ -18,11 +18,17 @@
 
 | File | Responsibility | Action |
 |---|---|---|
-| `src/Components/src/ProvenanceGrouping/ARCtrlConverter.fs` | Convert a loaded `ARCtrl.ARC` and selected table into `ProvenanceModel` plus ARCtrl writeback index | Create |
-| `src/Components/src/Swate.Components.fsproj` | Compile converter after provenance core model types | Modify |
+| `src/Shared/ProvenanceGrouping/ARCtrlConverter.fs` | Convert a loaded `ARCtrl.ARC` and selected table into `ProvenanceModel` plus ARCtrl writeback index | Create |
+| `src/Shared/Swate.Components.Core.fsproj` | Compile converter after provenance core model types | Modify |
 | `tests/Shared/ProvenanceGrouping.ARCtrlConverter.Tests.fs` | Shared tests for loaded endpoints, loaded connections, property values, collapsed previous context, and writeback locations | Create |
 | `tests/Shared/Shared.Tests.fsproj` | Compile the ARCtrl converter test file | Modify |
 | `tests/Shared/Shared.Tests.fs` | Add the ARCtrl converter tests to the shared suite | Modify |
+
+## Branch Structure Notes
+
+- `epic/SwateApp` moved reusable component UI into `src/Components/src/Primitive`, `src/Components/src/Composite`, and `src/Components/src/Page`.
+- The converter is shared Fable-compatible domain code, not a React component, so register it in `src/Shared/Swate.Components.Core.fsproj`.
+- Do not depend on helper modules under `src/Components/src/ARCtrl/*` from this converter; `src/Shared` cannot reference `src/Components` without creating the wrong dependency direction.
 
 ## ARCtrl Facts This Plan Uses
 
@@ -44,6 +50,7 @@
 - The converter sidecar is ARCtrl-specific and may mention ARCtrl selection concepts, but it must not expose ARCtrl object references.
 - The sidecar stores table scope, parent identifier, table name, process name, property header, input names, and output names.
 - The sidecar does not store row indices or column indices.
+- The converter may use ARCtrl package types directly, because `Swate.Components.Core` already references the ARCtrl packages, but public output remains stable IDs, names, headers, and `ArcTableLocation` records.
 - Collapsed previous context produces property values attached to loaded input sets only.
 - Collapsed previous context does not create previous-table `ProvenanceSet` records or previous-table `ProvenanceConnection` records.
 
@@ -70,8 +77,8 @@ open Expecto
 #endif
 
 open ARCtrl
-open Swate.Components.ProvenanceGrouping.Types
-open Swate.Components.ProvenanceGrouping.ARCtrlConverter
+open Swate.Components.Shared.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.ARCtrlConverter
 
 let private oa name =
     OntologyAnnotation.create(name = name)
@@ -341,19 +348,19 @@ Run:
 dotnet build tests\Shared\Shared.Tests.fsproj
 ```
 
-Expected result: build fails with `FS0039` because `Swate.Components.ProvenanceGrouping.ARCtrlConverter` does not exist yet.
+Expected result: build fails with `FS0039` because `Swate.Components.Shared.ProvenanceGrouping.ARCtrlConverter` does not exist yet.
 
 ---
 
 ## Task 2: Add the ARCtrl Converter Module
 
 **Files:**
-- Create: `src/Components/src/ProvenanceGrouping/ARCtrlConverter.fs`
-- Modify: `src/Components/src/Swate.Components.fsproj`
+- Create: `src/Shared/ProvenanceGrouping/ARCtrlConverter.fs`
+- Modify: `src/Shared/Swate.Components.Core.fsproj`
 
 - [ ] **Step 1: Add the converter compile item**
 
-In `src/Components/src/Swate.Components.fsproj`, add the converter after the provenance core model files from the previous plan:
+In `src/Shared/Swate.Components.Core.fsproj`, add the converter after the provenance core model files from the previous plan:
 
 ```xml
 <Compile Include="ProvenanceGrouping\Types.fs" />
@@ -366,14 +373,14 @@ In `src/Components/src/Swate.Components.fsproj`, add the converter after the pro
 
 - [ ] **Step 2: Create the complete converter module**
 
-Create `src/Components/src/ProvenanceGrouping/ARCtrlConverter.fs` with this content:
+Create `src/Shared/ProvenanceGrouping/ARCtrlConverter.fs` with this content:
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.ARCtrlConverter
+module Swate.Components.Shared.ProvenanceGrouping.ARCtrlConverter
 
 open System
 open ARCtrl
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 /// ARC table container that owns the selected or source table.
 /// The converter uses this with `ParentIdentifier` and `TableName` because table names alone are not unique across a full ARC.
@@ -1247,24 +1254,24 @@ let fromLoadedArc options (arc: ARC) : Result<ArcProvenanceConversionResult, Arc
 Run:
 
 ```powershell
-dotnet build src\Components\src\Swate.Components.fsproj
+dotnet build src\Shared\Swate.Components.Core.fsproj
 ```
 
-Expected result: if the previous core model plan has already been applied, the build succeeds for `Swate.Components.fsproj`.
+Expected result: if the previous core model plan has already been applied, the build succeeds for `Swate.Components.Core.fsproj`.
 
 ---
 
 ## Task 3: Verify Private Row Coordinate Scope
 
 **Files:**
-- Inspect: `src/Components/src/ProvenanceGrouping/ARCtrlConverter.fs`
+- Inspect: `src/Shared/ProvenanceGrouping/ARCtrlConverter.fs`
 
 - [ ] **Step 1: Confirm the internal row index is private**
 
 Run:
 
 ```powershell
-rg -n "RowIndex" src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs
+rg -n "RowIndex" src\Shared\ProvenanceGrouping\ARCtrlConverter.fs
 ```
 
 Expected result: matches appear only in the private `RowContext` type, loaded row construction, property extraction, and collapsed previous-context row construction.
@@ -1274,20 +1281,20 @@ Expected result: matches appear only in the private `RowContext` type, loaded ro
 Run:
 
 ```powershell
-rg -n "RowIndex:|ColumnIndex:|Row:|Column:" src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs
+rg -n "RowIndex:|ColumnIndex:|Row:|Column:" src\Shared\ProvenanceGrouping\ARCtrlConverter.fs
 ```
 
 Expected result: the only match is `RowIndex:` inside `type private RowContext`.
 
-- [ ] **Step 3: Run the component build again after inspection**
+- [ ] **Step 3: Run the shared core build again after inspection**
 
 Run:
 
 ```powershell
-dotnet build src\Components\src\Swate.Components.fsproj
+dotnet build src\Shared\Swate.Components.Core.fsproj
 ```
 
-Expected result: build succeeds for `Swate.Components.fsproj`.
+Expected result: build succeeds for `Swate.Components.Core.fsproj`.
 
 ---
 
@@ -1321,18 +1328,19 @@ Expected result: all shared tests pass, including `ProvenanceGrouping ARCtrl con
 Run:
 
 ```powershell
+dotnet build src\Shared\Swate.Components.Core.fsproj
 dotnet build src\Components\src\Swate.Components.fsproj
 dotnet build tests\Shared\Shared.Tests.fsproj
 ```
 
-Expected result: both builds succeed.
+Expected result: all builds succeed.
 
 ---
 
 ## Task 5: Review Converter Behavior Against the Model Rules
 
 **Files:**
-- Inspect: `src/Components/src/ProvenanceGrouping/ARCtrlConverter.fs`
+- Inspect: `src/Shared/ProvenanceGrouping/ARCtrlConverter.fs`
 - Inspect: `tests/Shared/ProvenanceGrouping.ARCtrlConverter.Tests.fs`
 
 - [ ] **Step 1: Verify loaded names come from loaded input/output cells**
@@ -1340,7 +1348,7 @@ Expected result: both builds succeed.
 Run:
 
 ```powershell
-rg -n "ProvenanceSet|Name = name|InputSets|OutputSets|PropertyValueIds" src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs
+rg -n "ProvenanceSet|Name = name|InputSets|OutputSets|PropertyValueIds" src\Shared\ProvenanceGrouping\ARCtrlConverter.fs
 ```
 
 Expected result: `ProvenanceSet.Name` is assigned from endpoint cell `name`, and property values only attach via `PropertyValueIds`.
@@ -1350,7 +1358,7 @@ Expected result: `ProvenanceSet.Name` is assigned from endpoint cell `name`, and
 Run:
 
 ```powershell
-rg -n "\bSide\b|ProvenanceSide" src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs tests\Shared\ProvenanceGrouping.ARCtrlConverter.Tests.fs
+rg -n "\bSide\b|ProvenanceSide" src\Shared\ProvenanceGrouping\ARCtrlConverter.fs tests\Shared\ProvenanceGrouping.ARCtrlConverter.Tests.fs
 ```
 
 Expected result: no matches.
@@ -1360,7 +1368,7 @@ Expected result: no matches.
 Run:
 
 ```powershell
-rg -n "ArcTable:|ArcTable option|ARC option|ArcStudy|ArcAssay|ArcRun" src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs
+rg -n "ArcTable:|ArcTable option|ARC option|ArcStudy|ArcAssay|ArcRun" src\Shared\ProvenanceGrouping\ARCtrlConverter.fs
 ```
 
 Expected result: matches appear only in private helper types/functions or in the `fromLoadedArc` input signature. Public output records use `ArcTableLocation`, names, IDs, headers, and maps.
@@ -1370,7 +1378,7 @@ Expected result: matches appear only in private helper types/functions or in the
 Run:
 
 ```powershell
-rg -n "RowIndex|ColumnIndex|row index|column index" src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs
+rg -n "RowIndex|ColumnIndex|row index|column index" src\Shared\ProvenanceGrouping\ARCtrlConverter.fs
 ```
 
 Expected result: `RowIndex` appears only on private `RowContext`, in `loadedRows`, in `addPropertiesFromTable`, and as `-1` for collapsed context. There are no public record fields named row or column.
@@ -1410,7 +1418,7 @@ Expected result: no output.
 Run:
 
 ```powershell
-git diff -- src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs src\Components\src\Swate.Components.fsproj tests\Shared\ProvenanceGrouping.ARCtrlConverter.Tests.fs tests\Shared\Shared.Tests.fsproj tests\Shared\Shared.Tests.fs
+git diff -- src\Shared\ProvenanceGrouping\ARCtrlConverter.fs src\Shared\Swate.Components.Core.fsproj tests\Shared\ProvenanceGrouping.ARCtrlConverter.Tests.fs tests\Shared\Shared.Tests.fsproj tests\Shared\Shared.Tests.fs
 ```
 
 Expected result: diff contains only the ARCtrl converter, project registration, and tests from this plan.
@@ -1420,7 +1428,7 @@ Expected result: diff contains only the ARCtrl converter, project registration, 
 Run:
 
 ```powershell
-git diff --check -- src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs src\Components\src\Swate.Components.fsproj tests\Shared\ProvenanceGrouping.ARCtrlConverter.Tests.fs tests\Shared\Shared.Tests.fsproj tests\Shared\Shared.Tests.fs
+git diff --check -- src\Shared\ProvenanceGrouping\ARCtrlConverter.fs src\Shared\Swate.Components.Core.fsproj tests\Shared\ProvenanceGrouping.ARCtrlConverter.Tests.fs tests\Shared\Shared.Tests.fsproj tests\Shared\Shared.Tests.fs
 ```
 
 Expected result: no whitespace errors.
@@ -1430,8 +1438,8 @@ Expected result: no whitespace errors.
 Run:
 
 ```powershell
-git add src\Components\src\ProvenanceGrouping\ARCtrlConverter.fs src\Components\src\Swate.Components.fsproj tests\Shared\ProvenanceGrouping.ARCtrlConverter.Tests.fs tests\Shared\Shared.Tests.fsproj tests\Shared\Shared.Tests.fs
-git commit -m "feat: convert loaded ARC provenance to core model"
+git add src\Shared\ProvenanceGrouping\ARCtrlConverter.fs src\Shared\Swate.Components.Core.fsproj tests\Shared\ProvenanceGrouping.ARCtrlConverter.Tests.fs tests\Shared\Shared.Tests.fsproj tests\Shared\Shared.Tests.fs
+git commit -m "convert loaded ARC provenance to core model"
 ```
 
 Expected result: git creates a commit with the converter and tests.

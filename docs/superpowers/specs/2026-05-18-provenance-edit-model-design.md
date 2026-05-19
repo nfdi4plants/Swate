@@ -2,7 +2,7 @@
 
 ## Correction Scope
 
-This design is for Swate's F#/Fable component library. The production model belongs in `.fs` files under `src/Components/src/ProvenanceGrouping`, with Storybook only acting as the browser preview layer.
+This design is for Swate's F#/Fable component library after the `epic/SwateApp` structure update. The production model belongs in `.fs` files under `src/Shared/ProvenanceGrouping` and is compiled by `src/Shared/Swate.Components.Core.fsproj`; a future browser preview or reusable UI can consume it from `src/Components`.
 
 The Swate model must not expose ARCtrl types as its public model because the same component must later accept import sources other than ARCtrl.
 
@@ -52,25 +52,27 @@ Relevant ARCtrl behavior:
 
 The Swate model keeps those semantics, but it does not copy the ARCtrl object model. The public model does not need a process graph, row index, column index, or `ProcessId`. When an ARCtrl adapter exists, it can read actual loaded input/output names from `ProcessInput.Name` and `ProcessOutput.Name` and pass plain Swate records into this model.
 
-## Component Boundary
+## Shared Core Boundary
 
-The reusable model lives in `src/Components`.
+The reusable model lives in `src/Shared/ProvenanceGrouping` because it is source-agnostic Fable domain code, not a React component. `src/Components/src/Swate.Components.fsproj` already references `src/Shared/Swate.Components.Core.fsproj`, so future component UI can consume these modules without duplicating model types.
 
 Recommended files:
 
-- `src/Components/src/ProvenanceGrouping/Types.fs`
-- `src/Components/src/ProvenanceGrouping/Import.fs`
-- `src/Components/src/ProvenanceGrouping/Grouping.fs`
-- `src/Components/src/ProvenanceGrouping/Edit.fs`
-- `src/Components/src/ProvenanceGrouping/Fixtures.fs`
+- `src/Shared/ProvenanceGrouping/Types.fs`
+- `src/Shared/ProvenanceGrouping/Import.fs`
+- `src/Shared/ProvenanceGrouping/Grouping.fs`
+- `src/Shared/ProvenanceGrouping/Edit.fs`
+- `src/Shared/ProvenanceGrouping/Fixtures.fs`
 
-These are non-component F# files, so their modules follow the component design rule:
+These are non-component F# files, so their modules follow the shared core namespace:
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Types
+module Swate.Components.Shared.ProvenanceGrouping.Types
 ```
 
 The public model must not use `ARCtrl.Process.Process`, `ProcessInput`, `ProcessOutput`, `ProcessParameterValue`, `MaterialAttributeValue`, or `FactorValue` in its signatures. ARCtrl-specific conversion can exist outside this core model, or as a thin adapter that returns plain import DTOs before entering the model.
+
+The removed root `src/Components/src/ProvenanceGrouping` mockup folder should not be recreated for this model. If a reusable React provenance grouping UI is restored later, place it under `src/Components/src/Composite/ProvenanceGrouping` and keep it dependent on these shared core modules.
 
 ## Model Principles
 
@@ -103,7 +105,7 @@ Missing a grouping property is not a group category. If a set has no value for t
 Use aliases for IDs to keep the model ergonomic in Fable and simple to serialize.
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Types
+module Swate.Components.Shared.ProvenanceGrouping.Types
 
 /// Name of a study, assay, or run table as known by the caller.
 type ProvenanceTableName = string
@@ -359,9 +361,9 @@ Rows or process-like occurrences are identified by the source adapter using the 
 The core import API accepts plain F# records, not ARCtrl types. The adapter is responsible for converting source-specific rows/processes into the reduced loaded-endpoint/property-value projection.
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Import
+module Swate.Components.Shared.ProvenanceGrouping.Import
 
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 type ImportedPropertyValue =
     {
@@ -425,9 +427,9 @@ The display layer is derived from the reduced model.
 Only the loaded table creates the main input and output display groups. Previous context tables do not create additional visible table columns by themselves. Their property values are available because imported loaded-table sets can point to those property value occurrences.
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Grouping
+module Swate.Components.Shared.ProvenanceGrouping.Grouping
 
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 type GroupingKey =
     {
@@ -531,9 +533,9 @@ Layer creation:
 Edits return patches; they do not mutate ARC tables directly.
 
 ```fsharp
-module Swate.Components.ProvenanceGrouping.Edit
+module Swate.Components.Shared.ProvenanceGrouping.Edit
 
-open Swate.Components.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Types
 
 [<RequireQualifiedAccess>]
 type EditError =
