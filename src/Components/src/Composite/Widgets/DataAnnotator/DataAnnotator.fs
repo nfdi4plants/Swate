@@ -587,13 +587,7 @@ type DataAnnotatorWidget =
                         UpdateDataFile(Some loadedDataFile) |> dispatch
                     with ex ->
                         onError $"Failed to read file: {ex.Message}"
-                // match parseDataFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile with
-                // | Ok parsed -> setLoadedFile loadedDataFile (Some parsed)
-                // | Error message ->
-                //     setLoadedFile loadedDataFile None
-                //     onError message
                 finally
-                    console.log "Finished processing file."
                     UpdateLoading false |> dispatch
             }
             |> Promise.start
@@ -611,38 +605,6 @@ type DataAnnotatorWidget =
                     with exceptionValue ->
                         onError exceptionValue.Message
                 | _ -> onError "Load a file first."
-
-        // let previewSection =
-        //     match parsedFile with
-        //     | None ->
-        //         Html.div [
-        //             prop.className
-        //                 "swt:rounded-box swt:border swt:border-base-300 swt:flex swt:items-center swt:justify-center swt:text-sm swt:opacity-70 swt:min-h-24 swt:px-3 swt:py-4"
-        //             prop.text "Load a data file to preview selectable targets."
-        //         ]
-        //     | Some currentParsedFile ->
-        //         let headerCount =
-        //             currentParsedFile.HeaderRow |> Option.map _.Length |> Option.defaultValue 0
-
-        //         let bodyCount =
-        //             currentParsedFile.BodyRows
-        //             |> Array.fold (fun count row -> max count row.Length) 0
-
-        //         let columnCount = max headerCount bodyCount
-
-        //         Html.div [
-        //             prop.className "swt:overflow-auto swt:rounded-box swt:border swt:border-base-300 swt:max-h-[55vh]"
-        //             prop.children [
-        //                 if currentParsedFile.BodyRows.Length = 0 || columnCount = 0 then
-        //                     Html.div [
-        //                         prop.className
-        //                             "swt:flex swt:items-center swt:justify-center swt:h-full swt:text-sm swt:opacity-70"
-        //                         prop.text "Parsed file contains no data rows."
-        //                     ]
-        //                 else
-        //                     DataAnnotatorWidget.Table(currentParsedFile, selectedTargets, columnCount, toggleTarget)
-        //             ]
-        //         ]
 
         React.Fragment [
 
