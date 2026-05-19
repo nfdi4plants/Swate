@@ -38,8 +38,8 @@ let private loadedAssayTable () =
             CompositeHeader.Factor(oa "Replicate")
         ]
         [
-            [ text "sample-a"; term "Arabidopsis"; text "22"; text "extract-a"; text "R1" ]
-            [ text "sample-b"; term "Arabidopsis"; text "23"; text "extract-b"; text "R2" ]
+            [ text "sample-a"; term "Arabidopsis"; term "22"; text "extract-a"; text "R1" ]
+            [ text "sample-b"; term "Arabidopsis"; term "23"; text "extract-b"; text "R2" ]
         ]
 
 let private previousStudyTable () =
