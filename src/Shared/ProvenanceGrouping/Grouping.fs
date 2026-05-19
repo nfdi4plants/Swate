@@ -81,7 +81,14 @@ let private valuesForKey model set key =
     |> List.filter (fun propertyValue -> propertyValue.Header = key.Header)
     |> List.groupBy (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
     |> List.map (fun ((value, unit), propertyValues) ->
-        key, value, unit, propertyValues |> List.map (fun propertyValue -> propertyValue.Id))
+        key,
+        value,
+        unit,
+        propertyValues
+        |> List.map (fun propertyValue -> propertyValue.Id)
+        |> List.distinct
+        |> List.sort)
+    |> List.sortBy (fun (_, value, unit, _) -> valueText value unit)
 
 let private combinations values =
     let rec loop collected remaining =
@@ -97,7 +104,7 @@ let private displayMember (set: ProvenanceSet) propertyValueIds =
     {
         SetId = set.Id
         Name = set.Name
-        PropertyValueIds = propertyValueIds
+        PropertyValueIds = propertyValueIds |> List.distinct
     }
 
 let private groupId side (values: DisplayGroupingValue list) fallbackSetId =
@@ -176,27 +183,30 @@ let private groupIdsBySetId groups =
     |> Map.ofList
 
 let displayConnections (model: ProvenanceModel) inputGroups outputGroups =
-    let inputGroupBySetId = groupIdsBySetId inputGroups
-    let outputGroupBySetId = groupIdsBySetId outputGroups
+    if List.isEmpty inputGroups || List.isEmpty outputGroups then
+        []
+    else
+        let inputGroupBySetId = groupIdsBySetId inputGroups
+        let outputGroupBySetId = groupIdsBySetId outputGroups
 
-    model.Connections
-    |> mapValues
-    |> List.filter (fun connection -> connection.TableName = model.LoadedTableName)
-    |> List.collect (fun connection ->
-        match inputGroupBySetId.TryFind connection.InputSetId, outputGroupBySetId.TryFind connection.OutputSetId with
-        | Some inputGroupIds, Some outputGroupIds ->
-            [
-                for inputGroupId in inputGroupIds do
-                    for outputGroupId in outputGroupIds do
-                        yield (inputGroupId, outputGroupId), connection.Id
-            ]
-        | _ -> [])
-    |> List.groupBy fst
-    |> List.map (fun ((inputGroupId, outputGroupId), grouped) ->
-        {
-            Id = sprintf "%s-to-%s" inputGroupId outputGroupId
-            SourceGroupId = inputGroupId
-            TargetGroupId = outputGroupId
-            ConnectionIds = grouped |> List.map snd |> List.distinct |> List.sort
-        })
-    |> List.sortBy (fun connection -> connection.Id)
+        model.Connections
+        |> mapValues
+        |> List.filter (fun connection -> connection.TableName = model.LoadedTableName)
+        |> List.collect (fun connection ->
+            match inputGroupBySetId.TryFind connection.InputSetId, outputGroupBySetId.TryFind connection.OutputSetId with
+            | Some inputGroupIds, Some outputGroupIds ->
+                [
+                    for inputGroupId in inputGroupIds do
+                        for outputGroupId in outputGroupIds do
+                            yield (inputGroupId, outputGroupId), connection.Id
+                ]
+            | _ -> [])
+        |> List.groupBy fst
+        |> List.map (fun ((inputGroupId, outputGroupId), grouped) ->
+            {
+                Id = sprintf "%s-to-%s" inputGroupId outputGroupId
+                SourceGroupId = inputGroupId
+                TargetGroupId = outputGroupId
+                ConnectionIds = grouped |> List.map snd |> List.distinct |> List.sort
+            })
+        |> List.sortBy (fun connection -> connection.Id)

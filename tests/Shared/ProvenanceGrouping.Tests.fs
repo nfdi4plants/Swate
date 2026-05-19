@@ -207,6 +207,24 @@ let groupingTests =
 
             Expect.equal groups.Length 2 "Values with the same scalar value but different units must not collapse."
 
+        testCase "displayGroups works for input-only loaded models" <| fun _ ->
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    []
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" []
+                    ]
+                    []
+                    []
+
+            let groups = displayGroups built ProvenanceSide.Input []
+
+            Expect.equal groups.Length 1 "Input-only models should still render input groups."
+            Expect.equal groups.Head.Members.Head.Name "Input A" "The loaded input should still be visible."
+
         testCase "displayConnections expands to represented loaded set pairs only" <| fun _ ->
             let model = validModel ()
             let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
@@ -220,6 +238,25 @@ let groupingTests =
                 |> List.sort
 
             Expect.equal representedIds [ "connection-a"; "connection-b"; "connection-c"; "connection-d" ] "Display lines should represent real loaded connections only."
+
+        testCase "displayConnections returns no lines when one side is absent" <| fun _ ->
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    []
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" []
+                    ]
+                    []
+                    []
+
+            let inputGroups = displayGroups built ProvenanceSide.Input []
+            let outputGroups = displayGroups built ProvenanceSide.Output []
+            let connections = displayConnections built inputGroups outputGroups
+
+            Expect.isEmpty connections "One-sided models must not invent display connections."
     ]
 
 let private sourceFromLoadedMembershipModel () =
