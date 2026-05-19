@@ -16,4 +16,5 @@ let shared = testList "Shared" [
     LandingTests.tests
     PathHelpersTests.tests
     ProvenanceGroupingTests.tests
+    ProvenanceGroupingARCtrlConverterTests.tests
 ]
