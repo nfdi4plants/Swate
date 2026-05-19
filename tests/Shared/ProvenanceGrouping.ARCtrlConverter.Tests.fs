@@ -90,6 +90,14 @@ let private convertWithPreviousContext () =
         }
         (arcFixture ())
 
+let private convertWithoutPreviousContext () =
+    fromLoadedArc
+        {
+            LoadedTable = loadedTable
+            IncludePreviousContext = false
+        }
+        (arcFixture ())
+
 let private expectOk result =
     match result with
     | Ok value -> value
@@ -121,6 +129,21 @@ let tests =
 
             Expect.equal inputNames [ "sample-a"; "sample-b" ] "Loaded inputs should come from loaded input cells."
             Expect.equal outputNames [ "extract-a"; "extract-b" ] "Loaded outputs should come from loaded output cells."
+
+        testCase "omits previous context when IncludePreviousContext is false" <| fun _ ->
+            let result = convertWithoutPreviousContext () |> expectOk
+
+            let previousValues =
+                result.Model.PropertyValues
+                |> Map.toSeq
+                |> Seq.map snd
+                |> Seq.filter (fun value ->
+                    value.Source
+                    |> Option.exists (fun source -> source.TableName <> result.Model.LoadedTableName)
+                )
+                |> Seq.toList
+
+            Expect.isEmpty previousValues "No property values from non-loaded tables should appear when previous context is excluded."
 
         testCase "converts loaded row input-to-output connections" <| fun _ ->
             let result = convertWithPreviousContext () |> expectOk
