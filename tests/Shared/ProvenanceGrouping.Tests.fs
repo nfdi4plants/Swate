@@ -8,6 +8,7 @@ open Expecto
 
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Import
+open Swate.Components.Shared.ProvenanceGrouping.Grouping
 
 let private term name =
     {
@@ -181,8 +182,82 @@ let importTests =
             Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "missing-input")) "Dangling loaded connection should warn."
     ]
 
+let private validImportedModel () =
+    let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+    let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+    fromImportedProvenance
+        {
+            LoadedTableName = "assay-table"
+            PropertyValues =
+                [
+                    propertyValue "pv-species-arabidopsis-a" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
+                    propertyValue "pv-species-arabidopsis-b" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "assay-table" (Some "assay-process") species [ "Input B" ] []))
+                    propertyValue "pv-rep-output-b-1" replicate (ProvenanceValue.Text "1") (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output B" ]))
+                    propertyValue "pv-rep-output-b-2" replicate (ProvenanceValue.Text "2") (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input B" ] [ "Output B" ]))
+                ]
+            InputSets =
+                [
+                    importedSet "input-a" "assay-table" inputHeader "Input A" [ "pv-species-arabidopsis-a" ]
+                    importedSet "input-b" "assay-table" inputHeader "Input B" [ "pv-species-arabidopsis-b" ]
+                    importedSet "input-c" "assay-table" inputHeader "Input C" []
+                ]
+            OutputSets =
+                [
+                    importedSet "output-a" "assay-table" outputHeader "Output A" []
+                    importedSet "output-b" "assay-table" outputHeader "Output B" [ "pv-rep-output-b-1"; "pv-rep-output-b-2" ]
+                    importedSet "output-c" "assay-table" outputHeader "Output C" []
+                ]
+            Connections =
+                [
+                    importedConnection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
+                    importedConnection "connection-b" "assay-table" (Some "assay-process") "input-a" "output-b"
+                    importedConnection "connection-c" "assay-table" (Some "assay-process") "input-b" "output-b"
+                    importedConnection "connection-d" "assay-table" (Some "assay-process") "input-c" "output-c"
+                ]
+        }
+        |> fun result -> result.Model
+
+let groupingTests =
+    testList "Grouping" [
+        testCase "no grouping displays each loaded set by name" <| fun _ ->
+            let model = validImportedModel ()
+            let groups = displayGroups model ProvenanceSide.Input []
+
+            Expect.equal (groups |> List.map (fun group -> group.Members.Head.Name)) [ "Input A"; "Input B"; "Input C" ] "No grouping should preserve loaded input names."
+
+        testCase "multi-value grouping duplicates the loaded set into each value group" <| fun _ ->
+            let model = validImportedModel ()
+            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+            let groups = displayGroups model ProvenanceSide.Output [ { Header = replicate } ]
+
+            let outputBGroupCount =
+                groups
+                |> List.filter (fun group -> group.Members |> List.exists (fun member' -> member'.SetId = "output-b"))
+                |> List.length
+
+            Expect.equal outputBGroupCount 2 "Output B should appear once for each repeated replicate value."
+
+        testCase "displayConnections expands to represented loaded set pairs only" <| fun _ ->
+            let model = validImportedModel ()
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let inputGroups = displayGroups model ProvenanceSide.Input [ { Header = species } ]
+            let outputGroups = displayGroups model ProvenanceSide.Output []
+            let connections = displayConnections model inputGroups outputGroups
+
+            let representedIds =
+                connections
+                |> List.collect (fun connection -> connection.ConnectionIds)
+                |> List.sort
+
+            Expect.equal representedIds [ "connection-a"; "connection-b"; "connection-c"; "connection-d" ] "Display lines should represent real loaded connections only."
+    ]
+
 let tests =
     testList "ProvenanceGrouping" [
         typeTests
         importTests
+        groupingTests
     ]
