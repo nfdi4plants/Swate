@@ -28,7 +28,6 @@
     <Compile Include="URLs.fs" />
     <Compile Include="Types.fs" />
     <Compile Include="ProvenanceGrouping\Types.fs" />
-    <Compile Include="ProvenanceGrouping\Import.fs" />
     <Compile Include="ProvenanceGrouping\Grouping.fs" />
     <Compile Include="ProvenanceGrouping\Edit.fs" />
     <Compile Include="ProvenanceGrouping\ARCtrlConverter.fs" />
