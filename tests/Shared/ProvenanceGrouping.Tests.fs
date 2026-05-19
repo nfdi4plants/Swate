@@ -7,65 +7,9 @@ open Expecto
 #endif
 
 open Swate.Components.Shared.ProvenanceGrouping.Types
-open Swate.Components.Shared.ProvenanceGrouping.Import
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Fixtures
-
-let private term name =
-    {
-        Name = name
-        TermSource = None
-        TermAccession = None
-    }
-
-let private ioHeader kind text =
-    {
-        Kind = kind
-        Text = text
-    }
-
-let private propertyHeader kind name =
-    {
-        Kind = kind
-        Category = term name
-    }
-
-let private anchor tableName processName header inputNames outputNames =
-    {
-        TableName = tableName
-        ProcessName = processName
-        Header = header
-        InputNames = inputNames
-        OutputNames = outputNames
-    }
-
-let private propertyValue id header value source =
-    {
-        Id = id
-        Header = header
-        Value = value
-        Unit = None
-        Source = source
-    }
-
-let private importedSet id tableName header name propertyValueIds =
-    {
-        Id = id
-        TableName = tableName
-        Header = header
-        Name = name
-        PropertyValueIds = propertyValueIds
-    }
-
-let private importedConnection id tableName processName inputSetId outputSetId =
-    {
-        Id = id
-        TableName = tableName
-        ProcessName = processName
-        InputSetId = inputSetId
-        OutputSetId = outputSetId
-    }
 
 let typeTests =
     testList "Types" [
@@ -107,158 +51,103 @@ let typeTests =
                 failwith "Expected collapsed value source."
     ]
 
-let importTests =
-    testList "Import" [
-        testCase "fromImportedProvenance preserves loaded names and repeated property values" <| fun _ ->
+let modelTests =
+    testList "Model" [
+        testCase "direct model builder preserves loaded names and repeated distinct property values" <| fun _ ->
             let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
             let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
             let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
             let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
 
-            let imported =
-                {
-                    LoadedTableName = "assay-table"
-                    PropertyValues =
-                        [
-                            propertyValue "pv-species-a" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "previous-table" (Some "previous-process") species [ "Ancestor A" ] []))
-                            propertyValue "pv-rep-1" replicate (ProvenanceValue.Text "1") (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output A" ]))
-                            propertyValue "pv-rep-2" replicate (ProvenanceValue.Text "2") (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output A" ]))
-                        ]
-                    InputSets =
-                        [
-                            importedSet "input-a" "assay-table" inputHeader "Input A" [ "pv-species-a"; "pv-rep-1"; "pv-rep-2" ]
-                        ]
-                    OutputSets =
-                        [
-                            importedSet "output-a" "assay-table" outputHeader "Output A" [ "pv-rep-1"; "pv-rep-2" ]
-                        ]
-                    Connections =
-                        [
-                            importedConnection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
-                        ]
-                }
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-species-a" species (ProvenanceValue.Text "Arabidopsis") None (Some(anchor "previous-table" (Some "previous-process") species [ "Ancestor A" ] []))
+                        propertyValue "pv-rep-1" replicate (ProvenanceValue.Text "1") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output A" ]))
+                        propertyValue "pv-rep-2" replicate (ProvenanceValue.Text "2") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output A" ]))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-species-a"; "pv-rep-1"; "pv-rep-2" ]
+                    ]
+                    [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-rep-1"; "pv-rep-2" ]
+                    ]
+                    [
+                        connection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
+                    ]
 
-            let result = fromImportedProvenance imported
+            Expect.equal built.InputSets.["input-a"].Name "Input A" "Direct model should keep the loaded input name."
+            Expect.equal built.OutputSets.["output-a"].Name "Output A" "Direct model should keep the loaded output name."
+            Expect.equal built.PropertyValues.Count 3 "Distinct repeated values should remain separate model values."
 
-            Expect.equal result.Warnings [] "Valid import should not warn."
-            Expect.equal result.Model.InputSets.["input-a"].Name "Input A" "Input set should carry the loaded input name."
-            Expect.equal result.Model.OutputSets.["output-a"].Name "Output A" "Output set should carry the loaded output name."
-            Expect.equal result.Model.PropertyValues.Count 3 "Repeated values should remain separate occurrences."
-            Expect.equal result.Model.InputSets.["input-a"].PropertyValueIds [ "pv-species-a"; "pv-rep-1"; "pv-rep-2" ] "Set should point to all property value occurrences."
-
-        testCase "fromImportedProvenance warns and skips non-loaded sets and connections" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
-
-            let imported =
-                {
-                    LoadedTableName = "assay-table"
-                    PropertyValues =
-                        [
-                            propertyValue "pv-species-a" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "previous-table" (Some "previous-process") species [ "Ancestor A" ] []))
-                        ]
-                    InputSets =
-                        [
-                            importedSet "input-a" "assay-table" inputHeader "Input A" [ "pv-species-a"; "missing-pv" ]
-                            importedSet "previous-input" "previous-table" inputHeader "Ancestor A" [ "pv-species-a" ]
-                        ]
-                    OutputSets =
-                        [
-                            importedSet "output-a" "assay-table" outputHeader "Output A" []
-                        ]
-                    Connections =
-                        [
-                            importedConnection "previous-connection" "previous-table" (Some "previous-process") "previous-input" "output-a"
-                            importedConnection "dangling-connection" "assay-table" (Some "assay-process") "missing-input" "output-a"
-                        ]
-                }
-
-            let result = fromImportedProvenance imported
-
-            Expect.isFalse (result.Model.InputSets.ContainsKey "previous-input") "Previous-table set should not become a first-class set."
-            Expect.equal result.Model.Connections.Count 1 "Loaded connection map keeps only loaded-table connection IDs, even when they warn."
-            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "previous-input")) "Skipped previous set should warn."
-            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "missing-pv")) "Missing property value should warn."
-            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "previous-connection")) "Skipped previous connection should warn."
-            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "missing-input")) "Dangling loaded connection should warn."
-
-        testCase "fromImportedProvenance warns on duplicate IDs and empty loaded table name" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+        testCase "direct model builder keeps previous-context anchors without previous first-class sets" <| fun _ ->
+            let previousTreatment = propertyHeader ProvenancePropertyKind.Characteristic "Previous Treatment"
             let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
 
-            let imported =
-                {
-                    LoadedTableName = ""
-                    PropertyValues =
-                        [
-                            propertyValue "pv-dup" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
-                            propertyValue "pv-dup" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
-                        ]
-                    InputSets =
-                        [
-                            importedSet "dup-set" "assay-table" inputHeader "Input A" [ "pv-dup" ]
-                            importedSet "dup-set" "assay-table" inputHeader "Input B" [ "pv-dup" ]
-                        ]
-                    OutputSets = []
-                    Connections = []
-                }
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-previous-treatment-a" previousTreatment (ProvenanceValue.Text "Drought") None (Some(anchor "previous-study-table" (Some "previous-process") previousTreatment [ "Ancestor A" ] []))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-previous-treatment-a" ]
+                    ]
+                    []
+                    []
 
-            let result = fromImportedProvenance imported
+            let value = built.PropertyValues.["pv-previous-treatment-a"]
+            Expect.equal built.InputSets.Count 1 "Only loaded sets should be first-class sets."
 
-            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "LoadedTableName is empty")) "Empty LoadedTableName should warn."
-            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "Duplicate property value id 'pv-dup'")) "Duplicate property value ID should warn."
-            Expect.isTrue (result.Warnings |> List.exists (fun warning -> warning.Contains "Duplicate input set id 'dup-set'")) "Duplicate input set ID should warn."
+            match value.Source with
+            | Some source ->
+                Expect.equal source.TableName "previous-study-table" "Collapsed previous-context values should keep their source table."
+            | None ->
+                failwith "Expected a previous-context source anchor."
     ]
 
-let private validImportedModel () =
+let private validModel () =
     let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
     let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
     let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
     let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
 
-    fromImportedProvenance
-        {
-            LoadedTableName = "assay-table"
-            PropertyValues =
-                [
-                    propertyValue "pv-species-arabidopsis-a" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
-                    propertyValue "pv-species-arabidopsis-b" species (ProvenanceValue.Text "Arabidopsis") (Some(anchor "assay-table" (Some "assay-process") species [ "Input B" ] []))
-                    propertyValue "pv-rep-output-b-1" replicate (ProvenanceValue.Text "1") (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output B" ]))
-                    propertyValue "pv-rep-output-b-2" replicate (ProvenanceValue.Text "2") (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input B" ] [ "Output B" ]))
-                ]
-            InputSets =
-                [
-                    importedSet "input-a" "assay-table" inputHeader "Input A" [ "pv-species-arabidopsis-a" ]
-                    importedSet "input-b" "assay-table" inputHeader "Input B" [ "pv-species-arabidopsis-b" ]
-                    importedSet "input-c" "assay-table" inputHeader "Input C" []
-                ]
-            OutputSets =
-                [
-                    importedSet "output-a" "assay-table" outputHeader "Output A" []
-                    importedSet "output-b" "assay-table" outputHeader "Output B" [ "pv-rep-output-b-1"; "pv-rep-output-b-2" ]
-                    importedSet "output-c" "assay-table" outputHeader "Output C" []
-                ]
-            Connections =
-                [
-                    importedConnection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
-                    importedConnection "connection-b" "assay-table" (Some "assay-process") "input-a" "output-b"
-                    importedConnection "connection-c" "assay-table" (Some "assay-process") "input-b" "output-b"
-                    importedConnection "connection-d" "assay-table" (Some "assay-process") "input-c" "output-c"
-                ]
-        }
-        |> fun result -> result.Model
+    model
+        "assay-table"
+        [
+            propertyValue "pv-species-arabidopsis-a" species (ProvenanceValue.Text "Arabidopsis") None (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
+            propertyValue "pv-species-arabidopsis-b" species (ProvenanceValue.Text "Arabidopsis") None (Some(anchor "assay-table" (Some "assay-process") species [ "Input B" ] []))
+            propertyValue "pv-rep-output-b-1" replicate (ProvenanceValue.Text "1") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output B" ]))
+            propertyValue "pv-rep-output-b-2" replicate (ProvenanceValue.Text "2") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input B" ] [ "Output B" ]))
+        ]
+        [
+            inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-species-arabidopsis-a" ]
+            inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-species-arabidopsis-b" ]
+            inputSet "input-c" "assay-table" inputHeader "Input C" []
+        ]
+        [
+            outputSet "output-a" "assay-table" outputHeader "Output A" []
+            outputSet "output-b" "assay-table" outputHeader "Output B" [ "pv-rep-output-b-1"; "pv-rep-output-b-2" ]
+            outputSet "output-c" "assay-table" outputHeader "Output C" []
+        ]
+        [
+            connection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
+            connection "connection-b" "assay-table" (Some "assay-process") "input-a" "output-b"
+            connection "connection-c" "assay-table" (Some "assay-process") "input-b" "output-b"
+            connection "connection-d" "assay-table" (Some "assay-process") "input-c" "output-c"
+        ]
 
 let groupingTests =
     testList "Grouping" [
         testCase "no grouping displays each loaded set by name" <| fun _ ->
-            let model = validImportedModel ()
+            let model = validModel ()
             let groups = displayGroups model ProvenanceSide.Input []
 
             Expect.equal (groups |> List.map (fun group -> group.Members.Head.Name)) [ "Input A"; "Input B"; "Input C" ] "No grouping should preserve loaded input names."
 
         testCase "multi-value grouping duplicates the loaded set into each value group" <| fun _ ->
-            let model = validImportedModel ()
+            let model = validModel ()
             let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
             let groups = displayGroups model ProvenanceSide.Output [ { Header = replicate } ]
 
@@ -270,7 +159,7 @@ let groupingTests =
             Expect.equal outputBGroupCount 2 "Output B should appear once for each repeated replicate value."
 
         testCase "displayConnections expands to represented loaded set pairs only" <| fun _ ->
-            let model = validImportedModel ()
+            let model = validModel ()
             let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
             let inputGroups = displayGroups model ProvenanceSide.Input [ { Header = species } ]
             let outputGroups = displayGroups model ProvenanceSide.Output []
@@ -294,38 +183,25 @@ let private sourceFromLoadedMembershipModel () =
     let setBId = "output-a"
     let connId = "connection-a"
 
-    fromImportedProvenance
-        {
-            LoadedTableName = "assay-table"
-            PropertyValues =
-                [
-                    {
-                        Id = pvId
-                        Header = species
-                        Value = ProvenanceValue.Text "Arabidopsis"
-                        Unit = None
-                        Source = None
-                    }
-                ]
-            InputSets =
-                [
-                    importedSet setAId "assay-table" inputHeader "Input A" [ pvId ]
-                ]
-            OutputSets =
-                [
-                    importedSet setBId "assay-table" outputHeader "Output A" [ pvId ]
-                ]
-            Connections =
-                [
-                    importedConnection connId "assay-table" (Some "assay-process") setAId setBId
-                ]
-        }
-        |> fun result -> result.Model
+    model
+        "assay-table"
+        [
+            propertyValue pvId species (ProvenanceValue.Text "Arabidopsis") None None
+        ]
+        [
+            inputSet setAId "assay-table" inputHeader "Input A" [ pvId ]
+        ]
+        [
+            outputSet setBId "assay-table" outputHeader "Output A" [ pvId ]
+        ]
+        [
+            connection connId "assay-table" (Some "assay-process") setAId setBId
+        ]
 
 let editTests =
     testList "Edit" [
         testCase "updatePropertyValue preserves collapsed source anchor" <| fun _ ->
-            let model = validImportedModel ()
+            let model = validModel ()
 
             match updatePropertyValue "pv-species-arabidopsis-a" (ProvenanceValue.Text "A. thaliana") None model with
             | Ok(nextModel, [ ProvenanceTablePatch.UpdatePropertyValue(propertyValueId, source, _, newValue, _) ]) ->
@@ -337,7 +213,7 @@ let editTests =
                 failwithf "Expected one UpdatePropertyValue patch, got %A" other
 
         testCase "createLoadedPropertyValue adds occurrence to target loaded set" <| fun _ ->
-            let model = validImportedModel ()
+            let model = validModel ()
             let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
 
             let command =
@@ -360,7 +236,7 @@ let editTests =
                 failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
 
         testCase "copyPropertyValueToLoadedTarget copies previous value to existing loaded connection" <| fun _ ->
-            let model = validImportedModel ()
+            let model = validModel ()
 
             match copyPropertyValueToLoadedTarget "pv-species-arabidopsis-a" (ProvenancePropertyTarget.Connections [ "connection-d" ]) model with
             | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedPropertyValue(target, copiedFrom, _, value, _) ]) ->
@@ -373,7 +249,7 @@ let editTests =
                 failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
 
         testCase "connectSets creates a loaded input output connection" <| fun _ ->
-            let model = validImportedModel ()
+            let model = validModel ()
 
             match connectSets "input-c" "output-a" None model with
             | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedConnection(tableName, processName, inputSetId, outputSetId) ]) ->
@@ -438,7 +314,7 @@ let fixtureTests =
 let tests =
     testList "ProvenanceGrouping" [
         typeTests
-        importTests
+        modelTests
         groupingTests
         editTests
         fixtureTests

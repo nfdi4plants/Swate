@@ -21,7 +21,7 @@ let propertyHeader kind name =
         Category = term name
     }
 
-let private source tableName processName header inputNames outputNames : ProvenanceWritebackAnchor =
+let anchor tableName processName header inputNames outputNames : ProvenanceWritebackAnchor =
     {
         TableName = tableName
         ProcessName = processName
@@ -30,31 +30,55 @@ let private source tableName processName header inputNames outputNames : Provena
         OutputNames = outputNames
     }
 
-let private propertyValue id header value tableName processName inputNames outputNames : ProvenancePropertyValue =
+let propertyValue id header value unit source : ProvenancePropertyValue =
     {
         Id = id
         Header = header
-        Value = ProvenanceValue.Text value
-        Unit = None
-        Source = Some(source tableName processName header inputNames outputNames)
+        Value = value
+        Unit = unit
+        Source = source
     }
 
-let private set id header name propertyValueIds : ProvenanceSet =
+let inputSet id tableName header name propertyValueIds : ProvenanceSet =
     {
         Id = id
-        TableName = "assay-table"
+        TableName = tableName
         Header = header
         Name = name
         PropertyValueIds = propertyValueIds
     }
 
-let private connection id inputSetId outputSetId : ProvenanceConnection =
+let outputSet id tableName header name propertyValueIds : ProvenanceSet =
     {
         Id = id
-        TableName = "assay-table"
-        ProcessName = Some "assay-process"
+        TableName = tableName
+        Header = header
+        Name = name
+        PropertyValueIds = propertyValueIds
+    }
+
+let connection id tableName processName inputSetId outputSetId : ProvenanceConnection =
+    {
+        Id = id
+        TableName = tableName
+        ProcessName = processName
         InputSetId = inputSetId
         OutputSetId = outputSetId
+    }
+
+let model
+    (loadedTableName: ProvenanceTableName)
+    (propertyValues: ProvenancePropertyValue list)
+    (inputSets: ProvenanceSet list)
+    (outputSets: ProvenanceSet list)
+    (connections: ProvenanceConnection list)
+    : ProvenanceModel =
+    {
+        LoadedTableName = loadedTableName
+        PropertyValues = propertyValues |> List.map (fun value -> value.Id, value) |> Map.ofList
+        InputSets = inputSets |> List.map (fun set -> set.Id, set) |> Map.ofList
+        OutputSets = outputSets |> List.map (fun set -> set.Id, set) |> Map.ofList
+        Connections = connections |> List.map (fun connection -> connection.Id, connection) |> Map.ofList
     }
 
 let sampleModel () : ProvenanceModel =
@@ -68,51 +92,45 @@ let sampleModel () : ProvenanceModel =
 
     let propertyValues =
         [
-            propertyValue "pv-input-a-species" species "Arabidopsis" "assay-table" (Some "assay-process") [ "Input A" ] []
-            propertyValue "pv-input-b-species" species "Arabidopsis" "assay-table" (Some "assay-process") [ "Input B" ] []
-            propertyValue "pv-input-c-species" species "Arabidopsis" "assay-table" (Some "assay-process") [ "Input C" ] []
-            propertyValue "pv-input-d-species" species "Chlamydomonas" "assay-table" (Some "assay-process") [ "Input D" ] []
-            propertyValue "pv-input-a-temperature" temperature "12 C" "assay-table" (Some "assay-process") [ "Input A" ] []
-            propertyValue "pv-input-b-temperature" temperature "12 C" "assay-table" (Some "assay-process") [ "Input B" ] []
-            propertyValue "pv-input-c-temperature" temperature "24 C" "assay-table" (Some "assay-process") [ "Input C" ] []
-            propertyValue "pv-output-a-analysis" analysis "Mass Spectrometry" "assay-table" (Some "assay-process") [] [ "Output A" ]
-            propertyValue "pv-output-b-analysis" analysis "Mass Spectrometry" "assay-table" (Some "assay-process") [] [ "Output B" ]
-            propertyValue "pv-output-c-analysis" analysis "LC-MS" "assay-table" (Some "assay-process") [] [ "Output C" ]
-            propertyValue "pv-output-b-replicate-1" replicate "1" "assay-table" (Some "assay-process") [ "Input A" ] [ "Output B" ]
-            propertyValue "pv-output-b-replicate-2" replicate "2" "assay-table" (Some "assay-process") [ "Input B" ] [ "Output B" ]
-            propertyValue "pv-previous-treatment-a" previousTreatment "Drought" "previous-study-table" (Some "previous-process") [ "Ancestor A" ] []
+            propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None (Some(anchor "assay-table" (Some "assay-process") species [ "Input A" ] []))
+            propertyValue "pv-input-b-species" species (ProvenanceValue.Text "Arabidopsis") None (Some(anchor "assay-table" (Some "assay-process") species [ "Input B" ] []))
+            propertyValue "pv-input-c-species" species (ProvenanceValue.Text "Arabidopsis") None (Some(anchor "assay-table" (Some "assay-process") species [ "Input C" ] []))
+            propertyValue "pv-input-d-species" species (ProvenanceValue.Text "Chlamydomonas") None (Some(anchor "assay-table" (Some "assay-process") species [ "Input D" ] []))
+            propertyValue "pv-input-a-temperature" temperature (ProvenanceValue.Text "12 C") None (Some(anchor "assay-table" (Some "assay-process") temperature [ "Input A" ] []))
+            propertyValue "pv-input-b-temperature" temperature (ProvenanceValue.Text "12 C") None (Some(anchor "assay-table" (Some "assay-process") temperature [ "Input B" ] []))
+            propertyValue "pv-input-c-temperature" temperature (ProvenanceValue.Text "24 C") None (Some(anchor "assay-table" (Some "assay-process") temperature [ "Input C" ] []))
+            propertyValue "pv-output-a-analysis" analysis (ProvenanceValue.Text "Mass Spectrometry") None (Some(anchor "assay-table" (Some "assay-process") analysis [] [ "Output A" ]))
+            propertyValue "pv-output-b-analysis" analysis (ProvenanceValue.Text "Mass Spectrometry") None (Some(anchor "assay-table" (Some "assay-process") analysis [] [ "Output B" ]))
+            propertyValue "pv-output-c-analysis" analysis (ProvenanceValue.Text "LC-MS") None (Some(anchor "assay-table" (Some "assay-process") analysis [] [ "Output C" ]))
+            propertyValue "pv-output-b-replicate-1" replicate (ProvenanceValue.Text "1") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] [ "Output B" ]))
+            propertyValue "pv-output-b-replicate-2" replicate (ProvenanceValue.Text "2") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input B" ] [ "Output B" ]))
+            propertyValue "pv-previous-treatment-a" previousTreatment (ProvenanceValue.Text "Drought") None (Some(anchor "previous-study-table" (Some "previous-process") previousTreatment [ "Ancestor A" ] []))
         ]
 
     let inputSets =
         [
-            set "input-a" inputHeader "Input A" [ "pv-input-a-species"; "pv-input-a-temperature"; "pv-previous-treatment-a" ]
-            set "input-b" inputHeader "Input B" [ "pv-input-b-species"; "pv-input-b-temperature" ]
-            set "input-c" inputHeader "Input C" [ "pv-input-c-species"; "pv-input-c-temperature" ]
-            set "input-d" inputHeader "Input D" [ "pv-input-d-species" ]
+            inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species"; "pv-input-a-temperature"; "pv-previous-treatment-a" ]
+            inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-input-b-species"; "pv-input-b-temperature" ]
+            inputSet "input-c" "assay-table" inputHeader "Input C" [ "pv-input-c-species"; "pv-input-c-temperature" ]
+            inputSet "input-d" "assay-table" inputHeader "Input D" [ "pv-input-d-species" ]
         ]
 
     let outputSets =
         [
-            set "output-a" outputHeader "Output A" [ "pv-output-a-analysis" ]
-            set "output-b" outputHeader "Output B" [ "pv-output-b-analysis"; "pv-output-b-replicate-1"; "pv-output-b-replicate-2" ]
-            set "output-c" outputHeader "Output C" [ "pv-output-c-analysis" ]
-            set "output-d" outputHeader "Output D" []
-            set "output-e" outputHeader "Output E" []
+            outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-output-a-analysis" ]
+            outputSet "output-b" "assay-table" outputHeader "Output B" [ "pv-output-b-analysis"; "pv-output-b-replicate-1"; "pv-output-b-replicate-2" ]
+            outputSet "output-c" "assay-table" outputHeader "Output C" [ "pv-output-c-analysis" ]
+            outputSet "output-d" "assay-table" outputHeader "Output D" []
+            outputSet "output-e" "assay-table" outputHeader "Output E" []
         ]
 
     let connections =
         [
-            connection "connection-a" "input-a" "output-a"
-            connection "connection-b" "input-a" "output-b"
-            connection "connection-c" "input-b" "output-b"
-            connection "connection-d" "input-c" "output-c"
-            connection "connection-e" "input-d" "output-d"
+            connection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
+            connection "connection-b" "assay-table" (Some "assay-process") "input-a" "output-b"
+            connection "connection-c" "assay-table" (Some "assay-process") "input-b" "output-b"
+            connection "connection-d" "assay-table" (Some "assay-process") "input-c" "output-c"
+            connection "connection-e" "assay-table" (Some "assay-process") "input-d" "output-d"
         ]
 
-    {
-        LoadedTableName = "assay-table"
-        PropertyValues = propertyValues |> List.map (fun value -> value.Id, value) |> Map.ofList
-        InputSets = inputSets |> List.map (fun set -> set.Id, set) |> Map.ofList
-        OutputSets = outputSets |> List.map (fun set -> set.Id, set) |> Map.ofList
-        Connections = connections |> List.map (fun connection -> connection.Id, connection) |> Map.ofList
-    }
+    model "assay-table" propertyValues inputSets outputSets connections
