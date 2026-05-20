@@ -30,8 +30,8 @@ module private DataAnnotatorWidgetModel =
 
     type Msg =
         | UpdateDataFile of DataFile option
-        | ToggleHeader
-        | UpdateSeparator of string
+        | UpdateParsedDataFile of ParsedDataFile
+        // | ToggleHeader
         | UpdateLoading of bool
 
     let update (state: Model) (msg: Msg) =
@@ -52,19 +52,13 @@ module private DataAnnotatorWidgetModel =
             }
 
             nextState
-        | ToggleHeader ->
+        | UpdateParsedDataFile parsedFile ->
             let nextState = {
                 state with
-                    ParsedFile = state.ParsedFile |> Option.map (fun file -> file.ToggleHeader())
+                    ParsedFile = Some parsedFile
+                    Loading = false
             }
 
-            nextState
-        | UpdateSeparator newSep ->
-            let parsedFile =
-                state.DataFile
-                |> Option.map (fun file -> ParsedDataFile.fromFileBySeparator newSep file)
-
-            let nextState = { state with ParsedFile = parsedFile }
             nextState
         | UpdateLoading isLoading -> { state with Loading = isLoading }
 
@@ -318,18 +312,21 @@ type DataAnnotator =
         ]
 
     [<ReactComponent>]
-    static member private UpdateSeparatorButton dispatch =
-        let updateSeparator = fun s -> UpdateSeparator s |> dispatch
+    static member private UpdateSeparatorButton(dataFile: DataFile, dispatch) =
 
-        let input_, setInput = React.useState ("")
+        let input, setInput = React.useState ("")
         let isOpen, setOpen = React.useState false
-        let close = fun _ -> setOpen false
-        let hasError = String.IsNullOrEmpty input_
+        let hasError = String.IsNullOrEmpty input
 
-        let setInputDropdown (s: string) =
-            fun _ ->
-                setInput s
+        let dispatchUpdateSeparator s =
+            promise {
+                UpdateLoading true |> dispatch
+                do! Promise.sleep 0 // let React re-render the loading state
+                let parsed = ParsedDataFile.fromFileBySeparator s dataFile
+                UpdateParsedDataFile parsed |> dispatch
                 setOpen false
+            }
+            |> Promise.start
 
         Html.div [
             prop.className "swt:join"
@@ -344,35 +341,38 @@ type DataAnnotator =
                         prop.children [ Primitive.Icons.AngleDown() ]
                     ],
                     React.Fragment [
-                        DataAnnotator.UpdateSeparatorDropdownElement("Tab (\\t)", setInputDropdown "\\t")
-                        DataAnnotator.UpdateSeparatorDropdownElement(",", setInputDropdown ",")
-                        DataAnnotator.UpdateSeparatorDropdownElement(";", setInputDropdown ";")
-                        DataAnnotator.UpdateSeparatorDropdownElement("|", setInputDropdown "|")
+                        DataAnnotator.UpdateSeparatorDropdownElement(
+                            "Tab (\\t)",
+                            fun _ -> dispatchUpdateSeparator "\\t"
+                        )
+                        DataAnnotator.UpdateSeparatorDropdownElement(",", fun _ -> dispatchUpdateSeparator ",")
+                        DataAnnotator.UpdateSeparatorDropdownElement(";", fun _ -> dispatchUpdateSeparator ";")
+                        DataAnnotator.UpdateSeparatorDropdownElement("|", fun _ -> dispatchUpdateSeparator "|")
                     ]
                 )
                 Html.input [
                     prop.className "swt:input swt:join-item"
                     prop.placeholder ".. update separator"
-                    prop.value input_
+                    prop.value input
                     prop.onChange (fun s -> setInput s)
                     prop.onKeyDown (
                         key.enter,
                         fun _ ->
                             if not hasError then
-                                updateSeparator input_
+                                dispatchUpdateSeparator input
                     )
                 ]
                 Html.button [
                     prop.className "swt:btn swt:join-item"
                     prop.text "Update"
                     prop.disabled hasError
-                    prop.onClick (fun _ -> updateSeparator input_)
+                    prop.onClick (fun _ -> dispatchUpdateSeparator input)
                 ]
             ]
         ]
 
     [<ReactComponent>]
-    static member private UpdateIsHeaderCheckbox(model: Model, dispatch) =
+    static member private UpdateIsHeaderCheckbox(model: Model, dispatch: Msg -> unit) =
         let hasHeader = model.ParsedFile.IsSome && model.ParsedFile.Value.HeaderRow.IsSome
 
         Html.button [
@@ -380,7 +380,15 @@ type DataAnnotator =
                 prop.className "swt:btn swt:btn-primary"
             else
                 prop.className "swt:btn"
-            prop.onClick (fun _ -> ToggleHeader |> dispatch)
+            prop.onClick (fun _ ->
+                promise {
+                    UpdateLoading true |> dispatch
+                    do! Promise.sleep 0 // let React re-render the loading state
+                    let next = model.ParsedFile.Value.ToggleHeader()
+                    UpdateParsedDataFile next |> dispatch
+                }
+                |> Promise.start
+            )
             prop.children [
                 Html.p [
                     if not hasHeader then
@@ -457,12 +465,19 @@ type DataAnnotator =
 
     [<ReactComponent>]
     static member private DataFileConfigComponent
-        (model, destination: AnnotationDestination, target, setTarget, writeMode, setWriteMode, dispatch)
-        =
+        (
+            model: Model,
+            destination: AnnotationDestination,
+            target,
+            setTarget,
+            writeMode,
+            setWriteMode,
+            dispatch: Msg -> unit
+        ) =
         Html.div [
             prop.className "swt:flex swt:flex-row swt:gap-4"
             prop.children [
-                DataAnnotator.UpdateSeparatorButton dispatch
+                DataAnnotator.UpdateSeparatorButton(model.DataFile.Value, dispatch)
                 DataAnnotator.UpdateIsHeaderCheckbox(model, dispatch)
                 match destination with
                 | AnnotationDestination.Table _ -> DataAnnotator.UpdateTargetColumn(target, writeMode, setTarget)
@@ -503,6 +518,10 @@ type DataAnnotator =
                     dispatch
                 )
                 DataAnnotator.FileMetadataComponent model.DataFile.Value
+                Html.button [
+                    prop.onClick (fun _ -> UpdateLoading(not model.Loading) |> dispatch)
+                    prop.text "Toggle Loading"
+                ]
             ]
 
         let content = DataAnnotator.Table(model.ParsedFile.Value, state, setState)
