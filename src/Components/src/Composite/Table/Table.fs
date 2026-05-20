@@ -75,8 +75,7 @@ swt:p-0"""
             ?onKeydown: (Browser.Types.KeyboardEvent * GridSelect.GridSelectHandle * CellCoordinate option) -> unit,
             ?enableColumnHeaderSelect: bool,
             ?defaultStyleSelect: bool,
-            ?debug: bool,
-            ?annotator: bool
+            ?debug: bool
         ) =
 
         // check for navigator agent if it is safari
@@ -85,7 +84,6 @@ swt:p-0"""
             userAgent.Contains "Safari" && not (userAgent.Contains "Chrome")
 
         let debug = defaultArg debug false
-        let annotator = defaultArg annotator false
         let enableColumnHeaderSelect = defaultArg enableColumnHeaderSelect false
         let defaultStyleSelect = defaultArg defaultStyleSelect true
 
@@ -376,10 +374,9 @@ swt:p-0"""
                                             prop.style [ style.marginTop Constants.Table.DefaultRowHeight ]
                                             prop.children [
                                                 for virtualRow in rowVirtualizer.getVirtualItems () do
-                                                    let rowStart =
-                                                        if annotator then virtualRow.``end`` else virtualRow.start
+                                                    let rowStart = virtualRow.start
 
-                                                    if virtualRow.index = 0 && not annotator then
+                                                    if virtualRow.index = 0 then
                                                         Html.none // skip header row, is part of thead
                                                     else
                                                         Html.tr [

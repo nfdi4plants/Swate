@@ -12,10 +12,6 @@ type WidgetHostView =
     | MetadataView
     | PreviewErrorView
 
-type DataAnnotatorWidgetServices = {
-    pickTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], string>>
-}
-
 type TemplateWidgetServices = {
     loadTemplates: unit -> Async<Result<Template[], string>>
 }

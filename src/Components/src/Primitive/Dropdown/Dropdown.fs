@@ -1,11 +1,13 @@
 namespace Swate.Components.Primitive.Dropdown
 
+open Fable.Core
 open Feliz
 open Swate.Components
 
+[<Erase; Mangle(false)>]
 type Dropdown =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (
             isOpen,
