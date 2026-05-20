@@ -53,17 +53,12 @@ module FileTreeDeleteWorkflow =
             |> Promise.start
 
     let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem) =
-        if canDeleteItem item then
-            [
-                {
-                    Label = "Delete"
-                    Icon = "swt:fluent--delete-24-regular"
-                    OnClick = fun () -> requestDeleteItem item
-                    Disabled = None
-                }
-            ]
-        else
-            []
+        FileExplorerContextMenuItem.whenItem
+            canDeleteItem
+            "Delete"
+            "swt:fluent--delete-24-regular"
+            requestDeleteItem
+            item
 
 [<Erase; Mangle(false)>]
 type FileTreeDelete =

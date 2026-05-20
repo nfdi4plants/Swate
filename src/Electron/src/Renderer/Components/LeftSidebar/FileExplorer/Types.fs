@@ -16,3 +16,9 @@ type ArcRenameDraft = {
     SourcePath: string
     InitialName: string
 }
+
+module FileExplorerItemPath =
+
+    let tryGetRelativePath (item: FileItem) =
+        item.Path
+        |> Option.map PathHelpers.normalizeCanonicalRelativePath

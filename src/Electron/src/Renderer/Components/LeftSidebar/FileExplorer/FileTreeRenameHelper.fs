@@ -6,10 +6,6 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.RenamePathRules
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 
-let private tryGetItemRelativePath (item: FileItem) =
-    item.Path
-    |> Option.map PathHelpers.normalizeCanonicalRelativePath
-
 let private normalizeRelativePath (path: string) =
     path
     |> PathHelpers.normalizeCanonicalRelativePath
@@ -24,11 +20,11 @@ let private isRenameContextMenuTarget (relativePath: string) =
     ArcDeletePathRules.isRenamePathAllowed relativePath
 
 let canRenameItem (item: FileItem) =
-    tryGetItemRelativePath item
+    FileExplorerItemPath.tryGetRelativePath item
     |> Option.exists isRenameContextMenuTarget
 
 let tryBuildRenameDraft (item: FileItem) : Result<ArcRenameDraft, string> =
-    match tryGetItemRelativePath item with
+    match FileExplorerItemPath.tryGetRelativePath item with
     | None -> Error "Could not resolve the selected item path for rename."
     | Some relativePath ->
         let normalizedRelativePath = normalizeRelativePath relativePath

@@ -109,9 +109,7 @@ let getItemIconClass (item: FileItem) =
 
 
 let tryGetItemRelativePath (item: FileItem) =
-    item.Path
-    |> Option.map PathHelpers.normalizeRelativePath
-    |> Option.map PathHelpers.normalizePath
+    FileExplorerItemPath.tryGetRelativePath item
 
 let canDeleteItem (item: FileItem) =
     tryGetItemRelativePath item
@@ -216,21 +214,6 @@ let arcCreateKindIcon =
     | ArcExplorerNodeKind.Workflow -> "swt:fluent--flowchart-24-regular"
     | ArcExplorerNodeKind.Run -> "swt:fluent--play-24-regular"
     | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
-
-let arcCreateKinds = [
-    ArcExplorerNodeKind.Study
-    ArcExplorerNodeKind.Assay
-    ArcExplorerNodeKind.Workflow
-    ArcExplorerNodeKind.Run
-]
-
-let arcCreateKindSortOrder =
-    function
-    | ArcExplorerNodeKind.Study -> 10
-    | ArcExplorerNodeKind.Assay -> 20
-    | ArcExplorerNodeKind.Workflow -> 30
-    | ArcExplorerNodeKind.Run -> 40
-    | _ -> 1000
 
 let arcCreateKindDefaultIdentifier =
     function

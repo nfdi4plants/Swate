@@ -14,6 +14,7 @@ open Fable.Core
 open ARCtrl
 open Types
 open Helper
+open Swate.Electron.Shared.RenamePathRules
 
 module private FileTreeHelper =
 
@@ -314,67 +315,65 @@ type FileTree =
                 match tryGetItemRelativePath draft.Parent with
                 | None -> applyFileSystemCreateError "Could not resolve the selected folder path."
                 | Some parentPath ->
-                    setIsCreatingFileSystemItem true
+                    match tryBuildGenericFileSystemChildPath parentPath name with
+                    | Error errorMessage -> applyFileSystemCreateError errorMessage
+                    | Ok _ ->
+                        setIsCreatingFileSystemItem true
 
-                    promise {
-                        let! createResult =
-                            Api.ipcArcVaultApi.createFileSystemItem {
-                                parentPath = parentPath
-                                name = name
-                                kind = draft.Kind
-                            }
+                        promise {
+                            let! createResult =
+                                Api.ipcArcVaultApi.createFileSystemItem {
+                                    parentPath = parentPath
+                                    name = name
+                                    kind = draft.Kind
+                                }
 
-                        match createResult with
-                        | Error exn -> applyFileSystemCreateError exn.Message
-                        | Ok createdPath ->
-                            let selectedPath = PathHelpers.normalizePath createdPath
-                            fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                            match createResult with
+                            | Error exn -> applyFileSystemCreateError exn.Message
+                            | Ok createdPath ->
+                                let selectedPath = PathHelpers.normalizePath createdPath
+                                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                            match draft.Kind with
-                            | FileSystemItemKind.File ->
-                                let! openResult = Api.ipcArcVaultApi.openFile selectedPath
+                                match draft.Kind with
+                                | FileSystemItemKind.File ->
+                                    let! openResult = Api.ipcArcVaultApi.openFile selectedPath
 
-                                match openResult with
-                                | Ok dto ->
-                                    dto
-                                    |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                                    |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
-                                | Error _ ->
-                                    FileContentDTO.create ARCtrl.Contract.DTOType.PlainText "" selectedPath
-                                    |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                                    |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
-                            | FileSystemItemKind.Folder ->
-                                setLoadedDirectoryPaths (fun current -> current.Add selectedPath)
-                                pageStateCtx.setState None
+                                    match openResult with
+                                    | Ok dto ->
+                                        dto
+                                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                    | Error _ ->
+                                        FileContentDTO.create ARCtrl.Contract.DTOType.PlainText "" selectedPath
+                                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                | FileSystemItemKind.Folder ->
+                                    setLoadedDirectoryPaths (fun current -> current.Add selectedPath)
+                                    pageStateCtx.setState None
 
-                            closeFileSystemCreateModal ()
-                    }
-                    |> Promise.catch (fun exn -> applyFileSystemCreateError exn.Message)
-                    |> Promise.map (fun _ -> setIsCreatingFileSystemItem false)
-                    |> Promise.start
+                                closeFileSystemCreateModal ()
+                        }
+                        |> Promise.catch (fun exn -> applyFileSystemCreateError exn.Message)
+                        |> Promise.map (fun _ -> setIsCreatingFileSystemItem false)
+                        |> Promise.start
 
         let arcCreateContextMenuItems (item: FileItem) =
-            if item.IsDirectory then
-                arcCreateKinds
-                |> List.sortBy arcCreateKindSortOrder
-                |> List.map (fun kind -> {
-                    Label = $"Add {ArcExplorerNodeKind.label kind}"
-                    Icon = arcCreateKindIcon kind
-                    OnClick = fun () -> openCreateModal kind
-                    Disabled = None
-                })
-            else
-                []
+            inlineCreateKindForItem item
+            |> Option.map (fun kind ->
+                FileExplorerContextMenuItem.create
+                    $"Add {ArcExplorerNodeKind.label kind}"
+                    (arcCreateKindIcon kind)
+                    (fun () -> openCreateModal kind))
+            |> Option.toList
 
         let fileSystemCreateContextMenuItems (item: FileItem) =
             if canCreateFileSystemItemIn item then
                 fileSystemCreateKinds
-                |> List.map (fun kind -> {
-                    Label = $"New {fileSystemCreateKindLabel kind}"
-                    Icon = fileSystemCreateKindIcon kind
-                    OnClick = fun () -> openFileSystemCreateModal kind item
-                    Disabled = None
-                })
+                |> List.map (fun kind ->
+                    FileExplorerContextMenuItem.create
+                        $"New {fileSystemCreateKindLabel kind}"
+                        (fileSystemCreateKindIcon kind)
+                        (fun () -> openFileSystemCreateModal kind item))
             else
                 []
 
