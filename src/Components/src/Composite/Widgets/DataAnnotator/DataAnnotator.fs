@@ -36,22 +36,11 @@ module private DataAnnotatorWidgetModel =
 
     let update (state: Model) (msg: Msg) =
         match msg with
-        | UpdateDataFile dataFile ->
-            let parsedFile =
-                dataFile
-                |> Option.map (fun file ->
-                    let s = file.ExpectedSeparator
-                    ParsedDataFile.fromFileBySeparator s file
-                )
-
-            let nextState: Model = {
-                state with
-                    DataFile = dataFile
-                    ParsedFile = parsedFile
-                    Loading = false
-            }
-
-            nextState
+        | UpdateDataFile dataFile -> {
+            state with
+                DataFile = dataFile
+                ParsedFile = None
+          }
         | UpdateParsedDataFile parsedFile ->
             let nextState = {
                 state with
@@ -168,8 +157,12 @@ type DataAnnotator =
 
     [<ReactComponent>]
     static member private Table
-        (file: ParsedDataFile, state: Set<DataTarget>, setState: (Set<DataTarget> -> Set<DataTarget>) -> unit)
-        =
+        (
+            file: ParsedDataFile,
+            state: Set<DataTarget>,
+            setState: (Set<DataTarget> -> Set<DataTarget>) -> unit,
+            isLoading: bool
+        ) =
         let toggleTarget =
             React.useCallback (
                 (fun (target: DataTarget) ->
@@ -247,7 +240,7 @@ type DataAnnotator =
             )
 
         Html.div [
-            prop.className "swt:overflow-hidden swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[80%]"
+            prop.className "swt:relative swt:overflow-hidden swt:grid swt:grid-cols-1 swt:grid-rows swt:h-[80%]"
             prop.children [
                 Table.Table(
                     rowCount,
@@ -299,6 +292,16 @@ type DataAnnotator =
                     (fun _ -> Html.div []),
                     tableRef
                 )
+                if isLoading then
+                    Html.div [
+                        prop.className
+                            "swt:absolute swt:inset-0 swt:flex swt:items-center swt:justify-center swt:bg-base-100/60 swt:z-10"
+                        prop.children [
+                            Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
+                                size = Primitive.Types.DaisyuiSize.XL
+                            )
+                        ]
+                    ]
             ]
         ]
 
@@ -518,13 +521,10 @@ type DataAnnotator =
                     dispatch
                 )
                 DataAnnotator.FileMetadataComponent model.DataFile.Value
-                Html.button [
-                    prop.onClick (fun _ -> UpdateLoading(not model.Loading) |> dispatch)
-                    prop.text "Toggle Loading"
-                ]
             ]
 
-        let content = DataAnnotator.Table(model.ParsedFile.Value, state, setState)
+        let content =
+            DataAnnotator.Table(model.ParsedFile.Value, state, setState, model.Loading)
 
         let footer =
             Html.div [
@@ -633,22 +633,25 @@ type DataAnnotator =
 
         let pickFile (file: Browser.Types.File) =
             promise {
-
                 UpdateLoading true |> dispatch
 
                 try
-                    try
-                        let! content = file.text ()
+                    let! content = file.text ()
 
-                        let name = file.name
+                    let name = file.name
 
-                        let loadedDataFile =
-                            DataFile.create (name, fileTypeFromName name, content, float file.size)
+                    let loadedDataFile =
+                        DataFile.create (name, fileTypeFromName name, content, float file.size)
 
-                        UpdateDataFile(Some loadedDataFile) |> dispatch
-                    with ex ->
-                        onError $"Failed to read file: {ex.Message}"
-                finally
+                    UpdateDataFile(Some loadedDataFile) |> dispatch
+                    do! Promise.sleep 0
+
+                    let parsedFile =
+                        ParsedDataFile.fromFileBySeparator loadedDataFile.ExpectedSeparator loadedDataFile
+
+                    UpdateParsedDataFile parsedFile |> dispatch
+                with ex ->
+                    onError $"Failed to read file: {ex.Message}"
                     UpdateLoading false |> dispatch
             }
             |> Promise.start
