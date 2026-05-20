@@ -302,31 +302,7 @@ type Widget =
     [<ReactComponent>]
     static member DataAnnotator(model: Model, dispatch, rmv) =
 
-        let pendingPickResolve =
-            React.useRef (None: (Result<ImportedTextFile[], string> -> unit) option)
-
-        let setArcFile nextArcFile =
-            nextArcFile |> Spreadsheet.UpdateArcFile |> SpreadsheetMsg |> dispatch
-
-        let content =
-            match model.SpreadsheetModel.ArcFile with
-            | None ->
-                Html.div [
-                    prop.className "swt:p-3 swt:text-sm swt:opacity-70"
-                    prop.text "Load an ArcFile to use the Data Annotator."
-                ]
-            | Some arcFile ->
-                match tryGetDataAnnotatorDestination (model.SpreadsheetModel.ActiveView, arcFile) with
-                | Result.Ok destination ->
-                    Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotatorWidget.Main(
-                        destination,
-                        applyDataAnnotatorInputToArcFile (destination, arcFile, setArcFile)
-                    )
-                | Result.Error message ->
-                    Html.div [
-                        prop.className "swt:p-3 swt:text-sm swt:opacity-70"
-                        prop.text message
-                    ]
+        let content = Pages.DataAnnotator.Main(model, dispatch)
 
         let prefix = WidgetLiterals.DataAnnotator
         Widget.Base(content, prefix, rmv, prefix)

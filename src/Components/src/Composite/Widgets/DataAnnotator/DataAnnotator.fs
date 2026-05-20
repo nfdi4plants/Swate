@@ -31,7 +31,7 @@ module private DataAnnotatorWidgetModel =
     type Msg =
         | UpdateDataFile of DataFile option
         | ToggleHeader
-        | UpdateSeperator of string
+        | UpdateSeparator of string
         | UpdateLoading of bool
 
     let update (state: Model) (msg: Msg) =
@@ -59,7 +59,7 @@ module private DataAnnotatorWidgetModel =
             }
 
             nextState
-        | UpdateSeperator newSep ->
+        | UpdateSeparator newSep ->
             let parsedFile =
                 state.DataFile
                 |> Option.map (fun file -> ParsedDataFile.fromFileBySeparator newSep file)
@@ -71,7 +71,7 @@ module private DataAnnotatorWidgetModel =
 open DataAnnotatorWidgetModel
 
 [<Erase; Mangle(false)>]
-type DataAnnotatorWidget =
+type DataAnnotator =
 
     [<ReactComponent>]
     static member private FileMetadataComponent(file: DataFile) =
@@ -242,7 +242,7 @@ type DataAnnotatorWidget =
                     || selectedRows.Contains targetRowIndex
                 | _ -> false
 
-            DataAnnotatorWidget.TableCellButton(
+            DataAnnotator.TableCellButton(
                 rowIndex,
                 columnIndex,
                 content,
@@ -268,7 +268,13 @@ type DataAnnotatorWidget =
                                 if bodyRowIndex < 0 || bodyRowIndex >= bodyRowCount then
                                     mkCell index.y index.x "" None
                                 else
-                                    mkCell index.y index.x (string bodyRowIndex) (Some(DataTarget.Row bodyRowIndex))
+                                    let content =
+                                        if hasHeader then
+                                            string (bodyRowIndex + 1)
+                                        else
+                                            string bodyRowIndex
+
+                                    mkCell index.y index.x content (Some(DataTarget.Row bodyRowIndex))
                         elif hasHeader && index.y = 0 then
                             let dataColumnIndex = index.x - 1
 
@@ -313,7 +319,7 @@ type DataAnnotatorWidget =
 
     [<ReactComponent>]
     static member private UpdateSeparatorButton dispatch =
-        let updateSeparator = fun s -> UpdateSeperator s |> dispatch
+        let updateSeparator = fun s -> UpdateSeparator s |> dispatch
 
         let input_, setInput = React.useState ("")
         let isOpen, setOpen = React.useState false
@@ -338,10 +344,10 @@ type DataAnnotatorWidget =
                         prop.children [ Primitive.Icons.AngleDown() ]
                     ],
                     React.Fragment [
-                        DataAnnotatorWidget.UpdateSeparatorDropdownElement("Tab (\\t)", setInputDropdown "\\t")
-                        DataAnnotatorWidget.UpdateSeparatorDropdownElement(",", setInputDropdown ",")
-                        DataAnnotatorWidget.UpdateSeparatorDropdownElement(";", setInputDropdown ";")
-                        DataAnnotatorWidget.UpdateSeparatorDropdownElement("|", setInputDropdown "|")
+                        DataAnnotator.UpdateSeparatorDropdownElement("Tab (\\t)", setInputDropdown "\\t")
+                        DataAnnotator.UpdateSeparatorDropdownElement(",", setInputDropdown ",")
+                        DataAnnotator.UpdateSeparatorDropdownElement(";", setInputDropdown ";")
+                        DataAnnotator.UpdateSeparatorDropdownElement("|", setInputDropdown "|")
                     ]
                 )
                 Html.input [
@@ -456,12 +462,12 @@ type DataAnnotatorWidget =
         Html.div [
             prop.className "swt:flex swt:flex-row swt:gap-4"
             prop.children [
-                DataAnnotatorWidget.UpdateSeparatorButton dispatch
-                DataAnnotatorWidget.UpdateIsHeaderCheckbox(model, dispatch)
+                DataAnnotator.UpdateSeparatorButton dispatch
+                DataAnnotator.UpdateIsHeaderCheckbox(model, dispatch)
                 match destination with
-                | AnnotationDestination.Table _ -> DataAnnotatorWidget.UpdateTargetColumn(target, writeMode, setTarget)
+                | AnnotationDestination.Table _ -> DataAnnotator.UpdateTargetColumn(target, writeMode, setTarget)
                 | AnnotationDestination.DataMap _ -> Html.none
-                DataAnnotatorWidget.UpdateWriteMode(writeMode, setWriteMode)
+                DataAnnotator.UpdateWriteMode(writeMode, setWriteMode)
             ]
         ]
 
@@ -487,7 +493,7 @@ type DataAnnotatorWidget =
 
         let modalActivity =
             Html.div [
-                DataAnnotatorWidget.DataFileConfigComponent(
+                DataAnnotator.DataFileConfigComponent(
                     model,
                     destination,
                     targetCol,
@@ -496,10 +502,10 @@ type DataAnnotatorWidget =
                     setWriteMode,
                     dispatch
                 )
-                DataAnnotatorWidget.FileMetadataComponent model.DataFile.Value
+                DataAnnotator.FileMetadataComponent model.DataFile.Value
             ]
 
-        let content = DataAnnotatorWidget.Table(model.ParsedFile.Value, state, setState)
+        let content = DataAnnotator.Table(model.ParsedFile.Value, state, setState)
 
         let footer =
             Html.div [
@@ -646,9 +652,9 @@ type DataAnnotatorWidget =
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:gap-2"
                 prop.children [
-                    DataAnnotatorWidget.InfoText()
-                    DataAnnotatorWidget.UploadButton(UploadButtonInputRef, pickFile)
-                    DataAnnotatorWidget.OpenAnnotatorTableModal(model, (fun () -> setShowModal true))
+                    DataAnnotator.InfoText()
+                    DataAnnotator.UploadButton(UploadButtonInputRef, pickFile)
+                    DataAnnotator.OpenAnnotatorTableModal(model, (fun () -> setShowModal true))
                 ]
             ]
 
@@ -657,6 +663,6 @@ type DataAnnotatorWidget =
                   DataFile = Some _
                   ParsedFile = Some _
               },
-              true -> DataAnnotatorWidget.Modal(destination, model, dispatch, showModal, setShowModal, submit)
+              true -> DataAnnotator.Modal(destination, model, dispatch, showModal, setShowModal, submit)
             | _, _ -> Html.none
         ]

@@ -63,11 +63,7 @@ type private LazyComponents =
 
     [<ReactLazyComponent>]
     static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
-        Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotatorWidget.Main(
-            destination,
-            setAnnotationInput,
-            onError
-        )
+        Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotator.Main(destination, setAnnotationInput, onError)
 
     [<ReactLazyComponent>]
     static member LazyArcFileMetadata(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
