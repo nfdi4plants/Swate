@@ -3,7 +3,9 @@ module ElectronCore.IpcArchitectureReviewTests
 open Fable.Core
 open Main.Bindings.Path
 open Main.ArcVault
-open Main.IPC.ArcVaultsApi
+open Main.ArcVaultTypes
+open Main.IPC.FileSystemIO
+open Main.IPC.Rename
 open Main.ArcMerge
 open Swate.Components.Shared
 open ARCtrl
@@ -135,8 +137,9 @@ Vitest.describe("ARC delete and rename validation", fun () ->
         Vitest.expect(ArcPathValidation.isWithinRootPath "C:/arc" "C:/other/place.txt").toBe(false)
     )
 
-    Vitest.test("isDeletePathAllowed only permits add-zone descendants", fun () ->
+    Vitest.test("isDeletePathAllowed permits safe non-ARC filesystem targets", fun () ->
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe(true)
+        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "test.fsx").toBe(true)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies").toBe(false)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "README.md").toBe(false)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
@@ -227,7 +230,7 @@ Vitest.describe("ARC delete and rename validation", fun () ->
         | Ok plan ->
             Vitest.expect(plan.SourcePath).toBe("assays/OldAssay")
             Vitest.expect(plan.TargetPath).toBe("assays/NewAssay")
-            Vitest.expect(plan.SyncPlan.Zone).toEqual(ArcDeletePathRules.AddZone.Assays)
+            Vitest.expect(plan.SyncPlan.FileType).toEqual(ArcFilesDiscriminate.Assay)
             Vitest.expect(plan.SyncPlan.OldIdentifier).toBe("OldAssay")
             Vitest.expect(plan.SyncPlan.NewIdentifier).toBe("NewAssay")
     )

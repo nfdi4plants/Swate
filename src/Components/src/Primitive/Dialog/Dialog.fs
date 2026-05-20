@@ -1,12 +1,37 @@
-namespace Renderer.Components.LeftSidebar.FileExplorer
+namespace Swate.Components.Primitive.Dialog
 
-open Swate.Components.Primitive.BaseModal
 open Feliz
+open Fable.Core
+open Swate.Components.Primitive.BaseModal
 
-type FileExplorerNameInputModal =
+[<Erase; Mangle(false)>]
+type Dialog =
 
     [<ReactComponent>]
-    static member Main
+    static member Dialog
+        (
+            isOpen: bool,
+            setIsOpen: bool -> unit,
+            header: ReactElement,
+            children: ReactElement,
+            ?description: ReactElement,
+            ?footer: ReactElement,
+            ?debug: string,
+            ?className: string
+        ) =
+        BaseModal.Modal(
+            isOpen = isOpen,
+            setIsOpen = setIsOpen,
+            header = header,
+            children = children,
+            ?description = description,
+            ?footer = footer,
+            ?debug = debug,
+            ?className = className
+        )
+
+    [<ReactComponent>]
+    static member StringSubmissionDialog
         (
             isOpen: bool,
             title: string,
@@ -26,7 +51,6 @@ type FileExplorerNameInputModal =
         let value, setValue = React.useState initialValue
         let isBusy = defaultArg isBusy false
         let busyLabel = defaultArg busyLabel submitLabel
-        let debug = defaultArg debug "file-explorer-name-input"
 
         React.useEffect ((fun () -> setValue initialValue), [| box initialValue; box isOpen; box title |])
 
@@ -89,12 +113,12 @@ type FileExplorerNameInputModal =
                 ]
             ]
 
-        BaseModal.Modal(
+        Dialog.Dialog(
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text title,
             description = Html.text description,
             children = content,
             footer = footer,
-            debug = debug
+            ?debug = debug
         )

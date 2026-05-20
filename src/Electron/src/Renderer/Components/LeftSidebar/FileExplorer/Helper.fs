@@ -107,30 +107,10 @@ let getItemIconClass (item: FileItem) =
         | Some colorClass -> Some colorClass
         | None -> colorClassForArcWorkbookFile fileName
 
-
-let tryGetItemRelativePath (item: FileItem) =
-    FileExplorerItemPath.tryGetRelativePath item
-
 let canDeleteItem (item: FileItem) =
-    tryGetItemRelativePath item
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
     |> Option.exists ArcDeletePathRules.isDeletePathAllowed
-
-let canCreateFileSystemItemIn (item: FileItem) =
-    item.IsDirectory
-    && (tryGetItemRelativePath item
-        |> Option.exists ArcDeletePathRules.isGenericFileSystemParentAllowed)
-
-let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
-
-let fileSystemCreateKindLabel =
-    function
-    | FileSystemItemKind.File -> "File"
-    | FileSystemItemKind.Folder -> "Folder"
-
-let fileSystemCreateKindIcon =
-    function
-    | FileSystemItemKind.File -> "swt:fluent--document-add-24-regular"
-    | FileSystemItemKind.Folder -> "swt:fluent--folder-add-24-regular"
 
 let rec private collectSelectedDirectoryPathChain
     (selectedTreeItemPath: string option)

@@ -1,0 +1,285 @@
+module Main.IPC.FileSystemIO
+
+open System
+open Fable.Core
+open Fable.Core.JsInterop
+open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.RenamePathRules
+
+let private fsPromisesDynamic: obj = importAll "fs/promises"
+let private pathDynamic: obj = importAll "path"
+
+[<RequireQualifiedAccess>]
+module ArcPathValidation =
+
+    let normalizePathForComparison (pathValue: string) =
+        PathHelpers.normalizePathForFsComparison pathValue
+
+    let containsTraversalSegments (pathValue: string) =
+        PathHelpers.containsPathTraversalSegments pathValue
+
+    let isSafeRelativePathCandidate (pathValue: string) =
+        let normalizedPath = PathHelpers.normalizePath pathValue
+
+        not (String.IsNullOrWhiteSpace normalizedPath)
+        && normalizedPath <> "."
+        && not (pathDynamic?isAbsolute (normalizedPath) |> unbox<bool>)
+        && not (containsTraversalSegments normalizedPath)
+
+    let isWithinRootPath (rootPath: string) (candidatePath: string) =
+        let normalizedRootPath =
+            pathDynamic?resolve (rootPath) |> unbox<string> |> normalizePathForComparison
+
+        let normalizedCandidatePath =
+            pathDynamic?resolve (candidatePath)
+            |> unbox<string>
+            |> normalizePathForComparison
+
+        normalizedCandidatePath = normalizedRootPath
+        || normalizedCandidatePath.StartsWith(normalizedRootPath + "/")
+
+let resolveAbsolutePath (pathValue: string) =
+    pathDynamic?resolve (pathValue) |> unbox<string>
+
+let tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
+    let arcRoot = resolveAbsolutePath arcPath
+    let absolutePath = resolveAbsolutePath requestedAbsolutePath
+
+    let relativePath =
+        pathDynamic?relative (arcRoot, absolutePath)
+        |> unbox<string>
+        |> PathHelpers.normalizePath
+
+    if String.IsNullOrWhiteSpace relativePath || relativePath = "." then
+        Ok ""
+    elif not (ArcPathValidation.isSafeRelativePathCandidate relativePath) then
+        Error(exn $"Path '{requestedAbsolutePath}' is outside the active ARC root.")
+    elif not (ArcPathValidation.isWithinRootPath arcRoot absolutePath) then
+        Error(exn $"Path '{requestedAbsolutePath}' is outside the active ARC root.")
+    else
+        Ok relativePath
+
+/// Resolves a relative path against the ARC root and rejects absolute or traversal-based escapes.
+let tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) =
+    let relativePath = PathHelpers.normalizePath requestedRelativePath
+
+    if String.IsNullOrWhiteSpace relativePath then
+        Error(exn "RelativePath must not be empty.")
+    elif not (ArcPathValidation.isSafeRelativePathCandidate relativePath) then
+        if pathDynamic?isAbsolute (relativePath) |> unbox<bool> then
+            Error(exn "RelativePath must not be absolute.")
+        else
+            Error(exn "RelativePath must not contain path traversal segments.")
+    else
+        let arcRoot = resolveAbsolutePath arcPath
+        let absolutePath = pathDynamic?resolve (arcRoot, relativePath) |> unbox<string>
+
+        if ArcPathValidation.isWithinRootPath arcRoot absolutePath then
+            Ok absolutePath
+        else
+            Error(exn "RelativePath resolves outside the ARC root.")
+
+let mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> = promise {
+    let mkdirPromise =
+        fsPromisesDynamic?mkdir (directoryPath, createObj [ "recursive" ==> true ])
+        |> unbox<JS.Promise<obj>>
+
+    let! _ = mkdirPromise
+    return ()
+}
+
+let writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Promise<unit> = promise {
+    let writePromise =
+        fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
+        |> unbox<JS.Promise<obj>>
+
+    let! _ = writePromise
+    return ()
+}
+
+let readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
+    fsPromisesDynamic?readFile (absolutePath, "utf8") |> unbox<JS.Promise<string>>
+
+let pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
+    try
+        let! _ = fsPromisesDynamic?access (absolutePath) |> unbox<JS.Promise<obj>>
+        return true
+    with _ ->
+        return false
+}
+
+let tryGetNodeErrorCode (error: exn) : string option =
+    try
+        error?code |> unbox<string> |> Option.ofObj
+    with _ ->
+        None
+
+type private RenameRetryStrategy = {
+    DelaysMs: int[]
+    IsTransientErrorCode: string option -> bool
+}
+
+// Windows file APIs can briefly report lock/contention errors while external processes still hold handles.
+let private renameRetryStrategy = {
+    DelaysMs = [| 0; 75; 200; 500 |]
+    IsTransientErrorCode =
+        function
+        | Some "EPERM"
+        | Some "EACCES"
+        | Some "EBUSY" -> true
+        | _ -> false
+}
+
+let private renameWithRetriesAsync
+    (sourceAbsolutePath: string)
+    (targetAbsolutePath: string)
+    : JS.Promise<Result<unit, exn>> =
+    let rec attempt (attemptIndex: int) = promise {
+        if attemptIndex > 0 then
+            do! Promise.sleep renameRetryStrategy.DelaysMs.[attemptIndex]
+
+        try
+            let! _ =
+                fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath)
+                |> unbox<JS.Promise<obj>>
+
+            return Ok()
+        with renameError ->
+            let errorCode = tryGetNodeErrorCode renameError
+
+            if
+                attemptIndex < renameRetryStrategy.DelaysMs.Length - 1
+                && renameRetryStrategy.IsTransientErrorCode errorCode
+            then
+                return! attempt (attemptIndex + 1)
+            else
+                return Error renameError
+    }
+
+    attempt 0
+
+let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
+    match tryGetNodeErrorCode renameError with
+    | Some "EPERM"
+    | Some "EACCES" ->
+        exn
+            $"Cannot rename '{sourcePath}' to '{targetPath}'. Windows reported a permission or file-lock conflict. If the destination already exists, choose a different name and close apps that may be using these paths."
+    | Some "ENOTEMPTY"
+    | Some "EEXIST" ->
+        exn
+            $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
+    | Some "ENOENT" ->
+        exn
+            $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
+    | _ -> renameError
+
+[<RequireQualifiedAccess>]
+module ArcFileSystemHelper =
+
+    type GenericRenamePlan = {
+        SourcePath: string
+        TargetPath: string
+    }
+        
+
+    let private resolveArcRelativePathPair arcPath firstRelativePath secondRelativePath =
+        match
+            tryResolveArcRelativePath arcPath firstRelativePath,
+            tryResolveArcRelativePath arcPath secondRelativePath
+        with
+        | Error pathError, _
+        | _, Error pathError -> Error pathError
+        | Ok firstAbsolutePath, Ok secondAbsolutePath -> Ok(firstAbsolutePath, secondAbsolutePath)
+
+    let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
+        let! targetExists = pathExistsAsync targetAbsolutePath
+
+        if targetExists then
+            return Error(exn errorMessage)
+        else
+            return Ok()
+    }
+
+    let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<GenericRenamePlan, exn> =
+        let requestedRelativePath =
+            request.relativePath
+            |> PathHelpers.normalizeCanonicalRelativePath
+
+        match tryBuildGenericFileSystemRenameTargetPath requestedRelativePath request.newName with
+        | Error validationError -> Error(exn validationError)
+        | Ok targetPath ->
+            Ok {
+                SourcePath = requestedRelativePath
+                TargetPath = targetPath
+            }
+
+    let renameGenericFileSystemItemOnDisk
+        (arcPath: string)
+        (request: RenamePathRequest)
+        : JS.Promise<Result<unit, exn>> =
+        promise {
+            match tryBuildGenericRenamePlan request with
+            | Error validationError -> return Error validationError
+            | Ok genericRenamePlan ->
+                match resolveArcRelativePathPair arcPath genericRenamePlan.SourcePath genericRenamePlan.TargetPath with
+                | Error pathError -> return Error pathError
+                | Ok(sourceAbsolutePath, targetAbsolutePath) ->
+                    let! targetCheck =
+                        ensureTargetDoesNotExist
+                            targetAbsolutePath
+                            $"Cannot rename '{genericRenamePlan.SourcePath}' to '{genericRenamePlan.TargetPath}' because the destination already exists."
+
+                    match targetCheck with
+                    | Error conflictError -> return Error conflictError
+                    | Ok() ->
+                        let! renameResult =
+                            renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
+
+                        match renameResult with
+                        | Ok() -> return Ok()
+                        | Error renameError ->
+                            return
+                                Error(
+                                    mapRenameDiskError
+                                        genericRenamePlan.SourcePath
+                                        genericRenamePlan.TargetPath
+                                        renameError
+                                )
+        }
+
+    let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
+        promise {
+            let normalizedRelativePath = 
+                relativePath
+                |> PathHelpers.normalizeCanonicalRelativePath
+
+            let isGenericDeleteTarget =
+                match ArcDeletePathRules.classifyDeleteTarget normalizedRelativePath with
+                | ArcDeletePathRules.DeletePathClassification.GenericTarget _
+                | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
+                    ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile _,
+                    _
+                  )
+                | ArcDeletePathRules.DeletePathClassification.AddZoneDescendantTarget _ ->
+                    ArcDeletePathRules.isDeletePathAllowed normalizedRelativePath
+                | _ -> false
+
+            if not isGenericDeleteTarget then
+                return Error(exn "Generic filesystem delete is only supported for safe non-entity paths.")
+            else
+                match tryResolveArcRelativePath arcPath normalizedRelativePath with
+                | Error pathError -> return Error pathError
+                | Ok absolutePath ->
+                    try
+                        let! _ =
+                            fsPromisesDynamic?rm (
+                                absolutePath,
+                                createObj [ "recursive" ==> true; "force" ==> false ]
+                            )
+                            |> unbox<JS.Promise<obj>>
+
+                        return Ok()
+                    with deleteError ->
+                        return Error deleteError
+        }

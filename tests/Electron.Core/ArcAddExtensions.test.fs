@@ -57,6 +57,9 @@ Vitest.describe("ARC AddArcFileAsync", fun () ->
 
             let! reloadedArc = loadArcAsync arcPath
             Vitest.expect(reloadedArc.ContainsAssay("New Assay")).toBe(true)
+            Vitest.expect(vault.hasUnsavedArcChanges).toBe(false)
+            Vitest.expect(vault.arc.Value.hasInMemoryChanges()).toBe(false)
+            Vitest.expect(vault.isBusyWriting).toBe(false)
         }))
 
     Vitest.test("vault add rejects duplicate entities", fun () ->
@@ -72,7 +75,9 @@ Vitest.describe("ARC AddArcFileAsync", fun () ->
 
             match! vault.AddArcFile request with
             | Ok() -> failwith "Expected duplicate entity add to fail."
-            | Error error -> Vitest.expect(error.Message).toContain("already contains assay")
+            | Error error ->
+                Vitest.expect(error.Message).toContain("already contains assay")
+                Vitest.expect(vault.isBusyWriting).toBe(false)
         }))
 
     Vitest.test("adds a study and creates the canonical study file", fun () ->
@@ -178,6 +183,8 @@ Vitest.describe("ARC AddArcFileAsync", fun () ->
             let inMemoryArc = vault.arc |> expectSome <| "Expected vault ARC."
             Vitest.expect(inMemoryArc.ContainsAssay("NewAssay")).toBe(true)
             Vitest.expect(inMemoryArc.GetAssay("ExistingAssay").Title).toEqual(Some "Unsaved local title")
+            Vitest.expect(inMemoryArc.GetAssay("NewAssay").StaticHash).not.toBe(0)
             Vitest.expect(vault.hasUnsavedArcChanges).toBe(true)
+            Vitest.expect(vault.isBusyWriting).toBe(false)
         }))
 )

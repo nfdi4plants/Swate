@@ -8,13 +8,30 @@ open Swate.Components
 open Swate.Components.Primitive
 open Swate.Components.Primitive.ContextMenu.Types
 
+module private ContextMenuDom =
+
+    let tryGetEventTargetElement (e: Event) : Element option =
+        let targetObj: obj = box e.target
+
+        if isNullOrUndefined targetObj then
+            None
+        elif isNullOrUndefined targetObj?closest then
+            let parentElement: obj = targetObj?parentElement
+
+            if isNullOrUndefined parentElement then
+                None
+            else
+                Some(unbox<Element> parentElement)
+        else
+            Some(unbox<Element> targetObj)
+
 [<Erase>]
 [<Mangle(false)>]
 type ContextMenu =
 
     /// <summary></summary>
     /// <param name="childInfo"></param>
-    /// <param name="ref">By default user Browser.document</param>
+    /// <param name="ref">Element that owns the local context-menu listener.</param>
     /// <param name="onSpawn">A function that returns an option of any data. Data is stored in react
     /// state and can be accessed in context menu item onClick handlers. By default stores just the
     /// event target. Only if Some is returned context menu is opened.</param>
@@ -96,76 +113,80 @@ type ContextMenu =
                     timeout.current
                     |> Option.iter (fun timeout -> Fable.Core.JS.clearTimeout timeout)
 
-                let onContextMenu (e: Event) =
-                    let e = e :?> Browser.Types.MouseEvent
-
-                    let isInsideContextMenuScope =
-                        match ref with
-                        | Some ref ->
-                            ref.current
-                            |> Option.exists (fun el ->
-                                let target = e.target :?> HTMLElement
-                                el.contains target)
-                        | None -> true
-
-                    if isInsideContextMenuScope then
-                        match onSpawn e with
-                        | Some data ->
-                            functionIsCalled.current <- false
-                            let children = childInfo data
-
-                            match children with
-                            | [] ->
-                                setSpawnData null
-                                setChildren []
-                                setIsOpen false
-                            | children ->
-                                e.preventDefault ()
-                                setSpawnData (data)
-
-                                children |> setChildren
-
-                                listContentRef.current.AddRange(
-                                    children
-                                    |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
-                                )
-
-                                let rect: ClientRect =
-                                    {|
-                                        width = 0
-                                        height = 0
-                                        x = e.clientX
-                                        y = e.clientY
-                                        top = e.clientY
-                                        left = e.clientX
-                                        right = e.clientX
-                                        bottom = e.clientY
-                                    |}
-                                    |> unbox
-
-                                let vEl = FloatingUI.VirtualElement(fun () -> rect)
-
-                                floating.refs.setPositionReference !^vEl
-                                setIsOpen (true)
-
-                                myClearTimeout ()
-
-                                allowMouseUpCloseRef.current <- false
-                                timeout.current <- Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
-
-                        | None -> ()
-
                 let onMouseUp (e: Event) =
                     if allowMouseUpCloseRef.current then
                         setIsOpen false
 
-                Browser.Dom.document.addEventListener ("contextmenu", onContextMenu)
-                Browser.Dom.document.addEventListener ("mouseup", onMouseUp)
+                let cleanupListeners =
+                    match ref |> Option.bind (fun ref -> ref.current) with
+                    | Some scopedElement ->
+                        let onContextMenu (e: Event) =
+                            let e = e :?> Browser.Types.MouseEvent
+
+                            let isInsideContextMenuScope =
+                                e
+                                |> ContextMenuDom.tryGetEventTargetElement
+                                |> Option.exists (fun target -> scopedElement.contains target)
+
+                            if isInsideContextMenuScope then
+                                match onSpawn e with
+                                | Some data ->
+                                    functionIsCalled.current <- false
+                                    let children = childInfo data
+
+                                    match children with
+                                    | [] ->
+                                        setSpawnData null
+                                        setChildren []
+                                        setIsOpen false
+                                    | children ->
+                                        e.preventDefault ()
+                                        setSpawnData (data)
+
+                                        children |> setChildren
+
+                                        listContentRef.current.AddRange(
+                                            children
+                                            |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
+                                        )
+
+                                        let rect: ClientRect =
+                                            {|
+                                                width = 0
+                                                height = 0
+                                                x = e.clientX
+                                                y = e.clientY
+                                                top = e.clientY
+                                                left = e.clientX
+                                                right = e.clientX
+                                                bottom = e.clientY
+                                            |}
+                                            |> unbox
+
+                                        let vEl = FloatingUI.VirtualElement(fun () -> rect)
+
+                                        floating.refs.setPositionReference !^vEl
+                                        setIsOpen (true)
+
+                                        myClearTimeout ()
+
+                                        allowMouseUpCloseRef.current <- false
+                                        timeout.current <-
+                                            Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
+
+                                | None -> ()
+
+                        scopedElement.addEventListener ("contextmenu", onContextMenu)
+                        scopedElement.addEventListener ("mouseup", onMouseUp)
+
+                        fun () ->
+                            scopedElement.removeEventListener ("mouseup", onMouseUp)
+                            scopedElement.removeEventListener ("contextmenu", onContextMenu)
+                    | None -> ignore
 
                 fun () ->
 
-                    Browser.Dom.document.removeEventListener ("mouseup", onMouseUp)
-                    Browser.Dom.document.removeEventListener ("contextmenu", onContextMenu)
+                    cleanupListeners ()
 
                     myClearTimeout ()
             ),
@@ -332,8 +353,10 @@ type ContextMenu =
                     ref = containerRef,
                     onSpawn =
                         (fun e ->
-                            let target = e.target :?> HTMLElement
-                            let tableCell = target.closest ("[data-row][data-column]")
+                            let tableCell =
+                                e
+                                |> ContextMenuDom.tryGetEventTargetElement
+                                |> Option.bind (fun target -> target.closest ("[data-row][data-column]"))
 
                             match tableCell with
                             | Some cell ->

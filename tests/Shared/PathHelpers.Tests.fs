@@ -127,6 +127,10 @@ let tests =
                 (ArcDeletePathRules.isDeletePathAllowed "assays/MyAssay/notes/custom.txt")
                 "Any descendant under add zones should remain deletable."
 
+            Expect.isTrue
+                (ArcDeletePathRules.isDeletePathAllowed "test.fsx")
+                "Safe root-level generic files should be deletable."
+
         testCase "isDeletePathAllowed rejects protected targets" <| fun _ ->
             Expect.isFalse
                 (ArcDeletePathRules.isDeletePathAllowed "workflows/MyWorkflow/readme.md")
@@ -191,6 +195,10 @@ let tests =
             Expect.isTrue
                 (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
                 "Safe generic descendants should be renameable."
+
+            Expect.isTrue
+                (ArcDeletePathRules.isRenamePathAllowed "test.fsx")
+                "Safe root-level generic files should be renameable."
 
         testCase "buildCanonicalEntityPaths returns entity and datamap canonical files" <| fun _ ->
             let paths =

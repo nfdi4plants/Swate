@@ -336,6 +336,6 @@ module FileContentDTO =
     let fromArcByPath (path: string) (arc: ARC) =
         let normalizedPath = PathHelpers.normalizePath path
 
-        arc.TryArcFileByPath(normalizedPath, arc)
+        arc.TryArcFileByPath(normalizedPath)
         |> Option.bind fromArcFile
         |> Option.map (fun dto -> {| dto with path = normalizedPath |})

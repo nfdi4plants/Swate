@@ -1,7 +1,6 @@
 [<AutoOpen>]
 module Main.ArcVault
 
-open System
 open System.Collections.Generic
 open Fable.Core
 open Fable.Electron
@@ -9,20 +8,14 @@ open Fable.Electron.Remoting.Main
 open Main
 open Main.Bindings
 open Main.ArcMerge
+open Main.ArcVaultTypes
 open Main.ArcVaultHelper
 open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
-
-type ArcVaultFileSystemEvent = {
-    EventName: string
-    RelativePath: string
-    AbsolutePath: string
-}
 
 /// <summary>
 /// Represents a vault window in the application, optionally associated with a file path.
@@ -71,74 +64,6 @@ type ArcVault(window: BrowserWindow) =
 [<AutoOpen>]
 module ArcVaultExtensions =
 
-    let private eventNameEquals (expected: Chokidar.Events) (actual: string) =
-        String.Equals(actual, expected.ToString(), StringComparison.OrdinalIgnoreCase)
-
-    let private buildWatcherEvent (arcPath: string) (eventName: string) (path: string) =
-        let normalizedPath = PathHelpers.normalizePath path
-        let normalizedArcPath = PathHelpers.normalizePath arcPath
-
-        let relativePath =
-            match tryGetRepoRelativePath arcPath normalizedPath with
-            | Some path -> PathHelpers.normalizePath path
-            | None ->
-                if PathHelpers.isSameOrDescendantPath normalizedPath normalizedArcPath then
-                    let prefix = normalizedArcPath + "/"
-
-                    if normalizedPath.StartsWith(prefix, StringComparison.OrdinalIgnoreCase) then
-                        normalizedPath.Substring(prefix.Length)
-                    else
-                        ""
-                else
-                    normalizedPath
-
-        let absolutePath =
-            if PathHelpers.isSameOrDescendantPath normalizedPath normalizedArcPath then
-                normalizedPath
-            else
-                $"{normalizedArcPath}/{relativePath}" |> PathHelpers.normalizePath
-
-        {
-            EventName = eventName
-            RelativePath = relativePath
-            AbsolutePath = absolutePath
-        }
-
-    let private toArcMergeEvents (events: ArcVaultFileSystemEvent list) =
-        events
-        |> List.collect (fun event ->
-            if eventNameEquals Chokidar.Events.Add event.EventName then
-                [
-                    {
-                        EventName = EventName.Add
-                        Path = event.RelativePath
-                    }
-                ]
-            elif eventNameEquals Chokidar.Events.Change event.EventName then
-                [
-                    {
-                        EventName = EventName.Change
-                        Path = event.RelativePath
-                    }
-                ]
-            elif eventNameEquals Chokidar.Events.Unlink event.EventName then
-                [
-                    {
-                        EventName = EventName.Unlink
-                        Path = event.RelativePath
-                    }
-                ]
-            elif eventNameEquals Chokidar.Events.UnlinkDir event.EventName then
-                event.RelativePath
-                |> ArcDeletePathRules.buildFallbackUnlinkPaths
-                |> List.map (fun path -> {
-                    EventName = EventName.Unlink
-                    Path = path
-                })
-            else
-                []
-        )
-
     type ArcVault with
 
         member private this.ApplyWatcherArcMerge(events: FileEvent list) = promise {
@@ -179,19 +104,19 @@ module ArcVaultExtensions =
                 for event in events do
                     try
                         if
-                            eventNameEquals Chokidar.Events.Add event.EventName
-                            || eventNameEquals Chokidar.Events.Change event.EventName
+                            WatcherHelpers.eventNameEquals Chokidar.Events.Add event.EventName
+                            || WatcherHelpers.eventNameEquals Chokidar.Events.Change event.EventName
                         then
                             let! changedFile = getFileEntryWithLfsMetadata arcPath event.AbsolutePath
                             nextFileTree <- upsertFileEntry changedFile nextFileTree
                             hasFileTreeChanges <- true
-                        elif eventNameEquals Chokidar.Events.AddDir event.EventName then
+                        elif WatcherHelpers.eventNameEquals Chokidar.Events.AddDir event.EventName then
                             let! addedDirectory = getFileEntry event.AbsolutePath
                             nextFileTree <- upsertFileEntry addedDirectory nextFileTree
                             hasFileTreeChanges <- true
                         elif
-                            eventNameEquals Chokidar.Events.Unlink event.EventName
-                            || eventNameEquals Chokidar.Events.UnlinkDir event.EventName
+                            WatcherHelpers.eventNameEquals Chokidar.Events.Unlink event.EventName
+                            || WatcherHelpers.eventNameEquals Chokidar.Events.UnlinkDir event.EventName
                         then
                             nextFileTree <- removePathAndDescendants event.AbsolutePath nextFileTree
                             hasFileTreeChanges <- true
@@ -208,7 +133,7 @@ module ArcVaultExtensions =
         }
 
         member this.TriggerArcInMemoryMergeOnFileWatcherEvents(events: ArcVaultFileSystemEvent list) = promise {
-            let arcEvents = toArcMergeEvents events
+            let arcEvents = WatcherHelpers.toArcMergeEvents events
             do! this.ApplyWatcherArcMerge arcEvents
         }
 
@@ -220,7 +145,7 @@ module ArcVaultExtensions =
 
                 this.path
                 |> Option.iter (fun arcPath ->
-                    let watcherEvent = buildWatcherEvent arcPath eventName path
+                    let watcherEvent = WatcherHelpers.buildWatcherEvent arcPath eventName path
                     this.fileWatcherPendingEvents.Add watcherEvent
                 )
 
@@ -290,8 +215,8 @@ module ArcVaultExtensions =
             | _ -> return Error(exn "ARC is not loaded.")
         }
 
-        /// Adds a new ARC entity through the scoped ARCtrl add path.
-        /// The file watcher performs the follow-up merge and file-tree update.
+        /// Adds a new ARC entity through ARCtrl's scoped add path.
+        /// Watcher ARC merges are suppressed during the disk write; static hashes are resynced from disk afterwards.
         member this.AddArcFile(request: FileContentDTO) : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
             | Some arcPath, Some arcLocal ->
@@ -301,19 +226,39 @@ module ArcVaultExtensions =
                 match Swate.Electron.Shared.FileIOHelper.FileContentDTO.toArcFile normalizedRequest with
                 | None -> return Error(exn $"Unsupported file type for adding: {normalizedRequest.fileType}")
                 | Some arcFile ->
-                    match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
-                    | Error errors ->
-                        return
-                            Error(
-                                exn(
-                                    errors
-                                    |> Array.map string
-                                    |> String.concat "\n"
+                    let wasBusyWriting = this.isBusyWriting
+                    this.isBusyWriting <- true
+
+                    try
+                        match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
+                        | Error errors ->
+                            return
+                                Error(
+                                    exn(
+                                        errors
+                                        |> Array.map string
+                                        |> String.concat "\n"
+                                    )
                                 )
-                            )
-                    | Ok _ ->
-                        this.SetArc arcLocal
-                        return Ok()
+                        | Ok _ ->
+                            match! ARC.tryLoadAsync arcPath with
+                            | Ok persistedArc ->
+                                baselineArcStaticHashes persistedArc
+                                syncArcStaticHashes persistedArc arcLocal
+                                this.RefreshHasUnsavedArcChangesFlag()
+                                return Ok()
+                            | Error loadErrors ->
+                                this.RefreshHasUnsavedArcChangesFlag()
+
+                                return
+                                    Error(
+                                        exn(
+                                            "Added ARC file, but could not reload the persisted hash baseline: "
+                                            + (loadErrors |> Array.map string |> String.concat "\n")
+                                        )
+                                    )
+                    finally
+                        this.isBusyWriting <- wasBusyWriting
             | _ -> return Error(exn "ARC is not loaded.")
         }
 

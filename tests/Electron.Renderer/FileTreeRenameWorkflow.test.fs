@@ -201,9 +201,13 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         expectRenameMenuVisibility 1 item
     )
 
+    Vitest.test("rename context menu item is shown for safe root-level generic paths", fun () ->
+        let item = createFileItem "test.fsx" "test.fsx"
+        expectRenameMenuVisibility 1 item
+    )
+
     Vitest.test("rename context menu item is hidden for unsafe generic paths", fun () ->
         let unsafePaths = [
-            "notes/custom.txt"
             "assays/AssayA/isa.assay.xlsx"
             "assays/AssayA/readme.md"
             "assays/AssayA/.git/config"

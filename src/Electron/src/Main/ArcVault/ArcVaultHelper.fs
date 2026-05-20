@@ -320,6 +320,7 @@ let private repairZeroByteCanonicalArcFiles (windowId: int) (arcPath: string) = 
     return repairedAny
 }
 
+/// Loads an ARC, repairing empty canonical workbooks that can be left behind by interrupted creates.
 let tryLoadArcWithZeroByteRepair (windowId: int) (arcPath: string) = promise {
     let! loadResult = ARC.tryLoadAsync arcPath
 

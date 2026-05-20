@@ -1,11 +1,11 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Fable.Core
-open Feliz
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.RenamePathRules
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 
@@ -76,10 +76,10 @@ module FileTreeRenameWorkflow =
         match config.pendingRenameDraft with
         | None -> config.closeRenameModal ()
         | Some renameDraft ->
-            match normalizeRenameName newName with
+            match validateRenameName newName with
             | Error validationError -> applyRenameError config validationError
             | Ok normalizedNewName ->
-                let targetPath = buildRenamedPath renameDraft.SourcePath normalizedNewName
+                let targetPath = buildRenamedSiblingPath renameDraft.SourcePath normalizedNewName
 
                 if PathHelpers.pathsEqual targetPath renameDraft.SourcePath then
                     config.closeRenameModal ()
@@ -119,37 +119,3 @@ module FileTreeRenameWorkflow =
                     |> Promise.catch (fun promiseError -> applyRenameError config promiseError.Message)
                     |> Promise.map (fun _ -> config.setIsRenaming false)
                     |> Promise.start
-
-[<Erase; Mangle(false)>]
-type FileTreeRename =
-
-    [<ReactComponent>]
-    static member RenameModal
-        (
-            isOpen: bool,
-            itemName: string option,
-            initialName: string option,
-            close: unit -> unit,
-            submit: string -> unit,
-            ?isRenaming: bool
-        ) =
-
-        let isRenaming = defaultArg isRenaming false
-
-        let displayName = itemName |> Option.defaultValue "this item"
-
-        FileExplorerNameInputModal.Main(
-            isOpen = isOpen,
-            title = "Rename Item",
-            description = $"Rename '{displayName}' in the current ARC.",
-            fieldLabel = "New name",
-            initialValue = (initialName |> Option.defaultValue ""),
-            close = close,
-            submit = submit,
-            validate = normalizeRenameName,
-            submitLabel = "Rename",
-            validationMessage = "Name is required and must not contain path separators.",
-            isBusy = isRenaming,
-            busyLabel = "Renaming...",
-            debug = "arc-rename"
-        )
