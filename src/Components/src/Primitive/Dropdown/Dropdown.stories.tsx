@@ -1,7 +1,7 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import React, { useState } from 'react';
 import { expect, userEvent, waitFor, within } from 'storybook/test';
-import { Dropdown_Main_Z54EBACFD as DropdownMain } from './Dropdown.fs.js';
+import DropdownMain from './Dropdown.fs.js';
 
 const DropdownExample = () => {
   const [isOpen, setIsOpen] = useState(false);
