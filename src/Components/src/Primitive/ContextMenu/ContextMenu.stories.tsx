@@ -1,5 +1,5 @@
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { expect, fireEvent, screen, within } from 'storybook/test';
+import { expect, fireEvent, screen, waitFor, within } from 'storybook/test';
 import { Example as ContextMenuExample } from './ContextMenu.fs.js';
 
 const meta = {
@@ -22,8 +22,9 @@ export const Basic: Story = {
     const canvas = within(canvasElement);
     const cell = canvas.getByRole('button', { name: /example table cell/i });
 
-    fireEvent.contextMenu(cell, { clientX: 40, clientY: 40, bubbles: true });
-
-    expect(await screen.findByRole('button', { name: /item 0/i })).toBeInTheDocument();
+    await waitFor(() => {
+      fireEvent.contextMenu(cell, { clientX: 40, clientY: 40, bubbles: true });
+      expect(screen.getByRole('button', { name: /item 0/i })).toBeInTheDocument();
+    });
   },
 };

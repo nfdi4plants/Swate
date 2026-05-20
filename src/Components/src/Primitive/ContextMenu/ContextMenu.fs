@@ -36,10 +36,6 @@ type ContextMenu =
 
         let allowMouseUpCloseRef = React.useRef (false)
         let timeout = React.useRef (None)
-        /// This is used to store reference to element with listeners attached.
-        /// Without this the listener cannot reliably be removed!
-        let targetRef = React.useRef<HTMLElement option> (None)
-
         let listItemsRef: IRefValue<ResizeArray<HTMLElement>> = React.useRef (ResizeArray())
 
         let listContentRef = React.useRef (ResizeArray())
@@ -94,7 +90,7 @@ type ContextMenu =
         let functionIsCalled = React.useRef (false)
 
         React.useEffect (
-            (fun _ ->
+            (fun () ->
 
                 let myClearTimeout () =
                     timeout.current
@@ -103,79 +99,75 @@ type ContextMenu =
                 let onContextMenu (e: Event) =
                     let e = e :?> Browser.Types.MouseEvent
 
-                    match onSpawn e with
-                    | Some data ->
-                        functionIsCalled.current <- false
-                        let children = childInfo data
+                    let isInsideContextMenuScope =
+                        match ref with
+                        | Some ref ->
+                            ref.current
+                            |> Option.exists (fun el ->
+                                let target = e.target :?> HTMLElement
+                                el.contains target)
+                        | None -> true
 
-                        match children with
-                        | [] ->
-                            setSpawnData null
-                            setChildren []
-                            setIsOpen false
-                        | children ->
-                            e.preventDefault ()
-                            setSpawnData (data)
+                    if isInsideContextMenuScope then
+                        match onSpawn e with
+                        | Some data ->
+                            functionIsCalled.current <- false
+                            let children = childInfo data
 
-                            children |> setChildren
+                            match children with
+                            | [] ->
+                                setSpawnData null
+                                setChildren []
+                                setIsOpen false
+                            | children ->
+                                e.preventDefault ()
+                                setSpawnData (data)
 
-                            listContentRef.current.AddRange(
-                                children
-                                |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
-                            )
+                                children |> setChildren
 
-                            let rect: ClientRect =
-                                {|
-                                    width = 0
-                                    height = 0
-                                    x = e.clientX
-                                    y = e.clientY
-                                    top = e.clientY
-                                    left = e.clientX
-                                    right = e.clientX
-                                    bottom = e.clientY
-                                |}
-                                |> unbox
+                                listContentRef.current.AddRange(
+                                    children
+                                    |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
+                                )
 
-                            let vEl = FloatingUI.VirtualElement(fun () -> rect)
+                                let rect: ClientRect =
+                                    {|
+                                        width = 0
+                                        height = 0
+                                        x = e.clientX
+                                        y = e.clientY
+                                        top = e.clientY
+                                        left = e.clientX
+                                        right = e.clientX
+                                        bottom = e.clientY
+                                    |}
+                                    |> unbox
 
-                            floating.refs.setPositionReference !^vEl
-                            setIsOpen (true)
+                                let vEl = FloatingUI.VirtualElement(fun () -> rect)
 
-                            myClearTimeout ()
+                                floating.refs.setPositionReference !^vEl
+                                setIsOpen (true)
 
-                            allowMouseUpCloseRef.current <- false
-                            timeout.current <- Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
+                                myClearTimeout ()
 
-                    | None -> ()
+                                allowMouseUpCloseRef.current <- false
+                                timeout.current <- Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
+
+                        | None -> ()
 
                 let onMouseUp (e: Event) =
                     if allowMouseUpCloseRef.current then
                         setIsOpen false
 
-                match ref with
-                | Some ref ->
-                    ref.current
-                    |> Option.iter (fun el ->
-                        el.addEventListener ("contextmenu", onContextMenu)
-                        targetRef.current <- Some el
-                    )
-                | None ->
-                    Browser.Dom.document.addEventListener ("contextmenu", onContextMenu)
-                    targetRef.current <- Some(Browser.Dom.document :?> HTMLElement)
-
+                Browser.Dom.document.addEventListener ("contextmenu", onContextMenu)
                 Browser.Dom.document.addEventListener ("mouseup", onMouseUp)
 
-                FsReact.createDisposable (fun () ->
+                fun () ->
 
                     Browser.Dom.document.removeEventListener ("mouseup", onMouseUp)
-
-                    targetRef.current
-                    |> Option.iter (fun el -> el.removeEventListener ("contextmenu", onContextMenu))
-
+                    Browser.Dom.document.removeEventListener ("contextmenu", onContextMenu)
 
                     myClearTimeout ()
-                )
             ),
             [| box floating.refs; box childInfo |]
         )
