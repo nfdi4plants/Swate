@@ -132,6 +132,24 @@ let syncArcStaticHashes (source: ARC) (target: ARC) : unit =
             syncDataMapStaticHash sourceRun.DataMap targetRun.DataMap
         | None -> ()
 
+/// Replaces the just-added ARC entity with the disk round-tripped version.
+/// This keeps lossy serialization details from becoming immediate unsaved changes.
+let syncAddedArcFileFromPersisted (source: ARC) (target: ARC) (arcFile: ArcFiles) : unit =
+    match arcFile with
+    | ArcFiles.Assay assay ->
+        source.TryGetAssay assay.Identifier
+        |> Option.iter (fun sourceAssay -> target.SetAssay(assay.Identifier, sourceAssay))
+    | ArcFiles.Study(study, _) ->
+        source.TryGetStudy study.Identifier
+        |> Option.iter (fun sourceStudy -> target.SetStudy(study.Identifier, sourceStudy))
+    | ArcFiles.Workflow workflow ->
+        source.TryGetWorkflow workflow.Identifier
+        |> Option.iter (fun sourceWorkflow -> target.SetWorkflow(workflow.Identifier, sourceWorkflow))
+    | ArcFiles.Run run ->
+        source.TryGetRun run.Identifier
+        |> Option.iter (fun sourceRun -> target.SetRun(run.Identifier, sourceRun))
+    | _ -> ()
+
 /// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
 let copyArcPreservingStaticHashes (arc: ARC) : ARC =
     let copiedArc = arc.Copy()

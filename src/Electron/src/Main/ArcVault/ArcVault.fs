@@ -244,6 +244,7 @@ module ArcVaultExtensions =
                             match! ARC.tryLoadAsync arcPath with
                             | Ok persistedArc ->
                                 baselineArcStaticHashes persistedArc
+                                syncAddedArcFileFromPersisted persistedArc arcLocal arcFile
                                 syncArcStaticHashes persistedArc arcLocal
                                 this.RefreshHasUnsavedArcChangesFlag()
                                 return Ok()
