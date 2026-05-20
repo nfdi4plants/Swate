@@ -43,6 +43,12 @@ type DataAnnotator =
                     prop.text message
                 ]
 
+    ///// --------------------------------- /////
+    // The code below uses has ARCitect specific logic for file upload.
+    // To my understanding, this should not be required for a simple upload.
+    // I am leaving the commented code here to make recovery easier if we actually need this logic.
+    ///// --------------------------------- /////
+
     // let showModal, setShowModal = React.useState (false)
     // let ref = React.useInputRef ()
 
