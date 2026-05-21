@@ -116,6 +116,7 @@ Vitest.describe("FileTreeContextMenu", fun () ->
                 "Add Assay"
                 "Add Workflow"
                 "Add Run"
+                "<divider>"
                 "Rename"
                 "Delete"
             |]
