@@ -189,9 +189,8 @@ let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem
     else
         []
 
-let arcContextMenuItems (config: ContextMenuConfig) (item: FileItem) =
+let arcDeleteAndRenameContextMenuItems (config: ContextMenuConfig) (item: FileItem) =
     [
-        yield! arcCreateContextMenuItems config.openCreateModal item
         yield! renameContextMenuItems config.requestRenameItem item
         yield! deleteContextMenuItems config.requestDeleteItem item
     ]
@@ -218,5 +217,6 @@ let createContextMenuItems (config: ContextMenuConfig) =
                 item
                 toggleLfsMark
                 (Some freeLocalLfsCopy)
-            arcContextMenuItems config item
+            arcCreateContextMenuItems config.openCreateModal item
+            arcDeleteAndRenameContextMenuItems config item
         ]
