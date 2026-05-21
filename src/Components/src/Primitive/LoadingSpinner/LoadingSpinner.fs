@@ -14,7 +14,7 @@ type LoadingSpinner =
             prop.children [
                 Html.div [
                     prop.className [
-                        "swt:loading"
+                        "swt:loading swt:loading-spinner"
                         match size with
                         | Some(DaisyuiSize.XS) -> $"swt:loading-xs"
                         | Some(DaisyuiSize.SM) -> $"swt:loading-sm"

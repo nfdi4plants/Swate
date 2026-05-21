@@ -102,6 +102,7 @@
     <Compile Include="Primitive\Select\Select.fs" />
     <Compile Include="Primitive\BaseModal\Context.fs" />
     <Compile Include="Primitive\BaseModal\BaseModal.fs" />
+    <Compile Include="Primitive\Dialog\Dialog.fs" />
     <Compile Include="Primitive\LayoutComponents\LayoutComponents.fs" />
     <Compile Include="Primitive\CardGrid\CardGrid.fs" />
     <Compile Include="Primitive\ContextMenu\Types.fs" />
@@ -193,7 +194,9 @@
     <Compile Include="Composite\Widgets\Context.fs" />
     <Compile Include="Composite\Widgets\BuildingBlockWidget.fs" />
     <Compile Include="Composite\Widgets\FilePickerWidget.fs" />
-    <Compile Include="Composite\Widgets\DataAnnotatorWidget.fs" />
+    <Compile Include="Composite\Widgets\DataAnnotator\Types.fs" />
+    <Compile Include="Composite\Widgets\DataAnnotator\Helper.fs" />
+    <Compile Include="Composite\Widgets\DataAnnotator\DataAnnotator.fs" />
     <Compile Include="Composite\Widgets\TemplateWidget.fs" />
     <Compile Include="Composite\Widgets\Widgets.fs" />
     

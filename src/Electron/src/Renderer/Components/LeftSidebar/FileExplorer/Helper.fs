@@ -107,15 +107,15 @@ let getItemIconClass (item: FileItem) =
         | Some colorClass -> Some colorClass
         | None -> colorClassForArcWorkbookFile fileName
 
+let canDeleteItem (item: FileItem) =
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+    |> Option.exists ArcDeletePathRules.isDeletePathAllowed
 
 let tryGetItemRelativePath (item: FileItem) =
     item.Path
     |> Option.map PathHelpers.normalizeRelativePath
     |> Option.map PathHelpers.normalizePath
-
-let canDeleteItem (item: FileItem) =
-    tryGetItemRelativePath item
-    |> Option.exists ArcDeletePathRules.isDeletePathAllowed
 
 let canCreateFileSystemItemIn (item: FileItem) =
     item.IsDirectory

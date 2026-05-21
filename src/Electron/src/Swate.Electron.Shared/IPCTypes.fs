@@ -50,7 +50,7 @@ type IArcVaultsApi = {
     setArcFileInMemory: FileContentDTO -> JS.Promise<Result<unit, exn>>
     /// Adds a new ARC entity from the file tree. The file watcher performs the follow-up merge and file-tree update.
     addArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
-    /// Creates a generic file or folder inside an ARC entity folder.
+    /// Creates a generic file or folder inside a safe ARC directory.
     createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>
     /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>

@@ -243,6 +243,7 @@ module FileContentDTO =
     open ARCtrl.Helper
     open ARCtrl.Contract
     open ARCtrl.ArcPathHelper
+    open ARC
 
     let DEFAULT_JSON_EXPORT_FORMAT = JsonExportFormat.ARCtrl
 
@@ -333,103 +334,8 @@ module FileContentDTO =
         | None -> None
 
     let fromArcByPath (path: string) (arc: ARC) =
-        let split = ARCtrl.ArcPathHelper.split path
-        let exportFormat = DEFAULT_JSON_EXPORT_FORMAT
+        let normalizedPath = PathHelpers.normalizePath path
 
-        /// This must be set if it returns Some
-        let mutable discFileType: DTOType option = None
-
-        let arcFileOpt =
-            match split with
-            | InvestigationPath _ ->
-                discFileType <- Some DTOType.ISA_Investigation
-                ArcFiles.Investigation arc |> Some
-            | AssayPath p ->
-                discFileType <- Some DTOType.ISA_Assay
-                let identifier = (Identifier.Assay.identifierFromFileName p)
-                let assay = arc.TryGetAssay identifier
-                assay |> Option.map ArcFiles.Assay
-            | StudyPath p ->
-                discFileType <- Some DTOType.ISA_Study
-                let identifier = (Identifier.Study.identifierFromFileName p)
-                let study = arc.TryGetStudy identifier
-
-                study
-                |> Option.map (fun s ->
-                    let assignedAssays =
-                        s.RegisteredAssayIdentifiers |> Seq.choose arc.TryGetAssay |> List.ofSeq
-
-                    ArcFiles.Study(s, assignedAssays)
-                )
-            | WorkflowPath p ->
-                discFileType <- Some DTOType.ISA_Workflow
-
-                let identifier = (Identifier.Workflow.identifierFromFileName p)
-                let workflow = arc.TryGetWorkflow identifier
-                workflow |> Option.map ArcFiles.Workflow
-            | RunPath p ->
-                discFileType <- Some DTOType.ISA_Run
-                let identifier = (Identifier.Run.identifierFromFileName p)
-                let run = arc.TryGetRun identifier
-                run |> Option.map ArcFiles.Run
-            | DatamapPath _ ->
-                discFileType <- Some DTOType.ISA_Datamap
-
-                match split with
-                | [| AssaysFolderName; anyAssayName; DataMapFileName |] ->
-                    let assay = arc.TryGetAssay(Identifier.Assay.identifierFromFileName anyAssayName)
-
-                    let datamap =
-                        assay
-                        |> Option.bind (fun a -> a.DataMap)
-                        |> Option.map (fun dm ->
-                            let dmpi = DatamapParentInfo.create anyAssayName DataMapParent.Assay |> Some
-                            dmpi, dm
-                        )
-
-                    datamap |> Option.map ArcFiles.DataMap
-                | [| StudiesFolderName; anyStudyName; DataMapFileName |] ->
-                    let study = arc.TryGetStudy(Identifier.Study.identifierFromFileName anyStudyName)
-
-                    let datamap =
-                        study
-                        |> Option.bind (fun s -> s.DataMap)
-                        |> Option.map (fun dm ->
-                            let dmpi = DatamapParentInfo.create anyStudyName DataMapParent.Study |> Some
-                            dmpi, dm
-                        )
-
-                    datamap |> Option.map ArcFiles.DataMap
-                | [| WorkflowsFolderName; anyWorkflowName; DataMapFileName |] ->
-                    let workflow =
-                        arc.TryGetWorkflow(Identifier.Workflow.identifierFromFileName anyWorkflowName)
-
-                    let datamap =
-                        workflow
-                        |> Option.bind (fun w -> w.DataMap)
-                        |> Option.map (fun dm ->
-                            let dmpi = DatamapParentInfo.create anyWorkflowName DataMapParent.Workflow |> Some
-                            dmpi, dm
-                        )
-
-                    datamap |> Option.map ArcFiles.DataMap
-                | [| RunsFolderName; anyRunName; DataMapFileName |] ->
-                    let run = arc.TryGetRun(Identifier.Run.identifierFromFileName anyRunName)
-
-                    let datamap =
-                        run
-                        |> Option.bind (fun r -> r.DataMap)
-                        |> Option.map (fun dm ->
-                            let dmpi = DatamapParentInfo.create anyRunName DataMapParent.Run |> Some
-                            dmpi, dm
-                        )
-
-                    datamap |> Option.map ArcFiles.DataMap
-                | _ -> None
-            | _ -> None
-
-        match arcFileOpt, discFileType with
-        | Some arcFile, Some discFileType ->
-            let _, json = Json.Export.parseToJsonString (arcFile, exportFormat)
-            create discFileType json path |> Some
-        | _ -> None
+        arc.TryArcFileByPath(normalizedPath)
+        |> Option.bind fromArcFile
+        |> Option.map (fun dto -> {| dto with path = normalizedPath |})

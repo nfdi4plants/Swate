@@ -3,7 +3,9 @@ module ElectronCore.IpcArchitectureReviewTests
 open Fable.Core
 open Main.Bindings.Path
 open Main.ArcVault
-open Main.IPC.ArcVaultsApi
+open Main.ArcVaultTypes
+open Main.IPC.FileSystemIO
+open Main.IPC.Rename
 open Main.ArcMerge
 open Swate.Components.Shared
 open ARCtrl
@@ -20,12 +22,14 @@ let private watcherEvent arcPath eventName relativePath : ArcVaultFileSystemEven
         AbsolutePath = join [| arcPath; relativePath |]
     }
 
-let private renamePlanOrFail relativePath newName =
+let private renamePlanOrFail arc relativePath newName =
     match
-        ArcRenameHelper.tryBuildRenamePlan {
-            relativePath = relativePath
-            newName = newName
-        }
+        ArcRenameHelper.tryBuildRenamePlan
+            arc
+            {
+                relativePath = relativePath
+                newName = newName
+            }
     with
     | Error error -> failwith error.Message
     | Ok renamePlan -> renamePlan
@@ -41,7 +45,7 @@ let private assertArcCtrlEntityRename
         let! loadedArc = loadArcAsync arcPath
         mutateLoadedArc loadedArc
 
-        let renamePlan = renamePlanOrFail sourceRelativePath newName
+        let renamePlan = renamePlanOrFail loadedArc sourceRelativePath newName
 
         match! ArcRenameHelper.renameArcEntityAsync arcPath renamePlan loadedArc with
         | Error renameError -> return failwith renameError.Message
@@ -140,8 +144,9 @@ Vitest.describe("ARC delete and rename validation", fun () ->
         Vitest.expect(ArcPathValidation.isSafeRelativePathCandidate "").toBe(false)
     )
 
-    Vitest.test("isDeletePathAllowed only permits add-zone descendants", fun () ->
+    Vitest.test("isDeletePathAllowed permits safe non-ARC filesystem targets", fun () ->
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe(true)
+        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "test.fsx").toBe(true)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies").toBe(false)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "README.md").toBe(false)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
@@ -199,11 +204,15 @@ Vitest.describe("ARC delete and rename validation", fun () ->
     )
 
     Vitest.test("tryBuildRenamePlan rejects non-entity rename paths", fun () ->
+        let arc = ARC("test-arc")
+
         let result =
-            ArcRenameHelper.tryBuildRenamePlan {
-                relativePath = "assays/StudyA/notes/info.md"
-                newName = "renamed.md"
-            }
+            ArcRenameHelper.tryBuildRenamePlan
+                arc
+                {
+                    relativePath = "assays/StudyA/notes/info.md"
+                    newName = "renamed.md"
+                }
 
         match result with
         | Ok _ -> failwith "Expected non-entity rename path classification to be rejected."
@@ -212,28 +221,37 @@ Vitest.describe("ARC delete and rename validation", fun () ->
     )
 
     Vitest.test("tryBuildRenamePlan accepts entity-folder rename paths", fun () ->
+        let arc = ARC("test-arc")
+        arc.AddAssay(ArcAssay("OldAssay"))
+
         let result =
-            ArcRenameHelper.tryBuildRenamePlan {
-                relativePath = "assays/OldAssay"
-                newName = "NewAssay"
-            }
+            ArcRenameHelper.tryBuildRenamePlan
+                arc
+                {
+                    relativePath = "assays/OldAssay"
+                    newName = "NewAssay"
+                }
 
         match result with
         | Error error -> failwith error.Message
         | Ok plan ->
             Vitest.expect(plan.SourcePath).toBe("assays/OldAssay")
             Vitest.expect(plan.TargetPath).toBe("assays/NewAssay")
-            Vitest.expect(plan.SyncPlan.Zone).toEqual(ArcDeletePathRules.AddZone.Assays)
+            Vitest.expect(plan.SyncPlan.FileType).toEqual(ArcFilesDiscriminate.Assay)
             Vitest.expect(plan.SyncPlan.OldIdentifier).toBe("OldAssay")
             Vitest.expect(plan.SyncPlan.NewIdentifier).toBe("NewAssay")
     )
 
     Vitest.test("tryBuildRenamePlan rejects canonical ARC file rename paths", fun () ->
+        let arc = ARC("test-arc")
+
         let result =
-            ArcRenameHelper.tryBuildRenamePlan {
-                relativePath = "assays/OldAssay/isa.assay.xlsx"
-                newName = "NewAssay"
-            }
+            ArcRenameHelper.tryBuildRenamePlan
+                arc
+                {
+                    relativePath = "assays/OldAssay/isa.assay.xlsx"
+                    newName = "NewAssay"
+                }
 
         match result with
         | Ok _ -> failwith "Expected canonical ARC file rename path to be rejected."

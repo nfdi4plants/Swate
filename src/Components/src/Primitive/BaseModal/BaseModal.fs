@@ -38,8 +38,15 @@ type BaseModal =
         ]
 
     [<ReactComponent>]
-    static member ModalActions(children: ReactElement) =
-        Html.div [ prop.className "swt:card-actions"; prop.children children ]
+    static member ModalActions(children: ReactElement, ?className: string) =
+        Html.div [
+            prop.className [
+                "swt:card-actions"
+                if className.IsSome then
+                    className.Value
+            ]
+            prop.children children
+        ]
 
     [<ReactComponent>]
     static member ModalContent(children: ReactElement, ?debug: string) =
@@ -52,7 +59,10 @@ type BaseModal =
 
     [<ReactComponent>]
     static member ModalFooter(children: ReactElement) =
-        Html.div [ prop.className "swt:card-actions"; prop.children children ]
+        Html.div [
+            prop.className "swt:card-actions"
+            prop.children children
+        ]
 
 
     [<ReactComponent>]
@@ -142,7 +152,8 @@ type BaseModal =
             ?initialFocusRef: IRefValue<option<Browser.Types.HTMLElement>>,
             ?returnFocusRef: IRefValue<option<Browser.Types.HTMLElement>>,
             ?debug: string,
-            ?className: string
+            ?className: string,
+            ?modalActionsClassName: string
         ) : ReactElement =
         BaseModal.BaseModal(
             isOpen = isOpen,
@@ -153,7 +164,7 @@ type BaseModal =
                     if description.IsSome then
                         BaseModal.ModalDescription(description.Value)
                     if modalActions.IsSome then
-                        BaseModal.ModalActions(modalActions.Value)
+                        BaseModal.ModalActions(modalActions.Value, ?className = modalActionsClassName)
                     BaseModal.ModalContent(children, ?debug = debug)
                     if footer.IsSome then
                         BaseModal.ModalFooter(footer.Value)

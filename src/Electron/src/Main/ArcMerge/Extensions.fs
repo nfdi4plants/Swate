@@ -5,7 +5,7 @@ open ARCtrl
 [<AutoOpen>]
 module ArcMergeExtensions =
 
-    //Used to handle intiated but empty datamaps that have a StaticHash of 0, which would otherwise be indistinguishable from unchanged datamaps
+    // Used to handle initiated but empty datamaps that have a StaticHash of 0, which would otherwise be indistinguishable from unchanged datamaps.
     let private cleanEmptyDataMapStaticHash = System.Int32.MinValue
 
     let cleanDataMapStaticHash (dataMap: DataMap) =

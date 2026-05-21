@@ -363,6 +363,15 @@ module ContextMenuItems =
                 IsDivider = Some true
         }
 
+    let forItem label icon onClick item =
+        create label icon (fun () -> onClick item)
+
+    let whenItem predicate label icon onClick item =
+        if predicate item then
+            [ forItem label icon onClick item ]
+        else
+            []
+
 module FileExplorerLogic =
 
     let private expandedIdsFromPath includeSelectedItem itemId items =

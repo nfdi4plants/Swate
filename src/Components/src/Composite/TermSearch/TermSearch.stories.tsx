@@ -174,6 +174,8 @@ export const TIBSearch: Story = {
 
     await userEvent.clear(input);
 
+    await userEvent.keyboard("{Escape}");
+
     await userEvent.click(input);
 
     await userEvent.keyboard("{ArrowDown}")
@@ -181,7 +183,7 @@ export const TIBSearch: Story = {
     await waitFor(() => { // await api call response
       const debugValue = input.getAttribute("data-debugresultcount")
       expect(debugValue ? parseInt(debugValue, 10) : 0).toBeGreaterThan(0);
-    }, { timeout: 3000 });
+    }, { timeout: 5000 });
   }
 }
 

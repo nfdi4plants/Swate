@@ -14,6 +14,7 @@ open Fable.Core
 open ARCtrl
 open Types
 open Helper
+open Renderer.Components.LeftSidebar.FileExplorer.Modals
 
 module private FileTreeHelper =
 
@@ -421,7 +422,7 @@ type FileTree =
             )
 
         let deleteConfirmModal =
-            FileTreeDelete.ConfirmModal(
+            FileTreeDeleteModal.Main(
                 isOpen = pendingDeleteItem.IsSome,
                 itemName = (pendingDeleteItem |> Option.map _.Name),
                 close = closeDeleteModal,
@@ -430,7 +431,7 @@ type FileTree =
             )
 
         let renameModal =
-            FileTreeRename.RenameModal(
+            FileTreeRenameModal.Main(
                 isOpen = pendingRenameDraft.IsSome,
                 itemName = (pendingRenameDraft |> Option.map (fun draft -> draft.Item.Name)),
                 initialName = (pendingRenameDraft |> Option.map _.InitialName),

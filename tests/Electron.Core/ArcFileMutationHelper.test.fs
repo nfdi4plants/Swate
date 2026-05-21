@@ -83,6 +83,42 @@ Vitest.describe("ArcFileMutationHelper", fun () ->
         let updatedAssay = updatedArc.GetAssay("assay_1")
         Vitest.expect(updatedAssay.Title).toEqual(Some "stable"))
 
+    Vitest.test("fromArcByPath resolves ARC files through shared path lookup", fun () ->
+        let arc = ARC("test-arc")
+
+        let assay = ArcAssay("assay_1")
+        assay.DataMap <- Some(DataMap.init ())
+        arc.AddAssay assay
+
+        let study = ArcStudy("study_1")
+        study.DataMap <- Some(DataMap.init ())
+        arc.AddStudy study
+
+        let workflow = ArcWorkflow("workflow_1")
+        workflow.DataMap <- Some(DataMap.init ())
+        arc.AddWorkflow workflow
+
+        let run = ArcRun("run_1")
+        run.DataMap <- Some(DataMap.init ())
+        arc.AddRun run
+
+        let cases = [|
+            "isa.investigation.xlsx", DTOType.ISA_Investigation
+            "assays/assay_1/isa.assay.xlsx", DTOType.ISA_Assay
+            "studies/study_1/isa.study.xlsx", DTOType.ISA_Study
+            "workflows/workflow_1/isa.workflow.xlsx", DTOType.ISA_Workflow
+            "runs/run_1/isa.run.xlsx", DTOType.ISA_Run
+            "assays/assay_1/isa.datamap.xlsx", DTOType.ISA_Datamap
+        |]
+
+        for path, expectedFileType in cases do
+            let dto =
+                FileContentDTO.fromArcByPath path arc
+                |> expectSome <| $"Expected DTO for {path}."
+
+            Vitest.expect(dto.fileType).toEqual(expectedFileType)
+            Vitest.expect(dto.path).toBe(path))
+
     Vitest.test("copyArcPreservingStaticHashes keeps static hashes for unchanged entities", fun () ->
         let sourceArc = ARC("test-arc")
         sourceArc.AddAssay(ArcAssay("assay_1", title = "stable"))

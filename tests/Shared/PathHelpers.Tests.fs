@@ -127,6 +127,10 @@ let tests =
                 (ArcDeletePathRules.isDeletePathAllowed "assays/MyAssay/notes/custom.txt")
                 "Any descendant under add zones should remain deletable."
 
+            Expect.isTrue
+                (ArcDeletePathRules.isDeletePathAllowed "test.fsx")
+                "Safe root-level generic files should be deletable."
+
         testCase "isDeletePathAllowed rejects protected targets" <| fun _ ->
             Expect.isFalse
                 (ArcDeletePathRules.isDeletePathAllowed "workflows/MyWorkflow/readme.md")
@@ -171,7 +175,7 @@ let tests =
                 "runs/MyRun"
                 "Renaming a canonical ARC file should rename the parent entity folder."
 
-        testCase "isRenamePathAllowed only allows entity folders" <| fun _ ->
+        testCase "isRenamePathAllowed allows entity folders and safe generic descendants" <| fun _ ->
             Expect.isFalse
                 (ArcDeletePathRules.isRenamePathAllowed "")
                 "ARC root must not be renameable."
@@ -188,9 +192,13 @@ let tests =
                 (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy")
                 "Entity folders should be renameable."
 
-            Expect.isFalse
+            Expect.isTrue
                 (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
-                "Generic descendants should not be renameable."
+                "Safe generic descendants should be renameable."
+
+            Expect.isTrue
+                (ArcDeletePathRules.isRenamePathAllowed "test.fsx")
+                "Safe root-level generic files should be renameable."
 
         testCase "buildCanonicalEntityPaths returns entity and datamap canonical files" <| fun _ ->
             let paths =
