@@ -127,7 +127,9 @@ let private subscribe (_model: Model) : Sub<Msg> = [
 ]
 
 [<ReactComponent>]
-let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget) =
+let private LeftActionButtons
+    (isInitializedArcVault: bool, leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget)
+    =
     let leftSidebarCtx = Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let toggleTarget target =
@@ -138,17 +140,24 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSideba
             setLeftSidebarTarget target
 
     React.Fragment [
+        if isInitializedArcVault then
+            Layout.LayoutBtn(
+                iconClassName = "swt:fluent--home-24-regular",
+                tooltip = "File explorer",
+                isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
+                onClick = fun () -> toggleTarget LeftSidebarPage.FileExplorer
+            )
+            Layout.LayoutBtn(
+                iconClassName = "swt:fluent--branch-fork-24-regular",
+                tooltip = "Git",
+                isActive = (leftSidebarTarget = LeftSidebarPage.Git),
+                onClick = fun () -> toggleTarget LeftSidebarPage.Git
+            )
         Layout.LayoutBtn(
-            iconClassName = "swt:fluent--home-24-regular",
-            tooltip = "File explorer",
-            isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
-            onClick = fun () -> toggleTarget LeftSidebarPage.FileExplorer
-        )
-        Layout.LayoutBtn(
-            iconClassName = "swt:fluent--branch-fork-24-regular",
-            tooltip = "Git",
-            isActive = (leftSidebarTarget = LeftSidebarPage.Git),
-            onClick = fun () -> toggleTarget LeftSidebarPage.Git
+            iconClassName = "swt:fluent--settings-24-regular",
+            tooltip = "Settings",
+            isActive = (leftSidebarTarget = LeftSidebarPage.Settings),
+            onClick = fun () -> toggleTarget LeftSidebarPage.Settings
         )
     ]
 
@@ -175,33 +184,40 @@ let Main () =
 
     let isInitializedArcVault = Option.isSome model.ArcRootPath
 
-    Context.AppStateContext.AppStateCtx.Provider(
-        model.ArcRootPath,
-        Renderer.Context.FileStateContext.FileStateCtxProvider(
-            (fun () -> Api.ipcArcVaultApi.getFileTree ()),
-            Renderer.Context.PageStateContext.PageStateCtx.Provider(
-                pageCtx,
-                ErrorModalProvider.ErrorModalProvider(
-                    Renderer.Context.AuthStateContext.Provider(
-                        Renderer.Context.GitStateContext.GitStateCtxProvider(
-                            Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
-                                Layout.Main(
-                                    children =
-                                        React.Fragment [|
-                                            children
-                                            CloseWindowController.CloseWindowController.Subscription()
-                                        |],
-                                    navbar = Renderer.Components.Navbar.Main(),
-                                    ?leftSidebar =
-                                        (if isInitializedArcVault then
-                                             Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget) |> Some
-                                         else
-                                             None),
-                                    ?leftActions =
-                                        (if isInitializedArcVault then
-                                             LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget) |> Some
-                                         else
-                                             None)
+    let leftSidebar =
+        if isInitializedArcVault || model.LeftSidebarTarget = LeftSidebarPage.Settings then
+            Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget) |> Some
+        else
+            None
+
+    Swate.Components.Composite.ThemeSelector.ThemeProvider.ThemeProvider(
+        Swate.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
+            Context.AppStateContext.AppStateCtx.Provider(
+                model.ArcRootPath,
+                Renderer.Context.FileStateContext.FileStateCtxProvider(
+                    (fun () -> Api.ipcArcVaultApi.getFileTree ()),
+                    Renderer.Context.PageStateContext.PageStateCtx.Provider(
+                        pageCtx,
+                        ErrorModalProvider.ErrorModalProvider(
+                            Renderer.Context.AuthStateContext.Provider(
+                                Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                    Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
+                                        Layout.Main(
+                                            children =
+                                                React.Fragment [|
+                                                    children
+                                                    CloseWindowController.CloseWindowController.Subscription()
+                                                |],
+                                            navbar = Renderer.Components.Navbar.Main(),
+                                            ?leftSidebar = leftSidebar,
+                                            leftActions =
+                                                LeftActionButtons(
+                                                    isInitializedArcVault,
+                                                    model.LeftSidebarTarget,
+                                                    setLeftSidebarTarget
+                                                )
+                                        )
+                                    )
                                 )
                             )
                         )

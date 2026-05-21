@@ -11,6 +11,7 @@ open Swate.Electron.Shared.GitTypes
 type LeftSidebarPage =
     | FileExplorer
     | Git
+    | Settings
 
 type GitUnsupportedPageData = GitUnsupportedContentDto
 

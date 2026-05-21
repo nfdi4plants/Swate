@@ -22,5 +22,6 @@ let Main (leftSidebarTarget: LeftSidebarPage) =
             match leftSidebarTarget with
             | LeftSidebarPage.FileExplorer -> Renderer.Components.LeftSidebar.FileExplorer.Main.Main()
             | LeftSidebarPage.Git -> GitSidebarPanel.Main()
+            | LeftSidebarPage.Settings -> Swate.Components.PageComponents.SettingsPage.SettingsPage.SettingsPage()
         |]
     ]
