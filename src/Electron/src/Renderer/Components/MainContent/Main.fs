@@ -45,6 +45,14 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                 prop.children [
                     match appRootPath, pageState with
                     | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
+                    | _, Some PageState.SettingsPage ->
+                        Html.div [
+                            prop.className "swt:size-full swt:min-w-0 swt:min-h-0 swt:overflow-y-auto"
+                            prop.testId "main-content-settings-page"
+                            prop.children [
+                                Swate.Components.PageComponents.SettingsPage.SettingsPage.SettingsPage()
+                            ]
+                        ]
                     | None, _ ->
                         Html.div [
                             prop.className

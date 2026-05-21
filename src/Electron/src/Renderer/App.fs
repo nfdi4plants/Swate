@@ -153,12 +153,6 @@ let private LeftActionButtons
                 isActive = (leftSidebarTarget = LeftSidebarPage.Git),
                 onClick = fun () -> toggleTarget LeftSidebarPage.Git
             )
-        Layout.LayoutBtn(
-            iconClassName = "swt:fluent--settings-24-regular",
-            tooltip = "Settings",
-            isActive = (leftSidebarTarget = LeftSidebarPage.Settings),
-            onClick = fun () -> toggleTarget LeftSidebarPage.Settings
-        )
     ]
 
 [<ReactComponent>]
@@ -185,8 +179,15 @@ let Main () =
     let isInitializedArcVault = Option.isSome model.ArcRootPath
 
     let leftSidebar =
-        if isInitializedArcVault || model.LeftSidebarTarget = LeftSidebarPage.Settings then
+        if isInitializedArcVault then
             Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget) |> Some
+        else
+            None
+
+    let leftActions =
+        if isInitializedArcVault then
+            LeftActionButtons(isInitializedArcVault, model.LeftSidebarTarget, setLeftSidebarTarget)
+            |> Some
         else
             None
 
@@ -210,12 +211,7 @@ let Main () =
                                                 |],
                                             navbar = Renderer.Components.Navbar.Main(),
                                             ?leftSidebar = leftSidebar,
-                                            leftActions =
-                                                LeftActionButtons(
-                                                    isInitializedArcVault,
-                                                    model.LeftSidebarTarget,
-                                                    setLeftSidebarTarget
-                                                )
+                                            ?leftActions = leftActions
                                         )
                                     )
                                 )
