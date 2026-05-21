@@ -59,46 +59,34 @@ let contextMenuItems
         let hasLocalLfsCopy = isMarked && item.Downloaded = Some true && item.IsLFSPointer <> Some true
 
         [
-            {
-                Label = if isMarked then "Unmark Git LFS" else "Mark Git LFS"
-                Icon =
-                    if isMarked then
-                        "swt:fluent--document-dismiss-24-regular"
-                    else
-                        "swt:fluent--document-add-24-regular"
-                OnClick = fun () -> onToggleLfsMark item (not isMarked)
-                Disabled = None
-            }
+            ContextMenuItems.create
+                (if isMarked then "Unmark Git LFS" else "Mark Git LFS")
+                (if isMarked then
+                     "swt:fluent--document-dismiss-24-regular"
+                 else
+                     "swt:fluent--document-add-24-regular")
+                (fun () -> onToggleLfsMark item (not isMarked))
             yield!
                 match onFreeLocalLfsCopy with
                 | Some freeLocalCopy when hasLocalLfsCopy ->
                     [
-                        {
-                            Label = "Free local LFS copy"
-                            Icon = "swt:fluent--document-arrow-up-20-regular"
-                            OnClick = fun () -> freeLocalCopy item
-                            Disabled = None
-                        }
+                        ContextMenuItems.create
+                            "Free local LFS copy"
+                            "swt:fluent--document-arrow-up-20-regular"
+                            (fun () -> freeLocalCopy item)
                     ]
                 | Some _ when isMarked ->
                     [
-                        {
-                            Label = "Free local LFS copy"
-                            Icon = "swt:fluent--document-arrow-up-20-regular"
-                            OnClick = fun () -> ()
-                            Disabled = Some true
-                        }
+                        ContextMenuItems.disabled
+                            "Free local LFS copy"
+                            "swt:fluent--document-arrow-up-20-regular"
                     ]
                 | _ -> []
-            {
-                Label =
-                    if isMarked then
-                        "Git LFS: marked"
-                    else
-                        "Git LFS: not marked"
-                Icon = "swt:fluent--tag-24-regular"
-                OnClick = fun () -> ()
-                Disabled = Some true
-            }
+            ContextMenuItems.disabled
+                (if isMarked then
+                     "Git LFS: marked"
+                 else
+                     "Git LFS: not marked")
+                "swt:fluent--tag-24-regular"
         ]
 

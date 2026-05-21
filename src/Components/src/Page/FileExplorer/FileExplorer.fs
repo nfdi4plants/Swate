@@ -25,6 +25,8 @@ module private FileExplorerHelper =
             (item: FileItem)
             (model: FileExplorerLogic.Model)
             (onItemClick: (FileItem -> unit) option)
+            (getCopyPath: FileItem -> string option)
+            (getCopyRelativePath: FileItem -> string option)
             (dispatch: FileExplorerLogic.Msg -> unit)
         : Swate.Components.Page.FileExplorer.Types.ContextMenuItem list =
         let canExpandDirectory =
@@ -34,36 +36,40 @@ module private FileExplorerHelper =
 
         [
             if not item.IsDirectory then
-                {
-                    Label = "Open"
-                    Icon = "swt:fluent--open-24-regular"
-                    OnClick = fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch
-                    Disabled = None
-                }
+                ContextMenuItems.create
+                    "Open"
+                    "swt:fluent--open-24-regular"
+                    (fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch)
 
             match item.Path with
-            | Some path ->
-                {
-                    Label = "Copy Path"
-                    Icon = "swt:fluent--copy-24-regular"
-                    OnClick = fun () -> copyPathToClipboard path
-                    Disabled = None
-                }
+            | Some _ ->
+                match getCopyPath item with
+                | Some path ->
+                    ContextMenuItems.create
+                        "Copy Path"
+                        "swt:fluent--copy-24-regular"
+                        (fun () -> copyPathToClipboard path)
+                | None -> ()
+
+                match getCopyRelativePath item with
+                | Some path ->
+                    ContextMenuItems.create
+                        "Copy Relative Path"
+                        "swt:fluent--copy-24-regular"
+                        (fun () -> copyPathToClipboard path)
+                | None -> ()
             | None -> ()
 
             if item.IsDirectory && canExpandDirectory then
                 let isExpanded = model.ExpandedIds.Contains item.Id
 
-                {
-                    Label = if isExpanded then "Collapse" else "Expand"
-                    Icon =
-                        if isExpanded then
-                            "swt:fluent--folder-open-24-regular"
-                        else
-                            "swt:fluent--folder-24-regular"
-                    OnClick = fun () -> dispatch (FileExplorerLogic.ToggleExpanded item.Id)
-                    Disabled = None
-                }
+                ContextMenuItems.create
+                    (if isExpanded then "Collapse" else "Expand")
+                    (if isExpanded then
+                         "swt:fluent--folder-open-24-regular"
+                     else
+                         "swt:fluent--folder-24-regular")
+                    (fun () -> dispatch (FileExplorerLogic.ToggleExpanded item.Id))
         ]
 
     let getContextMenuItems
@@ -71,38 +77,55 @@ module private FileExplorerHelper =
             (model: FileExplorerLogic.Model)
             (onItemClick: (FileItem -> unit) option)
             (onContextMenu: (FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem list) option)
+            (getCopyPath: FileItem -> string option)
+            (getCopyRelativePath: FileItem -> string option)
+            (includeDefaultContextMenuItems: bool)
             (dispatch: FileExplorerLogic.Msg -> unit)
         =
+        let defaultItems =
+            if includeDefaultContextMenuItems then
+                defaultContextMenuItems item model onItemClick getCopyPath getCopyRelativePath dispatch
+            else
+                []
+
         let customItems =
             onContextMenu |> Option.map (fun fn -> fn item) |> Option.defaultValue []
 
-        defaultContextMenuItems item model onItemClick dispatch @ customItems
+        defaultItems @ customItems
 
     let toComponentMenuItem (item: Swate.Components.Page.FileExplorer.Types.ContextMenuItem) =
-        let isDisabled = defaultArg item.Disabled false
-        let className =
-            if isDisabled then
-                "swt:opacity-50"
-            else
-                ""
+        if defaultArg item.IsDivider false then
+            ContextMenuItem(isDivider = true)
+        else
+            let isDisabled = defaultArg item.Disabled false
 
-        ContextMenuItem(
-            text = Html.span [ prop.className className; prop.text item.Label ],
-            icon =
-                Html.i [
-                    prop.className [
-                        "swt:iconify " + item.Icon
+            let className =
+                [
+                    item.ClassName
 
-                        if isDisabled then
-                            "swt:opacity-50"
-                    ]
-                ],
-            onClick =
-                (fun _ ->
-                    if not isDisabled then
-                        item.OnClick()
-                )
-        )
+                    if isDisabled then
+                        Some "swt:opacity-50"
+                ]
+                |> List.choose id
+                |> String.concat " "
+
+            ContextMenuItem(
+                text = Html.span [ prop.className className; prop.text item.Label ],
+                icon =
+                    Html.i [
+                        prop.className [
+                            "swt:iconify " + item.Icon
+
+                            if not (System.String.IsNullOrWhiteSpace className) then
+                                className
+                        ]
+                    ],
+                onClick =
+                    (fun _ ->
+                        if not isDisabled then
+                            item.OnClick()
+                    )
+            )
 
 // ---------------------------------------------------------------------------
 [<Mangle(false); Erase>]
@@ -124,7 +147,10 @@ type FileExplorer =
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?useDirectoryChevronToggle: bool,
             ?showBreadcrumbs: bool,
-            ?getItemIconClass: FileItem -> string option
+            ?getItemIconClass: FileItem -> string option,
+            ?getCopyPath: FileItem -> string option,
+            ?getCopyRelativePath: FileItem -> string option,
+            ?includeDefaultContextMenuItems: bool
         ) =
         let reducer model msg = FileExplorerLogic.update msg model
 
@@ -133,6 +159,9 @@ type FileExplorer =
         let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
         let showBreadcrumbs = defaultArg showBreadcrumbs true
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
+        let getCopyPath = defaultArg getCopyPath (fun item -> item.Path)
+        let getCopyRelativePath = defaultArg getCopyRelativePath (fun _ -> None)
+        let includeDefaultContextMenuItems = defaultArg includeDefaultContextMenuItems true
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
         let getItemActions = defaultArg getItemActions (fun (_: FileItem) -> [])
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
@@ -168,7 +197,15 @@ type FileExplorer =
             ContextMenu.ContextMenu(
                 (fun data ->
                     let item = data |> unbox<FileItem>
-                    FileExplorerHelper.getContextMenuItems item model onItemClick onContextMenu dispatch
+                    FileExplorerHelper.getContextMenuItems
+                        item
+                        model
+                        onItemClick
+                        onContextMenu
+                        getCopyPath
+                        getCopyRelativePath
+                        includeDefaultContextMenuItems
+                        dispatch
                     |> List.map FileExplorerHelper.toComponentMenuItem
                 ),
                 ref = containerRef,
@@ -189,6 +226,9 @@ type FileExplorer =
                                         model
                                         onItemClick
                                         onContextMenu
+                                        getCopyPath
+                                        getCopyRelativePath
+                                        includeDefaultContextMenuItems
                                         dispatch
 
                                 if List.isEmpty menuItems then None else Some(box item)
@@ -351,18 +391,14 @@ module FileExplorerExample =
             Browser.Dom.console.log ("Clicked:", item.Name)
 
         let handleContextMenu (item: FileItem) = [
-            {
-                Label = "Rename"
-                Icon = "swt:fluent--rename-24-regular"
-                OnClick = fun () -> Browser.Dom.console.log ("Rename", item.Name)
-                Disabled = None
-            }
-            {
-                Label = "Delete"
-                Icon = "swt:fluent--delete-24-regular"
-                OnClick = fun () -> Browser.Dom.console.log ("Delete", item.Name)
-                Disabled = None
-            }
+            ContextMenuItems.create
+                "Rename"
+                "swt:fluent--rename-24-regular"
+                (fun () -> Browser.Dom.console.log ("Rename", item.Name))
+            ContextMenuItems.create
+                "Delete"
+                "swt:fluent--delete-24-regular"
+                (fun () -> Browser.Dom.console.log ("Delete", item.Name))
         ]
 
         Html.div [

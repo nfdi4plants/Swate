@@ -64,19 +64,6 @@ module FileTreeRenameWorkflow =
         | Ok renameDraft -> setPendingRenameDraft (Some renameDraft)
         | Error validationError -> enqueueRenameError enqueueError arcScopeId validationError
 
-    let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
-        if canRenameItem item then
-            [
-                {
-                    Label = "Rename"
-                    Icon = "swt:fluent--edit-24-regular"
-                    OnClick = fun () -> requestRenameItem item
-                    Disabled = None
-                }
-            ]
-        else
-            []
-
     let confirmRenameItem (config: ConfirmRenameConfig) (newName: string) =
         match config.pendingRenameDraft with
         | None -> config.closeRenameModal ()

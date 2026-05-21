@@ -547,6 +547,57 @@ module ArcFileSystemHelper =
                         return Error deleteError
         }
 
+let private tryResolveExistingArcRelativePath (arcPath: string) (relativePath: string) : JS.Promise<Result<string, exn>> =
+    promise {
+        match tryResolveArcRelativePath arcPath relativePath with
+        | Error pathError -> return Error pathError
+        | Ok absolutePath ->
+            let! exists = pathExistsAsync absolutePath
+
+            if exists then
+                return Ok absolutePath
+            else
+                return Error(exn $"Path '{relativePath}' does not exist.")
+    }
+
+let private showPathInFileExplorerAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
+    promise {
+        match! tryResolveExistingArcRelativePath arcPath relativePath with
+        | Error pathError -> return Error pathError
+        | Ok absolutePath ->
+            try
+                shell.showItemInFolder absolutePath
+                return Ok()
+            with shellError ->
+                return Error(exn $"Could not show '{relativePath}' in file explorer: {shellError.Message}")
+    }
+
+let private openPathWithDefaultApplicationAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
+    promise {
+        match! tryResolveExistingArcRelativePath arcPath relativePath with
+        | Error pathError -> return Error pathError
+        | Ok absolutePath ->
+            let! shellOpenResult = shell.openPath absolutePath
+
+            if String.IsNullOrWhiteSpace shellOpenResult then
+                return Ok()
+            else
+                return Error(exn $"Could not open '{relativePath}' with the default application: {shellOpenResult}")
+    }
+
+let private runLoadedArcPathAction
+    (event: IpcMainInvokeEvent)
+    (operation: string -> JS.Promise<Result<'T, exn>>)
+    : JS.Promise<Result<'T, exn>> =
+    promise {
+        try
+            return!
+                withLoadedArcVault event (fun vault ->
+                    operation vault.path.Value)
+        with e ->
+            return Error e
+    }
+
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
@@ -646,6 +697,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    showPathInFileExplorer =
+        fun (relativePath: string) ->
+            runLoadedArcPathAction event (fun arcPath ->
+                showPathInFileExplorerAsync arcPath relativePath)
+    openPathWithDefaultApplication =
+        fun (relativePath: string) ->
+            runLoadedArcPathAction event (fun arcPath ->
+                openPathWithDefaultApplicationAsync arcPath relativePath)
     getRecentARCs = fun _ -> promise { return RECENT_ARCS.Get() }
     removeRecentARC =
         fun arcpointer -> promise {

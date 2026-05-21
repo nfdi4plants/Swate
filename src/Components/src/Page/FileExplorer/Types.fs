@@ -328,7 +328,40 @@ type ContextMenuItem = {
     Icon: string
     OnClick: unit -> unit
     Disabled: bool option
+    ClassName: string option
+    IsDivider: bool option
 }
+
+[<RequireQualifiedAccess>]
+module ContextMenuItems =
+
+    let create (label: string) (icon: string) (onClick: unit -> unit) : ContextMenuItem =
+        {
+            Label = label
+            Icon = icon
+            OnClick = onClick
+            Disabled = None
+            ClassName = None
+            IsDivider = None
+        }
+
+    let styled (label: string) (icon: string) (className: string) (onClick: unit -> unit) : ContextMenuItem =
+        {
+            (create label icon onClick) with
+                ClassName = Some className
+        }
+
+    let disabled (label: string) (icon: string) : ContextMenuItem =
+        {
+            (create label icon ignore) with
+                Disabled = Some true
+        }
+
+    let divider : ContextMenuItem =
+        {
+            (disabled "" "") with
+                IsDivider = Some true
+        }
 
 module FileExplorerLogic =
 

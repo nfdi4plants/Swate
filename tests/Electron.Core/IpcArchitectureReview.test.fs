@@ -133,6 +133,13 @@ Vitest.describe("ARC delete and rename validation", fun () ->
         Vitest.expect(ArcPathValidation.isWithinRootPath "C:/arc" "C:/other/place.txt").toBe(false)
     )
 
+    Vitest.test("ArcPathValidation.isSafeRelativePathCandidate rejects absolute and traversal paths", fun () ->
+        Vitest.expect(ArcPathValidation.isSafeRelativePathCandidate "assays/A/file.txt").toBe(true)
+        Vitest.expect(ArcPathValidation.isSafeRelativePathCandidate "../outside.txt").toBe(false)
+        Vitest.expect(ArcPathValidation.isSafeRelativePathCandidate "/outside.txt").toBe(false)
+        Vitest.expect(ArcPathValidation.isSafeRelativePathCandidate "").toBe(false)
+    )
+
     Vitest.test("isDeletePathAllowed only permits add-zone descendants", fun () ->
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe(true)
         Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies").toBe(false)

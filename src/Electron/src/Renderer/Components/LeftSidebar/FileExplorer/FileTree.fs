@@ -43,6 +43,7 @@ type FileTree =
     static member FileTree() =
 
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
@@ -353,48 +354,28 @@ type FileTree =
                     |> Promise.map (fun _ -> setIsCreatingFileSystemItem false)
                     |> Promise.start
 
-        let arcCreateContextMenuItems (item: FileItem) =
-            if item.IsDirectory then
-                arcCreateKinds
-                |> List.sortBy arcCreateKindSortOrder
-                |> List.map (fun kind -> {
-                    Label = $"Add {ArcExplorerNodeKind.label kind}"
-                    Icon = arcCreateKindIcon kind
-                    OnClick = fun () -> openCreateModal kind
-                    Disabled = None
-                })
-            else
-                []
-
-        let fileSystemCreateContextMenuItems (item: FileItem) =
-            if canCreateFileSystemItemIn item then
-                fileSystemCreateKinds
-                |> List.map (fun kind -> {
-                    Label = $"New {fileSystemCreateKindLabel kind}"
-                    Icon = fileSystemCreateKindIcon kind
-                    OnClick = fun () -> openFileSystemCreateModal kind item
-                    Disabled = None
-                })
-            else
-                []
-
-        let deleteContextMenuItems =
-            FileTreeDeleteWorkflow.deleteContextMenuItems requestDeleteItem
-
         let renameContextMenuItems =
-            FileTreeRenameWorkflow.renameContextMenuItems requestRenameItem
-
-        let baseContextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item
-            @ fileSystemCreateContextMenuItems item
-            @ renameContextMenuItems item
-            @ deleteContextMenuItems item
+            FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
         let createContextMenuItems =
-            Renderer.Components.FileExplorerLfs.createContextMenuItems
-                errorModal.enqueue
-                arcScopeId
-                baseContextMenuItems
+            FileTreeContextMenu.createContextMenuItems {
+                openItem = openPreview
+                arcRootPath = appStateCtx
+                openCreateModal = openCreateModal
+                openFileSystemCreateModal = openFileSystemCreateModal
+                requestRenameItem = requestRenameItem
+                requestDeleteItem = requestDeleteItem
+                pathActionConfig = {
+                    showPathInFileExplorer = Api.ipcArcVaultApi.showPathInFileExplorer
+                    openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
+                    enqueueError = errorModal.enqueue
+                    arcScopeId = arcScopeId
+                }
+                enqueueError = errorModal.enqueue
+                arcScopeId = arcScopeId
+                runToggleLfsMark = Renderer.Components.ARCHelper.runToggleLfsMark
+                runFreeLocalLfsCopy = Renderer.Components.ARCHelper.runFreeLocalLfsCopy
+            }
 
         let confirmRenameItem (newName: string) =
             FileTreeRenameWorkflow.confirmRenameItem
@@ -478,7 +459,8 @@ type FileTree =
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
-                            showBreadcrumbs = false
+                            showBreadcrumbs = false,
+                            includeDefaultContextMenuItems = false
                         )
                     ]
                 ]
