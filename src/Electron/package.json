@@ -16,7 +16,8 @@
     "make": "electron-forge make",
     "publish": "electron-forge publish",
     "lint": "echo \"No linting configured\"",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:server": "node ./src/tests/e2e-server.mjs"
   },
   "keywords": [],
   "author": {

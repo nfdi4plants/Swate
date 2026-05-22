@@ -47,6 +47,10 @@ let main args =
             match Test.Run.electronCore |> Async.RunSynchronously with
             | Ok() -> 0
             | Error _ -> 1
+        | "run" :: "electron-e2e" :: _ ->
+            match Test.Run.electronE2e |> Async.RunSynchronously with
+            | Ok() -> 0
+            | Error _ -> 1
         | "run" :: "components" :: _ ->
             match Test.Run.components |> Async.RunSynchronously with
             | Ok() -> 0

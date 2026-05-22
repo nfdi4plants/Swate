@@ -24,6 +24,30 @@ let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 let private processDynamic: obj = emitJsExpr () "process"
 
+module private E2E =
+
+    let private tryGetEnv (name: string) =
+        try
+            let value: string = emitJsExpr (processDynamic, name) "$0.env[$1]"
+
+            if String.IsNullOrWhiteSpace value then
+                None
+            else
+                Some value
+        with _ ->
+            None
+
+    let isEnabled () =
+        match tryGetEnv "SWATE_ELECTRON_E2E" with
+        | Some value when value = "1" || value.Equals("true", StringComparison.OrdinalIgnoreCase) -> true
+        | _ -> false
+
+    let tryGetCreateArcParentPath () =
+        if isEnabled () then
+            tryGetEnv "SWATE_ELECTRON_E2E_CREATE_ARC_PARENT"
+        else
+            None
+
 let private isWindowsPlatform () =
     try
         let platform = processDynamic?platform |> unbox<string>
@@ -542,26 +566,36 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         }
     createARC =
         fun (identifier: string) -> promise {
-            let window = dialogParentFromIpcEvent event
+            match E2E.tryGetCreateArcParentPath () with
+            | Some arcContainerPath ->
+                try
+                    let arcPath = ARCtrl.ArcPathHelper.combine arcContainerPath identifier
+                    let windowId = windowIdFromIpcEvent event
+                    let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
+                    return Ok(ArcOpenDisposition.path disposition)
+                with e ->
+                    return Error e
+            | None ->
+                let window = dialogParentFromIpcEvent event
 
-            let! r =
-                dialog.showOpenDialog (
-                    ?window = window,
-                    properties = [|
-                        Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                    |]
-                )
+                let! r =
+                    dialog.showOpenDialog (
+                        ?window = window,
+                        properties = [|
+                            Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
+                        |]
+                    )
 
-            if r.canceled then
-                return Error(exn "Cancelled")
-            elif r.filePaths.Length <> 1 then
-                return Error(exn "Not exactly one path")
-            else
-                let arcContainerPath = r.filePaths |> Array.exactlyOne
-                let arcPath = ARCtrl.ArcPathHelper.combine arcContainerPath identifier
-                let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
-                return Ok(ArcOpenDisposition.path disposition)
+                if r.canceled then
+                    return Error(exn "Cancelled")
+                elif r.filePaths.Length <> 1 then
+                    return Error(exn "Not exactly one path")
+                else
+                    let arcContainerPath = r.filePaths |> Array.exactlyOne
+                    let arcPath = ARCtrl.ArcPathHelper.combine arcContainerPath identifier
+                    let windowId = windowIdFromIpcEvent event
+                    let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
+                    return Ok(ArcOpenDisposition.path disposition)
         }
     closeARC =
         fun () -> promise {

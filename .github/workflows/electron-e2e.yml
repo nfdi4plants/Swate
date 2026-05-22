@@ -1,0 +1,55 @@
+name: Electron E2E
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  electron-e2e:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, windows-latest, macos-latest]
+
+    runs-on: ${{ matrix.os }}
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      - name: Restore .NET tools
+        run: dotnet tool restore
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: "npm"
+
+      - name: Install npm dependencies
+        run: npm ci
+
+      - name: Install Playwright dependencies
+        if: runner.os == 'Linux'
+        working-directory: src/Electron
+        run: npx playwright install --with-deps chromium
+
+      - name: Install Playwright browser
+        if: runner.os != 'Linux'
+        working-directory: src/Electron
+        run: npx playwright install chromium
+
+      - name: Run Electron E2E
+        if: runner.os != 'Linux'
+        working-directory: src/Electron
+        run: npm run test:e2e
+
+      - name: Run Electron E2E
+        if: runner.os == 'Linux'
+        working-directory: src/Electron
+        run: xvfb-run -a npm run test:e2e

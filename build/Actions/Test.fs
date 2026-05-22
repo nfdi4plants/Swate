@@ -193,6 +193,9 @@ module Run =
             ]
             ProjectPaths.electronRendererTestsPath
 
+    let electronE2e =
+        runAsync "electron-e2e" "npm" [ "run"; "test:e2e" ] ProjectPaths.electronPath
+
     let components =
         runAsync "components" "npm" [ "run"; "test:run" ] ProjectPaths.componentTestsPath
 
