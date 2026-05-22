@@ -56,6 +56,23 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
         | Error exn -> Error exn.Message
 }
 
+let runDownloadLfsFile (relativePath: string) = promise {
+    let request: GitLfsRequest = {
+        RequestId = Guid.NewGuid().ToString()
+        RepoPath = ""
+        Command = GitLfsCommand.Pull
+        FilePath = Some relativePath
+        TimeoutMs = None
+    }
+
+    let! result = Api.ipcArcVaultApi.runGitLfs request
+
+    return
+        match result with
+        | Ok _ -> Ok()
+        | Error exn -> Error exn.Message
+}
+
 let runFreeLocalLfsCopy (relativePath: string) = promise {
     let request: GitLfsFreeLocalCopyRequest = { Path = relativePath }
 

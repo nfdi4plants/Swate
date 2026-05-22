@@ -128,6 +128,20 @@ type FileTree =
             fileTree
             |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
 
+        let openSelectedPreview (itemName: string) (selectedPath: string) =
+            promise {
+                let! result = Renderer.Components.ARCHelper.openView selectedPath
+
+                match result with
+                | Ok loaded ->
+                    console.log ("[Renderer] Received data, processing...")
+                    Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                | Error errorMessage ->
+                    let fullErrorMessage = $"Could not open preview for '{itemName}': {errorMessage}"
+                    console.log ($"[Renderer] Error: {fullErrorMessage}")
+                    Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
+            }
+
         let openPreview (item: FileItem) =
             promise {
                 match item.Path with
@@ -156,16 +170,22 @@ type FileTree =
                 | Some path ->
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-                    let! result = Renderer.Components.ARCHelper.openView selectedPath
 
-                    match result with
-                    | Ok loaded ->
-                        console.log ("[Renderer] Received data, processing...")
-                        Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
-                    | Error errorMessage ->
-                        let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
-                        console.log ($"[Renderer] Error: {fullErrorMessage}")
-                        Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
+                    if lfsDownloadRequired item then
+                        console.log ($"[Renderer] Downloading Git LFS content for '{selectedPath}' before preview.")
+
+                        let! downloadResult = Renderer.Components.ARCHelper.runDownloadLfsFile selectedPath
+
+                        match downloadResult with
+                        | Error errorMessage ->
+                            let fullErrorMessage =
+                                $"Could not download Git LFS content for '{item.Name}': {errorMessage}"
+
+                            console.log ($"[Renderer] Error: {fullErrorMessage}")
+                            Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
+                        | Ok () -> do! openSelectedPreview item.Name selectedPath
+                    else
+                        do! openSelectedPreview item.Name selectedPath
             }
             |> Promise.start
 

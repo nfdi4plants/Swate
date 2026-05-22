@@ -87,14 +87,17 @@ type FileExplorerItem =
 
     [<ReactComponent>]
     static member private LFSStatusPill (item: FileItem) =
-        let isDownloaded = item.Downloaded = Some true
+        let isPointer = item.IsLFSPointer = Some true
+        let isDownloaded = item.Downloaded = Some true && not isPointer
 
         let statusAccessibilityText =
-            match item.SizeFormatted, isDownloaded with
-            | Some size, true -> $"LFS Downloaded - {size}"
-            | Some size, false -> $"LFS Not Downloaded - {size}"
-            | None, true -> "LFS Downloaded"
-            | None, false -> "LFS Not Downloaded"
+            match item.SizeFormatted, isDownloaded, isPointer with
+            | Some size, true, _ -> $"LFS Downloaded - {size}"
+            | Some size, false, true -> $"LFS Pointer - {size}"
+            | Some size, false, false -> $"LFS Not Downloaded - {size}"
+            | None, true, _ -> "LFS Downloaded"
+            | None, false, true -> "LFS Pointer"
+            | None, false, false -> "LFS Not Downloaded"
 
         let showSizeSegment = item.SizeFormatted.IsSome
 
@@ -124,6 +127,8 @@ type FileExplorerItem =
                     "data-lfs-download-status",
                     if isDownloaded then
                         "downloaded"
+                    elif isPointer then
+                        "pointer"
                     else
                         "not-downloaded"
                 )
@@ -377,5 +382,4 @@ type FileExplorerItem =
                 ]
             ]
         ]
-
 

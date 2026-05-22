@@ -118,6 +118,9 @@ let canDeleteItem (item: FileItem) =
     tryGetItemRelativePath item
     |> Option.exists ArcDeletePathRules.isDeletePathAllowed
 
+let lfsDownloadRequired (item: FileItem) =
+    item.IsLFS = Some true && (item.Downloaded <> Some true || item.IsLFSPointer = Some true)
+
 let rec private collectSelectedDirectoryPathChain
     (selectedTreeItemPath: string option)
     (node: FileTreeNode)
