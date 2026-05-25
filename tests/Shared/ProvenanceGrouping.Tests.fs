@@ -731,6 +731,22 @@ let sessionTests =
             let firstOutput = edited.Pairs.["pair-1"].Model.OutputSets.["output-a"]
             let nextInput = edited.Pairs.["pair-2"].Model.InputSets.["pair-2-from-output-0-output-a"]
             Expect.equal nextInput.PropertyValueIds firstOutput.PropertyValueIds "linked input mirrors the edited output"
+
+        testCase "adding a value to a removed connection returns a session error" <| fun _ ->
+            let command =
+                {
+                    Target = ProvenancePropertyTarget.Connections [ "missing-connection" ]
+                    CopiedFrom = None
+                    Header = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+                    Value = ProvenanceValue.Text "Microscopy"
+                    Unit = None
+                }
+
+            match Session.createLoadedPropertyValue command (Session.init (sampleModel ())) with
+            | Error(SessionError.EditFailed(EditError.ConnectionNotFound connectionId)) ->
+                Expect.equal connectionId "missing-connection" "Removed target identity should be returned."
+            | other ->
+                failwithf "Expected missing-connection session error, got %A" other
     ]
 
 let tests =

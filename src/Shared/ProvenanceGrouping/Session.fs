@@ -259,19 +259,27 @@ module Session =
     let private activeRef side setId session =
         { PairId = session.ActivePairId; Side = side; SetId = setId }
 
-    let private displayTargetRefs target session =
+    let private displayTargetRefs target session : Result<ProvenanceSetReference list, SessionError> =
         match target with
-        | ProvenancePropertyTarget.InputSets ids -> ids |> List.map (fun id -> activeRef ProvenanceSide.Input id session)
-        | ProvenancePropertyTarget.OutputSets ids -> ids |> List.map (fun id -> activeRef ProvenanceSide.Output id session)
+        | ProvenancePropertyTarget.InputSets ids -> ids |> List.map (fun id -> activeRef ProvenanceSide.Input id session) |> Ok
+        | ProvenancePropertyTarget.OutputSets ids -> ids |> List.map (fun id -> activeRef ProvenanceSide.Output id session) |> Ok
         | ProvenancePropertyTarget.Connections ids ->
             let pair = activePair session
             ids
-            |> List.collect (fun id ->
-                let connection = pair.Model.Connections.[id]
-                [
-                    activeRef ProvenanceSide.Input connection.InputSetId session
-                    activeRef ProvenanceSide.Output connection.OutputSetId session
-                ])
+            |> List.fold
+                (fun result id ->
+                    result
+                    |> Result.bind (fun references ->
+                        match pair.Model.Connections.TryFind id with
+                        | None -> Error(SessionError.EditFailed(EditError.ConnectionNotFound id))
+                        | Some connection ->
+                            Ok(
+                                references
+                                @ [
+                                    activeRef ProvenanceSide.Input connection.InputSetId session
+                                    activeRef ProvenanceSide.Output connection.OutputSetId session
+                                ])))
+                (Ok [])
 
     let rec private nativeOwner reference session =
         match session.BoundaryLinks |> List.tryFind (fun link -> link.Next = reference) with
@@ -280,19 +288,21 @@ module Session =
 
     let private ownedSetTargets target session =
         match target with
-        | ProvenancePropertyTarget.Connections _ -> []
+        | ProvenancePropertyTarget.Connections _ -> Ok []
         | _ ->
             displayTargetRefs target session
-            |> List.map (fun reference -> nativeOwner reference session)
-            |> List.distinct
-            |> List.groupBy (fun reference -> reference.PairId, reference.Side)
-            |> List.map (fun ((pairId, side), references) ->
-                let setIds = references |> List.map (fun reference -> reference.SetId)
-                let target =
-                    match side with
-                    | ProvenanceSide.Input -> ProvenancePropertyTarget.InputSets setIds
-                    | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets setIds
-                pairId, target, references)
+            |> Result.map (fun references ->
+                references
+                |> List.map (fun reference -> nativeOwner reference session)
+                |> List.distinct
+                |> List.groupBy (fun reference -> reference.PairId, reference.Side)
+                |> List.map (fun ((pairId, side), references) ->
+                    let setIds = references |> List.map (fun reference -> reference.SetId)
+                    let target =
+                        match side with
+                        | ProvenanceSide.Input -> ProvenancePropertyTarget.InputSets setIds
+                        | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets setIds
+                    pairId, target, references))
 
     let private activePropertyOwnerPair propertyValueId session =
         let pair = activePair session
@@ -330,33 +340,36 @@ module Session =
         match command.Target with
         | ProvenancePropertyTarget.Connections _ ->
             let pair = activePair session
-            let references = displayTargetRefs command.Target session
-            Edit.createLoadedPropertyValue command pair.Model
-            |> mapEditError
-            |> Result.bind (fun (model, patches) ->
-                updatePairModel pair.Id model session
-                |> Result.map (fun next ->
-                    let synchronized =
-                        references
-                        |> List.fold (fun current reference -> synchronizeSet reference current) next
-                    synchronized, patches))
+            displayTargetRefs command.Target session
+            |> Result.bind (fun references ->
+                Edit.createLoadedPropertyValue command pair.Model
+                |> mapEditError
+                |> Result.bind (fun (model, patches) ->
+                    updatePairModel pair.Id model session
+                    |> Result.map (fun next ->
+                        let synchronized =
+                            references
+                            |> List.fold (fun current reference -> synchronizeSet reference current) next
+                        synchronized, patches)))
         | _ ->
             ownedSetTargets command.Target session
-            |> List.fold
-                (fun result (pairId, target, references) ->
-                    result
-                    |> Result.bind (fun (state, patches) ->
-                        let pair = state.Pairs.[pairId]
-                        Edit.createLoadedPropertyValue { command with Target = target } pair.Model
-                        |> mapEditError
-                        |> Result.bind (fun (model, addedPatches) ->
-                            updatePairModel pair.Id model state
-                            |> Result.map (fun next ->
-                                let synchronized =
-                                    references
-                                    |> List.fold (fun current reference -> synchronizeSet reference current) next
-                                synchronized, patches @ addedPatches))))
-                (Ok(session, []))
+            |> Result.bind (fun targets ->
+                targets
+                |> List.fold
+                    (fun result (pairId, target, references) ->
+                        result
+                        |> Result.bind (fun (state, patches) ->
+                            let pair = state.Pairs.[pairId]
+                            Edit.createLoadedPropertyValue { command with Target = target } pair.Model
+                            |> mapEditError
+                            |> Result.bind (fun (model, addedPatches) ->
+                                updatePairModel pair.Id model state
+                                |> Result.map (fun next ->
+                                    let synchronized =
+                                        references
+                                        |> List.fold (fun current reference -> synchronizeSet reference current) next
+                                    synchronized, patches @ addedPatches))))
+                    (Ok(session, [])))
 
     let copyPropertyValueToLoadedTarget propertyValueId target session : SessionResult =
         let pair = activePair session
