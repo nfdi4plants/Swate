@@ -88,18 +88,17 @@ type GroupCard =
                             Controls.ValueChip(value, (fun nextValue unit -> onUpdateValue value.Id nextValue unit), ?debug = debug)
                     ]
                 ]
-                if defaultArg debug false then
-                    Html.div [
-                        prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:border-t swt:border-base-300 swt:pt-2"
-                        prop.children [
-                            for header in headersForSide side model do
-                                Controls.AddValuePopover(
-                                    targetForGroup side group,
-                                    header,
-                                    onCreateValue,
-                                    debug = true)
-                        ]
+                Html.div [
+                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:border-t swt:border-base-300 swt:pt-2"
+                    prop.children [
+                        for header in headersForSide side model do
+                            Controls.AddValuePopover(
+                                targetForGroup side group,
+                                header,
+                                onCreateValue,
+                                ?debug = debug)
                     ]
+                ]
                 if expanded then
                     Html.ul [
                         prop.className "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2 swt:text-sm"
