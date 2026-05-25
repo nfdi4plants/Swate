@@ -183,7 +183,9 @@ export const CreatesPropertyValueWithoutDebug: Story = {
 
     await userEvent.click(within(outputA).getByText('Add Analysis value'));
     await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), 'Imaging');
-    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+    const submit = screen.getByRole('button', { name: /Add value/i });
+    await waitFor(() => expect(submit).toBeEnabled());
+    await userEvent.click(submit);
 
     await waitFor(() =>
       expect(canvas.getByText('Output A').closest('article')!).toHaveTextContent('Analysis: Imaging'),
@@ -374,6 +376,28 @@ export const AddsExistingPropertyToCreatedEmptySide: Story = {
     await waitFor(() =>
       expect(canvas.getByText('New Output').closest('article')!).toHaveTextContent('Species: Arabidopsis'),
     );
+  },
+};
+
+export const AddsNewPropertyToCreatedEmptySide: Story = {
+  render: () => <Harness inputOnly debug={false} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText('Add output'));
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'New Output');
+    await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
+
+    const output = await waitFor(() => canvas.getByText('New Output').closest('article')!);
+    await userEvent.click(within(output).getByText('Add new property'));
+    const category = screen.getAllByTestId('term-search-input')[0];
+    await userEvent.type(category, 'Treatment');
+    await userEvent.keyboard('{Escape}');
+    await userEvent.type(screen.getByRole('textbox', { name: /Treatment value/i }), 'Drought');
+    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+
+    await waitFor(() => expect(output).toHaveTextContent('Treatment: Drought'));
+    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
   },
 };
 

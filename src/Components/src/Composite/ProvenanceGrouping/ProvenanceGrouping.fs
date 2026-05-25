@@ -154,9 +154,14 @@ type ProvenanceGrouping =
                                         for header in headersForModel pair.Model do
                                             Controls.AddValuePopover(
                                                 ProvenancePropertyTarget.Connections conn.ConnectionIds,
-                                                header,
+                                                Some header,
                                                 createPropertyValue,
                                                 debug = debug)
+                                        Controls.AddValuePopover(
+                                            ProvenancePropertyTarget.Connections conn.ConnectionIds,
+                                            None,
+                                            createPropertyValue,
+                                            debug = debug)
                                     ]
                                 ]
                             ]

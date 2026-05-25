@@ -102,9 +102,14 @@ type GroupCard =
                         for header in headersForModel model do
                             Controls.AddValuePopover(
                                 targetForGroup side group,
-                                header,
+                                Some header,
                                 onCreateValue,
                                 ?debug = debug)
+                        Controls.AddValuePopover(
+                            targetForGroup side group,
+                            None,
+                            onCreateValue,
+                            ?debug = debug)
                     ]
                 ]
                 if expanded then
