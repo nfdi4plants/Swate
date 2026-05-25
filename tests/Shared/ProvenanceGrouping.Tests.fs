@@ -594,6 +594,82 @@ let sessionTests =
                 Expect.equal next.Layers.[2].Label "Selection 3" "Selection layer should be visible in navigation."
             | Error error ->
                 failwithf "Expected mixed layer addition success, got %A" error
+
+        testCase "updating a carried property from the next pair updates the previous view once" <| fun _ ->
+            let first = Session.init (sampleModel ())
+            let layered =
+                match Session.addLayer { SelectedSets = [ ProvenanceSide.Output, "output-a" ] } first with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let nextPair = Session.activePair layered
+            let carriedInput = nextPair.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
+            let analysisId = carriedInput.PropertyValueIds |> List.head
+
+            match Session.updatePropertyValue analysisId (ProvenanceValue.Text "Imaging") None layered with
+            | Ok(next, [ ProvenanceTablePatch.UpdatePropertyValue(id, _, _, ProvenanceValue.Text "Imaging", _) ]) ->
+                let originalValue = next.Pairs.["pair-1"].Model.PropertyValues.[analysisId].Value
+                let carriedValue = next.Pairs.["pair-2"].Model.PropertyValues.[analysisId].Value
+
+                Expect.equal id analysisId "Edit patch should identify the edited occurrence."
+                Expect.equal originalValue (ProvenanceValue.Text "Imaging") "Previous output view should update."
+                Expect.equal carriedValue (ProvenanceValue.Text "Imaging") "Later input view should update."
+            | other ->
+                failwithf "Expected one synchronized update patch, got %A" other
+
+        testCase "assigning a value to a carried next input is reflected on its previous output" <| fun _ ->
+            let first = Session.init (sampleModel ())
+            let layered =
+                match Session.addLayer { SelectedSets = [ ProvenanceSide.Output, "output-d" ] } first with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let projectedId = (Session.activePair layered).Model.InputSets |> Map.toList |> List.exactlyOne |> fst
+            let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
+            let command =
+                {
+                    Target = ProvenancePropertyTarget.InputSets [ projectedId ]
+                    CopiedFrom = None
+                    Header = treatment
+                    Value = ProvenanceValue.Text "Drought"
+                    Unit = None
+                }
+
+            match Session.createLoadedPropertyValue command layered with
+            | Ok(next, [ ProvenanceTablePatch.AddLoadedPropertyValue(target, _, _, _, _) ]) ->
+                let previousOutput = next.Pairs.["pair-1"].Model.OutputSets.["output-d"]
+                let nextInput = next.Pairs.["pair-2"].Model.InputSets.[projectedId]
+
+                Expect.equal
+                    target
+                    (ProvenancePropertyTarget.OutputSets [ "output-d" ])
+                    "A carried pair-2 input must write through its native pair-1 output owner."
+                Expect.equal previousOutput.PropertyValueIds nextInput.PropertyValueIds "Linked endpoint views should share new properties."
+            | other ->
+                failwithf "Expected one property-add patch, got %A" other
+
+        testCase "creating and connecting a later output modifies only the active pair" <| fun _ ->
+            let layered =
+                Session.init (sampleModel ())
+                |> Session.addLayer { SelectedSets = [ ProvenanceSide.Output, "output-a" ] }
+                |> function Ok(next, _) -> next | Error error -> failwithf "%A" error
+
+            let outputHeader = ioHeader ProvenanceIOKind.Data "Output [Data]"
+            let created =
+                match Session.createLoadedSet { Side = ProvenanceSide.Output; Header = outputHeader; Name = "Raw file" } layered with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "%A" error
+
+            let pair = Session.activePair created
+            let inputId = pair.Model.InputSets |> Map.toList |> List.exactlyOne |> fst
+            let outputId = pair.Model.OutputSets |> Map.toList |> List.exactlyOne |> fst
+
+            match Session.connectSets inputId outputId None created with
+            | Ok(next, [ ProvenanceTablePatch.AddLoadedConnection _ ]) ->
+                Expect.equal next.Pairs.["pair-1"].Model.Connections.Count 5 "Prior transition should remain unchanged."
+                Expect.equal next.Pairs.["pair-2"].Model.Connections.Count 1 "Later transition gets its connection."
+            | other ->
+                failwithf "Expected a later connection patch, got %A" other
     ]
 
 let tests =

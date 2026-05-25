@@ -201,3 +201,183 @@ module Session =
                         BoundaryLinks = session.BoundaryLinks @ List.rev links
                 },
                 [])
+
+    let private replacePair pair session =
+        { session with Pairs = session.Pairs |> Map.add pair.Id pair }
+
+    let private mapEditError = Result.mapError SessionError.EditFailed
+
+    let private updatePairModel pairId model session =
+        match session.Pairs.TryFind pairId with
+        | None -> Error(SessionError.PairNotFound pairId)
+        | Some pair -> Ok(replacePair { pair with Model = model } session)
+
+    let private referencedPropertyValues set model =
+        set.PropertyValueIds
+        |> List.choose (fun id -> model.PropertyValues.TryFind id |> Option.map (fun value -> id, value))
+
+    let private copySetData sourceRef targetRef session =
+        let sourcePair = session.Pairs.[sourceRef.PairId]
+        let targetPair = session.Pairs.[targetRef.PairId]
+        let sourceSet = (setAt sourceRef.Side sourceRef.SetId sourcePair).Value
+        let targetSet = (setAt targetRef.Side targetRef.SetId targetPair).Value
+        let targetSet = { targetSet with PropertyValueIds = sourceSet.PropertyValueIds }
+        let propertyValues =
+            referencedPropertyValues sourceSet sourcePair.Model
+            |> List.fold (fun state (id, value) -> Map.add id value state) targetPair.Model.PropertyValues
+
+        let targetModel =
+            match targetRef.Side with
+            | ProvenanceSide.Input ->
+                { targetPair.Model with InputSets = targetPair.Model.InputSets |> Map.add targetSet.Id targetSet; PropertyValues = propertyValues }
+            | ProvenanceSide.Output ->
+                { targetPair.Model with OutputSets = targetPair.Model.OutputSets |> Map.add targetSet.Id targetSet; PropertyValues = propertyValues }
+
+        replacePair { targetPair with Model = targetModel } session
+
+    let private linkedRefs origin session =
+        let rec collect pending seen =
+            match pending with
+            | [] -> seen
+            | current :: rest when Set.contains current seen -> collect rest seen
+            | current :: rest ->
+                let adjacent =
+                    session.BoundaryLinks
+                    |> List.collect (fun link ->
+                        if link.Previous = current then [ link.Next ]
+                        elif link.Next = current then [ link.Previous ]
+                        else [])
+                collect (adjacent @ rest) (Set.add current seen)
+
+        collect [ origin ] Set.empty |> Set.toList
+
+    let private synchronizeSet origin session =
+        linkedRefs origin session
+        |> List.filter ((<>) origin)
+        |> List.fold (fun state target -> copySetData origin target state) session
+
+    let private activeRef side setId session =
+        { PairId = session.ActivePairId; Side = side; SetId = setId }
+
+    let private displayTargetRefs target session =
+        match target with
+        | ProvenancePropertyTarget.InputSets ids -> ids |> List.map (fun id -> activeRef ProvenanceSide.Input id session)
+        | ProvenancePropertyTarget.OutputSets ids -> ids |> List.map (fun id -> activeRef ProvenanceSide.Output id session)
+        | ProvenancePropertyTarget.Connections ids ->
+            let pair = activePair session
+            ids
+            |> List.collect (fun id ->
+                let connection = pair.Model.Connections.[id]
+                [
+                    activeRef ProvenanceSide.Input connection.InputSetId session
+                    activeRef ProvenanceSide.Output connection.OutputSetId session
+                ])
+
+    let rec private nativeOwner reference session =
+        match session.BoundaryLinks |> List.tryFind (fun link -> link.Next = reference) with
+        | Some link -> nativeOwner link.Previous session
+        | None -> reference
+
+    let private ownedSetTargets target session =
+        match target with
+        | ProvenancePropertyTarget.Connections _ -> []
+        | _ ->
+            displayTargetRefs target session
+            |> List.map (fun reference -> nativeOwner reference session)
+            |> List.distinct
+            |> List.groupBy (fun reference -> reference.PairId, reference.Side)
+            |> List.map (fun ((pairId, side), references) ->
+                let setIds = references |> List.map (fun reference -> reference.SetId)
+                let target =
+                    match side with
+                    | ProvenanceSide.Input -> ProvenancePropertyTarget.InputSets setIds
+                    | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets setIds
+                pairId, target, references)
+
+    let private activePropertyOwnerPair propertyValueId session =
+        let pair = activePair session
+        [
+            for setId, set in pair.Model.InputSets |> Map.toList do
+                if set.PropertyValueIds |> List.contains propertyValueId then
+                    yield activeRef ProvenanceSide.Input setId session
+            for setId, set in pair.Model.OutputSets |> Map.toList do
+                if set.PropertyValueIds |> List.contains propertyValueId then
+                    yield activeRef ProvenanceSide.Output setId session
+        ]
+        |> List.tryHead
+        |> Option.map (fun reference -> (nativeOwner reference session).PairId)
+        |> Option.defaultValue pair.Id
+
+    let updatePropertyValue propertyValueId value unit session : SessionResult =
+        let ownerPairId = activePropertyOwnerPair propertyValueId session
+        let pair = session.Pairs.[ownerPairId]
+        Edit.updatePropertyValue propertyValueId value unit pair.Model
+        |> mapEditError
+        |> Result.bind (fun (model, patches) ->
+            updatePairModel pair.Id model session
+            |> Result.map (fun next ->
+                let propagated =
+                    next.Pairs
+                    |> Map.fold (fun state pairId candidate ->
+                        if candidate.Model.PropertyValues.ContainsKey propertyValueId then
+                            let candidateModel =
+                                { candidate.Model with PropertyValues = candidate.Model.PropertyValues |> Map.add propertyValueId model.PropertyValues.[propertyValueId] }
+                            replacePair { candidate with Model = candidateModel } state
+                        else state) next
+                propagated, patches))
+
+    let createLoadedPropertyValue command session : SessionResult =
+        match command.Target with
+        | ProvenancePropertyTarget.Connections _ ->
+            let pair = activePair session
+            Edit.createLoadedPropertyValue command pair.Model
+            |> mapEditError
+            |> Result.bind (fun (model, patches) ->
+                updatePairModel pair.Id model session
+                |> Result.map (fun next -> next, patches))
+        | _ ->
+            ownedSetTargets command.Target session
+            |> List.fold
+                (fun result (pairId, target, references) ->
+                    result
+                    |> Result.bind (fun (state, patches) ->
+                        let pair = state.Pairs.[pairId]
+                        Edit.createLoadedPropertyValue { command with Target = target } pair.Model
+                        |> mapEditError
+                        |> Result.bind (fun (model, addedPatches) ->
+                            updatePairModel pair.Id model state
+                            |> Result.map (fun next ->
+                                let synchronized =
+                                    references
+                                    |> List.fold (fun current reference -> synchronizeSet reference current) next
+                                synchronized, patches @ addedPatches))))
+                (Ok(session, []))
+
+    let copyPropertyValueToLoadedTarget propertyValueId target session : SessionResult =
+        let pair = activePair session
+        match pair.Model.PropertyValues.TryFind propertyValueId with
+        | None -> Error(SessionError.EditFailed(EditError.PropertyNotFound propertyValueId))
+        | Some propertyValue ->
+            createLoadedPropertyValue
+                {
+                    Target = target
+                    CopiedFrom = Some propertyValueId
+                    Header = propertyValue.Header
+                    Value = propertyValue.Value
+                    Unit = propertyValue.Unit
+                }
+                session
+
+    let createLoadedSet command session : SessionResult =
+        let pair = activePair session
+        Edit.createLoadedSet command pair.Model
+        |> mapEditError
+        |> Result.bind (fun (model, patches) ->
+            updatePairModel pair.Id model session |> Result.map (fun next -> next, patches))
+
+    let connectSets inputSetId outputSetId processName session : SessionResult =
+        let pair = activePair session
+        Edit.connectSets inputSetId outputSetId processName pair.Model
+        |> mapEditError
+        |> Result.bind (fun (model, patches) ->
+            updatePairModel pair.Id model session |> Result.map (fun next -> next, patches))
