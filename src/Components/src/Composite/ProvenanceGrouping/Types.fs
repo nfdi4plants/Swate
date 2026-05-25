@@ -36,12 +36,29 @@ module Exports =
     let createSampleSession () = sampleSession ()
     let createInputOnlySession () = inputOnlyModel () |> Session.init
     let createOutputOnlySession () = outputOnlyModel () |> Session.init
+    let createTypedSampleSession () = typedSampleModel () |> Session.init
+    let createDataOutputOnlySession () = dataOutputOnlyModel () |> Session.init
 
-    let patchLabels patches =
+    let private valueKind value =
+        match value with
+        | ProvenanceValue.Text _ -> "Text"
+        | ProvenanceValue.Integer _ -> "Integer"
+        | ProvenanceValue.Float _ -> "Float"
+        | ProvenanceValue.Term _ -> "Term"
+
+    let private unitName (unit': ProvenanceTerm option) =
+        unit' |> Option.map (fun term -> term.Name) |> Option.defaultValue "none"
+
+    let patchDetails patches =
         patches
         |> List.map (function
-            | ProvenanceTablePatch.UpdatePropertyValue _ -> "UpdatePropertyValue"
-            | ProvenanceTablePatch.AddLoadedSet _ -> "AddLoadedSet"
-            | ProvenanceTablePatch.AddLoadedPropertyValue _ -> "AddLoadedPropertyValue"
+            | ProvenanceTablePatch.UpdatePropertyValue(_, _, _, value, unit') ->
+                $"UpdatePropertyValue:{valueKind value}:{unitName unit'}"
+            | ProvenanceTablePatch.AddLoadedSet(_, _, header, _) ->
+                match header.Kind with
+                | ProvenanceIOKind.FreeText text -> $"AddLoadedSet:FreeText:{text}"
+                | kind -> $"AddLoadedSet:{kind}"
+            | ProvenanceTablePatch.AddLoadedPropertyValue(_, _, _, value, unit') ->
+                $"AddLoadedPropertyValue:{valueKind value}:{unitName unit'}"
             | ProvenanceTablePatch.AddLoadedConnection _ -> "AddLoadedConnection")
         |> ResizeArray

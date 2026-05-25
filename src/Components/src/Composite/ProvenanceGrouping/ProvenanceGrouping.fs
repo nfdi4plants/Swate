@@ -118,7 +118,7 @@ type ProvenanceGrouping =
                                     GroupCard.Main(ProvenanceSide.Input, group, pair.Model, uiState.SelectedInputs.Contains group.Id, isExpanded ProvenanceSide.Input group.Id, (fun () -> setUiState (State.select ProvenanceSide.Input group.Id uiState)), (fun () -> toggleExpanded ProvenanceSide.Input group.Id), updateValue, createPropertyValue, debug = debug)
                                 if inputGroups.IsEmpty then
                                     Html.p [ prop.className "swt:text-sm swt:text-base-content/60"; prop.text "No entries in this layer" ]
-                                    Controls.AddEndpointPopover(ProvenanceSide.Input, ProvenanceIOKind.Sample, createSet, debug = debug)
+                                    Controls.AddEndpointPopover(ProvenanceSide.Input, defaultEndpointKind ProvenanceSide.Input pair.Model, createSet, debug = debug)
                             ]
                         ]
                         Html.div [ prop.className "swt:min-h-full" ]
@@ -129,7 +129,7 @@ type ProvenanceGrouping =
                                     GroupCard.Main(ProvenanceSide.Output, group, pair.Model, uiState.SelectedOutputs.Contains group.Id, isExpanded ProvenanceSide.Output group.Id, (fun () -> setUiState (State.select ProvenanceSide.Output group.Id uiState)), (fun () -> toggleExpanded ProvenanceSide.Output group.Id), updateValue, createPropertyValue, debug = debug)
                                 if outputGroups.IsEmpty then
                                     Html.p [ prop.className "swt:text-sm swt:text-base-content/60"; prop.text "No entries in this layer" ]
-                                    Controls.AddEndpointPopover(ProvenanceSide.Output, ProvenanceIOKind.Sample, createSet, debug = debug)
+                                    Controls.AddEndpointPopover(ProvenanceSide.Output, defaultEndpointKind ProvenanceSide.Output pair.Model, createSet, debug = debug)
                             ]
                         ]
                         Controls.PropertyRail(ProvenanceSide.Output, headersForSide ProvenanceSide.Output pair.Model, (State.layerState pair.RightLayerId uiState).GroupingKeys, (fun header -> setUiState (State.toggleGrouping pair.RightLayerId header uiState)), debug = debug)
@@ -148,18 +148,17 @@ type ProvenanceGrouping =
                                 Html.p [ prop.className "swt:text-sm"; let txt = $"Source: {conn.SourceGroupId}" in prop.text txt ]
                                 Html.p [ prop.className "swt:text-sm"; let txt = $"Target: {conn.TargetGroupId}" in prop.text txt ]
                                 Html.p [ prop.className "swt:text-sm"; let ids = conn.ConnectionIds |> String.concat ", " in prop.text $"Connection IDs: {ids}" ]
-                                if debug then
-                                    Html.div [
-                                        prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:pt-2"
-                                        prop.children [
-                                            for header in headersForSide ProvenanceSide.Input pair.Model do
-                                                Controls.AddValuePopover(
-                                                    ProvenancePropertyTarget.Connections conn.ConnectionIds,
-                                                    header,
-                                                    createPropertyValue,
-                                                    debug = true)
-                                        ]
+                                Html.div [
+                                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:pt-2"
+                                    prop.children [
+                                        for header in headersForModel pair.Model do
+                                            Controls.AddValuePopover(
+                                                ProvenancePropertyTarget.Connections conn.ConnectionIds,
+                                                header,
+                                                createPropertyValue,
+                                                debug = debug)
                                     ]
+                                ]
                             ]
                         ]
                     | None -> Html.none

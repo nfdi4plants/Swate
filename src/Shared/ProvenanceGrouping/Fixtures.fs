@@ -160,3 +160,57 @@ let outputOnlyModel () : ProvenanceModel =
         []
         [ outputSet "output-only-a" "output-only-table" outputHeader "Output Only A" [ "pv-output-only-analysis" ] ]
         []
+
+let typedSampleModel () : ProvenanceModel =
+    let baseModel = sampleModel ()
+    let instrument = propertyHeader ProvenancePropertyKind.Parameter "Instrument"
+    let degreeCelsius =
+        {
+            Name = "degree Celsius"
+            TermSource = Some "UO"
+            TermAccession = Some "UO:0000027"
+        }
+    let instrumentValue =
+        {
+            Name = "mass spectrometer"
+            TermSource = Some "OBI"
+            TermAccession = Some "OBI:0000049"
+        }
+    let temperature =
+        {
+            baseModel.PropertyValues.["pv-input-a-temperature"] with
+                Value = ProvenanceValue.Float 12.
+                Unit = Some degreeCelsius
+        }
+    let outputInstrument =
+        propertyValue
+            "pv-output-a-instrument"
+            instrument
+            (ProvenanceValue.Term instrumentValue)
+            None
+            (Some(anchor "assay-table" (Some "assay-process") instrument [] [ "Output A" ]))
+    let outputA =
+        {
+            baseModel.OutputSets.["output-a"] with
+                PropertyValueIds = baseModel.OutputSets.["output-a"].PropertyValueIds @ [ outputInstrument.Id ]
+        }
+
+    {
+        baseModel with
+            PropertyValues =
+                baseModel.PropertyValues
+                |> Map.add temperature.Id temperature
+                |> Map.add outputInstrument.Id outputInstrument
+            OutputSets = baseModel.OutputSets |> Map.add outputA.Id outputA
+    }
+
+let dataOutputOnlyModel () : ProvenanceModel =
+    let outputHeader = ioHeader ProvenanceIOKind.Data "Output [Data]"
+    let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+
+    model
+        "data-output-only-table"
+        [ propertyValue "pv-data-output-analysis" analysis (ProvenanceValue.Text "LC-MS") None None ]
+        []
+        [ outputSet "data-output-only-a" "data-output-only-table" outputHeader "Data Output A" [ "pv-data-output-analysis" ] ]
+        []

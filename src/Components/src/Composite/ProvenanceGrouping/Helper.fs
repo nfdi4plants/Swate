@@ -27,10 +27,23 @@ let headersForSide side (model: ProvenanceModel) =
     |> List.distinct
     |> List.sortBy (fun header -> header.Category.Name)
 
-let defaultEndpointHeader side =
-    match side with
-    | ProvenanceSide.Input -> { Kind = ProvenanceIOKind.Sample; Text = "Input [Sample Name]" }
-    | ProvenanceSide.Output -> { Kind = ProvenanceIOKind.Sample; Text = "Output [Sample Name]" }
+let headersForModel (model: ProvenanceModel) =
+    [ yield! headersForSide ProvenanceSide.Input model
+      yield! headersForSide ProvenanceSide.Output model ]
+    |> List.distinct
+    |> List.sortBy (fun header -> header.Category.Name)
+
+let defaultEndpointKind side (model: ProvenanceModel) =
+    let oppositeSets =
+        match side with
+        | ProvenanceSide.Input -> model.OutputSets
+        | ProvenanceSide.Output -> model.InputSets
+
+    match oppositeSets |> Map.toList |> List.map (fun (_, set) -> set.Header.Kind) |> List.distinct with
+    | [ ProvenanceIOKind.Unknown ]
+    | [] -> ProvenanceIOKind.Sample
+    | [ kind ] -> kind
+    | _ -> ProvenanceIOKind.Sample
 
 let displayPair session uiState =
     let pair = Session.activePair session
