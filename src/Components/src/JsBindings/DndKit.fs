@@ -38,6 +38,13 @@ module DndKit =
         abstract member setNodeRef: obj -> unit
         abstract member isOver: bool
 
+    type IDraggable =
+        abstract member attributes: IObject
+        abstract member listeners: IObject
+        abstract member setNodeRef: obj -> unit
+        abstract member transform: obj
+        abstract member isDragging: bool
+
     type IDndKitEvent =
         abstract member active: HTMLElement
         abstract member over: HTMLElement
@@ -79,6 +86,9 @@ type DndKit =
 
     [<Import("useDroppable", "@dnd-kit/core")>]
     static member useDroppable(props: obj) : IDroppable = jsNative
+
+    [<Import("useDraggable", "@dnd-kit/core")>]
+    static member useDraggable(props: obj) : IDraggable = jsNative
 
     [<Import("useSensor", "@dnd-kit/core")>]
     static member useSensor(sensor, ?props) : ISensor = jsNative
