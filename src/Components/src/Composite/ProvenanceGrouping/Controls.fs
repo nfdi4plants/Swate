@@ -194,12 +194,13 @@ type Controls =
     static member AddEndpointPopover
         (
             side: ProvenanceSide,
-            header: ProvenanceIOHeader,
+            defaultKind: ProvenanceIOKind,
             onCreate: CreateLoadedSetCommand -> unit,
             ?debug: bool
         ) =
         let sideName = Controls.SideName side
         let name, setName = React.useState ""
+        let kind, setKind = React.useState defaultKind
 
         Popover.Simple(
             trigger =
@@ -215,7 +216,7 @@ type Controls =
                     prop.className "swt:flex swt:flex-col swt:gap-2"
                     prop.onSubmit (fun event ->
                         event.preventDefault ()
-                        onCreate { Side = side; Header = header; Name = name })
+                        onCreate { Side = side; Header = endpointHeader side kind; Name = name })
                     prop.children [
                         Html.label [ prop.className "swt:label"; prop.text "Endpoint name" ]
                         Html.input [
@@ -223,6 +224,24 @@ type Controls =
                             prop.className "swt:input swt:input-bordered swt:input-sm"
                             prop.value name
                             prop.onChange setName
+                        ]
+                        Html.label [ prop.className "swt:label"; prop.text "Kind" ]
+                        Html.select [
+                            prop.className "swt:select swt:select-bordered swt:select-sm"
+                            prop.value (string kind)
+                            prop.onChange (fun (value: string) ->
+                                match value with
+                                | "Source" -> setKind ProvenanceIOKind.Source
+                                | "Sample" -> setKind ProvenanceIOKind.Sample
+                                | "Data" -> setKind ProvenanceIOKind.Data
+                                | "Material" -> setKind ProvenanceIOKind.Material
+                                | _ -> setKind ProvenanceIOKind.Sample)
+                            prop.children [
+                                Html.option [ prop.value "Source"; prop.text "Source" ]
+                                Html.option [ prop.value "Sample"; prop.text "Sample" ]
+                                Html.option [ prop.value "Data"; prop.text "Data" ]
+                                Html.option [ prop.value "Material"; prop.text "Material" ]
+                            ]
                         ]
                         Html.button [
                             prop.type'.submit

@@ -85,3 +85,15 @@ let targetForGroup side (group: DisplayGroup) =
     match side with
     | ProvenanceSide.Input -> ProvenancePropertyTarget.InputSets ids
     | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets ids
+
+let endpointHeader side kind =
+    let prefix = if side = ProvenanceSide.Input then "Input" else "Output"
+    let text =
+        match kind with
+        | ProvenanceIOKind.Source -> $"{prefix} [Source Name]"
+        | ProvenanceIOKind.Sample -> $"{prefix} [Sample Name]"
+        | ProvenanceIOKind.Data -> $"{prefix} [Data]"
+        | ProvenanceIOKind.Material -> $"{prefix} [Material]"
+        | ProvenanceIOKind.FreeText text -> text
+        | ProvenanceIOKind.Unknown -> $"{prefix} [Unknown]"
+    { Kind = kind; Text = text }
