@@ -10,6 +10,7 @@ open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Fixtures
+open Swate.Components.Shared.ProvenanceGrouping.Session
 
 let typeTests =
     testList "Types" [
@@ -517,6 +518,29 @@ let fixtureTests =
                 "Fixture should preserve exact loaded input/output set connections."
     ]
 
+let sessionTests =
+    testList "Session" [
+        testCase "init exposes the loaded model as the first active pair" <| fun _ ->
+            let initial = sampleModel ()
+            let session = Session.init initial
+            let active = Session.activePair session
+
+            Expect.equal session.Layers.Length 2 "Initial session should render input and output layers."
+            Expect.equal active.Model initial "Initial active pair should preserve the converted model."
+            Expect.equal active.LeftLayerId "layer-1" "The first pair should start on layer 1."
+            Expect.equal active.RightLayerId "layer-2" "The first pair should end on layer 2."
+
+        testCase "selectPair switches display pairs without producing writeback patches" <| fun _ ->
+            let session = Session.init (sampleModel ())
+
+            match Session.selectPair "pair-1" session with
+            | Ok(next, patches) ->
+                Expect.equal next.ActivePairId "pair-1" "Known pair should become active."
+                Expect.isEmpty patches "Navigation is view/session state only."
+            | Error error ->
+                failwithf "Expected pair selection success, got %A" error
+    ]
+
 let tests =
     testList "ProvenanceGrouping" [
         typeTests
@@ -524,4 +548,5 @@ let tests =
         groupingTests
         editTests
         fixtureTests
+        sessionTests
     ]
