@@ -1,6 +1,7 @@
 module Swate.Components.Shared.ProvenanceGrouping.Fixtures
 
 open Swate.Components.Shared.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Session
 
 let term name =
     {
@@ -134,3 +135,28 @@ let sampleModel () : ProvenanceModel =
         ]
 
     model "assay-table" propertyValues inputSets outputSets connections
+
+let sampleSession () : ProvenanceSession =
+    sampleModel () |> Session.init
+
+let inputOnlyModel () : ProvenanceModel =
+    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+    let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+
+    model
+        "input-only-table"
+        [ propertyValue "pv-input-only-species" species (ProvenanceValue.Text "Arabidopsis") None None ]
+        [ inputSet "input-only-a" "input-only-table" inputHeader "Input Only A" [ "pv-input-only-species" ] ]
+        []
+        []
+
+let outputOnlyModel () : ProvenanceModel =
+    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+    let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+
+    model
+        "output-only-table"
+        [ propertyValue "pv-output-only-analysis" analysis (ProvenanceValue.Text "LC-MS") None None ]
+        []
+        [ outputSet "output-only-a" "output-only-table" outputHeader "Output Only A" [ "pv-output-only-analysis" ] ]
+        []

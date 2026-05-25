@@ -670,6 +670,21 @@ let sessionTests =
                 Expect.equal next.Pairs.["pair-2"].Model.Connections.Count 1 "Later transition gets its connection."
             | other ->
                 failwithf "Expected a later connection patch, got %A" other
+
+        testCase "init and addLayer work for an output-only model" <| fun _ ->
+            let initial = Session.init (outputOnlyModel ())
+
+            Expect.isEmpty (Session.activePair initial).Model.InputSets "Output-only input has no synthetic input endpoints."
+            Expect.isNonEmpty (Session.activePair initial).Model.OutputSets "Real output endpoints remain visible."
+
+            match Session.addLayer { SelectedSets = [] } initial with
+            | Ok(next, patches) ->
+                let pair = Session.activePair next
+                Expect.isNonEmpty pair.Model.InputSets "Current outputs should seed the next displayed input side."
+                Expect.isEmpty pair.Model.OutputSets "A newly displayed transition has no invented outputs."
+                Expect.isEmpty patches "View-layer derivation is not a persistence edit."
+            | Error error ->
+                failwithf "Expected output-only layer derivation success, got %A" error
     ]
 
 let tests =

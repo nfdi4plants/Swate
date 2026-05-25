@@ -128,6 +128,9 @@
     <Compile Include="Composite\TermSearch\ConfigProvider.fs"/>
     <Compile Include="Composite\TermSearch\ConfigSetter.fs"/>
     <Compile Include="Composite\TermSearch\TermSearch.fs"/>
+    <Compile Include="Composite\ProvenanceGrouping\Types.fs"/>
+    <Compile Include="Composite\ProvenanceGrouping\State.fs"/>
+    <Compile Include="Composite\ProvenanceGrouping\Helper.fs"/>
     <Compile Include="Composite\Table\Types.fs"/>
     <Compile Include="Composite\Table\Constants.fs"/>
     <Compile Include="Composite\Table\Context.fs"/>

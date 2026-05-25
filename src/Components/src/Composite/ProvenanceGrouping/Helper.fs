@@ -1,0 +1,60 @@
+module Swate.Components.Composite.ProvenanceGrouping.Helper
+
+open Swate.Components.Shared.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Grouping
+open Swate.Components.Shared.ProvenanceGrouping.Session
+open Swate.Components.Composite.ProvenanceGrouping.Types
+open Swate.Components.Composite.ProvenanceGrouping.State
+
+let valueText value unit =
+    let text =
+        match value with
+        | ProvenanceValue.Text text -> text
+        | ProvenanceValue.Integer value -> string value
+        | ProvenanceValue.Float value -> string value
+        | ProvenanceValue.Term term -> term.Name
+    unit |> Option.map (fun unit -> $"{text} {unit.Name}") |> Option.defaultValue text
+
+let headersForSide side (model: ProvenanceModel) =
+    let sets = if side = ProvenanceSide.Input then model.InputSets else model.OutputSets
+    sets
+    |> Map.toList
+    |> List.collect (fun (_, set) ->
+        set.PropertyValueIds
+        |> List.choose (fun id -> model.PropertyValues.TryFind id)
+        |> List.map (fun value -> value.Header))
+    |> List.distinct
+    |> List.sortBy (fun header -> header.Category.Name)
+
+let defaultEndpointHeader side =
+    match side with
+    | ProvenanceSide.Input -> { Kind = ProvenanceIOKind.Sample; Text = "Input [Sample Name]" }
+    | ProvenanceSide.Output -> { Kind = ProvenanceIOKind.Sample; Text = "Output [Sample Name]" }
+
+let displayPair session uiState =
+    let pair = Session.activePair session
+    let leftState = layerState pair.LeftLayerId uiState
+    let rightState = layerState pair.RightLayerId uiState
+    let inputs = displayGroups pair.Model ProvenanceSide.Input leftState.GroupingKeys
+    let outputs = displayGroups pair.Model ProvenanceSide.Output rightState.GroupingKeys
+    pair, inputs, outputs, displayConnections pair.Model inputs outputs
+
+let setsInGroups (groups: DisplayGroup list) selectedIds =
+    groups
+    |> List.filter (fun (group: DisplayGroup) -> selectedIds |> Set.contains group.Id)
+    |> List.collect (fun (group: DisplayGroup) -> group.Members |> List.map (fun (member': DisplayMember) -> member'.SetId))
+    |> List.distinct
+
+let layerCommand inputGroups outputGroups uiState =
+    let inputs =
+        setsInGroups inputGroups uiState.SelectedInputs
+        |> List.map (fun id -> ProvenanceSide.Input, id)
+    let outputs =
+        setsInGroups outputGroups uiState.SelectedOutputs
+        |> List.map (fun id -> ProvenanceSide.Output, id)
+    { AddLayerCommand.SelectedSets = inputs @ outputs }
+
+let valueDragId propertyValueId = $"provenance-value::{propertyValueId}"
+let groupDragId side groupId = $"provenance-group::{side}::{groupId}"
+let groupDropId side groupId = $"provenance-drop::{side}::{groupId}"
+let groupNodeId side groupId = $"provenance-node::{side}::{groupId}"
