@@ -3,6 +3,7 @@ namespace Swate.Components.Composite.ProvenanceGrouping
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Primitive.Buttons
 open Swate.Components.Primitive.Popover
@@ -175,8 +176,8 @@ type Controls =
 
         Html.div [
             prop.ref draggable.setNodeRef
-            yield! !!draggable.attributes
-            yield! !!draggable.listeners
+            yield! prop.spread (!!draggable.attributes)
+            yield! prop.spread (!!draggable.listeners)
             prop.className [
                 "swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"
                 if draggable.isDragging then "swt:opacity-50"

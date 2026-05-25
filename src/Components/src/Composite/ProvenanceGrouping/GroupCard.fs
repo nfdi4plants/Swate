@@ -3,6 +3,7 @@ namespace Swate.Components.Composite.ProvenanceGrouping
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Primitive.Buttons
 open Swate.Components.Shared.ProvenanceGrouping.Types
@@ -60,8 +61,8 @@ type GroupCard =
                         Html.h3 [ prop.className "swt:grow swt:font-semibold"; prop.text title ]
                         Html.button [
                             prop.type'.button
-                            yield! !!draggable.attributes
-                            yield! !!draggable.listeners
+                            yield! prop.spread (!!draggable.attributes)
+                            yield! prop.spread (!!draggable.listeners)
                             prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm"
                             prop.ariaLabel "Connect group"
                             prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--link-20-regular swt:size-4" ] ]
