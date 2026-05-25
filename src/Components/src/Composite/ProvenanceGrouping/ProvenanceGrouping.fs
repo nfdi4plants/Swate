@@ -50,8 +50,6 @@ type ProvenanceGrouping =
         let findGroup side groupId =
             let groups : DisplayGroup list = if side = ProvenanceSide.Input then inputGroups else outputGroups
             groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
-            let groups : DisplayGroup list = if side = ProvenanceSide.Input then inputGroups else outputGroups
-            groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
 
         let connectGroups inputGroup outputGroup =
             [
