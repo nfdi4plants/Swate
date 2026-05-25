@@ -7,6 +7,7 @@ open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Primitive.Buttons
 open Swate.Components.Shared.ProvenanceGrouping.Types
+open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Composite.ProvenanceGrouping.Helper
 
@@ -24,6 +25,7 @@ type GroupCard =
             onSelect: unit -> unit,
             onExpand: unit -> unit,
             onUpdateValue: ProvenancePropertyValueId -> ProvenanceValue -> ProvenanceTerm option -> unit,
+            onCreateValue: CreateLoadedPropertyValueCommand -> unit,
             ?debug: bool
         ) =
         let droppable = DndKit.useDroppable ({| id = groupDropId side group.Id |})
@@ -86,6 +88,18 @@ type GroupCard =
                             Controls.ValueChip(value, (fun nextValue unit -> onUpdateValue value.Id nextValue unit), ?debug = debug)
                     ]
                 ]
+                if defaultArg debug false then
+                    Html.div [
+                        prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:border-t swt:border-base-300 swt:pt-2"
+                        prop.children [
+                            for header in headersForSide side model do
+                                Controls.AddValuePopover(
+                                    targetForGroup side group,
+                                    header,
+                                    onCreateValue,
+                                    debug = true)
+                        ]
+                    ]
                 if expanded then
                     Html.ul [
                         prop.className "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2 swt:text-sm"

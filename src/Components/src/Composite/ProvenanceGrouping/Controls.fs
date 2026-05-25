@@ -162,7 +162,7 @@ type Controls =
                         Html.button [ prop.type'.submit; prop.className "swt:btn swt:btn-primary swt:btn-sm"; prop.text "Add value" ]
                     ]
                 ],
-            ?debug = (if defaultArg debug false then Some "provenance-add-value" else None)
+            ?debug = (if defaultArg debug false then Some $"provenance-add-value-{category}" else None)
         )
 
     [<ReactComponent>]

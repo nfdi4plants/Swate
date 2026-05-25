@@ -2,6 +2,7 @@ module Swate.Components.Composite.ProvenanceGrouping.Helper
 
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
+open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Session
 open Swate.Components.Composite.ProvenanceGrouping.Types
 open Swate.Components.Composite.ProvenanceGrouping.State
@@ -78,3 +79,9 @@ let tryDropId (id: string) =
     | [| "provenance-drop"; "Input"; groupId |] -> Some(ProvenanceSide.Input, decode groupId)
     | [| "provenance-drop"; "Output"; groupId |] -> Some(ProvenanceSide.Output, decode groupId)
     | _ -> None
+
+let targetForGroup side (group: DisplayGroup) =
+    let ids = group.Members |> List.map (fun m -> m.SetId)
+    match side with
+    | ProvenanceSide.Input -> ProvenancePropertyTarget.InputSets ids
+    | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets ids
