@@ -330,11 +330,16 @@ module Session =
         match command.Target with
         | ProvenancePropertyTarget.Connections _ ->
             let pair = activePair session
+            let references = displayTargetRefs command.Target session
             Edit.createLoadedPropertyValue command pair.Model
             |> mapEditError
             |> Result.bind (fun (model, patches) ->
                 updatePairModel pair.Id model session
-                |> Result.map (fun next -> next, patches))
+                |> Result.map (fun next ->
+                    let synchronized =
+                        references
+                        |> List.fold (fun current reference -> synchronizeSet reference current) next
+                    synchronized, patches))
         | _ ->
             ownedSetTargets command.Target session
             |> List.fold

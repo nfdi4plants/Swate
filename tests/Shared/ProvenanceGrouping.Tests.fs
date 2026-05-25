@@ -685,6 +685,38 @@ let sessionTests =
                 Expect.isEmpty patches "View-layer derivation is not a persistence edit."
             | Error error ->
                 failwithf "Expected output-only layer derivation success, got %A" error
+
+        testCase "adding a connection property synchronizes a carried boundary endpoint" <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let layered =
+                Session.addLayer { SelectedSets = [ ProvenanceSide.Output, "output-a" ] } session
+                |> fun result ->
+                    match result with
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected addLayer error: %A" error
+            let pair1 =
+                Session.selectPair "pair-1" layered
+                |> fun result ->
+                    match result with
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected selectPair error: %A" error
+            let command =
+                {
+                    Target = ProvenancePropertyTarget.Connections [ "connection-a" ]
+                    CopiedFrom = None
+                    Header = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+                    Value = ProvenanceValue.Text "Microscopy"
+                    Unit = None
+                }
+            let edited =
+                Session.createLoadedPropertyValue command pair1
+                |> fun result ->
+                    match result with
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected createLoadedPropertyValue error: %A" error
+            let firstOutput = edited.Pairs.["pair-1"].Model.OutputSets.["output-a"]
+            let nextInput = edited.Pairs.["pair-2"].Model.InputSets.["pair-2-from-output-0-output-a"]
+            Expect.equal nextInput.PropertyValueIds firstOutput.PropertyValueIds "linked input mirrors the edited output"
     ]
 
 let tests =
