@@ -527,3 +527,29 @@ export const AddsLayerFromMixedSelection: Story = {
     });
   },
 };
+
+export const DoesNotReuseSelectionForEqualGroupIdsInDifferentPairs: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputA = canvas.getByText('Output A').closest('article')!;
+
+    await userEvent.click(within(outputA).getByRole('button', { name: 'Select group' }));
+    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+
+    await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Pair 2 Output');
+    await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
+    const pair2Output = await waitFor(() => canvas.getByText('Pair 2 Output').closest('article')!);
+
+    await userEvent.click(within(pair2Output).getByRole('button', { name: 'Select group' }));
+    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+
+    await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Pair 3 Output');
+    await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
+    const pair3Output = await waitFor(() => canvas.getByText('Pair 3 Output').closest('article')!);
+
+    expect(pair3Output).not.toHaveClass('swt:border-primary');
+  },
+};

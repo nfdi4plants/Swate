@@ -25,8 +25,8 @@ type ProvenanceDetail =
 type UiState =
     {
         LayerStates: Map<ProvenanceLayerId, LayerViewState>
-        SelectedInputs: Set<string>
-        SelectedOutputs: Set<string>
+        SelectedInputs: Set<ProvenancePairId * string>
+        SelectedOutputs: Set<ProvenancePairId * string>
         Detail: ProvenanceDetail option
         Error: string option
     }

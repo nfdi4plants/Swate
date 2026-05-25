@@ -48,11 +48,12 @@ let toggleGrouping layerId header state =
             current.GroupingKeys @ [ key ]
     { state with LayerStates = state.LayerStates |> Map.add layerId { current with GroupingKeys = nextKeys } }
 
-let select side groupId state =
+let select pairId side groupId state =
+    let identity = pairId, groupId
     match side with
     | ProvenanceSide.Input ->
-        let selected = if state.SelectedInputs.Contains groupId then state.SelectedInputs.Remove groupId else state.SelectedInputs.Add groupId
+        let selected = if state.SelectedInputs.Contains identity then state.SelectedInputs.Remove identity else state.SelectedInputs.Add identity
         { state with SelectedInputs = selected }
     | ProvenanceSide.Output ->
-        let selected = if state.SelectedOutputs.Contains groupId then state.SelectedOutputs.Remove groupId else state.SelectedOutputs.Add groupId
+        let selected = if state.SelectedOutputs.Contains identity then state.SelectedOutputs.Remove identity else state.SelectedOutputs.Add identity
         { state with SelectedOutputs = selected }

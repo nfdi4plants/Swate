@@ -62,18 +62,18 @@ let displayPair session uiState =
     let outputs = displayGroups pair.Model ProvenanceSide.Output rightState.GroupingKeys
     pair, inputs, outputs, displayConnections pair.Model inputs outputs
 
-let setsInGroups (groups: DisplayGroup list) selectedIds =
+let setsInGroups pairId (groups: DisplayGroup list) selectedIds =
     groups
-    |> List.filter (fun (group: DisplayGroup) -> selectedIds |> Set.contains group.Id)
+    |> List.filter (fun (group: DisplayGroup) -> selectedIds |> Set.contains (pairId, group.Id))
     |> List.collect (fun (group: DisplayGroup) -> group.Members |> List.map (fun (member': DisplayMember) -> member'.SetId))
     |> List.distinct
 
-let layerCommand inputGroups outputGroups uiState =
+let layerCommand pairId inputGroups outputGroups uiState =
     let inputs =
-        setsInGroups inputGroups uiState.SelectedInputs
+        setsInGroups pairId inputGroups uiState.SelectedInputs
         |> List.map (fun id -> ProvenanceSide.Input, id)
     let outputs =
-        setsInGroups outputGroups uiState.SelectedOutputs
+        setsInGroups pairId outputGroups uiState.SelectedOutputs
         |> List.map (fun id -> ProvenanceSide.Output, id)
     { AddLayerCommand.SelectedSets = inputs @ outputs }
 
