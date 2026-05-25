@@ -6,13 +6,39 @@ import {
   Exports_createSampleSession as createSampleSession,
   Exports_createInputOnlySession as createInputOnlySession,
   Exports_createOutputOnlySession as createOutputOnlySession,
-  Exports_patchLabels as patchLabels,
+  Exports_createTypedSampleSession as createTypedSampleSession,
+  Exports_createDataOutputOnlySession as createDataOutputOnlySession,
+  Exports_patchDetails as patchDetails,
 } from './Types.fs.js';
 
-function Harness({ inputOnly = false, outputOnly = false }: { inputOnly?: boolean; outputOnly?: boolean }) {
-  const [session, setSession] = React.useState(() =>
-    inputOnly ? createInputOnlySession() : outputOnly ? createOutputOnlySession() : createSampleSession(),
-  );
+type Fixture = 'sample' | 'inputOnly' | 'outputOnly' | 'typedSample' | 'dataOutputOnly';
+
+function Harness({
+  inputOnly = false,
+  outputOnly = false,
+  fixture = 'sample',
+  debug = true,
+}: {
+  inputOnly?: boolean;
+  outputOnly?: boolean;
+  fixture?: Fixture;
+  debug?: boolean;
+}) {
+  const [session, setSession] = React.useState(() => {
+    const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
+    switch (selected) {
+      case 'inputOnly':
+        return createInputOnlySession();
+      case 'outputOnly':
+        return createOutputOnlySession();
+      case 'typedSample':
+        return createTypedSampleSession();
+      case 'dataOutputOnly':
+        return createDataOutputOnlySession();
+      default:
+        return createSampleSession();
+    }
+  });
   const [patches, setPatches] = React.useState<string[]>([]);
 
   return (
@@ -20,12 +46,12 @@ function Harness({ inputOnly = false, outputOnly = false }: { inputOnly?: boolea
       <ProvenanceGrouping
         session={session}
         height={680}
-        debug={true}
+        debug={debug}
         onChange={(change: any) => {
           setSession(change.Session);
           setPatches((current) => [
             ...current,
-            ...Array.from(patchLabels(change.Patches)),
+            ...Array.from(patchDetails(change.Patches)),
           ]);
         }}
       />
@@ -72,7 +98,10 @@ export const GroupsByPropertiesAndShowsMembers: Story = {
       expect(canvasElement).toHaveTextContent('Species: Chlamydomonas');
     });
 
-    const grouped = canvas.getByText('Species: Arabidopsis').closest('article')!;
+    const grouped = canvas
+      .getAllByText('Species: Arabidopsis')
+      .find((element) => element.tagName === 'H3')!
+      .closest('article')!;
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
     await waitFor(() => expect(grouped).toHaveTextContent('Input A'));
   },
@@ -90,6 +119,147 @@ export const RendersMeasuredConnections: Story = {
   },
 };
 
+export const RemeasuresConnectionsAfterGroupExpansion: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const before = await waitFor(() => {
+      const paths = canvas.getAllByTestId('provenance-connection').map((connector) => connector.getAttribute('d'));
+      expect(paths.length).toBeGreaterThan(0);
+      return paths;
+    });
+
+    const inputA = canvas.getByText('Input A').closest('article')!;
+    await userEvent.click(within(inputA).getByRole('button', { name: 'Show members' }));
+
+    await waitFor(() => {
+      const after = canvas.getAllByTestId('provenance-connection').map((connector) => connector.getAttribute('d'));
+      expect(after).not.toEqual(before);
+    });
+  },
+};
+
+export const CreatesPropertyValueWithoutDebug: Story = {
+  render: () => <Harness debug={false} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputA = canvas.getByText('Output A').closest('article')!;
+
+    await userEvent.click(within(outputA).getByText('Add Analysis value'));
+    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), 'Imaging');
+    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+
+    await waitFor(() => expect(outputA).toHaveTextContent('Analysis: Imaging'));
+  },
+};
+
+export const CreatesOutputPropertyOnConnection: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
+    await userEvent.click(connector);
+
+    const details = canvas.getByTestId('provenance-connection-details');
+    expect(details).toHaveTextContent('Connection IDs');
+    await userEvent.click(within(details).getByText('Add Analysis value'));
+    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), 'Linked analysis');
+    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue'),
+    );
+  },
+};
+
+export const EditsNumericValueWithoutLosingUnit: Story = {
+  render: () => <Harness fixture="typedSample" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const temperature = canvas.getByTestId('provenance-value-pv-input-a-temperature');
+    expect(temperature).toHaveTextContent('Temperature: 12 degree Celsius');
+
+    await userEvent.click(within(temperature).getByTestId('popover_trigger_provenance-edit-Temperature'));
+    const value = screen.getByRole('textbox', { name: /Temperature value/i });
+    await userEvent.clear(value);
+    await userEvent.type(value, '13.5');
+    await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
+
+    await waitFor(() => {
+      expect(temperature).toHaveTextContent('Temperature: 13.5 degree Celsius');
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent(
+        'UpdatePropertyValue:Float:degree Celsius',
+      );
+    });
+  },
+};
+
+export const EditsOntologyTermWithoutFlatteningIt: Story = {
+  render: () => <Harness fixture="typedSample" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const instrument = canvas.getByTestId('provenance-value-pv-output-a-instrument');
+
+    await userEvent.click(within(instrument).getByTestId('popover_trigger_provenance-edit-Instrument'));
+    await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('UpdatePropertyValue:Term:none'),
+    );
+  },
+};
+
+export const CreatesNumericPropertyValue: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputD = canvas.getByText('Output D').closest('article')!;
+
+    await userEvent.click(within(outputD).getByText('Add Analysis value'));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /Value type/i }), 'Float');
+    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), '1.5');
+    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue:Float:none'),
+    );
+  },
+};
+
+export const CreatesMatchingDataEndpointForOneSidedModel: Story = {
+  render: () => <Harness fixture="dataOutputOnly" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-input'));
+    expect(screen.getByRole('combobox', { name: 'Kind' })).toHaveValue('Data');
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'New Input');
+    await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedSet:Data'),
+    );
+  },
+};
+
+export const CreatesFreeTextEndpointHeader: Story = {
+  render: () => <Harness inputOnly />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Kind' }), 'FreeText');
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint header/i }), 'Derived data');
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Custom Output');
+    await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedSet:FreeText:Derived data'),
+    );
+  },
+};
+
 export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -104,7 +274,7 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
       expect(canvasElement).toHaveTextContent('Output A');
     });
 
-    await userEvent.click(canvas.getByTestId('provenance-edit-trigger-Analysis'));
+    await userEvent.click(canvas.getByTestId('popover_trigger_provenance-edit-Analysis'));
     const value = screen.getByRole('textbox', { name: /Analysis value/i });
     await userEvent.clear(value);
     await userEvent.type(value, 'Imaging');
@@ -123,7 +293,7 @@ export const CompletesAnInputOnlyPair: Story = {
     expect(canvasElement).toHaveTextContent('Input Only A');
     expect(canvasElement).toHaveTextContent('No entries in this layer');
 
-    await userEvent.click(canvas.getByTestId('provenance-add-output-trigger'));
+    await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
     await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'New Output');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
 
@@ -135,16 +305,37 @@ export const CompletesAnInputOnlyPair: Story = {
 async function dragByPointer(source: Element, target: Element) {
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
-  fireEvent.pointerDown(source, { clientX: from.left + 4, clientY: from.top + 4, buttons: 1 });
-  fireEvent.pointerMove(target, { clientX: to.left + 4, clientY: to.top + 4, buttons: 1 });
-  fireEvent.pointerUp(target, { clientX: to.left + 4, clientY: to.top + 4 });
+  fireEvent.pointerDown(source, {
+    clientX: from.left + 4,
+    clientY: from.top + 4,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+  fireEvent.pointerMove(document, {
+    clientX: to.left + 4,
+    clientY: to.top + 4,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+  fireEvent.pointerUp(document, {
+    clientX: to.left + 4,
+    clientY: to.top + 4,
+    button: 0,
+    buttons: 0,
+    isPrimary: true,
+    pointerId: 1,
+  });
 }
 
 export const CopiesValueOntoAGroup: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const source = canvas.getByTestId('provenance-value-pv-output-a-analysis');
+    const source = canvas.getByTestId('provenance-drag-value-pv-output-a-analysis');
     const target = canvas.getByText('Output D').closest('article')!;
 
     await dragByPointer(source, target);
