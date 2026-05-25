@@ -16,7 +16,6 @@ type ProvenanceEditorChange =
 type LayerViewState =
     {
         GroupingKeys: GroupingKey list
-        SortHeader: ProvenancePropertyHeader option
     }
 
 type ProvenanceDetail =

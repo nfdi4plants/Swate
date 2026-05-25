@@ -8,7 +8,6 @@ open Swate.Components.Composite.ProvenanceGrouping.Types
 let emptyLayer =
     {
         GroupingKeys = []
-        SortHeader = None
     }
 
 let init (session: ProvenanceSession) =
@@ -57,6 +56,3 @@ let select side groupId state =
     | ProvenanceSide.Output ->
         let selected = if state.SelectedOutputs.Contains groupId then state.SelectedOutputs.Remove groupId else state.SelectedOutputs.Add groupId
         { state with SelectedOutputs = selected }
-
-let clearSelection state =
-    { state with SelectedInputs = Set.empty; SelectedOutputs = Set.empty }
