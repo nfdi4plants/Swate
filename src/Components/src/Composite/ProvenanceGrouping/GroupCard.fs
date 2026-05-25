@@ -93,7 +93,7 @@ type GroupCard =
                                 value,
                                 (fun nextValue unit -> onUpdateValue value.Id nextValue unit),
                                 ?debug = debug,
-                                key = $"{value.Id}:{formatValue value.Value value.Unit}")
+                                key = propertyValueIdentity value)
                     ]
                 ]
                 Html.div [

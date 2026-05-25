@@ -8,6 +8,7 @@ import {
   Exports_createOutputOnlySession as createOutputOnlySession,
   Exports_createTypedSampleSession as createTypedSampleSession,
   Exports_createDataOutputOnlySession as createDataOutputOnlySession,
+  Exports_createRetaggedTypedSampleSession as createRetaggedTypedSampleSession,
   Exports_patchDetails as patchDetails,
 } from './Types.fs.js';
 
@@ -18,11 +19,13 @@ function Harness({
   outputOnly = false,
   fixture = 'sample',
   debug = true,
+  allowTermReplacement = false,
 }: {
   inputOnly?: boolean;
   outputOnly?: boolean;
   fixture?: Fixture;
   debug?: boolean;
+  allowTermReplacement?: boolean;
 }) {
   const [session, setSession] = React.useState(() => {
     const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
@@ -43,6 +46,11 @@ function Harness({
 
   return (
     <div className="swt:flex swt:flex-col swt:gap-4 swt:min-h-screen swt:bg-base-200 swt:p-4">
+      {allowTermReplacement && (
+        <button type="button" onClick={() => setSession(createRetaggedTypedSampleSession())}>
+          Replace term metadata
+        </button>
+      )}
       <ProvenanceGrouping
         session={session}
         height={680}
@@ -248,6 +256,24 @@ export const EditsOntologyTermWithoutFlatteningIt: Story = {
 
     await waitFor(() =>
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('UpdatePropertyValue:Term:none'),
+    );
+  },
+};
+
+export const RefreshesOntologyDraftAfterControlledMetadataReplacement: Story = {
+  render: () => <Harness fixture="typedSample" allowTermReplacement />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole('button', { name: /Replace term metadata/i }));
+    const instrument = canvas.getByTestId('provenance-value-pv-output-a-instrument');
+    await userEvent.click(within(instrument).getByTestId('popover_trigger_provenance-edit-Instrument'));
+    await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent(
+        'UpdatePropertyValue:Term:none:MS:MS:1000031',
+      ),
     );
   },
 };

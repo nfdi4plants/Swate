@@ -38,6 +38,22 @@ module Exports =
     let createOutputOnlySession () = outputOnlyModel () |> Session.init
     let createTypedSampleSession () = typedSampleModel () |> Session.init
     let createDataOutputOnlySession () = dataOutputOnlyModel () |> Session.init
+    let createRetaggedTypedSampleSession () =
+        let model = typedSampleModel ()
+        let propertyValue = model.PropertyValues.["pv-output-a-instrument"]
+        let retagged =
+            {
+                Name = "mass spectrometer"
+                TermSource = Some "MS"
+                TermAccession = Some "MS:1000031"
+            }
+        {
+            model with
+                PropertyValues =
+                    model.PropertyValues
+                    |> Map.add propertyValue.Id { propertyValue with Value = ProvenanceValue.Term retagged }
+        }
+        |> Session.init
 
     let private valueKind value =
         match value with
@@ -49,16 +65,24 @@ module Exports =
     let private unitName (unit': ProvenanceTerm option) =
         unit' |> Option.map (fun term -> term.Name) |> Option.defaultValue "none"
 
+    let private valueMetadata value =
+        match value with
+        | ProvenanceValue.Term term ->
+            let source = term.TermSource |> Option.defaultValue "none"
+            let accession = term.TermAccession |> Option.defaultValue "none"
+            $":{source}:{accession}"
+        | _ -> ""
+
     let patchDetails patches =
         patches
         |> List.map (function
             | ProvenanceTablePatch.UpdatePropertyValue(_, _, _, value, unit') ->
-                $"UpdatePropertyValue:{valueKind value}:{unitName unit'}"
+                $"UpdatePropertyValue:{valueKind value}:{unitName unit'}{valueMetadata value}"
             | ProvenanceTablePatch.AddLoadedSet(_, _, header, _) ->
                 match header.Kind with
                 | ProvenanceIOKind.FreeText text -> $"AddLoadedSet:FreeText:{text}"
                 | kind -> $"AddLoadedSet:{kind}"
             | ProvenanceTablePatch.AddLoadedPropertyValue(_, _, _, value, unit') ->
-                $"AddLoadedPropertyValue:{valueKind value}:{unitName unit'}"
+                $"AddLoadedPropertyValue:{valueKind value}:{unitName unit'}{valueMetadata value}"
             | ProvenanceTablePatch.AddLoadedConnection _ -> "AddLoadedConnection")
         |> ResizeArray

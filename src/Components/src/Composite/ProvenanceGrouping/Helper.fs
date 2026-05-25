@@ -71,6 +71,24 @@ let layerCommand inputGroups outputGroups uiState =
 let private encode (value: string) = System.Uri.EscapeDataString value
 let private decode (value: string) = System.Uri.UnescapeDataString value
 
+let private termIdentity (term: ProvenanceTerm) =
+    let source = term.TermSource |> Option.defaultValue ""
+    let accession = term.TermAccession |> Option.defaultValue ""
+    $"{encode term.Name}|{encode source}|{encode accession}"
+
+let propertyValueIdentity (propertyValue: ProvenancePropertyValue) =
+    let value =
+        match propertyValue.Value with
+        | ProvenanceValue.Text text -> $"Text:{encode text}"
+        | ProvenanceValue.Integer integer -> $"Integer:{integer}"
+        | ProvenanceValue.Float float -> $"Float:{float}"
+        | ProvenanceValue.Term term -> $"Term:{termIdentity term}"
+    let unit =
+        propertyValue.Unit
+        |> Option.map termIdentity
+        |> Option.defaultValue ""
+    $"{propertyValue.Id}:{value}:Unit:{unit}"
+
 let valueDragId propertyValueId = $"provenance-value|{encode propertyValueId}"
 let groupDragId side groupId = $"provenance-group|{side}|{encode groupId}"
 let groupDropId side groupId = $"provenance-drop|{side}|{encode groupId}"
