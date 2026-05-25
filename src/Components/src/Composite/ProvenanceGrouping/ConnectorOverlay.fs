@@ -91,13 +91,26 @@ type ConnectorOverlay =
             svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
             svg.children [
                 for measured in paths do
+                    let activateFromKeyboard (event: KeyboardEvent) =
+                        match event.key with
+                        | "Enter"
+                        | " "
+                        | "Spacebar" ->
+                            event.preventDefault ()
+                            onSelect measured.Connection
+                        | _ -> ()
+
                     Svg.path [
                         svg.d measured.Path
                         svg.fill "none"
                         svg.stroke "currentColor"
                         svg.className "swt:text-primary swt:pointer-events-auto swt:cursor-pointer"
+                        svg.custom ("tabIndex", "0")
+                        svg.custom ("role", "button")
+                        svg.custom ("aria-label", $"Select connection {measured.Connection.Id}")
                         if defaultArg debug false then svg.custom ("data-testid", "provenance-connection")
                         svg.onClick (fun _ -> onSelect measured.Connection)
+                        svg.onKeyDown activateFromKeyboard
                     ]
             ]
         ]

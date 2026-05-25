@@ -228,6 +228,31 @@ export const CreatesOutputPropertyOnConnection: Story = {
   },
 };
 
+export const SelectsConnectionWithKeyboard: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
+
+    expect(connector).toHaveAttribute('role', 'button');
+    expect(connector).toHaveAttribute('aria-label');
+    expect(connector).toHaveAttribute('tabindex', '0');
+    connector.focus();
+    await userEvent.keyboard('{Enter}');
+
+    await waitFor(() => expect(canvas.getByTestId('provenance-connection-details')).toBeInTheDocument());
+
+    const secondConnector = canvas.getAllByTestId('provenance-connection')[1];
+    const secondLabel = secondConnector.getAttribute('aria-label')!.replace('Select connection ', '');
+    secondConnector.focus();
+    await userEvent.keyboard(' ');
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-connection-details')).toHaveTextContent(`Connection: ${secondLabel}`),
+    );
+  },
+};
+
 export const EditsNumericValueWithoutLosingUnit: Story = {
   render: () => <Harness fixture="typedSample" />,
   play: async ({ canvasElement }) => {
