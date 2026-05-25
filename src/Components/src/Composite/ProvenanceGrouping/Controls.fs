@@ -373,7 +373,8 @@ type Controls =
             side: ProvenanceSide,
             defaultKind: ProvenanceIOKind,
             onCreate: CreateLoadedSetCommand -> unit,
-            ?debug: bool
+            ?debug: bool,
+            ?key: string
         ) =
         let sideName = ControlsHelper.sideName side
         let name, setName = React.useState ""

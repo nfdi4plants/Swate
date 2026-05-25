@@ -21,6 +21,8 @@ type ProvenanceGrouping =
         let surfaceRef = React.useElementRef ()
         let uiState = State.ensureLayers session uiState
         let pair, inputGroups, outputGroups, connections = displayPair session uiState
+        let inputEndpointKind = defaultEndpointKind ProvenanceSide.Input pair.Model
+        let outputEndpointKind = defaultEndpointKind ProvenanceSide.Output pair.Model
 
         let publish result =
             match result with
@@ -118,7 +120,12 @@ type ProvenanceGrouping =
                                     GroupCard.Main(ProvenanceSide.Input, group, pair.Model, uiState.SelectedInputs.Contains group.Id, isExpanded ProvenanceSide.Input group.Id, (fun () -> setUiState (State.select ProvenanceSide.Input group.Id uiState)), (fun () -> toggleExpanded ProvenanceSide.Input group.Id), updateValue, createPropertyValue, debug = debug, key = $"Input:{group.Id}")
                                 if inputGroups.IsEmpty then
                                     Html.p [ prop.className "swt:text-sm swt:text-base-content/60"; prop.text "No entries in this layer" ]
-                                    Controls.AddEndpointPopover(ProvenanceSide.Input, defaultEndpointKind ProvenanceSide.Input pair.Model, createSet, debug = debug)
+                                    Controls.AddEndpointPopover(
+                                        ProvenanceSide.Input,
+                                        inputEndpointKind,
+                                        createSet,
+                                        debug = debug,
+                                        key = $"{pair.Id}:Input:{endpointKindIdentity inputEndpointKind}")
                             ]
                         ]
                         Html.div [ prop.className "swt:min-h-full" ]
@@ -129,7 +136,12 @@ type ProvenanceGrouping =
                                     GroupCard.Main(ProvenanceSide.Output, group, pair.Model, uiState.SelectedOutputs.Contains group.Id, isExpanded ProvenanceSide.Output group.Id, (fun () -> setUiState (State.select ProvenanceSide.Output group.Id uiState)), (fun () -> toggleExpanded ProvenanceSide.Output group.Id), updateValue, createPropertyValue, debug = debug, key = $"Output:{group.Id}")
                                 if outputGroups.IsEmpty then
                                     Html.p [ prop.className "swt:text-sm swt:text-base-content/60"; prop.text "No entries in this layer" ]
-                                    Controls.AddEndpointPopover(ProvenanceSide.Output, defaultEndpointKind ProvenanceSide.Output pair.Model, createSet, debug = debug)
+                                    Controls.AddEndpointPopover(
+                                        ProvenanceSide.Output,
+                                        outputEndpointKind,
+                                        createSet,
+                                        debug = debug,
+                                        key = $"{pair.Id}:Output:{endpointKindIdentity outputEndpointKind}")
                             ]
                         ]
                         Controls.PropertyRail(ProvenanceSide.Output, headersForSide ProvenanceSide.Output pair.Model, (State.layerState pair.RightLayerId uiState).GroupingKeys, (fun header -> setUiState (State.toggleGrouping pair.RightLayerId header uiState)), debug = debug)

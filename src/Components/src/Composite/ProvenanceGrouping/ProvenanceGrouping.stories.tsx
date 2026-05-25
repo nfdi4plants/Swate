@@ -20,12 +20,14 @@ function Harness({
   fixture = 'sample',
   debug = true,
   allowTermReplacement = false,
+  allowEndpointReplacement = false,
 }: {
   inputOnly?: boolean;
   outputOnly?: boolean;
   fixture?: Fixture;
   debug?: boolean;
   allowTermReplacement?: boolean;
+  allowEndpointReplacement?: boolean;
 }) {
   const [session, setSession] = React.useState(() => {
     const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
@@ -49,6 +51,11 @@ function Harness({
       {allowTermReplacement && (
         <button type="button" onClick={() => setSession(createRetaggedTypedSampleSession())}>
           Replace term metadata
+        </button>
+      )}
+      {allowEndpointReplacement && (
+        <button type="button" onClick={() => setSession(createOutputOnlySession())}>
+          Replace endpoint context
         </button>
       )}
       <ProvenanceGrouping
@@ -323,6 +330,18 @@ export const CreatesMatchingDataEndpointForOneSidedModel: Story = {
     await waitFor(() =>
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedSet:Data'),
     );
+  },
+};
+
+export const RefreshesEndpointKindAfterControlledSessionReplacement: Story = {
+  render: () => <Harness fixture="dataOutputOnly" allowEndpointReplacement />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole('button', { name: /Replace endpoint context/i }));
+    await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-input'));
+
+    expect(screen.getByRole('combobox', { name: 'Kind' })).toHaveValue('Sample');
   },
 };
 

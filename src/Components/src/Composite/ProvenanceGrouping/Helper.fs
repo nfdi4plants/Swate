@@ -45,6 +45,15 @@ let defaultEndpointKind side (model: ProvenanceModel) =
     | [ kind ] -> kind
     | _ -> ProvenanceIOKind.Sample
 
+let endpointKindIdentity kind =
+    match kind with
+    | ProvenanceIOKind.Source -> "Source"
+    | ProvenanceIOKind.Sample -> "Sample"
+    | ProvenanceIOKind.Data -> "Data"
+    | ProvenanceIOKind.Material -> "Material"
+    | ProvenanceIOKind.FreeText text -> $"FreeText:{text}"
+    | ProvenanceIOKind.Unknown -> "Unknown"
+
 let displayPair session uiState =
     let pair = Session.activePair session
     let leftState = layerState pair.LeftLayerId uiState
