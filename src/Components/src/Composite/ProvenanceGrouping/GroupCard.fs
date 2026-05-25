@@ -26,7 +26,8 @@ type GroupCard =
             onExpand: unit -> unit,
             onUpdateValue: ProvenancePropertyValueId -> ProvenanceValue -> ProvenanceTerm option -> unit,
             onCreateValue: CreateLoadedPropertyValueCommand -> unit,
-            ?debug: bool
+            ?debug: bool,
+            ?key: string
         ) =
         let droppable = DndKit.useDroppable ({| id = groupDropId side group.Id |})
         let draggable = DndKit.useDraggable ({| id = groupDragId side group.Id |})
@@ -47,6 +48,9 @@ type GroupCard =
                 |> String.concat ", "
 
         Html.article [
+            match key with
+            | Some key -> prop.key key
+            | None -> ()
             prop.ref setNodeRef
             prop.custom ("data-provenance-group-node", groupNodeId side group.Id)
             prop.className [
@@ -85,13 +89,17 @@ type GroupCard =
                     prop.className "swt:flex swt:flex-wrap swt:gap-1"
                     prop.children [
                         for value in values do
-                            Controls.ValueChip(value, (fun nextValue unit -> onUpdateValue value.Id nextValue unit), ?debug = debug)
+                            Controls.ValueChip(
+                                value,
+                                (fun nextValue unit -> onUpdateValue value.Id nextValue unit),
+                                ?debug = debug,
+                                key = $"{value.Id}:{formatValue value.Value value.Unit}")
                     ]
                 ]
                 Html.div [
                     prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:border-t swt:border-base-300 swt:pt-2"
                     prop.children [
-                        for header in headersForSide side model do
+                        for header in headersForModel model do
                             Controls.AddValuePopover(
                                 targetForGroup side group,
                                 header,

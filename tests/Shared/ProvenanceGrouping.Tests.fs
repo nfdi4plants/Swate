@@ -159,6 +159,20 @@ let groupingTests =
 
             Expect.equal outputBGroupCount 2 "Output B should appear once for each repeated replicate value."
 
+        testCase "grouped members retain non-grouping property values for editing" <| fun _ ->
+            let model = sampleModel ()
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let groups = displayGroups model ProvenanceSide.Input [ { Header = species } ]
+            let inputA =
+                groups
+                |> List.collect (fun group -> group.Members)
+                |> List.find (fun member' -> member'.SetId = "input-a")
+
+            Expect.contains
+                inputA.PropertyValueIds
+                "pv-input-a-temperature"
+                "Grouping by Species must not hide Temperature from the member editing surface."
+
         testCase "grouping collapses identical equal values for one set into one display member" <| fun _ ->
             let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
             let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"

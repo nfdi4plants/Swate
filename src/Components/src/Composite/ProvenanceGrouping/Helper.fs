@@ -74,7 +74,7 @@ let private decode (value: string) = System.Uri.UnescapeDataString value
 let valueDragId propertyValueId = $"provenance-value|{encode propertyValueId}"
 let groupDragId side groupId = $"provenance-group|{side}|{encode groupId}"
 let groupDropId side groupId = $"provenance-drop|{side}|{encode groupId}"
-let groupNodeId side groupId = $"provenance-node::{side}::{groupId}"
+let groupNodeId side groupId = $"provenance-node::{side}::{encode groupId}"
 
 type DragPayload =
     | PropertyValue of ProvenancePropertyValueId

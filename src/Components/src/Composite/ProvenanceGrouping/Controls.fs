@@ -71,7 +71,8 @@ module private ControlsHelper =
             | _ -> None
         | DraftFloat ->
             match Double.TryParse text with
-            | true, value -> Some(ProvenanceValue.Float value)
+            | true, value when not (Double.IsNaN value || Double.IsInfinity value) ->
+                Some(ProvenanceValue.Float value)
             | _ -> None
         | DraftTerm -> term |> Option.map ProvenanceValue.Term
 
@@ -284,11 +285,15 @@ type Controls =
         (
             propertyValue: ProvenancePropertyValue,
             onApply: ProvenanceValue -> ProvenanceTerm option -> unit,
-            ?debug: bool
+            ?debug: bool,
+            ?key: string
         ) =
         let draggable = DndKit.useDraggable ({| id = valueDragId propertyValue.Id |})
 
         Html.div [
+            match key with
+            | Some key -> prop.key key
+            | None -> ()
             prop.ref draggable.setNodeRef
             prop.className [
                 "swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"

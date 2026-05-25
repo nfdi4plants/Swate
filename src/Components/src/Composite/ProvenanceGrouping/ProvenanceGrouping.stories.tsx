@@ -107,6 +107,23 @@ export const GroupsByPropertiesAndShowsMembers: Story = {
   },
 };
 
+export const RegroupedValuesOpenTheirOwnDraft: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    const grouped = canvas
+      .getAllByText('Species: Chlamydomonas')
+      .find((element) => element.tagName === 'H3')!
+      .closest('article')!;
+
+    const species = within(grouped).getByTestId('provenance-value-pv-input-d-species');
+    await userEvent.click(within(species).getByTestId('popover_trigger_provenance-edit-Species'));
+    expect(screen.getByRole('textbox', { name: /Species value/i })).toHaveValue('Chlamydomonas');
+  },
+};
+
 export const RendersMeasuredConnections: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -139,6 +156,25 @@ export const RemeasuresConnectionsAfterGroupExpansion: Story = {
   },
 };
 
+export const RendersConnectionsForQuotedGroupingValues: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputD = canvas.getByText('Output D').closest('article')!;
+
+    await userEvent.click(within(outputD).getByText('Add Analysis value'));
+    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), "Farmer's field");
+    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+    await userEvent.click(canvas.getByTestId('provenance-property-Output-Analysis'));
+
+    await waitFor(() => {
+      const connectors = canvas.getAllByTestId('provenance-connection');
+      expect(connectors).toHaveLength(4);
+      expect(connectors.every((connector) => connector.getAttribute('d')?.startsWith('M '))).toBe(true);
+    });
+  },
+};
+
 export const CreatesPropertyValueWithoutDebug: Story = {
   render: () => <Harness debug={false} />,
   play: async ({ canvasElement }) => {
@@ -149,7 +185,9 @@ export const CreatesPropertyValueWithoutDebug: Story = {
     await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), 'Imaging');
     await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
 
-    await waitFor(() => expect(outputA).toHaveTextContent('Analysis: Imaging'));
+    await waitFor(() =>
+      expect(canvas.getByText('Output A').closest('article')!).toHaveTextContent('Analysis: Imaging'),
+    );
   },
 };
 
@@ -187,7 +225,9 @@ export const EditsNumericValueWithoutLosingUnit: Story = {
     await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
 
     await waitFor(() => {
-      expect(temperature).toHaveTextContent('Temperature: 13.5 degree Celsius');
+      expect(canvas.getByTestId('provenance-value-pv-input-a-temperature')).toHaveTextContent(
+        'Temperature: 13.5 degree Celsius',
+      );
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent(
         'UpdatePropertyValue:Float:degree Celsius',
       );
@@ -224,6 +264,21 @@ export const CreatesNumericPropertyValue: Story = {
     await waitFor(() =>
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue:Float:none'),
     );
+  },
+};
+
+export const RejectsNonFiniteNumericPropertyValue: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputD = canvas.getByText('Output D').closest('article')!;
+
+    await userEvent.click(within(outputD).getByText('Add Analysis value'));
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /Value type/i }), 'Float');
+    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), 'Infinity');
+
+    expect(screen.getByRole('button', { name: /Add value/i })).toBeDisabled();
+    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
   },
 };
 
@@ -299,6 +354,26 @@ export const CompletesAnInputOnlyPair: Story = {
 
     await waitFor(() => expect(canvasElement).toHaveTextContent('New Output'));
     expect(canvas.getByTestId('provenance-patch-preview')).not.toHaveTextContent('No patches emitted.');
+  },
+};
+
+export const AddsExistingPropertyToCreatedEmptySide: Story = {
+  render: () => <Harness inputOnly debug={false} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText('Add output'));
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'New Output');
+    await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
+
+    const output = await waitFor(() => canvas.getByText('New Output').closest('article')!);
+    await userEvent.click(within(output).getByText('Add Species value'));
+    await userEvent.type(screen.getByRole('textbox', { name: /Species value/i }), 'Arabidopsis');
+    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+
+    await waitFor(() =>
+      expect(canvas.getByText('New Output').closest('article')!).toHaveTextContent('Species: Arabidopsis'),
+    );
   },
 };
 

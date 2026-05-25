@@ -151,11 +151,7 @@ let displayGroups (model: ProvenanceModel) side groupingKeys =
                                         Unit = unit
                                     })
 
-                            let propertyValueIds =
-                                combination
-                                |> List.collect (fun (_, _, _, propertyValueIds) -> propertyValueIds)
-
-                            yield groupId side groupingValues set.Id, set.TableName, groupingValues, displayMember set propertyValueIds
+                            yield groupId side groupingValues set.Id, set.TableName, groupingValues, displayMember set set.PropertyValueIds
             ]
 
         grouped
