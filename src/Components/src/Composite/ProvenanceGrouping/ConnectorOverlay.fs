@@ -37,20 +37,22 @@ module private ConnectorMeasure =
             Some $"M {startX} {startY} C {startX + bend} {startY}, {endX - bend} {endY}, {endX} {endY}"
         | _ -> None
 
-[<Erase; Mangle(false)>]
-type ConnectorOverlay =
+module private ConnectorObserver =
 
     [<Emit("new ResizeObserver(() => $0())")>]
-    static member private createResizeObserver (callback: unit -> unit) : obj = jsNative
+    let create (callback: unit -> unit) : obj = jsNative
 
     [<Emit("$0.observe($1)")>]
-    static member private observeNode (observer: obj) (target: HTMLElement) : unit = jsNative
+    let observeNode (observer: obj) (target: HTMLElement) : unit = jsNative
 
     [<Emit("$0.querySelectorAll($1).forEach(node => $2.observe(node))")>]
-    static member private observeMatching (container: HTMLElement) (selector: string) (observer: obj) : unit = jsNative
+    let observeMatching (container: HTMLElement) (selector: string) (observer: obj) : unit = jsNative
 
     [<Emit("$0.disconnect()")>]
-    static member private disconnectObserver (observer: obj) : unit = jsNative
+    let disconnect (observer: obj) : unit = jsNative
+
+[<Erase; Mangle(false)>]
+type ConnectorOverlay =
 
     [<ReactComponent>]
     static member Main(containerRef: IRefValue<HTMLElement option>, connections: DisplayConnection list, onSelect: DisplayConnection -> unit, ?debug: bool) =
@@ -66,7 +68,7 @@ type ConnectorOverlay =
                     |> Option.map (fun path -> { Connection = connection; Path = path }))
                 |> setPaths
 
-        React.useLayoutEffect (
+        React.useEffect (
             (fun () ->
                 measure ()
                 match containerRef.current with
@@ -75,13 +77,13 @@ type ConnectorOverlay =
                     let onLayout = fun (_: Event) -> measure ()
                     container.addEventListener ("scroll", onLayout)
                     Browser.Dom.window.addEventListener ("resize", onLayout)
-                    let observer = ConnectorOverlay.createResizeObserver measure
-                    ConnectorOverlay.observeNode observer container
-                    ConnectorOverlay.observeMatching container "[data-provenance-group-node]" observer
+                    let observer = ConnectorObserver.create measure
+                    ConnectorObserver.observeNode observer container
+                    ConnectorObserver.observeMatching container "[data-provenance-group-node]" observer
                     FsReact.createDisposable (fun () ->
                         container.removeEventListener ("scroll", onLayout)
                         Browser.Dom.window.removeEventListener ("resize", onLayout)
-                        ConnectorOverlay.disconnectObserver observer)),
+                        ConnectorObserver.disconnect observer)),
             [| box connections |]
         )
 
