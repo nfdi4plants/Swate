@@ -54,7 +54,27 @@ let layerCommand inputGroups outputGroups uiState =
         |> List.map (fun id -> ProvenanceSide.Output, id)
     { AddLayerCommand.SelectedSets = inputs @ outputs }
 
-let valueDragId propertyValueId = $"provenance-value::{propertyValueId}"
-let groupDragId side groupId = $"provenance-group::{side}::{groupId}"
-let groupDropId side groupId = $"provenance-drop::{side}::{groupId}"
+let private encode (value: string) = System.Uri.EscapeDataString value
+let private decode (value: string) = System.Uri.UnescapeDataString value
+
+let valueDragId propertyValueId = $"provenance-value|{encode propertyValueId}"
+let groupDragId side groupId = $"provenance-group|{side}|{encode groupId}"
+let groupDropId side groupId = $"provenance-drop|{side}|{encode groupId}"
 let groupNodeId side groupId = $"provenance-node::{side}::{groupId}"
+
+type DragPayload =
+    | PropertyValue of ProvenancePropertyValueId
+    | Group of ProvenanceSide * string
+
+let tryDragId (id: string) =
+    match id.Split('|') with
+    | [| "provenance-value"; valueId |] -> Some(PropertyValue(decode valueId))
+    | [| "provenance-group"; "Input"; groupId |] -> Some(Group(ProvenanceSide.Input, decode groupId))
+    | [| "provenance-group"; "Output"; groupId |] -> Some(Group(ProvenanceSide.Output, decode groupId))
+    | _ -> None
+
+let tryDropId (id: string) =
+    match id.Split('|') with
+    | [| "provenance-drop"; "Input"; groupId |] -> Some(ProvenanceSide.Input, decode groupId)
+    | [| "provenance-drop"; "Output"; groupId |] -> Some(ProvenanceSide.Output, decode groupId)
+    | _ -> None

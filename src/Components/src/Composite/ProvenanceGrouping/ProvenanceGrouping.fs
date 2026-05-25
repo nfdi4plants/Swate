@@ -43,28 +43,9 @@ type ProvenanceGrouping =
             Session.createLoadedSet command session
             |> publish
 
-        let trySide text =
-            match text with
-            | "Input" -> Some ProvenanceSide.Input
-            | "Output" -> Some ProvenanceSide.Output
-            | _ -> None
-
-        let tryDragId (id: string) =
-            let parts = id.Split([|':'|])
-            match parts with
-            | [| "provenance-value"; ""; propertyValueId |] -> Some(Choice1Of2 propertyValueId)
-            | [| "provenance-group"; side; groupId |] ->
-                trySide side |> Option.map (fun side -> Choice2Of2(side, groupId))
-            | _ -> None
-
-        let tryDropId (id: string) =
-            let parts = id.Split([|':'|])
-            match parts with
-            | [| "provenance-drop"; ""; side; groupId |] ->
-                trySide side |> Option.map (fun side -> side, groupId)
-            | _ -> None
-
         let findGroup side groupId =
+            let groups : DisplayGroup list = if side = ProvenanceSide.Input then inputGroups else outputGroups
+            groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
             let groups : DisplayGroup list = if side = ProvenanceSide.Input then inputGroups else outputGroups
             groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
 
@@ -86,7 +67,7 @@ type ProvenanceGrouping =
         let handleDragEnd (event: DndKit.IDndKitEvent) =
             if not (isNull event.over) then
                 match tryDragId (string event.active.id), tryDropId (string event.over.id) with
-                | Some(Choice1Of2 propertyValueId), Some(side, groupId) ->
+                | Some(DragPayload.PropertyValue propertyValueId), Some(side, groupId) ->
                     match findGroup side groupId with
                     | Some group ->
                         let memberIds = group.Members |> List.map (fun member' -> member'.SetId)
@@ -96,7 +77,7 @@ type ProvenanceGrouping =
                             | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets memberIds
                         Session.copyPropertyValueToLoadedTarget propertyValueId target session |> publish
                     | None -> ()
-                | Some(Choice2Of2(ProvenanceSide.Input, inputGroupId)), Some(ProvenanceSide.Output, outputGroupId) ->
+                | Some(DragPayload.Group(ProvenanceSide.Input, inputGroupId)), Some(ProvenanceSide.Output, outputGroupId) ->
                     match findGroup ProvenanceSide.Input inputGroupId, findGroup ProvenanceSide.Output outputGroupId with
                     | Some inputGroup, Some outputGroup -> connectGroups inputGroup outputGroup
                     | _ -> ()
