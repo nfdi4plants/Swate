@@ -144,6 +144,7 @@ module private Authentication =
                 }
 
                 let! result = Api.ipcAuthApi.signIn request
+                console.log result
 
                 match result with
                 | Ok authResult when authResult.Success -> ()
@@ -164,9 +165,9 @@ module private Authentication =
             }
             |> Promise.start
 
-        let onSwitchAccount (accountId: string) =
+        let onSwitchAccount (localSwateAccountId: string) =
             promise {
-                match! Api.ipcAuthApi.setActiveAccount accountId with
+                match! Api.ipcAuthApi.setActiveAccount localSwateAccountId with
                 | Ok _ ->
                     match! Api.ipcAuthApi.revalidate () with
                     | Ok _ -> ()
@@ -175,9 +176,9 @@ module private Authentication =
             }
             |> Promise.start
 
-        let onRemoveAccount (accountId: string) =
+        let onRemoveAccount (localSwateAccountId: string) =
             promise {
-                match! Api.ipcAuthApi.removeAccount accountId with
+                match! Api.ipcAuthApi.removeAccount localSwateAccountId with
                 | Ok _ -> ()
                 | Error _ -> ()
             }

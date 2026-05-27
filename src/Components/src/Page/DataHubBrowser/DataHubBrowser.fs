@@ -582,9 +582,7 @@ type DataHubBrowser =
                         | Some closeFn ->
                             Html.div [
                                 prop.className "swt:ml-auto"
-                                prop.children [
-                                    Buttons.DeleteButton(props = [ prop.onClick closeFn ])
-                                ]
+                                prop.children [ Buttons.DeleteButton(props = [ prop.onClick closeFn ]) ]
                             ]
                         | None -> Html.none
                     ]
@@ -678,12 +676,12 @@ type DataHubBrowser =
 
     [<ReactComponent>]
     static member Entry() =
-        let accounts, setAccounts =
-            React.useState (AuthStateDto.Empty: AuthStateDto)
+        let accounts, setAccounts = React.useState (AuthStateDto.Empty: AuthStateDto)
 
         let mockUser: AccountSummary = {
             User = {
-                AccountId = "1"
+                Id = 1
+                LocalSwateAccountId = "1"
                 Name = "storybook-user"
                 Email = "Storybook User"
                 AvatarUrl = ""
@@ -702,8 +700,7 @@ type DataHubBrowser =
                 }
             )
 
-        let logout () =
-            setAccounts AuthStateDto.Empty
+        let logout () = setAccounts AuthStateDto.Empty
 
         let reloadTrigger = 0
 
@@ -921,10 +918,7 @@ type DataHubBrowser =
 
             do! Promise.sleep delayMs
 
-            let source =
-                orgRepos
-                |> Map.tryFind query.GroupId
-                |> Option.defaultValue [||]
+            let source = orgRepos |> Map.tryFind query.GroupId |> Option.defaultValue [||]
 
             let filtered =
                 source
@@ -1052,7 +1046,8 @@ type DataHubBrowser =
                 | Ok user ->
                     let userDTO: AccountSummary = {
                         User = {
-                            AccountId = string user.id
+                            Id = user.id
+                            LocalSwateAccountId = string user.id
                             Name = user.name
                             AvatarUrl = user.avatar_url |> Option.defaultValue ""
                             Email = ""
@@ -1131,14 +1126,7 @@ type DataHubBrowser =
                 GitLabApi.ListUserPersonalProjects(
                     baseUrl,
                     pat,
-                    ?userId =
-                        (currentUser
-                         |> Option.bind (fun u ->
-                             System.Int32.TryParse(u.AccountId)
-                             |> function
-                                 | true, id -> Some id
-                                 | _ -> None
-                         )),
+                    ?userId = (currentUser |> Option.map _.Id),
                     page = query.Page,
                     perPage = query.PerPage,
                     search = query.SearchTerm,
@@ -1251,4 +1239,3 @@ type DataHubBrowser =
                 DataHubBrowser.ExplorePanel(accounts, loaders, reloadTrigger, projectActionBtns = btnInfo)
             ]
         ]
-

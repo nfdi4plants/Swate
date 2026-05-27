@@ -345,32 +345,31 @@ type Authentication =
             )
         ]
 
-    static member ExmpUserInformation =
-        {
-            AccountId = "saödlkalsd"
-            Name = "John Doe"
-            Email = "john-doe@mail.com"
-            AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
-            TargetDataHub = Helper.Default_DataHub_Url
-        }
+    static member ExmpUserInformation = {
+        Id = 1
+        LocalSwateAccountId = "acc-1"
+        Name = "John Doe"
+        Email = "john-doe@mail.com"
+        AvatarUrl = "https://www.gravatar.com/avatar/00000000000000000000000000000000?d=mp&f=y"
+        TargetDataHub = Helper.Default_DataHub_Url
+    }
 
-    static member User =
-        {
-            Types.AuthStateDto.Empty with
-                ActiveAccount =
-                    Some {
-                        User = Authentication.ExmpUserInformation
-                        DateAdded = "2026-01-01T00:00:00.0000000Z"
-                        TokenInvalid = false
-                    }
-                StoredAccounts = [|
-                    {
-                        User = Authentication.ExmpUserInformation
-                        DateAdded = "2026-01-01T00:00:00.0000000Z"
-                        TokenInvalid = false
-                    }
-                |]
-        }
+    static member User = {
+        Types.AuthStateDto.Empty with
+            ActiveAccount =
+                Some {
+                    User = Authentication.ExmpUserInformation
+                    DateAdded = "2026-01-01T00:00:00.0000000Z"
+                    TokenInvalid = false
+                }
+            StoredAccounts = [|
+                {
+                    User = Authentication.ExmpUserInformation
+                    DateAdded = "2026-01-01T00:00:00.0000000Z"
+                    TokenInvalid = false
+                }
+            |]
+    }
 
     [<ReactComponent>]
     static member Entry(?user) =
@@ -395,7 +394,8 @@ type Authentication =
                         ActiveAccount =
                             Some {
                                 User = {
-                                    AccountId = "acc-1"
+                                    Id = activeUser.Id
+                                    LocalSwateAccountId = activeUser.LocalSwateAccountId
                                     Name = activeUser.Name
                                     Email = activeUser.Email
                                     AvatarUrl = activeUser.AvatarUrl
@@ -407,7 +407,8 @@ type Authentication =
                         StoredAccounts = [|
                             {
                                 User = {
-                                    AccountId = "acc-1"
+                                    Id = activeUser.Id
+                                    LocalSwateAccountId = activeUser.LocalSwateAccountId
                                     Name = activeUser.Name
                                     Email = activeUser.Email
                                     AvatarUrl = activeUser.AvatarUrl
@@ -418,7 +419,8 @@ type Authentication =
                             }
                             {
                                 User = {
-                                    AccountId = "acc-2"
+                                    Id = 2
+                                    LocalSwateAccountId = "acc-2"
                                     Name = "Max Mustermann"
                                     Email = "max@example.org"
                                     AvatarUrl =
@@ -437,10 +439,10 @@ type Authentication =
 
         let onLogout () = setAccounts AuthStateDto.Empty
 
-        let onSwitchAccount (accountId: string) =
+        let onSwitchAccount (localSwateAccountId: string) =
             let nextActive =
                 accounts.StoredAccounts
-                |> Array.tryFind (fun account -> account.User.AccountId = accountId)
+                |> Array.tryFind (fun account -> account.User.LocalSwateAccountId = localSwateAccountId)
                 |> Option.orElse accounts.ActiveAccount
                 |> Option.orElse (accounts.StoredAccounts |> Array.tryHead)
 
@@ -451,16 +453,18 @@ type Authentication =
 
             setAccounts next
 
-        let onRemoveAccount (accountId: string) =
+        let onRemoveAccount (localSwateAccountId: string) =
             let filteredAccounts =
                 accounts.StoredAccounts
-                |> Array.filter (fun account -> account.User.AccountId <> accountId)
+                |> Array.filter (fun account -> account.User.LocalSwateAccountId <> localSwateAccountId)
 
             let nextActive =
                 match accounts.ActiveAccount with
-                | Some activeAccount when activeAccount.User.AccountId <> accountId ->
+                | Some activeAccount when activeAccount.User.LocalSwateAccountId <> localSwateAccountId ->
                     filteredAccounts
-                    |> Array.tryFind (fun account -> account.User.AccountId = activeAccount.User.AccountId)
+                    |> Array.tryFind (fun account ->
+                        account.User.LocalSwateAccountId = activeAccount.User.LocalSwateAccountId
+                    )
                 | _ -> filteredAccounts |> Array.tryHead
 
             let next = {

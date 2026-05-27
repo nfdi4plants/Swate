@@ -60,7 +60,8 @@ type GitLabUser = {
 }
 
 type AuthUserDto = {
-    AccountId: string
+    Id: int
+    LocalSwateAccountId: string
     Name: string
     Email: string
     AvatarUrl: string
@@ -68,7 +69,8 @@ type AuthUserDto = {
 } with
 
     static member FromGitLabUser (gitLabUser: GitLabUser) (targetDataHub: string) : AuthUserDto = {
-        AccountId = string gitLabUser.id
+        Id = gitLabUser.id
+        LocalSwateAccountId = string gitLabUser.id
         Name = gitLabUser.name
         Email = gitLabUser.email
         AvatarUrl = gitLabUser.avatar_url
@@ -94,5 +96,9 @@ type AuthStateDto = {
     }
 
     member this.ActiveUser() = this.ActiveAccount |> Option.map _.User
-    member this.UsableActiveAccount() = this.ActiveAccount |> Option.filter (fun account -> not account.TokenInvalid)
-    member this.UsableActiveUser() = this.UsableActiveAccount() |> Option.map _.User
+
+    member this.UsableActiveAccount() =
+        this.ActiveAccount |> Option.filter (fun account -> not account.TokenInvalid)
+
+    member this.UsableActiveUser() =
+        this.UsableActiveAccount() |> Option.map _.User

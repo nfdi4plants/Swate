@@ -409,7 +409,8 @@ Vitest.describe (
             fun () ->
                 let invalidActiveAccount: AccountSummary = {
                     User = {
-                        AccountId = "acc-1"
+                        Id = 1
+                        LocalSwateAccountId = "acc-1"
                         Name = "Invalid User"
                         Email = "invalid@example.org"
                         AvatarUrl = "https://example.org/avatar.png"
