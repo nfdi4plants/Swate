@@ -31,33 +31,48 @@ type GitSidebarEmptyState =
         let secondaryActions =
             match secondaryAction with
             | Some action -> [
-                BlankslateAction.create (
+                BlankslateSecondaryAction.create (
                     action.Label,
                     action.OnClick,
                     iconClassName = action.IconClassName,
-                    disabled = action.Disabled,
-                    kind = BlankslateActionKind.Secondary
+                    disabled = action.Disabled
                 )
               ]
             | None -> []
 
-        let actions =
-            BlankslateAction.create (
+        let primaryActions = [
+            BlankslatePrimaryAction.create (
                 primaryAction.Label,
                 primaryAction.OnClick,
                 iconClassName = primaryAction.IconClassName,
-                disabled = primaryAction.Disabled,
-                kind = BlankslateActionKind.Primary
+                disabled = primaryAction.Disabled
             )
-            :: secondaryActions
+        ]
+
+        let trailingElement =
+            match infoText with
+            | Some info ->
+                Some(
+                    Html.div [
+                        prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
+                        prop.children [
+                            Html.span [
+                                prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                            ]
+                            Html.span info
+                        ]
+                    ]
+                )
+            | None -> None
 
         Blankslate.Blankslate(
             title = title,
             description = description,
             iconClassName = iconClassName,
-            actions = actions,
-            ?infoText = infoText,
-            ?extraContent = extraContent,
+            primaryActions = primaryActions,
+            secondaryActions = secondaryActions,
+            ?leadingElement = extraContent,
+            ?trailingElement = trailingElement,
             fullHeight = true,
             testId = "GitSidebarEmptyState"
         )
