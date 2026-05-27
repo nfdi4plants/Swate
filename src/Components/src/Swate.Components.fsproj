@@ -192,7 +192,8 @@
     <Compile Include="Composite\Widgets\Types.fs"/>
     <Compile Include="Composite\Widgets\LocalStorage.fs"/>
     <Compile Include="Composite\Widgets\Context.fs"/>
-    <Compile Include="Composite\Widgets\BuildingBlockWidget.fs"/>
+    <Compile Include="Composite\Widgets\BuildingBlockWidget\Dropdown.fs"/>
+    <Compile Include="Composite\Widgets\BuildingBlockWidget\BuildingBlockWidget.fs"/>
     <Compile Include="Composite\Widgets\FilePickerWidget.fs"/>
     <Compile Include="Composite\Widgets\DataAnnotator\Types.fs"/>
     <Compile Include="Composite\Widgets\DataAnnotator\Helper.fs"/>
