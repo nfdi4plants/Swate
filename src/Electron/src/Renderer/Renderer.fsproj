@@ -34,6 +34,7 @@
     <Compile Include="Components\LeftSidebar\Main.fs" />
     <Compile Include="Components\MainContent\Types.fs" />
     <Compile Include="Components\MainContent\Helper.fs" />
+    <Compile Include="Components\MainContent\SettingsPageTarget.fs" />
     <Compile Include="Components\MainContent\ArcFilePreviewTarget.fs" />
     <Compile Include="Components\MainContent\TextPreviewTarget.fs" />
     <Compile Include="Components\MainContent\UnknownPreviewTarget.fs" />

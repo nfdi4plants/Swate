@@ -56,11 +56,7 @@ type private Selector =
         ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
 
     static member DownloadArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        ButtonInfo.create (
-            "swt:fluent--cloud-beaker-24-regular swt:size-5",
-            "Download ARC from DataHub",
-            onClick
-        )
+        ButtonInfo.create ("swt:fluent--cloud-beaker-24-regular swt:size-5", "Download ARC from DataHub", onClick)
 
     [<ReactComponent>]
     static member private Actionbar(setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit) =
@@ -204,10 +200,10 @@ module private Authentication =
 
 type Navbar =
 
+    [<ReactComponent>]
     static member private Separator() =
         Html.div [
             prop.className "swt:divider swt:divider-horizontal swt:mx-0"
-            prop.testId "navbar-action-separator"
         ]
 
     [<ReactComponent>]
@@ -228,7 +224,7 @@ type Navbar =
         Html.button [
             prop.type'.button
             prop.className [
-                "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
+                "swt:btn swt:btn-outline swt:btn-square swt:btn-sm"
                 if isActive then
                     "swt:btn-active"
             ]
@@ -265,10 +261,7 @@ type Navbar =
                 onError =
                     fun ex ->
                         errorCtx.enqueue (
-                            ErrorModalRequest.create (
-                                ex.Message,
-                                title = "Error checking for unsaved changes"
-                            )
+                            ErrorModalRequest.create (ex.Message, title = "Error checking for unsaved changes")
                         )
                 dependencies = [||]
             }
@@ -281,13 +274,7 @@ type Navbar =
 
                     match! Api.ipcArcVaultApi.saveArcFile () with
                     | Ok _ -> ()
-                    | Error ex ->
-                        errorCtx.enqueue (
-                            ErrorModalRequest.create (
-                                ex.Message,
-                                title = "Error saving ARC"
-                            )
-                        )
+                    | Error ex -> errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
                 }
                 |> Promise.start
 
@@ -308,14 +295,14 @@ type Navbar =
     [<ReactComponent>]
     static member Main() =
 
+        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+
         let left =
             Html.div [
                 prop.className "swt:flex swt:items-center swt:gap-2"
                 prop.children [
-                    Selector.Main()
-                    Navbar.Separator()
                     Navbar.SettingsButton()
-                    Navbar.Separator()
+                    Selector.Main()
                     Navbar.SaveArcButton()
                 ]
             ]
@@ -325,8 +312,9 @@ type Navbar =
                 prop.className "swt:flex swt:items-center"
                 prop.children [
                     Authentication.UserAvatar()
-                    Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                    Layout.LeftSidebarToggleBtn()
+                    if appStateCtx.IsSome then
+                        Navbar.Separator()
+                        Layout.LeftSidebarToggleBtn()
                 ]
             ]
 

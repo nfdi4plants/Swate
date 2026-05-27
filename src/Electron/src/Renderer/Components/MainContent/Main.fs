@@ -15,6 +15,7 @@ open Renderer.Components.MainContent.NotesDraftTarget
 open Renderer.Components.MainContent.NotesSearchTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget
+open Renderer.Components.MainContent.SettingsPageTarget
 
 module private MainHelper =
 
@@ -34,6 +35,27 @@ module private MainHelper =
                 Error(sprintf "Error loading templates: %s" error.Message)
             )
 
+module private LazyComponents =
+
+    open Swate.Components.Primitive
+
+    [<ReactComponent>]
+    let FullPageLoadingSpinner (text: string) =
+        Html.div [
+            prop.className "swt:flex-1 swt:flex swt:min-w-0 swt:min-h-0 swt:grow swt:justify-center swt:items-center"
+            prop.children [
+                Swate.Components.Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
+                    size = DaisyuiSize.XL,
+                    color = DaisyuiColors.Primary,
+                    text = text
+                )
+            ]
+        ]
+
+    [<ReactLazyComponent>]
+    let LazySettingPage () =
+        Renderer.Components.MainContent.SettingsPageTarget.SettingsPage()
+
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
 [<ReactMemoComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option) =
@@ -46,13 +68,10 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     match appRootPath, pageState with
                     | _, Some PageState.DataHubBrowser -> DataHubBrowserTarget()
                     | _, Some PageState.SettingsPage ->
-                        Html.div [
-                            prop.className "swt:size-full swt:min-w-0 swt:min-h-0 swt:overflow-y-auto"
-                            prop.testId "main-content-settings-page"
-                            prop.children [
-                                Swate.Components.PageComponents.SettingsPage.SettingsPage.SettingsPage()
-                            ]
-                        ]
+                        React.Suspense(
+                            [ LazyComponents.LazySettingPage() ],
+                            fallback = LazyComponents.FullPageLoadingSpinner("Loading settings...")
+                        )
                     | None, _ ->
                         Html.div [
                             prop.className
