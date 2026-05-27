@@ -926,20 +926,22 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             try
                                 match request.fileType with
-                                | DTOType.DTOTypeIsPlainTextVariant ->
+                                | FileContentType.FileContentTypeIsPlainTextVariant ->
                                     let directoryPath = dirname absolutePath
                                     do! mkdirRecursiveAsync directoryPath
                                     do! writeUtf8FileAsync absolutePath request.content
                                     do! vault.RefreshFileTree()
                                     return Ok()
-                                | DTOType.CLI -> return Error(exn "Direct writing of CLI files is not supported.")
-                                | DTOType.DTOTypeIsISAFileVariant ->
+                                | FileContentType.CLI ->
+                                    return Error(exn "Direct writing of CLI files is not supported.")
+                                | FileContentType.FileContentTypeIsISAFileVariant ->
                                     return
                                         Error(
                                             exn
                                                 "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
                                         )
-                                | _ -> return Error(exn $"Unsupported DTOType for writing: {request.fileType}")
+                                | _ ->
+                                    return Error(exn $"Unsupported file content type for writing: {request.fileType}")
                             finally
                                 vault.isBusyWriting <- false
             with e ->
@@ -965,9 +967,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         | Error pathError -> return Error pathError
                         | Ok path ->
                             let content = readFileSync path TextEncoding.Utf8
+                            let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
 
-                            let dto =
-                                FileContentDTO.create ARCtrl.Contract.DTOType.PlainText content relativePath
+                            let dto = FileContentDTO.create fileType content relativePath
 
                             return Ok dto
                     with e ->

@@ -17,6 +17,7 @@ type GitUnsupportedPageData = GitUnsupportedContentDto
 [<RequireQualifiedAccess>]
 type PageState =
     | ArcFilePage of ArcFiles
+    | MarkdownPage of string
     | TextPage of string
     | UnknownPage
     | LandingDraftPage
@@ -28,11 +29,12 @@ type PageState =
     | ErrorPage of string
     | DataHubBrowser
     | SettingsPage
-with
+
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with
-        | DTOType.DTOTypeIsPlainTextVariant -> PageState.TextPage dto.content
-        | DTOType.DTOTypeIsISAFileVariant ->
+        | FileContentType.Markdown -> PageState.MarkdownPage dto.content
+        | FileContentType.FileContentTypeIsPlainTextVariant -> PageState.TextPage dto.content
+        | FileContentType.FileContentTypeIsISAFileVariant ->
             let arcfile = FileContentDTO.toArcFile dto
 
             match arcfile with
@@ -42,5 +44,4 @@ with
                     $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."
         | _ -> PageState.UnknownPage
 
-let pageStateOfFileContentDTO (dto: FileContentDTO) : PageState =
-    PageState.fromFileContentDTO dto
+let pageStateOfFileContentDTO (dto: FileContentDTO) : PageState = PageState.fromFileContentDTO dto

@@ -6,7 +6,6 @@ open Swate.Components.Page.Landing
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open ARCtrl.Contract
 
 [<ReactComponent>]
 let LandingDraftTarget () =
@@ -51,8 +50,11 @@ let LandingDraftTarget () =
                     match payload.ProtocolIntent with
                     | None -> finishSuccess previewData
                     | Some protocolIntent ->
+                        let requestFileType =
+                            FileContentDTO.inferTextFileTypeFromPath protocolIntent.RelativePath
+
                         let request: FileContentDTO =
-                            FileContentDTO.create DTOType.PlainText protocolIntent.Content protocolIntent.RelativePath
+                            FileContentDTO.create requestFileType protocolIntent.Content protocolIntent.RelativePath
 
                         let! writeResult = Api.ipcArcVaultApi.writeFile request
 

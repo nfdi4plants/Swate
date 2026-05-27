@@ -56,6 +56,10 @@ module private LazyComponents =
     let LazySettingPage () =
         Renderer.Components.MainContent.SettingsPageTarget.SettingsPage()
 
+    [<ReactLazyComponent>]
+    let LazyMarkdownEditorTarget (content: string) =
+        Renderer.Components.MainContent.MarkdownEditorTargetView.MarkdownEditorTarget(content)
+
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
 [<ReactMemoComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option) =
@@ -79,6 +83,11 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                             prop.children [ Renderer.Components.InitState.InitState() ]
                         ]
                     | Some _, Some(PageState.ArcFilePage arcFile) -> ArcFilePreviewTarget arcFile
+                    | Some _, Some(PageState.MarkdownPage content) ->
+                        React.Suspense(
+                            [ LazyComponents.LazyMarkdownEditorTarget(content) ],
+                            fallback = LazyComponents.FullPageLoadingSpinner("Loading markdown editor...")
+                        )
                     | Some _, Some(PageState.TextPage content) -> TextPreviewTarget content
                     | Some _, Some PageState.UnknownPage -> UnknownPreviewTarget()
                     | Some _, Some(PageState.ErrorPage errMsg) -> ErrorViewTarget errMsg

@@ -6,7 +6,6 @@ open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open ARCtrl.Contract
 
 [<ReactComponent>]
 let NotesDraftTarget () =
@@ -31,8 +30,11 @@ let NotesDraftTarget () =
                         Error = None
                 }
 
+                let requestFileType =
+                    FileContentDTO.inferTextFileTypeFromPath payload.Intent.RelativePath
+
                 let request: FileContentDTO =
-                    FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
+                    FileContentDTO.create requestFileType payload.Intent.Content payload.Intent.RelativePath
 
                 let! writeResult = Api.ipcArcVaultApi.writeFile request
 
@@ -58,7 +60,7 @@ let NotesDraftTarget () =
                         |> viewLoadResultOfDto
                         |> applyLoadedView pageStateCtx.setState
                     | Result.Error _ ->
-                        FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
+                        FileContentDTO.create requestFileType payload.Intent.Content payload.Intent.RelativePath
                         |> viewLoadResultOfDto
                         |> applyLoadedView pageStateCtx.setState
             }
