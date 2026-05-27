@@ -1,6 +1,7 @@
 module Renderer.Components.FileExplorerLfs
 
 open Fable.Core
+open Renderer.Components.Helper.GitLfsHelper
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -81,9 +82,9 @@ let createContextMenuItems
     (baseItems: FileItem -> ContextMenuItem list)
     : FileItem -> ContextMenuItem list =
     let toggleLfsMark =
-        createToggleLfsMark enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runToggleLfsMark
+        createToggleLfsMark enqueueErrorModal arcScopeId runToggleLfsMark
 
     let freeLocalLfsCopy =
-        createFreeLocalLfsCopy enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runFreeLocalLfsCopy
+        createFreeLocalLfsCopy enqueueErrorModal arcScopeId runFreeLocalLfsCopy
 
     fun item -> withLfsContextMenuItems item toggleLfsMark freeLocalLfsCopy (baseItems item)

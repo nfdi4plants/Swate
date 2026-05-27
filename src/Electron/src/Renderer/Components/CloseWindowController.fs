@@ -3,7 +3,7 @@ module Renderer.Components.CloseWindowController
 
 open Feliz
 open Fable.Core
-open Renderer.Components.ARCHelper
+open Renderer.Components.Helper.ArcScopeHelper
 open Swate.Components
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.ErrorModal.Context

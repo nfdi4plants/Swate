@@ -2,11 +2,14 @@ module Renderer.Components.MainContent.DataHubBrowserTarget
 
 open System
 open Feliz
+open Renderer.Components.Helper.ArcScopeHelper
+open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
 open Swate.Components.Page.DataHub
 open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Primitive.Actionbar.Types
+open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Electron.Shared.GitTypes
 
 module DataHubBrowserHelper =
@@ -33,6 +36,11 @@ let DataHubBrowserTarget () =
     let authCtx = Renderer.Context.AuthStateContext.useAuthStateCtx ()
     let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
+    let errorCtx = useErrorModalCtx ()
+    let arcScopeId = useCurrentArcScopeId ()
+
+    let onArcError =
+        createErrorModalCallback errorCtx.enqueue "Could not open ARC" arcScopeId
 
     let loadAllRepos (query: ExploreRepoQuery) =
         Api.ipcGitLabApi.loadAllRepos query
@@ -68,7 +76,7 @@ let DataHubBrowserTarget () =
 
             match destinationResult with
             | Error error when DataHubBrowserHelper.isCancelError error -> ()
-            | Error error -> Browser.Dom.console.error ($"[Swate] Could not pick download folder: {error.Message}")
+            | Error error -> onArcError $"Could not pick download folder: {error.Message}"
             | Ok destinationFolder ->
                 let targetPath =
                     ARCtrl.ArcPathHelper.combine
@@ -85,9 +93,10 @@ let DataHubBrowserTarget () =
                 match! gitStateCtx.cloneRepository cloneRequest with
                 | Error _ -> ()
                 | Ok clonedPath ->
-                    match! Api.ipcArcVaultApi.openARCByPath clonedPath with
-                    | Ok _ -> closeBrowser ()
-                    | Error error -> Browser.Dom.console.error ($"[Swate] Could not open cloned ARC: {error.Message}")
+                    let! wasOpened = Renderer.Components.Helper.ArcVaultHelper.openArcByPath onArcError clonedPath
+
+                    if wasOpened then
+                        closeBrowser ()
         }
         |> Promise.start
 

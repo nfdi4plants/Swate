@@ -107,6 +107,15 @@ let private mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> = pro
     return ()
 }
 
+let private mkdirRecursiveWithCreationFlagAsync (directoryPath: string) : JS.Promise<bool> = promise {
+    let mkdirPromise =
+        fsPromisesDynamic?mkdir (directoryPath, createObj [ "recursive" ==> true ])
+        |> unbox<JS.Promise<obj>>
+
+    let! mkdirResult = mkdirPromise
+    return not (isNullOrUndefined mkdirResult)
+}
+
 let private writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Promise<unit> = promise {
     let writePromise =
         fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
@@ -118,6 +127,38 @@ let private writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Pro
 
 let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
     fsPromisesDynamic?readFile (absolutePath, "utf8") |> unbox<JS.Promise<string>>
+
+let private notesFolderName = "notes"
+let private notesReadmeFileName = "README.md"
+
+let private notesReadmeContent =
+    """# Notes folder
+
+Swate created this optional folder automatically because "Automatically create notes folder" is enabled.
+
+To disable this behavior, open Swate Settings and turn off "Automatically create notes folder".
+"""
+
+/// Ensures ARC notes scaffolding exists for the provided ARC root path.
+let ensureNotesFolderAtArcPath (arcPath: string) : JS.Promise<Result<unit, exn>> =
+    promise {
+        try
+            if String.IsNullOrWhiteSpace arcPath then
+                return Error(exn "ARC path must not be empty.")
+            else
+                let resolvedArcPath = pathDynamic?resolve (arcPath) |> unbox<string>
+                let notesFolderPath = pathDynamic?join (resolvedArcPath, notesFolderName) |> unbox<string>
+                let notesReadmePath = pathDynamic?join (notesFolderPath, notesReadmeFileName) |> unbox<string>
+
+                let! notesFolderWasCreated = mkdirRecursiveWithCreationFlagAsync notesFolderPath
+
+                if notesFolderWasCreated then
+                    do! writeUtf8FileAsync notesReadmePath notesReadmeContent
+
+                return Ok()
+        with error ->
+            return Error error
+    }
 
 let private tryGetNodeErrorCode (error: exn) : string option =
     try
@@ -562,6 +603,15 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
                 return Ok(ArcOpenDisposition.path disposition)
+        }
+    ensureNotesFolder =
+        fun () -> promise {
+            try
+                match tryGetVaultAndArcPath event with
+                | Error error -> return Error error
+                | Ok(_, arcPath) -> return! ensureNotesFolderAtArcPath arcPath
+            with error ->
+                return Error error
         }
     closeARC =
         fun () -> promise {

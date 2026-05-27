@@ -1,8 +1,9 @@
 module Renderer.Components.LeftSidebar.GitSidebarPanel
 
 open Feliz
+open Renderer.Components.Helper.ArcScopeHelper
+open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Primitive.ErrorModal.Types
 
 let mutable private gitVersionCheckStarted = false
 
@@ -15,6 +16,10 @@ let Main () =
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
     let errorCtx = useErrorModalCtx ()
+    let arcScopeId = useCurrentArcScopeId ()
+
+    let onOpenArcError =
+        createErrorModalCallback errorCtx.enqueue "Error opening ARC" arcScopeId
 
     React.useEffectOnce (fun () ->
         if not gitVersionCheckStarted then
@@ -45,16 +50,7 @@ let Main () =
 
     let openArc =
         fun _ ->
-            promise {
-                let! r = Api.ipcArcVaultApi.openARC ()
-
-                match r with
-                | Error e ->
-                    errorCtx.enqueue (
-                        ErrorModalRequest.create (e.Message, title = "Error opening ARC")
-                    )
-                | Ok _ -> ()
-            }
+            Renderer.Components.Helper.ArcVaultHelper.openArc onOpenArcError
             |> Promise.start
 
     match gitStateCtx.state.CurrentArcPath with

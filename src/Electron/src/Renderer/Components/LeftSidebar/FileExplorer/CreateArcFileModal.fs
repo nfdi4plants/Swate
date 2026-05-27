@@ -1,6 +1,5 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
-open Renderer.Components.ARCHelper
 open Swate.Components
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Page.FileExplorer.Types

@@ -29,6 +29,8 @@ type IArcVaultsApi = {
     openARCByPath: string -> JS.Promise<Result<string, exn>>
     /// Create ARC via folder dialog. Main decides disposition.
     createARC: string -> JS.Promise<Result<string, exn>>
+    /// Ensure ARC notes scaffolding exists for the ARCVault root path.
+    ensureNotesFolder: unit -> JS.Promise<Result<unit, exn>>
     closeARC: unit -> JS.Promise<Result<unit, exn>>
     getOpenPath: unit -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<ARCPointer[]>

@@ -1,6 +1,8 @@
 namespace Renderer.Components
 
 open Feliz
+open Renderer.Components.Helper.ArcScopeHelper
+open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Layout
@@ -19,31 +21,20 @@ module NavbarHelper =
     module Selector =
 
         /// Unified open: main process decides current window / new window / focus existing.
-        let openARC =
-            fun _ ->
-                promise {
-                    let! r = Api.ipcArcVaultApi.openARC ()
-
-                    match r with
-                    | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
-                    | Ok _ -> ()
-                }
-                |> Promise.start
-
-        /// Click on a recent ARC: main process decides open-or-focus.
-        let openArcByPath (clickedARC: ARCPointer) =
-            promise {
-                match! Api.ipcArcVaultApi.openARCByPath clickedARC.path with
-                | Ok _ -> ()
-                | Error exn -> console.error (Fable.Core.JS.JSON.stringify exn.Message)
-            }
+        let openARC (onError: string -> unit) () =
+            Renderer.Components.Helper.ArcVaultHelper.openArc onError
             |> Promise.start
 
-        let rmvRecentArc (pointer: ARCPointer) =
+        /// Click on a recent ARC: main process decides open-or-focus.
+        let openArcByPath (onError: string -> unit) (clickedARC: ARCPointer) =
+            Renderer.Components.Helper.ArcVaultHelper.openArcByPath onError clickedARC.path
+            |> Promise.start
+
+        let rmvRecentArc (onError: string -> unit) (pointer: ARCPointer) =
             promise {
                 match! Api.ipcArcVaultApi.removeRecentARC pointer with
                 | Ok _ -> ()
-                | Error exn -> console.error (Fable.Core.JS.JSON.stringify exn.Message)
+                | Error exn -> onError exn.Message
             }
             |> Promise.start
 
@@ -59,7 +50,11 @@ type private Selector =
         ButtonInfo.create ("swt:fluent--cloud-beaker-24-regular swt:size-5", "Download ARC from DataHub", onClick)
 
     [<ReactComponent>]
-    static member private Actionbar(setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit) =
+    static member private Actionbar(
+        setNewArcModalIsOpen: bool -> unit,
+        toggleSelector: unit -> unit,
+        onArcError: string -> unit
+    ) =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
         let onCreateARC =
@@ -69,7 +64,7 @@ type private Selector =
 
         let onOpenARC =
             fun _ ->
-                NavbarHelper.Selector.openARC ()
+                NavbarHelper.Selector.openARC onArcError ()
                 toggleSelector ()
 
         let openDataHubBrowser =
@@ -90,6 +85,11 @@ type private Selector =
     static member Main() =
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
+        let errorCtx = useErrorModalCtx ()
+        let arcScopeId = useCurrentArcScopeId ()
+
+        let onArcError =
+            createErrorModalCallback errorCtx.enqueue "ARC action failed" arcScopeId
 
         let recentArcs =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -119,10 +119,10 @@ type private Selector =
             )
             Swate.Components.Composite.ArcSelector.ArcSelector.Main(
                 recentArcs.state,
-                NavbarHelper.Selector.openArcByPath,
-                rmvRecentArc = NavbarHelper.Selector.rmvRecentArc,
+                NavbarHelper.Selector.openArcByPath onArcError,
+                rmvRecentArc = NavbarHelper.Selector.rmvRecentArc onArcError,
                 onOpenChange = onOpen,
-                actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle),
+                actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle, onArcError),
                 isLoading = recentArcs.isLoading,
                 controlRef = selectorControlRef,
                 ?currentlyOpenArcPath = appStateCtx

@@ -1,16 +1,28 @@
 module Renderer.Components.MainContent.SettingsPageTarget
 
 open Feliz
+open Renderer.Components.Helper.ArcScopeHelper
+open Renderer.Components.Helper.ArcVaultHelper
+open Swate.Components.Primitive.ErrorModal.Context
 
 [<ReactComponent(true)>]
 let SettingsPage () =
+    let errorModal = useErrorModalCtx ()
+    let arcScopeId = useCurrentArcScopeId ()
 
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let onEnsureNotesError =
+        createErrorModalCallback errorModal.enqueue "Could not create notes folder" arcScopeId
+
+    let onAutoCreateNotesFolderEnabled () =
+        ensureNotesFolder onEnsureNotesError
+        |> Promise.start
 
     Html.div [
         prop.className "swt:size-full swt:min-w-0 swt:min-h-0 swt:overflow-y-auto"
         prop.testId "main-content-settings-page"
         prop.children [
-            Swate.Components.PageComponents.SettingsPage.SettingsPage.SettingsPage()
+            Swate.Components.PageComponents.SettingsPage.SettingsPage.SettingsPage(
+                onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled
+            )
         ]
     ]

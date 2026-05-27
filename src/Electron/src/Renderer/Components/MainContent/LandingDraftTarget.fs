@@ -1,6 +1,7 @@
 module Renderer.Components.MainContent.LandingDraftTarget
 
 open Feliz
+open Renderer.Components.Helper.ArcViewHelper
 open Swate.Components.Page.Landing
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -24,8 +25,8 @@ let LandingDraftTarget () =
                 fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                 response
-                |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                |> viewLoadResultOfDto
+                |> applyLoadedView pageStateCtx.setState
 
                 setLandingDraft LandingDraft.init
                 setLandingUiState LandingUiState.init
