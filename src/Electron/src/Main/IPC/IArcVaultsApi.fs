@@ -492,7 +492,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             elif r.filePaths.Length <> 1 then
                 return Error(exn "Not exactly one path")
             else
-                let arcPath = r.filePaths |> Array.exactlyOne
+                let arcPath = r.filePaths |> Array.exactlyOne |> PathHelpers.normalizePath
+
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
                 return Ok(ArcOpenDisposition.path disposition)
@@ -500,6 +501,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARCByPath =
         fun (arcPath: string) -> promise {
             try
+                let arcPath = PathHelpers.normalizePath arcPath
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
                 return Ok(ArcOpenDisposition.path disposition)
@@ -524,7 +526,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error(exn "Not exactly one path")
             else
                 let arcContainerPath = r.filePaths |> Array.exactlyOne
-                let arcPath = ARCtrl.ArcPathHelper.combine arcContainerPath identifier
+
+                let arcPath =
+                    ARCtrl.ArcPathHelper.combine arcContainerPath identifier
+                    |> PathHelpers.normalizePath
+
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
                 return Ok(ArcOpenDisposition.path disposition)

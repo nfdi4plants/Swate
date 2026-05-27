@@ -1,7 +1,6 @@
 namespace Renderer.Components
 
 open Feliz
-open Renderer.Components.Helper.ArcScopeHelper
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
 open Swate.Components.Shared
@@ -22,8 +21,7 @@ module NavbarHelper =
 
         /// Unified open: main process decides current window / new window / focus existing.
         let openARC (onError: string -> unit) () =
-            Renderer.Components.Helper.ArcVaultHelper.openArc onError
-            |> Promise.start
+            Renderer.Components.Helper.ArcVaultHelper.openArc onError |> Promise.start
 
         /// Click on a recent ARC: main process decides open-or-focus.
         let openArcByPath (onError: string -> unit) (clickedARC: ARCPointer) =
@@ -50,11 +48,9 @@ type private Selector =
         ButtonInfo.create ("swt:fluent--cloud-beaker-24-regular swt:size-5", "Download ARC from DataHub", onClick)
 
     [<ReactComponent>]
-    static member private Actionbar(
-        setNewArcModalIsOpen: bool -> unit,
-        toggleSelector: unit -> unit,
-        onArcError: string -> unit
-    ) =
+    static member private Actionbar
+        (setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit, onArcError: string -> unit)
+        =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
         let onCreateARC =
@@ -86,10 +82,9 @@ type private Selector =
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
         let errorCtx = useErrorModalCtx ()
-        let arcScopeId = useCurrentArcScopeId ()
 
         let onArcError =
-            createErrorModalCallback errorCtx.enqueue "ARC action failed" arcScopeId
+            createErrorModalCallback errorCtx.enqueue "ARC action failed" appStateCtx
 
         let recentArcs =
             Renderer.MainSyncedState.useMainSyncedState {

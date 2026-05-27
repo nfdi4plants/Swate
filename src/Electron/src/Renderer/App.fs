@@ -1,6 +1,7 @@
 module Renderer.App
 
 
+open System
 open Elmish
 open Feliz
 open Feliz.UseElmish
@@ -22,7 +23,7 @@ module private AppModel =
         ArcRootPathLiveUpdateVersion: int
         // Bumped for each snapshot request so older async replies cannot win.
         ArcRootPathRequestVersion: int
-        PageState: PageState option
+        PageState: Renderer.Types.PageState option
         LeftSidebarTarget: LeftSidebarPage
     } with
 
@@ -38,7 +39,7 @@ module private AppModel =
         | ArcRootPathSnapshotRequested
         | ArcRootPathSnapshotLoaded of requestVersion: int * liveUpdateVersionAtStart: int * Result<ArcRootPath, exn>
         | ArcRootPathChanged of ArcRootPath
-        | PageStateChanged of PageState option
+        | PageStateChanged of Renderer.Types.PageState option
         | SetLeftSidebarTarget of LeftSidebarPage
 
     let init () : Model * Cmd<Msg> = Model.Empty, Cmd.none
@@ -60,9 +61,17 @@ module private AppModel =
             ArcRootPathRequestVersion = model.ArcRootPathRequestVersion
     }
 
+    let private normalizeArcRootPath (arcRootPath: ArcRootPath) =
+        arcRootPath
+        |> Option.map Swate.Components.Shared.PathHelpers.normalizePath
+        |> Option.bind (fun path -> if String.IsNullOrWhiteSpace path then None else Some path)
+
     let private applyArcRootPath (arcRootPath: ArcRootPath) (model: Model) =
-        match arcRootPath with
-        | Some _ -> { model with ArcRootPath = arcRootPath }
+        match normalizeArcRootPath arcRootPath with
+        | Some normalizedPath -> {
+            model with
+                ArcRootPath = Some normalizedPath
+          }
         | None -> resetForClosedArc model
 
     let private createGetOpenPathCmd requestVersion liveUpdateVersionAtStart =
@@ -98,9 +107,7 @@ module private AppModel =
                     ArcRootPathLiveUpdateVersion = model.ArcRootPathLiveUpdateVersion + 1
             }
 
-            match appState with
-            | Some _ -> model |> applyArcRootPath appState, Cmd.none
-            | None -> model |> resetForClosedArc, Cmd.none
+            model |> applyArcRootPath appState, Cmd.none
         | PageStateChanged pageStateOption ->
             {
                 model with
@@ -130,10 +137,9 @@ module private AppModel =
     ]
 
 [<ReactComponent>]
-let private LeftActionButtons
-    (leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget)
-    =
-    let leftSidebarCtx = Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
+let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget) =
+    let leftSidebarCtx =
+        Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let toggleTarget target =
         if leftSidebarTarget = target then
@@ -164,9 +170,9 @@ open AppModel
 let Main () =
     let model, dispatch = React.useElmish (init, update, subscribe, [||])
 
-    let setPageState (pageState: PageState option) = dispatch (PageStateChanged pageState)
+    let setPageState (pageState: Renderer.Types.PageState option) = dispatch (PageStateChanged pageState)
 
-    let pageCtx: StateContext<PageState option> =
+    let pageCtx: StateContext<Renderer.Types.PageState option> =
         React.useMemo (
             (fun _ -> {
                 state = model.PageState
@@ -191,8 +197,7 @@ let Main () =
 
     let leftActions =
         if isInitializedArcVault then
-            LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget)
-            |> Some
+            LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget) |> Some
         else
             None
 
@@ -207,18 +212,23 @@ let Main () =
                         ErrorModalProvider.ErrorModalProvider(
                             Renderer.Context.AuthStateContext.Provider(
                                 Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                    Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
-                                        Layout.Main(
-                                            children =
-                                                React.Fragment [|
-                                                    children
-                                                    CloseWindowController.CloseWindowController.Subscription()
-                                                |],
-                                            navbar = Renderer.Components.Navbar.Main(),
-                                            ?leftSidebar = leftSidebar,
-                                            ?leftActions = leftActions
+                                    Swate
+                                        .Components
+                                        .Composite
+                                        .AnnotationTable
+                                        .AnnotationTableContextProvider
+                                        .AnnotationTableContextProvider(
+                                            Layout.Main(
+                                                children =
+                                                    React.Fragment [|
+                                                        children
+                                                        CloseWindowController.CloseWindowController.Subscription()
+                                                    |],
+                                                navbar = Renderer.Components.Navbar.Main(),
+                                                ?leftSidebar = leftSidebar,
+                                                ?leftActions = leftActions
+                                            )
                                         )
-                                    )
                                 )
                             )
                         )

@@ -1,7 +1,6 @@
 module Renderer.Components.LeftSidebar.GitSidebarPanel
 
 open Feliz
-open Renderer.Components.Helper.ArcScopeHelper
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components.Primitive.ErrorModal.Context
 
@@ -16,10 +15,10 @@ let Main () =
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
     let errorCtx = useErrorModalCtx ()
-    let arcScopeId = useCurrentArcScopeId ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
     let onOpenArcError =
-        createErrorModalCallback errorCtx.enqueue "Error opening ARC" arcScopeId
+        createErrorModalCallback errorCtx.enqueue "Error opening ARC" appStateCtx
 
     React.useEffectOnce (fun () ->
         if not gitVersionCheckStarted then

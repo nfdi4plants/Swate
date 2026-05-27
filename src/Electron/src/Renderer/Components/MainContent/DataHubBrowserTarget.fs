@@ -2,7 +2,6 @@ module Renderer.Components.MainContent.DataHubBrowserTarget
 
 open System
 open Feliz
-open Renderer.Components.Helper.ArcScopeHelper
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
 open Swate.Components.Page.DataHub
@@ -37,19 +36,17 @@ let DataHubBrowserTarget () =
     let pageCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
     let errorCtx = useErrorModalCtx ()
-    let arcScopeId = useCurrentArcScopeId ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
     let onArcError =
-        createErrorModalCallback errorCtx.enqueue "Could not open ARC" arcScopeId
+        createErrorModalCallback errorCtx.enqueue "Could not open ARC" appStateCtx
 
-    let loadAllRepos (query: ExploreRepoQuery) =
-        Api.ipcGitLabApi.loadAllRepos query
+    let loadAllRepos (query: ExploreRepoQuery) = Api.ipcGitLabApi.loadAllRepos query
 
     let loadMostStarredRepos (query: ExploreMostStarredQuery) =
         Api.ipcGitLabApi.loadMostStarredRepos query
 
-    let loadUserRepos (query: ExploreRepoQuery) =
-        Api.ipcGitLabApi.loadUserRepos query
+    let loadUserRepos (query: ExploreRepoQuery) = Api.ipcGitLabApi.loadUserRepos query
 
     let loadOrganisationGroups (query: ExploreGroupsQuery) =
         Api.ipcGitLabApi.loadOrganisationGroups query

@@ -1,6 +1,5 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
-open Renderer.Components.Helper.ArcScopeHelper
 open Renderer.Components.Helper.ArcViewHelper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
@@ -26,8 +25,7 @@ module private FileTreeHelper =
         | Some request ->
             match! Api.ipcArcVaultApi.applyArcFileAndSave request with
             | Error saveError -> return Error saveError
-            | Ok() ->
-                return! Api.ipcArcVaultApi.openFile request.path
+            | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
     }
 
 open FileTreeHelper
@@ -49,12 +47,14 @@ type FileTree =
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
-        let arcScopeId = useCurrentArcScopeId ()
+        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
         let pendingCreateKind, setPendingCreateKind =
             React.useState<ArcExplorerNodeKind option> None
 
-        let pendingRenameDraft, setPendingRenameDraft = React.useState<ArcRenameDraft option> None
+        let pendingRenameDraft, setPendingRenameDraft =
+            React.useState<ArcRenameDraft option> None
+
         let isRenaming, setIsRenaming = React.useState false
         let pendingDeleteItem, setPendingDeleteItem = React.useState<FileItem option> None
         let isDeleting, setIsDeleting = React.useState false
@@ -65,9 +65,7 @@ type FileTree =
 
         React.useEffect (
             (fun () ->
-                let filePaths =
-                    effectiveFileTree
-                    |> Array.map (fun entry -> entry.path)
+                let filePaths = effectiveFileTree |> Array.map (fun entry -> entry.path)
 
                 if FileExplorerDeleteHelper.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath then
                     fileStateCtx.setSelection ArcSelection.empty
@@ -137,7 +135,7 @@ type FileTree =
                         ErrorModalRequest.create (
                             $"File '{item.Name}' has no path.",
                             title = "Preview failed",
-                            ?scopeId = arcScopeId
+                            ?scopeId = appStateCtx
                         )
                     )
                 | Some path when item.IsDirectory ->
@@ -185,10 +183,15 @@ type FileTree =
                     match result with
                     | Ok loaded -> applyLoadedView pageStateCtx.setState loaded
                     | Error errorMessage ->
-                        applyViewError pageStateCtx.setState $"Could not reload preview for '{selectedPath}': {errorMessage}"
+                        applyViewError
+                            pageStateCtx.setState
+                            $"Could not reload preview for '{selectedPath}': {errorMessage}"
                 }
                 |> Promise.catch (fun exn ->
-                    applyViewError pageStateCtx.setState $"Could not reload preview for '{selectedPath}': {exn.Message}")
+                    applyViewError
+                        pageStateCtx.setState
+                        $"Could not reload preview for '{selectedPath}': {exn.Message}"
+                )
                 |> Promise.start
 
         React.useEffect (
@@ -196,7 +199,8 @@ type FileTree =
                 if hasObservedFileTreeUpdateRef.current then
                     reloadSelectedPreviewAfterFileTreeUpdate ()
                 else
-                    hasObservedFileTreeUpdateRef.current <- true),
+                    hasObservedFileTreeUpdateRef.current <- true
+            ),
             [| box fileStateCtx.state.FileTree |]
         )
 
@@ -218,17 +222,15 @@ type FileTree =
 
         let openCreateModal kind = setPendingCreateKind (Some kind)
 
-        let closeDeleteModal () =
-            setPendingDeleteItem None
+        let closeDeleteModal () = setPendingDeleteItem None
 
-        let closeRenameModal () =
-            setPendingRenameDraft None
+        let closeRenameModal () = setPendingRenameDraft None
 
         let requestDeleteItem =
             FileTreeDeleteWorkflow.requestDeleteItem setPendingDeleteItem
 
         let requestRenameItem =
-            FileTreeRenameWorkflow.requestRenameItem setPendingRenameDraft errorModal.enqueue arcScopeId
+            FileTreeRenameWorkflow.requestRenameItem setPendingRenameDraft errorModal.enqueue appStateCtx
 
         let rootPath = fileTree |> Option.map (fun tree -> tree.path)
 
@@ -244,18 +246,19 @@ type FileTree =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
         let applyCreateError errorMessage =
-            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file", ?scopeId = arcScopeId))
+            errorModal.enqueue (
+                ErrorModalRequest.create (errorMessage, title = "Could not create ARC file", ?scopeId = appStateCtx)
+            )
 
-        let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> =
-            promise {
-                let! openResult = openView path
+        let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> = promise {
+            let! openResult = openView path
 
-                match openResult with
-                | Ok loaded ->
-                    applyLoadedView pageStateCtx.setState loaded
-                    return Ok()
-                | Error errorMessage -> return Error errorMessage
-            }
+            match openResult with
+            | Ok loaded ->
+                applyLoadedView pageStateCtx.setState loaded
+                return Ok()
+            | Error errorMessage -> return Error errorMessage
+        }
 
         let confirmDeleteItem () =
             FileTreeDeleteWorkflow.confirmDeleteItem {
@@ -263,7 +266,7 @@ type FileTree =
                 closeDeleteModal = closeDeleteModal
                 setIsDeleting = setIsDeleting
                 enqueueError = errorModal.enqueue
-                arcScopeId = arcScopeId
+                arcScopeId = appStateCtx
             }
 
         let createArcEntry kind (identifier: string) =
@@ -310,12 +313,14 @@ type FileTree =
             FileTreeRenameWorkflow.renameContextMenuItems requestRenameItem
 
         let baseContextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item @ renameContextMenuItems item @ deleteContextMenuItems item
+            arcCreateContextMenuItems item
+            @ renameContextMenuItems item
+            @ deleteContextMenuItems item
 
         let createContextMenuItems =
             Renderer.Components.FileExplorerLfs.createContextMenuItems
                 errorModal.enqueue
-                arcScopeId
+                appStateCtx
                 baseContextMenuItems
 
         let confirmRenameItem (newName: string) =
@@ -331,7 +336,7 @@ type FileTree =
                     reloadPreviewByPath = reloadPreviewByPath
                     renamePath = Api.ipcArcVaultApi.renamePath
                     enqueueError = errorModal.enqueue
-                    arcScopeId = arcScopeId
+                    arcScopeId = appStateCtx
                 }
                 newName
 

@@ -1,7 +1,6 @@
 module Renderer.Components.InitState
 
 open Feliz
-open Renderer.Components.Helper.ArcScopeHelper
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
 open Swate.Components.Primitive.BaseModal
@@ -14,10 +13,10 @@ let CreateNewArcModalContent (close: unit -> unit) =
     let isValid, setIsValid = React.useState (true)
     let temp, setTemp = React.useState ("")
     let errorModal = useErrorModalCtx ()
-    let arcScopeId = useCurrentArcScopeId ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
     let onCreateArcError =
-        createErrorModalCallback errorModal.enqueue "Could not create ARC" arcScopeId
+        createErrorModalCallback errorModal.enqueue "Could not create ARC" appStateCtx
 
     let handleSubmit =
         fun () ->
@@ -75,10 +74,10 @@ let InitState () =
     let modalIsOpen, setModalIsOpen = React.useState (false)
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
-    let arcScopeId = useCurrentArcScopeId ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
     let onOpenArcError =
-        createErrorModalCallback errorModal.enqueue "Could not open ARC" arcScopeId
+        createErrorModalCallback errorModal.enqueue "Could not open ARC" appStateCtx
 
     React.Fragment [
         BaseModal.BaseModal(modalIsOpen, setModalIsOpen, CreateNewArcModalContent(fun () -> setModalIsOpen false))
