@@ -57,6 +57,7 @@ let Main () =
         Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
             title = "Open an ARC to use Git features",
             description = "Source control becomes available after you open or download an ARC.",
+            iconClassName = "swt:fluent--folder-open-24-regular",
             primaryAction = {
                 Label = "Open ARC"
                 IconClassName = "swt:fluent--folder-open-24-regular"
@@ -76,6 +77,7 @@ let Main () =
         Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
             title = "Initialize Git for this ARC",
             description = "The selected ARC folder is not a Git repository yet.",
+            iconClassName = "swt:fluent--branch-fork-24-regular",
             primaryAction = {
                 Label =
                     if

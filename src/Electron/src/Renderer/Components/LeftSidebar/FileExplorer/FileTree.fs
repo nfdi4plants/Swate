@@ -3,6 +3,8 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 open Renderer.Components.Helper.ArcViewHelper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
+open Swate.Components.Primitive.Blankslate
+open Swate.Components.Primitive.Blankslate.Types
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
@@ -35,10 +37,15 @@ type FileTree =
 
     [<ReactComponent>]
     static member private EmptyFileTreePlaceholder() =
-        Html.div [
-            prop.className "swt:p-4 swt:text-center swt:text-gray-500"
-            prop.text "No files found."
-        ]
+        Blankslate.Blankslate(
+            title = "No files found",
+            description = "This ARC does not contain files yet.",
+            iconClassName = "swt:fluent--document-folder-24-regular",
+            textSize = BlankslateTextSize.Small,
+            fullHeight = true,
+            className = "swt:w-full",
+            testId = "EmptyFileTreePlaceholder"
+        )
 
     [<ReactComponent>]
     static member FileTree() =
