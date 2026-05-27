@@ -16,8 +16,7 @@ let MarkdownEditorTarget (content: string) =
     let saveError, setSaveError = React.useState (None: string option)
 
     let selectedPath =
-        fileStateCtx.state.Selection.TreePath
-        |> Option.map PathHelpers.normalizePath
+        fileStateCtx.state.Selection.TreePath |> Option.map PathHelpers.normalizePath
 
     let hasUnsavedChanges = markdown <> lastSavedContent
 
@@ -25,7 +24,8 @@ let MarkdownEditorTarget (content: string) =
         (fun () ->
             setMarkdown content
             setLastSavedContent content
-            setSaveError None),
+            setSaveError None
+        ),
         [| box content |]
     )
 
