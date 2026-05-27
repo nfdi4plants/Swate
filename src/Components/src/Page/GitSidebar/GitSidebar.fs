@@ -131,6 +131,8 @@ type private BranchHeaderProps = {
     Status: GitSidebarStatus
     HasConflicts: bool
     IsBusy: bool
+    CanOpenRemoteRepository: bool
+    OnOpenRemoteRepository: unit -> unit
     OnRefresh: unit -> unit
 }
 
@@ -372,15 +374,13 @@ type GitSidebar =
                     prop.className "swt:flex swt:min-w-0 swt:flex-col"
                     prop.children [
                         Html.span [
-                            prop.className
-                                "swt:min-w-0 swt:wrap-break-word swt:text-sm swt:font-medium"
+                            prop.className "swt:min-w-0 swt:wrap-break-word swt:text-sm swt:font-medium"
                             prop.text (defaultArg label "Download Large Files")
                         ]
                         match description with
                         | Some text ->
                             Html.span [
-                                prop.className
-                                    "swt:min-w-0 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
+                                prop.className "swt:min-w-0 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
                                 prop.text text
                             ]
                         | None -> Html.none
@@ -470,8 +470,7 @@ type GitSidebar =
                     if testId.IsSome then
                         prop.testId (testId.Value + "Label")
 
-                    prop.className
-                        "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left swt:@max-3xs/gitSidebar:sr-only"
+                    prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left swt:@max-3xs/gitSidebar:sr-only"
                     prop.text label
                 ]
             ]
@@ -509,15 +508,33 @@ type GitSidebar =
                             ]
                         ]
                     ]
-                    Html.button [
-                        prop.testId "GitSidebarRefreshButton"
-                        prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm swt:shrink-0"
-                        prop.disabled props.IsBusy
-                        prop.title "Refresh git status"
-                        prop.onClick (fun _ -> props.OnRefresh())
+                    Html.div [
+                        prop.className "swt:flex swt:shrink-0 swt:items-center swt:gap-1"
                         prop.children [
-                            Html.span [
-                                prop.className "swt:iconify swt:fluent--arrow-clockwise-24-regular swt:size-4"
+                            Html.button [
+                                prop.testId "GitSidebarOpenRemoteRepositoryButton"
+                                prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm swt:shrink-0"
+                                prop.disabled (props.IsBusy || not props.CanOpenRemoteRepository)
+                                prop.title "Open origin repository"
+                                prop.ariaLabel "Open origin repository"
+                                prop.onClick (fun _ -> props.OnOpenRemoteRepository())
+                                prop.children [
+                                    Html.span [
+                                        prop.className "swt:iconify swt:fluent--open-24-regular swt:size-4"
+                                    ]
+                                ]
+                            ]
+                            Html.button [
+                                prop.testId "GitSidebarRefreshButton"
+                                prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm swt:shrink-0"
+                                prop.disabled props.IsBusy
+                                prop.title "Refresh git status"
+                                prop.onClick (fun _ -> props.OnRefresh())
+                                prop.children [
+                                    Html.span [
+                                        prop.className "swt:iconify swt:fluent--arrow-clockwise-24-regular swt:size-4"
+                                    ]
+                                ]
                             ]
                         ]
                     ]
@@ -586,8 +603,7 @@ type GitSidebar =
                                                     "swt:iconify swt:fluent--branch-request-20-regular swt:size-4 swt:shrink-0"
                                             ]
                                             Html.span [
-                                                prop.className
-                                                    "swt:min-w-0 swt:wrap-anywhere"
+                                                prop.className "swt:min-w-0 swt:wrap-anywhere"
                                                 prop.text
                                                     $"No upstream configured yet. Push will publish and track origin/{currentBranch}."
                                             ]
@@ -620,8 +636,7 @@ type GitSidebar =
                     ]
                 ]
                 Html.p [
-                    prop.className
-                        "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
+                    prop.className "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/70"
                     prop.text
                         "Files larger than this limit are automatically re-staged through Git LFS during save operations."
                 ]
@@ -629,8 +644,7 @@ type GitSidebar =
                     prop.className "swt:mt-3 swt:flex swt:flex-wrap swt:items-end swt:gap-2"
                     prop.children [
                         Html.label [
-                            prop.className
-                                "swt:flex swt:min-w-40 swt:flex-1 swt:flex-col swt:gap-2 swt:@max-xs:min-w-0"
+                            prop.className "swt:flex swt:min-w-40 swt:flex-1 swt:flex-col swt:gap-2 swt:@max-xs:min-w-0"
                             prop.children [
                                 Html.span [
                                     prop.className "swt:text-xs swt:font-medium swt:text-base-content/70"
@@ -669,8 +683,7 @@ type GitSidebar =
                     ]
                 ]
                 Html.div [
-                    prop.className
-                        "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/60"
+                    prop.className "swt:mt-2 swt:wrap-break-word swt:text-xs swt:text-base-content/60"
                     prop.text "Threshold setting: 1-100 MB. This does not cap LFS-tracked file size."
                 ]
             ]
@@ -690,7 +703,8 @@ type GitSidebar =
                         props.IsBusy || not props.RemoteActionsEnabled,
                         props.SubmitUpdateFromOnline,
                         testId = "GitSidebarUpdateArcButton",
-                        tooltipText = "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin"
+                        tooltipText =
+                            "Update ARC from Online:\n- git fetch origin\n- git merge-tree (conflict preflight)\n- git pull origin"
                     )
                     GitSidebar.ActionButton(
                         "More Git Actions",
@@ -989,8 +1003,7 @@ type GitSidebar =
                                                                         "swt:iconify swt:fluent--save-24-regular swt:size-4 swt:shrink-0"
                                                                 ]
                                                                 Html.span [
-                                                                    prop.className
-                                                                        "swt:min-w-0 swt:wrap-anywhere"
+                                                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
                                                                     prop.text localCommitLabel
                                                                 ]
                                                             ]
@@ -1456,7 +1469,9 @@ type GitSidebar =
             ?warningNotice: string,
             ?pendingConfirmation: GitSidebarConfirmationDialog,
             ?remoteActionsEnabled: bool,
-            ?remoteActionsWarning: string
+            ?remoteActionsWarning: string,
+            ?canOpenRemoteRepository: bool,
+            ?onOpenRemoteRepository: unit -> unit
         ) =
 
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
@@ -1465,6 +1480,8 @@ type GitSidebar =
         let pendingConfirmation = pendingConfirmation
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
+        let canOpenRemoteRepository = defaultArg canOpenRemoteRepository false
+        let onOpenRemoteRepository = defaultArg onOpenRemoteRepository (fun () -> ())
         let _selectedFileForCompatibility = selectedFile
         let onRefresh = callbacks.OnRefresh
         let onFetch = callbacks.OnFetch
@@ -1788,6 +1805,8 @@ type GitSidebar =
                         Status = status
                         HasConflicts = hasConflicts
                         IsBusy = isBusy
+                        CanOpenRemoteRepository = canOpenRemoteRepository
+                        OnOpenRemoteRepository = onOpenRemoteRepository
                         OnRefresh =
                             fun () ->
                                 setLocalError None
@@ -1931,5 +1950,3 @@ type GitSidebar =
                 )
             ]
         ]
-
-

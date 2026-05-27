@@ -320,6 +320,31 @@ let ensureAllowedRemoteUrl (remoteUrl: string) =
     else
         Error(exn "Only https:// and ssh:// remotes are allowed.")
 
+let private trimTrailingGitSuffix (path: string) =
+    if path.EndsWith(".git", StringComparison.OrdinalIgnoreCase) && path.Length > 4 then
+        path.[.. path.Length - 5]
+    else
+        path
+
+/// Converts a validated git remote URL (https/ssh) into a browser-friendly repository URL.
+let tryGetRepositoryWebUrlFromRemoteUrl (remoteUrl: string) : Result<string, exn> =
+    match ensureAllowedRemoteUrl remoteUrl with
+    | Error remoteUrlError -> Error remoteUrlError
+    | Ok safeRemoteUrl ->
+        let mutable uri = Unchecked.defaultof<Uri>
+
+        if not (Uri.TryCreate(safeRemoteUrl, UriKind.Absolute, &uri)) then
+            Error(exn $"Remote URL '{safeRemoteUrl}' is not a valid absolute URI.")
+        elif String.IsNullOrWhiteSpace uri.Host then
+            Error(exn "Remote URL is missing a host.")
+        else
+            let normalizedPath = uri.AbsolutePath.TrimEnd('/') |> trimTrailingGitSuffix
+
+            if String.IsNullOrWhiteSpace normalizedPath || normalizedPath = "/" then
+                Error(exn "Remote URL does not contain a repository path.")
+            else
+                Ok($"https://{uri.Host}{normalizedPath}".TrimEnd('/'))
+
 let private validateOptionalBranchName (branchName: string option) =
     match branchName with
     | None -> Ok None
@@ -2149,6 +2174,78 @@ let addRemote (arcPath: string) (remoteName: string) (remoteUrl: string) : JS.Pr
                             return ()
                     })
 }
+
+/// Resolves the origin remote to a browser-friendly repository URL if one exists and is openable.
+let getOriginRepositoryWebUrl (arcPath: string) : JS.Promise<GitResult<string option>> =
+    withLocalGit
+        arcPath
+        (fun git -> promise {
+            let originName = "origin"
+
+            let! verboseRemoteList = git.getRemotes true
+
+            let configuredFromVerboseRemotes =
+                match verboseRemoteList with
+                | U2.Case2 remotes ->
+                    remotes
+                    |> Array.tryFind (fun remote -> String.Equals(remote.name, originName, StringComparison.Ordinal))
+                    |> Option.bind (fun remote ->
+                        remote.refs
+                        |> Option.ofObj
+                        |> Option.bind (fun refs ->
+                            [| refs.push; refs.fetch |]
+                            |> Array.choose Option.ofObj
+                            |> Array.map _.Trim()
+                            |> Array.tryFind (String.IsNullOrWhiteSpace >> not)
+                        )
+                    )
+                | U2.Case1 _ -> None
+
+            let! configuredRemoteUrlOption =
+                match configuredFromVerboseRemotes with
+                | Some configuredRemoteUrl -> promise { return Some configuredRemoteUrl }
+                | None -> promise {
+                    let! remoteList = git.getRemotes ()
+
+                    let originExists =
+                        match remoteList with
+                        | U2.Case1 remotes ->
+                            remotes
+                            |> Array.exists (fun remote ->
+                                String.Equals(remote.name, originName, StringComparison.Ordinal)
+                            )
+                        | U2.Case2 remotes ->
+                            remotes
+                            |> Array.exists (fun remote ->
+                                String.Equals(remote.name, originName, StringComparison.Ordinal)
+                            )
+
+                    if not originExists then
+                        return None
+                    else
+                        let! configuredRemoteUrlResult =
+                            runSimpleGit
+                                (fun currentGit -> currentGit.raw [| "config"; "--get"; "remote.origin.url" |])
+                                git
+
+                        match configuredRemoteUrlResult with
+                        | Ok configuredRemoteUrl ->
+                            let normalizedRemoteUrl = configuredRemoteUrl.Trim()
+
+                            if String.IsNullOrWhiteSpace normalizedRemoteUrl then
+                                return None
+                            else
+                                return Some normalizedRemoteUrl
+                        | Error _ -> return None
+                  }
+
+            match configuredRemoteUrlOption with
+            | None -> return None
+            | Some configuredRemoteUrl ->
+                match tryGetRepositoryWebUrlFromRemoteUrl configuredRemoteUrl with
+                | Ok repositoryWebUrl -> return Some repositoryWebUrl
+                | Error _ -> return None
+        })
 
 /// Checks out an existing local branch, or creates/checks out a local branch from StartPoint.
 /// Renderer passes remote branch switches as Name=<local name>, StartPoint=<remote ref>.

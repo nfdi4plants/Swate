@@ -1,5 +1,6 @@
 module Renderer.Components.LeftSidebar.GitSidebarPanel
 
+open Browser.Dom
 open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components.Primitive.ErrorModal.Context
@@ -163,5 +164,12 @@ let Main () =
             downloadLargeFiles = gitStateCtx.state.DownloadLargeFiles,
             lfsAutoTrackThresholdMb = gitStateCtx.state.LfsAutoTrackThresholdMb,
             remoteActionsEnabled = remoteActionsEnabled,
+            canOpenRemoteRepository = gitStateCtx.state.OriginRemoteRepositoryWebUrl.IsSome,
+            onOpenRemoteRepository =
+                (fun () ->
+                    match gitStateCtx.state.OriginRemoteRepositoryWebUrl with
+                    | Some repositoryWebUrl -> window.``open`` (repositoryWebUrl, "_blank") |> ignore
+                    | None -> ()
+                ),
             ?remoteActionsWarning = remoteActionsWarning
         )

@@ -342,6 +342,43 @@ Vitest.describe (
 )
 
 Vitest.describe (
+    "GitService.tryGetRepositoryWebUrlFromRemoteUrl",
+    fun () ->
+        let validCases = [|
+            "converts https remote with .git suffix",
+            "https://github.com/nfdi4plants/Swate.git",
+            "https://github.com/nfdi4plants/Swate"
+            "keeps https remote without .git suffix",
+            "https://gitlab.example/group/project",
+            "https://gitlab.example/group/project"
+            "converts ssh remote to https browser URL",
+            "ssh://git@gitlab.example/group/project.git",
+            "https://gitlab.example/group/project"
+            "removes credentials from https remote",
+            "https://oauth2:secret@gitlab.example/group/project.git",
+            "https://gitlab.example/group/project"
+        |]
+
+        for testName, remoteUrl, expectedWebUrl in validCases do
+            Vitest.test (
+                testName,
+                fun () ->
+                    GitService.tryGetRepositoryWebUrlFromRemoteUrl remoteUrl
+                    |> expectOk expectedWebUrl
+            )
+
+        let invalidCases = [|
+            "rejects empty remote", ""
+            "rejects unsupported protocol", "git://github.com/nfdi4plants/Swate.git"
+            "rejects SCP-style ssh remote", "git@github.com:nfdi4plants/Swate.git"
+            "rejects remote without repository path", "https://github.com"
+        |]
+
+        for testName, remoteUrl in invalidCases do
+            Vitest.test (testName, fun () -> GitService.tryGetRepositoryWebUrlFromRemoteUrl remoteUrl |> expectError)
+)
+
+Vitest.describe (
     "GitAuthAdapter.redactToken and redactArgs",
     fun () ->
         let tokenCases = [|
@@ -812,6 +849,23 @@ Vitest.describe (
                 Vitest.expect(argumentTypes.Length).toBe (1)
                 Vitest.expect(argumentTypes.[0].FullName).toBe (typeof<GitPathspecRequest>.FullName)
                 Vitest.expect(returnType.FullName.Contains("GitOperationResult")).toBe (true)
+        )
+
+        Vitest.test (
+            "IGitApi.getOriginRepositoryWebUrl uses a typed no-payload endpoint",
+            fun () ->
+                let originRemoteField = getRecordField typeof<IGitApi> "getOriginRepositoryWebUrl"
+
+                let argumentTypes, returnType =
+                    flattenFunctionSignature originRemoteField.PropertyType
+
+                let returnTypeName = returnType.FullName
+
+                Vitest.expect(argumentTypes.Length).toBe (1)
+                Vitest.expect(argumentTypes.[0]).toEqual (typeof<unit>)
+                Vitest.expect(returnTypeName.Contains("FSharpResult")).toBe (true)
+                Vitest.expect(returnTypeName.Contains("FSharpOption")).toBe (true)
+                Vitest.expect(returnTypeName.Contains("System.String")).toBe (true)
         )
 
         Vitest.test (

@@ -65,6 +65,7 @@ type IGitApi = {
     checkGitVersions: unit -> JS.Promise<Result<unit, exn>>
     getGitStatus: unit -> JS.Promise<Result<GitStatusDto, exn>>
     getGitBranches: unit -> JS.Promise<Result<GitBranchRefDto[], exn>>
+    getOriginRepositoryWebUrl: unit -> JS.Promise<Result<string option, exn>>
     getGitLfsSettings: unit -> JS.Promise<Result<GitLfsSettingsDto, exn>>
     previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
     getGitDiffSummary: unit -> JS.Promise<Result<GitDiffSummaryDto, exn>>

@@ -231,6 +231,7 @@ let private unexpectedPromise<'T> (name: string) : JS.Promise<Result<'T, string>
 let private defaultDependencies: GitDependencies = {
     getGitStatus = fun () -> unexpectedPromise "getGitStatus"
     getGitBranches = fun () -> unexpectedPromise "getGitBranches"
+    getOriginRemoteRepositoryWebUrl = fun () -> promise { return Ok None }
     getGitLfsSettings = fun () -> unexpectedPromise "getGitLfsSettings"
     loadDiffPage = fun path -> unexpectedPromise $"loadDiffPage:{path}"
     loadMergeConflictPage = fun path -> unexpectedPromise $"loadMergeConflictPage:{path}"
@@ -532,6 +533,7 @@ Vitest.describe (
                     Status = Ok(statusForBranch "feature/stale")
                     Branches = Ok [| localBranch "feature/stale" true true |]
                     LfsSettings = Ok(lfsSettings 9 false)
+                    OriginRemoteRepositoryWebUrl = Some "https://example.org/feature/stale"
                 }
 
                 let nextState, cmd =
@@ -566,6 +568,70 @@ Vitest.describe (
                 Vitest.expect(nextState.Status.CurrentBranch).toEqual (Some "feature/live")
                 Vitest.expect(nextState.ErrorNotice).toEqual (Some "keep current error")
                 Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "RefreshRequested stores origin repository URL from refresh metadata",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 3 true) }
+                        getOriginRemoteRepositoryWebUrl =
+                            fun () -> promise { return Ok(Some "https://github.com/nfdi4plants/Swate") }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                }
+
+                let requestingState, requestCmd = update deps ignore RefreshRequested state
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, nextCmd =
+                    match requestMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message requestingState
+                    | _ -> failwith "Expected refresh completion message."
+
+                let! nextMessages = collectMessages nextCmd
+
+                Vitest.expect(nextState.OriginRemoteRepositoryWebUrl).toEqual (Some "https://github.com/nfdi4plants/Swate")
+                Vitest.expect(nextMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "RefreshRequested keeps refresh successful when origin repository URL lookup fails",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 2 false) }
+                        getOriginRemoteRepositoryWebUrl = fun () -> promise { return Error "origin lookup failed" }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                }
+
+                let requestingState, requestCmd = update deps ignore RefreshRequested state
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, nextCmd =
+                    match requestMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message requestingState
+                    | _ -> failwith "Expected refresh completion message."
+
+                let! nextMessages = collectMessages nextCmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(nextState.OriginRemoteRepositoryWebUrl).toEqual (None)
+                Vitest.expect(nextMessages).toEqual ([||])
             }
         )
 
