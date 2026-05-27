@@ -9,6 +9,7 @@ open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.Node
 open Main.Bindings.Filesystem
+open Main.Bindings.Path
 open Main.Bindings.SimpleGit
 open Main.Git.GitLfsAdapter
 open Main.Git.GitLfsService
@@ -49,17 +50,16 @@ let private gitLfsDefaultThresholdMb = 1
 let private gitLfsMaximumThresholdMb = 100
 let private gitLfsDefaultDownloadLargeFiles = true
 
-let private lfsInstallRequiredTokens =
-    [|
-        "git lfs is required for files larger than"
-        "git lfs is required for this operation"
-        "git: 'lfs' is not a git command"
-        "git-lfs filter-process"
-        "this repository is configured for git lfs but 'git-lfs' was not found"
-        "external filter 'git-lfs filter-process' failed"
-        "smudge filter lfs failed"
-        "clean filter 'lfs' failed"
-    |]
+let private lfsInstallRequiredTokens = [|
+    "git lfs is required for files larger than"
+    "git lfs is required for this operation"
+    "git: 'lfs' is not a git command"
+    "git-lfs filter-process"
+    "this repository is configured for git lfs but 'git-lfs' was not found"
+    "external filter 'git-lfs filter-process' failed"
+    "smudge filter lfs failed"
+    "clean filter 'lfs' failed"
+|]
 
 /// Classifies git/simple-git/LFS error text into the shared failure taxonomy used over IPC.
 let classifyFailureKind (message: string) =
@@ -70,8 +70,7 @@ let classifyFailureKind (message: string) =
         |> fun text -> text.ToLowerInvariant()
 
     let containsAny (terms: string[]) =
-        terms
-        |> Array.exists normalizedMessage.Contains
+        terms |> Array.exists normalizedMessage.Contains
 
     if containsAny lfsInstallRequiredTokens then
         GitFailureKind.LfsInstallRequired
@@ -130,12 +129,8 @@ let private createFailure kind (message: string) : GitFailure =
             else
                 buildLfsInstallPromptMessage None (Some message)
 
-        {
-            Kind = kind
-            Message = finalMessage
-        }
-    | _ ->
-        { Kind = kind; Message = message }
+        { Kind = kind; Message = finalMessage }
+    | _ -> { Kind = kind; Message = message }
 
 let private toFailure (error: exn) : GitFailure =
     GitInternals.toFailure classifyFailureKind createFailure error
@@ -173,7 +168,10 @@ let private tryParseConfiguredThresholdMb (value: string option) =
     | Some text ->
         let success, parsed = Int32.TryParse(text.Trim())
 
-        if success && parsed >= 1 && parsed <= gitLfsMaximumThresholdMb then Some parsed else None
+        if success && parsed >= 1 && parsed <= gitLfsMaximumThresholdMb then
+            Some parsed
+        else
+            None
 
 // GitService parses the download preference because pull behavior is part of the git workflow owned here.
 let private tryParseConfiguredDownloadLargeFiles (value: string option) =
@@ -192,8 +190,7 @@ let private tryParseConfiguredDownloadLargeFiles (value: string option) =
         | _ -> None
 
 // GitService converts the threshold to bytes because file-size decisions happen during stage/commit orchestration here.
-let private thresholdMbToBytes (thresholdMb: int) =
-    int64 thresholdMb * 1024L * 1024L
+let private thresholdMbToBytes (thresholdMb: int) = int64 thresholdMb * 1024L * 1024L
 
 // GitService formats the persisted threshold because it owns the config contract for this workflow setting.
 let private formatThresholdConfigValue (thresholdMb: int) = string thresholdMb
@@ -202,16 +199,15 @@ let private formatThresholdConfigValue (thresholdMb: int) = string thresholdMb
 let private formatDownloadLargeFilesConfigValue (downloadLargeFiles: bool) =
     if downloadLargeFiles then "true" else "false"
 
-let private tryGetFileSizeInBytes (absolutePath: string) : JS.Promise<int64 option> =
-    promise {
-        try
-            let! stats = fsPromisesDynamic?stat (absolutePath) |> unbox<JS.Promise<obj>>
-            return Some(stats?size |> unbox<float> |> int64)
-        with error ->
-            match tryGetNodeErrorCode error with
-            | Some "ENOENT" -> return None
-            | _ -> return raise error
-    }
+let private tryGetFileSizeInBytes (absolutePath: string) : JS.Promise<int64 option> = promise {
+    try
+        let! stats = statAsync absolutePath
+        return Some(stats.size |> int64)
+    with error ->
+        match tryGetNodeErrorCode error with
+        | Some "ENOENT" -> return None
+        | _ -> return raise error
+}
 
 /// Validates local branch names and branch-like start points before passing them to git.
 let ensureValidBranchLikeName (label: string) (value: string) =
@@ -284,12 +280,11 @@ let private splitGitOutputLines (text: string) =
     |> Array.map _.Trim()
     |> Array.filter (String.IsNullOrWhiteSpace >> not)
 
-let private withGitPathspecs (command: string[]) (pathSpecs: string[]) =
-    [|
-        yield! command
-        yield "--"
-        yield! pathSpecs
-    |]
+let private withGitPathspecs (command: string[]) (pathSpecs: string[]) = [|
+    yield! command
+    yield "--"
+    yield! pathSpecs
+|]
 
 /// Validates a remote name and defaults blank input to `origin`.
 let validateRemoteName (remoteName: string) =
@@ -330,7 +325,8 @@ let private validateOptionalBranchName (branchName: string option) =
     | None -> Ok None
     | Some branchName -> ensureValidBranchLikeName "Branch name" branchName |> Result.map Some
 
-let private unsupportedGitContentMessage (path: string) = $"Unsupported git content for '{path}'."
+let private unsupportedGitContentMessage (path: string) =
+    $"Unsupported git content for '{path}'."
 
 let private unsupportedGitContentResult<'T> (path: string) : GitResult<'T> =
     Error {
@@ -352,8 +348,7 @@ let tryGetUnsupportedGitContent (requestedPath: string) (failure: GitFailure) : 
 // Binary files cannot be displayed in the text-based diff/merge viewers and need to be routed
 // to the unsupported content page instead.
 let private readFileBufferAsync (absolutePath: string) : JS.Promise<obj> =
-    fsPromisesDynamic?readFile (absolutePath)
-    |> unbox<JS.Promise<obj>>
+    Main.Bindings.Filesystem.readFileBufferAsync absolutePath
 
 let private explicitlyUnsupportedExtensions =
     set [
@@ -377,7 +372,7 @@ let private explicitlyUnsupportedExtensions =
     ]
 
 let private isExplicitlyUnsupportedPath (path: string) =
-    let extension = pathDynamic?extname (path) |> unbox<string>
+    let extension = extname path
 
     not (String.IsNullOrWhiteSpace extension)
     && explicitlyUnsupportedExtensions.Contains(extension.ToLowerInvariant())
@@ -405,20 +400,18 @@ let private tryResolveArcRelativePath (arcPath: string) (requestedPath: string) 
     match ensureValidPathspec requestedPath with
     | Error validationError -> Error validationError
     | Ok safeRelativePath ->
-        let arcRoot = pathDynamic?resolve (arcPath) |> unbox<string>
-        let absolutePath = pathDynamic?resolve (arcRoot, safeRelativePath) |> unbox<string>
+        let arcRoot = resolve [| arcPath |]
+        let absolutePath = resolve [| arcRoot; safeRelativePath |]
 
         let relativePath =
-            pathDynamic?relative (arcRoot, absolutePath)
-            |> unbox<string>
-            |> fun value -> value.Replace("\\", "/")
+            relative arcRoot absolutePath |> fun value -> value.Replace("\\", "/")
 
         if
             String.IsNullOrWhiteSpace relativePath
             || relativePath = "."
             || relativePath = ".."
             || relativePath.StartsWith("../", StringComparison.Ordinal)
-            || (pathDynamic?isAbsolute (relativePath) |> unbox<bool>)
+            || isAbsolute relativePath
         then
             Error(exn "Pathspec resolves outside the active ARC root.")
         else
@@ -431,10 +424,15 @@ let private isPathCleanInStatus (status: StatusResult) (relativePath: string) =
     valueOrEmptyArray status.files
     |> Array.exists (fun fileStatus ->
         String.Equals(fileStatus.path, relativePath, StringComparison.Ordinal)
-        || (fileStatus.``from`` |> Option.exists (fun original -> String.Equals(original, relativePath, StringComparison.Ordinal))))
+        || (fileStatus.``from``
+            |> Option.exists (fun original -> String.Equals(original, relativePath, StringComparison.Ordinal)))
+    )
     |> not
 
-let private ensureBackupMatchesLfsOid (backupPath: string) (listing: Swate.Electron.Shared.FileIOTypes.GitLfsLsFileInfo) =
+let private ensureBackupMatchesLfsOid
+    (backupPath: string)
+    (listing: Swate.Electron.Shared.FileIOTypes.GitLfsLsFileInfo)
+    =
     promise {
         let! pointerTextResult =
             runGitCaptured {
@@ -445,17 +443,21 @@ let private ensureBackupMatchesLfsOid (backupPath: string) (listing: Swate.Elect
                 TimeoutMs = Some 30000
             }
 
-        let generatedPointer = $"{pointerTextResult.StdoutText}\n{pointerTextResult.StderrText}"
+        let generatedPointer =
+            $"{pointerTextResult.StdoutText}\n{pointerTextResult.StderrText}"
 
         return
-            if pointerTextResult.ExitCode = 0 && generatedPointer.Contains($"oid sha256:{listing.oid}") then
+            if
+                pointerTextResult.ExitCode = 0
+                && generatedPointer.Contains($"oid sha256:{listing.oid}")
+            then
                 Ok()
             else
                 Error(exn "The temporary LFS backup did not match the expected object. The original file was restored.")
     }
 
 let private isMergeInProgress (arcPath: string) =
-    let mergeHeadPath = pathDynamic?resolve (arcPath, ".git", "MERGE_HEAD") |> unbox<string>
+    let mergeHeadPath = resolve [| arcPath; ".git"; "MERGE_HEAD" |]
     existsSync mergeHeadPath
 
 let private toStatusDto (arcPath: string) (status: StatusResult) : GitStatusDto =
@@ -490,19 +492,21 @@ let private ensureCurrentlyConflictedPath (status: GitStatusDto) (requestedPath:
     else
         Error(exn $"File '{requestedPath}' is not currently marked as conflicted.")
 
-let private missingHeadContentMarkers =
-    [|
-        "does not exist in 'head'"
-        "exists on disk, but not in 'head'"
-        "bad revision 'head'"
-        "invalid object name 'head'"
-    |]
+let private missingHeadContentMarkers = [|
+    "does not exist in 'head'"
+    "exists on disk, but not in 'head'"
+    "bad revision 'head'"
+    "invalid object name 'head'"
+|]
 
 let private isMissingHeadContentFailure (failure: GitFailure) =
     let message = failure.Message.ToLowerInvariant()
     missingHeadContentMarkers |> Array.exists message.Contains
 
-let private readWorkingTreeTextIfPresent (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<string option>> =
+let private readWorkingTreeTextIfPresent
+    (arcPath: string)
+    (requestedPath: string)
+    : JS.Promise<GitResult<string option>> =
     promise {
         match tryResolveArcRelativePath arcPath requestedPath with
         | Error validationError -> return errorResult validationError
@@ -520,32 +524,30 @@ let private readWorkingTreeTextIfPresent (arcPath: string) (requestedPath: strin
                     return Ok(Some(bufferToUtf8String buffer))
     }
 
-let private readHeadTextIfAvailable (git: ISimpleGit) (requestedPath: string) : JS.Promise<GitResult<string option>> =
-    promise {
-        match ensureValidPathspec requestedPath with
-        | Error validationError -> return errorResult validationError
-        | Ok safePath ->
-            if isExplicitlyUnsupportedPath safePath then
-                return unsupportedGitContentResult safePath
-            else
-                let! result =
-                    GitInternals.runSimpleGit
-                        toFailure
-                        (fun currentGit -> currentGit.raw [| "show"; $"HEAD:{safePath}" |])
-                        git
+let private readHeadTextIfAvailable (git: ISimpleGit) (requestedPath: string) : JS.Promise<GitResult<string option>> = promise {
+    match ensureValidPathspec requestedPath with
+    | Error validationError -> return errorResult validationError
+    | Ok safePath ->
+        if isExplicitlyUnsupportedPath safePath then
+            return unsupportedGitContentResult safePath
+        else
+            let! result =
+                GitInternals.runSimpleGit
+                    toFailure
+                    (fun currentGit -> currentGit.raw [| "show"; $"HEAD:{safePath}" |])
+                    git
 
-                match result with
-                | Ok content -> return Ok(Some content)
-                | Error failure when isMissingHeadContentFailure failure -> return Ok None
-                | Error failure -> return Error failure
-    }
+            match result with
+            | Ok content -> return Ok(Some content)
+            | Error failure when isMissingHeadContentFailure failure -> return Ok None
+            | Error failure -> return Error failure
+}
 
 let private quoteDiffPathToken (pathPrefix: string) (path: string option) =
     match path with
     | None -> "/dev/null"
     | Some value ->
-        let escapedPath =
-            value.Replace("\\", "\\\\").Replace("\"", "\\\"")
+        let escapedPath = value.Replace("\\", "\\\\").Replace("\"", "\\\"")
 
         $"\"{pathPrefix}{escapedPath}\""
 
@@ -557,73 +559,61 @@ let private buildSyntheticWordDiffText (previousPath: string option) (currentPat
         yield $"diff --git {previousToken} {currentToken}"
 
         match previousPath, currentPath with
-        | None, Some _ ->
-            yield "new file mode 100644"
-        | Some _, None ->
-            yield "deleted file mode 100644"
-        | _ ->
-            ()
+        | None, Some _ -> yield "new file mode 100644"
+        | Some _, None -> yield "deleted file mode 100644"
+        | _ -> ()
 
         match previousPath, currentPath with
         | Some oldPath, Some currentPath when not (String.Equals(oldPath, currentPath, StringComparison.Ordinal)) ->
             yield $"rename from {oldPath}"
             yield $"rename to {currentPath}"
-        | _ ->
-            ()
+        | _ -> ()
 
         yield $"--- {previousToken}"
         yield $"+++ {currentToken}"
     ]
     |> String.concat "\n"
 
-let private ensureDefaultTrackingBranchForPull
-    (remoteName: string)
-    (git: ISimpleGit)
-    : JS.Promise<unit> =
-    promise {
-        let! remoteBranchText = git.raw [| "branch"; "-r"; "--no-color" |]
-        let! status = git.status ()
+let private ensureDefaultTrackingBranchForPull (remoteName: string) (git: ISimpleGit) : JS.Promise<unit> = promise {
+    let! remoteBranchText = git.raw [| "branch"; "-r"; "--no-color" |]
+    let! status = git.status ()
 
-        let currentBranch =
-            status.current
-            |> Option.bind Option.ofObj
-            |> Option.map _.Trim()
-            |> Option.filter (fun branch -> not (String.IsNullOrWhiteSpace branch))
+    let currentBranch =
+        status.current
+        |> Option.bind Option.ofObj
+        |> Option.map _.Trim()
+        |> Option.filter (fun branch -> not (String.IsNullOrWhiteSpace branch))
 
-        let currentTracking =
-            status.tracking
-            |> Option.bind Option.ofObj
-            |> Option.map _.Trim()
-            |> Option.filter (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
+    let currentTracking =
+        status.tracking
+        |> Option.bind Option.ofObj
+        |> Option.map _.Trim()
+        |> Option.filter (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
 
-        let remoteRefs =
-            remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
-            |> Array.map _.Trim()
-            |> Array.filter (fun branchName ->
-                not (String.IsNullOrWhiteSpace branchName)
-                && not (branchName.Contains " -> ")
-            )
+    let remoteRefs =
+        remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+        |> Array.map _.Trim()
+        |> Array.filter (fun branchName ->
+            not (String.IsNullOrWhiteSpace branchName) && not (branchName.Contains " -> ")
+        )
 
-        match status.detached, currentBranch with
-        | true, _
-        | _, None ->
+    match status.detached, currentBranch with
+    | true, _
+    | _, None -> return ()
+    | false, Some branchName ->
+        let desiredUpstreamRef = $"{remoteName}/{branchName}"
+
+        let desiredTracking =
+            remoteRefs
+            |> Array.tryFind (fun branchRef -> String.Equals(branchRef, desiredUpstreamRef, StringComparison.Ordinal))
+
+        match desiredTracking, currentTracking with
+        | None, _ -> return ()
+        | Some desired, Some current when String.Equals(current, desired, StringComparison.Ordinal) -> return ()
+        | Some desired, _ ->
+            let! _ = git.raw [| "branch"; $"--set-upstream-to={desired}"; branchName |]
             return ()
-        | false, Some branchName ->
-            let desiredUpstreamRef = $"{remoteName}/{branchName}"
-
-            let desiredTracking =
-                remoteRefs
-                |> Array.tryFind (fun branchRef -> String.Equals(branchRef, desiredUpstreamRef, StringComparison.Ordinal))
-
-            match desiredTracking, currentTracking with
-            | None, _ ->
-                return ()
-            | Some desired, Some current when String.Equals(current, desired, StringComparison.Ordinal) ->
-                return ()
-            | Some desired, _ ->
-                let! _ = git.raw [| "branch"; $"--set-upstream-to={desired}"; branchName |]
-                return ()
-    }
+}
 
 let private normalizeOptionalGitRef (value: string option) =
     value
@@ -643,30 +633,27 @@ let resolvePushTarget
     let normalizedTrackingBranch = normalizeOptionalGitRef trackingBranch
 
     match requestedBranchName with
-    | Some branchName ->
-        {
-            RefSpec = branchName
-            PushBranch = branchName
-            SetUpstream =
-                not isDetached
-                && normalizedCurrentBranch = Some branchName
-                && normalizedTrackingBranch.IsNone
-        }
+    | Some branchName -> {
+        RefSpec = branchName
+        PushBranch = branchName
+        SetUpstream =
+            not isDetached
+            && normalizedCurrentBranch = Some branchName
+            && normalizedTrackingBranch.IsNone
+      }
     | None ->
         match isDetached, normalizedCurrentBranch with
         | true, _
-        | _, None ->
-            {
-                RefSpec = "HEAD"
-                PushBranch = "HEAD"
-                SetUpstream = false
-            }
-        | false, Some branchName ->
-            {
-                RefSpec = branchName
-                PushBranch = branchName
-                SetUpstream = normalizedTrackingBranch.IsNone
-            }
+        | _, None -> {
+            RefSpec = "HEAD"
+            PushBranch = "HEAD"
+            SetUpstream = false
+          }
+        | false, Some branchName -> {
+            RefSpec = branchName
+            PushBranch = branchName
+            SetUpstream = normalizedTrackingBranch.IsNone
+          }
 
 let private reconcileTrackingBranchForCheckout
     (remoteName: string)
@@ -687,8 +674,7 @@ let private reconcileTrackingBranchForCheckout
             remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
             |> Array.map _.Trim()
             |> Array.filter (fun branchRef ->
-                not (String.IsNullOrWhiteSpace branchRef)
-                && not (branchRef.Contains " -> ")
+                not (String.IsNullOrWhiteSpace branchRef) && not (branchRef.Contains " -> ")
             )
 
         let desiredUpstreamRef = $"{remoteName}/{branchName}"
@@ -698,48 +684,44 @@ let private reconcileTrackingBranchForCheckout
             |> Array.tryFind (fun branchRef -> String.Equals(branchRef, desiredUpstreamRef, StringComparison.Ordinal))
 
         match desiredTracking, currentTracking with
-        | Some desired, Some current when String.Equals(current, desired, StringComparison.Ordinal) ->
-            return ()
+        | Some desired, Some current when String.Equals(current, desired, StringComparison.Ordinal) -> return ()
         | Some desired, _ ->
             let! _ = git.raw [| "branch"; $"--set-upstream-to={desired}"; branchName |]
             return ()
         | None, Some _ ->
             let! _ = git.raw [| "branch"; "--unset-upstream"; branchName |]
             return ()
-        | None, None ->
-            return ()
+        | None, None -> return ()
     }
 
 let private runSimpleGit (operation: ISimpleGit -> JS.Promise<'T>) (git: ISimpleGit) : JS.Promise<GitResult<'T>> =
     GitInternals.runSimpleGit toFailure operation git
 
 // GitService reads the threshold because stage/commit need the value while deciding whether to enforce LFS automatically.
-let private getConfiguredLfsThresholdMb (git: ISimpleGit) : JS.Promise<int> =
-    promise {
-        try
-            let! configResult = git.getConfig (gitLfsThresholdConfigKey, "local")
+let private getConfiguredLfsThresholdMb (git: ISimpleGit) : JS.Promise<int> = promise {
+    try
+        let! configResult = git.getConfig (gitLfsThresholdConfigKey, "local")
 
-            return
-                configResult.value
-                |> tryParseConfiguredThresholdMb
-                |> Option.defaultValue gitLfsDefaultThresholdMb
-        with _ ->
-            return gitLfsDefaultThresholdMb
-    }
+        return
+            configResult.value
+            |> tryParseConfiguredThresholdMb
+            |> Option.defaultValue gitLfsDefaultThresholdMb
+    with _ ->
+        return gitLfsDefaultThresholdMb
+}
 
 // GitService reads the download preference because pull/sync need it while deciding whether to hydrate LFS content or keep pointers.
-let private getConfiguredLfsDownloadLargeFiles (git: ISimpleGit) : JS.Promise<bool> =
-    promise {
-        try
-            let! configResult = git.getConfig (gitLfsDownloadLargeFilesConfigKey, "local")
+let private getConfiguredLfsDownloadLargeFiles (git: ISimpleGit) : JS.Promise<bool> = promise {
+    try
+        let! configResult = git.getConfig (gitLfsDownloadLargeFilesConfigKey, "local")
 
-            return
-                configResult.value
-                |> tryParseConfiguredDownloadLargeFiles
-                |> Option.defaultValue gitLfsDefaultDownloadLargeFiles
-        with _ ->
-            return gitLfsDefaultDownloadLargeFiles
-    }
+        return
+            configResult.value
+            |> tryParseConfiguredDownloadLargeFiles
+            |> Option.defaultValue gitLfsDefaultDownloadLargeFiles
+    with _ ->
+        return gitLfsDefaultDownloadLargeFiles
+}
 
 // GitService creates this failure because install-required is surfaced as a git workflow error, not as a raw LFS command result.
 let private createLfsInstallRequiredFailure (thresholdMb: int option) (details: string option) : GitFailure = {
@@ -758,11 +740,10 @@ let private runGitLfsTrackCommand
 
         return
             match result with
-            | Ok () -> Ok()
+            | Ok() -> Ok()
             | Error message when classifyFailureKind message = GitFailureKind.LfsInstallRequired ->
                 Error(createLfsInstallRequiredFailure (Some thresholdMb) (Some message))
-            | Error message ->
-                Error(createFailure GitFailureKind.Unknown message)
+            | Error message -> Error(createFailure GitFailureKind.Unknown message)
     }
 
 let private getOversizedWorkingTreePaths
@@ -779,8 +760,7 @@ let private getOversizedWorkingTreePaths
             | Some _ -> ()
             | None ->
                 match tryResolveArcRelativePath arcPath selectedPath with
-                | Error validationError ->
-                    failure <- Some(toFailure validationError)
+                | Error validationError -> failure <- Some(toFailure validationError)
                 | Ok(_, absolutePath) ->
                     let! fileSizeOption = tryGetFileSizeInBytes absolutePath
 
@@ -820,61 +800,51 @@ let private enforceStageTimeLfsTrackingForPaths
                     let! trackResult = runGitLfsTrackCommand arcPath pathToTrack thresholdMb
 
                     match trackResult with
-                    | Ok () -> ()
+                    | Ok() -> ()
                     | Error trackFailure -> failure <- Some trackFailure
 
             match failure with
-            | Some failure ->
-                return Error failure
+            | Some failure -> return Error failure
             | None ->
                 if pathsToTrack.Length = 0 then
                     return Ok()
                 else
-                    let pathsToRestage =
-                        [|
-                            ".gitattributes"
-                            yield! oversizedPaths
-                        |]
-                        |> Array.distinct
+                    let pathsToRestage = [| ".gitattributes"; yield! oversizedPaths |] |> Array.distinct
 
                     let! restageResult = runSimpleGit (fun currentGit -> currentGit.add pathsToRestage) git
 
                     match restageResult with
-                    | Ok _ ->
-                        return Ok()
+                    | Ok _ -> return Ok()
                     | Error failure when failure.Kind = GitFailureKind.LfsInstallRequired ->
                         return Error(createLfsInstallRequiredFailure (Some thresholdMb) None)
-                    | Error failure ->
-                        return Error failure
+                    | Error failure -> return Error failure
     }
 
-let private tryGetIndexedBlobId
-    (git: ISimpleGit)
-    (relativePath: string)
-    : JS.Promise<GitResult<string option>> =
-    promise {
-        let! lsFilesResult = runSimpleGit (fun currentGit -> currentGit.raw [| "ls-files"; "--stage"; "--"; relativePath |]) git
+let private tryGetIndexedBlobId (git: ISimpleGit) (relativePath: string) : JS.Promise<GitResult<string option>> = promise {
+    let! lsFilesResult =
+        runSimpleGit (fun currentGit -> currentGit.raw [| "ls-files"; "--stage"; "--"; relativePath |]) git
 
-        return
-            lsFilesResult
-            |> Result.bind (fun output ->
-                output.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
-                |> Array.tryPick (fun line ->
-                    let tabIndex = line.IndexOf('\t')
+    return
+        lsFilesResult
+        |> Result.bind (fun output ->
+            output.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
+            |> Array.tryPick (fun line ->
+                let tabIndex = line.IndexOf('\t')
 
-                    if tabIndex <= 0 then
-                        None
+                if tabIndex <= 0 then
+                    None
+                else
+                    let metadata =
+                        line.Substring(0, tabIndex).Split(' ', StringSplitOptions.RemoveEmptyEntries)
+
+                    if metadata.Length >= 3 && metadata.[2] = "0" then
+                        Some metadata.[1]
                     else
-                        let metadata = line.Substring(0, tabIndex).Split(' ', StringSplitOptions.RemoveEmptyEntries)
-
-                        if metadata.Length >= 3 && metadata.[2] = "0" then
-                            Some metadata.[1]
-                        else
-                            None
-                )
-                |> Ok
+                        None
             )
-    }
+            |> Ok
+        )
+}
 
 let private tryGetIndexedBlobSizeInBytes
     (git: ISimpleGit)
@@ -884,10 +854,8 @@ let private tryGetIndexedBlobSizeInBytes
         let! blobIdResult = tryGetIndexedBlobId git relativePath
 
         match blobIdResult with
-        | Error failure ->
-            return Error failure
-        | Ok None ->
-            return Ok None
+        | Error failure -> return Error failure
+        | Ok None -> return Ok None
         | Ok(Some blobId) ->
             let! sizeResult = runSimpleGit (fun currentGit -> currentGit.raw [| "cat-file"; "-s"; blobId |]) git
 
@@ -904,16 +872,9 @@ let private tryGetIndexedBlobSizeInBytes
     }
 
 let private createCommitLfsValidationFailure (thresholdMb: int) (oversizedPaths: string[]) =
-    let listedPaths =
-        oversizedPaths
-        |> Array.truncate 5
-        |> String.concat ", "
+    let listedPaths = oversizedPaths |> Array.truncate 5 |> String.concat ", "
 
-    let suffix =
-        if oversizedPaths.Length > 5 then
-            ", ..."
-        else
-            String.Empty
+    let suffix = if oversizedPaths.Length > 5 then ", ..." else String.Empty
 
     {
         Kind = GitFailureKind.Unknown
@@ -921,47 +882,39 @@ let private createCommitLfsValidationFailure (thresholdMb: int) (oversizedPaths:
             $"Staged content larger than {formatThresholdMb thresholdMb} must already be staged as Git LFS pointers before commit. Re-stage the affected paths after tracking them with Git LFS or use Swate staging. Affected paths: {listedPaths}{suffix}"
     }
 
-let private validateCommitLfsPolicy (git: ISimpleGit) : JS.Promise<GitResult<unit>> =
-    promise {
-        let! thresholdMb = getConfiguredLfsThresholdMb git
-        let thresholdBytes = thresholdMbToBytes thresholdMb
-        let! statusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
+let private validateCommitLfsPolicy (git: ISimpleGit) : JS.Promise<GitResult<unit>> = promise {
+    let! thresholdMb = getConfiguredLfsThresholdMb git
+    let thresholdBytes = thresholdMbToBytes thresholdMb
+    let! statusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
-        match statusResult with
-        | Error failure ->
-            return Error failure
-        | Ok status ->
-            let stagedPaths =
-                valueOrEmptyArray status.files
-                |> Array.filter (fun fileStatus -> GitStatusCode.isStagedIndexStatus fileStatus.index)
-                |> Array.map _.path
-                |> Array.distinct
+    match statusResult with
+    | Error failure -> return Error failure
+    | Ok status ->
+        let stagedPaths =
+            valueOrEmptyArray status.files
+            |> Array.filter (fun fileStatus -> GitStatusCode.isStagedIndexStatus fileStatus.index)
+            |> Array.map _.path
+            |> Array.distinct
 
-            let oversizedPaths = ResizeArray<string>()
-            let mutable failure: GitFailure option = None
+        let oversizedPaths = ResizeArray<string>()
+        let mutable failure: GitFailure option = None
 
-            for stagedPath in stagedPaths do
-                match failure with
-                | Some _ -> ()
-                | None ->
-                    let! stagedSizeResult = tryGetIndexedBlobSizeInBytes git stagedPath
-
-                    match stagedSizeResult with
-                    | Error stagedFailure ->
-                        failure <- Some stagedFailure
-                    | Ok(Some stagedSize) when stagedSize > thresholdBytes ->
-                        oversizedPaths.Add stagedPath
-                    | Ok _ ->
-                        ()
-
+        for stagedPath in stagedPaths do
             match failure with
-            | Some failure ->
-                return Error failure
-            | None when oversizedPaths.Count = 0 ->
-                return Ok()
+            | Some _ -> ()
             | None ->
-                return Error(createCommitLfsValidationFailure thresholdMb (oversizedPaths.ToArray()))
-    }
+                let! stagedSizeResult = tryGetIndexedBlobSizeInBytes git stagedPath
+
+                match stagedSizeResult with
+                | Error stagedFailure -> failure <- Some stagedFailure
+                | Ok(Some stagedSize) when stagedSize > thresholdBytes -> oversizedPaths.Add stagedPath
+                | Ok _ -> ()
+
+        match failure with
+        | Some failure -> return Error failure
+        | None when oversizedPaths.Count = 0 -> return Ok()
+        | None -> return Error(createCommitLfsValidationFailure thresholdMb (oversizedPaths.ToArray()))
+}
 
 // GitService keeps the pull preference application here because it changes how the authenticated pull workflow checks out the working tree.
 let private applyLfsDownloadPreference (downloadLargeFiles: bool) (git: ISimpleGit) =
@@ -971,18 +924,17 @@ let private applyLfsDownloadPreference (downloadLargeFiles: bool) (git: ISimpleG
         git.env (GitLfsSkipSmudgeEnvKey, "1")
 
 // GitService keeps explicit post-pull hydration here because it must reuse the authenticated git instance created for the pull workflow.
-let private hydratePulledLfsContent (git: ISimpleGit) : JS.Promise<GitResult<unit>> =
-    promise {
-        let! result =
-            runSimpleGit
-                (fun currentGit -> promise {
-                    let! _ = currentGit.raw [| "lfs"; "pull" |]
-                    return ()
-                })
-                git
+let private hydratePulledLfsContent (git: ISimpleGit) : JS.Promise<GitResult<unit>> = promise {
+    let! result =
+        runSimpleGit
+            (fun currentGit -> promise {
+                let! _ = currentGit.raw [| "lfs"; "pull" |]
+                return ()
+            })
+            git
 
-        return result
-    }
+    return result
+}
 
 let private createPullHydrationFailure (failure: GitFailure) = {
     failure with
@@ -1026,7 +978,16 @@ let private createAuthenticatedGitSession
                     | Some token when not (String.IsNullOrWhiteSpace token) ->
                         try
                             let operationOptions = createOptions arcPath syncTimeout progressCallback
-                            let git = applyAuth createGit operationOptions host token (Some remoteName) (Some allowedRemoteUrl)
+
+                            let git =
+                                applyAuth
+                                    createGit
+                                    operationOptions
+                                    host
+                                    token
+                                    (Some remoteName)
+                                    (Some allowedRemoteUrl)
+
                             let commandAuth =
                                 createCommandAuthentication host token (Some remoteName) (Some allowedRemoteUrl)
 
@@ -1065,12 +1026,13 @@ let private createOriginLfsRemoteGit
             | Ok _ ->
                 let! sessionResult = createAuthenticatedGitSession arcPath remoteName progressCallback
                 return sessionResult |> Result.map _.Git
-            | Error _ when remoteUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
-                           || (pathDynamic?isAbsolute(remoteUrl) |> unbox<bool>) ->
+            | Error _ when
+                remoteUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
+                || isAbsolute remoteUrl
+                ->
                 let options = createOptions arcPath syncTimeout progressCallback
                 return Ok(createGit options)
-            | Error validationError ->
-                return errorResult validationError
+            | Error validationError -> return errorResult validationError
     }
 
 let private ensureRepo (git: ISimpleGit) = promise {
@@ -1107,30 +1069,25 @@ let private withAuthenticatedGit
         | Ok session -> return! runSimpleGit operation session.Git
     }
 
-let private requireCleanWorkingTreeForLfsStorageAction (actionLabel: string) (git: ISimpleGit) =
-    promise {
-        let! status = git.status ()
+let private requireCleanWorkingTreeForLfsStorageAction (actionLabel: string) (git: ISimpleGit) = promise {
+    let! status = git.status ()
 
-        return
-            if status.isClean () then
-                Ok()
-            else
-                Error(exn $"{actionLabel} requires a clean working tree. Save, discard, or commit local changes first.")
-    }
+    return
+        if status.isClean () then
+            Ok()
+        else
+            Error(exn $"{actionLabel} requires a clean working tree. Save, discard, or commit local changes first.")
+}
 
-let private rejectCustomLfsStorageForPrune (git: ISimpleGit) =
-    promise {
-        let! storageResult =
-            runSimpleGit
-                (fun currentGit -> currentGit.raw [| "config"; "--get"; "lfs.storage" |])
-                git
+let private rejectCustomLfsStorageForPrune (git: ISimpleGit) = promise {
+    let! storageResult = runSimpleGit (fun currentGit -> currentGit.raw [| "config"; "--get"; "lfs.storage" |]) git
 
-        return
-            match storageResult with
-            | Ok value when not (String.IsNullOrWhiteSpace(value.Trim())) ->
-                Error(exn "Git LFS prune is disabled because this repository uses a custom lfs.storage directory.")
-            | _ -> Ok()
-    }
+    return
+        match storageResult with
+        | Ok value when not (String.IsNullOrWhiteSpace(value.Trim())) ->
+            Error(exn "Git LFS prune is disabled because this repository uses a custom lfs.storage directory.")
+        | _ -> Ok()
+}
 
 /// Reads status for the active ARC repository, including conflict metadata used by the sidebar and merge UI.
 let getStatus (arcPath: string) : JS.Promise<GitResult<GitStatusDto>> =
@@ -1170,8 +1127,7 @@ let getBranches (arcPath: string) : JS.Promise<GitResult<GitBranchRefDto[]>> =
                 remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
                 |> Array.map _.Trim()
                 |> Array.filter (fun branchName ->
-                    not (String.IsNullOrWhiteSpace branchName)
-                    && not (branchName.Contains " -> ")
+                    not (String.IsNullOrWhiteSpace branchName) && not (branchName.Contains " -> ")
                 )
                 |> Array.map (fun branchName -> {
                     RefName = branchName
@@ -1190,7 +1146,10 @@ let getBranches (arcPath: string) : JS.Promise<GitResult<GitBranchRefDto[]>> =
                         | GitBranchRefKind.Local -> 0
                         | GitBranchRefKind.Remote -> 1
 
-                    kindOrder, (if branch.IsCurrent then 0 else 1), (if branch.IsTracking then 0 else 1), branch.DisplayLabel.ToLowerInvariant()
+                    kindOrder,
+                    (if branch.IsCurrent then 0 else 1),
+                    (if branch.IsTracking then 0 else 1),
+                    branch.DisplayLabel.ToLowerInvariant()
                 )
         })
 
@@ -1275,11 +1234,16 @@ let getDiffViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitRe
                         let! status = git.status ()
                         let statusDto = toStatusDto arcPath status
 
-                        match statusDto.Files |> Array.tryFind (fun file -> String.Equals(file.Path, safeRequestedPath, StringComparison.Ordinal)) with
-                        | None ->
-                            return abortGitPromise $"No git status entry found for '{safeRequestedPath}'."
+                        match
+                            statusDto.Files
+                            |> Array.tryFind (fun file ->
+                                String.Equals(file.Path, safeRequestedPath, StringComparison.Ordinal)
+                            )
+                        with
+                        | None -> return abortGitPromise $"No git status entry found for '{safeRequestedPath}'."
                         | Some fileStatus ->
-                            let previousPathCandidate = fileStatus.OriginalPath |> Option.defaultValue safeRequestedPath
+                            let previousPathCandidate =
+                                fileStatus.OriginalPath |> Option.defaultValue safeRequestedPath
 
                             let! previousContentResult = readHeadTextIfAvailable git previousPathCandidate
 
@@ -1298,16 +1262,16 @@ let getDiffViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitRe
                             if previousContent.IsNone && currentContent.IsNone then
                                 return abortGitPromise $"No git diff content found for '{safeRequestedPath}'."
                             else
-                                let diffPaths =
-                                    [|
-                                        yield safeRequestedPath
+                                let diffPaths = [|
+                                    yield safeRequestedPath
 
-                                        match fileStatus.OriginalPath with
-                                        | Some originalPath when not (String.Equals(originalPath, safeRequestedPath, StringComparison.Ordinal)) ->
-                                            yield originalPath
-                                        | _ ->
-                                            ()
-                                    |]
+                                    match fileStatus.OriginalPath with
+                                    | Some originalPath when
+                                        not (String.Equals(originalPath, safeRequestedPath, StringComparison.Ordinal))
+                                        ->
+                                        yield originalPath
+                                    | _ -> ()
+                                |]
 
                                 let! wordDiffResult =
                                     runSimpleGit
@@ -1351,38 +1315,40 @@ let getDiffViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitRe
 }
 
 /// Loads the current conflicted file content for the merge-resolution view.
-let getMergeConflictViewData (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<GitMergeConflictViewDataDto>> = promise {
-    match ensureValidPathspec requestedPath with
-    | Error validationError -> return errorResult validationError
-    | Ok safeRequestedPath ->
-        if isExplicitlyUnsupportedPath safeRequestedPath then
-            return unsupportedGitContentResult safeRequestedPath
-        else
-            return!
-                withLocalGit
-                    arcPath
-                    (fun git -> promise {
-                        let! status = git.status ()
-                        let statusDto = toStatusDto arcPath status
+let getMergeConflictViewData
+    (arcPath: string)
+    (requestedPath: string)
+    : JS.Promise<GitResult<GitMergeConflictViewDataDto>> =
+    promise {
+        match ensureValidPathspec requestedPath with
+        | Error validationError -> return errorResult validationError
+        | Ok safeRequestedPath ->
+            if isExplicitlyUnsupportedPath safeRequestedPath then
+                return unsupportedGitContentResult safeRequestedPath
+            else
+                return!
+                    withLocalGit
+                        arcPath
+                        (fun git -> promise {
+                            let! status = git.status ()
+                            let statusDto = toStatusDto arcPath status
 
-                        match ensureCurrentlyConflictedPath statusDto safeRequestedPath with
-                        | Error conflictError ->
-                            return abortGitPromiseWith conflictError
-                        | Ok() ->
-                            let! contentResult = readWorkingTreeTextIfPresent arcPath safeRequestedPath
+                            match ensureCurrentlyConflictedPath statusDto safeRequestedPath with
+                            | Error conflictError -> return abortGitPromiseWith conflictError
+                            | Ok() ->
+                                let! contentResult = readWorkingTreeTextIfPresent arcPath safeRequestedPath
 
-                            match contentResult with
-                            | Ok(Some content) ->
-                                return {
-                                    Path = safeRequestedPath
-                                    MergeConflictContent = content
-                                }
-                            | Ok None ->
-                                return abortGitPromise $"Conflicted file '{safeRequestedPath}' no longer exists."
-                            | Error failure ->
-                                return abortGitPromise failure.Message
-                    })
-}
+                                match contentResult with
+                                | Ok(Some content) ->
+                                    return {
+                                        Path = safeRequestedPath
+                                        MergeConflictContent = content
+                                    }
+                                | Ok None ->
+                                    return abortGitPromise $"Conflicted file '{safeRequestedPath}' no longer exists."
+                                | Error failure -> return abortGitPromise failure.Message
+                        })
+    }
 
 /// Fetches from a validated remote using the configured token provider and optional progress callback.
 let fetch
@@ -1466,8 +1432,7 @@ let previewPull
                             return
                                 Ok {
                                     Status = GitPullPreflightStatus.Indeterminate
-                                    Message =
-                                        Some "No upstream tracking branch is configured for the current branch."
+                                    Message = Some "No upstream tracking branch is configured for the current branch."
                                 }
                         | Some resolvedUpstreamRef ->
                             return!
@@ -1487,7 +1452,12 @@ let previewPull
                                         let! mergeTreeResult =
                                             runGitCaptured {
                                                 WorkingDirectory = Some arcPath
-                                                Arguments = [| "merge-tree"; "--write-tree"; "HEAD"; resolvedUpstreamRef |]
+                                                Arguments = [|
+                                                    "merge-tree"
+                                                    "--write-tree"
+                                                    "HEAD"
+                                                    resolvedUpstreamRef
+                                                |]
                                                 Environment = None
                                                 StandardInput = None
                                                 TimeoutMs = Some 30000
@@ -1521,7 +1491,8 @@ let previewPull
                                                         if String.IsNullOrWhiteSpace trimmedDiagnostic then
                                                             Some "Git pull preflight could not be classified safely."
                                                         else
-                                                            Some $"Git pull preflight could not be classified safely: {trimmedDiagnostic}"
+                                                            Some
+                                                                $"Git pull preflight could not be classified safely: {trimmedDiagnostic}"
                                                 }
                                     })
     }
@@ -1563,7 +1534,7 @@ let pull
                                 let! lfsPullResult = hydratePulledLfsContent effectiveGit
 
                                 match lfsPullResult with
-                                | Ok () -> return { Warning = None }
+                                | Ok() -> return { Warning = None }
                                 | Error failure ->
                                     let hydrationFailure = createPullHydrationFailure failure
                                     return abortGitPromise hydrationFailure.Message
@@ -1587,16 +1558,13 @@ let executePushWorkflow
         let! lfsPlanResult = buildOutboundPlan ()
 
         match lfsPlanResult with
-        | Error failure ->
-            return Error failure
-        | Ok OutboundPushPlan.SkipLfsUpload ->
-            return! pushToRemote false pushTarget
+        | Error failure -> return Error failure
+        | Ok OutboundPushPlan.SkipLfsUpload -> return! pushToRemote false pushTarget
         | Ok(OutboundPushPlan.UploadLfsObjects lfsObjectIds) ->
             let! lfsUploadResult = uploadLfsObjects lfsObjectIds
 
             match lfsUploadResult with
-            | Ok () ->
-                return! pushToRemote true pushTarget
+            | Ok() -> return! pushToRemote true pushTarget
             | Error failure ->
                 let! diagnostics = collectLfsDiagnostics failure
 
@@ -1630,8 +1598,7 @@ let push
                     let! pushStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
                     match pushStatusResult with
-                    | Error failure ->
-                        return Error failure
+                    | Error failure -> return Error failure
                     | Ok pushStatus ->
                         let pushTarget =
                             resolvePushTarget safeBranchName pushStatus.current pushStatus.tracking pushStatus.detached
@@ -1644,11 +1611,14 @@ let push
                                         runSimpleGit
                                         runGitCaptured
                                         toFailure
-                                        (fun currentGit -> runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit)
+                                        (fun currentGit ->
+                                            runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit
+                                        )
                                         arcPath
                                         safeRemoteName
                                         (Some pushTarget.RefSpec)
-                                        git)
+                                        git
+                                )
                                 (fun objectIds -> promise {
                                     let! uploadResult =
                                         GitLfsService.uploadObjects
@@ -1683,70 +1653,70 @@ let push
                                                 let! _ = pushGit.push (safeRemoteName, currentPushTarget.PushBranch)
                                                 return ()
                                         })
-                                        git)
+                                        git
+                                )
                                 (fun _failure ->
                                     collectPushDiagnostics
                                         runSimpleGit
                                         (fun currentFailure -> Some currentFailure.Message)
                                         safeRemoteName
-                                        git)
+                                        git
+                                )
     }
 
 /// Persists Git workflow LFS settings in local repository config.
-let setLfsSettings (arcPath: string) (settings: GitLfsSettingsDto) : JS.Promise<GitResult<unit>> =
-    promise {
-        match validateLfsThresholdMb settings.AutoTrackThresholdMb with
-        | Error validationError -> return errorResult validationError
-        | Ok thresholdMb ->
-            return!
-                withLocalGit
-                    arcPath
-                    (fun git -> promise {
-                        let! _ =
-                            git.raw [|
-                                "config"
-                                "--local"
-                                gitLfsThresholdConfigKey
-                                formatThresholdConfigValue thresholdMb
-                            |]
-
-                        let! _ =
-                            git.raw [|
-                                "config"
-                                "--local"
-                                gitLfsDownloadLargeFilesConfigKey
-                                formatDownloadLargeFilesConfigValue settings.DownloadLargeFiles
-                            |]
-
-                        return ()
-                    })
-    }
-
-let pruneLfsCache (arcPath: string) : JS.Promise<GitResult<string>> =
-    promise {
-        let! localValidationResult =
+let setLfsSettings (arcPath: string) (settings: GitLfsSettingsDto) : JS.Promise<GitResult<unit>> = promise {
+    match validateLfsThresholdMb settings.AutoTrackThresholdMb with
+    | Error validationError -> return errorResult validationError
+    | Ok thresholdMb ->
+        return!
             withLocalGit
                 arcPath
                 (fun git -> promise {
-                    match! requireCleanWorkingTreeForLfsStorageAction "Cleaning the Git LFS cache" git with
-                    | Error validationError -> return abortGitPromiseWith validationError
-                    | Ok() ->
-                        match! rejectCustomLfsStorageForPrune git with
-                        | Error validationError -> return abortGitPromiseWith validationError
-                        | Ok() -> return ()
+                    let! _ =
+                        git.raw [|
+                            "config"
+                            "--local"
+                            gitLfsThresholdConfigKey
+                            formatThresholdConfigValue thresholdMb
+                        |]
+
+                    let! _ =
+                        git.raw [|
+                            "config"
+                            "--local"
+                            gitLfsDownloadLargeFilesConfigKey
+                            formatDownloadLargeFilesConfigValue settings.DownloadLargeFiles
+                        |]
+
+                    return ()
                 })
+}
 
-        match localValidationResult with
+let pruneLfsCache (arcPath: string) : JS.Promise<GitResult<string>> = promise {
+    let! localValidationResult =
+        withLocalGit
+            arcPath
+            (fun git -> promise {
+                match! requireCleanWorkingTreeForLfsStorageAction "Cleaning the Git LFS cache" git with
+                | Error validationError -> return abortGitPromiseWith validationError
+                | Ok() ->
+                    match! rejectCustomLfsStorageForPrune git with
+                    | Error validationError -> return abortGitPromiseWith validationError
+                    | Ok() -> return ()
+            })
+
+    match localValidationResult with
+    | Error failure -> return Error failure
+    | Ok() ->
+        let! gitResult = createOriginLfsRemoteGit arcPath None
+
+        match gitResult with
         | Error failure -> return Error failure
-        | Ok() ->
-            let! gitResult = createOriginLfsRemoteGit arcPath None
-
-            match gitResult with
-            | Error failure -> return Error failure
-            | Ok git ->
-                let! result = runSimpleGit (fun currentGit -> currentGit.raw GitLfsService.storagePruneArgs) git
-                return result
-    }
+        | Ok git ->
+            let! result = runSimpleGit (fun currentGit -> currentGit.raw GitLfsService.storagePruneArgs) git
+            return result
+}
 
 let dedupLfsStorage (arcPath: string) : JS.Promise<GitResult<string>> =
     withLocalGit
@@ -1772,7 +1742,7 @@ let stagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<un
                     let! lfsResult = enforceStageTimeLfsTrackingForPaths arcPath safePathSpecs git
 
                     match lfsResult with
-                    | Ok () -> return ()
+                    | Ok() -> return ()
                     | Error failure -> return abortGitPromise failure.Message
                 })
 }
@@ -1801,15 +1771,7 @@ let private hasHeadCommit (git: ISimpleGit) = promise {
 let private headPathsForPathspecs (git: ISimpleGit) (pathSpecs: string[]) = promise {
     let! headPathsResult =
         runSimpleGit
-            (fun currentGit ->
-                currentGit.raw (
-                    withGitPathspecs [|
-                        "ls-tree"
-                        "-r"
-                        "--name-only"
-                        "HEAD"
-                    |] pathSpecs
-                ))
+            (fun currentGit -> currentGit.raw (withGitPathspecs [| "ls-tree"; "-r"; "--name-only"; "HEAD" |] pathSpecs))
             git
 
     match headPathsResult with
@@ -1827,113 +1789,116 @@ let private discardPathspecsWithOriginals (arcPath: string) (status: StatusResul
             if selectedPaths.Contains file.Path then
                 file.OriginalPath
             else
-                None)
+                None
+        )
         |> Array.choose (fun path ->
             match ensureValidPathspec path with
             | Ok safePath -> Some safePath
-            | Error _ -> None)
+            | Error _ -> None
+        )
 
-    Array.append safePathSpecs originalPaths
-    |> Array.distinct
+    Array.append safePathSpecs originalPaths |> Array.distinct
 
-let freeLocalLfsCopy
-    (arcPath: string)
-    (requestedPath: string)
-    : JS.Promise<GitResult<unit>> =
-    promise {
-        match tryResolveArcRelativePath arcPath requestedPath with
-        | Error validationError -> return errorResult validationError
-        | Ok(safePath, absolutePath) ->
-            if not (isTrackedByAttributes arcPath safePath) then
-                return errorResult (exn $"'{safePath}' is not tracked by Git LFS.")
-            else
-                let! gitResult = createOriginLfsRemoteGit arcPath None
+let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<unit>> = promise {
+    match tryResolveArcRelativePath arcPath requestedPath with
+    | Error validationError -> return errorResult validationError
+    | Ok(safePath, absolutePath) ->
+        if not (isTrackedByAttributes arcPath safePath) then
+            return errorResult (exn $"'{safePath}' is not tracked by Git LFS.")
+        else
+            let! gitResult = createOriginLfsRemoteGit arcPath None
 
-                match gitResult with
+            match gitResult with
+            | Error failure -> return Error failure
+            | Ok git ->
+                let! statusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
+
+                match statusResult with
                 | Error failure -> return Error failure
-                | Ok git ->
-                    let! statusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
+                | Ok status when not (isPathCleanInStatus status safePath) ->
+                    return
+                        errorResult (
+                            exn
+                                $"'{safePath}' has local changes. Save, discard, or commit them before freeing the local LFS copy."
+                        )
+                | Ok _ ->
+                    let! listingResult =
+                        runSimpleGit
+                            (fun currentGit -> currentGit.raw (GitLfsService.buildLsFilesJsonArgs safePath))
+                            git
 
-                    match statusResult with
+                    match listingResult with
                     | Error failure -> return Error failure
-                    | Ok status when not (isPathCleanInStatus status safePath) ->
-                        return
-                            errorResult (
-                                exn $"'{safePath}' has local changes. Save, discard, or commit them before freeing the local LFS copy."
-                            )
-                    | Ok _ ->
-                        let! listingResult =
-                            runSimpleGit
-                                (fun currentGit -> currentGit.raw (GitLfsService.buildLsFilesJsonArgs safePath))
-                                git
+                    | Ok listingJson ->
+                        match GitLfsService.tryFindListingForPath safePath listingJson with
+                        | Error message -> return errorResult (exn $"'{safePath}' {message}")
+                        | Ok listing when not listing.checkout -> return Ok()
+                        | Ok listing ->
+                            let! fetchResult =
+                                runSimpleGit
+                                    (fun currentGit -> currentGit.raw (GitLfsService.buildFetchRefetchArgs safePath))
+                                    git
 
-                        match listingResult with
-                        | Error failure -> return Error failure
-                        | Ok listingJson ->
-                            match GitLfsService.tryFindListingForPath safePath listingJson with
-                            | Error message -> return errorResult (exn $"'{safePath}' {message}")
-                            | Ok listing when not listing.checkout -> return Ok()
-                            | Ok listing ->
-                                let! fetchResult =
-                                    runSimpleGit
-                                        (fun currentGit -> currentGit.raw (GitLfsService.buildFetchRefetchArgs safePath))
-                                        git
+                            match fetchResult with
+                            | Error failure -> return Error failure
+                            | Ok _ ->
+                                let backupPath = createTemporaryLfsBackupPath absolutePath
 
-                                match fetchResult with
-                                | Error failure -> return Error failure
-                                | Ok _ ->
-                                    let backupPath = createTemporaryLfsBackupPath absolutePath
+                                try
+                                    renameSync absolutePath backupPath
 
-                                    try
-                                        renameSync absolutePath backupPath
+                                    match! ensureBackupMatchesLfsOid backupPath listing with
+                                    | Error validationError ->
+                                        if existsSync backupPath then
+                                            renameSync backupPath absolutePath
 
-                                        match! ensureBackupMatchesLfsOid backupPath listing with
-                                        | Error validationError ->
+                                        return errorResult validationError
+                                    | Ok() ->
+                                        let pointerGit = git.env (GitLfsSkipSmudgeEnvKey, "1")
+
+                                        let! checkoutResult =
+                                            runSimpleGit
+                                                (fun currentGit ->
+                                                    currentGit.raw [| "checkout"; "HEAD"; "--"; safePath |]
+                                                )
+                                                pointerGit
+
+                                        match checkoutResult with
+                                        | Error failure ->
                                             if existsSync backupPath then
                                                 renameSync backupPath absolutePath
 
-                                            return errorResult validationError
-                                        | Ok() ->
-                                            let pointerGit = git.env (GitLfsSkipSmudgeEnvKey, "1")
-                                            let! checkoutResult =
-                                                runSimpleGit
-                                                    (fun currentGit -> currentGit.raw [| "checkout"; "HEAD"; "--"; safePath |])
-                                                    pointerGit
+                                            return Error failure
+                                        | Ok _ ->
+                                            let! finalStatusResult =
+                                                runSimpleGit (fun currentGit -> currentGit.status ()) git
 
-                                            match checkoutResult with
+                                            match finalStatusResult with
                                             | Error failure ->
                                                 if existsSync backupPath then
                                                     renameSync backupPath absolutePath
 
                                                 return Error failure
+                                            | Ok finalStatus when not (isPathCleanInStatus finalStatus safePath) ->
+                                                if existsSync backupPath then
+                                                    renameSync backupPath absolutePath
+
+                                                return
+                                                    errorResult (
+                                                        exn
+                                                            $"Could not replace '{safePath}' with an LFS pointer without changing Git status."
+                                                    )
                                             | Ok _ ->
-                                                let! finalStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
+                                                if existsSync backupPath then
+                                                    unlinkSync backupPath
 
-                                                match finalStatusResult with
-                                                | Error failure ->
-                                                    if existsSync backupPath then
-                                                        renameSync backupPath absolutePath
+                                                return Ok()
+                                with ex ->
+                                    if existsSync backupPath then
+                                        renameSync backupPath absolutePath
 
-                                                    return Error failure
-                                                | Ok finalStatus when not (isPathCleanInStatus finalStatus safePath) ->
-                                                    if existsSync backupPath then
-                                                        renameSync backupPath absolutePath
-
-                                                    return
-                                                        errorResult (
-                                                            exn $"Could not replace '{safePath}' with an LFS pointer without changing Git status."
-                                                        )
-                                                | Ok _ ->
-                                                    if existsSync backupPath then
-                                                        unlinkSync backupPath
-
-                                                    return Ok()
-                                    with ex ->
-                                        if existsSync backupPath then
-                                            renameSync backupPath absolutePath
-
-                                        return errorResult ex
-    }
+                                    return errorResult ex
+}
 
 /// Discards validated pathspecs by restoring tracked paths from HEAD and cleaning selected untracked files.
 let discardPaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {
@@ -1963,7 +1928,8 @@ let discardPaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<
                                 let! restoreResult =
                                     runSimpleGit
                                         (fun currentGit ->
-                                            currentGit.raw (withGitPathspecs [| "restore"; "--worktree" |] headPaths))
+                                            currentGit.raw (withGitPathspecs [| "restore"; "--worktree" |] headPaths)
+                                        )
                                         git
 
                                 match restoreResult with
@@ -1974,13 +1940,11 @@ let discardPaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<
                             runSimpleGit
                                 (fun currentGit ->
                                     currentGit.raw (
-                                        withGitPathspecs [|
-                                            "rm"
-                                            "--cached"
-                                            "-r"
-                                            "--ignore-unmatch"
-                                        |] discardPathSpecs
-                                    ))
+                                        withGitPathspecs
+                                            [| "rm"; "--cached"; "-r"; "--ignore-unmatch" |]
+                                            discardPathSpecs
+                                    )
+                                )
                                 git
 
                         match rmCachedResult with
@@ -2012,9 +1976,8 @@ let commit (arcPath: string) (message: string) : JS.Promise<GitResult<string>> =
                     let! lfsResult = validateCommitLfsPolicy git
 
                     match lfsResult with
-                    | Error failure ->
-                        return abortGitPromise failure.Message
-                    | Ok () ->
+                    | Error failure -> return abortGitPromise failure.Message
+                    | Ok() ->
                         let! result = git.commit (normalizedMessage)
 
                         return
@@ -2049,18 +2012,26 @@ let confirmMergeResolution
                             let statusDtoBeforeWrite = toStatusDto arcPath statusBeforeWrite
 
                             match ensureCurrentlyConflictedPath statusDtoBeforeWrite safeRequestedPath with
-                            | Error conflictError ->
-                                return abortGitPromiseWith conflictError
+                            | Error conflictError -> return abortGitPromiseWith conflictError
                             | Ok() ->
                                 let! currentContentResult = readWorkingTreeTextIfPresent arcPath safeRequestedPath
 
                                 let currentConflictContent =
                                     match currentContentResult with
                                     | Ok(Some content) -> content
-                                    | Ok None -> abortGitPromise $"Conflicted file '{safeRequestedPath}' no longer exists."
+                                    | Ok None ->
+                                        abortGitPromise $"Conflicted file '{safeRequestedPath}' no longer exists."
                                     | Error failure -> abortGitPromise failure.Message
 
-                                if not (String.Equals(currentConflictContent, expectedConflictContent, StringComparison.Ordinal)) then
+                                if
+                                    not (
+                                        String.Equals(
+                                            currentConflictContent,
+                                            expectedConflictContent,
+                                            StringComparison.Ordinal
+                                        )
+                                    )
+                                then
                                     return
                                         abortGitPromise
                                             $"Conflicted file '{safeRequestedPath}' changed on disk since it was opened. Reopen the merge conflict view and retry."
@@ -2073,9 +2044,7 @@ let confirmMergeResolution
                                                 $"Failed to write resolved content for '{safeRequestedPath}': {error.Message}"
 
                                     let! addResult =
-                                        runSimpleGit
-                                            (fun currentGit -> currentGit.add [| safeRequestedPath |])
-                                            git
+                                        runSimpleGit (fun currentGit -> currentGit.add [| safeRequestedPath |]) git
 
                                     match addResult with
                                     | Error failure ->
@@ -2086,15 +2055,18 @@ let confirmMergeResolution
                                         let! statusAfterStage = git.status ()
                                         let updatedStatus = toStatusDto arcPath statusAfterStage
 
-                                        if autoCommit && updatedStatus.Conflicted.Length = 0 && updatedStatus.IsMergeInProgress then
+                                        if
+                                            autoCommit
+                                            && updatedStatus.Conflicted.Length = 0
+                                            && updatedStatus.IsMergeInProgress
+                                        then
                                             let! commitResult =
                                                 runSimpleGit
                                                     (fun currentGit -> currentGit.commit "Resolve merge conflicts")
                                                     git
 
                                             match commitResult with
-                                            | Error failure ->
-                                                return abortGitPromise failure.Message
+                                            | Error failure -> return abortGitPromise failure.Message
                                             | Ok _ ->
                                                 let! statusAfterCommit = git.status ()
                                                 let committedStatus = toStatusDto arcPath statusAfterCommit
@@ -2161,10 +2133,14 @@ let addRemote (arcPath: string) (remoteName: string) (remoteUrl: string) : JS.Pr
                             match remoteList with
                             | U2.Case1 remotes ->
                                 remotes
-                                |> Array.exists (fun remote -> String.Equals(remote.name, safeRemoteName, StringComparison.Ordinal))
+                                |> Array.exists (fun remote ->
+                                    String.Equals(remote.name, safeRemoteName, StringComparison.Ordinal)
+                                )
                             | U2.Case2 remotes ->
                                 remotes
-                                |> Array.exists (fun remote -> String.Equals(remote.name, safeRemoteName, StringComparison.Ordinal))
+                                |> Array.exists (fun remote ->
+                                    String.Equals(remote.name, safeRemoteName, StringComparison.Ordinal)
+                                )
 
                         if remoteExists then
                             return abortGitPromise $"Remote '{safeRemoteName}' already exists."
@@ -2176,43 +2152,42 @@ let addRemote (arcPath: string) (remoteName: string) (remoteUrl: string) : JS.Pr
 
 /// Checks out an existing local branch, or creates/checks out a local branch from StartPoint.
 /// Renderer passes remote branch switches as Name=<local name>, StartPoint=<remote ref>.
-let checkoutBranch (arcPath: string) (request: GitCheckoutBranchRequest) : JS.Promise<GitResult<unit>> =
-    promise {
-        match ensureValidBranchLikeName "Branch name" request.Name with
-        | Error branchError -> return errorResult branchError
-        | Ok safeBranchName ->
-            match request.StartPoint with
-            | Some startPoint ->
-                match ensureValidBranchLikeName "Start point" startPoint with
-                | Error startPointError -> return errorResult startPointError
-                | Ok safeStartPoint ->
-                    return!
-                        withLocalGit
-                            arcPath
-                            (fun git -> promise {
-                                let! _ = git.checkoutBranch (safeBranchName, safeStartPoint)
-                                do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
-                                return ()
-                            })
-            | None ->
+let checkoutBranch (arcPath: string) (request: GitCheckoutBranchRequest) : JS.Promise<GitResult<unit>> = promise {
+    match ensureValidBranchLikeName "Branch name" request.Name with
+    | Error branchError -> return errorResult branchError
+    | Ok safeBranchName ->
+        match request.StartPoint with
+        | Some startPoint ->
+            match ensureValidBranchLikeName "Start point" startPoint with
+            | Error startPointError -> return errorResult startPointError
+            | Ok safeStartPoint ->
                 return!
                     withLocalGit
                         arcPath
                         (fun git -> promise {
-                            let! localBranches = git.branchLocal ()
-                            let branches = valueOrEmptyArray localBranches.all
-
-                            let exists =
-                                branches
-                                |> Array.exists (fun existing ->
-                                    String.Equals(existing, safeBranchName, StringComparison.Ordinal)
-                                )
-
-                            if not exists then
-                                return abortGitPromise $"Branch '{safeBranchName}' does not exist in the local repository."
-
-                            let! _ = git.checkout (safeBranchName)
+                            let! _ = git.checkoutBranch (safeBranchName, safeStartPoint)
                             do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
                             return ()
                         })
-    }
+        | None ->
+            return!
+                withLocalGit
+                    arcPath
+                    (fun git -> promise {
+                        let! localBranches = git.branchLocal ()
+                        let branches = valueOrEmptyArray localBranches.all
+
+                        let exists =
+                            branches
+                            |> Array.exists (fun existing ->
+                                String.Equals(existing, safeBranchName, StringComparison.Ordinal)
+                            )
+
+                        if not exists then
+                            return abortGitPromise $"Branch '{safeBranchName}' does not exist in the local repository."
+
+                        let! _ = git.checkout (safeBranchName)
+                        do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
+                        return ()
+                    })
+}
