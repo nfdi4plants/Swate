@@ -207,6 +207,21 @@ let createWindow () = promise {
         window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
         do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
 
+    // Prevent links from opening new Electron windows
+    window.webContents.setWindowOpenHandler (fun details ->
+        Fable.Electron.Main.shell.openExternal details.url |> Promise.start
+        WindowOpenHandlerResponse(Enums.Types.WindowOpenHandlerResponse.Action.Deny)
+    )
+
+    // Prevent navigation inside current Electron window
+    window.webContents.onWillNavigate (fun event url _ _ _ _ ->
+        let currentUrl = window.webContents.getURL ()
+
+        if url <> currentUrl then
+            event.preventDefault ()
+            Fable.Electron.Main.shell.openExternal url |> Promise.start
+    )
+
     return window
 }
 
@@ -244,12 +259,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
                 binaryInterval = 400
             )
         else
-            Chokidar.WatchOptions(
-                cwd = path,
-                awaitWriteFinish = true,
-                ignored = !^ignoreFn,
-                ignoreInitial = true
-            )
+            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 
