@@ -86,20 +86,32 @@ type FileExplorerItem =
             Html.none
 
     [<ReactComponent>]
-    static member private LFSStatusPill (item: FileItem) =
+    static member private LFSStatusPill (item: FileItem, ?lfsAction: ContextMenuItem) =
         let isPointer = item.IsLFSPointer = Some true
         let isDownloaded = item.Downloaded = Some true && not isPointer
 
-        let statusAccessibilityText =
-            match item.SizeFormatted, isDownloaded, isPointer with
-            | Some size, true, _ -> $"LFS Downloaded - {size}"
-            | Some size, false, true -> $"LFS Pointer - {size}"
-            | Some size, false, false -> $"LFS Not Downloaded - {size}"
-            | None, true, _ -> "LFS Downloaded"
-            | None, false, true -> "LFS Pointer"
-            | None, false, false -> "LFS Not Downloaded"
+        let statusText =
+            if isDownloaded then
+                "LFS Downloaded"
+            elif isPointer then
+                "LFS Pointer"
+            else
+                "LFS Not Downloaded"
 
-        let showSizeSegment = item.SizeFormatted.IsSome
+        let statusAccessibilityText =
+            item.SizeFormatted
+            |> Option.map (fun size -> $"{statusText} - {size}")
+            |> Option.defaultValue statusText
+
+        let isActionDisabled =
+            lfsAction
+            |> Option.bind (fun action -> action.Disabled)
+            |> Option.defaultValue false
+
+        let pillAccessibilityText =
+            match lfsAction with
+            | Some action -> $"{action.Label} {item.Name}. {statusAccessibilityText}"
+            | None -> statusAccessibilityText
 
         let statusClassName =
             if isDownloaded then
@@ -114,15 +126,21 @@ type FileExplorerItem =
                 "swt:fluent--cloud-arrow-down-24-regular"
 
         let statusShapeClass =
-            if showSizeSegment then
+            if item.SizeFormatted.IsSome then
                 "swt:rounded-none swt:border-0"
             else
                 "swt:rounded-full"
 
+        let segmentCursorClass =
+            match lfsAction, isActionDisabled with
+            | Some _, true -> "swt:cursor-not-allowed"
+            | Some _, false -> "swt:cursor-pointer"
+            | None, _ -> "swt:cursor-default"
+
         let statusBadge =
             Html.span [
                 prop.className
-                    $"swt:badge swt:badge-sm swt:cursor-default swt:gap-0.5 {statusClassName} {statusShapeClass}"
+                    $"swt:badge swt:badge-sm swt:gap-0.5 {segmentCursorClass} {statusClassName} {statusShapeClass}"
                 prop.custom (
                     "data-lfs-download-status",
                     if isDownloaded then
@@ -150,22 +168,52 @@ type FileExplorerItem =
                 | Some size ->
                     Html.span [
                         prop.className
-                            "swt:badge swt:badge-sm swt:rounded-none swt:border-0 swt:cursor-default swt:bg-base-200 swt:text-base-content"
+                            $"swt:badge swt:badge-sm swt:rounded-none swt:border-0 {segmentCursorClass} swt:bg-base-200 swt:text-base-content"
                         prop.text size
                     ]
                 | None -> ()
             ]
 
-        Html.span [
-            prop.className "swt:inline-flex swt:overflow-hidden swt:rounded-full swt:border swt:border-base-300"
-            prop.ariaLabel statusAccessibilityText
-            prop.title statusAccessibilityText
-            prop.onClick (fun e ->
-                e.preventDefault ()
-                e.stopPropagation ()
-            )
-            prop.children badgeSegments
-        ]
+        let commonProps (className: string list) =
+            [
+                prop.className className
+                prop.ariaLabel pillAccessibilityText
+                prop.title pillAccessibilityText
+                prop.children badgeSegments
+            ]
+
+        let stopPillClick (e: Browser.Types.MouseEvent) =
+            e.preventDefault ()
+            e.stopPropagation ()
+
+        match lfsAction with
+        | Some action ->
+            Html.button [
+                prop.type'.button
+                prop.disabled isActionDisabled
+                yield!
+                    commonProps [
+                        "swt:inline-flex swt:m-0 swt:overflow-hidden swt:rounded-full swt:border swt:border-base-300 swt:bg-transparent swt:p-0 swt:align-middle swt:transition-colors"
+
+                        if isActionDisabled then
+                            "swt:cursor-not-allowed swt:opacity-70"
+                        else
+                            "swt:cursor-pointer swt:hover:border-primary swt:focus-visible:outline swt:focus-visible:outline-2 swt:focus-visible:outline-offset-2 swt:focus-visible:outline-primary"
+                    ]
+                prop.onClick (fun e ->
+                    stopPillClick e
+
+                    if not isActionDisabled then
+                        action.OnClick()
+                )
+            ]
+        | None ->
+            Html.span [
+                yield!
+                    commonProps
+                        [ "swt:inline-flex swt:overflow-hidden swt:rounded-full swt:border swt:border-base-300" ]
+                prop.onClick stopPillClick
+            ]
 
     [<ReactComponent>]
     static member DirectoryRow
@@ -184,6 +232,7 @@ type FileExplorerItem =
             ?itemActions: ContextMenuItem list,
             ?onDeleteItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool,
+            ?lfsPillAction: ContextMenuItem,
             ?children: ReactElement
         ) =
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
@@ -270,7 +319,9 @@ type FileExplorerItem =
                                             if item.IsLFS = Some true then
                                                 Html.div [
                                                     prop.className "swt:flex swt:items-center"
-                                                    prop.children [ FileExplorerItem.LFSStatusPill item ]
+                                                    prop.children [
+                                                        FileExplorerItem.LFSStatusPill(item, ?lfsAction = lfsPillAction)
+                                                    ]
                                                 ]
 
                                             if canExpandDirectory then
@@ -320,7 +371,8 @@ type FileExplorerItem =
             onSelect: unit -> unit,
             ?itemActions: ContextMenuItem list,
             ?onDeleteItem: FileItem -> unit,
-            ?canDeleteItem: FileItem -> bool
+            ?canDeleteItem: FileItem -> bool,
+            ?lfsPillAction: ContextMenuItem
         ) =
         let itemActions = defaultArg itemActions []
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
@@ -375,7 +427,7 @@ type FileExplorerItem =
                                     )
 
                                     if item.IsLFS = Some true then
-                                        FileExplorerItem.LFSStatusPill item
+                                        FileExplorerItem.LFSStatusPill(item, ?lfsAction = lfsPillAction)
                                 ]
                             ]
                     ]

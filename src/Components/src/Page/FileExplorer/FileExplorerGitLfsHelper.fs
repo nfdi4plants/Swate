@@ -90,9 +90,6 @@ let private downloadLfsMenuItem = lfsMenuItem "Download LFS file" "swt:fluent--c
 let private freeLocalLfsCopyMenuItem =
     lfsMenuItem "Free local LFS copy" "swt:fluent--document-arrow-up-20-regular"
 
-let private enabledLfsActionItems createItem action =
-    action |> Option.map (createItem false) |> Option.toList
-
 let private markedLfsActionItems isMarked isEnabled createItem action =
     match action with
     | Some handler when isEnabled || isMarked -> [ createItem (not isEnabled) handler ]
@@ -101,11 +98,11 @@ let private markedLfsActionItems isMarked isEnabled createItem action =
 let private lfsStatusMenuItem isMarked =
     menuItem (if isMarked then "Git LFS: marked" else "Git LFS: not marked") "swt:fluent--tag-24-regular" true ignore
 
-let fileActionItems (item: FileItem) onDownloadLfsFile onFreeLocalLfsCopy =
-    if item.IsDirectory then []
-    elif needsLfsDownload item then enabledLfsActionItems (downloadLfsMenuItem item) onDownloadLfsFile
-    elif hasLocalLfsCopy item then enabledLfsActionItems (freeLocalLfsCopyMenuItem item) onFreeLocalLfsCopy
-    else []
+let lfsPillAction (item: FileItem) onDownloadLfsFile onFreeLocalLfsCopy =
+    if item.IsDirectory then None
+    elif needsLfsDownload item then onDownloadLfsFile |> Option.map (downloadLfsMenuItem item false)
+    elif hasLocalLfsCopy item then onFreeLocalLfsCopy |> Option.map (freeLocalLfsCopyMenuItem item false)
+    else None
 
 let contextMenuItemsWithDownload
     (item: FileItem)

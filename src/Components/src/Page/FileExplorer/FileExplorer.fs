@@ -117,12 +117,14 @@ type FileExplorer =
             ?canCreateItem: FileItem -> bool,
             ?onCreateItem: FileItem -> unit,
             ?getItemActions: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem list,
+            ?getLfsPillAction: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem option,
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
             ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?useDirectoryChevronToggle: bool,
+            ?useParentHorizontalScroll: bool,
             ?showBreadcrumbs: bool,
             ?getItemIconClass: FileItem -> string option
         ) =
@@ -131,10 +133,12 @@ type FileExplorer =
         let initialModel = FileExplorerLogic.init (defaultArg initialItems [])
         let directoryInteractionMode = defaultArg directoryInteractionMode DirectoryInteractionMode.SingleClickToggle
         let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
+        let useParentHorizontalScroll = defaultArg useParentHorizontalScroll false
         let showBreadcrumbs = defaultArg showBreadcrumbs true
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
         let getItemActions = defaultArg getItemActions (fun (_: FileItem) -> [])
+        let getLfsPillAction = defaultArg getLfsPillAction (fun (_: FileItem) -> None)
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
@@ -163,6 +167,12 @@ type FileExplorer =
             let willExpand = not isExpanded
             dispatch (FileExplorerLogic.ToggleExpanded item.Id)
             onDirectoryArrowToggle |> Option.iter (fun fn -> fn item willExpand)
+
+        let scrollContainerClassName =
+            if useParentHorizontalScroll then
+                "swt:w-max swt:min-w-full"
+            else
+                "swt:w-full swt:overflow-x-auto"
 
         let contextMenu =
             ContextMenu.ContextMenu(
@@ -227,6 +237,7 @@ type FileExplorer =
                 | None -> true
 
             let itemActions = getItemActions item
+            let lfsPillAction = getLfsPillAction item
 
             if item.IsDirectory then
                 let childrenTree =
@@ -262,6 +273,7 @@ type FileExplorer =
                     itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
+                    ?lfsPillAction = lfsPillAction,
                     ?children = childrenTree
                 )
             else
@@ -273,7 +285,8 @@ type FileExplorer =
                     (fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch),
                     itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
-                    canDeleteItem = canDeleteItem
+                    canDeleteItem = canDeleteItem,
+                    ?lfsPillAction = lfsPillAction
                 )
 
         Html.div [
@@ -284,7 +297,7 @@ type FileExplorer =
                 //    Breadcrumbs.Breadcrumbs(model.BreadcrumbPath, fun id -> dispatch (FileExplorerLogic.NavigateTo id))
                 Html.div [
                     prop.testId "file-explorer-scroll-container"
-                    prop.className "swt:w-full swt:overflow-x-auto"
+                    prop.className scrollContainerClassName
                     prop.children [
                         Html.ul [
                             prop.testId "file-explorer-container"

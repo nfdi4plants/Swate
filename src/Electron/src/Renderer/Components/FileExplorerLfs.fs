@@ -75,7 +75,7 @@ let createContextMenuItems enqueueErrorModal arcScopeId baseItems =
         baseItems item
         @ Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItemsWithDownload item toggleLfsMark (Some downloadLfsFile) (Some freeLocalLfsCopy)
 
-let createFileActionItems enqueueErrorModal arcScopeId baseItems =
+let createLfsPillAction enqueueErrorModal arcScopeId =
     let downloadLfsFile =
         createDownloadLfsFile enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runDownloadLfsFile
 
@@ -83,5 +83,4 @@ let createFileActionItems enqueueErrorModal arcScopeId baseItems =
         createFreeLocalLfsCopy enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runFreeLocalLfsCopy
 
     fun item ->
-        baseItems item
-        @ Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.fileActionItems item (Some downloadLfsFile) (Some freeLocalLfsCopy)
+        Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.lfsPillAction item (Some downloadLfsFile) (Some freeLocalLfsCopy)

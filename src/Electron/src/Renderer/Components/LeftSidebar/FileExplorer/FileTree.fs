@@ -341,11 +341,8 @@ type FileTree =
                 arcScopeId
                 baseContextMenuItems
 
-        let createFileActionItems =
-            Renderer.Components.FileExplorerLfs.createFileActionItems
-                errorModal.enqueue
-                arcScopeId
-                renameContextMenuItems
+        let getLfsPillAction =
+            Renderer.Components.FileExplorerLfs.createLfsPillAction errorModal.enqueue arcScopeId
 
         let confirmRenameItem (newName: string) =
             FileTreeRenameWorkflow.confirmRenameItem
@@ -410,10 +407,12 @@ type FileTree =
                             getItemIconClass = getItemIconClass,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
-                            getItemActions = createFileActionItems,
+                            getItemActions = renameContextMenuItems,
+                            getLfsPillAction = getLfsPillAction,
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
+                            useParentHorizontalScroll = true,
                             showBreadcrumbs = false
                         )
                     ]
