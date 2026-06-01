@@ -6,7 +6,7 @@ open Swate.Components.Page.FileExplorer.Types
 open Vitest
 
 let private createConfig () : PathActionConfig = {
-    showPathInFileExplorer = fun _ -> promise { return Ok() }
+    openPathInFileExplorer = fun _ -> promise { return Ok() }
     openPathWithDefaultApplication = fun _ -> promise { return Ok() }
     enqueueError = ignore
     arcScopeId = None

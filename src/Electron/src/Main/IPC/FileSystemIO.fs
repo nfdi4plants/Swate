@@ -7,6 +7,7 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
 
+
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
@@ -80,44 +81,18 @@ let tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) 
         else
             Error(exn "RelativePath resolves outside the ARC root.")
 
-let mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> = promise {
-    let mkdirPromise =
-        fsPromisesDynamic?mkdir (directoryPath, createObj [ "recursive" ==> true ])
-        |> unbox<JS.Promise<obj>>
-
-    let! _ = mkdirPromise
-    return ()
-}
-
-let writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Promise<unit> = promise {
-    let writePromise =
-        fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
-        |> unbox<JS.Promise<obj>>
-
-    let! _ = writePromise
-    return ()
-}
-
-let readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
-    fsPromisesDynamic?readFile (absolutePath, "utf8") |> unbox<JS.Promise<string>>
 
 let pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
-    try
-        let! _ = fsPromisesDynamic?access (absolutePath) |> unbox<JS.Promise<obj>>
+    let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
+
+    if fileExists then
         return true
-    with _ ->
-        return false
+    else
+        return! ARCtrl.FileSystemHelper.directoryExistsAsync absolutePath
 }
 
-let isDirectoryAsync (absolutePath: string) : JS.Promise<bool> = promise {
-    let! stats = fsPromisesDynamic?stat (absolutePath) |> unbox<JS.Promise<obj>>
-    return stats?isDirectory () |> unbox<bool>
-}
-
-let mkdirAsync (directoryPath: string) : JS.Promise<unit> = promise {
-    let! _ = fsPromisesDynamic?mkdir (directoryPath) |> unbox<JS.Promise<obj>>
-    return ()
-}
+let mkdirAsync (directoryPath: string) : JS.Promise<unit> =
+    ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
 
 let tryGetNodeErrorCode (error: exn) : string option =
     try
@@ -218,7 +193,7 @@ module ArcFileSystemHelper =
 
     let private createTargetAsync kind targetAbsolutePath =
         match kind with
-        | FileSystemItemKind.File -> writeUtf8FileAsync targetAbsolutePath ""
+        | FileSystemItemKind.File -> ARCtrl.FileSystemHelper.writeFileTextAsync targetAbsolutePath ""
         | FileSystemItemKind.Folder -> mkdirAsync targetAbsolutePath
 
     let tryBuildCreateFileSystemItemPlan
@@ -245,7 +220,7 @@ module ArcFileSystemHelper =
                 | Error pathError -> return Error pathError
                 | Ok(parentAbsolutePath, targetAbsolutePath) ->
                     try
-                        let! parentIsDirectory = isDirectoryAsync parentAbsolutePath
+                        let! parentIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync parentAbsolutePath
 
                         if parentIsDirectory |> not then
                             return Error(exn $"Cannot create item because '{plan.ParentPath}' is not a folder.")

@@ -11,7 +11,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 
 type PathActionConfig = {
-    showPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
+    openPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
     openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>
     enqueueError: ErrorModalRequest -> unit
     arcScopeId: string option
@@ -114,7 +114,7 @@ let private pathActionContextMenuItemsForRelativePath
                 runPathAction
                     config
                     "Open folder location failed"
-                    config.showPathInFileExplorer
+                    config.openPathInFileExplorer
                     relativePath)
     ]
 

@@ -7,18 +7,12 @@ open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.RenamePathRules
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Fable.Core.JsInterop
 open Main
-open Main.ArcMerge
-open Main.ArcVaultHelper
 open Node.Api
-open ARCtrl
 open ARCtrl.Contract
-open ARC
 open Main.IPC.FileSystemIO
 open Main.IPC.Delete
 open Main.IPC.Rename
@@ -310,7 +304,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                     for filePath in result.filePaths do
                         let absolutePath = resolveAbsolutePath filePath
-                        let! content = readUtf8FileAsync absolutePath
+                        let! content = ARCtrl.FileSystemHelper.readFileTextAsync absolutePath
 
                         importedFiles.Add {
                             Name = path.basename absolutePath
@@ -567,8 +561,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match request.fileType with
                                 | DTOType.DTOTypeIsPlainTextVariant ->
                                     let directoryPath = path.dirname absolutePath
-                                    do! mkdirRecursiveAsync directoryPath
-                                    do! writeUtf8FileAsync absolutePath request.content
+                                    do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
+                                    do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
                                     do! vault.RefreshFileTree()
                                     return Ok()
                                 | DTOType.CLI -> return Error(exn "Direct writing of CLI files is not supported.")
