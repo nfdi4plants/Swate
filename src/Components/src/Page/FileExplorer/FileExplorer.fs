@@ -1,8 +1,6 @@
 namespace Swate.Components.Page.FileExplorer
 
 open Swate.Components
-open Swate.Components.Primitive.ContextMenu
-open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Page.FileExplorer.Types
 open Fable.Core
 open Fable.Core.JsInterop
@@ -108,40 +106,6 @@ module private FileExplorerHelper =
 
         defaultItems @ customItems
 
-    let toComponentMenuItem (item: Swate.Components.Page.FileExplorer.Types.ContextMenuItem) =
-        if defaultArg item.IsDivider false then
-            ContextMenuItem(isDivider = true)
-        else
-            let isDisabled = defaultArg item.Disabled false
-
-            let className =
-                [
-                    item.ClassName
-
-                    if isDisabled then
-                        Some "swt:opacity-50"
-                ]
-                |> List.choose id
-                |> String.concat " "
-
-            ContextMenuItem(
-                text = Html.span [ prop.className className; prop.text item.Label ],
-                icon =
-                    Html.i [
-                        prop.className [
-                            "swt:iconify " + item.Icon
-
-                            if not (System.String.IsNullOrWhiteSpace className) then
-                                className
-                        ]
-                    ],
-                onClick =
-                    (fun _ ->
-                        if not isDisabled then
-                            item.OnClick()
-                    )
-            )
-
 // ---------------------------------------------------------------------------
 [<Mangle(false); Erase>]
 type FileExplorer =
@@ -209,7 +173,7 @@ type FileExplorer =
             onDirectoryArrowToggle |> Option.iter (fun fn -> fn item willExpand)
 
         let contextMenu =
-            ContextMenu.ContextMenu(
+            Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
                 (fun data ->
                     let item = data |> unbox<FileItem>
                     FileExplorerHelper.getContextMenuItems
@@ -221,7 +185,7 @@ type FileExplorer =
                         getCopyRelativePath
                         includeDefaultContextMenuItems
                         dispatch
-                    |> List.map FileExplorerHelper.toComponentMenuItem
+                    |> List.map Swate.Components.Page.FileExplorer.Helper.toPrimitiveContextMenuItem
                 ),
                 ref = containerRef,
                 onSpawn =

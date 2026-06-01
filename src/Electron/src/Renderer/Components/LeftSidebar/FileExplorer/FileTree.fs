@@ -41,7 +41,7 @@ type FileTree =
         ]
 
     [<ReactComponent>]
-    static member FileTree() =
+    static member FileTree(rootContextMenuRef: IRefValue<Browser.Types.HTMLElement option>) =
 
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
@@ -358,8 +358,7 @@ type FileTree =
         let renameContextMenuItems =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
-        let createContextMenuItems =
-            FileTreeContextMenu.createContextMenuItems {
+        let contextMenuConfig: FileTreeContextMenu.ContextMenuConfig = {
                 openItem = openPreview
                 arcRootPath = appStateCtx
                 openCreateModal = openCreateModal
@@ -377,6 +376,20 @@ type FileTree =
                 runToggleLfsMark = Renderer.Components.ARCHelper.runToggleLfsMark
                 runFreeLocalLfsCopy = Renderer.Components.ARCHelper.runFreeLocalLfsCopy
             }
+
+        let createContextMenuItems =
+            FileTreeContextMenu.createContextMenuItems contextMenuConfig
+
+        let rootContextMenu rootItem =
+            let rootMenuItem = { rootItem with Path = Some ""; IsDirectory = true }
+
+            Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
+                (fun _ ->
+                    FileTreeContextMenu.rootContextMenuItems contextMenuConfig rootMenuItem
+                    |> List.map Swate.Components.Page.FileExplorer.Helper.toPrimitiveContextMenuItem),
+                ref = rootContextMenuRef,
+                onSpawn = (fun _ -> Some(box ()))
+            )
 
         let confirmRenameItem (newName: string) =
             FileTreeRenameWorkflow.confirmRenameItem
@@ -465,6 +478,7 @@ type FileTree =
                         )
                     ]
                 ]
+                rootContextMenu rootItem
                 arcCreateModal
                 fileSystemCreateModal
                 renameModal

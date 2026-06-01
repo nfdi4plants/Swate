@@ -120,7 +120,9 @@ let tryGetItemRelativePath (item: FileItem) =
 let canCreateFileSystemItemIn (item: FileItem) =
     item.IsDirectory
     && (tryGetItemRelativePath item
-        |> Option.exists ArcDeletePathRules.isGenericFileSystemParentAllowed)
+        |> Option.exists (fun path ->
+            String.IsNullOrWhiteSpace path
+            || ArcDeletePathRules.isGenericFileSystemParentAllowed path))
 
 let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
 

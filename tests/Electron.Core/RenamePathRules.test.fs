@@ -61,6 +61,35 @@ Vitest.describe("RenamePathRules", fun () ->
         rejectedTargets
         |> List.iter (fun path -> Vitest.expect(ArcDeletePathRules.isGenericFileSystemTargetAllowed path).toBe(false))
     )
+
+    Vitest.test("root-level generic filesystem child paths are allowed for safe targets only", fun () ->
+        match tryBuildGenericFileSystemChildPath "" "docs" with
+        | Ok targetPath -> Vitest.expect(targetPath).toBe("docs")
+        | Error errorMessage -> failwith errorMessage
+
+        match tryBuildGenericFileSystemChildPath "" "notes.txt" with
+        | Ok targetPath -> Vitest.expect(targetPath).toBe("notes.txt")
+        | Error errorMessage -> failwith errorMessage
+
+        let rejectedRootTargets = [
+            "studies"
+            "assays"
+            "workflows"
+            "runs"
+            "isa.investigation.xlsx"
+            ".git"
+            ".gitkeep"
+            "readme.md"
+            "../escape"
+        ]
+
+        rejectedRootTargets
+        |> List.iter (fun name ->
+            match tryBuildGenericFileSystemChildPath "" name with
+            | Ok targetPath -> failwith $"Expected root target '{targetPath}' to be rejected."
+            | Error _ -> ()
+        )
+    )
 )
 
 Vitest.describe("PathHelpers path relation helpers", fun () ->

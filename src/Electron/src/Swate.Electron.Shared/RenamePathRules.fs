@@ -59,7 +59,11 @@ let tryBuildRenameTargetPath (sourcePath: string) (newName: string) =
 let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
     let normalizedParentPath = normalizeRelativePath parentPath
 
-    if ArcDeletePathRules.isGenericFileSystemParentAllowed normalizedParentPath |> not then
+    let parentIsAllowed =
+        String.IsNullOrWhiteSpace normalizedParentPath
+        || ArcDeletePathRules.isGenericFileSystemParentAllowed normalizedParentPath
+
+    if parentIsAllowed |> not then
         Error "Generic file and folder creation is only allowed inside safe ARC directories."
     else
         match validateRenameName name with

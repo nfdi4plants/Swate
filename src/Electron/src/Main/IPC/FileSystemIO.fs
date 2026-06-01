@@ -182,6 +182,25 @@ module ArcFileSystemHelper =
         | _, Error pathError -> Error pathError
         | Ok firstAbsolutePath, Ok secondAbsolutePath -> Ok(firstAbsolutePath, secondAbsolutePath)
 
+    let private resolveCreatePathPair arcPath parentRelativePath targetRelativePath =
+        let normalizedParentPath =
+            parentRelativePath
+            |> PathHelpers.normalizeCanonicalRelativePath
+
+        let parentPath =
+            if String.IsNullOrWhiteSpace normalizedParentPath then
+                Ok(resolveAbsolutePath arcPath)
+            else
+                tryResolveArcRelativePath arcPath normalizedParentPath
+
+        match
+            parentPath,
+            tryResolveArcRelativePath arcPath targetRelativePath
+        with
+        | Error pathError, _
+        | _, Error pathError -> Error pathError
+        | Ok parentAbsolutePath, Ok targetAbsolutePath -> Ok(parentAbsolutePath, targetAbsolutePath)
+
     let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
         let! targetExists = pathExistsAsync targetAbsolutePath
 
@@ -216,7 +235,7 @@ module ArcFileSystemHelper =
             match tryBuildCreateFileSystemItemPlan request with
             | Error validationError -> return Error validationError
             | Ok plan ->
-                match resolveArcRelativePathPair arcPath plan.ParentPath plan.TargetPath with
+                match resolveCreatePathPair arcPath plan.ParentPath plan.TargetPath with
                 | Error pathError -> return Error pathError
                 | Ok(parentAbsolutePath, targetAbsolutePath) ->
                     try

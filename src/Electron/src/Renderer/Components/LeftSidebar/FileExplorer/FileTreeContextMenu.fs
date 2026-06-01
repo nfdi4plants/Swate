@@ -172,6 +172,12 @@ let fileSystemCreateContextMenuItems
     else
         []
 
+let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
+    withDividers [
+        fileSystemCreateContextMenuItems config.openFileSystemCreateModal rootItem
+        arcCreateContextMenuItems config.openCreateModal rootItem
+    ]
+
 let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
     if canRenameItem item then
         [
