@@ -8,9 +8,6 @@ open Swate.Components.Shared
 [<AutoOpen>]
 module ArcAddExtensions =
 
-    let private formatContractErrors (errors: string[]) =
-        errors |> Array.map string |> String.concat "\n"
-
     let private failIfEntityExists (entityKind: string) (identifier: string) (exists: bool) =
         if exists then
             failwith $"ARC already contains {entityKind} with identifier '{identifier}'."
@@ -75,5 +72,7 @@ module ArcAddExtensions =
                 match result with
                 | Ok _ -> ()
                 | Error errors ->
-                    failwithf "Could not add ARC file, failed with the following errors %s" (formatContractErrors errors)
+                    failwithf
+                        "Could not add ARC file, failed with the following errors %s"
+                        (PathHelpers.formatContractErrors errors)
             }

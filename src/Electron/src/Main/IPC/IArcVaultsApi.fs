@@ -434,45 +434,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match vault.arc with
                                 | None -> return Error(exn "ARC is not loaded.")
                                 | Some arcLocal ->
-                                    match ArcRenameHelper.tryBuildRenamePlan arcLocal request with
-                                    | Error validationError -> return Error validationError
-                                    | Ok renamePlan ->
-                                        match tryResolveArcRelativePath arcPath renamePlan.TargetPath with
-                                        | Error pathError -> return Error pathError
-                                        | Ok targetAbsolutePath ->
-                                            let! targetExists = pathExistsAsync targetAbsolutePath
+                                    let wasBusyWriting = vault.isBusyWriting
+                                    vault.isBusyWriting <- true
 
-                                            if targetExists then
-                                                return
-                                                    Error(
-                                                        exn
-                                                            $"Cannot rename '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}' because the destination already exists."
-                                                    )
-                                            else
-                                                let wasBusyWriting = vault.isBusyWriting
-                                                vault.isBusyWriting <- true
-
-                                                try
-                                                    match!
-                                                        ArcRenameHelper.renameArcEntityAsync
-                                                            arcPath
-                                                            renamePlan
-                                                            arcLocal
-                                                    with
-                                                    | Error renameError ->
-                                                        return
-                                                            Error(
-                                                                mapRenameDiskError
-                                                                    renamePlan.SourcePath
-                                                                    renamePlan.TargetPath
-                                                                    renameError
-                                                            )
-                                                    | Ok renamedArc ->
-                                                        vault.SetArc renamedArc
-                                                        vault.RefreshHasUnsavedArcChangesFlag()
-                                                        return Ok()
-                                                finally
-                                                    vault.isBusyWriting <- wasBusyWriting
+                                    try
+                                        match! ArcRenameHelper.renameArcEntityAsync arcPath request arcLocal with
+                                        | Error renameError -> return Error renameError
+                                        | Ok renamedArc ->
+                                            vault.SetArc renamedArc
+                                            vault.RefreshHasUnsavedArcChangesFlag()
+                                            return Ok()
+                                    finally
+                                        vault.isBusyWriting <- wasBusyWriting
                         }
                     )
             with e ->

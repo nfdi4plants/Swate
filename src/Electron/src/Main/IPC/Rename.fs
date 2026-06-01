@@ -1,7 +1,11 @@
 module Main.IPC.Rename
 
+open System
 open Fable.Core
 open ARCtrl
+open Main.ArcMerge
+open Main.ArcVaultHelper
+open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
@@ -9,18 +13,6 @@ open ARC
 
 [<RequireQualifiedAccess>]
 module ArcRenameHelper =
-
-    type IdentifierRenameSyncPlan = {
-        FileType: ArcFilesDiscriminate
-        OldIdentifier: string
-        NewIdentifier: string
-    }
-
-    type RenamePlan = {
-        SourcePath: string
-        TargetPath: string
-        SyncPlan: IdentifierRenameSyncPlan
-    }
 
     let private normalizeRelativePathForComparison (path: string) =
         path
@@ -72,31 +64,145 @@ module ArcRenameHelper =
         ArcDeletePathRules.buildCanonicalEntityPaths zone identifier
         |> List.head
 
-    /// Performs the ARCtrl entity rename contract matching the plan's ARC file type.
-    let renameArcEntityAsync (arcPath: string) (renamePlan: RenamePlan) (arc: ARC) : JS.Promise<Result<ARC, exn>> =
-        let syncPlan = renamePlan.SyncPlan
+    let private tryRenameEntityOnDiskAsync
+        arcPath
+        fileType
+        oldIdentifier
+        newIdentifier
+        (arc: ARC)
+        =
+        match fileType with
+        | ArcFilesDiscriminate.Assay ->
+            arc.TryRenameAssayAsync(arcPath, oldIdentifier, newIdentifier)
+        | ArcFilesDiscriminate.Study ->
+            arc.TryRenameStudyAsync(arcPath, oldIdentifier, newIdentifier)
+        | ArcFilesDiscriminate.Workflow ->
+            arc.TryRenameWorkflowAsync(arcPath, oldIdentifier, newIdentifier)
+        | ArcFilesDiscriminate.Run ->
+            arc.TryRenameRunAsync(arcPath, oldIdentifier, newIdentifier)
+        | fileType -> promise { return Error [| $"Renaming {fileType} is not supported." |] }
 
-        let renameAsync =
-            match syncPlan.FileType with
-            | ArcFilesDiscriminate.Assay ->
-                arc.RenameAssayAsync(arcPath, syncPlan.OldIdentifier, syncPlan.NewIdentifier)
-            | ArcFilesDiscriminate.Study ->
-                arc.RenameStudyAsync(arcPath, syncPlan.OldIdentifier, syncPlan.NewIdentifier)
-            | ArcFilesDiscriminate.Workflow ->
-                arc.RenameWorkflowAsync(arcPath, syncPlan.OldIdentifier, syncPlan.NewIdentifier)
-            | ArcFilesDiscriminate.Run ->
-                arc.RenameRunAsync(arcPath, syncPlan.OldIdentifier, syncPlan.NewIdentifier)
-            | fileType -> promise { return failwith $"Renaming {fileType} is not supported." }
+    let private applyInMemoryRename fileType oldIdentifier newIdentifier (arc: ARC) =
+        match fileType with
+        | ArcFilesDiscriminate.Assay -> arc.RenameAssay(oldIdentifier, newIdentifier)
+        | ArcFilesDiscriminate.Study -> arc.RenameStudy(oldIdentifier, newIdentifier)
+        | ArcFilesDiscriminate.Workflow -> arc.RenameWorkflow(oldIdentifier, newIdentifier)
+        | ArcFilesDiscriminate.Run -> arc.RenameRun(oldIdentifier, newIdentifier)
+        | fileType -> failwith $"Renaming {fileType} is not supported."
 
+    let private remapArcFileSystemPaths sourcePath targetPath (arc: ARC) =
+        let normalizedSourcePath = normalizeRelativePathForComparison sourcePath
+        let normalizedTargetPath = normalizeRelativePathForComparison targetPath
+        let sourcePrefix = normalizedSourcePath + "/"
+
+        let remappedPaths =
+            arc.FileSystem.Tree.ToFilePaths()
+            |> Array.map (fun path ->
+                let normalizedPath = normalizeRelativePathForComparison path
+
+                if PathHelpers.pathsEqual normalizedPath normalizedSourcePath then
+                    normalizedTargetPath
+                elif normalizedPath.StartsWith(sourcePrefix, StringComparison.OrdinalIgnoreCase) then
+                    normalizedTargetPath + normalizedPath.Substring(normalizedSourcePath.Length)
+                else
+                    normalizedPath
+            )
+
+        arc.SetFilePaths(remappedPaths)
+
+    let private mergeRenamedEntityFromDisk
+        arcPath
+        sourcePath
+        targetPath
+        fileType
+        oldIdentifier
+        newIdentifier
+        (arcLocal: ARC)
+        =
         promise {
-            try
-                do! renameAsync
-                return Ok arc
-            with renameError ->
+            match! ARC.tryLoadAsync arcPath with
+            | Error errors ->
                 return
                     Error(
                         exn
-                            $"Could not rename ARC entity from '{renamePlan.SourcePath}' to '{renamePlan.TargetPath}': {renameError.Message}"
+                            $"Renamed ARC entity, but could not reload the ARC from disk: {PathHelpers.formatContractErrors errors}"
+                    )
+            | Ok persistedArc ->
+                baselineArcStaticHashes persistedArc
+                let renamedArc = copyArcPreservingStaticHashes arcLocal
+                applyInMemoryRename fileType oldIdentifier newIdentifier renamedArc
+                remapArcFileSystemPaths sourcePath targetPath renamedArc
+                syncArcStaticHashes persistedArc renamedArc
+                return Ok renamedArc
+        }
+
+    let private renameResolvedArcEntityAsync
+        (arcPath: string)
+        sourcePath
+        targetPath
+        canonicalSourcePath
+        fileType
+        oldIdentifier
+        newIdentifier
+        (arcLocal: ARC)
+        : JS.Promise<Result<ARC, exn>> =
+        promise {
+            try
+                match tryResolveArcRelativePath arcPath targetPath with
+                | Error pathError -> return Error pathError
+                | Ok targetAbsolutePath ->
+                    let! targetExists = pathExistsAsync targetAbsolutePath
+
+                    if targetExists then
+                        return
+                            Error(
+                                exn
+                                    $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
+                            )
+                    else
+                        match! ARC.tryLoadAsync arcPath with
+                        | Error errors ->
+                            return
+                                Error(
+                                    exn
+                                        $"Could not load ARC from disk before renaming '{sourcePath}': {PathHelpers.formatContractErrors errors}"
+                                )
+                        | Ok diskArc ->
+                            match tryEnsureArcEntityResolved fileType oldIdentifier canonicalSourcePath diskArc with
+                            | Error resolutionError -> return Error resolutionError
+                            | Ok() ->
+                                match!
+                                    tryRenameEntityOnDiskAsync
+                                        arcPath
+                                        fileType
+                                        oldIdentifier
+                                        newIdentifier
+                                        diskArc
+                                with
+                                | Error errors ->
+                                    return
+                                        Error(
+                                            exn
+                                                $"Could not rename ARC entity from '{sourcePath}' to '{targetPath}': {PathHelpers.formatContractErrors errors}"
+                                        )
+                                | Ok _ ->
+                                    return!
+                                        mergeRenamedEntityFromDisk
+                                            arcPath
+                                            sourcePath
+                                            targetPath
+                                            fileType
+                                            oldIdentifier
+                                            newIdentifier
+                                            arcLocal
+            with renameError ->
+                let mappedError =
+                    mapRenameDiskError sourcePath targetPath renameError
+
+                return
+                    Error(
+                        exn
+                            $"Could not rename ARC entity from '{sourcePath}' to '{targetPath}': {mappedError.Message}"
                     )
         }
 
@@ -119,29 +225,34 @@ module ArcRenameHelper =
         | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
             Error(exn "Renaming generic files or folders uses the generic filesystem rename path.")
 
-    let tryBuildRenamePlan (arc: ARC) (request: RenamePathRequest) : Result<RenamePlan, exn> =
-        let requestedRelativePath = normalizeRelativePathForComparison request.relativePath
-        let sourceClassification = ArcDeletePathRules.classifyRenameTarget requestedRelativePath
+    /// Performs the ARCtrl entity rename contract for an entity-folder rename request.
+    let renameArcEntityAsync (arcPath: string) (request: RenamePathRequest) (arcLocal: ARC) : JS.Promise<Result<ARC, exn>> =
+        promise {
+            let requestedRelativePath = normalizeRelativePathForComparison request.relativePath
+            let sourceClassification = ArcDeletePathRules.classifyRenameTarget requestedRelativePath
 
-        match validateEntityRenameSourceClassification sourceClassification with
-        | Error validationError -> Error validationError
-        | Ok(sourceZone, sourceIdentifier, sourcePath) ->
-            let sourceFileType = arcFileTypeForZone sourceZone
+            match validateEntityRenameSourceClassification sourceClassification with
+            | Error validationError -> return Error validationError
+            | Ok(sourceZone, sourceIdentifier, sourcePath) ->
+                let sourceFileType = arcFileTypeForZone sourceZone
+                let canonicalSourcePath = canonicalEntityFilePath sourceZone sourceIdentifier
 
-            match tryEnsureArcEntityResolved sourceFileType sourceIdentifier (canonicalEntityFilePath sourceZone sourceIdentifier) arc with
-            | Error resolutionError -> Error resolutionError
-            | Ok() ->
-                match tryBuildRenameTargetPath sourcePath request.newName with
-                | Error targetPathError -> Error(exn targetPathError)
-                | Ok targetPath ->
-                    let targetIdentifier = PathHelpers.getNameFromPath targetPath
+                match tryEnsureArcEntityResolved sourceFileType sourceIdentifier canonicalSourcePath arcLocal with
+                | Error resolutionError -> return Error resolutionError
+                | Ok() ->
+                    match tryBuildRenameTargetPath sourcePath request.newName with
+                    | Error targetPathError -> return Error(exn targetPathError)
+                    | Ok targetPath ->
+                        let targetIdentifier = PathHelpers.getNameFromPath targetPath
 
-                    Ok {
-                        SourcePath = sourcePath
-                        TargetPath = targetPath
-                        SyncPlan = {
-                            FileType = sourceFileType
-                            OldIdentifier = sourceIdentifier
-                            NewIdentifier = targetIdentifier
-                        }
-                    }
+                        return!
+                            renameResolvedArcEntityAsync
+                                arcPath
+                                sourcePath
+                                targetPath
+                                canonicalSourcePath
+                                sourceFileType
+                                sourceIdentifier
+                                targetIdentifier
+                                arcLocal
+        }
