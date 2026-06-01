@@ -6,6 +6,9 @@ open System
 [<RequireQualifiedAccess>]
 module PathHelpers =
 
+    let formatContractErrors (errors: string[]) =
+        errors |> Array.map string |> String.concat "\n"
+
     /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
     let normalizeSeparators (path: string) = path.Replace("\\", "/")
 

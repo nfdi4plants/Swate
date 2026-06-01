@@ -318,7 +318,7 @@ let private repairZeroByteCanonicalArcFile
                     windowId
                     "Unable to repair zero-byte ARC workbook '%s': %s"
                     relativePath
-                    (errors |> Array.map string |> String.concat "\n")
+                    (PathHelpers.formatContractErrors errors)
 
                 return false
         | _ -> return false

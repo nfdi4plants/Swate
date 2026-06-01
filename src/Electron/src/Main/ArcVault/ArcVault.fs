@@ -2,13 +2,11 @@
 module Main.ArcVault
 
 open System.Collections.Generic
-open Fable.Core
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Bindings
 open Main.ArcMerge
-open Main.ArcVaultTypes
 open Main.ArcVaultHelper
 open Swate.Components.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -74,7 +72,7 @@ module ArcVaultExtensions =
                     swatelogfn
                         this.window.id
                         "Unable to reload ARC after file watcher event: %s"
-                        (loadError |> Array.map string |> String.concat "\n")
+                        (PathHelpers.formatContractErrors loadError)
                 | Ok reloadedArc ->
                     let! mergeResult =
                         promise {
@@ -235,9 +233,7 @@ module ArcVaultExtensions =
                             return
                                 Error(
                                     exn(
-                                        errors
-                                        |> Array.map string
-                                        |> String.concat "\n"
+                                        PathHelpers.formatContractErrors errors
                                     )
                                 )
                         | Ok _ ->
@@ -255,7 +251,7 @@ module ArcVaultExtensions =
                                     Error(
                                         exn(
                                             "Added ARC file, but could not reload the persisted hash baseline: "
-                                            + (loadErrors |> Array.map string |> String.concat "\n")
+                                            + (PathHelpers.formatContractErrors loadErrors)
                                         )
                                     )
                     finally
@@ -296,7 +292,7 @@ module ArcVaultExtensions =
                     swatefailfn
                         this.window.id
                         "Unable to load ARC: %s"
-                        (e |> Array.map string |> String.concat "\n")
+                        (PathHelpers.formatContractErrors e)
                 | Ok arc ->
                     this.SetArc(arc)
                     this.RefreshHasUnsavedArcChangesFlag()

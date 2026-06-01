@@ -10,9 +10,6 @@ open ARC
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-    let private formatContractErrors (errors: string[]) =
-        errors |> Array.map string |> String.concat "\n"
-
     let private arcFileTypeForZone =
         function
         | ArcDeletePathRules.AddZone.Assays -> ArcFilesDiscriminate.Assay
@@ -73,7 +70,7 @@ module ArcDeleteHelper =
             return
                 Error(
                     exn
-                        $"Deleted ARC entity, but could not reload the ARC from disk: {formatContractErrors errors}"
+                        $"Deleted ARC entity, but could not reload the ARC from disk: {PathHelpers.formatContractErrors errors}"
                 )
         | Ok diskArc ->
             // The IPC delete path suppresses watcher ARC merges, so apply the same unlink event explicitly.
@@ -129,7 +126,7 @@ module ArcDeleteHelper =
                         return
                             Error(
                                 exn
-                                    $"Could not load ARC from disk before deleting '{normalizedRelativePath}': {formatContractErrors errors}"
+                                    $"Could not load ARC from disk before deleting '{normalizedRelativePath}': {PathHelpers.formatContractErrors errors}"
                             )
                     | Ok diskArc ->
                         match tryEnsureArcEntityResolved fileType identifier canonicalFilePath diskArc with
@@ -140,7 +137,7 @@ module ArcDeleteHelper =
                                 return
                                     Error(
                                         exn
-                                            $"Could not delete ARC entity at '{normalizedRelativePath}': {formatContractErrors errors}"
+                                            $"Could not delete ARC entity at '{normalizedRelativePath}': {PathHelpers.formatContractErrors errors}"
                                     )
                             | Ok _ ->
                                 return! mergeDeletedEntityFromDisk arcPath canonicalFilePath arc
