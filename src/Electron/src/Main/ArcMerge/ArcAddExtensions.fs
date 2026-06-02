@@ -12,17 +12,6 @@ module ArcAddExtensions =
         if exists then
             failwith $"ARC already contains {entityKind} with identifier '{identifier}'."
 
-    let private getContractsFromWorkingArc
-        (workingArc: ARC)
-        (arcFileContracts: unit -> Contract[])
-        (includeUpdateContractsFlag: bool option)
-        =
-        workingArc.UpdateFileSystem()
-
-        match includeUpdateContractsFlag with
-        | Some true -> workingArc.GetUpdateContracts(skipUpdateFS = true)
-        | _ -> arcFileContracts ()
-
     let private prepareEntityAddContracts
         (sourceArc: ARC)
         (entityKind: string)
@@ -35,9 +24,12 @@ module ArcAddExtensions =
         failIfEntityExists entityKind identifier exists
         let workingArc = copyArcPreservingStaticHashes sourceArc
         addToArc workingArc
+        workingArc.UpdateFileSystem()
 
         let contracts =
-            getContractsFromWorkingArc workingArc arcFileContracts includeUpdateContractsFlag
+            match includeUpdateContractsFlag with
+            | Some true -> workingArc.GetUpdateContracts(skipUpdateFS = true)
+            | _ -> arcFileContracts ()
 
         workingArc, contracts
 
@@ -95,16 +87,16 @@ module ArcAddExtensions =
         match arcFile with
         | ArcFiles.Assay assay ->
             workingArc.TryGetAssay assay.Identifier
-            |> Option.iter (fun sourceAssay -> targetArc.SetAssay(assay.Identifier, sourceAssay.Copy()))
+            |> Option.iter (fun sourceAssay -> targetArc.AddAssay(sourceAssay.Copy()))
         | ArcFiles.Study(study, _) ->
             workingArc.TryGetStudy study.Identifier
-            |> Option.iter (fun sourceStudy -> targetArc.SetStudy(study.Identifier, sourceStudy.Copy()))
+            |> Option.iter (fun sourceStudy -> targetArc.AddStudy(sourceStudy.Copy()))
         | ArcFiles.Run run ->
             workingArc.TryGetRun run.Identifier
-            |> Option.iter (fun sourceRun -> targetArc.SetRun(run.Identifier, sourceRun.Copy()))
+            |> Option.iter (fun sourceRun -> targetArc.AddRun(sourceRun.Copy()))
         | ArcFiles.Workflow workflow ->
             workingArc.TryGetWorkflow workflow.Identifier
-            |> Option.iter (fun sourceWorkflow -> targetArc.SetWorkflow(workflow.Identifier, sourceWorkflow.Copy()))
+            |> Option.iter (fun sourceWorkflow -> targetArc.AddWorkflow(sourceWorkflow.Copy()))
         | _ -> ()
 
         targetArc.UpdateFileSystem()
