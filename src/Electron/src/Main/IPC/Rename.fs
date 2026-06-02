@@ -155,30 +155,30 @@ module ArcRenameHelper =
                     )
         }
 
-    let private validateEntityRenameSourceClassification (classification: ArcDeletePathRules.RenamePathClassification) =
+    let private validateEntityRenameSourceClassification (classification: ArcEntityPathRules.RenamePathClassification) =
         match classification with
-        | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
+        | ArcEntityPathRules.RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
             Ok(zone, identifier, normalizedRelativePath)
-        | ArcDeletePathRules.RenamePathClassification.RootTarget -> Error(exn "Renaming the ARC root is not allowed.")
-        | ArcDeletePathRules.RenamePathClassification.DisallowedTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.RootTarget -> Error(exn "Renaming the ARC root is not allowed.")
+        | ArcEntityPathRules.RenamePathClassification.DisallowedTarget _ ->
             Error(exn "Rename path must not contain path traversal segments.")
-        | ArcDeletePathRules.RenamePathClassification.ProtectedTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.ProtectedTarget _ ->
             Error(exn "Renaming protected files (for example .gitkeep or readme.md) is not allowed.")
-        | ArcDeletePathRules.RenamePathClassification.InvestigationFileTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.InvestigationFileTarget _ ->
             Error(exn "Renaming the investigation file is not supported.")
-        | ArcDeletePathRules.RenamePathClassification.AddZoneRootTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.AddZoneRootTarget _ ->
             Error(exn "Renaming add-zone root folders (studies/, assays/, workflows/, runs/) is not allowed.")
-        | ArcDeletePathRules.RenamePathClassification.CanonicalEntityFileTarget _
-        | ArcDeletePathRules.RenamePathClassification.CanonicalDataMapFileTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.CanonicalEntityFileTarget _
+        | ArcEntityPathRules.RenamePathClassification.CanonicalDataMapFileTarget _ ->
             Error(exn "Renaming canonical ARC files is not supported. Rename the containing ARC entity folder instead.")
-        | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
             Error(exn "Renaming generic files or folders uses the generic filesystem rename path.")
 
     /// Performs the ARCtrl entity rename contract for an entity-folder rename request.
     let renameArcEntityAsync (arcPath: string) (request: RenamePathRequest) (arcLocal: ARC) : JS.Promise<Result<ARC, exn>> =
         promise {
             let requestedRelativePath = request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
-            let sourceClassification = ArcDeletePathRules.classifyRenameTarget requestedRelativePath
+            let sourceClassification = ArcEntityPathRules.classifyRenameTarget requestedRelativePath
 
             match validateEntityRenameSourceClassification sourceClassification with
             | Error validationError -> return Error validationError

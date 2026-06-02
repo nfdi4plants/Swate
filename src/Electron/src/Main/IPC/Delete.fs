@@ -12,10 +12,10 @@ module ArcDeleteHelper =
 
     let arcFileTypeForZone =
         function
-        | ArcDeletePathRules.AddZone.Assays -> ArcFilesDiscriminate.Assay
-        | ArcDeletePathRules.AddZone.Studies -> ArcFilesDiscriminate.Study
-        | ArcDeletePathRules.AddZone.Workflows -> ArcFilesDiscriminate.Workflow
-        | ArcDeletePathRules.AddZone.Runs -> ArcFilesDiscriminate.Run
+        | ArcEntityPathRules.AddZone.Assays -> ArcFilesDiscriminate.Assay
+        | ArcEntityPathRules.AddZone.Studies -> ArcFilesDiscriminate.Study
+        | ArcEntityPathRules.AddZone.Workflows -> ArcFilesDiscriminate.Workflow
+        | ArcEntityPathRules.AddZone.Runs -> ArcFilesDiscriminate.Run
 
     let private entityKindForFileType =
         function
@@ -61,7 +61,7 @@ module ArcDeleteHelper =
             )
 
     let canonicalEntityFilePath zone identifier =
-        ArcDeletePathRules.buildCanonicalEntityPaths zone identifier
+        ArcEntityPathRules.buildCanonicalEntityPaths zone identifier
         |> List.head
 
     let private mergeDeletedEntityFromDisk arcPath canonicalFilePath (arcLocal: ARC) = promise {
@@ -89,29 +89,29 @@ module ArcDeleteHelper =
     }
 
     let private tryGetEntityDeleteTarget relativePath =
-        match ArcDeletePathRules.classifyDeleteTarget relativePath with
-        | ArcDeletePathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
+        match ArcEntityPathRules.classifyDeleteTarget relativePath with
+        | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
             Ok(arcFileTypeForZone zone, identifier, normalizedRelativePath, canonicalEntityFilePath zone identifier)
-        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcDeletePathRules.CanonicalArcFileTarget.EntityFile(zone, identifier),
+        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+            ArcEntityPathRules.CanonicalArcFileTarget.EntityFile(zone, identifier),
             normalizedRelativePath
           ) ->
             Ok(arcFileTypeForZone zone, identifier, normalizedRelativePath, normalizedRelativePath)
-        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile _,
+        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+            ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
             _
           )
-        | ArcDeletePathRules.DeletePathClassification.AddZoneDescendantTarget _
-        | ArcDeletePathRules.DeletePathClassification.GenericTarget _ ->
+        | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget _
+        | ArcEntityPathRules.DeletePathClassification.GenericTarget _ ->
             Error(exn "Generic filesystem delete paths do not use ARC entity delete contracts.")
-        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcDeletePathRules.CanonicalArcFileTarget.InvestigationFile,
+        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+            ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
             _
           ) ->
             Error(exn "Deleting the investigation file is not supported.")
-        | ArcDeletePathRules.DeletePathClassification.ProtectedTarget _ ->
+        | ArcEntityPathRules.DeletePathClassification.ProtectedTarget _ ->
             Error(exn "Deleting protected files (for example .gitkeep or readme.md) is not allowed.")
-        | ArcDeletePathRules.DeletePathClassification.DisallowedTarget _ ->
+        | ArcEntityPathRules.DeletePathClassification.DisallowedTarget _ ->
             Error(exn "Deletion is not allowed for this path.")
 
     /// Deletes ARC entities through ARCtrl contracts while preserving unrelated dirty in-memory edits.

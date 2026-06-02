@@ -120,7 +120,7 @@ module PathHelpers =
         |> pathMatchesAny protectedDeleteTargetNames
 
 [<RequireQualifiedAccess>]
-module ArcDeletePathRules =
+module ArcEntityPathRules =
 
     type AddZone =
         | Studies
