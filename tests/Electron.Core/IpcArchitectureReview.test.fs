@@ -191,47 +191,47 @@ Vitest.describe("ARC delete and rename validation", fun () ->
     )
 
     Vitest.test("isDeletePathAllowed permits safe non-ARC filesystem targets", fun () ->
-        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe(true)
-        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "test.fsx").toBe(true)
-        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "studies").toBe(false)
-        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "README.md").toBe(false)
-        Vitest.expect(ArcDeletePathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
+        Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe(true)
+        Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "test.fsx").toBe(true)
+        Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies").toBe(false)
+        Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "README.md").toBe(false)
+        Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe(false)
     )
 
     Vitest.test("classifyDeleteTarget identifies entity folder delete paths", fun () ->
-        match ArcDeletePathRules.classifyDeleteTarget "assays/OldAssay" with
-        | ArcDeletePathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedPath) ->
-            Vitest.expect(zone).toEqual(ArcDeletePathRules.AddZone.Assays)
+        match ArcEntityPathRules.classifyDeleteTarget "assays/OldAssay" with
+        | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedPath) ->
+            Vitest.expect(zone).toEqual(ArcEntityPathRules.AddZone.Assays)
             Vitest.expect(identifier).toBe("OldAssay")
             Vitest.expect(normalizedPath).toBe("assays/OldAssay")
         | other -> failwith $"Expected entity folder target, got {other}."
     )
 
     Vitest.test("classifyDeleteTarget identifies canonical entity files", fun () ->
-        match ArcDeletePathRules.classifyDeleteTarget "workflows/MyWorkflow/isa.workflow.xlsx" with
-        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcDeletePathRules.CanonicalArcFileTarget.EntityFile(zone, identifier),
+        match ArcEntityPathRules.classifyDeleteTarget "workflows/MyWorkflow/isa.workflow.xlsx" with
+        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+            ArcEntityPathRules.CanonicalArcFileTarget.EntityFile(zone, identifier),
             normalizedPath
           ) ->
-            Vitest.expect(zone).toEqual(ArcDeletePathRules.AddZone.Workflows)
+            Vitest.expect(zone).toEqual(ArcEntityPathRules.AddZone.Workflows)
             Vitest.expect(identifier).toBe("MyWorkflow")
             Vitest.expect(normalizedPath).toBe("workflows/MyWorkflow/isa.workflow.xlsx")
         | other -> failwith $"Expected canonical entity file target, got {other}."
     )
 
     Vitest.test("classifyDeleteTarget separates generic and datamap delete paths from entity deletes", fun () ->
-        match ArcDeletePathRules.classifyDeleteTarget "assays/My Assay/notes/info.md" with
-        | ArcDeletePathRules.DeletePathClassification.AddZoneDescendantTarget(zone, normalizedPath) ->
-            Vitest.expect(zone).toEqual(ArcDeletePathRules.AddZone.Assays)
+        match ArcEntityPathRules.classifyDeleteTarget "assays/My Assay/notes/info.md" with
+        | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(zone, normalizedPath) ->
+            Vitest.expect(zone).toEqual(ArcEntityPathRules.AddZone.Assays)
             Vitest.expect(normalizedPath).toBe("assays/My Assay/notes/info.md")
         | other -> failwith $"Expected add-zone descendant target, got {other}."
 
-        match ArcDeletePathRules.classifyDeleteTarget "assays/My Assay/isa.datamap.xlsx" with
-        | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile(zone, identifier),
+        match ArcEntityPathRules.classifyDeleteTarget "assays/My Assay/isa.datamap.xlsx" with
+        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+            ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile(zone, identifier),
             normalizedPath
           ) ->
-            Vitest.expect(zone).toEqual(ArcDeletePathRules.AddZone.Assays)
+            Vitest.expect(zone).toEqual(ArcEntityPathRules.AddZone.Assays)
             Vitest.expect(identifier).toBe("My Assay")
             Vitest.expect(normalizedPath).toBe("assays/My Assay/isa.datamap.xlsx")
         | other -> failwith $"Expected canonical datamap file target, got {other}."
@@ -239,7 +239,7 @@ Vitest.describe("ARC delete and rename validation", fun () ->
 
     Vitest.test("directory delete fallback paths remain available for watcher unlink-dir events", fun () ->
         let fallbackPaths =
-            ArcDeletePathRules.buildFallbackUnlinkPaths "workflows/MyWorkflow"
+            ArcEntityPathRules.buildFallbackUnlinkPaths "workflows/MyWorkflow"
 
         Vitest.expect(fallbackPaths).toEqual(
             [

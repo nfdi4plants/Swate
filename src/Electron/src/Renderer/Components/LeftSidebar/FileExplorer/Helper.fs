@@ -110,7 +110,7 @@ let getItemIconClass (item: FileItem) =
 let canDeleteItem (item: FileItem) =
     item.Path
     |> Option.map PathHelpers.normalizeCanonicalRelativePath
-    |> Option.exists ArcDeletePathRules.isDeletePathAllowed
+    |> Option.exists ArcEntityPathRules.isDeletePathAllowed
 
 let rec private collectSelectedDirectoryPathChain
     (selectedTreeItemPath: string option)

@@ -26,11 +26,11 @@ Vitest.describe("RenamePathRules", fun () ->
         Vitest.expect(result).toEqual(Error "Rename target is identical to the current path.")
     )
 
-    Vitest.test("ArcDeletePathRules.isRenamePathAllowed allows entity folders and safe generic descendants", fun () ->
-        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay").toBe(true)
-        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe(false)
-        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe(true)
-        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "test.fsx").toBe(true)
+    Vitest.test("ArcEntityPathRules.isRenamePathAllowed allows entity folders and safe generic descendants", fun () ->
+        Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay").toBe(true)
+        Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe(false)
+        Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe(true)
+        Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "test.fsx").toBe(true)
     )
 
     Vitest.test("generic filesystem targets are limited to safe non-canonical paths", fun () ->
@@ -44,7 +44,7 @@ Vitest.describe("RenamePathRules", fun () ->
         ]
 
         allowedTargets
-        |> List.iter (fun path -> Vitest.expect(ArcDeletePathRules.isGenericFileSystemTargetAllowed path).toBe(true))
+        |> List.iter (fun path -> Vitest.expect(ArcEntityPathRules.isGenericFileSystemTargetAllowed path).toBe(true))
 
         let rejectedTargets = [
             ""
@@ -59,7 +59,7 @@ Vitest.describe("RenamePathRules", fun () ->
         ]
 
         rejectedTargets
-        |> List.iter (fun path -> Vitest.expect(ArcDeletePathRules.isGenericFileSystemTargetAllowed path).toBe(false))
+        |> List.iter (fun path -> Vitest.expect(ArcEntityPathRules.isGenericFileSystemTargetAllowed path).toBe(false))
     )
 )
 

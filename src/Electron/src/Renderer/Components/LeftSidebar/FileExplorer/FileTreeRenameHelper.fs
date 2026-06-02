@@ -12,7 +12,7 @@ let private normalizeRelativePath (path: string) =
 let canRenameItem (item: FileItem) =
     item.Path
     |> Option.map PathHelpers.normalizeCanonicalRelativePath
-    |> Option.exists ArcDeletePathRules.isRenamePathAllowed
+    |> Option.exists ArcEntityPathRules.isRenamePathAllowed
 
 let tryBuildRenameDraft (item: FileItem) : Result<ArcRenameDraft, string> =
 
@@ -25,7 +25,7 @@ let tryBuildRenameDraft (item: FileItem) : Result<ArcRenameDraft, string> =
     | Some relativePath ->
         let normalizedRelativePath = normalizeRelativePath relativePath
 
-        if ArcDeletePathRules.isRenamePathAllowed normalizedRelativePath |> not then
+        if ArcEntityPathRules.isRenamePathAllowed normalizedRelativePath |> not then
             Error "Renaming this item is not allowed."
         else
             let sourcePath = normalizedRelativePath
