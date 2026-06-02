@@ -3,6 +3,7 @@ module Swate.Components.Page.ARCObjectExplorer.GraphExplorer.GraphObjectExplorer
 open Swate.Components
 open Swate.Components.Primitive.Select.Types
 open Swate.Components.Shared
+open Swate.Components.Page.ARCObjectExplorer.Model
 open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
 
 
@@ -147,17 +148,6 @@ let private semanticKindsForNode
                 semanticKindForPropertyValueOwnerTag datasetKindInScope ownerTag
                 |> Option.toList))
     |> Option.defaultValue []
-
-let private tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
-    let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
-        nodes
-        |> List.tryPick (fun node ->
-            if node.id = nodeId then
-                Some(node, List.rev ancestors)
-            else
-                loop (node :: ancestors) node.children)
-
-    loop [] nodes
 
 let private selectedPathContext
     (selectedSemanticKinds: Set<GraphSemanticKind>)

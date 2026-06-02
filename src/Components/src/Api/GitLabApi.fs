@@ -314,6 +314,11 @@ module private Internals =
         avatar_url = group.avatar_url
     }
 
+    let toExploreProjectPagedResponse (response: PagedResponse<GitLabProjectResponse>) : PagedResponse<ExploreProjectDto> = {
+        Items = response.Items |> Array.map toExploreProjectDto
+        Pagination = response.Pagination
+    }
+
     let toCurrentUserDto (user: GitLabCurrentUserResponse) : CurrentUserDto = {
         id = user.id
         username = user.username
@@ -346,6 +351,15 @@ module private Internals =
                         return Error(GitLabError.DecodeError decodeError)
             with networkError ->
                 return Error(GitLabError.NetworkError networkError)
+        }
+
+    let sendExploreProjectPage
+        (url: string)
+        (pat: string option)
+        : JS.Promise<Result<PagedResponse<ExploreProjectDto>, GitLabError>> =
+        promise {
+            let! response = sendGet<GitLabProjectResponse> url pat
+            return response |> Result.map toExploreProjectPagedResponse
         }
 
     let sendGetSingle<'T> (url: string) (pat: string) : JS.Promise<Result<'T, GitLabError>> = promise {
@@ -486,18 +500,7 @@ type GitLabApi =
 
             let url = appendQueryParams baseEndpoint effectiveQueryParams
             let patHeader = if String.IsNullOrWhiteSpace pat then None else Some pat
-            let! response = Internals.sendGet<GitLabProjectResponse> url patHeader
-
-            return
-                response
-                |> Result.map (fun x ->
-                    let itemsDTOs = x.Items |> Array.map Internals.toExploreProjectDto
-
-                    {
-                        Items = itemsDTOs
-                        Pagination = x.Pagination
-                    }
-                )
+            return! Internals.sendExploreProjectPage url patHeader
         }
 
     /// GET /api/v4/users/:user_id/projects
@@ -552,14 +555,7 @@ type GitLabApi =
                     |> Internals.addInt "min_access_level" minAccessLevel
 
                 let url = appendQueryParams baseEndpoint queryParams
-                let! response = Internals.sendGet<GitLabProjectResponse> url (Some pat)
-
-                return
-                    response
-                    |> Result.map (fun x -> {
-                        Items = x.Items |> Array.map Internals.toExploreProjectDto
-                        Pagination = x.Pagination
-                    })
+                return! Internals.sendExploreProjectPage url (Some pat)
         }
 
     /// GET /api/v4/groups
@@ -625,14 +621,7 @@ type GitLabApi =
                 |> Internals.addString "search" search
 
             let url = appendQueryParams baseEndpoint queryParams
-            let! response = Internals.sendGet<GitLabProjectResponse> url (Some pat)
-
-            return
-                response
-                |> Result.map (fun x -> {
-                    Items = x.Items |> Array.map Internals.toExploreProjectDto
-                    Pagination = x.Pagination
-                })
+            return! Internals.sendExploreProjectPage url (Some pat)
         }
 
     /// Wrapper over ListProjects for "Most starred".

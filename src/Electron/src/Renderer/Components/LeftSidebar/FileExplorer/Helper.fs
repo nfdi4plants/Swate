@@ -1,7 +1,6 @@
 module Renderer.Components.LeftSidebar.FileExplorer.Helper
 
 open System
-open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
@@ -108,15 +107,10 @@ let getItemIconClass (item: FileItem) =
         | Some colorClass -> Some colorClass
         | None -> colorClassForArcWorkbookFile fileName
 
-
-let tryGetItemRelativePath (item: FileItem) =
-    item.Path
-    |> Option.map PathHelpers.normalizeRelativePath
-    |> Option.map PathHelpers.normalizePath
-
 let canDeleteItem (item: FileItem) =
-    tryGetItemRelativePath item
-    |> Option.exists ArcDeletePathRules.isDeletePathAllowed
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+    |> Option.exists ArcEntityPathRules.isDeletePathAllowed
 
 let rec private collectSelectedDirectoryPathChain
     (selectedTreeItemPath: string option)
@@ -200,21 +194,6 @@ let arcCreateKindIcon =
     | ArcExplorerNodeKind.Workflow -> "swt:fluent--flowchart-24-regular"
     | ArcExplorerNodeKind.Run -> "swt:fluent--play-24-regular"
     | kind -> failwithf "ARC node kind '%s' cannot be created from the file explorer." (ArcExplorerNodeKind.label kind)
-
-let arcCreateKinds = [
-    ArcExplorerNodeKind.Study
-    ArcExplorerNodeKind.Assay
-    ArcExplorerNodeKind.Workflow
-    ArcExplorerNodeKind.Run
-]
-
-let arcCreateKindSortOrder =
-    function
-    | ArcExplorerNodeKind.Study -> 10
-    | ArcExplorerNodeKind.Assay -> 20
-    | ArcExplorerNodeKind.Workflow -> 30
-    | ArcExplorerNodeKind.Run -> 40
-    | _ -> 1000
 
 let arcCreateKindDefaultIdentifier =
     function

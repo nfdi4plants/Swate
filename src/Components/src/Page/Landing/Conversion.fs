@@ -12,12 +12,6 @@ module Conversion =
         |> List.map _.Trim()
         |> List.filter (System.String.IsNullOrWhiteSpace >> not)
 
-    let isSafePathSegment (value: string) =
-        not (System.String.IsNullOrWhiteSpace value)
-        && not (value.Contains "/")
-        && not (value.Contains "\\")
-        && not (value.Contains "..")
-
     let private fillInputColumnIfFilesExist (table: ArcTable) (files: string list) =
         let normalizedFiles = normalizeFiles files
 
@@ -74,7 +68,7 @@ module Conversion =
         assay
 
     let private toProtocolIntent (draft: LandingDraft) (target: LandingTarget) (identifier: string) =
-        if isSafePathSegment identifier |> not then
+        if PathHelpers.isSafePathSegment identifier |> not then
             None
         else
             match Validation.toOptionalString draft.MainText with

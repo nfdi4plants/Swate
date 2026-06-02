@@ -6,6 +6,14 @@ type EventName =
     | Unlink
     | Change
 
+module EventName =
+    let parse (s: string) =
+        match s.ToLowerInvariant() with
+        | "add" -> EventName.Add
+        | "unlink" -> EventName.Unlink
+        | "change" -> EventName.Change
+        | other -> failwithf "Unknown event name: '%s'" other
+
 type FileEvent = { EventName: EventName; Path: string }
 
 [<RequireQualifiedAccess>]

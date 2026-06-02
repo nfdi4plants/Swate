@@ -28,15 +28,6 @@ let private asOptionalTextOption (value: string option) =
     value
     |> Option.bind normalizeText
 
-let private sanitizeIdSegment (value: string) =
-    value
-        .Trim()
-        .ToLowerInvariant()
-        .Replace(" ", "-")
-        .Replace("/", "-")
-        .Replace("\\", "-")
-        .Replace(":", "-")
-
 let private graphKindForDataset =
     function
     | ARCDatasets.Assay -> GraphExplorerNodeKind.Assay
@@ -927,7 +918,7 @@ let private processNode
     (metaById: Map<string, GraphNodeMeta>)
     =
     let processName = processDisplayName processValue
-    let processNodeId = $"{parentNodeId}:process:{sanitizeIdSegment processName}:{index}"
+    let processNodeId = $"{parentNodeId}:process:{sanitizeSegment processName}:{index}"
 
     let inputNodeGroup, metaAfterInput, inputEndpointCount =
         processEndpointGroupNodeFromProcessTypes processNodeId "input" "Input" "Inputs" processValue.inputs true metaById
@@ -1014,7 +1005,7 @@ let private protocolNode
         |> asOptionalTextOption
         |> Option.defaultValue $"Protocol {index + 1}"
 
-    let nodeId = $"{parentNodeId}:protocol:{sanitizeIdSegment protocolName}:{index}"
+    let nodeId = $"{parentNodeId}:protocol:{sanitizeSegment protocolName}:{index}"
 
     let formalParameterNodes, metaAfterParameters =
         protocol.parameters
@@ -1098,7 +1089,7 @@ let rec private datasetNode
     let kindLabel = dataset.type'.ToString()
     let datasetKind = graphKindForDataset dataset.type'
     let title = datasetDisplayName dataset
-    let nodeId = $"{scopeNodeId}:{kindLabel.ToLowerInvariant()}:{sanitizeIdSegment dataset.identifier}:{index}"
+    let nodeId = $"{scopeNodeId}:{kindLabel.ToLowerInvariant()}:{sanitizeSegment dataset.identifier}:{index}"
 
     let aboutProtocols = dataset.about |> Array.toList
 
