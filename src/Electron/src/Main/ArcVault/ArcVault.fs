@@ -21,6 +21,8 @@ open ARCtrl
 /// <param name="path">Can be None if not opened ARC.</param>
 type ArcVault(window: BrowserWindow) =
 
+    let fileWatcherOwnWriteArcMergeSuppressionMs = 500
+
     member val window: BrowserWindow = window with get
     member val path: string option = None with get, set
     member val arc: ARC option = None with get, private set
@@ -35,9 +37,36 @@ type ArcVault(window: BrowserWindow) =
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
     member val fileWatcherPendingEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
+    member val fileWatcherPendingArcMergeEvents: ResizeArray<ArcVaultFileSystemEvent> = ResizeArray() with get
+    member val private isBusyWritingValue: bool = false with get, set
+    member val private fileWatcherOwnWriteArcMergeSuppressionTimeout: int option = None with get, set
+
+    member private this.StartFileWatcherOwnWriteArcMergeSuppression() =
+        this.fileWatcherOwnWriteArcMergeSuppressionTimeout
+        |> Option.iter Fable.Core.JS.clearTimeout
+
+        let timeoutId =
+            Fable.Core.JS.setTimeout
+                (fun () -> this.fileWatcherOwnWriteArcMergeSuppressionTimeout <- None)
+                fileWatcherOwnWriteArcMergeSuppressionMs
+
+        this.fileWatcherOwnWriteArcMergeSuppressionTimeout <- Some timeoutId
+
     /// Indicates whether the vault is currently busy writing changes to disk.
-    /// This should disable reloads from the file watcher.
-    member val isBusyWriting: bool = false with get, set
+    /// When a write finishes, watcher ARC merges stay suppressed briefly to cover delayed own-write events.
+    member this.isBusyWriting
+        with get () = this.isBusyWritingValue
+        and set value =
+            let wasBusyWriting = this.isBusyWritingValue
+            this.isBusyWritingValue <- value
+
+            if wasBusyWriting && not value then
+                this.StartFileWatcherOwnWriteArcMergeSuppression()
+
+    /// Indicates whether a captured watcher event is eligible to update the in-memory ARC.
+    member this.IsFileWatcherArcMergeEligible =
+        not this.isBusyWritingValue && this.fileWatcherOwnWriteArcMergeSuppressionTimeout.IsNone
+
     /// Indicates whether a close confirmation dialog is currently open.
     member val isCloseRequestPending: bool = false with get, set
     /// Allows a confirmed close to pass through the onClose handler exactly once.
@@ -141,10 +170,15 @@ module ArcVaultExtensions =
 
                 swatelogfn this.window.id "File change detected: %s on %s" eventName path
 
+                let isArcMergeEligible = this.IsFileWatcherArcMergeEligible
+
                 this.path
                 |> Option.iter (fun arcPath ->
                     let watcherEvent = WatcherHelpers.buildWatcherEvent arcPath eventName path
                     this.fileWatcherPendingEvents.Add watcherEvent
+
+                    if isArcMergeEligible then
+                        this.fileWatcherPendingArcMergeEvents.Add watcherEvent
                 )
 
                 match this.fileWatcherReloadArcTimeout with
@@ -159,12 +193,14 @@ module ArcVaultExtensions =
                             promise {
                                 swatelogfn this.window.id "Scheduled ARC reload triggered by file watcher."
                                 let pendingEvents = this.fileWatcherPendingEvents |> Seq.toList
+                                let pendingArcMergeEvents = this.fileWatcherPendingArcMergeEvents |> Seq.toList
                                 this.fileWatcherPendingEvents.Clear()
+                                this.fileWatcherPendingArcMergeEvents.Clear()
 
                                 do! this.ApplyWatcherFileTreeEvents pendingEvents
 
-                                if not this.isBusyWriting then
-                                    do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingEvents
+                                if not pendingArcMergeEvents.IsEmpty && not this.isBusyWriting then
+                                    do! this.TriggerArcInMemoryMergeOnFileWatcherEvents pendingArcMergeEvents
 
                                 this.fileWatcherReloadArcTimeout <- None
                                 sendMsgApi.IsLoadingChanges false
