@@ -4,6 +4,7 @@ open Fable.Core
 open ARCtrl
 open ARCtrl.Contract
 open Main.ArcMerge
+open Main.ArcVaultHelper
 open Swate.Components.Shared
 open ARC
 
@@ -73,19 +74,21 @@ module ArcDeleteHelper =
                         $"Deleted ARC entity, but could not reload the ARC from disk: {PathHelpers.formatContractErrors errors}"
                 )
         | Ok diskArc ->
+            baselineArcStaticHashes diskArc
             // The IPC delete path suppresses watcher ARC merges, so apply the same unlink event explicitly.
-            return
-                Ok(
-                    ARC.merge
-                        arcLocal
-                        diskArc
-                        [
-                            {
-                                EventName = EventName.Unlink
-                                Path = canonicalFilePath
-                            }
-                        ]
-                )
+            let mergedArc =
+                ARC.merge
+                    arcLocal
+                    diskArc
+                    [
+                        {
+                            EventName = EventName.Unlink
+                            Path = canonicalFilePath
+                        }
+                    ]
+
+            syncArcStaticHashes diskArc mergedArc
+            return Ok mergedArc
     }
 
     let private tryGetEntityDeleteTarget relativePath =
