@@ -3,6 +3,7 @@ module Main.IPC.Rename
 open System
 open Fable.Core
 open ARCtrl
+open Main.ArcMerge
 open Main.ArcVaultHelper
 open Main.IPC.Delete
 open Main.IPC.FileSystemIO

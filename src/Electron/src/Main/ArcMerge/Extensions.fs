@@ -27,6 +27,71 @@ module ArcMergeExtensions =
         staticHash <> lightHash
         || (dataMap |> Option.exists (fun dm -> dm.hasInMemoryChanges()))
 
+    let private syncDataMapStaticHash (sourceDataMap: DataMap option) (targetDataMap: DataMap option) =
+        match sourceDataMap, targetDataMap with
+        | Some sourceDataMap, Some targetDataMap -> targetDataMap.StaticHash <- sourceDataMap.StaticHash
+        | _ -> ()
+
+    let private syncEntityStaticHashes
+        (targetEntities: seq<'Entity>)
+        (tryGetSource: string -> 'Entity option)
+        (getIdentifier: 'Entity -> string)
+        (syncEntityStaticHash: 'Entity -> 'Entity -> unit)
+        =
+        for targetEntity in targetEntities do
+            targetEntity
+            |> getIdentifier
+            |> tryGetSource
+            |> Option.iter (fun sourceEntity ->
+                syncEntityStaticHash sourceEntity targetEntity)
+
+    /// Syncs static hashes from source ARC to target ARC for matching entities.
+    /// This keeps ARCtrl update contract generation scoped to actual changes.
+    let syncArcStaticHashes (source: ARC) (target: ARC) : unit =
+        target.StaticHash <- source.StaticHash
+
+        match source.License, target.License with
+        | Some sourceLicense, Some targetLicense -> targetLicense.StaticHash <- sourceLicense.StaticHash
+        | _ -> ()
+
+        syncEntityStaticHashes
+            target.Studies
+            source.TryGetStudy
+            (fun (study: ArcStudy) -> study.Identifier)
+            (fun sourceStudy targetStudy ->
+                targetStudy.StaticHash <- sourceStudy.StaticHash
+                syncDataMapStaticHash sourceStudy.DataMap targetStudy.DataMap)
+
+        syncEntityStaticHashes
+            target.Assays
+            source.TryGetAssay
+            (fun (assay: ArcAssay) -> assay.Identifier)
+            (fun sourceAssay targetAssay ->
+                targetAssay.StaticHash <- sourceAssay.StaticHash
+                syncDataMapStaticHash sourceAssay.DataMap targetAssay.DataMap)
+
+        syncEntityStaticHashes
+            target.Workflows
+            source.TryGetWorkflow
+            (fun (workflow: ArcWorkflow) -> workflow.Identifier)
+            (fun sourceWorkflow targetWorkflow ->
+                targetWorkflow.StaticHash <- sourceWorkflow.StaticHash
+                syncDataMapStaticHash sourceWorkflow.DataMap targetWorkflow.DataMap)
+
+        syncEntityStaticHashes
+            target.Runs
+            source.TryGetRun
+            (fun (run: ArcRun) -> run.Identifier)
+            (fun sourceRun targetRun ->
+                targetRun.StaticHash <- sourceRun.StaticHash
+                syncDataMapStaticHash sourceRun.DataMap targetRun.DataMap)
+
+    /// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
+    let copyArcPreservingStaticHashes (arc: ARC) : ARC =
+        let copiedArc = arc.Copy()
+        syncArcStaticHashes arc copiedArc
+        copiedArc
+
     type ArcAssay with
         member this.hasInMemoryChanges() =
             hasStaticHashOrDataMapChanges this.StaticHash (this.GetLightHashCode()) this.DataMap
