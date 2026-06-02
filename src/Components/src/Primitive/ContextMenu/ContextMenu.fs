@@ -40,7 +40,7 @@ type ContextMenu =
     static member ContextMenu
         (
             childInfo: obj -> ContextMenuItem list,
-            ?ref: IRefValue<HTMLElement option>,
+            ref: IRefValue<HTMLElement option>,
             ?onSpawn: Browser.Types.MouseEvent -> obj option,
             ?debug: bool
         ) =
@@ -118,7 +118,7 @@ type ContextMenu =
                         setIsOpen false
 
                 let cleanupListeners =
-                    match ref |> Option.bind (fun ref -> ref.current) with
+                    match ref.current with
                     | Some scopedElement ->
                         let onContextMenu (e: Event) =
                             let e = e :?> Browser.Types.MouseEvent
