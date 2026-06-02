@@ -49,6 +49,12 @@ let private gitLfsDefaultThresholdMb = 1
 let private gitLfsMaximumThresholdMb = 100
 let private gitLfsDefaultDownloadLargeFiles = true
 
+let private normalizeOptionalGitRef (value: string option) =
+    value
+    |> Option.bind Option.ofObj
+    |> Option.map _.Trim()
+    |> Option.filter (fun item -> not (String.IsNullOrWhiteSpace item))
+
 let private lfsInstallRequiredTokens =
     [|
         "git lfs is required for files larger than"
@@ -584,17 +590,8 @@ let private ensureDefaultTrackingBranchForPull
         let! remoteBranchText = git.raw [| "branch"; "-r"; "--no-color" |]
         let! status = git.status ()
 
-        let currentBranch =
-            status.current
-            |> Option.bind Option.ofObj
-            |> Option.map _.Trim()
-            |> Option.filter (fun branch -> not (String.IsNullOrWhiteSpace branch))
-
-        let currentTracking =
-            status.tracking
-            |> Option.bind Option.ofObj
-            |> Option.map _.Trim()
-            |> Option.filter (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
+        let currentBranch = normalizeOptionalGitRef status.current
+        let currentTracking = normalizeOptionalGitRef status.tracking
 
         let remoteRefs =
             remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -624,12 +621,6 @@ let private ensureDefaultTrackingBranchForPull
                 let! _ = git.raw [| "branch"; $"--set-upstream-to={desired}"; branchName |]
                 return ()
     }
-
-let private normalizeOptionalGitRef (value: string option) =
-    value
-    |> Option.bind Option.ofObj
-    |> Option.map _.Trim()
-    |> Option.filter (fun item -> not (String.IsNullOrWhiteSpace item))
 
 /// Resolves the branch/refspec to push and whether `--set-upstream` should be used.
 /// Exposed for tests because this policy affects new-branch publishing behavior.
@@ -677,11 +668,7 @@ let private reconcileTrackingBranchForCheckout
         let! remoteBranchText = git.raw [| "branch"; "-r"; "--no-color" |]
         let! status = git.status ()
 
-        let currentTracking =
-            status.tracking
-            |> Option.bind Option.ofObj
-            |> Option.map _.Trim()
-            |> Option.filter (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
+        let currentTracking = normalizeOptionalGitRef status.tracking
 
         let remoteRefs =
             remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -1436,11 +1423,7 @@ let previewPull
                 match statusResult with
                 | Error failure -> return Error failure
                 | Ok status ->
-                    let currentBranch =
-                        status.current
-                        |> Option.bind Option.ofObj
-                        |> Option.map _.Trim()
-                        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                    let currentBranch = normalizeOptionalGitRef status.current
 
                     match status.detached, currentBranch with
                     | true, _
@@ -1455,10 +1438,7 @@ let previewPull
                             safeBranchName
                             |> Option.map (fun safeBranch -> $"{safeRemoteName}/{safeBranch}")
                             |> Option.orElseWith (fun () ->
-                                status.tracking
-                                |> Option.bind Option.ofObj
-                                |> Option.map _.Trim()
-                                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                                normalizeOptionalGitRef status.tracking
                             )
 
                         match upstreamRef with

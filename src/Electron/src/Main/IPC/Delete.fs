@@ -10,7 +10,7 @@ open ARC
 [<RequireQualifiedAccess>]
 module ArcDeleteHelper =
 
-    let private arcFileTypeForZone =
+    let arcFileTypeForZone =
         function
         | ArcDeletePathRules.AddZone.Assays -> ArcFilesDiscriminate.Assay
         | ArcDeletePathRules.AddZone.Studies -> ArcFilesDiscriminate.Study
@@ -51,7 +51,7 @@ module ArcDeleteHelper =
         | ArcFiles.DataMap _
         | ArcFiles.Template _ -> false
 
-    let private tryEnsureArcEntityResolved fileType identifier relativePath (arc: ARC) =
+    let tryEnsureArcEntityResolved fileType identifier relativePath (arc: ARC) =
         match arc.TryArcFileByPath(relativePath) with
         | Some arcFile when arcFileMatchesEntity fileType identifier arcFile -> Ok()
         | _ ->
@@ -60,7 +60,7 @@ module ArcDeleteHelper =
                     $"ARC does not contain {entityKindForFileType fileType} with identifier '{identifier}'."
             )
 
-    let private canonicalEntityFilePath zone identifier =
+    let canonicalEntityFilePath zone identifier =
         ArcDeletePathRules.buildCanonicalEntityPaths zone identifier
         |> List.head
 

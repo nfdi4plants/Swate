@@ -23,49 +23,25 @@ module ArcMergeExtensions =
             else
                 this.StaticHash = 0 || this.StaticHash <> this.GetHashCode()
 
+    let private hasStaticHashOrDataMapChanges staticHash lightHash (dataMap: DataMap option) =
+        staticHash <> lightHash
+        || (dataMap |> Option.exists (fun dm -> dm.hasInMemoryChanges()))
+
     type ArcAssay with
         member this.hasInMemoryChanges() =
-            let mutable isDirty = this.StaticHash <> this.GetLightHashCode()
-
-            if not isDirty then
-                match this.DataMap with
-                | Some dm -> isDirty <- isDirty || dm.hasInMemoryChanges()
-                | None -> ()
-
-            isDirty
+            hasStaticHashOrDataMapChanges this.StaticHash (this.GetLightHashCode()) this.DataMap
 
     type ArcStudy with
         member this.hasInMemoryChanges() =
-            let mutable isDirty = this.StaticHash <> this.GetLightHashCode()
-
-            if not isDirty then
-                match this.DataMap with
-                | Some dm -> isDirty <- isDirty || dm.hasInMemoryChanges()
-                | None -> ()
-
-            isDirty
+            hasStaticHashOrDataMapChanges this.StaticHash (this.GetLightHashCode()) this.DataMap
 
     type ArcRun with
         member this.hasInMemoryChanges() =
-            let mutable isDirty = this.StaticHash <> this.GetLightHashCode()
-
-            if not isDirty then
-                match this.DataMap with
-                | Some dm -> isDirty <- isDirty || dm.hasInMemoryChanges()
-                | None -> ()
-
-            isDirty
+            hasStaticHashOrDataMapChanges this.StaticHash (this.GetLightHashCode()) this.DataMap
 
     type ArcWorkflow with
         member this.hasInMemoryChanges() =
-            let mutable isDirty = this.StaticHash <> this.GetLightHashCode()
-
-            if not isDirty then
-                match this.DataMap with
-                | Some dm -> isDirty <- isDirty || dm.hasInMemoryChanges()
-                | None -> ()
-
-            isDirty
+            hasStaticHashOrDataMapChanges this.StaticHash (this.GetLightHashCode()) this.DataMap
 
     type ARC with
         member this.hasInMemoryChanges() =

@@ -37,23 +37,6 @@ module private GraphObjectExplorerHelper =
             $"{kindLabel} | {role}")
         |> Option.defaultValue "Selection"
 
-    let private flattenFileItems (items: FileItem list) =
-        let rec loop (items: FileItem list) =
-            items
-            |> List.collect (fun item ->
-                item :: (item.Children |> Option.defaultValue [] |> loop))
-
-        loop items
-
-    let private flattenNodesWithAncestors (nodes: ArcExplorerNode list) =
-        let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
-            nodes
-            |> List.collect (fun node ->
-                let orderedAncestors = List.rev ancestors
-                (node, orderedAncestors) :: loop (node :: ancestors) node.children)
-
-        loop [] nodes
-
     let searchableItems
         (nodes: ArcExplorerNode list)
         (items: FileItem list)
