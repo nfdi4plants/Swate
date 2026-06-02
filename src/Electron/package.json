@@ -39,7 +39,7 @@
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron-forge/plugin-vite": "^7.10.2",
     "@electron/fuses": "^1.8.0",
-    "@playwright/test": "^1.58.2",
+    "@playwright/test": "^1.60.0",
     "electron": "40.9.2"
   }
 }
