@@ -63,8 +63,8 @@ type Dialog =
 
         let submitIfValid () =
             match validationResult with
-            | Ok normalizedValue -> submit normalizedValue
-            | Error _ -> ()
+            | Ok normalizedValue when not isBusy -> submit normalizedValue
+            | _ -> ()
 
         let footer =
             Html.div [
