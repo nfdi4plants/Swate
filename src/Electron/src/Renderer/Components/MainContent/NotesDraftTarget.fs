@@ -53,13 +53,14 @@ let NotesDraftTarget () =
 
                     match previewResult with
                     | Ok previewData ->
-                        previewData
-                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                        let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
+                        pageStateCtx.setState (Some pageState)
                     | Result.Error _ ->
-                        FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
-                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                        let fallbackData =
+                            FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
+
+                        let pageState = Renderer.Types.PageState.fromFileContentDTO fallbackData
+                        pageStateCtx.setState (Some pageState)
             }
             |> Promise.start
 

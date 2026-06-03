@@ -4,7 +4,6 @@ open System
 open Feliz
 open Swate.Components
 open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Components.Shared
 
@@ -18,22 +17,6 @@ let useCurrentArcScopeId () =
     appStateCtx
     |> Option.map PathHelpers.normalizePath
     |> Option.bind (fun path -> if String.IsNullOrWhiteSpace path then None else Some path)
-
-/// TODO: Check if this type is necessary. Looks like it just is an additonal wrapper around PageState? Not sure why we need this + helper boilerplate below.
-type ViewLoadResult = {
-    RendererPageState: Renderer.Types.PageState
-}
-
-let viewLoadResultOfDto (data: FileContentDTO) =
-    let pageState = Renderer.Types.PageState.fromFileContentDTO data
-
-    { RendererPageState = pageState }
-
-let applyLoadedView (setPageState: Renderer.Types.PageState option -> unit) (loaded: ViewLoadResult) =
-    setPageState (Some loaded.RendererPageState)
-
-let applyViewError (setPageState: Renderer.Types.PageState option -> unit) (errorMessage: string) =
-    setPageState (Some(Renderer.Types.PageState.ErrorPage errorMessage))
 
 let runToggleLfsMark (relativePath: string) (markAsLfs: bool) = promise {
     let request: GitLfsRequest = {
@@ -73,7 +56,7 @@ let private loadViewResult (previewPath: string) = promise {
 
     return
         match result with
-        | Ok data -> Ok(viewLoadResultOfDto data)
+        | Ok data -> Ok(Renderer.Types.PageState.fromFileContentDTO data)
         | Error exn -> Error exn.Message
 }
 

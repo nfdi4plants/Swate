@@ -23,9 +23,8 @@ let LandingDraftTarget () =
 
                 fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                response
-                |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                let pageState = Renderer.Types.PageState.fromFileContentDTO response
+                pageStateCtx.setState (Some pageState)
 
                 setLandingDraft LandingDraft.init
                 setLandingUiState LandingUiState.init

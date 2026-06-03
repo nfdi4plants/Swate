@@ -158,13 +158,13 @@ type FileTree =
                     let! result = Renderer.Components.ARCHelper.openView selectedPath
 
                     match result with
-                    | Ok loaded ->
+                    | Ok pageState ->
                         console.log ("[Renderer] Received data, processing...")
-                        Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                        pageStateCtx.setState (Some pageState)
                     | Error errorMessage ->
                         let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
                         console.log ($"[Renderer] Error: {fullErrorMessage}")
-                        Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
+                        pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
             }
             |> Promise.start
 
@@ -181,16 +181,16 @@ type FileTree =
                     let! result = Renderer.Components.ARCHelper.openView selectedPath
 
                     match result with
-                    | Ok loaded -> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                    | Ok pageState -> pageStateCtx.setState (Some pageState)
                     | Error errorMessage ->
-                        Renderer.Components.ARCHelper.applyViewError
-                            pageStateCtx.setState
-                            $"Could not reload preview for '{selectedPath}': {errorMessage}"
+                        pageStateCtx.setState (
+                            Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{selectedPath}': {errorMessage}")
+                        )
                 }
                 |> Promise.catch (fun exn ->
-                    Renderer.Components.ARCHelper.applyViewError
-                        pageStateCtx.setState
-                        $"Could not reload preview for '{selectedPath}': {exn.Message}")
+                    pageStateCtx.setState (
+                        Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{selectedPath}': {exn.Message}")
+                    ))
                 |> Promise.start
 
         React.useEffect (
@@ -257,8 +257,8 @@ type FileTree =
                 let! openResult = Renderer.Components.ARCHelper.openView path
 
                 match openResult with
-                | Ok loaded ->
-                    Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                | Ok pageState ->
+                    pageStateCtx.setState (Some pageState)
                     return Ok()
                 | Error errorMessage -> return Error errorMessage
             }
@@ -300,9 +300,8 @@ type FileTree =
                             let selectedPath = PathHelpers.normalizePath createdArcFileDto.path
                             fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                            createdArcFileDto
-                            |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                            |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                            let pageState = Renderer.Types.PageState.fromFileContentDTO createdArcFileDto
+                            pageStateCtx.setState (Some pageState)
 
                             closeDialog ()
                     }
