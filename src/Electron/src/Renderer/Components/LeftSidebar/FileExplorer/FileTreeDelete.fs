@@ -35,7 +35,7 @@ module FileTreeDeleteWorkflow =
     let confirmDeleteItem (config: ConfirmDeleteConfig) =
         match config.pendingDeleteItem |> Option.bind tryGetRelativePath with
         | None -> config.closeDeleteModal ()
-        | Some deletePath when ArcDeletePathRules.isDeletePathAllowed deletePath |> not ->
+        | Some deletePath when ArcEntityPathRules.isDeletePathAllowed deletePath |> not ->
             config.closeDeleteModal ()
         | Some deletePath ->
             config.setIsDeleting true

@@ -415,12 +415,12 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         promise {
                             let arcPath = vault.path.Value
                             let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
-                            let classification = ArcDeletePathRules.classifyDeleteTarget normalizedRelativePath
+                            let classification = ArcEntityPathRules.classifyDeleteTarget normalizedRelativePath
 
                             match classification with
-                            | ArcDeletePathRules.DeletePathClassification.EntityFolderTarget _
-                            | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcDeletePathRules.CanonicalArcFileTarget.EntityFile _,
+                            | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget _
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+                                ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
                                 _
                               ) ->
                                 match vault.arc with
@@ -443,13 +443,13 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
-                            | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile _,
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+                                ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
                                 normalizedGenericPath
                               )
-                            | ArcDeletePathRules.DeletePathClassification.GenericTarget normalizedGenericPath
-                            | ArcDeletePathRules.DeletePathClassification.AddZoneDescendantTarget(_, normalizedGenericPath) ->
-                                if ArcDeletePathRules.isDeletePathAllowed normalizedGenericPath |> not then
+                            | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
+                            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_, normalizedGenericPath) ->
+                                if ArcEntityPathRules.isDeletePathAllowed normalizedGenericPath |> not then
                                     return
                                         Error(
                                             exn
@@ -460,18 +460,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
                                             arcPath
                                             normalizedGenericPath
-                            | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcDeletePathRules.CanonicalArcFileTarget.InvestigationFile,
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+                                ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
                                 _
                               ) ->
                                 return Error(exn "Deleting the investigation file is not supported.")
-                            | ArcDeletePathRules.DeletePathClassification.ProtectedTarget _ ->
+                            | ArcEntityPathRules.DeletePathClassification.ProtectedTarget _ ->
                                 return
                                     Error(
                                         exn
                                             "Deleting protected files (for example .gitkeep or readme.md) is not allowed."
                                     )
-                            | ArcDeletePathRules.DeletePathClassification.DisallowedTarget _ ->
+                            | ArcEntityPathRules.DeletePathClassification.DisallowedTarget _ ->
                                 return
                                     Error(
                                         exn
@@ -490,8 +490,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         promise {
                             let arcPath = vault.path.Value
 
-                            match ArcDeletePathRules.classifyRenameTarget request.relativePath with
-                            | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
+                            match ArcEntityPathRules.classifyRenameTarget request.relativePath with
+                            | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
                                 return! ArcFileSystemHelper.renameGenericFileSystemItemOnDisk arcPath request
                             | _ ->
                                 match vault.arc with

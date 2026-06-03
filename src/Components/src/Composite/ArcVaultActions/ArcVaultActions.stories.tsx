@@ -26,11 +26,14 @@ const ArcVaultActionsPathCopy = "arc-vault-actions-path-copy"
 const ArcVaultActionsPathOpenFolder = "arc-vault-actions-path-open-folder"
 
 const arcRootPath = "C:\\Users\\User\\ArcVault"
+const arcName = "ArcVault"
 
 async function openActionsPopover(canvasElement: HTMLElement) {
   const canvas = within(canvasElement)
   const toggle = await canvas.findByTestId(ArcVaultActionsBtn)
   expect(toggle).toBeInTheDocument()
+  expect(toggle).toHaveTextContent(arcName)
+  expect(toggle).toHaveAttribute("title", arcRootPath)
   await userEvent.click(toggle)
 }
 
@@ -39,6 +42,8 @@ export const Default: Story = {
     await openActionsPopover(canvasElement)
     const pathValue = await screen.findByTestId(ArcVaultActionsPathValue)
     expect(pathValue).toHaveTextContent(arcRootPath)
+    expect(await screen.findByTestId(ArcVaultActionsPathCopy)).toBeVisible()
+    expect(await screen.findByTestId(ArcVaultActionsPathOpenFolder)).toBeVisible()
     await openActionsPopover(canvasElement) // close popover
   }
 };

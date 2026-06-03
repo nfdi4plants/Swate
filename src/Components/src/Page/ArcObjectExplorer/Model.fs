@@ -87,7 +87,7 @@ let filterTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) 
 
     nodes |> List.choose loop
 
-let private flattenFileItems (items: FileItem list) =
+let flattenFileItems (items: FileItem list) =
     let rec loop (items: FileItem list) =
         items
         |> List.collect (fun item ->
@@ -95,7 +95,7 @@ let private flattenFileItems (items: FileItem list) =
 
     loop items
 
-let private flattenNodesWithAncestors (nodes: ArcExplorerNode list) =
+let flattenNodesWithAncestors (nodes: ArcExplorerNode list) =
     let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
         nodes
         |> List.collect (fun node ->
@@ -146,7 +146,7 @@ let searchableItems (nodes: ArcExplorerNode list) (items: FileItem list) =
     |> List.sortBy (fun (name, _, _) -> name.ToLowerInvariant())
     |> List.toArray
 
-let private tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
+let tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
     let rec loop (ancestors: ArcExplorerNode list) (nodes: ArcExplorerNode list) =
         nodes
         |> List.tryPick (fun node ->

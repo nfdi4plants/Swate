@@ -54,6 +54,12 @@ module PathHelpers =
         |> fun normalized -> normalized.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
         |> Array.exists (fun segment -> segment = "." || segment = "..")
 
+    let isSafePathSegment (value: string) =
+        not (String.IsNullOrWhiteSpace value)
+        && not (value.Contains "/")
+        && not (value.Contains "\\")
+        && not (value.Contains "..")
+
     let pathsEqual (left: string) (right: string) =
         normalizeForComparison left = normalizeForComparison right
 
@@ -65,7 +71,7 @@ module PathHelpers =
         |> fun normalized -> normalized.Split('/')
         |> Array.last
 
-    let private tryGetParentPath (path: string) =
+    let tryGetParentPath (path: string) =
         let normalizedPath = normalizePath path
         let separatorIndex = normalizedPath.LastIndexOf('/')
 
@@ -114,7 +120,7 @@ module PathHelpers =
         |> pathMatchesAny protectedDeleteTargetNames
 
 [<RequireQualifiedAccess>]
-module ArcDeletePathRules =
+module ArcEntityPathRules =
 
     type AddZone =
         | Studies

@@ -4,6 +4,7 @@ open Fable.Core
 open Main.ArcMerge
 open Main.ArcVault
 open Main.Bindings.Path
+open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open ARCtrl
@@ -146,6 +147,21 @@ Vitest.describe("ARC AddArcFileAsync", fun () ->
                 match addResult with
                 | Ok _ -> failwith $"Expected {expectedMessage} add to fail."
                 | Error errors -> Vitest.expect(errors.[0]).toContain(expectedMessage)
+        }))
+
+    Vitest.test("does not mutate the in-memory ARC when add contracts fail", fun () ->
+        withTempArc ignore (fun arcPath -> promise {
+            let! arc = loadArcAsync arcPath
+            do! mkdirRecursiveAsync (join [| arcPath; "assays" |])
+            do! writeUtf8FileAsync (join [| arcPath; "assays"; "NewAssay" |]) "conflicting file"
+
+            let! addResult = arc.TryAddArcFileAsync(arcPath, ArcFiles.Assay(ArcAssay("NewAssay")))
+
+            match addResult with
+            | Ok _ -> failwith "Expected assay add to fail because the assay folder path is already a file."
+            | Error _ -> ()
+
+            Vitest.expect(arc.ContainsAssay("NewAssay")).toBe(false)
         }))
 
     Vitest.test("keeps existing entities when adding a new one", fun () ->

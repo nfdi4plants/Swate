@@ -3,65 +3,16 @@ module Main.IPC.Rename
 open System
 open Fable.Core
 open ARCtrl
+open Main.ArcMerge
 open Main.ArcVaultHelper
+open Main.IPC.Delete
 open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
-open ARC
 
 [<RequireQualifiedAccess>]
 module ArcRenameHelper =
-
-    let private normalizeRelativePathForComparison (path: string) =
-        path
-        |> PathHelpers.normalizeCanonicalRelativePath
-
-    let private arcFileTypeForZone =
-        function
-        | ArcDeletePathRules.AddZone.Assays -> ArcFilesDiscriminate.Assay
-        | ArcDeletePathRules.AddZone.Studies -> ArcFilesDiscriminate.Study
-        | ArcDeletePathRules.AddZone.Workflows -> ArcFilesDiscriminate.Workflow
-        | ArcDeletePathRules.AddZone.Runs -> ArcFilesDiscriminate.Run
-
-    let private entityKindForFileType =
-        function
-        | ArcFilesDiscriminate.Assay -> "assay"
-        | ArcFilesDiscriminate.Study -> "study"
-        | ArcFilesDiscriminate.Workflow -> "workflow"
-        | ArcFilesDiscriminate.Run -> "run"
-        | fileType -> string fileType
-
-    let private arcFileMatchesEntity fileType identifier =
-        function
-        | ArcFiles.Assay assay ->
-            fileType = ArcFilesDiscriminate.Assay
-            && PathHelpers.pathsEqual assay.Identifier identifier
-        | ArcFiles.Study(study, _) ->
-            fileType = ArcFilesDiscriminate.Study
-            && PathHelpers.pathsEqual study.Identifier identifier
-        | ArcFiles.Workflow workflow ->
-            fileType = ArcFilesDiscriminate.Workflow
-            && PathHelpers.pathsEqual workflow.Identifier identifier
-        | ArcFiles.Run run ->
-            fileType = ArcFilesDiscriminate.Run
-            && PathHelpers.pathsEqual run.Identifier identifier
-        | ArcFiles.Investigation _
-        | ArcFiles.DataMap _
-        | ArcFiles.Template _ -> false
-
-    let private tryEnsureArcEntityResolved fileType identifier relativePath (arc: ARC) =
-        match arc.TryArcFileByPath(relativePath) with
-        | Some arcFile when arcFileMatchesEntity fileType identifier arcFile -> Ok()
-        | _ ->
-            Error(
-                exn
-                    $"ARC does not contain {entityKindForFileType fileType} with identifier '{identifier}'."
-            )
-
-    let private canonicalEntityFilePath zone identifier =
-        ArcDeletePathRules.buildCanonicalEntityPaths zone identifier
-        |> List.head
 
     let private tryRenameEntityOnDiskAsync
         arcPath
@@ -90,14 +41,14 @@ module ArcRenameHelper =
         | fileType -> failwith $"Renaming {fileType} is not supported."
 
     let private remapArcFileSystemPaths sourcePath targetPath (arc: ARC) =
-        let normalizedSourcePath = normalizeRelativePathForComparison sourcePath
-        let normalizedTargetPath = normalizeRelativePathForComparison targetPath
+        let normalizedSourcePath = sourcePath |> PathHelpers.normalizeCanonicalRelativePath
+        let normalizedTargetPath = targetPath |> PathHelpers.normalizeCanonicalRelativePath
         let sourcePrefix = normalizedSourcePath + "/"
 
         let remappedPaths =
             arc.FileSystem.Tree.ToFilePaths()
             |> Array.map (fun path ->
-                let normalizedPath = normalizeRelativePathForComparison path
+                let normalizedPath = path |> PathHelpers.normalizeCanonicalRelativePath
 
                 if PathHelpers.pathsEqual normalizedPath normalizedSourcePath then
                     normalizedTargetPath
@@ -170,7 +121,7 @@ module ArcRenameHelper =
                         | Ok diskArc ->
                             baselineArcStaticHashes diskArc
 
-                            match tryEnsureArcEntityResolved fileType oldIdentifier canonicalSourcePath diskArc with
+                            match ArcDeleteHelper.tryEnsureArcEntityResolved fileType oldIdentifier canonicalSourcePath diskArc with
                             | Error resolutionError -> return Error resolutionError
                             | Ok() ->
                                 match!
@@ -208,38 +159,38 @@ module ArcRenameHelper =
                     )
         }
 
-    let private validateEntityRenameSourceClassification (classification: ArcDeletePathRules.RenamePathClassification) =
+    let private validateEntityRenameSourceClassification (classification: ArcEntityPathRules.RenamePathClassification) =
         match classification with
-        | ArcDeletePathRules.RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
+        | ArcEntityPathRules.RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
             Ok(zone, identifier, normalizedRelativePath)
-        | ArcDeletePathRules.RenamePathClassification.RootTarget -> Error(exn "Renaming the ARC root is not allowed.")
-        | ArcDeletePathRules.RenamePathClassification.DisallowedTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.RootTarget -> Error(exn "Renaming the ARC root is not allowed.")
+        | ArcEntityPathRules.RenamePathClassification.DisallowedTarget _ ->
             Error(exn "Rename path must not contain path traversal segments.")
-        | ArcDeletePathRules.RenamePathClassification.ProtectedTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.ProtectedTarget _ ->
             Error(exn "Renaming protected files (for example .gitkeep or readme.md) is not allowed.")
-        | ArcDeletePathRules.RenamePathClassification.InvestigationFileTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.InvestigationFileTarget _ ->
             Error(exn "Renaming the investigation file is not supported.")
-        | ArcDeletePathRules.RenamePathClassification.AddZoneRootTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.AddZoneRootTarget _ ->
             Error(exn "Renaming add-zone root folders (studies/, assays/, workflows/, runs/) is not allowed.")
-        | ArcDeletePathRules.RenamePathClassification.CanonicalEntityFileTarget _
-        | ArcDeletePathRules.RenamePathClassification.CanonicalDataMapFileTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.CanonicalEntityFileTarget _
+        | ArcEntityPathRules.RenamePathClassification.CanonicalDataMapFileTarget _ ->
             Error(exn "Renaming canonical ARC files is not supported. Rename the containing ARC entity folder instead.")
-        | ArcDeletePathRules.RenamePathClassification.GenericTarget _ ->
+        | ArcEntityPathRules.RenamePathClassification.GenericTarget _ ->
             Error(exn "Renaming generic files or folders uses the generic filesystem rename path.")
 
     /// Performs the ARCtrl entity rename contract for an entity-folder rename request.
     let renameArcEntityAsync (arcPath: string) (request: RenamePathRequest) (arcLocal: ARC) : JS.Promise<Result<ARC, exn>> =
         promise {
-            let requestedRelativePath = normalizeRelativePathForComparison request.relativePath
-            let sourceClassification = ArcDeletePathRules.classifyRenameTarget requestedRelativePath
+            let requestedRelativePath = request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
+            let sourceClassification = ArcEntityPathRules.classifyRenameTarget requestedRelativePath
 
             match validateEntityRenameSourceClassification sourceClassification with
             | Error validationError -> return Error validationError
             | Ok(sourceZone, sourceIdentifier, sourcePath) ->
-                let sourceFileType = arcFileTypeForZone sourceZone
-                let canonicalSourcePath = canonicalEntityFilePath sourceZone sourceIdentifier
+                let sourceFileType = ArcDeleteHelper.arcFileTypeForZone sourceZone
+                let canonicalSourcePath = ArcDeleteHelper.canonicalEntityFilePath sourceZone sourceIdentifier
 
-                match tryEnsureArcEntityResolved sourceFileType sourceIdentifier canonicalSourcePath arcLocal with
+                match ArcDeleteHelper.tryEnsureArcEntityResolved sourceFileType sourceIdentifier canonicalSourcePath arcLocal with
                 | Error resolutionError -> return Error resolutionError
                 | Ok() ->
                     match tryBuildRenameTargetPath sourcePath request.newName with

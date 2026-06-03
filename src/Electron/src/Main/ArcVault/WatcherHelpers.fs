@@ -69,7 +69,7 @@ let toArcMergeEvents (events: ArcVaultFileSystemEvent list) =
             ]
         elif eventNameEquals Chokidar.Events.UnlinkDir event.EventName then
             event.RelativePath
-            |> ArcDeletePathRules.buildFallbackUnlinkPaths
+            |> ArcEntityPathRules.buildFallbackUnlinkPaths
             |> List.map (fun path -> {
                 EventName = EventName.Unlink
                 Path = path

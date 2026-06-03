@@ -11,10 +11,17 @@ type CreateArcFileModal =
 
     [<ReactComponent>]
     static member Main
-        (isOpen: bool, kind: ArcExplorerNodeKind, close: unit -> unit, submit: ArcExplorerNodeKind -> string -> unit)
+        (
+            isOpen: bool,
+            kind: ArcExplorerNodeKind,
+            close: unit -> unit,
+            submit: ArcExplorerNodeKind -> string -> unit,
+            ?isCreating: bool
+        )
         =
 
         let label = ArcExplorerNodeKind.label kind
+        let isCreating = defaultArg isCreating false
 
         Dialog.StringSubmissionDialog(
             isOpen = isOpen,
@@ -31,5 +38,7 @@ type CreateArcFileModal =
                     Error arcCreateIdentifierError),
             submitLabel = $"Create {label}",
             validationMessage = arcCreateIdentifierError,
+            isBusy = isCreating,
+            busyLabel = "Creating...",
             debug = "arc-create"
         )

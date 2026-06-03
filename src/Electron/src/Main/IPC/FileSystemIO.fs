@@ -312,14 +312,14 @@ module ArcFileSystemHelper =
                 |> PathHelpers.normalizeCanonicalRelativePath
 
             let isGenericDeleteTarget =
-                match ArcDeletePathRules.classifyDeleteTarget normalizedRelativePath with
-                | ArcDeletePathRules.DeletePathClassification.GenericTarget _
-                | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-                    ArcDeletePathRules.CanonicalArcFileTarget.DataMapFile _,
+                match ArcEntityPathRules.classifyDeleteTarget normalizedRelativePath with
+                | ArcEntityPathRules.DeletePathClassification.GenericTarget _
+                | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+                    ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
                     _
                   )
-                | ArcDeletePathRules.DeletePathClassification.AddZoneDescendantTarget _ ->
-                    ArcDeletePathRules.isDeletePathAllowed normalizedRelativePath
+                | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget _ ->
+                    ArcEntityPathRules.isDeletePathAllowed normalizedRelativePath
                 | _ -> false
 
             if not isGenericDeleteTarget then

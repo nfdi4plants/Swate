@@ -1,7 +1,9 @@
 module ElectronCore.ArcDeleteHelperTests
 
 open Fable.Core
+open Main.ArcMerge
 open Main.ArcVault
+open Main.ArcVaultHelper
 open Main.Bindings.Path
 open Main.IPC.Delete
 open Swate.Components.Shared
@@ -41,6 +43,20 @@ Vitest.describe("ARC delete helper", fun () ->
             let! deletedArc = deleteEntityOrFail arcPath "assays/DeleteAssay" arc
 
             Vitest.expect(deletedArc.ContainsAssay("DeleteAssay")).toBe(false)
+            do! assertDeletedOnDisk arcPath [| "assays"; "DeleteAssay" |] (fun arc ->
+                arc.ContainsAssay("DeleteAssay"))
+        }))
+
+    Vitest.test("deletes a clean assay without marking the ARC dirty", fun () ->
+        withTempArc (fun arc -> arc.AddAssay(ArcAssay("DeleteAssay"))) (fun arcPath -> promise {
+            let! loadedArc = loadArcAsync arcPath
+            baselineArcStaticHashes loadedArc
+            Vitest.expect(loadedArc.hasInMemoryChanges()).toBe(false)
+
+            let! deletedArc = deleteEntityOrFail arcPath "assays/DeleteAssay" loadedArc
+
+            Vitest.expect(deletedArc.ContainsAssay("DeleteAssay")).toBe(false)
+            Vitest.expect(deletedArc.hasInMemoryChanges()).toBe(false)
             do! assertDeletedOnDisk arcPath [| "assays"; "DeleteAssay" |] (fun arc ->
                 arc.ContainsAssay("DeleteAssay"))
         }))

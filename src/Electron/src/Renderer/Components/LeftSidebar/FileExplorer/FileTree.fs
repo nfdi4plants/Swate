@@ -18,6 +18,12 @@ open Renderer.Components.LeftSidebar.FileExplorer.Modals
 
 module private FileTreeHelper =
 
+    type FileTreeDialog =
+        | CreateDialog of ArcExplorerNodeKind
+        | FileSystemCreateDialog of FileSystemCreateDraft
+        | RenameDialog of ArcRenameDraft
+        | DeleteDialog of FileItem
+
     let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
         match FileContentDTO.fromArcFile arcFile with
         | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
@@ -50,17 +56,8 @@ type FileTree =
         let errorModal = useErrorModalCtx ()
         let arcScopeId = useCurrentArcScopeId ()
 
-        let pendingCreateKind, setPendingCreateKind =
-            React.useState<ArcExplorerNodeKind option> None
-
-        let pendingFileSystemCreateDraft, setPendingFileSystemCreateDraft =
-            React.useState<FileSystemCreateDraft option> None
-
-        let pendingRenameDraft, setPendingRenameDraft = React.useState<ArcRenameDraft option> None
-        let isCreatingFileSystemItem, setIsCreatingFileSystemItem = React.useState false
-        let isRenaming, setIsRenaming = React.useState false
-        let pendingDeleteItem, setPendingDeleteItem = React.useState<FileItem option> None
-        let isDeleting, setIsDeleting = React.useState false
+        let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
+        let isDialogBusy, setIsDialogBusy = React.useState false
         let hasObservedFileTreeUpdateRef = React.useRef false
 
         let effectiveFileTree =
@@ -221,28 +218,29 @@ type FileTree =
                     )
                 | None -> ()
 
-        let closeCreateModal () = setPendingCreateKind None
+        let openDialog dialog =
+            setIsDialogBusy false
+            setActiveDialog (Some dialog)
 
-        let closeFileSystemCreateModal () =
-            setPendingFileSystemCreateDraft None
+        let closeDialog () =
+            setIsDialogBusy false
+            setActiveDialog None
 
-        let openCreateModal kind = setPendingCreateKind (Some kind)
+        let openCreateModal kind =
+            openDialog (CreateDialog kind)
 
         let openFileSystemCreateModal kind item =
             if canCreateFileSystemItemIn item then
-                setPendingFileSystemCreateDraft (Some { Parent = item; Kind = kind })
-
-        let closeDeleteModal () =
-            setPendingDeleteItem None
-
-        let closeRenameModal () =
-            setPendingRenameDraft None
+                openDialog (FileSystemCreateDialog { Parent = item; Kind = kind })
 
         let requestDeleteItem =
-            FileTreeDeleteWorkflow.requestDeleteItem setPendingDeleteItem
+            FileTreeDeleteWorkflow.requestDeleteItem (Option.iter (DeleteDialog >> openDialog))
 
         let requestRenameItem =
-            FileTreeRenameWorkflow.requestRenameItem setPendingRenameDraft errorModal.enqueue arcScopeId
+            FileTreeRenameWorkflow.requestRenameItem
+                (Option.iter (RenameDialog >> openDialog))
+                errorModal.enqueue
+                arcScopeId
 
         let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
@@ -276,84 +274,101 @@ type FileTree =
                 | Error errorMessage -> return Error errorMessage
             }
 
+        let activeCreateKind, activeFileSystemCreateDraft, activeRenameDraft, activeDeleteItem =
+            match activeDialog with
+            | Some(CreateDialog kind) -> Some kind, None, None, None
+            | Some(FileSystemCreateDialog draft) -> None, Some draft, None, None
+            | Some(RenameDialog renameDraft) -> None, None, Some renameDraft, None
+            | Some(DeleteDialog item) -> None, None, None, Some item
+            | None -> None, None, None, None
+
         let confirmDeleteItem () =
-            FileTreeDeleteWorkflow.confirmDeleteItem {
-                pendingDeleteItem = pendingDeleteItem
-                closeDeleteModal = closeDeleteModal
-                setIsDeleting = setIsDeleting
-                enqueueError = errorModal.enqueue
-                arcScopeId = arcScopeId
-            }
+            if not isDialogBusy then
+                FileTreeDeleteWorkflow.confirmDeleteItem {
+                    pendingDeleteItem = activeDeleteItem
+                    closeDeleteModal = closeDialog
+                    setIsDeleting = setIsDialogBusy
+                    enqueueError = errorModal.enqueue
+                    arcScopeId = arcScopeId
+                }
 
         let createArcEntry kind (identifier: string) =
-            let existingPaths = effectiveFileTree |> Array.map (fun entry -> entry.path)
+            if not isDialogBusy then
+                let existingPaths = effectiveFileTree |> Array.map (fun entry -> entry.path)
 
-            match tryBuildArcCreateDraft kind identifier existingPaths with
-            | Error errorMessage -> applyCreateError errorMessage
-            | Ok draft ->
-                promise {
-                    let! createResult = saveArcFileAndOpen draft.ArcFile
-
-                    match createResult with
-                    | Error exn -> applyCreateError exn.Message
-                    | Ok createdArcFileDto ->
-                        let selectedPath = PathHelpers.normalizePath createdArcFileDto.path
-                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                        createdArcFileDto
-                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
-
-                        closeCreateModal ()
-                }
-                |> Promise.catch (fun exn -> applyCreateError exn.Message)
-                |> Promise.start
-
-        let createFileSystemItem (name: string) =
-            match pendingFileSystemCreateDraft with
-            | None -> closeFileSystemCreateModal ()
-            | Some draft ->
-                match tryGetItemRelativePath draft.Parent with
-                | None -> applyFileSystemCreateError "Could not resolve the selected folder path."
-                | Some parentPath ->
-                    setIsCreatingFileSystemItem true
+                match tryBuildArcCreateDraft kind identifier existingPaths with
+                | Error errorMessage -> applyCreateError errorMessage
+                | Ok draft ->
+                    setIsDialogBusy true
 
                     promise {
-                        let! createResult =
-                            Api.ipcArcVaultApi.createFileSystemItem {
-                                parentPath = parentPath
-                                name = name
-                                kind = draft.Kind
-                            }
+                        let! createResult = saveArcFileAndOpen draft.ArcFile
 
                         match createResult with
-                        | Error exn -> applyFileSystemCreateError exn.Message
-                        | Ok createdPath ->
-                            let selectedPath = PathHelpers.normalizePath createdPath
+                        | Error exn ->
+                            setIsDialogBusy false
+                            applyCreateError exn.Message
+                        | Ok createdArcFileDto ->
+                            let selectedPath = PathHelpers.normalizePath createdArcFileDto.path
                             fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                            match draft.Kind with
-                            | FileSystemItemKind.File ->
-                                let! openResult = Api.ipcArcVaultApi.openFile selectedPath
+                            createdArcFileDto
+                            |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                            |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
 
-                                match openResult with
-                                | Ok dto ->
-                                    dto
-                                    |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                                    |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
-                                | Error _ ->
-                                    FileContentDTO.create ARCtrl.Contract.DTOType.PlainText "" selectedPath
-                                    |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                                    |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
-                            | FileSystemItemKind.Folder ->
-                                setLoadedDirectoryPaths (fun current -> current.Add selectedPath)
-                                pageStateCtx.setState None
-
-                            closeFileSystemCreateModal ()
+                            closeDialog ()
                     }
-                    |> Promise.catch (fun exn -> applyFileSystemCreateError exn.Message)
-                    |> Promise.map (fun _ -> setIsCreatingFileSystemItem false)
+                    |> Promise.catch (fun exn ->
+                        setIsDialogBusy false
+                        applyCreateError exn.Message)
                     |> Promise.start
+
+        let createFileSystemItem (name: string) =
+            if not isDialogBusy then
+                match activeFileSystemCreateDraft with
+                | None -> closeDialog ()
+                | Some draft ->
+                    match tryGetItemRelativePath draft.Parent with
+                    | None -> applyFileSystemCreateError "Could not resolve the selected folder path."
+                    | Some parentPath ->
+                        setIsDialogBusy true
+
+                        promise {
+                            let! createResult =
+                                Api.ipcArcVaultApi.createFileSystemItem {
+                                    parentPath = parentPath
+                                    name = name
+                                    kind = draft.Kind
+                                }
+
+                            match createResult with
+                            | Error exn -> applyFileSystemCreateError exn.Message
+                            | Ok createdPath ->
+                                let selectedPath = PathHelpers.normalizePath createdPath
+                                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                                match draft.Kind with
+                                | FileSystemItemKind.File ->
+                                    let! openResult = Api.ipcArcVaultApi.openFile selectedPath
+
+                                    match openResult with
+                                    | Ok dto ->
+                                        dto
+                                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                    | Error _ ->
+                                        FileContentDTO.create ARCtrl.Contract.DTOType.PlainText "" selectedPath
+                                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                | FileSystemItemKind.Folder ->
+                                    setLoadedDirectoryPaths (fun current -> current.Add selectedPath)
+                                    pageStateCtx.setState None
+
+                                closeDialog ()
+                        }
+                        |> Promise.catch (fun exn -> applyFileSystemCreateError exn.Message)
+                        |> Promise.map (fun _ -> setIsDialogBusy false)
+                        |> Promise.start
 
         let renameContextMenuItems =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
@@ -392,65 +407,67 @@ type FileTree =
             )
 
         let confirmRenameItem (newName: string) =
-            FileTreeRenameWorkflow.confirmRenameItem
-                {
-                    pendingRenameDraft = pendingRenameDraft
-                    selectedTreePath = fileStateCtx.state.Selection.TreePath
-                    pageState = pageStateCtx.state
-                    closeRenameModal = closeRenameModal
-                    setIsRenaming = setIsRenaming
-                    setSelection = fileStateCtx.setSelection
-                    refreshGitStatus = gitStateCtx.refresh
-                    reloadPreviewByPath = reloadPreviewByPath
-                    renamePath = Api.ipcArcVaultApi.renamePath
-                    enqueueError = errorModal.enqueue
-                    arcScopeId = arcScopeId
-                }
-                newName
+            if not isDialogBusy then
+                FileTreeRenameWorkflow.confirmRenameItem
+                    {
+                        pendingRenameDraft = activeRenameDraft
+                        selectedTreePath = fileStateCtx.state.Selection.TreePath
+                        pageState = pageStateCtx.state
+                        closeRenameModal = closeDialog
+                        setIsRenaming = setIsDialogBusy
+                        setSelection = fileStateCtx.setSelection
+                        refreshGitStatus = gitStateCtx.refresh
+                        reloadPreviewByPath = reloadPreviewByPath
+                        renamePath = Api.ipcArcVaultApi.renamePath
+                        enqueueError = errorModal.enqueue
+                        arcScopeId = arcScopeId
+                    }
+                    newName
 
-        let activeCreateKind =
-            pendingCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
+        let createModalKind =
+            activeCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
 
         let arcCreateModal =
             CreateArcFileModal.Main(
-                isOpen = pendingCreateKind.IsSome,
-                kind = activeCreateKind,
-                close = closeCreateModal,
-                submit = createArcEntry
+                isOpen = activeCreateKind.IsSome,
+                kind = createModalKind,
+                close = closeDialog,
+                submit = createArcEntry,
+                isCreating = isDialogBusy
             )
 
         let activeFileSystemCreateKind =
-            pendingFileSystemCreateDraft
+            activeFileSystemCreateDraft
             |> Option.map _.Kind
             |> Option.defaultValue FileSystemItemKind.File
 
         let fileSystemCreateModal =
             CreateFileSystemItemModal.Main(
-                isOpen = pendingFileSystemCreateDraft.IsSome,
+                isOpen = activeFileSystemCreateDraft.IsSome,
                 kind = activeFileSystemCreateKind,
-                parentName = (pendingFileSystemCreateDraft |> Option.map _.Parent.Name),
-                close = closeFileSystemCreateModal,
+                parentName = (activeFileSystemCreateDraft |> Option.map _.Parent.Name),
+                close = closeDialog,
                 submit = createFileSystemItem,
-                isCreating = isCreatingFileSystemItem
+                isCreating = isDialogBusy
             )
 
         let deleteConfirmModal =
             FileTreeDeleteModal.Main(
-                isOpen = pendingDeleteItem.IsSome,
-                itemName = (pendingDeleteItem |> Option.map _.Name),
-                close = closeDeleteModal,
+                isOpen = activeDeleteItem.IsSome,
+                itemName = (activeDeleteItem |> Option.map _.Name),
+                close = closeDialog,
                 submit = confirmDeleteItem,
-                isDeleting = isDeleting
+                isDeleting = isDialogBusy
             )
 
         let renameModal =
             FileTreeRenameModal.Main(
-                isOpen = pendingRenameDraft.IsSome,
-                itemName = (pendingRenameDraft |> Option.map (fun draft -> draft.Item.Name)),
-                initialName = (pendingRenameDraft |> Option.map _.InitialName),
-                close = closeRenameModal,
+                isOpen = activeRenameDraft.IsSome,
+                itemName = (activeRenameDraft |> Option.map (fun draft -> draft.Item.Name)),
+                initialName = (activeRenameDraft |> Option.map _.InitialName),
+                close = closeDialog,
                 submit = confirmRenameItem,
-                isRenaming = isRenaming
+                isRenaming = isDialogBusy
             )
 
         match fileItem with

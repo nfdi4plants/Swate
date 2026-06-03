@@ -5,6 +5,7 @@ import { FileExplorer, FileExplorerExample_Example as FileExplorerExample } from
 import { contextMenuItems as fileExplorerGitLfsContextMenuItems } from "./FileExplorerGitLfsHelper.fs.js";
 import {
   ContextMenuItem,
+  type FileItem,
   FileItemIcon_Document$,
   FileItemIcon_Folder,
   FileTree_createFile,
@@ -18,6 +19,15 @@ const arcCreateItems = [
   { label: "Add Workflow", path: "workflows/NewWorkflow/isa.workflow.xlsx" },
   { label: "Add Run", path: "runs/NewRun/isa.run.xlsx" },
 ];
+
+const createStableFile = (name: string, path: string, id: string): FileItem =>
+  Object.assign(FileTree_createFile(name, path, FileItemIcon_Document$()), { Id: id });
+
+const createStableFolder = (name: string, path: string, id: string, children?: FileItem[]): FileItem =>
+  Object.assign(FileTree_createFolder(name, path, FileItemIcon_Folder()), {
+    Id: id,
+    Children: children === undefined ? undefined : ofArray(children),
+  });
 
 const InMemoryCreateFileExplorer = () => {
   const [pendingPath, setPendingPath] = React.useState<string | null>(null);
@@ -57,6 +67,51 @@ const InMemoryCreateFileExplorer = () => {
       >
         Save
       </button>
+    </div>
+  );
+};
+
+const LazyLoadDirectoryFileExplorer = () => {
+  const [lazyFolderLoaded, setLazyFolderLoaded] = React.useState(false);
+
+  const items = React.useMemo(() => {
+    const emptyFolder = createStableFolder("Empty Folder", "arc/empty-folder", "empty-folder", []);
+    const lazyChild = createStableFile("Lazy Child.txt", "arc/lazy-folder/Lazy Child.txt", "lazy-child");
+    const lazyFolder = createStableFolder(
+      "Lazy Folder",
+      "arc/lazy-folder",
+      "lazy-folder",
+      lazyFolderLoaded ? [lazyChild] : undefined,
+    );
+
+    return ofArray([emptyFolder, lazyFolder]);
+  }, [lazyFolderLoaded]);
+
+  return (
+    <div className="swt:p-4">
+      <FileExplorer
+        initialItems={items}
+        onDirectoryArrowToggle={(item, willExpand) => {
+          if (item.Id === "lazy-folder" && willExpand) {
+            setLazyFolderLoaded(true);
+          }
+        }}
+      />
+    </div>
+  );
+};
+
+const SelectedPathFileExplorer = () => {
+  const items = React.useMemo(() => {
+    const selectedFile = createStableFile("selected-report.txt", "arc/selected-parent/selected-report.txt", "selected-file");
+    const parentFolder = createStableFolder("Selected Parent", "arc/selected-parent", "selected-parent", [selectedFile]);
+
+    return ofArray([parentFolder]);
+  }, []);
+
+  return (
+    <div className="swt:p-4">
+      <FileExplorer initialItems={items} selectedItemId="selected-file" />
     </div>
   );
 };
@@ -240,6 +295,52 @@ export const Default: Story = {
     const folder = await canvas.findByText("My Files");
     await userEvent.click(folder);
   }),
+};
+
+export const DirectoryArrowsReflectLoadability: StoryObj<typeof LazyLoadDirectoryFileExplorer> = {
+  render: () => <LazyLoadDirectoryFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await canvas.findByText("Empty Folder");
+    await expect(canvas.queryByRole("button", { name: "Expand Empty Folder" })).toBeNull();
+
+    const lazyFolderToggle = await canvas.findByRole("button", { name: "Expand Lazy Folder" });
+    await expect(canvas.queryByText("Lazy Child.txt")).toBeNull();
+
+    await userEvent.click(lazyFolderToggle);
+
+    await waitFor(() => {
+      expect(canvas.getByText("Lazy Child.txt")).toBeInTheDocument();
+    });
+  },
+};
+
+export const SelectedFileHighlightPersistsAfterParentReopen: StoryObj<typeof SelectedPathFileExplorer> = {
+  render: () => <SelectedPathFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const selectedFileLabel = await canvas.findByText("selected-report.txt");
+    await expect(selectedFileLabel).toHaveClass(/swt:font-semibold/);
+    await expect(selectedFileLabel).toHaveClass(/swt:text-primary/);
+
+    const collapseParent = await canvas.findByRole("button", { name: "Collapse Selected Parent" });
+    await expect(collapseParent).toHaveClass(/swt:bg-base-300/);
+    await userEvent.click(collapseParent);
+
+    await waitFor(() => {
+      expect(canvas.queryByText("selected-report.txt")).toBeNull();
+    });
+
+    await userEvent.click(await canvas.findByRole("button", { name: "Expand Selected Parent" }));
+
+    const selectedFileLabelAfterReopen = await canvas.findByText("selected-report.txt");
+    await expect(selectedFileLabelAfterReopen).toHaveClass(/swt:font-semibold/);
+    await expect(selectedFileLabelAfterReopen).toHaveClass(/swt:text-primary/);
+  },
 };
 
 export const ContextMenuCreatesInMemoryUntilSave: StoryObj<typeof InMemoryCreateFileExplorer> = {

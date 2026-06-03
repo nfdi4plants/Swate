@@ -7,15 +7,6 @@ let private normalizeRelativePath (path: string) =
     path
     |> PathHelpers.normalizeCanonicalRelativePath
 
-let private tryGetParentPath (path: string) =
-    let normalizedPath = PathHelpers.normalizePath path
-    let separatorIndex = normalizedPath.LastIndexOf('/')
-
-    if separatorIndex < 0 then
-        None
-    else
-        Some(normalizedPath.Substring(0, separatorIndex))
-
 let validateRenameName (newName: string) =
     let normalizedNewName = newName.Trim()
 
@@ -36,7 +27,7 @@ let buildRenamedSiblingPath (sourcePath: string) (newName: string) =
     let normalizedSourcePath = normalizeRelativePath sourcePath
     let normalizedNewName = newName.Trim()
 
-    match tryGetParentPath normalizedSourcePath with
+    match PathHelpers.tryGetParentPath normalizedSourcePath with
     | Some parentPath when String.IsNullOrWhiteSpace parentPath |> not -> $"{parentPath}/{normalizedNewName}"
     | _ -> normalizedNewName
 
@@ -61,7 +52,7 @@ let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
 
     let parentIsAllowed =
         String.IsNullOrWhiteSpace normalizedParentPath
-        || ArcDeletePathRules.isGenericFileSystemParentAllowed normalizedParentPath
+        || ArcEntityPathRules.isGenericFileSystemParentAllowed normalizedParentPath
 
     if parentIsAllowed |> not then
         Error "Generic file and folder creation is only allowed inside safe ARC directories."
@@ -75,7 +66,7 @@ let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
                 else
                     $"{normalizedParentPath}/{normalizedName}"
 
-            if ArcDeletePathRules.isGenericFileSystemTargetAllowed targetPath then
+            if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath then
                 Ok targetPath
             else
                 Error "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
@@ -83,13 +74,13 @@ let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
 let tryBuildGenericFileSystemRenameTargetPath (sourcePath: string) (newName: string) =
     let normalizedSourcePath = normalizeRelativePath sourcePath
 
-    if ArcDeletePathRules.isGenericFileSystemTargetAllowed normalizedSourcePath |> not then
+    if ArcEntityPathRules.isGenericFileSystemTargetAllowed normalizedSourcePath |> not then
         Error "Generic file and folder rename is only allowed for safe non-canonical paths inside the ARC."
     else
         match tryBuildRenameTargetPath normalizedSourcePath newName with
         | Error validationError -> Error validationError
         | Ok targetPath ->
-            if ArcDeletePathRules.isGenericFileSystemTargetAllowed targetPath then
+            if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath then
                 Ok targetPath
             else
                 Error "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."
