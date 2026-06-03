@@ -33,7 +33,7 @@ module private MainHelper =
 
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
 [<ReactMemoComponent>]
-let Main (appRootPath: ArcRootPath, pageState: PageState option) =
+let Main (appRootPath: ArcRootPath) (pageState: PageState option) =
     Swate.Components.Composite.Template.TemplateCacheProvider.TemplateCacheProvider(
         loadTemplates = MainHelper.loadTemplates,
         children =

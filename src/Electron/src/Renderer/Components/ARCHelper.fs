@@ -1,23 +1,11 @@
 module Renderer.Components.ARCHelper
 
 open System
-open Feliz
 open Swate.Components
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Components.Shared
-
-/// This is boilerplate we do not need. Just ensure that the path is normalized inside `useAppStateCtx`. As we do this so many times, we should focus on the base information and ensure it is normalized at the source, not every time we use it.
-///
-/// In addition, i have seen component using `useCurrentArcScopeId` AND `useAppStateCtx` due to confusion.
-[<Hook>]
-let useCurrentArcScopeId () =
-    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
-
-    appStateCtx
-    |> Option.map PathHelpers.normalizePath
-    |> Option.bind (fun path -> if String.IsNullOrWhiteSpace path then None else Some path)
 
 /// TODO: Check if this type is necessary. Looks like it just is an additonal wrapper around PageState? Not sure why we need this + helper boilerplate below.
 type ViewLoadResult = {

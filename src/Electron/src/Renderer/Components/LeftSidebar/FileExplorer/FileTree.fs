@@ -52,7 +52,6 @@ type FileTree =
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
-        let arcScopeId = useCurrentArcScopeId ()
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
@@ -134,8 +133,7 @@ type FileTree =
                     errorModal.enqueue (
                         ErrorModalRequest.create (
                             $"File '{item.Name}' has no path.",
-                            title = "Preview failed",
-                            ?scopeId = arcScopeId
+                            title = "Preview failed"
                         )
                     )
                 | Some path when item.IsDirectory ->
@@ -234,7 +232,6 @@ type FileTree =
             FileTreeRenameWorkflow.requestRenameItem
                 (Option.iter (RenameDialog >> openDialog))
                 errorModal.enqueue
-                arcScopeId
 
         let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
@@ -250,7 +247,7 @@ type FileTree =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
         let applyCreateError errorMessage =
-            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file", ?scopeId = arcScopeId))
+            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
 
         let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> =
             promise {
@@ -277,7 +274,6 @@ type FileTree =
                     closeDeleteModal = closeDialog
                     setIsDeleting = setIsDialogBusy
                     enqueueError = errorModal.enqueue
-                    arcScopeId = arcScopeId
                 }
 
         let createArcEntry kind (identifier: string) =
@@ -334,7 +330,6 @@ type FileTree =
         let createContextMenuItems =
             Renderer.Components.FileExplorerLfs.createContextMenuItems
                 errorModal.enqueue
-                arcScopeId
                 baseContextMenuItems
 
         let confirmRenameItem (newName: string) =
@@ -351,7 +346,6 @@ type FileTree =
                         reloadPreviewByPath = reloadPreviewByPath
                         renamePath = Api.ipcArcVaultApi.renamePath
                         enqueueError = errorModal.enqueue
-                        arcScopeId = arcScopeId
                     }
                     newName
 

@@ -22,24 +22,21 @@ module FileTreeRenameWorkflow =
         reloadPreviewByPath: string -> JS.Promise<Result<unit, string>>
         renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
         enqueueError: ErrorModalRequest -> unit
-        arcScopeId: string option
     }
 
     let private enqueueRenameError
         (enqueueError: ErrorModalRequest -> unit)
-        (arcScopeId: string option)
         (errorMessage: string)
         =
         enqueueError (
             ErrorModalRequest.create (
                 errorMessage,
-                title = "Could not rename item",
-                ?scopeId = arcScopeId
+                title = "Could not rename item"
             )
         )
 
     let private applyRenameError (config: ConfirmRenameConfig) (errorMessage: string) =
-        enqueueRenameError config.enqueueError config.arcScopeId errorMessage
+        enqueueRenameError config.enqueueError errorMessage
 
     let private tryRemapActiveArcFilePath
         (sourcePath: string)
@@ -57,12 +54,11 @@ module FileTreeRenameWorkflow =
     let requestRenameItem
         (setPendingRenameDraft: ArcRenameDraft option -> unit)
         (enqueueError: ErrorModalRequest -> unit)
-        (arcScopeId: string option)
         (item: FileItem)
         =
         match tryBuildRenameDraft item with
         | Ok renameDraft -> setPendingRenameDraft (Some renameDraft)
-        | Error validationError -> enqueueRenameError enqueueError arcScopeId validationError
+        | Error validationError -> enqueueRenameError enqueueError validationError
 
     let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
         FileExplorerContextMenuItem.whenItem

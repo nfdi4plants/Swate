@@ -12,15 +12,13 @@ module FileTreeDeleteWorkflow =
         closeDeleteModal: unit -> unit
         setIsDeleting: bool -> unit
         enqueueError: ErrorModalRequest -> unit
-        arcScopeId: string option
     }
 
     let private applyDeleteError (config: ConfirmDeleteConfig) (errorMessage: string) =
         config.enqueueError (
             ErrorModalRequest.create (
                 errorMessage,
-                title = "Could not delete item",
-                ?scopeId = config.arcScopeId
+                title = "Could not delete item"
             )
         )
 
