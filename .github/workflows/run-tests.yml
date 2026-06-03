@@ -38,6 +38,12 @@ jobs:
       - name: Install root npm dependencies
         run: npm ci
 
+      # Ensure Electron's platform binary is present before tests import Fable.Electron.
+      - name: Install Electron binary
+        run: node node_modules/electron/install.js
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: ""
+
       # Install playwright dependencies
       - name: Install Playwright dependencies
         working-directory: src/Components
