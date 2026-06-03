@@ -142,6 +142,7 @@
     <Compile Include="Composite\AnnotationTable\ContextMenu.fs" />
     <Compile Include="Composite\AnnotationTable\Modals.fs" />
     <Compile Include="Composite\AnnotationTable\AnnotationTable.fs" />
+    <Compile Include="Composite\AnnotationTable\ResetTableConfirmationModal.fs" />
     <Compile Include="Composite\DataMapTable\Types.fs" />
     <Compile Include="Composite\DataMapTable\DataMapTable.fs" />
     <Compile Include="Composite\Authentication\Types.fs" />
