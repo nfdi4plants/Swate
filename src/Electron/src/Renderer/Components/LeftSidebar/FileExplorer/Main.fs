@@ -3,13 +3,11 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Primitive.Actionbar
 open Swate.Components.Primitive.Actionbar.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
 module private FileExplorerHelper =
-    open Swate.Electron.Shared.FileIOHelper
 
     let copyArcPathToClipboard (onError: exn -> unit) =
         fun (path: string) -> promise {
@@ -148,11 +146,11 @@ type Main =
                         prop.children [
                             Swate.Components.Primitive.Actionbar.Actionbar.Main(
                                 [|
-                                    ButtonInfo.create (
-                                        "swt:fluent--book-open-24-regular swt:size-5",
-                                        "Lab book view",
-                                        fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.LandingDraftPage)
-                                    )
+                                    //ButtonInfo.create (
+                                    //    "swt:fluent--book-open-24-regular swt:size-5",
+                                    //    "Lab book view",
+                                    //    fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.LandingDraftPage)
+                                    //)
                                     ButtonInfo.create (
                                         "swt:fluent--document-add-24-regular swt:size-5",
                                         "Create Note",
@@ -164,7 +162,7 @@ type Main =
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
                                     )
                                 |],
-                                3
+                                2
                             )
                         ]
                     ]

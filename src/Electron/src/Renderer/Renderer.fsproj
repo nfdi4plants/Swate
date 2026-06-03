@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -24,7 +24,9 @@
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRenameHelper.fs" />
-    <Compile Include="Components\LeftSidebar\FileExplorer\CreateArcFileModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Modals\CreateArcFileModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Modals\FileTreeRenameModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Modals\FileTreeDeleteModal.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRename.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeDelete.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTree.fs" />

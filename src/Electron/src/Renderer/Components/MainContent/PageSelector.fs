@@ -7,7 +7,6 @@ open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.DataHubBrowserTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
 open Renderer.Components.MainContent.ErrorViewTarget
-open Renderer.Components.MainContent.LandingDraftTarget
 open Renderer.Components.MainContent.NotesDraftTarget
 open Renderer.Components.MainContent.NotesSearchTarget
 open Renderer.Components.MainContent.TextPreviewTarget
@@ -34,7 +33,6 @@ let Main (appRootPath: ArcRootPath) (pageState: PageState option) =
     | Some _, Some(PageState.TextPage content) -> TextPreviewTarget content
     | Some _, Some PageState.UnknownPage -> UnknownPreviewTarget()
     | Some _, Some(PageState.ErrorPage errMsg) -> ErrorViewTarget errMsg
-    | Some _, Some PageState.LandingDraftPage -> LandingDraftTarget()
     | Some _, Some PageState.NotesDraftPage -> NotesDraftTarget()
     | Some _, Some PageState.NotesSearchPage -> NotesSearchTarget()
     | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData

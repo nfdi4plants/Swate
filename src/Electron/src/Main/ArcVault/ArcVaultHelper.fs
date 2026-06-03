@@ -1,16 +1,21 @@
 module Main.ArcVaultHelper
 
 
+open System
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
+open ARCtrl.Contract
 open Fable.Electron
+open Fable.Core
 open Fable.Core.JsInterop
 open Main
 open Main.ArcMerge
 open Main.Bindings
 open Node.Api
+
+let private fsPromisesDynamic: obj = importAll "fs/promises"
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
@@ -60,53 +65,48 @@ let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: Dat
     with e ->
         Error(exn $"Failed to set datamap on ARC: {e.Message}")
 
-let private syncDataMapStaticHash (sourceDataMap: DataMap option) (targetDataMap: DataMap option) =
-    match sourceDataMap, targetDataMap with
-    | Some sourceDataMap, Some targetDataMap -> targetDataMap.StaticHash <- sourceDataMap.StaticHash
+let private baselineDataMapStaticHash (dataMap: DataMap option) =
+    dataMap |> Option.iter (fun dm -> dm.StaticHash <- cleanDataMapStaticHash dm)
+
+/// Sets the current loaded ARC state as the clean in-memory baseline.
+let baselineArcStaticHashes (arc: ARC) : unit =
+    arc.License |> Option.iter (fun license -> license.StaticHash <- license.GetHashCode())
+
+    for study in arc.Studies do
+        study.StaticHash <- study.GetLightHashCode()
+        baselineDataMapStaticHash study.DataMap
+
+    for assay in arc.Assays do
+        assay.StaticHash <- assay.GetLightHashCode()
+        baselineDataMapStaticHash assay.DataMap
+
+    for workflow in arc.Workflows do
+        workflow.StaticHash <- workflow.GetLightHashCode()
+        baselineDataMapStaticHash workflow.DataMap
+
+    for run in arc.Runs do
+        run.StaticHash <- run.GetLightHashCode()
+        baselineDataMapStaticHash run.DataMap
+
+    arc.StaticHash <- arc.GetLightHashCode()
+
+/// Replaces the just-added ARC entity with the disk round-tripped version.
+/// This keeps lossy serialization details from becoming immediate unsaved changes.
+let syncAddedArcFileFromPersisted (source: ARC) (target: ARC) (arcFile: ArcFiles) : unit =
+    match arcFile with
+    | ArcFiles.Assay assay ->
+        source.TryGetAssay assay.Identifier
+        |> Option.iter (fun sourceAssay -> target.SetAssay(assay.Identifier, sourceAssay))
+    | ArcFiles.Study(study, _) ->
+        source.TryGetStudy study.Identifier
+        |> Option.iter (fun sourceStudy -> target.SetStudy(study.Identifier, sourceStudy))
+    | ArcFiles.Workflow workflow ->
+        source.TryGetWorkflow workflow.Identifier
+        |> Option.iter (fun sourceWorkflow -> target.SetWorkflow(workflow.Identifier, sourceWorkflow))
+    | ArcFiles.Run run ->
+        source.TryGetRun run.Identifier
+        |> Option.iter (fun sourceRun -> target.SetRun(run.Identifier, sourceRun))
     | _ -> ()
-
-/// Syncs static hashes from source ARC to target ARC for matching entities.
-/// This keeps ARCtrl update contract generation scoped to actual changes.
-let syncArcStaticHashes (source: ARC) (target: ARC) : unit =
-    target.StaticHash <- source.StaticHash
-
-    match source.License, target.License with
-    | Some sourceLicense, Some targetLicense -> targetLicense.StaticHash <- sourceLicense.StaticHash
-    | _ -> ()
-
-    for targetStudy in target.Studies do
-        match source.TryGetStudy targetStudy.Identifier with
-        | Some sourceStudy ->
-            targetStudy.StaticHash <- sourceStudy.StaticHash
-            syncDataMapStaticHash sourceStudy.DataMap targetStudy.DataMap
-        | None -> ()
-
-    for targetAssay in target.Assays do
-        match source.TryGetAssay targetAssay.Identifier with
-        | Some sourceAssay ->
-            targetAssay.StaticHash <- sourceAssay.StaticHash
-            syncDataMapStaticHash sourceAssay.DataMap targetAssay.DataMap
-        | None -> ()
-
-    for targetWorkflow in target.Workflows do
-        match source.TryGetWorkflow targetWorkflow.Identifier with
-        | Some sourceWorkflow ->
-            targetWorkflow.StaticHash <- sourceWorkflow.StaticHash
-            syncDataMapStaticHash sourceWorkflow.DataMap targetWorkflow.DataMap
-        | None -> ()
-
-    for targetRun in target.Runs do
-        match source.TryGetRun targetRun.Identifier with
-        | Some sourceRun ->
-            targetRun.StaticHash <- sourceRun.StaticHash
-            syncDataMapStaticHash sourceRun.DataMap targetRun.DataMap
-        | None -> ()
-
-/// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
-let copyArcPreservingStaticHashes (arc: ARC) : ARC =
-    let copiedArc = arc.Copy()
-    syncArcStaticHashes arc copiedArc
-    copiedArc
 
 /// This function should only be used for partial updates to an ARC based on a file content DTO.
 let updateARCByFileContentDTO (oldArc: ARC) (dto: FileContentDTO) : Result<ARC, exn> =
@@ -188,6 +188,132 @@ let swatelogfn id fmt =
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
 
+type private CanonicalArcFileRepairSpec = {
+    CollectionFolder: string
+    FileName: string
+    CreateContracts: string -> Contract[]
+}
+
+let private canonicalArcFileRepairSpecs = [|
+    {
+        CollectionFolder = "assays"
+        FileName = "isa.assay.xlsx"
+        CreateContracts = fun identifier -> (ArcAssay.init identifier).ToCreateContract(false)
+    }
+    {
+        CollectionFolder = "studies"
+        FileName = "isa.study.xlsx"
+        CreateContracts = fun identifier -> (ArcStudy.init identifier).ToCreateContract(false)
+    }
+    {
+        CollectionFolder = "workflows"
+        FileName = "isa.workflow.xlsx"
+        CreateContracts = fun identifier -> (ArcWorkflow.init identifier).ToCreateContract(false)
+    }
+    {
+        CollectionFolder = "runs"
+        FileName = "isa.run.xlsx"
+        CreateContracts = fun identifier -> (ArcRun.init identifier).ToCreateContract(false)
+    }
+|]
+
+let private isZeroByteZipReadError (errors: string[]) =
+    errors
+    |> Array.exists (fun error ->
+        let normalizedError = error.ToLowerInvariant()
+        normalizedError.Contains("error reading contract")
+        && normalizedError.Contains("data length = 0")
+    )
+
+let private tryReadDirectoryAsync (directoryPath: string) = promise {
+    try
+        let! entries = fsPromisesDynamic?readdir (directoryPath) |> unbox<JS.Promise<string[]>>
+        return entries
+    with _ ->
+        return [||]
+}
+
+let private tryGetFileSizeAsync (filePath: string) = promise {
+    try
+        let! stats = fsPromisesDynamic?stat (filePath) |> unbox<JS.Promise<obj>>
+        return Some(stats?size |> unbox<float>)
+    with _ ->
+        return None
+}
+
+let private repairZeroByteCanonicalArcFile
+    (windowId: int)
+    (arcPath: string)
+    (spec: CanonicalArcFileRepairSpec)
+    (identifier: string)
+    =
+    promise {
+        let relativePath =
+            ARCtrl.ArcPathHelper.combineMany [|
+                spec.CollectionFolder
+                identifier
+                spec.FileName
+            |]
+
+        let absolutePath = path.join (arcPath, spec.CollectionFolder, identifier, spec.FileName)
+        let! fileSize = tryGetFileSizeAsync absolutePath
+
+        match fileSize with
+        | Some size when size = 0.0 ->
+            swatelogfn windowId "Repairing zero-byte ARC workbook: %s" relativePath
+            let! repairResult = fullFillContractBatchAsync arcPath (spec.CreateContracts identifier)
+
+            match repairResult with
+            | Ok _ -> return true
+            | Error errors ->
+                swatelogfn
+                    windowId
+                    "Unable to repair zero-byte ARC workbook '%s': %s"
+                    relativePath
+                    (PathHelpers.formatContractErrors errors)
+
+                return false
+        | _ -> return false
+    }
+
+let private repairZeroByteCanonicalArcFiles (windowId: int) (arcPath: string) = promise {
+    let mutable repairedAny = false
+
+    for spec in canonicalArcFileRepairSpecs do
+        let collectionPath = path.join (arcPath, spec.CollectionFolder)
+        let! identifiers = tryReadDirectoryAsync collectionPath
+
+        for identifier in identifiers do
+            let! repaired = repairZeroByteCanonicalArcFile windowId arcPath spec identifier
+            repairedAny <- repairedAny || repaired
+
+    return repairedAny
+}
+
+/// Loads an ARC, repairing empty canonical workbooks that can be left behind by interrupted creates.
+let tryLoadArcWithZeroByteRepair (windowId: int) (arcPath: string) = promise {
+    let! loadResult = ARC.tryLoadAsync arcPath
+
+    match loadResult with
+    | Ok arc ->
+        baselineArcStaticHashes arc
+        return Ok arc
+    | Error errors when isZeroByteZipReadError errors ->
+        let! repairedAny = repairZeroByteCanonicalArcFiles windowId arcPath
+
+        if repairedAny then
+            let! retryLoadResult = ARC.tryLoadAsync arcPath
+
+            match retryLoadResult with
+            | Ok arc ->
+                baselineArcStaticHashes arc
+                return Ok arc
+            | Error errors -> return Error errors
+        else
+            return Error errors
+    | Error errors -> return Error errors
+}
+
 let createWindow () = promise {
     printfn "[Swate] Creating new window"
     let screenSize = screen.getPrimaryDisplay().workAreaSize
@@ -210,6 +336,12 @@ let createWindow () = promise {
     return window
 }
 
+let shouldUsePollingByDefault (platform: string) =
+    System.String.Equals(platform, "win32", System.StringComparison.OrdinalIgnoreCase)
+
+let private currentNodePlatform () : string =
+    emitJsExpr () "process.platform" |> unbox<string>
+
 let createFileWatcher (path: string) (usePolling: bool option) =
 
     let ignoreFn =
@@ -230,7 +362,8 @@ let createFileWatcher (path: string) (usePolling: bool option) =
             else
                 false
 
-    let usePolling = defaultArg usePolling false
+    // Native Windows file events can keep handles that block app-initiated folder renames.
+    let usePolling = defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
 
     let watcherOptions =
         if usePolling then

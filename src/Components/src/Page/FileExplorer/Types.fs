@@ -330,6 +330,32 @@ type ContextMenuItem = {
     Disabled: bool option
 }
 
+[<RequireQualifiedAccess>]
+module FileExplorerContextMenuItem =
+
+    let create label icon onClick = {
+        Label = label
+        Icon = icon
+        OnClick = onClick
+        Disabled = None
+    }
+
+    let disabled label icon = {
+        Label = label
+        Icon = icon
+        OnClick = fun () -> ()
+        Disabled = Some true
+    }
+
+    let forItem label icon onClick item =
+        create label icon (fun () -> onClick item)
+
+    let whenItem predicate label icon onClick item =
+        if predicate item then
+            [ forItem label icon onClick item ]
+        else
+            []
+
 module FileExplorerLogic =
 
     let private expandedIdsFromPath includeSelectedItem itemId items =

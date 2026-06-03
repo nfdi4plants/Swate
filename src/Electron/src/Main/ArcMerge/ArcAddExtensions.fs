@@ -8,64 +8,144 @@ open Swate.Components.Shared
 [<AutoOpen>]
 module ArcAddExtensions =
 
-    let private formatContractErrors (errors: string[]) =
-        errors |> Array.map string |> String.concat "\n"
-
     let private failIfEntityExists (entityKind: string) (identifier: string) (exists: bool) =
         if exists then
             failwith $"ARC already contains {entityKind} with identifier '{identifier}'."
 
+    let private prepareEntityAddContracts
+        (sourceArc: ARC)
+        (entityKind: string)
+        (identifier: string)
+        (exists: bool)
+        (addToArc: ARC -> unit)
+        (arcFileContracts: unit -> Contract[])
+        (includeUpdateContractsFlag: bool option)
+        =
+        failIfEntityExists entityKind identifier exists
+        let workingArc = copyArcPreservingStaticHashes sourceArc
+        addToArc workingArc
+        workingArc.UpdateFileSystem()
+
+        let contracts =
+            match includeUpdateContractsFlag with
+            | Some true -> workingArc.GetUpdateContracts(skipUpdateFS = true)
+            | _ -> arcFileContracts ()
+
+        workingArc, contracts
+
+    let private prepareAddContracts (sourceArc: ARC) (arcFile: ArcFiles) (includeUpdateContractsFlag: bool option) =
+        match arcFile with
+        | ArcFiles.Assay assay ->
+            let assayCopy = assay.Copy()
+
+            prepareEntityAddContracts
+                sourceArc
+                "assay"
+                assay.Identifier
+                (sourceArc.ContainsAssay assay.Identifier)
+                (fun arc -> arc.AddAssay assayCopy)
+                (fun () -> assayCopy.ToCreateContract(true))
+                includeUpdateContractsFlag
+        | ArcFiles.Study(study, _) ->
+            let studyCopy = study.Copy()
+
+            prepareEntityAddContracts
+                sourceArc
+                "study"
+                study.Identifier
+                (sourceArc.ContainsStudy study.Identifier)
+                (fun arc -> arc.AddStudy studyCopy)
+                (fun () -> studyCopy.ToCreateContract(true))
+                includeUpdateContractsFlag
+        | ArcFiles.Run run ->
+            let runCopy = run.Copy()
+
+            prepareEntityAddContracts
+                sourceArc
+                "run"
+                run.Identifier
+                (sourceArc.ContainsRun run.Identifier)
+                (fun arc -> arc.AddRun runCopy)
+                (fun () -> runCopy.ToCreateContract(true))
+                includeUpdateContractsFlag
+        | ArcFiles.Workflow workflow ->
+            let workflowCopy = workflow.Copy()
+
+            prepareEntityAddContracts
+                sourceArc
+                "workflow"
+                workflow.Identifier
+                (sourceArc.ContainsWorkflow workflow.Identifier)
+                (fun arc -> arc.AddWorkflow workflowCopy)
+                (fun () -> workflowCopy.ToCreateContract(true))
+                includeUpdateContractsFlag
+        | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
+        | ArcFiles.DataMap _ -> failwith "Adding datamap files is not supported."
+        | ArcFiles.Template _ -> failwith "Adding template files is not supported."
+
+    let private commitAddedArcFile (targetArc: ARC) (workingArc: ARC) (arcFile: ArcFiles) =
+        match arcFile with
+        | ArcFiles.Assay assay ->
+            workingArc.TryGetAssay assay.Identifier
+            |> Option.iter (fun sourceAssay -> targetArc.AddAssay(sourceAssay.Copy()))
+        | ArcFiles.Study(study, _) ->
+            workingArc.TryGetStudy study.Identifier
+            |> Option.iter (fun sourceStudy -> targetArc.AddStudy(sourceStudy.Copy()))
+        | ArcFiles.Run run ->
+            workingArc.TryGetRun run.Identifier
+            |> Option.iter (fun sourceRun -> targetArc.AddRun(sourceRun.Copy()))
+        | ArcFiles.Workflow workflow ->
+            workingArc.TryGetWorkflow workflow.Identifier
+            |> Option.iter (fun sourceWorkflow -> targetArc.AddWorkflow(sourceWorkflow.Copy()))
+        | _ -> ()
+
+        targetArc.UpdateFileSystem()
+
     type ARC with
 
-        member this.GetAssayAddContracts(assay: ArcAssay) =
-            failIfEntityExists "assay" assay.Identifier (this.ContainsAssay assay.Identifier)
-            this.AddAssay(assay)
-            this.UpdateFileSystem()
-            this.GetUpdateContracts(skipUpdateFS = true)
+        member this.GetAssayAddContracts(assay: ArcAssay, ?includeUpdateContractsFlag: bool) =
+            let _, contracts = prepareAddContracts this (ArcFiles.Assay assay) includeUpdateContractsFlag
+            contracts
 
-        member this.GetStudyAddContracts(study: ArcStudy) =
-            failIfEntityExists "study" study.Identifier (this.ContainsStudy study.Identifier)
-            this.AddStudy(study)
-            this.UpdateFileSystem()
-            this.GetUpdateContracts(skipUpdateFS = true)
+        member this.GetStudyAddContracts(study: ArcStudy, ?includeUpdateContractsFlag: bool) =
+            let _, contracts = prepareAddContracts this (ArcFiles.Study(study, [])) includeUpdateContractsFlag
+            contracts
 
-        member this.GetRunAddContracts(run: ArcRun) =
-            failIfEntityExists "run" run.Identifier (this.ContainsRun run.Identifier)
-            this.AddRun(run)
-            this.UpdateFileSystem()
-            this.GetUpdateContracts(skipUpdateFS = true)
+        member this.GetRunAddContracts(run: ArcRun, ?includeUpdateContractsFlag: bool) =
+            let _, contracts = prepareAddContracts this (ArcFiles.Run run) includeUpdateContractsFlag
+            contracts
 
-        member this.GetWorkflowAddContracts(workflow: ArcWorkflow) =
-            failIfEntityExists "workflow" workflow.Identifier (this.ContainsWorkflow workflow.Identifier)
-            this.AddWorkflow(workflow)
-            this.UpdateFileSystem()
-            this.GetUpdateContracts(skipUpdateFS = true)
+        member this.GetWorkflowAddContracts(workflow: ArcWorkflow, ?includeUpdateContractsFlag: bool) =
+            let _, contracts = prepareAddContracts this (ArcFiles.Workflow workflow) includeUpdateContractsFlag
+            contracts
 
-        member this.GetAddContracts(arcFile: ArcFiles) =
-            match arcFile with
-            | ArcFiles.Assay assay -> this.GetAssayAddContracts assay
-            | ArcFiles.Study(study, _) -> this.GetStudyAddContracts study
-            | ArcFiles.Run run -> this.GetRunAddContracts run
-            | ArcFiles.Workflow workflow -> this.GetWorkflowAddContracts workflow
-            | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
-            | ArcFiles.DataMap _ -> failwith "Adding datamap files is not supported."
-            | ArcFiles.Template _ -> failwith "Adding template files is not supported."
-
-        member this.TryAddAsync(arcPath: string, arcFile: ArcFiles) =
+        member this.GetAddContracts(arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) =
+            let _, contracts = prepareAddContracts this arcFile includeUpdateContractsFlag
+            contracts
+            
+        member this.TryAddArcFileAsync(arcPath: string, arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) =
             crossAsync {
                 try
-                    let contracts = this.GetAddContracts arcFile
-                    return! fullFillContractBatchAsync arcPath contracts
+                    let workingArc, contracts = prepareAddContracts this arcFile includeUpdateContractsFlag
+                    let! result = fullFillContractBatchAsync arcPath contracts
+
+                    match result with
+                    | Ok _ -> commitAddedArcFile this workingArc arcFile
+                    | Error _ -> ()
+
+                    return result
                 with error ->
                     return Error [| error.Message |]
             }
 
-        member this.AddAsync(arcPath: string, arcFile: ArcFiles) =
+        member this.AddArcFileAsync(arcPath: string, arcFile: ArcFiles) =
             crossAsync {
-                let! result = this.TryAddAsync(arcPath, arcFile)
+                let! result = this.TryAddArcFileAsync(arcPath, arcFile)
 
                 match result with
                 | Ok _ -> ()
                 | Error errors ->
-                    failwithf "Could not add ARC file, failed with the following errors %s" (formatContractErrors errors)
+                    failwithf
+                        "Could not add ARC file, failed with the following errors %s"
+                        (PathHelpers.formatContractErrors errors)
             }

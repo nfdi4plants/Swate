@@ -18,7 +18,7 @@ type PageState =
     | ArcFilePage of ArcFiles
     | TextPage of string
     | UnknownPage
-    | LandingDraftPage
+    //| LandingDraftPage
     | NotesDraftPage
     | NotesSearchPage
     | GitDiffPage of GitDiffViewDataDto
