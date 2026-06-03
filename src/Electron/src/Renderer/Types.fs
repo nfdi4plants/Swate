@@ -1,7 +1,6 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
-open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper

@@ -4,7 +4,6 @@ open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Layout
-open Swate.Components.Composite.ArcSelector
 open Swate.Components.Composite.Authentication.Types
 open Swate.Components.Primitive.Actionbar
 open Swate.Components.Primitive.Actionbar.Types
@@ -204,6 +203,7 @@ module private Authentication =
 
 type Navbar =
 
+    [<ReactComponent>]
     static member private Separator() =
         Html.div [
             prop.className "swt:divider swt:divider-horizontal swt:mx-0"

@@ -1,6 +1,5 @@
 module Renderer.App
 
-
 open Elmish
 open Feliz
 open Feliz.UseElmish
@@ -128,7 +127,8 @@ let private subscribe (_model: Model) : Sub<Msg> = [
 
 [<ReactComponent>]
 let private LeftActionButtons
-    (isInitializedArcVault: bool, leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget)
+    (leftSidebarTarget: LeftSidebarPage) 
+    setLeftSidebarTarget
     =
     let leftSidebarCtx = Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
@@ -140,19 +140,18 @@ let private LeftActionButtons
             setLeftSidebarTarget target
 
     React.Fragment [
-        if isInitializedArcVault then
-            Layout.LayoutBtn(
-                iconClassName = "swt:fluent--home-24-regular",
-                tooltip = "File explorer",
-                isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
-                onClick = fun () -> toggleTarget LeftSidebarPage.FileExplorer
-            )
-            Layout.LayoutBtn(
-                iconClassName = "swt:fluent--branch-fork-24-regular",
-                tooltip = "Git",
-                isActive = (leftSidebarTarget = LeftSidebarPage.Git),
-                onClick = fun () -> toggleTarget LeftSidebarPage.Git
-            )
+        Layout.LayoutBtn(
+            iconClassName = "swt:fluent--home-24-regular",
+            tooltip = "File explorer",
+            isActive = (leftSidebarTarget = LeftSidebarPage.FileExplorer),
+            onClick = fun () -> toggleTarget LeftSidebarPage.FileExplorer
+        )
+        Layout.LayoutBtn(
+            iconClassName = "swt:fluent--branch-fork-24-regular",
+            tooltip = "Git",
+            isActive = (leftSidebarTarget = LeftSidebarPage.Git),
+            onClick = fun () -> toggleTarget LeftSidebarPage.Git
+        )
     ]
 
 [<ReactComponent>]
@@ -171,7 +170,7 @@ let Main () =
         )
 
     let children =
-        Renderer.Components.MainContent.Main.Main(model.ArcRootPath, model.PageState)
+        Renderer.Components.MainContent.Main.Main model.ArcRootPath model.PageState
 
     let setLeftSidebarTarget =
         React.useCallback ((fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)), [||])
@@ -186,7 +185,7 @@ let Main () =
 
     let leftActions =
         if isInitializedArcVault then
-            LeftActionButtons(isInitializedArcVault, model.LeftSidebarTarget, setLeftSidebarTarget)
+            LeftActionButtons model.LeftSidebarTarget setLeftSidebarTarget
             |> Some
         else
             None
