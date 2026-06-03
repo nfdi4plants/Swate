@@ -537,8 +537,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         return Error e
                     | Ok successResult ->
                         match enforcedRequest.Command with
-                        | Pull
-                        | Fetch
                         | Track
                         | Untrack -> do! vault.RefreshFileTree()
                         | _ -> ()

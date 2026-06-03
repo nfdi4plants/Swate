@@ -1816,6 +1816,52 @@ let private discardPathspecsWithOriginals (arcPath: string) (status: StatusResul
     Array.append safePathSpecs originalPaths
     |> Array.distinct
 
+let downloadLfsFile
+    (arcPath: string)
+    (requestedPath: string)
+    : JS.Promise<GitResult<unit>> =
+    promise {
+        match tryResolveArcRelativePath arcPath requestedPath with
+        | Error validationError -> return errorResult validationError
+        | Ok(safePath, _) ->
+            if not (isTrackedByAttributes arcPath safePath) then
+                return errorResult (exn $"'{safePath}' is not tracked by Git LFS.")
+            else
+                let! gitResult = createOriginLfsRemoteGit arcPath None
+
+                match gitResult with
+                | Error failure -> return Error failure
+                | Ok git ->
+                    let! listingResult =
+                        runSimpleGit
+                            (fun currentGit -> currentGit.raw (GitLfsService.buildLsFilesJsonArgs safePath))
+                            git
+
+                    match listingResult with
+                    | Error failure -> return Error failure
+                    | Ok listingJson ->
+                        match GitLfsService.tryFindListingForPath safePath listingJson with
+                        | Error message -> return errorResult (exn $"'{safePath}' {message}")
+                        | Ok listing when listing.checkout -> return Ok()
+                        | Ok _ ->
+                            let! pullResult =
+                                runSimpleGit
+                                    (fun currentGit -> currentGit.raw [| "lfs"; "pull"; "--include"; safePath |])
+                                    git
+
+                            match pullResult with
+                            | Error failure -> return Error failure
+                            | Ok _ ->
+                                let! checkoutResult =
+                                    runSimpleGit
+                                        (fun currentGit -> currentGit.raw [| "checkout"; "--"; safePath |])
+                                        git
+
+                                match checkoutResult with
+                                | Error failure -> return Error failure
+                                | Ok _ -> return Ok()
+    }
+
 let freeLocalLfsCopy
     (arcPath: string)
     (requestedPath: string)

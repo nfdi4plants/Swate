@@ -86,7 +86,7 @@ type FileExplorerItem =
             Html.none
 
     [<ReactComponent>]
-    static member private LFSStatusPill (item: FileItem, ?lfsAction: ContextMenuItem) =
+    static member private LFSStatusPill (item: FileItem, ?statusAction: ContextMenuItem) =
         let isPointer = item.IsLFSPointer = Some true
         let isDownloaded = item.Downloaded = Some true && not isPointer
 
@@ -104,12 +104,12 @@ type FileExplorerItem =
             |> Option.defaultValue statusText
 
         let isActionDisabled =
-            lfsAction
+            statusAction
             |> Option.bind (fun action -> action.Disabled)
             |> Option.defaultValue false
 
         let pillAccessibilityText =
-            match lfsAction with
+            match statusAction with
             | Some action -> $"{action.Label} {item.Name}. {statusAccessibilityText}"
             | None -> statusAccessibilityText
 
@@ -132,7 +132,7 @@ type FileExplorerItem =
                 "swt:rounded-full"
 
         let segmentCursorClass =
-            match lfsAction, isActionDisabled with
+            match statusAction, isActionDisabled with
             | Some _, true -> "swt:cursor-not-allowed"
             | Some _, false -> "swt:cursor-pointer"
             | None, _ -> "swt:cursor-default"
@@ -186,7 +186,7 @@ type FileExplorerItem =
             e.preventDefault ()
             e.stopPropagation ()
 
-        match lfsAction with
+        match statusAction with
         | Some action ->
             Html.button [
                 prop.type'.button
@@ -232,7 +232,7 @@ type FileExplorerItem =
             ?itemActions: ContextMenuItem list,
             ?onDeleteItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool,
-            ?lfsPillAction: ContextMenuItem,
+            ?statusAction: ContextMenuItem,
             ?children: ReactElement
         ) =
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
@@ -320,7 +320,7 @@ type FileExplorerItem =
                                                 Html.div [
                                                     prop.className "swt:flex swt:items-center"
                                                     prop.children [
-                                                        FileExplorerItem.LFSStatusPill(item, ?lfsAction = lfsPillAction)
+                                                        FileExplorerItem.LFSStatusPill(item, ?statusAction = statusAction)
                                                     ]
                                                 ]
 
@@ -372,7 +372,7 @@ type FileExplorerItem =
             ?itemActions: ContextMenuItem list,
             ?onDeleteItem: FileItem -> unit,
             ?canDeleteItem: FileItem -> bool,
-            ?lfsPillAction: ContextMenuItem
+            ?statusAction: ContextMenuItem
         ) =
         let itemActions = defaultArg itemActions []
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
@@ -427,11 +427,10 @@ type FileExplorerItem =
                                     )
 
                                     if item.IsLFS = Some true then
-                                        FileExplorerItem.LFSStatusPill(item, ?lfsAction = lfsPillAction)
+                                        FileExplorerItem.LFSStatusPill(item, ?statusAction = statusAction)
                                 ]
                             ]
                     ]
                 ]
             ]
         ]
-

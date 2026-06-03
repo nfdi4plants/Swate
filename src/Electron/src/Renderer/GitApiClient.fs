@@ -107,5 +107,8 @@ let gitLfsPrune () =
 let gitLfsDedup () =
     callIpc (fun () -> gitApi.gitLfsDedup ())
 
+let gitLfsDownloadFile (request: GitLfsDownloadFileRequest) =
+    callIpcWith request (gitApi.gitLfsDownloadFile)
+
 let gitLfsFreeLocalCopy (request: GitLfsFreeLocalCopyRequest) =
     callIpcWith request (gitApi.gitLfsFreeLocalCopy)

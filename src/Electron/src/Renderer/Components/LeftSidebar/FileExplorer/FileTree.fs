@@ -57,6 +57,7 @@ type FileTree =
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
         let hasObservedFileTreeUpdateRef = React.useRef false
+        let skipNextFileTreeReloadPathRef = React.useRef<string option> None
 
         let effectiveFileTree =
             React.useMemo ((fun () -> fileStateCtx.state.FileTree), [| box fileStateCtx.state.FileTree |])
@@ -171,12 +172,14 @@ type FileTree =
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                     if lfsDownloadRequired item then
+                        skipNextFileTreeReloadPathRef.current <- Some selectedPath
                         console.log ($"[Renderer] Downloading Git LFS content for '{selectedPath}' before preview.")
 
                         let! downloadResult = Renderer.Components.ARCHelper.runDownloadLfsFile selectedPath
 
                         match downloadResult with
                         | Error errorMessage ->
+                            skipNextFileTreeReloadPathRef.current <- None
                             let fullErrorMessage =
                                 $"Could not download Git LFS content for '{item.Name}': {errorMessage}"
 
@@ -216,7 +219,13 @@ type FileTree =
         React.useEffect (
             (fun () ->
                 if hasObservedFileTreeUpdateRef.current then
-                    reloadSelectedPreviewAfterFileTreeUpdate ()
+                    match skipNextFileTreeReloadPathRef.current, fileStateCtx.state.Selection.TreePath with
+                    | Some pendingPath, Some selectedPath when PathHelpers.pathsEqual pendingPath selectedPath ->
+                        skipNextFileTreeReloadPathRef.current <- None
+                    | Some _, _ ->
+                        skipNextFileTreeReloadPathRef.current <- None
+                        reloadSelectedPreviewAfterFileTreeUpdate ()
+                    | None, _ -> reloadSelectedPreviewAfterFileTreeUpdate ()
                 else
                     hasObservedFileTreeUpdateRef.current <- true),
             [| box fileStateCtx.state.FileTree |]
@@ -357,7 +366,7 @@ type FileTree =
                 arcScopeId
                 baseContextMenuItems
 
-        let getLfsPillAction =
+        let getItemStatusAction =
             Renderer.Components.FileExplorerLfs.createLfsPillAction errorModal.enqueue arcScopeId
 
         let confirmRenameItem (newName: string) =
@@ -426,7 +435,7 @@ type FileTree =
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
                             getItemActions = renameContextMenuItems,
-                            getLfsPillAction = getLfsPillAction,
+                            getItemStatusAction = getItemStatusAction,
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,

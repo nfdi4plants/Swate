@@ -125,7 +125,7 @@ type FileExplorer =
             ?canCreateItem: FileItem -> bool,
             ?onCreateItem: FileItem -> unit,
             ?getItemActions: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem list,
-            ?getLfsPillAction: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem option,
+            ?getItemStatusAction: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem option,
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
@@ -146,7 +146,7 @@ type FileExplorer =
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
         let getItemActions = defaultArg getItemActions (fun (_: FileItem) -> [])
-        let getLfsPillAction = defaultArg getLfsPillAction (fun (_: FileItem) -> None)
+        let getItemStatusAction = defaultArg getItemStatusAction (fun (_: FileItem) -> None)
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let includeSelectedDirectoryInVisiblePath =
             directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
@@ -248,7 +248,7 @@ type FileExplorer =
                 | None -> true
 
             let itemActions = getItemActions item
-            let lfsPillAction = getLfsPillAction item
+            let statusAction = getItemStatusAction item
 
             if item.IsDirectory then
                 let childrenTree =
@@ -284,7 +284,7 @@ type FileExplorer =
                     itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
-                    ?lfsPillAction = lfsPillAction,
+                    ?statusAction = statusAction,
                     ?children = childrenTree
                 )
             else
@@ -297,7 +297,7 @@ type FileExplorer =
                     itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
-                    ?lfsPillAction = lfsPillAction
+                    ?statusAction = statusAction
                 )
 
         Html.div [
@@ -399,4 +399,3 @@ module FileExplorerExample =
                 )
             ]
         ]
-

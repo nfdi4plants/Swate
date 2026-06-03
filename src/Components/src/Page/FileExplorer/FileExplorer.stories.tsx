@@ -213,7 +213,7 @@ const LfsContextMenuFileExplorer = () => {
             freeLocalLfsCopy,
           )
         }
-        getLfsPillAction={(item) => fileExplorerGitLfsPillAction(item, downloadLfsFile, freeLocalLfsCopy)}
+        getItemStatusAction={(item) => fileExplorerGitLfsPillAction(item, downloadLfsFile, freeLocalLfsCopy)}
       />
       <div data-testid="lfs-events">LFS events: {lfsEvents.join(" | ") || "none"}</div>
       <div data-testid="last-opened-file">Last opened: {lastOpened}</div>

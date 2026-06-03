@@ -403,6 +403,21 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                             return toGitOperationResult (fun _ -> Some "Git LFS deduplication completed.") None None result
                         })
         }
+    gitLfsDownloadFile =
+        fun (request: GitLfsDownloadFileRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                return!
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.downloadLfsFile arcPath request.Path
+                            if Result.isOk result then
+                                do! vault.RefreshFileTree()
+                            return toGitOperationResult (fun () -> Some $"Downloaded LFS file '{request.Path}'.") None None result
+                        })
+        }
     gitLfsFreeLocalCopy =
         fun (request: GitLfsFreeLocalCopyRequest) -> promise {
             match tryGetVaultAndArcPath event with

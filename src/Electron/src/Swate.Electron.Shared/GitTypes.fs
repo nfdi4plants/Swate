@@ -149,6 +149,8 @@ type GitCloneRepositoryRequest = {
 
 type GitPathspecRequest = { Pathspecs: string[] }
 
+type GitLfsDownloadFileRequest = { Path: string }
+
 type GitLfsFreeLocalCopyRequest = { Path: string }
 
 type GitCommitRequest = { Message: string }
