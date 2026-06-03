@@ -1,9 +1,5 @@
 import { defineConfig } from 'playwright/test';
 
-// Playwright launches Electron with Node/Chromium debugging flags. If this leaks
-// in from a parent shell, Electron runs as Node and rejects those flags.
-delete process.env.ELECTRON_RUN_AS_NODE;
-
 export default defineConfig({
   timeout: 120000,
   testDir: './src/tests',
