@@ -227,6 +227,7 @@ export const ToggleButtonsControlOwnSide: Story = {
 
     await ensureSidebarIsOpen(leftSidebar, leftToggle);
     await ensureSidebarIsOpen(rightSidebar, rightToggle);
+    await expect(canvas.getByText('Left Item 1')).toBeVisible();
 
     await userEvent.click(leftToggle);
 
@@ -237,6 +238,7 @@ export const ToggleButtonsControlOwnSide: Story = {
 
     await userEvent.click(leftToggle);
     await ensureSidebarIsOpen(leftSidebar, leftToggle);
+    await expect(canvas.getByText('Left Item 1')).toBeVisible();
 
     await userEvent.click(rightToggle);
 
