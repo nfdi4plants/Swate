@@ -6,6 +6,9 @@ open System
 [<RequireQualifiedAccess>]
 module PathHelpers =
 
+    let formatContractErrors (errors: string[]) =
+        errors |> Array.map string |> String.concat "\n"
+
     /// normalizes the path by replacing backslashes with forward slashes, trimming whitespace, and removing trailing slashes
     let normalizeSeparators (path: string) = path.Replace("\\", "/")
 
@@ -51,6 +54,12 @@ module PathHelpers =
         |> fun normalized -> normalized.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
         |> Array.exists (fun segment -> segment = "." || segment = "..")
 
+    let isSafePathSegment (value: string) =
+        not (String.IsNullOrWhiteSpace value)
+        && not (value.Contains "/")
+        && not (value.Contains "\\")
+        && not (value.Contains "..")
+
     let pathsEqual (left: string) (right: string) =
         normalizeForComparison left = normalizeForComparison right
 
@@ -62,7 +71,7 @@ module PathHelpers =
         |> fun normalized -> normalized.Split('/')
         |> Array.last
 
-    let private tryGetParentPath (path: string) =
+    let tryGetParentPath (path: string) =
         let normalizedPath = normalizePath path
         let separatorIndex = normalizedPath.LastIndexOf('/')
 
@@ -111,7 +120,7 @@ module PathHelpers =
         |> pathMatchesAny protectedDeleteTargetNames
 
 [<RequireQualifiedAccess>]
-module ArcDeletePathRules =
+module ArcEntityPathRules =
 
     type AddZone =
         | Studies
@@ -129,6 +138,7 @@ module ArcDeletePathRules =
         | CanonicalFileTarget of target: CanonicalArcFileTarget * normalizedRelativePath: string
         | EntityFolderTarget of zone: AddZone * identifier: string * normalizedRelativePath: string
         | AddZoneDescendantTarget of zone: AddZone * normalizedRelativePath: string
+        | GenericTarget of normalizedRelativePath: string
         | DisallowedTarget of normalizedRelativePath: string
 
     type RenamePathClassification =
@@ -143,6 +153,7 @@ module ArcDeletePathRules =
         | GenericTarget of normalizedRelativePath: string
 
     let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
+    let private disallowedGenericPathSegments = [ ".git" ]
 
     let private normalizeRelativePath (path: string) =
         path
@@ -197,6 +208,18 @@ module ArcDeletePathRules =
         else
             None
 
+    let private isCanonicalArcFileName (fileName: string) =
+        PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.InvestigationFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.StudyFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.AssayFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.WorkflowFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.RunFileName
+        || PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.DataMapFileName
+
+    let private containsDisallowedGenericPathSegment (segments: string[]) =
+        segments
+        |> Array.exists (fun segment -> disallowedGenericPathSegments |> List.exists (fun blocked -> PathHelpers.pathsEqual segment blocked))
+
     /// Parses canonical ARC file targets from the tail of a path and supports absolute paths.
     let tryParseCanonicalArcFileTarget (path: string) =
         path
@@ -215,10 +238,19 @@ module ArcDeletePathRules =
             let segments = normalizedRelativePath |> splitPathSegments
 
             match segments with
+            | [| singleSegment |] ->
+                match tryParseZone singleSegment with
+                | Some _ -> DeletePathClassification.DisallowedTarget normalizedRelativePath
+                | None when PathHelpers.pathsEqual singleSegment ARCtrl.ArcPathHelper.InvestigationFileName ->
+                    DeletePathClassification.CanonicalFileTarget(
+                        CanonicalArcFileTarget.InvestigationFile,
+                        normalizedRelativePath
+                    )
+                | None -> DeletePathClassification.GenericTarget normalizedRelativePath
             | [| zoneSegment; identifier |] ->
                 match tryParseZone zoneSegment with
                 | Some zone -> DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath)
-                | None -> DeletePathClassification.DisallowedTarget normalizedRelativePath
+                | None -> DeletePathClassification.GenericTarget normalizedRelativePath
             | [| zoneSegment; identifier; fileName |] ->
                 match tryParseZone zoneSegment with
                 | Some zone when PathHelpers.pathsEqual fileName (zoneEntityFileName zone) ->
@@ -239,23 +271,43 @@ module ArcDeletePathRules =
                             normalizedRelativePath
                         )
                     else
-                        DeletePathClassification.DisallowedTarget normalizedRelativePath
+                        DeletePathClassification.GenericTarget normalizedRelativePath
             | _ ->
                 if segments.Length >= 2 then
                     match tryParseZone segments.[0] with
                     | Some zone -> DeletePathClassification.AddZoneDescendantTarget(zone, normalizedRelativePath)
-                    | None -> DeletePathClassification.DisallowedTarget normalizedRelativePath
+                    | None -> DeletePathClassification.GenericTarget normalizedRelativePath
                 else
                     match tryParseCanonicalArcFileTargetFromSegments segments with
                     | Some target -> DeletePathClassification.CanonicalFileTarget(target, normalizedRelativePath)
                     | None -> DeletePathClassification.DisallowedTarget normalizedRelativePath
 
+    let isGenericFileSystemTargetAllowed (relativePath: string) =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+
+        if
+            String.IsNullOrWhiteSpace normalizedRelativePath
+            || PathHelpers.containsPathTraversalSegments normalizedRelativePath
+            || PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+        then
+            false
+        else
+            let segments = normalizedRelativePath |> splitPathSegments
+
+            segments.Length >= 1
+            && (segments |> containsDisallowedGenericPathSegment |> not)
+            && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
+            && (segments.Length <> 1 || (tryParseZone segments.[0]).IsNone)
+            && (segments.Length <> 2 || (tryParseZone segments.[0]).IsNone)
+
     let isDeletePathAllowed (relativePath: string) =
         match classifyDeleteTarget relativePath with
         | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, _)
         | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.DataMapFile _, _)
-        | DeletePathClassification.EntityFolderTarget _
-        | DeletePathClassification.AddZoneDescendantTarget _ -> true
+        | DeletePathClassification.EntityFolderTarget _ -> true
+        | DeletePathClassification.GenericTarget normalizedRelativePath
+        | DeletePathClassification.AddZoneDescendantTarget(_, normalizedRelativePath) ->
+            isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
 
     let private canonicalEntityFilePath zone identifier =
@@ -328,6 +380,8 @@ module ArcDeletePathRules =
     let isRenamePathAllowed (relativePath: string) =
         match classifyRenameTarget relativePath with
         | RenamePathClassification.EntityFolderTarget _ -> true
+        | RenamePathClassification.GenericTarget normalizedRelativePath ->
+            isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
 
     let resolveRenameSourcePath (relativePath: string) =

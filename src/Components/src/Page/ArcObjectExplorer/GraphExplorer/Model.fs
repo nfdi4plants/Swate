@@ -131,6 +131,15 @@ type ARCObjects =
     | FormalParameters of FormalParameter []
     | Processes of LabProcess []
 
+let sanitizeSegment (value: string) =
+    value
+        .Trim()
+        .ToLowerInvariant()
+        .Replace(" ", "-")
+        .Replace("/", "-")
+        .Replace("\\", "-")
+        .Replace(":", "-")
+
 type GraphProcessEndpointValueType =
     | Material
     | Data

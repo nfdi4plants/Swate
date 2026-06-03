@@ -11,6 +11,21 @@ open Feliz
 
 module private FileExplorerHelper =
 
+    let tryGetEventTargetElement (e: Browser.Types.Event) : Browser.Types.Element option =
+        let targetObj: obj = box e.target
+
+        if isNullOrUndefined targetObj then
+            None
+        elif isNullOrUndefined targetObj?closest then
+            let parentElement: obj = targetObj?parentElement
+
+            if isNullOrUndefined parentElement then
+                None
+            else
+                Some(unbox<Browser.Types.Element> parentElement)
+        else
+            Some(unbox<Browser.Types.Element> targetObj)
+
     let private copyPathToClipboard (path: string) =
         promise {
             try
@@ -34,36 +49,29 @@ module private FileExplorerHelper =
 
         [
             if not item.IsDirectory then
-                {
-                    Label = "Open"
-                    Icon = "swt:fluent--open-24-regular"
-                    OnClick = fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch
-                    Disabled = None
-                }
+                FileExplorerContextMenuItem.create
+                    "Open"
+                    "swt:fluent--open-24-regular"
+                    (fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch)
 
             match item.Path with
             | Some path ->
-                {
-                    Label = "Copy Path"
-                    Icon = "swt:fluent--copy-24-regular"
-                    OnClick = fun () -> copyPathToClipboard path
-                    Disabled = None
-                }
+                FileExplorerContextMenuItem.create
+                    "Copy Path"
+                    "swt:fluent--copy-24-regular"
+                    (fun () -> copyPathToClipboard path)
             | None -> ()
 
             if item.IsDirectory && canExpandDirectory then
                 let isExpanded = model.ExpandedIds.Contains item.Id
 
-                {
-                    Label = if isExpanded then "Collapse" else "Expand"
-                    Icon =
-                        if isExpanded then
-                            "swt:fluent--folder-open-24-regular"
-                        else
-                            "swt:fluent--folder-24-regular"
-                    OnClick = fun () -> dispatch (FileExplorerLogic.ToggleExpanded item.Id)
-                    Disabled = None
-                }
+                FileExplorerContextMenuItem.create
+                    (if isExpanded then "Collapse" else "Expand")
+                    (if isExpanded then
+                         "swt:fluent--folder-open-24-regular"
+                     else
+                         "swt:fluent--folder-24-regular")
+                    (fun () -> dispatch (FileExplorerLogic.ToggleExpanded item.Id))
         ]
 
     let getContextMenuItems
@@ -184,9 +192,12 @@ type FileExplorer =
                 ref = containerRef,
                 onSpawn =
                     (fun e ->
-                        let target = e.target :?> Browser.Types.HTMLElement
+                        let trigger =
+                            e
+                            |> FileExplorerHelper.tryGetEventTargetElement
+                            |> Option.bind (fun target -> target.closest ("[data-file-item-id]"))
 
-                        match target.closest ("[data-file-item-id]"), containerRef.current with
+                        match trigger, containerRef.current with
                         | Some trigger, Some container when container.contains (trigger) ->
                             let trigger = trigger :?> Browser.Types.HTMLElement
                             let itemId: string = !!trigger?dataset?fileItemId
@@ -364,18 +375,14 @@ module FileExplorerExample =
             Browser.Dom.console.log ("Clicked:", item.Name)
 
         let handleContextMenu (item: FileItem) = [
-            {
-                Label = "Rename"
-                Icon = "swt:fluent--rename-24-regular"
-                OnClick = fun () -> Browser.Dom.console.log ("Rename", item.Name)
-                Disabled = None
-            }
-            {
-                Label = "Delete"
-                Icon = "swt:fluent--delete-24-regular"
-                OnClick = fun () -> Browser.Dom.console.log ("Delete", item.Name)
-                Disabled = None
-            }
+            FileExplorerContextMenuItem.create
+                "Rename"
+                "swt:fluent--rename-24-regular"
+                (fun () -> Browser.Dom.console.log ("Rename", item.Name))
+            FileExplorerContextMenuItem.create
+                "Delete"
+                "swt:fluent--delete-24-regular"
+                (fun () -> Browser.Dom.console.log ("Delete", item.Name))
         ]
 
         Html.div [

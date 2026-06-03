@@ -75,12 +75,11 @@ let downloadLfsFile
         (fun item -> $"'{item.Name}' is already downloaded.")
         (fun item msg -> $"Git LFS download failed for '{item.Name}': {msg}")
 
-let private menuItem label icon disabled onClick = {
-    Label = label
-    Icon = icon
-    OnClick = fun () -> if not disabled then onClick()
-    Disabled = Some disabled
-}
+let private menuItem label icon disabled onClick =
+    if disabled then
+        FileExplorerContextMenuItem.disabled label icon
+    else
+        FileExplorerContextMenuItem.create label icon onClick
 
 let private lfsMenuItem label icon (item: FileItem) disabled (action: FileItem -> unit) =
     menuItem label icon disabled (fun () -> action item)

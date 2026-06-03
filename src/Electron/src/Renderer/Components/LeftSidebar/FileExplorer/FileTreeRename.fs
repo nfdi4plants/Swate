@@ -1,13 +1,11 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Fable.Core
-open Feliz
-open Swate.Components
-open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.RenamePathRules
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 
@@ -67,26 +65,21 @@ module FileTreeRenameWorkflow =
         | Error validationError -> enqueueRenameError enqueueError arcScopeId validationError
 
     let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
-        if canRenameItem item then
-            [
-                {
-                    Label = "Rename"
-                    Icon = "swt:fluent--edit-24-regular"
-                    OnClick = fun () -> requestRenameItem item
-                    Disabled = None
-                }
-            ]
-        else
-            []
+        FileExplorerContextMenuItem.whenItem
+            canRenameItem
+            "Rename"
+            "swt:fluent--edit-24-regular"
+            requestRenameItem
+            item
 
     let confirmRenameItem (config: ConfirmRenameConfig) (newName: string) =
         match config.pendingRenameDraft with
         | None -> config.closeRenameModal ()
         | Some renameDraft ->
-            match normalizeRenameName newName with
+            match validateRenameName newName with
             | Error validationError -> applyRenameError config validationError
             | Ok normalizedNewName ->
-                let targetPath = buildRenamedPath renameDraft.SourcePath normalizedNewName
+                let targetPath = buildRenamedSiblingPath renameDraft.SourcePath normalizedNewName
 
                 if PathHelpers.pathsEqual targetPath renameDraft.SourcePath then
                     config.closeRenameModal ()
@@ -126,100 +119,3 @@ module FileTreeRenameWorkflow =
                     |> Promise.catch (fun promiseError -> applyRenameError config promiseError.Message)
                     |> Promise.map (fun _ -> config.setIsRenaming false)
                     |> Promise.start
-
-[<Erase; Mangle(false)>]
-type FileTreeRename =
-
-    [<ReactComponent>]
-    static member RenameModal
-        (
-            isOpen: bool,
-            itemName: string option,
-            initialName: string option,
-            close: unit -> unit,
-            submit: string -> unit,
-            ?isRenaming: bool
-        ) =
-
-        let renameName, setRenameName = React.useState (initialName |> Option.defaultValue "")
-        let isRenaming = defaultArg isRenaming false
-
-        React.useEffect (
-            (fun () -> setRenameName (initialName |> Option.defaultValue "")),
-            [| box initialName; box isOpen |]
-        )
-
-        let setIsOpen isOpen =
-            if not isOpen then
-                close ()
-
-        let displayName = itemName |> Option.defaultValue "this item"
-        let normalizedNameResult = normalizeRenameName renameName
-        let isValid = normalizedNameResult |> Result.isOk
-
-        let submitIfValid () =
-            match normalizeRenameName renameName with
-            | Ok normalizedName -> submit normalizedName
-            | Error _ -> ()
-
-        let footer =
-            Html.div [
-                prop.className "swt:flex swt:gap-2 swt:justify-end swt:w-full"
-                prop.children [
-                    Html.button [
-                        prop.className "swt:btn swt:btn-ghost"
-                        prop.disabled isRenaming
-                        prop.onClick (fun _ -> close ())
-                        prop.text "Cancel"
-                    ]
-                    Html.button [
-                        prop.className "swt:btn swt:btn-primary"
-                        prop.disabled ((not isValid) || isRenaming)
-                        prop.onClick (fun _ -> submitIfValid ())
-                        prop.children [
-                            if isRenaming then
-                                Html.span [ prop.text "Renaming..." ]
-                            else
-                                Html.span [ prop.text "Rename" ]
-                        ]
-                    ]
-                ]
-            ]
-
-        let content =
-            Html.fieldSet [
-                prop.className "swt:fieldset"
-                prop.children [
-                    Html.legend [
-                        prop.className "swt:fieldset-legend"
-                        prop.text "New name"
-                    ]
-                    Html.label [
-                        prop.className "swt:input swt:w-full"
-                        prop.children [
-                            Html.input [
-                                prop.autoFocus true
-                                prop.disabled isRenaming
-                                prop.value renameName
-                                prop.onChange setRenameName
-                                prop.onKeyDown (key.enter, fun _ -> submitIfValid ())
-                            ]
-                        ]
-                    ]
-                    Html.p [
-                        prop.hidden isValid
-                        prop.className "swt:text-error swt:text-sm"
-                        prop.text "Name is required and must not contain path separators."
-                    ]
-                ]
-            ]
-
-        BaseModal.Modal(
-            isOpen = isOpen,
-            setIsOpen = setIsOpen,
-            header = Html.text "Rename Item",
-            description = Html.text $"Rename '{displayName}' in the current ARC.",
-            children = content,
-            footer = footer,
-            debug = "arc-rename"
-        )
