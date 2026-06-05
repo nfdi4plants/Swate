@@ -1832,34 +1832,44 @@ let downloadLfsFile
                 match gitResult with
                 | Error failure -> return Error failure
                 | Ok git ->
-                    let! listingResult =
-                        runSimpleGit
-                            (fun currentGit -> currentGit.raw (GitLfsService.buildLsFilesJsonArgs safePath))
-                            git
+                    let! statusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
-                    match listingResult with
+                    match statusResult with
                     | Error failure -> return Error failure
-                    | Ok listingJson ->
-                        match GitLfsService.tryFindListingForPath safePath listingJson with
-                        | Error message -> return errorResult (exn $"'{safePath}' {message}")
-                        | Ok listing when listing.checkout -> return Ok()
-                        | Ok _ ->
-                            let! pullResult =
-                                runSimpleGit
-                                    (fun currentGit -> currentGit.raw [| "lfs"; "pull"; "--include"; safePath |])
-                                    git
+                    | Ok status when not (isPathCleanInStatus status safePath) ->
+                        return
+                            errorResult (
+                                exn $"'{safePath}' has local changes. Save, discard, or commit them before downloading the Git LFS file."
+                            )
+                    | Ok _ ->
+                        let! listingResult =
+                            runSimpleGit
+                                (fun currentGit -> currentGit.raw (GitLfsService.buildLsFilesJsonArgs safePath))
+                                git
 
-                            match pullResult with
-                            | Error failure -> return Error failure
+                        match listingResult with
+                        | Error failure -> return Error failure
+                        | Ok listingJson ->
+                            match GitLfsService.tryFindListingForPath safePath listingJson with
+                            | Error message -> return errorResult (exn $"'{safePath}' {message}")
+                            | Ok listing when listing.checkout -> return Ok()
                             | Ok _ ->
-                                let! checkoutResult =
+                                let! pullResult =
                                     runSimpleGit
-                                        (fun currentGit -> currentGit.raw [| "checkout"; "--"; safePath |])
+                                        (fun currentGit -> currentGit.raw [| "lfs"; "pull"; "--include"; safePath |])
                                         git
 
-                                match checkoutResult with
+                                match pullResult with
                                 | Error failure -> return Error failure
-                                | Ok _ -> return Ok()
+                                | Ok _ ->
+                                    let! checkoutResult =
+                                        runSimpleGit
+                                            (fun currentGit -> currentGit.raw [| "checkout"; "--"; safePath |])
+                                            git
+
+                                    match checkoutResult with
+                                    | Error failure -> return Error failure
+                                    | Ok _ -> return Ok()
     }
 
 let freeLocalLfsCopy
