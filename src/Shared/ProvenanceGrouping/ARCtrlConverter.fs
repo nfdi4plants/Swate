@@ -430,6 +430,7 @@ module internal Dedup =
                     Header = header
                     Name = name
                     PropertyValueIds = []
+                    InheritedPropertyValueIds = Map.empty
                 }
 
         let endpointLocation : ArcEndpointLocation =
@@ -459,6 +460,7 @@ module internal Dedup =
                     Header = header
                     Name = name
                     PropertyValueIds = []
+                    InheritedPropertyValueIds = Map.empty
                 }
 
         let endpointLocation : ArcEndpointLocation =
@@ -601,13 +603,14 @@ module internal Dedup =
     let toResult (loadedTable: ArcTableLocation) (state: ConvertState) : ArcProvenanceConversionResult =
         {
             Model =
-                {
+                ({
                     LoadedTableName = loadedTable.TableName
                     PropertyValues = state.PropertyValues
                     InputSets = state.InputSets
                     OutputSets = state.OutputSets
                     Connections = state.Connections
                 }
+                 |> ProvenanceModel.refreshInheritedOutputProperties)
             Index =
                 {
                     LoadedTable = loadedTable

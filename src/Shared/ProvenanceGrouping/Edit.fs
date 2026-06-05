@@ -189,12 +189,12 @@ let private sourceFromLoadedMembership (model: ProvenanceModel) (propertyValue: 
     let inputSets =
         model.InputSets
         |> mapValues
-        |> List.filter (fun set -> set.PropertyValueIds |> List.contains propertyValue.Id)
+        |> List.filter (fun set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValue.Id)
 
     let outputSets =
         model.OutputSets
         |> mapValues
-        |> List.filter (fun set -> set.PropertyValueIds |> List.contains propertyValue.Id)
+        |> List.filter (fun set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValue.Id)
 
     match inputSets, outputSets with
     | [], [] -> None
@@ -269,6 +269,7 @@ let createLoadedSet (command: CreateLoadedSetCommand) (model: ProvenanceModel) :
                 Header = command.Header
                 Name = command.Name
                 PropertyValueIds = []
+                InheritedPropertyValueIds = Map.empty
             }
 
         let nextModel =
@@ -333,6 +334,7 @@ let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) (model
                         InputSets = model.InputSets |> updateSets propertyValueId inputSetIds
                         OutputSets = model.OutputSets |> updateSets propertyValueId outputSetIds
                 }
+                |> ProvenanceModel.refreshInheritedOutputProperties
 
             if nextModel = model then
                 Ok(model, [])
@@ -361,6 +363,7 @@ let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) (model
                         InputSets = model.InputSets |> updateSets propertyValueId inputSetIds
                         OutputSets = model.OutputSets |> updateSets propertyValueId outputSetIds
                 }
+                |> ProvenanceModel.refreshInheritedOutputProperties
 
             Ok(
                 nextModel,
@@ -403,6 +406,7 @@ let connectSets inputSetId outputSetId processName (model: ProvenanceModel) : Ed
                 model with
                     Connections = model.Connections |> Map.add connectionId connection
             }
+            |> ProvenanceModel.refreshInheritedOutputProperties
 
         Ok(
             nextModel,

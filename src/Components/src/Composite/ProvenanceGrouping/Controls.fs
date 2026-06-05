@@ -145,29 +145,128 @@ type Controls =
         ]
 
     [<ReactComponent>]
+    static member private PropertySwapButton
+        (
+            side: ProvenanceSide,
+            header: ProvenancePropertyHeader,
+            onSwitch: ProvenancePropertyHeader -> unit,
+            ?debug: bool
+        ) =
+        let sideName = ControlsHelper.sideName side
+
+        Html.button [
+            prop.type'.button
+            prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+            prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
+            if defaultArg debug false then prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
+            prop.onClick (fun _ -> onSwitch header)
+            prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4" ] ]
+        ]
+
+    [<ReactComponent>]
+    static member private PropertyRailItem
+        (
+            side: ProvenanceSide,
+            header: ProvenancePropertyHeader,
+            active: GroupingAssignment list,
+            canSwitch: bool,
+            onToggleSide: ProvenancePropertyHeader -> unit,
+            onToggleBoth: ProvenancePropertyHeader -> unit,
+            onSwitch: ProvenancePropertyHeader -> unit,
+            ?debug: bool,
+            ?key: string
+        ) =
+        let draggable = DndKit.useDraggable ({| id = propertyDragId side header |})
+        let sideScope =
+            match side with
+            | ProvenanceSide.Input -> GroupingScope.Input
+            | ProvenanceSide.Output -> GroupingScope.Output
+        let sideSelected =
+            active |> List.exists (fun assignment -> assignment.Key.Header = header && assignment.Scope = sideScope)
+        let bothSelected =
+            active |> List.exists (fun assignment -> assignment.Key.Header = header && assignment.Scope = GroupingScope.Both)
+        let sideName = ControlsHelper.sideName side
+
+        Html.div [
+            match key with
+            | Some key -> prop.key key
+            | None -> ()
+            prop.className "swt:flex swt:items-center swt:gap-1"
+            prop.children [
+                Html.button [
+                    prop.type'.button
+                    if canSwitch then
+                        prop.ref draggable.setNodeRef
+                        yield! prop.spread (!!draggable.attributes)
+                        yield! prop.spread (!!draggable.listeners)
+                    prop.className [
+                        "swt:btn swt:btn-sm swt:grow swt:justify-start"
+                        if sideSelected then "swt:btn-primary" else "swt:btn-outline"
+                        if canSwitch && draggable.isDragging then "swt:opacity-50"
+                    ]
+                    if defaultArg debug false then prop.testId $"provenance-property-{side}-{header.Category.Name}"
+                    prop.onClick (fun _ -> onToggleSide header)
+                    prop.text header.Category.Name
+                ]
+                Html.button [
+                    prop.type'.button
+                    prop.className [
+                        "swt:btn swt:btn-sm swt:btn-square"
+                        if bothSelected then "swt:btn-primary" else "swt:btn-outline"
+                    ]
+                    if defaultArg debug false then prop.testId $"provenance-property-both-{side}-{header.Category.Name}"
+                    prop.ariaLabel $"Group {header.Category.Name} on both sides"
+                    prop.onClick (fun _ -> onToggleBoth header)
+                    prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--link-multiple-20-regular swt:size-4" ] ]
+                ]
+                if canSwitch then
+                    Controls.PropertySwapButton(side, header, onSwitch, ?debug = debug)
+                else
+                    Html.button [
+                        prop.type'.button
+                        prop.disabled true
+                        prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+                        prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
+                        if defaultArg debug false then prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
+                        prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4" ] ]
+                    ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member PropertyRail
         (
             side: ProvenanceSide,
             headers: ProvenancePropertyHeader list,
-            active: GroupingKey list,
-            onToggle: ProvenancePropertyHeader -> unit,
+            active: GroupingAssignment list,
+            onToggleSide: ProvenancePropertyHeader -> unit,
+            onToggleBoth: ProvenancePropertyHeader -> unit,
+            onSwitch: ProvenancePropertyHeader -> unit,
+            canSwitch: ProvenancePropertyHeader -> bool,
             ?debug: bool
         ) =
+        let droppable = DndKit.useDroppable ({| id = propertyRailDropId side |})
+
         Html.aside [
-            prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-44"
+            prop.ref droppable.setNodeRef
+            prop.className [
+                "swt:flex swt:flex-col swt:gap-2 swt:min-w-44"
+                if droppable.isOver then "swt:ring-2 swt:ring-primary swt:rounded"
+            ]
+            if defaultArg debug false then prop.testId $"provenance-property-rail-{side}"
             prop.children [
                 Html.h3 [ prop.className "swt:text-sm swt:font-semibold swt:text-primary"; prop.text "Properties" ]
                 for header in headers do
-                    let selected = active |> List.exists (fun key -> key.Header = header)
-                    Html.button [
-                        prop.className [
-                            "swt:btn swt:btn-sm swt:justify-start"
-                            if selected then "swt:btn-primary" else "swt:btn-outline"
-                        ]
-                        if defaultArg debug false then prop.testId $"provenance-property-{side}-{header.Category.Name}"
-                        prop.onClick (fun _ -> onToggle header)
-                        prop.text header.Category.Name
-                    ]
+                    Controls.PropertyRailItem(
+                        side,
+                        header,
+                        active,
+                        canSwitch header,
+                        onToggleSide,
+                        onToggleBoth,
+                        onSwitch,
+                        debug = defaultArg debug false,
+                        key = propertyHeaderIdentity header)
             ]
         ]
 

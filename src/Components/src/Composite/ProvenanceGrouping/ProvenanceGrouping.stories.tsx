@@ -6,13 +6,31 @@ import {
   Exports_createSampleSession as createSampleSession,
   Exports_createInputOnlySession as createInputOnlySession,
   Exports_createOutputOnlySession as createOutputOnlySession,
+  Exports_createSwitchablePropertySession as createSwitchablePropertySession,
   Exports_createTypedSampleSession as createTypedSampleSession,
   Exports_createDataOutputOnlySession as createDataOutputOnlySession,
   Exports_createRetaggedTypedSampleSession as createRetaggedTypedSampleSession,
   Exports_patchDetails as patchDetails,
 } from './Types.fs.js';
 
-type Fixture = 'sample' | 'inputOnly' | 'outputOnly' | 'typedSample' | 'dataOutputOnly';
+type Fixture = 'sample' | 'inputOnly' | 'outputOnly' | 'switchableProperty' | 'typedSample' | 'dataOutputOnly';
+
+function createSessionForFixture(selected: Fixture) {
+  switch (selected) {
+    case 'inputOnly':
+      return createInputOnlySession();
+    case 'outputOnly':
+      return createOutputOnlySession();
+    case 'switchableProperty':
+      return createSwitchablePropertySession();
+    case 'typedSample':
+      return createTypedSampleSession();
+    case 'dataOutputOnly':
+      return createDataOutputOnlySession();
+    default:
+      return createSampleSession();
+  }
+}
 
 function Harness({
   inputOnly = false,
@@ -29,22 +47,14 @@ function Harness({
   allowTermReplacement?: boolean;
   allowEndpointReplacement?: boolean;
 }) {
-  const [session, setSession] = React.useState(() => {
-    const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
-    switch (selected) {
-      case 'inputOnly':
-        return createInputOnlySession();
-      case 'outputOnly':
-        return createOutputOnlySession();
-      case 'typedSample':
-        return createTypedSampleSession();
-      case 'dataOutputOnly':
-        return createDataOutputOnlySession();
-      default:
-        return createSampleSession();
-    }
-  });
+  const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
+  const [session, setSession] = React.useState(() => createSessionForFixture(selected));
   const [patches, setPatches] = React.useState<string[]>([]);
+
+  React.useEffect(() => {
+    setSession(createSessionForFixture(selected));
+    setPatches([]);
+  }, [selected]);
 
   return (
     <div className="swt:flex swt:flex-col swt:gap-4 swt:min-h-screen swt:bg-base-200 swt:p-4">
@@ -122,16 +132,145 @@ export const GroupsByPropertiesAndShowsMembers: Story = {
   },
 };
 
+export const GroupsBothSidesFromOutputProperty: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-group-Input-input:Replicate=1 | 2')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:Replicate=1 | 2')).toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Input-input:Replicate=1')).not.toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Output-output:Replicate=2')).not.toBeInTheDocument();
+    });
+  },
+};
+
+export const ConnectedOutputsShowInheritedInputProperties: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputA = canvas.getByText('Output A').closest('article')!;
+
+    expect(outputA).toHaveTextContent('Analysis: Mass Spectrometry');
+    expect(outputA).toHaveTextContent('Species: Arabidopsis');
+    expect(outputA).toHaveTextContent('Temperature: 12 C');
+  },
+};
+
+export const GroupingPropertiesStayOnOwningSide: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
+    const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
+
+    expect(inputRail.getByTestId('provenance-property-Input-Species')).toBeInTheDocument();
+    expect(inputRail.getByTestId('provenance-property-Input-Temperature')).toBeInTheDocument();
+    expect(inputRail.queryByTestId('provenance-property-Input-Analysis')).not.toBeInTheDocument();
+    expect(inputRail.queryByTestId('provenance-property-Input-Replicate')).not.toBeInTheDocument();
+
+    expect(outputRail.getByTestId('provenance-property-Output-Analysis')).toBeInTheDocument();
+    expect(outputRail.getByTestId('provenance-property-Output-Replicate')).toBeInTheDocument();
+    expect(outputRail.queryByTestId('provenance-property-Output-Species')).not.toBeInTheDocument();
+    expect(outputRail.queryByTestId('provenance-property-Output-Temperature')).not.toBeInTheDocument();
+  },
+};
+
+export const SingleSidedPropertiesCannotSwitchSides: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    expect(canvas.getByTestId('provenance-property-drag-Output-Analysis')).toBeDisabled();
+    expect(canvas.getByTestId('provenance-property-drag-Output-Replicate')).toBeDisabled();
+  },
+};
+
+export const SwitchesPropertyGroupingSideByDrag: Story = {
+  render: () => <Harness fixture="switchableProperty" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('provenance-property-Input-Batch'));
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-group-Input-input:Batch=A')).toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Output-output:Batch=A')).not.toBeInTheDocument();
+    });
+
+    await dragByPointer(
+      canvas.getByTestId('provenance-property-Input-Batch'),
+      canvas.getByTestId('provenance-property-rail-Output'),
+    );
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('provenance-group-Input-input:Batch=A')).not.toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:input-a')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:Batch=A')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:Batch=B')).toBeInTheDocument();
+    });
+  },
+};
+
+export const SwitchesInheritedInputPropertyGroupingToOutputSide: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
+    const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
+
+    expect(canvas.getByTestId('provenance-property-drag-Input-Species')).not.toBeDisabled();
+    await dragByPointer(
+      canvas.getByTestId('provenance-property-Input-Species'),
+      canvas.getByTestId('provenance-property-rail-Output'),
+    );
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:Species=Chlamydomonas')).toBeInTheDocument();
+      expect(outputRail.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
+      expect(inputRail.queryByTestId('provenance-property-Input-Species')).not.toBeInTheDocument();
+    });
+  },
+};
+
+export const ClicksSwapHandleToSwitchGroupingSide: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
+    const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
+
+    await userEvent.click(canvas.getByTestId('provenance-property-drag-Input-Species'));
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis')).toBeInTheDocument();
+      expect(outputRail.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
+      expect(inputRail.queryByTestId('provenance-property-Input-Species')).not.toBeInTheDocument();
+    });
+  },
+};
+
 export const RegroupedValuesOpenTheirOwnDraft: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
-    const grouped = canvas
-      .getAllByText('Species: Chlamydomonas')
-      .find((element) => element.tagName === 'H3')!
-      .closest('article')!;
+    const grouped = await waitFor(
+      () => {
+        const heading = canvas
+          .getAllByText('Species: Chlamydomonas')
+          .find((element) => element.tagName === 'H3');
+        expect(heading).toBeDefined();
+        return heading!.closest('article')!;
+      },
+      { timeout: 3000 },
+    );
 
     const species = within(grouped).getByTestId('provenance-value-pv-input-d-species');
     await userEvent.click(within(species).getByTestId('popover_trigger_provenance-edit-Species'));
@@ -194,6 +333,8 @@ export const CreatesPropertyValueWithoutDebug: Story = {
   render: () => <Harness debug={false} />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await userEvent.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('textbox', { name: /Analysis value/i })).not.toBeInTheDocument());
     const outputA = canvas.getByText('Output A').closest('article')!;
 
     await userEvent.click(within(outputA).getByText('Add Analysis value'));
@@ -202,8 +343,9 @@ export const CreatesPropertyValueWithoutDebug: Story = {
     await waitFor(() => expect(submit).toBeEnabled());
     await userEvent.click(submit);
 
-    await waitFor(() =>
-      expect(canvas.getByText('Output A').closest('article')!).toHaveTextContent('Analysis: Imaging'),
+    await waitFor(
+      () => expect(canvas.getByText('Output A').closest('article')!).toHaveTextContent('Analysis: Imaging'),
+      { timeout: 3000 },
     );
   },
 };
@@ -257,7 +399,8 @@ export const EditsNumericValueWithoutLosingUnit: Story = {
   render: () => <Harness fixture="typedSample" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const temperature = canvas.getByTestId('provenance-value-pv-input-a-temperature');
+    const inputA = canvas.getByText('Input A').closest('article')!;
+    const temperature = within(inputA).getByTestId('provenance-value-pv-input-a-temperature');
     expect(temperature).toHaveTextContent('Temperature: 12 degree Celsius');
 
     await userEvent.click(within(temperature).getByTestId('popover_trigger_provenance-edit-Temperature'));
@@ -267,7 +410,7 @@ export const EditsNumericValueWithoutLosingUnit: Story = {
     await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
 
     await waitFor(() => {
-      expect(canvas.getByTestId('provenance-value-pv-input-a-temperature')).toHaveTextContent(
+      expect(within(inputA).getByTestId('provenance-value-pv-input-a-temperature')).toHaveTextContent(
         'Temperature: 13.5 degree Celsius',
       );
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent(
@@ -474,30 +617,52 @@ export const AddsNewPropertyToCreatedEmptySide: Story = {
 async function dragByPointer(source: Element, target: Element) {
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
+  const fromX = from.left + from.width / 2;
+  const fromY = from.top + from.height / 2;
+  const toX = to.left + to.width / 2;
+  const toY = to.top + to.height / 2;
+  const deltaX = toX - fromX;
+  const deltaY = toY - fromY;
+  const distance = Math.hypot(deltaX, deltaY) || 1;
+  const activationX = fromX + (deltaX / distance) * 8;
+  const activationY = fromY + (deltaY / distance) * 8;
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
   fireEvent.pointerDown(source, {
-    clientX: from.left + 4,
-    clientY: from.top + 4,
+    clientX: fromX,
+    clientY: fromY,
     button: 0,
     buttons: 1,
     isPrimary: true,
     pointerId: 1,
   });
+  await nextFrame();
   fireEvent.pointerMove(document, {
-    clientX: to.left + 4,
-    clientY: to.top + 4,
+    clientX: activationX,
+    clientY: activationY,
     button: 0,
     buttons: 1,
     isPrimary: true,
     pointerId: 1,
   });
+  await nextFrame();
+  fireEvent.pointerMove(document, {
+    clientX: toX,
+    clientY: toY,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+  await nextFrame();
   fireEvent.pointerUp(document, {
-    clientX: to.left + 4,
-    clientY: to.top + 4,
+    clientX: toX,
+    clientY: toY,
     button: 0,
     buttons: 0,
     isPrimary: true,
     pointerId: 1,
   });
+  await nextFrame();
 }
 
 export const CopiesValueOntoAGroup: Story = {

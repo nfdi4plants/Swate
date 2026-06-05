@@ -7,12 +7,13 @@ open Swate.Components.Composite.ProvenanceGrouping.Types
 
 let emptyLayer =
     {
-        GroupingKeys = []
+        GroupingAssignments = []
     }
 
 let init (session: ProvenanceSession) =
     {
         LayerStates = session.Layers |> List.map (fun layer -> layer.Id, emptyLayer) |> Map.ofList
+        PropertyRailPlacements = Map.empty
         SelectedInputs = Set.empty
         SelectedOutputs = Set.empty
         Detail = None
@@ -27,6 +28,7 @@ let ensureLayers session state =
         session.Layers
         |> List.map (fun layer -> layer.Id)
         |> Set.ofList
+    let currentPairIds = session.PairOrder |> Set.ofList
 
     let layers =
         let retained : Map<ProvenanceLayerId, LayerViewState> =
@@ -36,17 +38,102 @@ let ensureLayers session state =
         |> List.fold (fun (map: Map<ProvenanceLayerId, LayerViewState>) layer ->
             if map.ContainsKey layer.Id then map else map |> Map.add layer.Id emptyLayer) retained
 
-    { state with LayerStates = layers }
+    let placements =
+        state.PropertyRailPlacements
+        |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
 
-let toggleGrouping layerId header state =
+    { state with LayerStates = layers; PropertyRailPlacements = placements }
+
+let private groupingKey header : GroupingKey =
+    { Header = header }
+
+let private scopeForSide side =
+    match side with
+    | ProvenanceSide.Input -> GroupingScope.Input
+    | ProvenanceSide.Output -> GroupingScope.Output
+
+let private removeHeader header (assignments: GroupingAssignment list) : GroupingAssignment list =
+    let key = groupingKey header
+    assignments |> List.filter (fun assignment -> assignment.Key <> key)
+
+let private upsert (assignment: GroupingAssignment) (assignments: GroupingAssignment list) : GroupingAssignment list =
+    assignments
+    |> List.filter (fun current -> current.Key <> assignment.Key)
+    |> fun retained -> retained @ [ assignment ]
+
+let private updateLayer layerId update state =
     let current = layerState layerId state
-    let key = { Header = header }
-    let nextKeys =
-        if current.GroupingKeys |> List.contains key then
-            current.GroupingKeys |> List.filter ((<>) key)
-        else
-            current.GroupingKeys @ [ key ]
-    { state with LayerStates = state.LayerStates |> Map.add layerId { current with GroupingKeys = nextKeys } }
+    let next = update current
+    { state with LayerStates = state.LayerStates |> Map.add layerId next }
+
+let toggleSideGrouping layerId side header state =
+    updateLayer
+        layerId
+        (fun current ->
+            let key = groupingKey header
+            let scope = scopeForSide side
+            let assignment : GroupingAssignment = { Key = key; Scope = scope }
+            let isSelected =
+                current.GroupingAssignments
+                |> List.exists (fun current -> current.Key = key && current.Scope = scope)
+
+            let nextAssignments =
+                if isSelected then
+                    removeHeader header current.GroupingAssignments
+                else
+                    upsert assignment current.GroupingAssignments
+
+            { current with GroupingAssignments = nextAssignments })
+        state
+
+let toggleBothGrouping leftLayerId rightLayerId header state =
+    let key = groupingKey header
+    let isSelected =
+        [ leftLayerId; rightLayerId ]
+        |> List.exists (fun layerId ->
+            (layerState layerId state).GroupingAssignments
+            |> List.exists (fun assignment -> assignment.Key = key && assignment.Scope = GroupingScope.Both))
+
+    let setLayer state layerId =
+        updateLayer
+            layerId
+            (fun current ->
+                let nextAssignments =
+                    if isSelected then
+                        removeHeader header current.GroupingAssignments
+                    else
+                        upsert ({ Key = key; Scope = GroupingScope.Both } : GroupingAssignment) current.GroupingAssignments
+
+                { current with GroupingAssignments = nextAssignments })
+            state
+
+    let withLeft = setLayer state leftLayerId
+    setLayer withLeft rightLayerId
+
+let moveGrouping pairId sourceLayerId targetLayerId targetSide header state =
+    let key = groupingKey header
+    let targetAssignment : GroupingAssignment =
+        {
+            Key = key
+            Scope = scopeForSide targetSide
+        }
+
+    let withoutSource =
+        updateLayer
+            sourceLayerId
+            (fun current -> { current with GroupingAssignments = removeHeader header current.GroupingAssignments })
+            state
+
+    let withTarget =
+        updateLayer
+            targetLayerId
+            (fun current -> { current with GroupingAssignments = upsert targetAssignment current.GroupingAssignments })
+            withoutSource
+
+    {
+        withTarget with
+            PropertyRailPlacements = withTarget.PropertyRailPlacements |> Map.add (pairId, key) targetSide
+    }
 
 let select pairId side groupId state =
     let identity = pairId, groupId

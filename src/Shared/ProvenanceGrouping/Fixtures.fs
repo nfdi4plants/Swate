@@ -47,6 +47,7 @@ let inputSet id tableName header name propertyValueIds : ProvenanceSet =
         Header = header
         Name = name
         PropertyValueIds = propertyValueIds
+        InheritedPropertyValueIds = Map.empty
     }
 
 let outputSet id tableName header name propertyValueIds : ProvenanceSet =
@@ -56,6 +57,7 @@ let outputSet id tableName header name propertyValueIds : ProvenanceSet =
         Header = header
         Name = name
         PropertyValueIds = propertyValueIds
+        InheritedPropertyValueIds = Map.empty
     }
 
 let connection id tableName processName inputSetId outputSetId : ProvenanceConnection =
@@ -81,6 +83,7 @@ let model
         OutputSets = outputSets |> List.map (fun set -> set.Id, set) |> Map.ofList
         Connections = connections |> List.map (fun connection -> connection.Id, connection) |> Map.ofList
     }
+    |> ProvenanceModel.refreshInheritedOutputProperties
 
 let sampleModel () : ProvenanceModel =
     let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
@@ -160,6 +163,31 @@ let outputOnlyModel () : ProvenanceModel =
         []
         [ outputSet "output-only-a" "output-only-table" outputHeader "Output Only A" [ "pv-output-only-analysis" ] ]
         []
+
+let switchablePropertyModel () : ProvenanceModel =
+    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+    let batch = propertyHeader ProvenancePropertyKind.Parameter "Batch"
+
+    model
+        "switchable-table"
+        [
+            propertyValue "pv-input-a-batch" batch (ProvenanceValue.Text "A") None None
+            propertyValue "pv-output-a-batch" batch (ProvenanceValue.Text "A") None None
+            propertyValue "pv-output-b-batch" batch (ProvenanceValue.Text "B") None None
+        ]
+        [
+            inputSet "input-a" "switchable-table" inputHeader "Input A" [ "pv-input-a-batch" ]
+            inputSet "input-b" "switchable-table" inputHeader "Input B" []
+        ]
+        [
+            outputSet "output-a" "switchable-table" outputHeader "Output A" [ "pv-output-a-batch" ]
+            outputSet "output-b" "switchable-table" outputHeader "Output B" [ "pv-output-b-batch" ]
+        ]
+        [
+            connection "connection-a" "switchable-table" None "input-a" "output-a"
+            connection "connection-b" "switchable-table" None "input-b" "output-b"
+        ]
 
 let typedSampleModel () : ProvenanceModel =
     let baseModel = sampleModel ()

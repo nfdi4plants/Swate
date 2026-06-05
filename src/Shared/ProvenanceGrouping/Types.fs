@@ -145,7 +145,41 @@ type ProvenanceSet =
         Name: string
         /// Property value occurrences attached to this loaded endpoint.
         PropertyValueIds: ProvenancePropertyValueId list
+        /// Property value occurrences inherited through loaded connections, keyed by connection ID.
+        /// These pointers are connection-specific so removing a connection can remove the inherited values.
+        InheritedPropertyValueIds: Map<ProvenanceConnectionId, ProvenancePropertyValueId list>
     }
+
+module ProvenanceSet =
+
+    let private distinct values =
+        values |> List.distinct
+
+    let inheritedPropertyValueIds (set: ProvenanceSet) =
+        set.InheritedPropertyValueIds
+        |> Map.toList
+        |> List.sortBy fst
+        |> List.collect snd
+        |> distinct
+
+    let effectivePropertyValueIds (set: ProvenanceSet) =
+        [ yield! set.PropertyValueIds
+          yield! inheritedPropertyValueIds set ]
+        |> distinct
+
+    let inheritPropertyValueIds connectionId propertyValueIds (set: ProvenanceSet) =
+        let propertyValueIds = propertyValueIds |> distinct
+
+        let inherited =
+            if propertyValueIds.IsEmpty then
+                set.InheritedPropertyValueIds |> Map.remove connectionId
+            else
+                set.InheritedPropertyValueIds |> Map.add connectionId propertyValueIds
+
+        { set with InheritedPropertyValueIds = inherited }
+
+    let removeInheritedPropertyValueIds connectionId (set: ProvenanceSet) =
+        { set with InheritedPropertyValueIds = set.InheritedPropertyValueIds |> Map.remove connectionId }
 
 /// One exact connection between a loaded input endpoint and a loaded output endpoint.
 /// Previous-table connections are intentionally not represented here.
@@ -181,3 +215,39 @@ type ProvenanceModel =
         /// May be empty for one-sided loaded tables.
         Connections: Map<ProvenanceConnectionId, ProvenanceConnection>
     }
+
+module ProvenanceModel =
+
+    let refreshInheritedOutputProperties (model: ProvenanceModel) =
+        let inheritedByOutput =
+            model.Connections
+            |> Map.toList
+            |> List.choose (fun (connectionId, connection) ->
+                match model.InputSets.TryFind connection.InputSetId, model.OutputSets.TryFind connection.OutputSetId with
+                | Some inputSet, Some _ when connection.TableName = model.LoadedTableName ->
+                    let propertyValueIds = ProvenanceSet.effectivePropertyValueIds inputSet
+                    if propertyValueIds.IsEmpty then
+                        None
+                    else
+                        Some(connection.OutputSetId, connectionId, propertyValueIds)
+                | _ -> None)
+            |> List.groupBy (fun (outputSetId, _, _) -> outputSetId)
+            |> List.map (fun (outputSetId, inherited) ->
+                outputSetId,
+                inherited
+                |> List.map (fun (_, connectionId, propertyValueIds) -> connectionId, propertyValueIds)
+                |> Map.ofList)
+            |> Map.ofList
+
+        let outputSets =
+            model.OutputSets
+            |> Map.map (fun outputSetId outputSet ->
+                {
+                    outputSet with
+                        InheritedPropertyValueIds =
+                            inheritedByOutput
+                            |> Map.tryFind outputSetId
+                            |> Option.defaultValue Map.empty
+                })
+
+        { model with OutputSets = outputSets }

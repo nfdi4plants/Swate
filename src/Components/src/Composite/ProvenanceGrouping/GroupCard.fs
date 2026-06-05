@@ -44,7 +44,16 @@ type GroupCard =
             | [] -> group.Members.Head.Name
             | values ->
                 values
-                |> List.map (fun value -> $"{value.Key.Header.Category.Name}: {formatValue value.Value value.Unit}")
+                |> List.groupBy (fun value -> value.Key)
+                |> List.sortBy (fun (key, _) -> $"{key.Header.Kind}:{key.Header.Category.Name}")
+                |> List.map (fun (key, groupedValues) ->
+                    let valuesText =
+                        groupedValues
+                        |> List.sortBy (fun value -> formatValue value.Value value.Unit)
+                        |> List.map (fun value -> formatValue value.Value value.Unit)
+                        |> String.concat " | "
+
+                    $"{key.Header.Category.Name}: {valuesText}")
                 |> String.concat ", "
 
         Html.article [

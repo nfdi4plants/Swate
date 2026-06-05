@@ -15,7 +15,7 @@ type ProvenanceEditorChange =
 
 type LayerViewState =
     {
-        GroupingKeys: GroupingKey list
+        GroupingAssignments: GroupingAssignment list
     }
 
 type ProvenanceDetail =
@@ -25,6 +25,7 @@ type ProvenanceDetail =
 type UiState =
     {
         LayerStates: Map<ProvenanceLayerId, LayerViewState>
+        PropertyRailPlacements: Map<ProvenancePairId * GroupingKey, ProvenanceSide>
         SelectedInputs: Set<ProvenancePairId * string>
         SelectedOutputs: Set<ProvenancePairId * string>
         Detail: ProvenanceDetail option
@@ -36,6 +37,7 @@ module Exports =
     let createSampleSession () = sampleSession ()
     let createInputOnlySession () = inputOnlyModel () |> Session.init
     let createOutputOnlySession () = outputOnlyModel () |> Session.init
+    let createSwitchablePropertySession () = switchablePropertyModel () |> Session.init
     let createTypedSampleSession () = typedSampleModel () |> Session.init
     let createDataOutputOnlySession () = dataOutputOnlyModel () |> Session.init
     let createRetaggedTypedSampleSession () =

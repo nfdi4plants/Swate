@@ -23,6 +23,14 @@ type ProvenanceGrouping =
         let pair, inputGroups, outputGroups, connections = displayPair session uiState
         let inputEndpointKind = defaultEndpointKind ProvenanceSide.Input pair.Model
         let outputEndpointKind = defaultEndpointKind ProvenanceSide.Output pair.Model
+        let pointerSensor =
+            DndKit.useSensor (
+                DndKit.PointerSensor,
+                {|
+                    activationConstraint = {| distance = 6 |}
+                |}
+            )
+        let sensors = DndKit.useSensors [| pointerSensor |]
 
         let publish result =
             match result with
@@ -53,6 +61,10 @@ type ProvenanceGrouping =
             let groups : DisplayGroup list = if side = ProvenanceSide.Input then inputGroups else outputGroups
             groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
 
+        let findHeader headerId =
+            headersForModel pair.Model
+            |> List.tryFind (fun header -> propertyHeaderIdentity header = headerId)
+
         let connectGroups inputGroup outputGroup =
             [
                 for input in inputGroup.Members do
@@ -69,9 +81,15 @@ type ProvenanceGrouping =
             |> publish
 
         let handleDragEnd (event: DndKit.IDndKitEvent) =
-            if not (isNull event.over) then
-                match tryDragId (string event.active.id), tryDropId (string event.over.id) with
-                | Some(DragPayload.PropertyValue propertyValueId), Some(side, groupId) ->
+            if isNull event.over then
+                ()
+            else
+                let dragPayload = tryDragId (string event.active.id)
+                let groupDrop = tryDropId (string event.over.id)
+                let propertyDrop = tryPropertyDropId (string event.over.id)
+
+                match dragPayload, groupDrop, propertyDrop with
+                | Some(DragPayload.PropertyValue propertyValueId), Some(side, groupId), _ ->
                     match findGroup side groupId with
                     | Some group ->
                         let memberIds = group.Members |> List.map (fun member' -> member'.SetId)
@@ -81,9 +99,24 @@ type ProvenanceGrouping =
                             | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets memberIds
                         Session.copyPropertyValueToLoadedTarget propertyValueId target session |> publish
                     | None -> ()
-                | Some(DragPayload.Group(ProvenanceSide.Input, inputGroupId)), Some(ProvenanceSide.Output, outputGroupId) ->
+                | Some(DragPayload.Group(ProvenanceSide.Input, inputGroupId)), Some(ProvenanceSide.Output, outputGroupId), _ ->
                     match findGroup ProvenanceSide.Input inputGroupId, findGroup ProvenanceSide.Output outputGroupId with
                     | Some inputGroup, Some outputGroup -> connectGroups inputGroup outputGroup
+                    | _ -> ()
+                | Some(DragPayload.PropertyHeader(sourceSide, headerId)), _, Some targetSide when sourceSide <> targetSide ->
+                    match findHeader headerId with
+                    | Some header when canSwitchHeader header pair.Model ->
+                        let sourceLayerId =
+                            match sourceSide with
+                            | ProvenanceSide.Input -> pair.LeftLayerId
+                            | ProvenanceSide.Output -> pair.RightLayerId
+                        let targetLayerId =
+                            match targetSide with
+                            | ProvenanceSide.Input -> pair.LeftLayerId
+                            | ProvenanceSide.Output -> pair.RightLayerId
+
+                        State.moveGrouping pair.Id sourceLayerId targetLayerId targetSide header uiState
+                        |> setUiState
                     | _ -> ()
                 | _ -> ()
 
@@ -112,7 +145,15 @@ type ProvenanceGrouping =
                     prop.children [
                         ConnectorOverlay.Main(surfaceRef, connections, (fun connection ->
                             setUiState { uiState with Detail = Some(ProvenanceDetail.Connection connection.Id) }), debug = debug)
-                        Controls.PropertyRail(ProvenanceSide.Input, headersForSide ProvenanceSide.Input pair.Model, (State.layerState pair.LeftLayerId uiState).GroupingKeys, (fun header -> setUiState (State.toggleGrouping pair.LeftLayerId header uiState)), debug = debug)
+                        Controls.PropertyRail(
+                            ProvenanceSide.Input,
+                            propertyRailHeadersForSide pair.Id ProvenanceSide.Input pair.Model uiState,
+                            (State.layerState pair.LeftLayerId uiState).GroupingAssignments,
+                            (fun header -> setUiState (State.toggleSideGrouping pair.LeftLayerId ProvenanceSide.Input header uiState)),
+                            (fun header -> setUiState (State.toggleBothGrouping pair.LeftLayerId pair.RightLayerId header uiState)),
+                            (fun header -> setUiState (State.moveGrouping pair.Id pair.LeftLayerId pair.RightLayerId ProvenanceSide.Output header uiState)),
+                            (fun header -> canSwitchHeader header pair.Model),
+                            debug = debug)
                         Html.div [
                             prop.className "swt:flex swt:flex-col swt:gap-3"
                             prop.children [
@@ -144,7 +185,15 @@ type ProvenanceGrouping =
                                         key = $"{pair.Id}:Output:{endpointKindIdentity outputEndpointKind}")
                             ]
                         ]
-                        Controls.PropertyRail(ProvenanceSide.Output, headersForSide ProvenanceSide.Output pair.Model, (State.layerState pair.RightLayerId uiState).GroupingKeys, (fun header -> setUiState (State.toggleGrouping pair.RightLayerId header uiState)), debug = debug)
+                        Controls.PropertyRail(
+                            ProvenanceSide.Output,
+                            propertyRailHeadersForSide pair.Id ProvenanceSide.Output pair.Model uiState,
+                            (State.layerState pair.RightLayerId uiState).GroupingAssignments,
+                            (fun header -> setUiState (State.toggleSideGrouping pair.RightLayerId ProvenanceSide.Output header uiState)),
+                            (fun header -> setUiState (State.toggleBothGrouping pair.LeftLayerId pair.RightLayerId header uiState)),
+                            (fun header -> setUiState (State.moveGrouping pair.Id pair.RightLayerId pair.LeftLayerId ProvenanceSide.Input header uiState)),
+                            (fun header -> canSwitchHeader header pair.Model),
+                            debug = debug)
                     ]
                 ]
                 match uiState.Detail with
@@ -184,6 +233,7 @@ type ProvenanceGrouping =
             ]
 
         DndKit.DndContext(
+            sensors = sensors,
             collisionDetection = DndKit.pointerWithin,
             onDragEnd = handleDragEnd,
             children = content

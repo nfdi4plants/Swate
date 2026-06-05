@@ -12,6 +12,8 @@ open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 open Swate.Components.Shared.ProvenanceGrouping.Session
 
+module ProvenanceGroupingState = Swate.Components.Composite.ProvenanceGrouping.State
+
 let typeTests =
     testList "Types" [
         testCase "loaded input set carries the actual input name" <| fun _ ->
@@ -23,6 +25,7 @@ let typeTests =
                     Header = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
                     Name = "Input A"
                     PropertyValueIds = [ "pv-species-a" ]
+                    InheritedPropertyValueIds = Map.empty
                 }
 
             let propertyValue =
@@ -147,17 +150,53 @@ let groupingTests =
 
             Expect.equal (groups |> List.map (fun group -> group.Members.Head.Name)) [ "Input A"; "Input B"; "Input C" ] "No grouping should preserve loaded input names."
 
-        testCase "multi-value grouping duplicates the loaded set into each value group" <| fun _ ->
-            let model = validModel ()
-            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
-            let groups = displayGroups model ProvenanceSide.Output [ { Header = replicate } ]
+        testCase "multi-value grouping uses the complete value set as one group key" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
 
-            let outputBGroupCount =
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species-chlamy" species (ProvenanceValue.Text "Chlamydomonas") None None
+                        propertyValue "pv-input-b-species-arabidopsis" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-input-c-species-arabidopsis" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-input-c-species-chlamy" species (ProvenanceValue.Text "Chlamydomonas") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species-chlamy" ]
+                        inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-input-b-species-arabidopsis" ]
+                        inputSet "input-c" "assay-table" inputHeader "Input C" [ "pv-input-c-species-arabidopsis"; "pv-input-c-species-chlamy" ]
+                    ]
+                    []
+                    []
+
+            let groups = displayGroups built ProvenanceSide.Input [ { Header = species } ]
+
+            let membersByTitle =
                 groups
-                |> List.filter (fun group -> group.Members |> List.exists (fun member' -> member'.SetId = "output-b"))
-                |> List.length
+                |> List.map (fun group ->
+                    let title =
+                        group.GroupingValues
+                        |> List.map (fun value ->
+                            match value.Value with
+                            | ProvenanceValue.Text text -> text
+                            | other -> string other)
+                        |> List.sort
+                        |> String.concat ", "
+                    title, group.Members |> List.map (fun member' -> member'.SetId) |> List.sort)
+                |> Map.ofList
 
-            Expect.equal outputBGroupCount 2 "Output B should appear once for each repeated replicate value."
+            Expect.equal
+                (membersByTitle |> Map.toList |> List.map fst)
+                [ "Arabidopsis"; "Arabidopsis, Chlamydomonas"; "Chlamydomonas" ]
+                "Grouping by a multi-valued property should create one group for the complete value set."
+            Expect.isTrue
+                (groups |> List.exists (fun group -> group.Id = "input:Species=Arabidopsis | Chlamydomonas"))
+                "A multi-valued group id should print the grouping key once and join values with ' | '."
+            Expect.equal membersByTitle.["Arabidopsis"] [ "input-b" ] "The multi-valued set must not appear in the Arabidopsis-only group."
+            Expect.equal membersByTitle.["Chlamydomonas"] [ "input-a" ] "The multi-valued set must not appear in the Chlamydomonas-only group."
+            Expect.equal membersByTitle.["Arabidopsis, Chlamydomonas"] [ "input-c" ] "The multi-valued set should appear in its combined value-set group."
 
         testCase "grouped members retain non-grouping property values for editing" <| fun _ ->
             let model = sampleModel ()
@@ -172,6 +211,89 @@ let groupingTests =
                 inputA.PropertyValueIds
                 "pv-input-a-temperature"
                 "Grouping by Species must not hide Temperature from the member editing surface."
+
+        testCase "outputs expose input properties inherited through current loaded connections" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let temperature = propertyHeader ProvenancePropertyKind.Parameter "Temperature"
+            let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-input-b-temperature" temperature (ProvenanceValue.Text "12 C") None None
+                        propertyValue "pv-output-a-analysis" analysis (ProvenanceValue.Text "LC-MS") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species" ]
+                        inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-input-b-temperature" ]
+                    ]
+                    [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-output-a-analysis" ]
+                    ]
+                    [
+                        connection "connection-a" "assay-table" None "input-a" "output-a"
+                        connection "connection-b" "assay-table" None "input-b" "output-a"
+                    ]
+
+            let outputA =
+                displayGroups built ProvenanceSide.Output []
+                |> List.collect (fun group -> group.Members)
+                |> List.find (fun member' -> member'.SetId = "output-a")
+
+            Expect.equal
+                (outputA.PropertyValueIds |> List.sort)
+                [ "pv-input-a-species"; "pv-input-b-temperature"; "pv-output-a-analysis" ]
+                "An output should expose its own properties plus properties inherited from all directly connected loaded inputs."
+
+        testCase "output inheritance follows the current loaded connection set" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+            let build connections =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-input-b-species" species (ProvenanceValue.Text "Chlamydomonas") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species" ]
+                        inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-input-b-species" ]
+                    ]
+                    [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" []
+                    ]
+                    connections
+
+            let withOneConnection =
+                build [ connection "connection-a" "assay-table" None "input-a" "output-a" ]
+
+            let withTwoConnections =
+                build
+                    [
+                        connection "connection-a" "assay-table" None "input-a" "output-a"
+                        connection "connection-b" "assay-table" None "input-b" "output-a"
+                    ]
+
+            let inheritedIds model =
+                displayGroups model ProvenanceSide.Output []
+                |> List.collect (fun group -> group.Members)
+                |> List.find (fun member' -> member'.SetId = "output-a")
+                |> fun member' -> member'.PropertyValueIds |> List.sort
+
+            Expect.equal
+                (inheritedIds withOneConnection)
+                [ "pv-input-a-species" ]
+                "Only properties from currently connected inputs should be inherited."
+            Expect.equal
+                (inheritedIds withTwoConnections)
+                [ "pv-input-a-species"; "pv-input-b-species" ]
+                "Adding a connection should add that input's properties to the output's effective properties."
 
         testCase "grouping collapses identical equal values for one set into one display member" <| fun _ ->
             let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
@@ -221,6 +343,122 @@ let groupingTests =
             let groups = displayGroups built ProvenanceSide.Input [ { Header = temperature } ]
 
             Expect.equal groups.Length 2 "Values with the same scalar value but different units must not collapse."
+
+        testCase "scoped input grouping uses multiple own values as one value-set group" <| fun _ ->
+            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-rep-1" replicate (ProvenanceValue.Text "1") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] []))
+                        propertyValue "pv-input-a-rep-2" replicate (ProvenanceValue.Text "2") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] []))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-rep-1"; "pv-input-a-rep-2" ]
+                    ]
+                    []
+                    []
+
+            let groups =
+                displayGroupsForAssignments
+                    built
+                    ProvenanceSide.Input
+                    [ { Key = { Header = replicate }; Scope = GroupingScope.Input } ]
+
+            let groupedValues =
+                groups
+                |> List.choose (fun group ->
+                    if group.Members |> List.exists (fun member' -> member'.SetId = "input-a") then
+                        group.GroupingValues
+                        |> List.map (fun groupingValue -> groupingValue.Value)
+                        |> List.sort
+                        |> Some
+                    else
+                        None)
+                |> List.exactlyOne
+
+            Expect.equal groupedValues [ ProvenanceValue.Text "1"; ProvenanceValue.Text "2" ] "An input with multiple values for the same grouping key must appear in one combined value-set group."
+
+        testCase "both-side grouping lets inputs inherit missing values from direct connected outputs" <| fun _ ->
+            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-output-a-rep-1" replicate (ProvenanceValue.Text "1") None (Some(anchor "assay-table" (Some "assay-process") replicate [] [ "Output A" ]))
+                        propertyValue "pv-output-b-rep-2" replicate (ProvenanceValue.Text "2") None (Some(anchor "assay-table" (Some "assay-process") replicate [] [ "Output B" ]))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" []
+                    ]
+                    [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-output-a-rep-1" ]
+                        outputSet "output-b" "assay-table" outputHeader "Output B" [ "pv-output-b-rep-2" ]
+                    ]
+                    [
+                        connection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
+                        connection "connection-b" "assay-table" (Some "assay-process") "input-a" "output-b"
+                    ]
+
+            let groups =
+                displayGroupsForAssignments
+                    built
+                    ProvenanceSide.Input
+                    [ { Key = { Header = replicate }; Scope = GroupingScope.Both } ]
+
+            let groupedValues =
+                groups
+                |> List.find (fun group -> group.Members |> List.exists (fun member' -> member'.SetId = "input-a"))
+                |> fun group ->
+                    group.GroupingValues
+                    |> List.map (fun groupingValue -> groupingValue.Value)
+                    |> List.sort
+
+            Expect.equal groupedValues [ ProvenanceValue.Text "1"; ProvenanceValue.Text "2" ] "A missing input property should inherit direct connected output values as one combined value-set group."
+
+        testCase "both-side grouping prefers input values over inherited output values" <| fun _ ->
+            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+            let built =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-rep-3" replicate (ProvenanceValue.Text "3") None (Some(anchor "assay-table" (Some "assay-process") replicate [ "Input A" ] []))
+                        propertyValue "pv-output-a-rep-1" replicate (ProvenanceValue.Text "1") None (Some(anchor "assay-table" (Some "assay-process") replicate [] [ "Output A" ]))
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-rep-3" ]
+                    ]
+                    [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-output-a-rep-1" ]
+                    ]
+                    [
+                        connection "connection-a" "assay-table" (Some "assay-process") "input-a" "output-a"
+                    ]
+
+            let groups =
+                displayGroupsForAssignments
+                    built
+                    ProvenanceSide.Input
+                    [ { Key = { Header = replicate }; Scope = GroupingScope.Both } ]
+
+            let groupedValues =
+                groups
+                |> List.filter (fun group -> group.Members |> List.exists (fun member' -> member'.SetId = "input-a"))
+                |> List.choose (fun group ->
+                    group.GroupingValues
+                    |> List.tryExactlyOne
+                    |> Option.map (fun groupingValue -> groupingValue.Value))
+                |> List.sort
+
+            Expect.equal groupedValues [ ProvenanceValue.Text "3" ] "An input's own values should be used before direct connected output values are considered."
 
         testCase "displayGroups works for input-only loaded models" <| fun _ ->
             let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
@@ -575,9 +813,49 @@ let sessionTests =
                     (pair.Model.PropertyValues
                      |> Map.forall (fun id _ ->
                          pair.Model.InputSets
-                         |> Map.exists (fun _ set -> set.PropertyValueIds |> List.contains id)))
+                         |> Map.exists (fun _ set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains id)))
                     "Derived pairs should retain only values referenced by their projected endpoints."
                 Expect.isEmpty patches "Creating an empty editing layer does not write ARC data."
+            | Error error ->
+                failwithf "Expected layer addition success, got %A" error
+
+        testCase "addLayer carries output properties inherited through loaded connections" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+
+            let initial =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-output-a-analysis" analysis (ProvenanceValue.Text "LC-MS") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species" ]
+                    ]
+                    [
+                        outputSet "output-a" "assay-table" outputHeader "Output A" [ "pv-output-a-analysis" ]
+                    ]
+                    [
+                        connection "connection-a" "assay-table" None "input-a" "output-a"
+                    ]
+                |> Session.init
+
+            match Session.addLayer { SelectedSets = [ ProvenanceSide.Output, "output-a" ] } initial with
+            | Ok(next, patches) ->
+                Expect.isEmpty patches "Layer projection should not write ARC data."
+                let projected =
+                    (Session.activePair next).Model.InputSets
+                    |> Map.toList
+                    |> List.exactlyOne
+                    |> snd
+
+                Expect.equal
+                    (ProvenanceSet.effectivePropertyValueIds projected |> List.sort)
+                    [ "pv-input-a-species"; "pv-output-a-analysis" ]
+                    "A projected output should keep properties inherited from its previously connected loaded input."
             | Error error ->
                 failwithf "Expected layer addition success, got %A" error
 
@@ -749,6 +1027,69 @@ let sessionTests =
                 failwithf "Expected missing-connection session error, got %A" other
     ]
 
+let uiStateTests =
+    testList "UI state" [
+        testCase "toggleSideGrouping applies grouping only to the selected layer side" <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let state = ProvenanceGroupingState.init session
+            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+
+            let next = ProvenanceGroupingState.toggleSideGrouping pair.RightLayerId ProvenanceSide.Output replicate state
+
+            Expect.equal
+                (ProvenanceGroupingState.layerState pair.LeftLayerId next).GroupingAssignments
+                []
+                "Side-only output grouping should not change the input layer state."
+            Expect.equal
+                (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
+                [ { Key = { Header = replicate }; Scope = GroupingScope.Output } ]
+                "Side-only output grouping should be stored as an output-scoped assignment."
+
+        testCase "toggleBothGrouping applies grouping to both active layer states" <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let state = ProvenanceGroupingState.init session
+            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+
+            let next = ProvenanceGroupingState.toggleBothGrouping pair.LeftLayerId pair.RightLayerId replicate state
+            let expected = [ { Key = { Header = replicate }; Scope = GroupingScope.Both } ]
+
+            Expect.equal
+                (ProvenanceGroupingState.layerState pair.LeftLayerId next).GroupingAssignments
+                expected
+                "Both-side grouping should be visible from the input layer."
+            Expect.equal
+                (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
+                expected
+                "Both-side grouping should be visible from the output layer."
+
+        testCase "moveGrouping switches a property to the target side only" <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let state = ProvenanceGroupingState.init session
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+
+            let selected =
+                ProvenanceGroupingState.toggleSideGrouping pair.LeftLayerId ProvenanceSide.Input species state
+
+            let next =
+                ProvenanceGroupingState.moveGrouping pair.Id pair.LeftLayerId pair.RightLayerId ProvenanceSide.Output species selected
+
+            Expect.equal
+                (ProvenanceGroupingState.layerState pair.LeftLayerId next).GroupingAssignments
+                []
+                "Dragging a property away should remove it from the source layer."
+            Expect.equal
+                (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
+                [ { Key = { Header = species }; Scope = GroupingScope.Output } ]
+                "Dragging a property to output should make it output-only."
+            Expect.equal
+                (next.PropertyRailPlacements |> Map.tryFind (pair.Id, { Header = species }))
+                (Some ProvenanceSide.Output)
+                "Dragging a property to output should move its rail control to the output side."
+    ]
+
 let tests =
     testList "ProvenanceGrouping" [
         typeTests
@@ -757,4 +1098,5 @@ let tests =
         editTests
         fixtureTests
         sessionTests
+        uiStateTests
     ]

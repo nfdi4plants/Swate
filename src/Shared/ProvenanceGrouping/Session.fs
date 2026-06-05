@@ -169,7 +169,7 @@ module Session =
             let projectedPropertyValueIds =
                 inputs
                 |> Map.toList
-                |> List.collect (fun (_, set) -> set.PropertyValueIds)
+                |> List.collect (fun (_, set) -> ProvenanceSet.effectivePropertyValueIds set)
                 |> Set.ofList
 
             let projectedPropertyValues =
@@ -213,7 +213,7 @@ module Session =
         | Some pair -> Ok(replacePair { pair with Model = model } session)
 
     let private referencedPropertyValues set model =
-        set.PropertyValueIds
+        ProvenanceSet.effectivePropertyValueIds set
         |> List.choose (fun id -> model.PropertyValues.TryFind id |> Option.map (fun value -> id, value))
 
     let private copySetData sourceRef targetRef session =
@@ -221,7 +221,12 @@ module Session =
         let targetPair = session.Pairs.[targetRef.PairId]
         let sourceSet = (setAt sourceRef.Side sourceRef.SetId sourcePair).Value
         let targetSet = (setAt targetRef.Side targetRef.SetId targetPair).Value
-        let targetSet = { targetSet with PropertyValueIds = sourceSet.PropertyValueIds }
+        let targetSet =
+            {
+                targetSet with
+                    PropertyValueIds = sourceSet.PropertyValueIds
+                    InheritedPropertyValueIds = sourceSet.InheritedPropertyValueIds
+            }
         let propertyValues =
             referencedPropertyValues sourceSet sourcePair.Model
             |> List.fold (fun state (id, value) -> Map.add id value state) targetPair.Model.PropertyValues
@@ -308,10 +313,10 @@ module Session =
         let pair = activePair session
         [
             for setId, set in pair.Model.InputSets |> Map.toList do
-                if set.PropertyValueIds |> List.contains propertyValueId then
+                if ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValueId then
                     yield activeRef ProvenanceSide.Input setId session
             for setId, set in pair.Model.OutputSets |> Map.toList do
-                if set.PropertyValueIds |> List.contains propertyValueId then
+                if ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValueId then
                     yield activeRef ProvenanceSide.Output setId session
         ]
         |> List.tryHead
