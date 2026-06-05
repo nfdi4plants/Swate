@@ -7,14 +7,7 @@ open Swate.Components.Shared.ProvenanceGrouping.Session
 open Swate.Components.Composite.ProvenanceGrouping.Types
 open Swate.Components.Composite.ProvenanceGrouping.State
 
-let formatValue (value: ProvenanceValue) (unit': ProvenanceTerm option) =
-    let text =
-        match value with
-        | ProvenanceValue.Text text -> text
-        | ProvenanceValue.Integer value -> string value
-        | ProvenanceValue.Float value -> string value
-        | ProvenanceValue.Term term -> term.Name
-    unit' |> Option.map (fun u -> $"{text} {u.Name}") |> Option.defaultValue text
+let formatValue value unit' = valueText value unit'
 
 let private setsForSide side (model: ProvenanceModel) =
     if side = ProvenanceSide.Input then model.InputSets else model.OutputSets

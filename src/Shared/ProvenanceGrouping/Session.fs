@@ -222,10 +222,15 @@ module Session =
         let sourceSet = (setAt sourceRef.Side sourceRef.SetId sourcePair).Value
         let targetSet = (setAt targetRef.Side targetRef.SetId targetPair).Value
         let targetSet =
+            let inheritedPropertyValueIds =
+                match targetRef.Side with
+                | ProvenanceSide.Input -> sourceSet.InheritedPropertyValueIds
+                | ProvenanceSide.Output -> targetSet.InheritedPropertyValueIds
+
             {
                 targetSet with
                     PropertyValueIds = sourceSet.PropertyValueIds
-                    InheritedPropertyValueIds = sourceSet.InheritedPropertyValueIds
+                    InheritedPropertyValueIds = inheritedPropertyValueIds
             }
         let propertyValues =
             referencedPropertyValues sourceSet sourcePair.Model
@@ -237,6 +242,7 @@ module Session =
                 { targetPair.Model with InputSets = targetPair.Model.InputSets |> Map.add targetSet.Id targetSet; PropertyValues = propertyValues }
             | ProvenanceSide.Output ->
                 { targetPair.Model with OutputSets = targetPair.Model.OutputSets |> Map.add targetSet.Id targetSet; PropertyValues = propertyValues }
+            |> ProvenanceModel.refreshInheritedOutputProperties
 
         replacePair { targetPair with Model = targetModel } session
 

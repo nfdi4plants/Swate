@@ -47,14 +47,13 @@ let ensureLayers session state =
 let private groupingKey header : GroupingKey =
     { Header = header }
 
-let private scopeForSide side =
-    match side with
-    | ProvenanceSide.Input -> GroupingScope.Input
-    | ProvenanceSide.Output -> GroupingScope.Output
-
 let private removeHeader header (assignments: GroupingAssignment list) : GroupingAssignment list =
     let key = groupingKey header
     assignments |> List.filter (fun assignment -> assignment.Key <> key)
+
+let private removeHeaderScope header scope (assignments: GroupingAssignment list) : GroupingAssignment list =
+    let key = groupingKey header
+    assignments |> List.filter (fun assignment -> assignment.Key <> key || assignment.Scope <> scope)
 
 let private upsert (assignment: GroupingAssignment) (assignments: GroupingAssignment list) : GroupingAssignment list =
     assignments
@@ -79,7 +78,7 @@ let toggleSideGrouping layerId side header state =
 
             let nextAssignments =
                 if isSelected then
-                    removeHeader header current.GroupingAssignments
+                    removeHeaderScope header scope current.GroupingAssignments
                 else
                     upsert assignment current.GroupingAssignments
 
@@ -100,7 +99,7 @@ let toggleBothGrouping leftLayerId rightLayerId header state =
             (fun current ->
                 let nextAssignments =
                     if isSelected then
-                        removeHeader header current.GroupingAssignments
+                        removeHeaderScope header GroupingScope.Both current.GroupingAssignments
                     else
                         upsert ({ Key = key; Scope = GroupingScope.Both } : GroupingAssignment) current.GroupingAssignments
 

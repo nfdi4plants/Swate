@@ -53,6 +53,42 @@ let typeTests =
                 Expect.equal source.TableName "previous-table" "Collapsed value should keep writeback table metadata."
             | None ->
                 failwith "Expected collapsed value source."
+
+        testCase "inherited property helpers replace and remove connection-specific pointers" <| fun _ ->
+            let inputSet =
+                {
+                    Id = "input-a"
+                    TableName = "assay-table"
+                    Header = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+                    Name = "Input A"
+                    PropertyValueIds = []
+                    InheritedPropertyValueIds = Map.empty
+                }
+
+            let inherited =
+                inputSet
+                |> ProvenanceSet.inheritPropertyValueIds "connection-a" [ "pv-a"; "pv-a"; "pv-b" ]
+
+            Expect.equal
+                inherited.InheritedPropertyValueIds.["connection-a"]
+                [ "pv-a"; "pv-b" ]
+                "Inherited property IDs should be distinct per connection."
+
+            let replaced =
+                inherited
+                |> ProvenanceSet.inheritPropertyValueIds "connection-a" []
+
+            Expect.isFalse
+                (replaced.InheritedPropertyValueIds.ContainsKey "connection-a")
+                "Empty inherited IDs should remove the connection entry."
+
+            let removed =
+                inherited
+                |> ProvenanceSet.removeInheritedPropertyValueIds "connection-a"
+
+            Expect.isFalse
+                (removed.InheritedPropertyValueIds.ContainsKey "connection-a")
+                "Explicit removal should drop only the requested connection entry."
     ]
 
 let modelTests =
@@ -1010,6 +1046,85 @@ let sessionTests =
             let nextInput = edited.Pairs.["pair-2"].Model.InputSets.["pair-2-from-output-0-output-a"]
             Expect.equal nextInput.PropertyValueIds firstOutput.PropertyValueIds "linked input mirrors the edited output"
 
+        testCase "synchronizing a carried input back to an output recomputes output inherited pointers" <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let layered =
+                Session.addLayer { SelectedSets = [ ProvenanceSide.Output, "output-a" ] } session
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let pair2 = Session.activePair layered
+            let projectedId = pair2.Model.InputSets |> Map.toList |> List.exactlyOne |> fst
+            let foreignHeader = propertyHeader ProvenancePropertyKind.Parameter "Foreign"
+            let foreignValue =
+                propertyValue "pv-foreign" foreignHeader (ProvenanceValue.Text "stale") None None
+            let pollutedInput =
+                {
+                    pair2.Model.InputSets.[projectedId] with
+                        InheritedPropertyValueIds =
+                            pair2.Model.InputSets.[projectedId].InheritedPropertyValueIds
+                            |> Map.add "foreign-connection" [ foreignValue.Id ]
+                }
+            let pollutedPair2 =
+                {
+                    pair2 with
+                        Model =
+                            {
+                                pair2.Model with
+                                    PropertyValues = pair2.Model.PropertyValues |> Map.add foreignValue.Id foreignValue
+                                    InputSets = pair2.Model.InputSets |> Map.add projectedId pollutedInput
+                            }
+                }
+            let polluted =
+                {
+                    layered with
+                        Pairs = layered.Pairs |> Map.add pair2.Id pollutedPair2
+                }
+
+            let outputHeader = ioHeader ProvenanceIOKind.Data "Output [Data]"
+            let withOutput =
+                Session.createLoadedSet { Side = ProvenanceSide.Output; Header = outputHeader; Name = "Pair 2 Output" } polluted
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected createLoadedSet error: %A" error
+            let pair2WithOutput = Session.activePair withOutput
+            let outputId = pair2WithOutput.Model.OutputSets |> Map.toList |> List.exactlyOne |> fst
+            let connected =
+                Session.connectSets projectedId outputId None withOutput
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected connectSets error: %A" error
+            let pair2ConnectionId =
+                (Session.activePair connected).Model.Connections
+                |> Map.toList
+                |> List.exactlyOne
+                |> fst
+            let syncHeader = propertyHeader ProvenancePropertyKind.Parameter "Sync"
+            let command =
+                {
+                    Target = ProvenancePropertyTarget.Connections [ pair2ConnectionId ]
+                    CopiedFrom = None
+                    Header = syncHeader
+                    Value = ProvenanceValue.Text "pair-2"
+                    Unit = None
+                }
+
+            let edited =
+                Session.createLoadedPropertyValue command connected
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected createLoadedPropertyValue error: %A" error
+
+            let previousOutput = edited.Pairs.["pair-1"].Model.OutputSets.["output-a"]
+
+            Expect.isFalse
+                (previousOutput.InheritedPropertyValueIds.ContainsKey "foreign-connection")
+                "Synchronizing into an output must not copy inherited pointers from another pair verbatim."
+            Expect.isTrue
+                (previousOutput.InheritedPropertyValueIds.ContainsKey "connection-a")
+                "The output should keep inherited pointers recomputed from its own loaded connections."
+
         testCase "adding a value to a removed connection returns a session error" <| fun _ ->
             let command =
                 {
@@ -1088,6 +1203,35 @@ let uiStateTests =
                 (next.PropertyRailPlacements |> Map.tryFind (pair.Id, { Header = species }))
                 (Some ProvenanceSide.Output)
                 "Dragging a property to output should move its rail control to the output side."
+
+        testCase "toggleBothGrouping removes only both-scope assignments from inconsistent state" <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let state = ProvenanceGroupingState.init session
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let key = { Header = species }
+            let sideAssignment = { Key = key; Scope = GroupingScope.Input }
+            let bothAssignment = { Key = key; Scope = GroupingScope.Both }
+            let inconsistent =
+                {
+                    state with
+                        LayerStates =
+                            state.LayerStates
+                            |> Map.add pair.LeftLayerId { GroupingAssignments = [ sideAssignment; bothAssignment ] }
+                            |> Map.add pair.RightLayerId { GroupingAssignments = [ bothAssignment ] }
+                }
+
+            let next =
+                ProvenanceGroupingState.toggleBothGrouping pair.LeftLayerId pair.RightLayerId species inconsistent
+
+            Expect.equal
+                (ProvenanceGroupingState.layerState pair.LeftLayerId next).GroupingAssignments
+                [ sideAssignment ]
+                "Removing a both-side grouping should not silently drop an existing side-specific assignment for the same key."
+            Expect.equal
+                (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
+                []
+                "Only the both-side assignment should be removed from the opposite layer."
     ]
 
 let tests =

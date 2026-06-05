@@ -53,7 +53,7 @@ type DisplayConnection =
 let private mapValues map =
     map |> Map.toList |> List.map snd
 
-let private valueText (value: ProvenanceValue) (unit: ProvenanceTerm option) =
+let valueText (value: ProvenanceValue) (unit: ProvenanceTerm option) =
     let text =
         match value with
         | ProvenanceValue.Text value -> value
@@ -165,7 +165,7 @@ let private scopeApplies side scope =
     | ProvenanceSide.Output, GroupingScope.Both -> true
     | _ -> false
 
-let private scopeForSide side =
+let scopeForSide side =
     match side with
     | ProvenanceSide.Input -> GroupingScope.Input
     | ProvenanceSide.Output -> GroupingScope.Output

@@ -17,9 +17,9 @@ type ProvenanceGrouping =
     [<ReactComponent>]
     static member Main(session: ProvenanceSession, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool) =
         let debug = defaultArg debug false
-        let uiState, setUiState = React.useState (State.init session)
+        let rawUiState, setUiState = React.useState (State.init session)
         let surfaceRef = React.useElementRef ()
-        let uiState = State.ensureLayers session uiState
+        let uiState = State.ensureLayers session rawUiState
         let pair, inputGroups, outputGroups, connections = displayPair session uiState
         let inputEndpointKind = defaultEndpointKind ProvenanceSide.Input pair.Model
         let outputEndpointKind = defaultEndpointKind ProvenanceSide.Output pair.Model
