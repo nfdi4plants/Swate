@@ -9,6 +9,40 @@ open Swate.Components.Composite.ProvenanceGrouping.State
 
 let formatValue value unit' = valueText value unit'
 
+let dragIndicatorClasses isDragging =
+    [
+        "swt:transition swt:duration-150"
+        if isDragging then "swt:ring-2 swt:ring-primary swt:border-primary swt:bg-primary/10 swt:shadow-md swt:opacity-80"
+    ]
+
+let draggableButtonClasses isDragging =
+    [
+        "swt:cursor-grab swt:active:cursor-grabbing"
+        yield! dragIndicatorClasses isDragging
+    ]
+
+let draggableBoxClasses isDragging =
+    [
+        "swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:shadow-sm"
+        yield! draggableButtonClasses isDragging
+    ]
+
+let propertyValueButtonClasses isDragging =
+    [
+        "swt:btn swt:btn-sm swt:btn-primary swt:w-fit swt:max-w-full swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium"
+        yield! draggableButtonClasses isDragging
+    ]
+
+let propertyValueOverlayClasses =
+    [
+        "swt:btn swt:btn-sm swt:btn-primary swt:w-fit swt:max-w-[18rem] swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium swt:pointer-events-none swt:shadow-lg swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
+    ]
+
+let addPropertyValueButtonClasses =
+    [
+        "swt:btn swt:btn-sm swt:btn-outline swt:btn-primary swt:w-fit swt:max-w-full swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium"
+    ]
+
 let private setsForSide side (model: ProvenanceModel) =
     if side = ProvenanceSide.Input then model.InputSets else model.OutputSets
 
@@ -52,10 +86,15 @@ let private railPlacement pairId header (uiState: UiState) =
 
 let propertyRailHeadersForSide pairId side model uiState =
     let ownHeaders = ownedHeadersForSide side model
-    let knownHeaders = headersForModel model
+    let paletteHeaders = paletteHeadersForSide pairId side uiState
+    let knownHeaders =
+        [ yield! headersForModel model
+          yield! paletteHeaders ]
+        |> List.distinct
 
     [ yield! ownHeaders
-      yield! placedHeadersForSide pairId side uiState ]
+      yield! placedHeadersForSide pairId side uiState
+      yield! paletteHeaders ]
     |> List.distinct
     |> List.filter (fun header -> knownHeaders |> List.contains header)
     |> List.filter (fun header ->
@@ -64,6 +103,21 @@ let propertyRailHeadersForSide pairId side model uiState =
         | Some _ -> ownHeaders |> List.contains header
         | None -> true)
     |> List.sortBy (fun header -> header.Category.Name)
+
+let propertyValuesForSideHeader pairId side header (model: ProvenanceModel) uiState =
+    let modelValues =
+        setsForSide side model
+        |> Map.toList
+        |> List.collect (fun (_, set) -> ProvenanceSet.effectivePropertyValueIds set)
+        |> List.distinct
+        |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
+        |> List.filter (fun propertyValue -> propertyValue.Header = header)
+
+    [ yield! modelValues
+      yield! paletteValuesForHeader pairId side header uiState ]
+    |> List.groupBy (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
+    |> List.map (fun (_, values) -> values |> List.sortBy (fun value -> value.Id) |> List.head)
+    |> List.sortBy (fun propertyValue -> formatValue propertyValue.Value propertyValue.Unit)
 
 let defaultEndpointKind side (model: ProvenanceModel) =
     let oppositeSets =
@@ -182,6 +236,57 @@ let targetForGroup side (group: DisplayGroup) =
     match side with
     | ProvenanceSide.Input -> ProvenancePropertyTarget.InputSets ids
     | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets ids
+
+let private memberValuesForHeader header (model: ProvenanceModel) (member': DisplayMember) =
+    member'.PropertyValueIds
+    |> List.distinct
+    |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
+    |> List.filter (fun propertyValue -> propertyValue.Header = header)
+
+let planPropertyValueDrop
+    (source: ValueAssignmentSource)
+    (group: DisplayGroup)
+    (model: ProvenanceModel)
+    : Result<ValueAssignmentPlan, ValueAssignmentError> =
+    let memberValues =
+        group.Members
+        |> List.map (fun member' -> member'.SetId, memberValuesForHeader source.Header model member')
+
+    if memberValues.IsEmpty then
+        Error ValueAssignmentError.EmptyTarget
+    else
+        let membersWithMultipleValues =
+            memberValues
+            |> List.choose (fun (setId, values) ->
+                if values.Length > 1 then Some setId else None)
+
+        if not membersWithMultipleValues.IsEmpty then
+            Error(ValueAssignmentError.MultiplePropertyValues(source.Header, membersWithMultipleValues))
+        elif memberValues |> List.forall (fun (_, values) -> values.IsEmpty) then
+            Ok(
+                AddCurrent
+                    {
+                        Target = targetForGroup group.Side group
+                        CopiedFrom = source.CopiedFrom
+                        Header = source.Header
+                        Value = source.Value
+                        Unit = source.Unit
+                    })
+        elif memberValues |> List.forall (fun (_, values) -> values.Length = 1) then
+            Ok(
+                ConfirmOverwrite
+                    {
+                        Target = targetForGroup group.Side group
+                        ExistingValueIds =
+                            memberValues
+                            |> List.collect (fun (_, values) -> values |> List.map (fun value -> value.Id))
+                            |> List.distinct
+                        Header = source.Header
+                        Value = source.Value
+                        Unit = source.Unit
+                    })
+        else
+            Error(ValueAssignmentError.MixedPropertyValueCounts source.Header)
 
 let endpointHeader side kind =
     let prefix = if side = ProvenanceSide.Input then "Input" else "Output"

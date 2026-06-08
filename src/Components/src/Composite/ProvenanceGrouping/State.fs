@@ -14,6 +14,9 @@ let init (session: ProvenanceSession) =
     {
         LayerStates = session.Layers |> List.map (fun layer -> layer.Id, emptyLayer) |> Map.ofList
         PropertyRailPlacements = Map.empty
+        ExpandedProperties = Set.empty
+        PaletteValues = Map.empty
+        PendingOverwrite = None
         SelectedInputs = Set.empty
         SelectedOutputs = Set.empty
         Detail = None
@@ -42,10 +45,107 @@ let ensureLayers session state =
         state.PropertyRailPlacements
         |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
 
-    { state with LayerStates = layers; PropertyRailPlacements = placements }
+    let expandedProperties =
+        state.ExpandedProperties
+        |> Set.filter (fun (pairId, _, _) -> currentPairIds.Contains pairId)
+
+    let paletteValues =
+        state.PaletteValues
+        |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
+
+    {
+        state with
+            LayerStates = layers
+            PropertyRailPlacements = placements
+            ExpandedProperties = expandedProperties
+            PaletteValues = paletteValues
+    }
 
 let private groupingKey header : GroupingKey =
     { Header = header }
+
+let private propertySlot pairId side header =
+    pairId, side, groupingKey header
+
+let isPropertyExpanded pairId side header state =
+    state.ExpandedProperties |> Set.contains (propertySlot pairId side header)
+
+let togglePropertyExpanded pairId side header state =
+    let slot = propertySlot pairId side header
+    let expanded =
+        if state.ExpandedProperties.Contains slot then
+            state.ExpandedProperties.Remove slot
+        else
+            state.ExpandedProperties.Add slot
+
+    { state with ExpandedProperties = expanded }
+
+let private paletteKey pairId side = pairId, side
+
+let paletteValuesForSide pairId side state =
+    state.PaletteValues
+    |> Map.tryFind (paletteKey pairId side)
+    |> Option.defaultValue []
+
+let paletteValuesForHeader pairId side header state =
+    paletteValuesForSide pairId side state
+    |> List.filter (fun propertyValue -> propertyValue.Header = header)
+
+let paletteHeadersForSide pairId side state =
+    paletteValuesForSide pairId side state
+    |> List.map (fun propertyValue -> propertyValue.Header)
+    |> List.distinct
+    |> List.sortBy (fun header -> header.Category.Name)
+
+let tryFindPaletteValue propertyValueId state =
+    state.PaletteValues
+    |> Map.toList
+    |> List.collect snd
+    |> List.tryFind (fun propertyValue -> propertyValue.Id = propertyValueId)
+
+let private nextPaletteValueId pairId side state =
+    let sideText =
+        match side with
+        | ProvenanceSide.Input -> "input"
+        | ProvenanceSide.Output -> "output"
+
+    let existing =
+        state.PaletteValues
+        |> Map.toList
+        |> List.collect snd
+        |> List.map (fun propertyValue -> propertyValue.Id)
+        |> Set.ofList
+
+    let rec loop index =
+        let id = $"palette-{pairId}-{sideText}-{index}"
+        if existing.Contains id then loop (index + 1) else id
+
+    loop (existing.Count + 1)
+
+let addPaletteValue pairId side header value unit state =
+    let key = paletteKey pairId side
+    let propertyValue : ProvenancePropertyValue =
+        {
+            Id = nextPaletteValueId pairId side state
+            Header = header
+            Value = value
+            Unit = unit
+            Source = None
+        }
+    let nextValues = paletteValuesForSide pairId side state @ [ propertyValue ]
+
+    {
+        state with
+            PaletteValues = state.PaletteValues |> Map.add key nextValues
+            ExpandedProperties = state.ExpandedProperties |> Set.add (propertySlot pairId side header)
+            Error = None
+    }
+
+let setPendingOverwrite warning state =
+    { state with PendingOverwrite = Some warning; Error = None }
+
+let clearPendingOverwrite state =
+    { state with PendingOverwrite = None }
 
 let private removeHeader header (assignments: GroupingAssignment list) : GroupingAssignment list =
     let key = groupingKey header

@@ -13,6 +13,8 @@ open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 open Swate.Components.Shared.ProvenanceGrouping.Session
 
 module ProvenanceGroupingState = Swate.Components.Composite.ProvenanceGrouping.State
+module ProvenanceGroupingHelper = Swate.Components.Composite.ProvenanceGrouping.Helper
+module ProvenanceGroupingTypes = Swate.Components.Composite.ProvenanceGrouping.Types
 
 let typeTests =
     testList "Types" [
@@ -976,6 +978,55 @@ let sessionTests =
             | other ->
                 failwithf "Expected one property-add patch, got %A" other
 
+        testCase "assigning a palette value to a carried next input writes only to the active pair" <| fun _ ->
+            let first = Session.init (sampleModel ())
+            let layered =
+                match Session.addLayer { SelectedSets = [ ProvenanceSide.Output, "output-d" ] } first with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let projectedId = (Session.activePair layered).Model.InputSets |> Map.toList |> List.exactlyOne |> fst
+            let previousBefore = layered.Pairs.["pair-1"].Model.OutputSets.["output-d"]
+            let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
+            let command =
+                {
+                    Target = ProvenancePropertyTarget.InputSets [ projectedId ]
+                    CopiedFrom = None
+                    Header = treatment
+                    Value = ProvenanceValue.Text "Drought"
+                    Unit = None
+                }
+
+            match Session.createCurrentLoadedPropertyValue command layered with
+            | Ok(next, [ ProvenanceTablePatch.AddLoadedPropertyValue(target, _, header, value, _) ]) ->
+                let previousOutput = next.Pairs.["pair-1"].Model.OutputSets.["output-d"]
+                let nextInput = next.Pairs.["pair-2"].Model.InputSets.[projectedId]
+
+                Expect.equal target (ProvenancePropertyTarget.InputSets [ projectedId ]) "Palette drops should patch the active displayed target."
+                Expect.equal header treatment "Patch should carry the palette property."
+                Expect.equal value (ProvenanceValue.Text "Drought") "Patch should carry the palette value."
+                Expect.equal previousOutput.PropertyValueIds previousBefore.PropertyValueIds "Palette additions must not write through to the native boundary owner."
+                Expect.isGreaterThan nextInput.PropertyValueIds.Length previousBefore.PropertyValueIds.Length "The active pair input should receive the new property value."
+            | other ->
+                failwithf "Expected one active-pair property-add patch, got %A" other
+
+        testCase "updating multiple property values uses the edit path for every value" <| fun _ ->
+            let session = Session.init (validModel ())
+            let updates =
+                [
+                    "pv-species-arabidopsis-a", ProvenanceValue.Text "A. thaliana", None
+                    "pv-species-arabidopsis-b", ProvenanceValue.Text "A. thaliana", None
+                ]
+
+            match Session.updatePropertyValues updates session with
+            | Ok(next, patches) ->
+                let model = (Session.activePair next).Model
+                Expect.equal patches.Length 2 "Every existing value should produce an edit patch."
+                Expect.equal model.PropertyValues.["pv-species-arabidopsis-a"].Value (ProvenanceValue.Text "A. thaliana") "First value should be edited."
+                Expect.equal model.PropertyValues.["pv-species-arabidopsis-b"].Value (ProvenanceValue.Text "A. thaliana") "Second value should be edited."
+            | other ->
+                failwithf "Expected batched edit success, got %A" other
+
         testCase "creating and connecting a later output modifies only the active pair" <| fun _ ->
             let layered =
                 Session.init (sampleModel ())
@@ -1232,6 +1283,145 @@ let uiStateTests =
                 (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
                 []
                 "Only the both-side assignment should be removed from the opposite layer."
+
+        testCase "property value drop plan adds only when every group member has no value for the property" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let model =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species" ]
+                        inputSet "input-b" "assay-table" inputHeader "Input B" []
+                    ]
+                    []
+                    []
+            let group : DisplayGroup =
+                {
+                    Id = "manual"
+                    TableName = "assay-table"
+                    Side = ProvenanceSide.Input
+                    GroupingValues = []
+                    Members =
+                        [
+                            { SetId = "input-a"; Name = "Input A"; PropertyValueIds = [ "pv-input-a-species" ] }
+                            { SetId = "input-b"; Name = "Input B"; PropertyValueIds = [] }
+                        ]
+                }
+            let source : ProvenanceGroupingTypes.ValueAssignmentSource =
+                {
+                    CopiedFrom = None
+                    Header = treatment
+                    Value = ProvenanceValue.Text "Drought"
+                    Unit = None
+                }
+
+            match ProvenanceGroupingHelper.planPropertyValueDrop source group model with
+            | Ok(ProvenanceGroupingTypes.ValueAssignmentPlan.AddCurrent command) ->
+                Expect.equal command.Target (ProvenancePropertyTarget.InputSets [ "input-a"; "input-b" ]) "Add plan should target all current group members."
+                Expect.equal command.Header treatment "Add plan should preserve the dropped property."
+            | other ->
+                failwithf "Expected an add plan, got %A" other
+
+            let mixedSource : ProvenanceGroupingTypes.ValueAssignmentSource =
+                { source with Header = species }
+
+            match ProvenanceGroupingHelper.planPropertyValueDrop mixedSource group model with
+            | Error(ProvenanceGroupingTypes.ValueAssignmentError.MixedPropertyValueCounts header) ->
+                Expect.equal header species "Mixed zero/one members should reject the drop for that property."
+            | other ->
+                failwithf "Expected a mixed-count rejection, got %A" other
+
+        testCase "property value drop plan warns only when every group member has exactly one value" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let model =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-input-b-species" species (ProvenanceValue.Text "Chlamydomonas") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species" ]
+                        inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-input-b-species" ]
+                    ]
+                    []
+                    []
+            let group : DisplayGroup =
+                {
+                    Id = "manual"
+                    TableName = "assay-table"
+                    Side = ProvenanceSide.Input
+                    GroupingValues = []
+                    Members =
+                        [
+                            { SetId = "input-a"; Name = "Input A"; PropertyValueIds = [ "pv-input-a-species" ] }
+                            { SetId = "input-b"; Name = "Input B"; PropertyValueIds = [ "pv-input-b-species" ] }
+                        ]
+                }
+            let source : ProvenanceGroupingTypes.ValueAssignmentSource =
+                {
+                    CopiedFrom = None
+                    Header = species
+                    Value = ProvenanceValue.Text "A. thaliana"
+                    Unit = None
+                }
+
+            match ProvenanceGroupingHelper.planPropertyValueDrop source group model with
+            | Ok(ProvenanceGroupingTypes.ValueAssignmentPlan.ConfirmOverwrite warning) ->
+                Expect.equal warning.ExistingValueIds [ "pv-input-a-species"; "pv-input-b-species" ] "Overwrite warning should target the one editable value per member."
+                Expect.equal warning.Header species "Warning should keep the overwritten property."
+            | other ->
+                failwithf "Expected an overwrite warning, got %A" other
+
+        testCase "property value drop plan rejects members with multiple values for the same property" <| fun _ ->
+            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let model =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-input-b-species-a" species (ProvenanceValue.Text "Arabidopsis") None None
+                        propertyValue "pv-input-b-species-b" species (ProvenanceValue.Text "Chlamydomonas") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species" ]
+                        inputSet "input-b" "assay-table" inputHeader "Input B" [ "pv-input-b-species-a"; "pv-input-b-species-b" ]
+                    ]
+                    []
+                    []
+            let group : DisplayGroup =
+                {
+                    Id = "manual"
+                    TableName = "assay-table"
+                    Side = ProvenanceSide.Input
+                    GroupingValues = []
+                    Members =
+                        [
+                            { SetId = "input-a"; Name = "Input A"; PropertyValueIds = [ "pv-input-a-species" ] }
+                            { SetId = "input-b"; Name = "Input B"; PropertyValueIds = [ "pv-input-b-species-a"; "pv-input-b-species-b" ] }
+                        ]
+                }
+            let source : ProvenanceGroupingTypes.ValueAssignmentSource =
+                {
+                    CopiedFrom = None
+                    Header = species
+                    Value = ProvenanceValue.Text "A. thaliana"
+                    Unit = None
+                }
+
+            match ProvenanceGroupingHelper.planPropertyValueDrop source group model with
+            | Error(ProvenanceGroupingTypes.ValueAssignmentError.MultiplePropertyValues(header, setIds)) ->
+                Expect.equal header species "Multi-value members should reject the drop for that property."
+                Expect.equal setIds [ "input-b" ] "The rejection should identify the multi-value member."
+            | other ->
+                failwithf "Expected a multiple-value rejection, got %A" other
     ]
 
 let tests =

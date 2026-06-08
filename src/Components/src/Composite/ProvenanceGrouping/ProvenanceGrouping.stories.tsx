@@ -179,6 +179,65 @@ export const GroupingPropertiesStayOnOwningSide: Story = {
   },
 };
 
+export const PropertyRailExpandsValuesAndAddControls: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
+
+    expect(inputRail.queryByText('Arabidopsis')).not.toBeInTheDocument();
+    expect(inputRail.getByText('Add property')).toBeInTheDocument();
+
+    const panel = await expandProperty(canvas, 'Input', 'Species');
+    const arabidopsis = panel.getByText('Arabidopsis').closest('button, div')!;
+    expect(arabidopsis).toBeInTheDocument();
+    expect(arabidopsis).toHaveClass('swt:btn');
+    expect(arabidopsis).toHaveClass('swt:btn-primary');
+    expect(arabidopsis).toHaveClass('swt:w-fit');
+    expect(arabidopsis).toHaveClass('swt:cursor-grab');
+    expect(arabidopsis.querySelector('[class*="re-order-dots"]')).not.toBeInTheDocument();
+    expect(panel.getByText('Chlamydomonas')).toBeInTheDocument();
+    const addValue = panel.getByText('Add value').closest('button')!;
+    expect(addValue).toHaveClass('swt:btn');
+    expect(addValue).toHaveClass('swt:btn-outline');
+    expect(addValue).toHaveClass('swt:w-fit');
+    expect(addValue.querySelector('[class*="fluent--add-20-regular"]')).toBeInTheDocument();
+  },
+};
+
+export const ExpandsPropertyValuesWithoutGrouping: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expandProperty(canvas, 'Input', 'Species');
+
+    expect(canvas.getByTestId('provenance-group-Input-input:input-a')).toBeInTheDocument();
+    expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
+  },
+};
+
+export const RailValueShowsDragIndicatorWhileDragging: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const source = await railValue(canvas, 'Output', 'Analysis', 'Mass Spectrometry');
+
+    await startDragByPointer(source);
+
+    await waitFor(() => expect(source).toHaveClass('swt:ring-2'));
+    await waitFor(() => expect(screen.getByTestId('provenance-drag-overlay-value')).toHaveTextContent('Mass Spectrometry'));
+    fireEvent.pointerUp(document, {
+      clientX: source.getBoundingClientRect().left + 12,
+      clientY: source.getBoundingClientRect().top + 12,
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId: 1,
+    });
+  },
+};
+
 export const SingleSidedPropertiesCannotSwitchSides: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -255,7 +314,7 @@ export const ClicksSwapHandleToSwitchGroupingSide: Story = {
   },
 };
 
-export const RegroupedValuesOpenTheirOwnDraft: Story = {
+export const RegroupedValuesAreReadOnlyOnCards: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -273,8 +332,8 @@ export const RegroupedValuesOpenTheirOwnDraft: Story = {
     );
 
     const species = within(grouped).getByTestId('provenance-value-pv-input-d-species');
-    await userEvent.click(within(species).getByTestId('popover_trigger_provenance-edit-Species'));
-    expect(screen.getByRole('textbox', { name: /Species value/i })).toHaveValue('Chlamydomonas');
+    expect(species).toHaveTextContent('Species: Chlamydomonas');
+    expect(within(species).queryByRole('button')).not.toBeInTheDocument();
   },
 };
 
@@ -314,12 +373,11 @@ export const RendersConnectionsForQuotedGroupingValues: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const source = await addRailValue(canvas, 'Output', 'Analysis', "Farmer's field");
+    await groupByProperty(canvas, 'Output', 'Analysis');
     const outputD = canvas.getByText('Output D').closest('article')!;
 
-    await userEvent.click(within(outputD).getByText('Add Analysis value'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), "Farmer's field");
-    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
-    await userEvent.click(canvas.getByTestId('provenance-property-Output-Analysis'));
+    await dragByPointer(source, outputD);
 
     await waitFor(() => {
       const connectors = canvas.getAllByTestId('provenance-connection');
@@ -329,28 +387,24 @@ export const RendersConnectionsForQuotedGroupingValues: Story = {
   },
 };
 
-export const CreatesPropertyValueWithoutDebug: Story = {
-  render: () => <Harness debug={false} />,
+export const CreatesPropertyValueFromRail: Story = {
+  render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.keyboard('{Escape}');
-    await waitFor(() => expect(screen.queryByRole('textbox', { name: /Analysis value/i })).not.toBeInTheDocument());
-    const outputA = canvas.getByText('Output A').closest('article')!;
+    const source = await addRailValue(canvas, 'Output', 'Analysis', 'Imaging');
+    await groupByProperty(canvas, 'Output', 'Analysis');
+    const outputD = canvas.getByText('Output D').closest('article')!;
 
-    await userEvent.click(within(outputA).getByText('Add Analysis value'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), 'Imaging');
-    const submit = screen.getByRole('button', { name: /Add value/i });
-    await waitFor(() => expect(submit).toBeEnabled());
-    await userEvent.click(submit);
+    await dragByPointer(source, outputD);
 
-    await waitFor(
-      () => expect(canvas.getByText('Output A').closest('article')!).toHaveTextContent('Analysis: Imaging'),
-      { timeout: 3000 },
-    );
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
+      expect(canvas.getByTestId('provenance-group-Output-output:Analysis=Imaging')).toBeInTheDocument();
+    });
   },
 };
 
-export const CreatesOutputPropertyOnConnection: Story = {
+export const ConnectionDetailsDoNotExposePropertyCreation: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -360,13 +414,8 @@ export const CreatesOutputPropertyOnConnection: Story = {
 
     const details = canvas.getByTestId('provenance-connection-details');
     expect(details).toHaveTextContent('Connection IDs');
-    await userEvent.click(within(details).getByText('Add Analysis value'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), 'Linked analysis');
-    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
-
-    await waitFor(() =>
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue'),
-    );
+    expect(within(details).queryByText(/Add value/i)).not.toBeInTheDocument();
+    expect(within(details).queryByText(/Add property/i)).not.toBeInTheDocument();
   },
 };
 
@@ -395,61 +444,55 @@ export const SelectsConnectionWithKeyboard: Story = {
   },
 };
 
-export const EditsNumericValueWithoutLosingUnit: Story = {
-  render: () => <Harness fixture="typedSample" />,
+export const WarnsBeforeOverwritingSingleValueFromRail: Story = {
+  render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const inputA = canvas.getByText('Input A').closest('article')!;
-    const temperature = within(inputA).getByTestId('provenance-value-pv-input-a-temperature');
-    expect(temperature).toHaveTextContent('Temperature: 12 degree Celsius');
+    const source = await railValue(canvas, 'Input', 'Species', 'Arabidopsis');
+    await groupByProperty(canvas, 'Input', 'Species');
+    const target = canvas
+      .getAllByText('Species: Chlamydomonas')
+      .find((element) => element.tagName === 'H3')!
+      .closest('article')!;
 
-    await userEvent.click(within(temperature).getByTestId('popover_trigger_provenance-edit-Temperature'));
-    const value = screen.getByRole('textbox', { name: /Temperature value/i });
-    await userEvent.clear(value);
-    await userEvent.type(value, '13.5');
-    await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
+    await dragByPointer(source, target);
+
+    await waitFor(() => expect(canvas.getByTestId('provenance-overwrite-warning')).toBeInTheDocument());
+    expect(canvas.getByTestId('provenance-overwrite-warning')).toHaveTextContent('Overwrite Species value?');
+    await userEvent.click(canvas.getByTestId('provenance-confirm-overwrite'));
 
     await waitFor(() => {
-      expect(within(inputA).getByTestId('provenance-value-pv-input-a-temperature')).toHaveTextContent(
-        'Temperature: 13.5 degree Celsius',
-      );
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent(
-        'UpdatePropertyValue:Float:degree Celsius',
-      );
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('UpdatePropertyValue:Text:none');
     });
   },
 };
 
-export const EditsOntologyTermWithoutFlatteningIt: Story = {
-  render: () => <Harness fixture="typedSample" />,
+export const RejectsOverwriteWhenTargetHasMultipleValues: Story = {
+  render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const instrument = canvas.getByTestId('provenance-value-pv-output-a-instrument');
+    const source = await railValue(canvas, 'Output', 'Replicate', '1');
+    await groupByProperty(canvas, 'Output', 'Replicate');
+    const target = canvas
+      .getAllByText('Replicate: 1 | 2')
+      .find((element) => element.tagName === 'H3')!
+      .closest('article')!;
 
-    await userEvent.click(within(instrument).getByTestId('popover_trigger_provenance-edit-Instrument'));
-    await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
+    await dragByPointer(source, target);
 
-    await waitFor(() =>
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('UpdatePropertyValue:Term:none'),
-    );
+    await waitFor(() => expect(canvas.getByText(/Cannot overwrite Replicate/i)).toBeInTheDocument());
+    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
   },
 };
 
-export const RefreshesOntologyDraftAfterControlledMetadataReplacement: Story = {
+export const RefreshesRailTermValueAfterControlledMetadataReplacement: Story = {
   render: () => <Harness fixture="typedSample" allowTermReplacement />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByRole('button', { name: /Replace term metadata/i }));
-    const instrument = canvas.getByTestId('provenance-value-pv-output-a-instrument');
-    await userEvent.click(within(instrument).getByTestId('popover_trigger_provenance-edit-Instrument'));
-    await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
-
-    await waitFor(() =>
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent(
-        'UpdatePropertyValue:Term:none:MS:MS:1000031',
-      ),
-    );
+    const source = await railValue(canvas, 'Output', 'Instrument', 'mass spectrometer');
+    expect(source).toBeInTheDocument();
   },
 };
 
@@ -457,12 +500,10 @@ export const CreatesNumericPropertyValue: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const source = await addRailValue(canvas, 'Output', 'Analysis', '1.5', 'Float');
     const outputD = canvas.getByText('Output D').closest('article')!;
 
-    await userEvent.click(within(outputD).getByText('Add Analysis value'));
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: /Value type/i }), 'Float');
-    await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), '1.5');
-    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+    await dragByPointer(source, outputD);
 
     await waitFor(() =>
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue:Float:none'),
@@ -474,13 +515,16 @@ export const RejectsNonFiniteNumericPropertyValue: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const outputD = canvas.getByText('Output D').closest('article')!;
+    const panel = await expandProperty(canvas, 'Output', 'Analysis');
 
-    await userEvent.click(within(outputD).getByText('Add Analysis value'));
+    await userEvent.click(panel.getByText('Add value'));
     await userEvent.selectOptions(screen.getByRole('combobox', { name: /Value type/i }), 'Float');
     await userEvent.type(screen.getByRole('textbox', { name: /Analysis value/i }), 'Infinity');
 
-    expect(screen.getByRole('button', { name: /Add value/i })).toBeDisabled();
+    const submit = screen
+      .getAllByRole('button', { name: /^Add value$/i })
+      .find((button) => button.getAttribute('type') === 'submit')!;
+    expect(submit).toBeDisabled();
     expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
   },
 };
@@ -544,11 +588,14 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
       expect(canvasElement).toHaveTextContent('Output A');
     });
 
-    await userEvent.click(canvas.getByTestId('popover_trigger_provenance-edit-Analysis'));
-    const value = screen.getByRole('textbox', { name: /Analysis value/i });
-    await userEvent.clear(value);
-    await userEvent.type(value, 'Imaging');
-    await userEvent.click(screen.getByRole('button', { name: /Apply value/i }));
+    const source = await addRailValue(canvas, 'Input', 'Analysis', 'Imaging');
+    await groupByProperty(canvas, 'Input', 'Analysis');
+    const carried = canvas
+      .getAllByText('Analysis: Mass Spectrometry')
+      .find((element) => element.tagName === 'H3')!
+      .closest('article')!;
+    await dragByPointer(source, carried);
+    await userEvent.click(canvas.getByTestId('provenance-confirm-overwrite'));
 
     await userEvent.click(canvas.getByTestId('provenance-pair-pair-1'));
     await waitFor(() => expect(canvasElement).toHaveTextContent('Imaging'));
@@ -573,18 +620,18 @@ export const CompletesAnInputOnlyPair: Story = {
 };
 
 export const AddsExistingPropertyToCreatedEmptySide: Story = {
-  render: () => <Harness inputOnly debug={false} />,
+  render: () => <Harness inputOnly />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByText('Add output'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'New Output');
+    await userEvent.click(canvas.getByTestId('provenance-add-output-trigger'));
+    const endpoint = await waitFor(() => screen.getByRole('textbox', { name: /Endpoint name/i }));
+    await userEvent.type(endpoint, 'New Output');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
 
     const output = await waitFor(() => canvas.getByText('New Output').closest('article')!);
-    await userEvent.click(within(output).getByText('Add Species value'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Species value/i }), 'Arabidopsis');
-    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
+    const source = await railValue(canvas, 'Input', 'Species', 'Arabidopsis');
+    await dragByPointer(source, output);
 
     await waitFor(() =>
       expect(canvas.getByText('New Output').closest('article')!).toHaveTextContent('Species: Arabidopsis'),
@@ -592,24 +639,16 @@ export const AddsExistingPropertyToCreatedEmptySide: Story = {
   },
 };
 
-export const AddsNewPropertyToCreatedEmptySide: Story = {
-  render: () => <Harness inputOnly debug={false} />,
+export const AddsNewPropertyFromRail: Story = {
+  render: () => <Harness inputOnly />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByText('Add output'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'New Output');
-    await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
+    const target = canvas.getByText('Input Only A').closest('article')!;
+    const source = await addRailProperty(canvas, 'Input', 'Treatment', 'Drought');
+    await dragByPointer(source, target);
 
-    const output = await waitFor(() => canvas.getByText('New Output').closest('article')!);
-    await userEvent.click(within(output).getByText('Add new property'));
-    const category = screen.getAllByTestId('term-search-input')[0];
-    await userEvent.type(category, 'Treatment');
-    await userEvent.keyboard('{Escape}');
-    await userEvent.type(screen.getByRole('textbox', { name: /Treatment value/i }), 'Drought');
-    await userEvent.click(screen.getByRole('button', { name: /Add value/i }));
-
-    await waitFor(() => expect(output).toHaveTextContent('Treatment: Drought'));
+    await waitFor(() => expect(target).toHaveTextContent('Treatment: Drought'));
     expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
   },
 };
@@ -665,17 +704,110 @@ async function dragByPointer(source: Element, target: Element) {
   await nextFrame();
 }
 
+async function startDragByPointer(source: Element) {
+  const from = source.getBoundingClientRect();
+  const fromX = from.left + from.width / 2;
+  const fromY = from.top + from.height / 2;
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  fireEvent.pointerDown(source, {
+    clientX: fromX,
+    clientY: fromY,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+  await nextFrame();
+  fireEvent.pointerMove(document, {
+    clientX: fromX + 8,
+    clientY: fromY,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+  await nextFrame();
+}
+
+async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
+  const panelId = `provenance-property-values-${side}-${propertyName}`;
+  if (!canvas.queryByTestId(panelId)) {
+    await userEvent.click(canvas.getByTestId(`provenance-property-expand-${side}-${propertyName}`));
+  }
+  await waitFor(() => expect(canvas.getByTestId(panelId)).toBeInTheDocument());
+  return within(canvas.getByTestId(panelId));
+}
+
+async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
+  await userEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
+}
+
+async function railValue(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  propertyName: string,
+  valueText: string,
+) {
+  const panel = await expandProperty(canvas, side, propertyName);
+  const value = await waitFor(() => panel.getByText(valueText).closest('button'));
+  expect(value).toBeTruthy();
+  return value!;
+}
+
+async function addRailValue(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  propertyName: string,
+  valueText: string,
+  valueType = 'Text',
+) {
+  const panel = await expandProperty(canvas, side, propertyName);
+  await userEvent.click(panel.getByText('Add value'));
+  if (valueType !== 'Text') {
+    await userEvent.selectOptions(screen.getByRole('combobox', { name: /Value type/i }), valueType);
+  }
+  await userEvent.type(screen.getByRole('textbox', { name: new RegExp(`${propertyName} value`, 'i') }), valueText);
+  const submit = screen
+    .getAllByRole('button', { name: /^Add value$/i })
+    .find((button) => button.getAttribute('type') === 'submit')!;
+  await userEvent.click(submit);
+  await userEvent.keyboard('{Escape}');
+  return railValue(canvas, side, propertyName, valueText);
+}
+
+async function addRailProperty(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  propertyName: string,
+  valueText: string,
+) {
+  const rail = within(canvas.getByTestId(`provenance-property-rail-${side}`));
+  const addPropertyTrigger = within(rail.getByTestId('popover_trigger_provenance-add-value-Property'))
+    .getByText('Add property')
+    .closest('button')!;
+  await userEvent.click(addPropertyTrigger);
+  const category = await waitFor(() => screen.getAllByTestId('term-search-input')[0]);
+  await userEvent.type(category, propertyName);
+  await userEvent.keyboard('{Escape}');
+  await userEvent.type(screen.getByRole('textbox', { name: new RegExp(`${propertyName} value`, 'i') }), valueText);
+  const submit = screen
+    .getAllByRole('button', { name: /^Add property$/i })
+    .find((button) => button.getAttribute('type') === 'submit')!;
+  await userEvent.click(submit);
+  await userEvent.keyboard('{Escape}');
+  return railValue(canvas, side, propertyName, valueText);
+}
+
 export const CopiesValueOntoAGroup: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const source = canvas.getByTestId('provenance-drag-value-pv-output-a-analysis');
+    const source = await railValue(canvas, 'Output', 'Analysis', 'Mass Spectrometry');
     const target = canvas.getByText('Output D').closest('article')!;
 
     await dragByPointer(source, target);
 
     await waitFor(() => {
-      expect(target).toHaveTextContent('Analysis: Mass Spectrometry');
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
     });
   },

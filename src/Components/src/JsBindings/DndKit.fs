@@ -102,6 +102,9 @@ type DndKit =
         =
         React.Imported()
 
+    [<ReactComponent("DragOverlay", "@dnd-kit/core")>]
+    static member DragOverlay(?children: ReactElement, ?dropAnimation: obj, ?key) = React.Imported()
+
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
     static member SortableContext(items: ResizeArray<string>, strategy, children: ReactElement) = React.Imported()
 

@@ -22,10 +22,40 @@ type ProvenanceDetail =
     | Group of side: ProvenanceSide * groupId: string
     | Connection of connectionId: string
 
+type ValueAssignmentSource =
+    {
+        CopiedFrom: ProvenancePropertyValueId option
+        Header: ProvenancePropertyHeader
+        Value: ProvenanceValue
+        Unit: ProvenanceTerm option
+    }
+
+type ValueAssignmentWarning =
+    {
+        Target: ProvenancePropertyTarget
+        ExistingValueIds: ProvenancePropertyValueId list
+        Header: ProvenancePropertyHeader
+        Value: ProvenanceValue
+        Unit: ProvenanceTerm option
+    }
+
+type ValueAssignmentPlan =
+    | AddCurrent of CreateLoadedPropertyValueCommand
+    | ConfirmOverwrite of ValueAssignmentWarning
+
+[<RequireQualifiedAccess>]
+type ValueAssignmentError =
+    | EmptyTarget
+    | MixedPropertyValueCounts of ProvenancePropertyHeader
+    | MultiplePropertyValues of ProvenancePropertyHeader * ProvenanceSetId list
+
 type UiState =
     {
         LayerStates: Map<ProvenanceLayerId, LayerViewState>
         PropertyRailPlacements: Map<ProvenancePairId * GroupingKey, ProvenanceSide>
+        ExpandedProperties: Set<ProvenancePairId * ProvenanceSide * GroupingKey>
+        PaletteValues: Map<ProvenancePairId * ProvenanceSide, ProvenancePropertyValue list>
+        PendingOverwrite: ValueAssignmentWarning option
         SelectedInputs: Set<ProvenancePairId * string>
         SelectedOutputs: Set<ProvenancePairId * string>
         Detail: ProvenanceDetail option

@@ -18,6 +18,7 @@ type ProvenanceGrouping =
     static member Main(session: ProvenanceSession, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool) =
         let debug = defaultArg debug false
         let rawUiState, setUiState = React.useState (State.init session)
+        let activeDrag, setActiveDrag = React.useState<DragPayload option> None
         let surfaceRef = React.useElementRef ()
         let uiState = State.ensureLayers session rawUiState
         let pair, inputGroups, outputGroups, connections = displayPair session uiState
@@ -35,7 +36,8 @@ type ProvenanceGrouping =
         let publish result =
             match result with
             | Ok(next, patches) ->
-                setUiState (State.ensureLayers next uiState)
+                let nextUiState = State.ensureLayers next uiState
+                setUiState { nextUiState with Error = None; PendingOverwrite = None }
                 onChange { Session = next; Patches = patches }
             | Error error ->
                 setUiState { uiState with Error = Some(string error) }
@@ -45,16 +47,8 @@ type ProvenanceGrouping =
             |> fun command -> Session.addLayer command session
             |> publish
 
-        let updateValue propertyValueId value unit =
-            Session.updatePropertyValue propertyValueId value unit session
-            |> publish
-
         let createSet command =
             Session.createLoadedSet command session
-            |> publish
-
-        let createPropertyValue command =
-            Session.createLoadedPropertyValue command session
             |> publish
 
         let findGroup side groupId =
@@ -64,6 +58,55 @@ type ProvenanceGrouping =
         let findHeader headerId =
             headersForModel pair.Model
             |> List.tryFind (fun header -> propertyHeaderIdentity header = headerId)
+
+        let findPropertyValue propertyValueId =
+            pair.Model.PropertyValues.TryFind propertyValueId
+            |> Option.orElseWith (fun () -> State.tryFindPaletteValue propertyValueId uiState)
+
+        let sourceForValue propertyValueId (propertyValue: ProvenancePropertyValue) : ValueAssignmentSource =
+            {
+                CopiedFrom =
+                    if pair.Model.PropertyValues.ContainsKey propertyValueId then Some propertyValueId else None
+                Header = propertyValue.Header
+                Value = propertyValue.Value
+                Unit = propertyValue.Unit
+            }
+
+        let assignmentErrorText error =
+            match error with
+            | ValueAssignmentError.EmptyTarget -> "Drop a value onto a group with at least one entity."
+            | ValueAssignmentError.MixedPropertyValueCounts header ->
+                $"Cannot assign {header.Category.Name}: every target must either have no value or exactly one value for this property."
+            | ValueAssignmentError.MultiplePropertyValues(header, setIds) ->
+                let targets = setIds |> String.concat ", "
+                $"Cannot overwrite {header.Category.Name}: {targets} already has multiple values for this property."
+
+        let addPaletteValue side header value unit =
+            State.addPaletteValue pair.Id side header value unit uiState
+            |> setUiState
+
+        let toggleSideGrouping layerId side header =
+            State.toggleSideGrouping layerId side header uiState
+            |> setUiState
+
+        let togglePropertyExpanded side header =
+            State.togglePropertyExpanded pair.Id side header uiState
+            |> setUiState
+
+        let confirmPendingOverwrite warning =
+            let rec apply current patches propertyValueIds =
+                match propertyValueIds with
+                | [] -> Ok(current, patches)
+                | propertyValueId :: rest ->
+                    match Session.updatePropertyValue propertyValueId warning.Value warning.Unit current with
+                    | Ok(next, addedPatches) -> apply next (patches @ addedPatches) rest
+                    | Error error -> Error error
+
+            match warning.ExistingValueIds with
+            | [] ->
+                setUiState { uiState with Error = Some "Cannot overwrite because the target value context is no longer available." }
+            | propertyValueIds ->
+                apply session [] propertyValueIds |> publish
 
         let connectGroups inputGroup outputGroup =
             [
@@ -80,7 +123,13 @@ type ProvenanceGrouping =
                 (Ok(session, []))
             |> publish
 
+        let handleDragStart (event: DndKit.IDndKitEvent) =
+            tryDragId (string event.active.id)
+            |> setActiveDrag
+
         let handleDragEnd (event: DndKit.IDndKitEvent) =
+            setActiveDrag None
+
             if isNull event.over then
                 ()
             else
@@ -90,15 +139,16 @@ type ProvenanceGrouping =
 
                 match dragPayload, groupDrop, propertyDrop with
                 | Some(DragPayload.PropertyValue propertyValueId), Some(side, groupId), _ ->
-                    match findGroup side groupId with
-                    | Some group ->
-                        let memberIds = group.Members |> List.map (fun member' -> member'.SetId)
-                        let target =
-                            match side with
-                            | ProvenanceSide.Input -> ProvenancePropertyTarget.InputSets memberIds
-                            | ProvenanceSide.Output -> ProvenancePropertyTarget.OutputSets memberIds
-                        Session.copyPropertyValueToLoadedTarget propertyValueId target session |> publish
-                    | None -> ()
+                    match findGroup side groupId, findPropertyValue propertyValueId with
+                    | Some group, Some propertyValue ->
+                        match planPropertyValueDrop (sourceForValue propertyValueId propertyValue) group pair.Model with
+                        | Ok(ValueAssignmentPlan.AddCurrent command) ->
+                            Session.createCurrentLoadedPropertyValue command session |> publish
+                        | Ok(ValueAssignmentPlan.ConfirmOverwrite warning) ->
+                            State.setPendingOverwrite warning uiState |> setUiState
+                        | Error error ->
+                            setUiState { uiState with Error = Some(assignmentErrorText error) }
+                    | _ -> ()
                 | Some(DragPayload.Group(ProvenanceSide.Input, inputGroupId)), Some(ProvenanceSide.Output, outputGroupId), _ ->
                     match findGroup ProvenanceSide.Input inputGroupId, findGroup ProvenanceSide.Output outputGroupId with
                     | Some inputGroup, Some outputGroup -> connectGroups inputGroup outputGroup
@@ -139,6 +189,53 @@ type ProvenanceGrouping =
                 match uiState.Error with
                 | Some error -> Html.div [ prop.className "swt:alert swt:alert-error"; prop.text error ]
                 | None -> Html.none
+                match uiState.PendingOverwrite with
+                | Some warning ->
+                    let count = warning.ExistingValueIds.Length
+                    let valueText = formatValue warning.Value warning.Unit
+                    Html.div [
+                        prop.className "swt:alert swt:alert-warning swt:items-start"
+                        if debug then prop.testId "provenance-overwrite-warning"
+                        prop.children [
+                            Html.i [ prop.className "swt:iconify swt:fluent--warning-20-regular swt:size-5" ]
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-1"
+                                prop.children [
+                                    Html.strong [
+                                        prop.text (
+                                            if count > 1 then
+                                                $"Overwrite {count} {warning.Header.Category.Name} values?"
+                                            else
+                                                $"Overwrite {warning.Header.Category.Name} value?")
+                                    ]
+                                    Html.span [
+                                        prop.className "swt:text-sm"
+                                        prop.text $"The selected targets already have {warning.Header.Category.Name}. Confirm to replace with {valueText} using the existing edit path."
+                                    ]
+                                ]
+                            ]
+                            Html.div [
+                                prop.className "swt:ml-auto swt:flex swt:gap-2"
+                                prop.children [
+                                    Html.button [
+                                        prop.type'.button
+                                        prop.className "swt:btn swt:btn-warning swt:btn-sm"
+                                        if debug then prop.testId "provenance-confirm-overwrite"
+                                        prop.onPointerUp (fun _ -> confirmPendingOverwrite warning)
+                                        prop.onClick (fun _ -> confirmPendingOverwrite warning)
+                                        prop.text "Overwrite"
+                                    ]
+                                    Html.button [
+                                        prop.type'.button
+                                        prop.className "swt:btn swt:btn-ghost swt:btn-sm"
+                                        prop.onClick (fun _ -> State.clearPendingOverwrite uiState |> setUiState)
+                                        prop.text "Cancel"
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                | None -> Html.none
                 Html.div [
                     prop.ref surfaceRef
                     prop.className "swt:relative swt:grid swt:grid-cols-[minmax(10rem,12rem)_minmax(16rem,1fr)_6rem_minmax(16rem,1fr)_minmax(10rem,12rem)] swt:gap-4 swt:items-start"
@@ -149,16 +246,20 @@ type ProvenanceGrouping =
                             ProvenanceSide.Input,
                             propertyRailHeadersForSide pair.Id ProvenanceSide.Input pair.Model uiState,
                             (State.layerState pair.LeftLayerId uiState).GroupingAssignments,
-                            (fun header -> setUiState (State.toggleSideGrouping pair.LeftLayerId ProvenanceSide.Input header uiState)),
+                            (fun header -> propertyValuesForSideHeader pair.Id ProvenanceSide.Input header pair.Model uiState),
+                            (fun header -> State.isPropertyExpanded pair.Id ProvenanceSide.Input header uiState),
+                            (fun header -> toggleSideGrouping pair.LeftLayerId ProvenanceSide.Input header),
                             (fun header -> setUiState (State.toggleBothGrouping pair.LeftLayerId pair.RightLayerId header uiState)),
                             (fun header -> setUiState (State.moveGrouping pair.Id pair.LeftLayerId pair.RightLayerId ProvenanceSide.Output header uiState)),
+                            (fun header -> togglePropertyExpanded ProvenanceSide.Input header),
+                            (fun header value unit -> addPaletteValue ProvenanceSide.Input header value unit),
                             (fun header -> canSwitchHeader header pair.Model),
                             debug = debug)
                         Html.div [
                             prop.className "swt:flex swt:flex-col swt:gap-3"
                             prop.children [
                                 for group in inputGroups do
-                                    GroupCard.Main(ProvenanceSide.Input, group, pair.Model, uiState.SelectedInputs.Contains (pair.Id, group.Id), isExpanded ProvenanceSide.Input group.Id, (fun () -> setUiState (State.select pair.Id ProvenanceSide.Input group.Id uiState)), (fun () -> toggleExpanded ProvenanceSide.Input group.Id), updateValue, createPropertyValue, debug = debug, key = $"Input:{group.Id}")
+                                    GroupCard.Main(ProvenanceSide.Input, group, pair.Model, uiState.SelectedInputs.Contains (pair.Id, group.Id), isExpanded ProvenanceSide.Input group.Id, (fun () -> setUiState (State.select pair.Id ProvenanceSide.Input group.Id uiState)), (fun () -> toggleExpanded ProvenanceSide.Input group.Id), debug = debug, key = $"Input:{group.Id}")
                                 if inputGroups.IsEmpty then
                                     Html.p [ prop.className "swt:text-sm swt:text-base-content/60"; prop.text "No entries in this layer" ]
                                     Controls.AddEndpointPopover(
@@ -174,7 +275,7 @@ type ProvenanceGrouping =
                             prop.className "swt:flex swt:flex-col swt:gap-3"
                             prop.children [
                                 for group in outputGroups do
-                                    GroupCard.Main(ProvenanceSide.Output, group, pair.Model, uiState.SelectedOutputs.Contains (pair.Id, group.Id), isExpanded ProvenanceSide.Output group.Id, (fun () -> setUiState (State.select pair.Id ProvenanceSide.Output group.Id uiState)), (fun () -> toggleExpanded ProvenanceSide.Output group.Id), updateValue, createPropertyValue, debug = debug, key = $"Output:{group.Id}")
+                                    GroupCard.Main(ProvenanceSide.Output, group, pair.Model, uiState.SelectedOutputs.Contains (pair.Id, group.Id), isExpanded ProvenanceSide.Output group.Id, (fun () -> setUiState (State.select pair.Id ProvenanceSide.Output group.Id uiState)), (fun () -> toggleExpanded ProvenanceSide.Output group.Id), debug = debug, key = $"Output:{group.Id}")
                                 if outputGroups.IsEmpty then
                                     Html.p [ prop.className "swt:text-sm swt:text-base-content/60"; prop.text "No entries in this layer" ]
                                     Controls.AddEndpointPopover(
@@ -189,9 +290,13 @@ type ProvenanceGrouping =
                             ProvenanceSide.Output,
                             propertyRailHeadersForSide pair.Id ProvenanceSide.Output pair.Model uiState,
                             (State.layerState pair.RightLayerId uiState).GroupingAssignments,
-                            (fun header -> setUiState (State.toggleSideGrouping pair.RightLayerId ProvenanceSide.Output header uiState)),
+                            (fun header -> propertyValuesForSideHeader pair.Id ProvenanceSide.Output header pair.Model uiState),
+                            (fun header -> State.isPropertyExpanded pair.Id ProvenanceSide.Output header uiState),
+                            (fun header -> toggleSideGrouping pair.RightLayerId ProvenanceSide.Output header),
                             (fun header -> setUiState (State.toggleBothGrouping pair.LeftLayerId pair.RightLayerId header uiState)),
                             (fun header -> setUiState (State.moveGrouping pair.Id pair.RightLayerId pair.LeftLayerId ProvenanceSide.Input header uiState)),
+                            (fun header -> togglePropertyExpanded ProvenanceSide.Output header),
+                            (fun header value unit -> addPaletteValue ProvenanceSide.Output header value unit),
                             (fun header -> canSwitchHeader header pair.Model),
                             debug = debug)
                     ]
@@ -209,22 +314,6 @@ type ProvenanceGrouping =
                                 Html.p [ prop.className "swt:text-sm"; let txt = $"Source: {conn.SourceGroupId}" in prop.text txt ]
                                 Html.p [ prop.className "swt:text-sm"; let txt = $"Target: {conn.TargetGroupId}" in prop.text txt ]
                                 Html.p [ prop.className "swt:text-sm"; let ids = conn.ConnectionIds |> String.concat ", " in prop.text $"Connection IDs: {ids}" ]
-                                Html.div [
-                                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:pt-2"
-                                    prop.children [
-                                        for header in headersForModel pair.Model do
-                                            Controls.AddValuePopover(
-                                                ProvenancePropertyTarget.Connections conn.ConnectionIds,
-                                                Some header,
-                                                createPropertyValue,
-                                                debug = debug)
-                                        Controls.AddValuePopover(
-                                            ProvenancePropertyTarget.Connections conn.ConnectionIds,
-                                            None,
-                                            createPropertyValue,
-                                            debug = debug)
-                                    ]
-                                ]
                             ]
                         ]
                     | None -> Html.none
@@ -232,11 +321,26 @@ type ProvenanceGrouping =
                 ]
             ]
 
+        let dragOverlay =
+            match activeDrag with
+            | Some(DragPayload.PropertyValue propertyValueId) ->
+                match findPropertyValue propertyValueId with
+                | Some propertyValue ->
+                    Controls.ValueDragPreview(propertyValue, showHeader = false, debug = debug)
+                | None -> Html.none
+            | _ -> Html.none
+
         DndKit.DndContext(
             sensors = sensors,
             collisionDetection = DndKit.pointerWithin,
+            onDragStart = handleDragStart,
+            onDragCancel = (fun _ -> setActiveDrag None),
             onDragEnd = handleDragEnd,
-            children = content
+            children =
+                React.Fragment [
+                    content
+                    DndKit.DragOverlay(children = dragOverlay)
+                ]
         )
 
     [<ReactComponent>]

@@ -24,8 +24,6 @@ type GroupCard =
             expanded: bool,
             onSelect: unit -> unit,
             onExpand: unit -> unit,
-            onUpdateValue: ProvenancePropertyValueId -> ProvenanceValue -> ProvenanceTerm option -> unit,
-            onCreateValue: CreateLoadedPropertyValueCommand -> unit,
             ?debug: bool,
             ?key: string
         ) =
@@ -66,7 +64,7 @@ type GroupCard =
                 "swt:rounded-box swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm swt:space-y-2"
                 if selected then "swt:border-primary swt:bg-primary/5" else "swt:border-base-300"
                 if droppable.isOver then "swt:ring-2 swt:ring-primary"
-                if draggable.isDragging then "swt:opacity-50"
+                yield! dragIndicatorClasses draggable.isDragging
             ]
             if defaultArg debug false then prop.testId $"provenance-group-{side}-{group.Id}"
             prop.children [
@@ -78,7 +76,10 @@ type GroupCard =
                             prop.type'.button
                             yield! prop.spread (!!draggable.attributes)
                             yield! prop.spread (!!draggable.listeners)
-                            prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm"
+                            prop.className [
+                                "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm"
+                                yield! draggableButtonClasses draggable.isDragging
+                            ]
                             prop.ariaLabel "Connect group"
                             prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--link-20-regular swt:size-4" ] ]
                         ]
@@ -98,27 +99,10 @@ type GroupCard =
                     prop.className "swt:flex swt:flex-wrap swt:gap-1"
                     prop.children [
                         for value in values do
-                            Controls.ValueChip(
+                            Controls.ValueLabel(
                                 value,
-                                (fun nextValue unit -> onUpdateValue value.Id nextValue unit),
                                 ?debug = debug,
                                 key = propertyValueIdentity value)
-                    ]
-                ]
-                Html.div [
-                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:border-t swt:border-base-300 swt:pt-2"
-                    prop.children [
-                        for header in headersForModel model do
-                            Controls.AddValuePopover(
-                                targetForGroup side group,
-                                Some header,
-                                onCreateValue,
-                                ?debug = debug)
-                        Controls.AddValuePopover(
-                            targetForGroup side group,
-                            None,
-                            onCreateValue,
-                            ?debug = debug)
                     ]
                 ]
                 if expanded then

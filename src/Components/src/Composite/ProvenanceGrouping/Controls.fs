@@ -159,6 +159,7 @@ type Controls =
             prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
             prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
             if defaultArg debug false then prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
+            prop.onPointerUp (fun _ -> onSwitch header)
             prop.onClick (fun _ -> onSwitch header)
             prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4" ] ]
         ]
@@ -168,11 +169,15 @@ type Controls =
         (
             side: ProvenanceSide,
             header: ProvenancePropertyHeader,
+            propertyValues: ProvenancePropertyValue list,
             active: GroupingAssignment list,
             canSwitch: bool,
+            expanded: bool,
             onToggleSide: ProvenancePropertyHeader -> unit,
             onToggleBoth: ProvenancePropertyHeader -> unit,
             onSwitch: ProvenancePropertyHeader -> unit,
+            onToggleExpanded: ProvenancePropertyHeader -> unit,
+            onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             ?debug: bool,
             ?key: string
         ) =
@@ -191,45 +196,92 @@ type Controls =
             match key with
             | Some key -> prop.key key
             | None -> ()
-            prop.className "swt:flex swt:items-center swt:gap-1"
+            prop.className "swt:flex swt:flex-col swt:gap-1"
             prop.children [
-                Html.button [
-                    prop.type'.button
-                    if canSwitch then
-                        prop.ref draggable.setNodeRef
-                        yield! prop.spread (!!draggable.attributes)
-                        yield! prop.spread (!!draggable.listeners)
-                    prop.className [
-                        "swt:btn swt:btn-sm swt:grow swt:justify-start"
-                        if sideSelected then "swt:btn-primary" else "swt:btn-outline"
-                        if canSwitch && draggable.isDragging then "swt:opacity-50"
+                Html.div [
+                    prop.className "swt:flex swt:items-center swt:gap-1"
+                    prop.children [
+                        Html.button [
+                            prop.type'.button
+                            if canSwitch then
+                                prop.ref draggable.setNodeRef
+                                yield! prop.spread (!!draggable.attributes)
+                                yield! prop.spread (!!draggable.listeners)
+                            prop.className [
+                                "swt:btn swt:btn-sm swt:grow swt:min-w-0 swt:justify-start"
+                                if sideSelected then "swt:btn-primary" else "swt:btn-outline"
+                                if canSwitch then yield! draggableButtonClasses draggable.isDragging
+                            ]
+                            if defaultArg debug false then prop.testId $"provenance-property-{side}-{header.Category.Name}"
+                            prop.onClick (fun _ -> onToggleSide header)
+                            prop.children [
+                                Html.span [ prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-left"; prop.text header.Category.Name ]
+                            ]
+                        ]
+                        Html.button [
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+                            if defaultArg debug false then prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
+                            prop.ariaLabel (
+                                if expanded then $"Collapse {header.Category.Name} values"
+                                else $"Expand {header.Category.Name} values")
+                            prop.onClick (fun _ -> onToggleExpanded header)
+                            prop.children [
+                                Html.i [
+                                    prop.className [
+                                        "swt:iconify swt:size-4"
+                                        if expanded then "swt:fluent--chevron-up-20-regular" else "swt:fluent--chevron-down-20-regular"
+                                    ]
+                                ]
+                            ]
+                        ]
+                        Html.button [
+                            prop.type'.button
+                            prop.className [
+                                "swt:btn swt:btn-sm swt:btn-square"
+                                if bothSelected then "swt:btn-primary" else "swt:btn-outline"
+                            ]
+                            if defaultArg debug false then prop.testId $"provenance-property-both-{side}-{header.Category.Name}"
+                            prop.ariaLabel $"Group {header.Category.Name} on both sides"
+                            prop.onClick (fun _ -> onToggleBoth header)
+                            prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--link-multiple-20-regular swt:size-4" ] ]
+                        ]
+                        if canSwitch then
+                            Controls.PropertySwapButton(side, header, onSwitch, ?debug = debug)
+                        else
+                            Html.button [
+                                prop.type'.button
+                                prop.disabled true
+                                prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+                                prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
+                                if defaultArg debug false then prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
+                                prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4" ] ]
+                            ]
                     ]
-                    if defaultArg debug false then prop.testId $"provenance-property-{side}-{header.Category.Name}"
-                    prop.onClick (fun _ -> onToggleSide header)
-                    prop.text header.Category.Name
                 ]
-                Html.button [
-                    prop.type'.button
-                    prop.className [
-                        "swt:btn swt:btn-sm swt:btn-square"
-                        if bothSelected then "swt:btn-primary" else "swt:btn-outline"
+                if expanded then
+                    Html.div [
+                        prop.className "swt:flex swt:flex-col swt:gap-1 swt:pl-2"
+                        if defaultArg debug false then prop.testId $"provenance-property-values-{side}-{header.Category.Name}"
+                        prop.children [
+                            for propertyValue in propertyValues do
+                                Controls.ValueChip(
+                                    propertyValue,
+                                    draggable = true,
+                                    showHeader = false,
+                                    ?debug = debug,
+                                    key = propertyValueIdentity propertyValue)
+                            Controls.AddValuePopover(
+                                Some header,
+                                (fun addedHeader value unit -> onAddValue addedHeader value unit),
+                                label = "Add value",
+                                ?debug = debug)
+                        ]
                     ]
-                    if defaultArg debug false then prop.testId $"provenance-property-both-{side}-{header.Category.Name}"
-                    prop.ariaLabel $"Group {header.Category.Name} on both sides"
-                    prop.onClick (fun _ -> onToggleBoth header)
-                    prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--link-multiple-20-regular swt:size-4" ] ]
-                ]
-                if canSwitch then
-                    Controls.PropertySwapButton(side, header, onSwitch, ?debug = debug)
+                elif propertyValues.IsEmpty then
+                    Html.none
                 else
-                    Html.button [
-                        prop.type'.button
-                        prop.disabled true
-                        prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
-                        prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
-                        if defaultArg debug false then prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
-                        prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4" ] ]
-                    ]
+                    Html.none
             ]
         ]
 
@@ -239,9 +291,13 @@ type Controls =
             side: ProvenanceSide,
             headers: ProvenancePropertyHeader list,
             active: GroupingAssignment list,
+            valuesForHeader: ProvenancePropertyHeader -> ProvenancePropertyValue list,
+            isExpanded: ProvenancePropertyHeader -> bool,
             onToggleSide: ProvenancePropertyHeader -> unit,
             onToggleBoth: ProvenancePropertyHeader -> unit,
             onSwitch: ProvenancePropertyHeader -> unit,
+            onToggleExpanded: ProvenancePropertyHeader -> unit,
+            onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             canSwitch: ProvenancePropertyHeader -> bool,
             ?debug: bool
         ) =
@@ -260,13 +316,22 @@ type Controls =
                     Controls.PropertyRailItem(
                         side,
                         header,
+                        valuesForHeader header,
                         active,
                         canSwitch header,
+                        isExpanded header,
                         onToggleSide,
                         onToggleBoth,
                         onSwitch,
+                        onToggleExpanded,
+                        onAddValue,
                         debug = defaultArg debug false,
                         key = propertyHeaderIdentity header)
+                Controls.AddValuePopover(
+                    None,
+                    onAddValue,
+                    label = "Add property",
+                    ?debug = debug)
             ]
         ]
 
@@ -331,11 +396,11 @@ type Controls =
     [<ReactComponent>]
     static member AddValuePopover
         (
-            target: ProvenancePropertyTarget,
             header: ProvenancePropertyHeader option,
-            onCreate: CreateLoadedPropertyValueCommand -> unit,
+            onCreate: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
+            ?label: string,
             ?debug: bool
-        ) =
+        ) : ReactElement =
         let propertyKind, setPropertyKind =
             React.useState (header |> Option.map (fun known -> known.Kind) |> Option.defaultValue ProvenancePropertyKind.Parameter)
         let categoryTerm, setCategoryTerm = React.useState (header |> Option.map (fun known -> known.Category))
@@ -360,8 +425,11 @@ type Controls =
             trigger =
                 Html.button [
                     prop.type'.button
-                    prop.className "swt:btn swt:btn-outline swt:btn-xs"
-                    prop.text (if header.IsSome then $"Add {category} value" else "Add new property")
+                    prop.className addPropertyValueButtonClasses
+                    prop.children [
+                        Html.i [ prop.className "swt:iconify swt:fluent--add-20-regular swt:size-5 swt:shrink-0" ]
+                        Html.span [ prop.text (label |> Option.defaultValue (if header.IsSome then "Add value" else "Add property")) ]
+                    ]
                 ],
             content =
                 Html.form [
@@ -370,13 +438,7 @@ type Controls =
                         event.preventDefault ()
                         match nextHeader, nextValue with
                         | Some createdHeader, Some created ->
-                            onCreate {
-                                Target = target
-                                CopiedFrom = None
-                                Header = createdHeader
-                                Value = created
-                                Unit = unit'
-                            }
+                            onCreate createdHeader created unit'
                         | _ -> ())
                     prop.children [
                         if header.IsNone then
@@ -424,45 +486,86 @@ type Controls =
                             (fun next -> setUnit (next |> Option.bind ControlsHelper.fromTermSearchTerm)))
                         if not canCreate then
                             Html.p [ prop.className "swt:text-xs swt:text-error"; prop.text "Enter a valid value." ]
-                        Html.button [ prop.type'.submit; prop.disabled (not canCreate); prop.className "swt:btn swt:btn-primary swt:btn-sm"; prop.text "Add value" ]
+                        Html.button [
+                            prop.type'.submit
+                            prop.disabled (not canCreate)
+                            prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                            prop.text (if header.IsSome then "Add value" else "Add property")
+                        ]
                     ]
                 ],
             ?debug = (if defaultArg debug false then Some $"provenance-add-value-{category}" else None)
         )
 
     [<ReactComponent>]
-    static member ValueChip
+    static member ValueLabel
         (
             propertyValue: ProvenancePropertyValue,
-            onApply: ProvenanceValue -> ProvenanceTerm option -> unit,
             ?debug: bool,
             ?key: string
-        ) =
-        let draggable = DndKit.useDraggable ({| id = valueDragId propertyValue.Id |})
+        ) : ReactElement =
+        let label = $"{propertyValue.Header.Category.Name}: {formatValue propertyValue.Value propertyValue.Unit}"
 
         Html.div [
             match key with
             | Some key -> prop.key key
             | None -> ()
-            prop.ref draggable.setNodeRef
+            prop.className "swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"
+            if defaultArg debug false then prop.testId $"provenance-value-{propertyValue.Id}"
+            prop.children [ Html.span [ prop.text label ] ]
+        ]
+
+    [<ReactComponent>]
+    static member ValueChip
+        (
+            propertyValue: ProvenancePropertyValue,
+            ?draggable: bool,
+            ?showHeader: bool,
+            ?debug: bool,
+            ?key: string
+        ) : ReactElement =
+        let canDrag = defaultArg draggable true
+        let showHeader = defaultArg showHeader true
+        let drag = DndKit.useDraggable ({| id = valueDragId propertyValue.Id |})
+        let text = formatValue propertyValue.Value propertyValue.Unit
+        let label = if showHeader then $"{propertyValue.Header.Category.Name}: {text}" else text
+
+        Html.button [
+            match key with
+            | Some key -> prop.key key
+            | None -> ()
+            prop.type'.button
+            if canDrag then
+                prop.ref drag.setNodeRef
+                yield! prop.spread (!!drag.attributes)
+                yield! prop.spread (!!drag.listeners)
             prop.className [
-                "swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"
-                if draggable.isDragging then "swt:opacity-50"
+                yield! propertyValueButtonClasses drag.isDragging
+                if not canDrag then "swt:cursor-default"
             ]
             if defaultArg debug false then prop.testId $"provenance-value-{propertyValue.Id}"
-            let label = $"{propertyValue.Header.Category.Name}: {formatValue propertyValue.Value propertyValue.Unit}"
+            prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"
             prop.children [
-                Html.span [ prop.text label ]
-                Html.button [
-                    prop.type'.button
-                    yield! prop.spread (!!draggable.attributes)
-                    yield! prop.spread (!!draggable.listeners)
-                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:btn-square"
-                    prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"
-                    if defaultArg debug false then prop.testId $"provenance-drag-value-{propertyValue.Id}"
-                    prop.children [ Html.i [ prop.className "swt:iconify swt:fluent--re-order-dots-vertical-20-regular swt:size-4" ] ]
-                ]
-                Controls.EditValuePopover(propertyValue, onApply, ?debug = debug)
+                Html.span [ prop.className "swt:min-w-0 swt:truncate"; prop.text label ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member ValueDragPreview
+        (
+            propertyValue: ProvenancePropertyValue,
+            ?showHeader: bool,
+            ?debug: bool
+        ) : ReactElement =
+        let showHeader = defaultArg showHeader true
+        let text = formatValue propertyValue.Value propertyValue.Unit
+        let label = if showHeader then $"{propertyValue.Header.Category.Name}: {text}" else text
+
+        Html.div [
+            prop.className propertyValueOverlayClasses
+            if defaultArg debug false then prop.testId "provenance-drag-overlay-value"
+            prop.children [
+                Html.span [ prop.className "swt:min-w-0 swt:truncate"; prop.text label ]
             ]
         ]
 

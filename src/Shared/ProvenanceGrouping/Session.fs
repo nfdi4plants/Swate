@@ -347,6 +347,49 @@ module Session =
                         else state) next
                 propagated, patches))
 
+    let private validatePropertyValueUpdate propertyValueId value unit session =
+        let ownerPairId = activePropertyOwnerPair propertyValueId session
+
+        match session.Pairs.TryFind ownerPairId with
+        | None -> Error(SessionError.PairNotFound ownerPairId)
+        | Some pair ->
+            Edit.updatePropertyValue propertyValueId value unit pair.Model
+            |> mapEditError
+            |> Result.map ignore
+
+    let updatePropertyValues
+        (updates: (ProvenancePropertyValueId * ProvenanceValue * ProvenanceTerm option) list)
+        session
+        : SessionResult =
+        let updates = updates |> List.distinctBy (fun (propertyValueId, _, _) -> propertyValueId)
+
+        let rec validate remaining =
+            match remaining with
+            | [] -> Ok()
+            | (propertyValueId, value, unit) :: tail ->
+                validatePropertyValueUpdate propertyValueId value unit session
+                |> Result.bind (fun () -> validate tail)
+
+        validate updates
+        |> Result.bind (fun () ->
+            updates
+            |> List.fold
+                (fun result (propertyValueId, value, unit) ->
+                    result
+                    |> Result.bind (fun (state, patches) ->
+                        updatePropertyValue propertyValueId value unit state
+                        |> Result.map (fun (next, addedPatches) -> next, patches @ addedPatches)))
+                (Ok(session, [])))
+
+    let createCurrentLoadedPropertyValue command session : SessionResult =
+        let pair = activePair session
+
+        Edit.createLoadedPropertyValue command pair.Model
+        |> mapEditError
+        |> Result.bind (fun (model, patches) ->
+            updatePairModel pair.Id model session
+            |> Result.map (fun next -> next, patches))
+
     let createLoadedPropertyValue command session : SessionResult =
         match command.Target with
         | ProvenancePropertyTarget.Connections _ ->
