@@ -1,16 +1,10 @@
-namespace Renderer.Components.LeftSidebar
+namespace Renderer.Components.LeftSidebar.Git
 
 open Fable.Core
 open Feliz
 open Swate.Components.Primitive.Blankslate
 open Swate.Components.Primitive.Blankslate.Types
-
-type EmptyStateAction = {
-    Label: string
-    IconClassName: string
-    Disabled: bool
-    OnClick: unit -> unit
-}
+open Renderer.Components.LeftSidebar.Git.Types
 
 [<Erase; Mangle(false)>]
 type GitSidebarEmptyState =

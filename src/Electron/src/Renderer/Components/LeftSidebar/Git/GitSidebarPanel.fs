@@ -1,4 +1,4 @@
-module Renderer.Components.LeftSidebar.GitSidebarPanel
+module Renderer.Components.LeftSidebar.Git.GitSidebarPanel
 
 open Browser.Dom
 open Feliz
@@ -55,7 +55,7 @@ let Main () =
 
     match gitStateCtx.state.CurrentArcPath with
     | None ->
-        Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
+        Renderer.Components.LeftSidebar.Git.GitSidebarEmptyState.Main(
             title = "Open an ARC to use Git features",
             description = "Source control becomes available after you open or download an ARC.",
             iconClassName = "swt:fluent--folder-open-24-regular",
@@ -75,7 +75,7 @@ let Main () =
     | Some _ when
         gitStateCtx.state.RepositoryAvailability = Renderer.Context.GitWorkflow.GitRepositoryAvailability.MissingRepository
         ->
-        Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
+        Renderer.Components.LeftSidebar.Git.GitSidebarEmptyState.Main(
             title = "Initialize Git for this ARC",
             description = "The selected ARC folder is not a Git repository yet.",
             iconClassName = "swt:fluent--branch-fork-24-regular",

@@ -334,7 +334,7 @@ type GitSidebar =
                             prop.children [
                                 Html.span [
                                     prop.className
-                                        "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
+                                        "swt:iconify swt:fluent--warning-shield-20-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
                                     prop.className "swt:min-w-0 swt:wrap-anywhere"
@@ -732,7 +732,7 @@ type GitSidebar =
                             prop.children [
                                 Html.span [
                                     prop.className
-                                        "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
+                                        "swt:iconify swt:fluent--warning-shield-20-regular swt:size-4 swt:shrink-0"
                                 ]
                                 Html.span [
                                     prop.className "swt:min-w-0 swt:wrap-anywhere"
@@ -1897,7 +1897,7 @@ type GitSidebar =
                                 prop.children [
                                     Html.span [
                                         prop.className
-                                            "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4 swt:shrink-0"
+                                            "swt:iconify swt:fluent--warning-shield-20-regular swt:size-4 swt:shrink-0"
                                     ]
                                     Html.span [
                                         prop.className "swt:min-w-0 swt:wrap-anywhere"

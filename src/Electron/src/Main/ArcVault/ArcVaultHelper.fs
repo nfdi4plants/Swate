@@ -70,7 +70,8 @@ let private baselineDataMapStaticHash (dataMap: DataMap option) =
 
 /// Sets the current loaded ARC state as the clean in-memory baseline.
 let baselineArcStaticHashes (arc: ARC) : unit =
-    arc.License |> Option.iter (fun license -> license.StaticHash <- license.GetHashCode())
+    arc.License
+    |> Option.iter (fun license -> license.StaticHash <- license.GetHashCode())
 
     for study in arc.Studies do
         study.StaticHash <- study.GetLightHashCode()
@@ -221,6 +222,7 @@ let private isZeroByteZipReadError (errors: string[]) =
     errors
     |> Array.exists (fun error ->
         let normalizedError = error.ToLowerInvariant()
+
         normalizedError.Contains("error reading contract")
         && normalizedError.Contains("data length = 0")
     )
@@ -249,13 +251,11 @@ let private repairZeroByteCanonicalArcFile
     =
     promise {
         let relativePath =
-            ARCtrl.ArcPathHelper.combineMany [|
-                spec.CollectionFolder
-                identifier
-                spec.FileName
-            |]
+            ARCtrl.ArcPathHelper.combineMany [| spec.CollectionFolder; identifier; spec.FileName |]
 
-        let absolutePath = path.join (arcPath, spec.CollectionFolder, identifier, spec.FileName)
+        let absolutePath =
+            path.join (arcPath, spec.CollectionFolder, identifier, spec.FileName)
+
         let! fileSize = tryGetFileSizeAsync absolutePath
 
         match fileSize with
@@ -348,6 +348,8 @@ let createWindow () = promise {
             Fable.Electron.Main.shell.openExternal url |> Promise.start
     )
 
+    window.title <- "Swate"
+
     return window
 }
 
@@ -378,7 +380,8 @@ let createFileWatcher (path: string) (usePolling: bool option) =
                 false
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
-    let usePolling = defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
+    let usePolling =
+        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
 
     let watcherOptions =
         if usePolling then
