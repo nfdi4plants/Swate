@@ -202,7 +202,6 @@ type GraphObjectExplorer =
                     (fun item ->
                         if item.Selectable then
                             setExplorerSelection item.Id item.Path),
-                showBreadcrumbs = false,
                 useDirectoryChevronToggle = true
             )
 

@@ -22,6 +22,7 @@
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeMaterialization.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRenameHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Modals\CreateArcFileModal.fs" />
