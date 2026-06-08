@@ -39,7 +39,7 @@ let saveArcFileAndOpen (arcFile: ArcFiles) =
     withArcFileRequest
         arcFile
         (fun request -> promise {
-            let! saveResult = Api.ipcArcVaultApi.applyArcFileAndSave request
+            let! saveResult = Api.ipcArcVaultApi.addArcFile request
 
             match saveResult with
             | Error exn -> return Error exn

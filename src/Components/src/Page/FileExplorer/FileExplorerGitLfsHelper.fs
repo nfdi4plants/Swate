@@ -4,8 +4,8 @@ open Fable.Core
 open Swate.Components.Page.FileExplorer.Types
 
 let toggleLfsMark
-        (setError: string option -> unit)
-        (runToggle: string -> bool -> JS.Promise<Result<unit, string>>)
+    (setError: string option -> unit)
+    (runToggle: string -> bool -> JS.Promise<Result<unit, string>>)
     : (FileItem -> bool -> unit) =
     fun item markAsLfs ->
         promise {
@@ -24,8 +24,8 @@ let toggleLfsMark
         |> Promise.start
 
 let freeLocalLfsCopy
-        (setError: string option -> unit)
-        (runCleanup: string -> JS.Promise<Result<unit, string>>)
+    (setError: string option -> unit)
+    (runCleanup: string -> JS.Promise<Result<unit, string>>)
     : (FileItem -> unit) =
     fun item ->
         promise {
@@ -56,49 +56,34 @@ let contextMenuItems
         []
     else
         let isMarked = item.IsLFS = Some true
-        let hasLocalLfsCopy = isMarked && item.Downloaded = Some true && item.IsLFSPointer <> Some true
+
+        let hasLocalLfsCopy =
+            isMarked && item.Downloaded = Some true && item.IsLFSPointer <> Some true
 
         [
-            {
-                Label = if isMarked then "Unmark Git LFS" else "Mark Git LFS"
-                Icon =
-                    if isMarked then
-                        "swt:fluent--document-dismiss-24-regular"
-                    else
-                        "swt:fluent--document-add-24-regular"
-                OnClick = fun () -> onToggleLfsMark item (not isMarked)
-                Disabled = None
-            }
+            ContextMenuItem.create
+                (if isMarked then "Unmark Git LFS" else "Mark Git LFS")
+                (if isMarked then
+                     "swt:fluent--document-dismiss-24-regular"
+                 else
+                     "swt:fluent--document-add-24-regular")
+                (fun () -> onToggleLfsMark item (not isMarked))
             yield!
                 match onFreeLocalLfsCopy with
-                | Some freeLocalCopy when hasLocalLfsCopy ->
-                    [
-                        {
-                            Label = "Free local LFS copy"
-                            Icon = "swt:fluent--document-arrow-up-20-regular"
-                            OnClick = fun () -> freeLocalCopy item
-                            Disabled = None
-                        }
-                    ]
-                | Some _ when isMarked ->
-                    [
-                        {
-                            Label = "Free local LFS copy"
-                            Icon = "swt:fluent--document-arrow-up-20-regular"
-                            OnClick = fun () -> ()
-                            Disabled = Some true
-                        }
-                    ]
+                | Some freeLocalCopy when hasLocalLfsCopy -> [
+                    ContextMenuItem.create
+                        "Free local LFS copy"
+                        "swt:fluent--document-arrow-up-20-regular"
+                        (fun () -> freeLocalCopy item)
+                  ]
+                | Some _ when isMarked -> [
+                    ContextMenuItem.disabled "Free local LFS copy" "swt:fluent--document-arrow-up-20-regular"
+                  ]
                 | _ -> []
-            {
-                Label =
-                    if isMarked then
-                        "Git LFS: marked"
-                    else
-                        "Git LFS: not marked"
-                Icon = "swt:fluent--tag-24-regular"
-                OnClick = fun () -> ()
-                Disabled = Some true
-            }
+            ContextMenuItem.disabled
+                (if isMarked then
+                     "Git LFS: marked"
+                 else
+                     "Git LFS: not marked")
+                "swt:fluent--tag-24-regular"
         ]
-

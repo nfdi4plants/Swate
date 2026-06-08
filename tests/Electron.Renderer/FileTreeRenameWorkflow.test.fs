@@ -12,6 +12,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 module RenameWorkflow = Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameWorkflow
+module FileTreeContextMenu = Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 
 let rec private waitUntil (predicate: unit -> bool, attempts: int) =
     promise {
@@ -73,9 +74,76 @@ Vitest.describe("FileTreeRenameHelper", fun () ->
     )
 )
 
+let private getRenameMenuItems (item: FileItem) =
+    FileTreeContextMenu.renameContextMenuItems (fun _ -> ()) item
+
+let private expectRenameMenuVisibility expectedCount item =
+    let menuItems = getRenameMenuItems item
+    Vitest.expect(menuItems.Length).toBe(expectedCount)
+
+    if expectedCount = 1 then
+        Vitest.expect(menuItems.[0].Label).toBe("Rename")
+        Vitest.expect(menuItems.[0].Icon).toBe("swt:fluent--edit-24-regular")
+
+let private buildRenameDraftOrFail item =
+    match tryBuildRenameDraft item with
+    | Ok draft -> draft
+    | Error error -> failwith error
+
+type private RenameWorkflowProbe = {
+    mutable RenameRequest: RenamePathRequest option
+    mutable RenamedSelection: ArcSelection option
+    mutable Closed: bool
+    mutable GitStatusRefreshCount: int
+    mutable ReloadedPreviewPath: string option
+}
+
+let private createRenameWorkflowProbe () = {
+    RenameRequest = None
+    RenamedSelection = None
+    Closed = false
+    GitStatusRefreshCount = 0
+    ReloadedPreviewPath = None
+}
+
+let private createConfirmRenameConfig
+    renameDraft
+    selectedTreePath
+    pageState
+    (probe: RenameWorkflowProbe)
+    : RenameWorkflow.ConfirmRenameConfig =
+    {
+        pendingRenameDraft = Some renameDraft
+        selectedTreePath = Some selectedTreePath
+        pageState = pageState
+        closeRenameModal = fun () -> probe.Closed <- true
+        setIsRenaming = ignore
+        setSelection = fun selection -> probe.RenamedSelection <- Some selection
+        refreshGitStatus = fun () -> probe.GitStatusRefreshCount <- probe.GitStatusRefreshCount + 1
+        reloadPreviewByPath =
+            fun path ->
+                promise {
+                    probe.ReloadedPreviewPath <- Some path
+                    return Ok()
+                }
+        renamePath =
+            fun request ->
+                promise {
+                    probe.RenameRequest <- Some request
+                    return Ok()
+                }
+        enqueueError = fun _ -> failwith "Did not expect rename error."
+        arcScopeId = None
+    }
+
+let private expectRenameRequest probe expectedRelativePath expectedNewName =
+    match probe.RenameRequest with
+    | None -> failwith "Expected renamePath to be dispatched."
+    | Some request ->
+        Vitest.expect(request.relativePath).toBe(expectedRelativePath)
+        Vitest.expect(request.newName).toBe(expectedNewName)
+
 Vitest.describe("FileTreeRenameWorkflow", fun () ->
-    let getRenameMenuItems (item: FileItem) =
-        RenameWorkflow.renameContextMenuItems (fun _ -> ()) item
 
     Vitest.test("rename context menu item is shown for assay, study, workflow, and run entity folders", fun () ->
         let entityFolderPaths =
@@ -89,10 +157,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         entityFolderPaths
         |> List.iter (fun path ->
             let item = createFolderItem (PathHelpers.getNameFromPath path) path
-            let menuItems = getRenameMenuItems item
-            Vitest.expect(menuItems.Length).toBe(1)
-            Vitest.expect(menuItems.[0].Label).toBe("Rename")
-            Vitest.expect(menuItems.[0].Icon).toBe("swt:fluent--edit-24-regular")
+            expectRenameMenuVisibility 1 item
         )
     )
 
@@ -112,8 +177,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         canonicalFilePaths
         |> List.iter (fun path ->
             let item = createFileItem (PathHelpers.getNameFromPath path) path
-            let menuItems = getRenameMenuItems item
-            Vitest.expect(menuItems.Length).toBe(0)
+            expectRenameMenuVisibility 0 item
         )
     )
 
@@ -129,15 +193,32 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         addZoneRootPaths
         |> List.iter (fun path ->
             let item = createFolderItem path path
-            let menuItems = getRenameMenuItems item
-            Vitest.expect(menuItems.Length).toBe(0)
+            expectRenameMenuVisibility 0 item
         )
     )
 
-    Vitest.test("rename context menu item is hidden for generic descendants", fun () ->
+    Vitest.test("rename context menu item is shown for safe generic descendants", fun () ->
         let item = createFileItem "custom.txt" "studies/MyStudy/notes/custom.txt"
-        let menuItems = getRenameMenuItems item
-        Vitest.expect(menuItems.Length).toBe(0)
+        expectRenameMenuVisibility 1 item
+    )
+
+    Vitest.test("rename context menu item is shown for safe root-level generic paths", fun () ->
+        let item = createFileItem "test.fsx" "test.fsx"
+        expectRenameMenuVisibility 1 item
+    )
+
+    Vitest.test("rename context menu item is hidden for unsafe generic paths", fun () ->
+        let unsafePaths = [
+            "assays/AssayA/isa.assay.xlsx"
+            "assays/AssayA/readme.md"
+            "assays/AssayA/.git/config"
+        ]
+
+        unsafePaths
+        |> List.iter (fun path ->
+            let item = createFileItem (PathHelpers.getNameFromPath path) path
+            expectRenameMenuVisibility 0 item
+        )
     )
 
     Vitest.test("rename context menu action requests a rename draft for renameable items", fun () ->
@@ -148,7 +229,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
             RenameWorkflow.requestRenameItem (fun draft -> pendingRenameDraft <- draft) ignore None
 
         let menuItems =
-            RenameWorkflow.renameContextMenuItems requestRenameItem item
+            FileTreeContextMenu.renameContextMenuItems requestRenameItem item
 
         Vitest.expect(menuItems.Length).toBe(1)
         menuItems.[0].OnClick()
@@ -194,7 +275,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
                 renderToBody (
                     Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                         initialItems = items,
-                        getItemActions = RenameWorkflow.renameContextMenuItems onRenameItem
+                        getItemActions = FileTreeContextMenu.renameContextMenuItems onRenameItem
                     )
                 )
 
@@ -219,58 +300,52 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
 
     Vitest.test("confirmRenameItem dispatches renamePath, remaps active selection, and refreshes git status", fun () ->
         promise {
-            let renameDraftResult =
-                createFolderItem "OldAssay" "assays/OldAssay"
-                |> tryBuildRenameDraft
-
             let renameDraft =
-                match renameDraftResult with
-                | Ok draft -> draft
-                | Error error -> failwith error
+                createFolderItem "OldAssay" "assays/OldAssay"
+                |> buildRenameDraftOrFail
 
-            let mutable renameRequest: RenamePathRequest option = None
-            let mutable renamedSelection: ArcSelection option = None
-            let mutable closed = false
-            let mutable gitStatusRefreshCount = 0
-            let mutable reloadedPreviewPath: string option = None
+            let probe = createRenameWorkflowProbe ()
 
-            let config: RenameWorkflow.ConfirmRenameConfig = {
-                pendingRenameDraft = Some renameDraft
-                selectedTreePath = Some "assays/OldAssay/notes/protocol.md"
-                pageState = Some(Renderer.Types.PageState.ArcFilePage(ArcFiles.Assay(ArcAssay.init "OldAssay")))
-                closeRenameModal = fun () -> closed <- true
-                setIsRenaming = ignore
-                setSelection = fun selection -> renamedSelection <- Some selection
-                refreshGitStatus = fun () -> gitStatusRefreshCount <- gitStatusRefreshCount + 1
-                reloadPreviewByPath =
-                    fun path ->
-                        promise {
-                            reloadedPreviewPath <- Some path
-                            return Ok()
-                        }
-                renamePath =
-                    fun request ->
-                        promise {
-                            renameRequest <- Some request
-                            return Ok()
-                        }
-                enqueueError = fun _ -> failwith "Did not expect rename error."
-                arcScopeId = None
-            }
+            let config =
+                createConfirmRenameConfig
+                    renameDraft
+                    "assays/OldAssay/notes/protocol.md"
+                    (Some(Renderer.Types.PageState.ArcFilePage(ArcFiles.Assay(ArcAssay.init "OldAssay"))))
+                    probe
 
             RenameWorkflow.confirmRenameItem config "NewAssay"
-            do! waitUntil ((fun () -> renameRequest.IsSome && closed), 50)
+            do! waitUntil ((fun () -> probe.RenameRequest.IsSome && probe.Closed), 50)
 
-            match renameRequest with
-            | None -> failwith "Expected renamePath to be dispatched."
-            | Some request ->
-                Vitest.expect(request.relativePath).toBe("assays/OldAssay")
-                Vitest.expect(request.newName).toBe("NewAssay")
+            expectRenameRequest probe "assays/OldAssay" "NewAssay"
+            Vitest.expect(probe.RenamedSelection.IsSome).toBe(true)
+            Vitest.expect(probe.RenamedSelection.Value.TreePath).toEqual(Some "assays/NewAssay/notes/protocol.md")
+            Vitest.expect(probe.ReloadedPreviewPath).toEqual(Some "assays/NewAssay/isa.assay.xlsx")
+            Vitest.expect(probe.GitStatusRefreshCount).toBe(1)
+        }
+    )
 
-            Vitest.expect(renamedSelection.IsSome).toBe(true)
-            Vitest.expect(renamedSelection.Value.TreePath).toEqual(Some "assays/NewAssay/notes/protocol.md")
-            Vitest.expect(reloadedPreviewPath).toEqual(Some "assays/NewAssay/isa.assay.xlsx")
-            Vitest.expect(gitStatusRefreshCount).toBe(1)
+    Vitest.test("confirmRenameItem dispatches generic renamePath and remaps generic file selection", fun () ->
+        promise {
+            let renameDraft =
+                createFileItem "old.txt" "assays/AssayA/protocols/old.txt"
+                |> buildRenameDraftOrFail
+
+            let probe = createRenameWorkflowProbe ()
+
+            let config =
+                createConfirmRenameConfig
+                    renameDraft
+                    "assays/AssayA/protocols/old.txt"
+                    (Some(Renderer.Types.PageState.TextPage "old content"))
+                    probe
+
+            RenameWorkflow.confirmRenameItem config "new.txt"
+            do! waitUntil ((fun () -> probe.RenameRequest.IsSome && probe.Closed), 50)
+
+            expectRenameRequest probe "assays/AssayA/protocols/old.txt" "new.txt"
+            Vitest.expect(probe.RenamedSelection.IsSome).toBe(true)
+            Vitest.expect(probe.RenamedSelection.Value.TreePath).toEqual(Some "assays/AssayA/protocols/new.txt")
+            Vitest.expect(probe.GitStatusRefreshCount).toBe(1)
         }
     )
 )

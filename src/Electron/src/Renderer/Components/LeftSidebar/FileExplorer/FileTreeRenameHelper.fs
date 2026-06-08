@@ -3,37 +3,29 @@ module Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.RenamePathRules
 open Renderer.Components.LeftSidebar.FileExplorer.Types
-
-let private tryGetItemRelativePath (item: FileItem) =
-    item.Path
-    |> Option.map PathHelpers.normalizeCanonicalRelativePath
 
 let private normalizeRelativePath (path: string) =
     path
     |> PathHelpers.normalizeCanonicalRelativePath
 
-let normalizeRenameName (newName: string) =
-    validateRenameName newName
-
-let buildRenamedPath (sourcePath: string) (newName: string) =
-    buildRenamedSiblingPath sourcePath newName
-
-let private isRenameContextMenuTarget (relativePath: string) =
-    ArcDeletePathRules.isRenamePathAllowed relativePath
-
 let canRenameItem (item: FileItem) =
-    tryGetItemRelativePath item
-    |> Option.exists isRenameContextMenuTarget
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+    |> Option.exists ArcEntityPathRules.isRenamePathAllowed
 
 let tryBuildRenameDraft (item: FileItem) : Result<ArcRenameDraft, string> =
-    match tryGetItemRelativePath item with
+
+    let tryGetRelativePath (item: FileItem) : string option =
+        item.Path
+        |> Option.map PathHelpers.normalizeCanonicalRelativePath
+
+    match tryGetRelativePath item with
     | None -> Error "Could not resolve the selected item path for rename."
     | Some relativePath ->
         let normalizedRelativePath = normalizeRelativePath relativePath
 
-        if ArcDeletePathRules.isRenamePathAllowed normalizedRelativePath |> not then
+        if ArcEntityPathRules.isRenamePathAllowed normalizedRelativePath |> not then
             Error "Renaming this item is not allowed."
         else
             let sourcePath = normalizedRelativePath

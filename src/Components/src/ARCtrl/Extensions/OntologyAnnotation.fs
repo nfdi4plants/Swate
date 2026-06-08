@@ -3,7 +3,6 @@ module ARCtrl.OntologyAnnotationExtensions
 
 open ARCtrl
 open Swate.Components
-open Swate.Components.Shared
 
 module OntologyAnnotationHelper =
 

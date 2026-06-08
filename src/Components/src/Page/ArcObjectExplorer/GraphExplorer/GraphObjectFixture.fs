@@ -24,15 +24,6 @@ module private GraphObjectFixtureHelper =
         unitTAN = None
     }
 
-    let sanitizeSegment (value: string) =
-        value
-            .Trim()
-            .ToLowerInvariant()
-            .Replace(" ", "-")
-            .Replace("/", "-")
-            .Replace("\\", "-")
-            .Replace(":", "-")
-
     let makeOwnerProperty (ownerKind: string) (ownerId: string) (name: string) (value: string) =
         makeProperty(
             $"prop:{ownerKind}:{sanitizeSegment ownerId}",

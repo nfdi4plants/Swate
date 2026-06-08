@@ -1,6 +1,7 @@
 module ElectronCore.ArcFileMutationHelperTests
 
 open ARCtrl
+open Main.ArcMerge
 open Main.ArcVaultHelper
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
@@ -103,6 +104,46 @@ Vitest.describe (
                     <| "Expected datamap to be present on assay."
 
                 Vitest.expect(updatedDataMap.StaticHash).toBe (777)
+        )
+
+        Vitest.test (
+            "fromArcByPath resolves ARC files through shared path lookup",
+            fun () ->
+                let arc = ARC("test-arc")
+
+                let assay = ArcAssay("assay_1")
+                assay.DataMap <- Some(DataMap.init ())
+                arc.AddAssay assay
+
+                let study = ArcStudy("study_1")
+                study.DataMap <- Some(DataMap.init ())
+                arc.AddStudy study
+
+                let workflow = ArcWorkflow("workflow_1")
+                workflow.DataMap <- Some(DataMap.init ())
+                arc.AddWorkflow workflow
+
+                let run = ArcRun("run_1")
+                run.DataMap <- Some(DataMap.init ())
+                arc.AddRun run
+
+                let cases = [|
+                    "isa.investigation.xlsx", FileContentType.ISA_Investigation
+                    "assays/assay_1/isa.assay.xlsx", FileContentType.ISA_Assay
+                    "studies/study_1/isa.study.xlsx", FileContentType.ISA_Study
+                    "workflows/workflow_1/isa.workflow.xlsx", FileContentType.ISA_Workflow
+                    "runs/run_1/isa.run.xlsx", FileContentType.ISA_Run
+                    "assays/assay_1/isa.datamap.xlsx", FileContentType.ISA_Datamap
+                |]
+
+                for path, expectedFileType in cases do
+                    let dto =
+                        FileContentDTO.fromArcByPath path arc
+                        |> expectSome
+                        <| $"Expected DTO for {path}."
+
+                    Vitest.expect(dto.fileType).toEqual(expectedFileType)
+                    Vitest.expect(dto.path).toBe(path)
         )
 
         Vitest.test (

@@ -1,7 +1,6 @@
 module Renderer.Components.LeftSidebar.FileExplorer.Helper
 
 open System
-open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
@@ -108,15 +107,34 @@ let getItemIconClass (item: FileItem) =
         | Some colorClass -> Some colorClass
         | None -> colorClassForArcWorkbookFile fileName
 
+let canDeleteItem (item: FileItem) =
+    item.Path
+    |> Option.map PathHelpers.normalizeCanonicalRelativePath
+    |> Option.exists ArcEntityPathRules.isDeletePathAllowed
 
 let tryGetItemRelativePath (item: FileItem) =
     item.Path
     |> Option.map PathHelpers.normalizeRelativePath
     |> Option.map PathHelpers.normalizePath
 
-let canDeleteItem (item: FileItem) =
-    tryGetItemRelativePath item
-    |> Option.exists ArcDeletePathRules.isDeletePathAllowed
+let canCreateFileSystemItemIn (item: FileItem) =
+    item.IsDirectory
+    && (tryGetItemRelativePath item
+        |> Option.exists (fun path ->
+            String.IsNullOrWhiteSpace path
+            || ArcEntityPathRules.isGenericFileSystemParentAllowed path))
+
+let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
+
+let fileSystemCreateKindLabel =
+    function
+    | FileSystemItemKind.File -> "File"
+    | FileSystemItemKind.Folder -> "Folder"
+
+let fileSystemCreateKindIcon =
+    function
+    | FileSystemItemKind.File -> "swt:fluent--document-add-24-regular"
+    | FileSystemItemKind.Folder -> "swt:fluent--folder-add-24-regular"
 
 let rec private collectSelectedDirectoryPathChain
     (selectedTreeItemPath: string option)

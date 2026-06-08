@@ -1023,7 +1023,7 @@ type DataHubBrowser =
 
         let isConnected = not (System.String.IsNullOrWhiteSpace baseUrl)
 
-        let emptyResponse (page: int) (perPage: int) : PagedResponse<ExploreProjectDto> = {
+        let emptyPagedResponse (page: int) (perPage: int) : PagedResponse<'T> = {
             Items = [||]
             Pagination = {
                 Link = None
@@ -1074,21 +1074,6 @@ type DataHubBrowser =
                     setAccounts AuthStateDto.Empty
             }
 
-        let emptyGroupsResponse (page: int) (perPage: int) : PagedResponse<GroupDto> = {
-            Items = [||]
-            Pagination = {
-                Link = None
-                NextPage = None
-                Page = Some page
-                PerPage = Some perPage
-                PrevPage = None
-                Total = Some 0
-                TotalPages = Some 1
-                NextCursor = None
-                PrevCursor = None
-            }
-        }
-
         let loadAllRepos (query: ExploreRepoQuery) =
             if isConnected then
                 let requestPat = if query.Visibility.IsSome then "" else pat
@@ -1104,7 +1089,7 @@ type DataHubBrowser =
                     ?visibility = query.Visibility
                 )
             else
-                promise { return Ok(emptyResponse query.Page query.PerPage) }
+                promise { return Ok(emptyPagedResponse query.Page query.PerPage) }
 
         let loadMostStarredRepos (query: ExploreMostStarredQuery) =
             if isConnected then
@@ -1119,7 +1104,7 @@ type DataHubBrowser =
                     ?visibility = query.Visibility
                 )
             else
-                promise { return Ok(emptyResponse query.Page query.PerPage) }
+                promise { return Ok(emptyPagedResponse query.Page query.PerPage) }
 
         let loadUserRepos (query: ExploreRepoQuery) =
             if isConnected then
@@ -1134,13 +1119,13 @@ type DataHubBrowser =
                     sort = query.Sort
                 )
             else
-                promise { return Ok(emptyResponse query.Page query.PerPage) }
+                promise { return Ok(emptyPagedResponse query.Page query.PerPage) }
 
         let loadOrganisationGroups (query: ExploreGroupsQuery) =
             if isConnected then
                 GitLabApi.ListGroupsForCurrentUser(baseUrl, pat, page = query.Page, perPage = query.PerPage)
             else
-                promise { return Ok(emptyGroupsResponse query.Page query.PerPage) }
+                promise { return Ok(emptyPagedResponse query.Page query.PerPage) }
 
         let loadOrganisationRepos (query: ExploreGroupProjectsQuery) =
             if isConnected then
@@ -1157,7 +1142,7 @@ type DataHubBrowser =
                     sort = query.Sort
                 )
             else
-                promise { return Ok(emptyResponse query.Page query.PerPage) }
+                promise { return Ok(emptyPagedResponse query.Page query.PerPage) }
 
         let loaders: ExploreLoaders = {
             LoadAllRepos = loadAllRepos

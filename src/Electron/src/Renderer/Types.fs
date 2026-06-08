@@ -1,7 +1,6 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
-open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -20,7 +19,7 @@ type PageState =
     | MarkdownPage of string
     | TextPage of string
     | UnknownPage
-    | LandingDraftPage
+    //| LandingDraftPage
     | NotesDraftPage
     | NotesSearchPage
     | GitDiffPage of GitDiffViewDataDto

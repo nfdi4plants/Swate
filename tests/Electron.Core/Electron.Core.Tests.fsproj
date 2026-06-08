@@ -3,10 +3,24 @@
     <TargetFramework>net10.0</TargetFramework>
   </PropertyGroup>
   <ItemGroup>
+    <Compile Include="TestHelpers.fs" />
+    <Compile Include="ArcMerge\MockData.fs" />
+    <Compile Include="ArcMerge\HasInMemoryChanges.test.fs" />
+    <Compile Include="ArcMerge\PathParsing.test.fs" />
+    <Compile Include="ArcMerge\ShortCircuit.test.fs" />
+    <Compile Include="ArcMerge\InvestigationEvents.test.fs" />
+    <Compile Include="ArcMerge\AssayEvents.test.fs" />
+    <Compile Include="ArcMerge\StudyEvents.test.fs" />
+    <Compile Include="ArcMerge\RunEvents.test.fs" />
+    <Compile Include="ArcMerge\WorkflowEvents.test.fs" />
+    <Compile Include="ArcMerge\DataMapEvents.test.fs" />
+    <Compile Include="ArcMerge\EdgeCases.test.fs" />
     <Compile Include="FileTreeCompaction.test.fs" />
     <Compile Include="FileTreeCreator.test.fs" />
     <Compile Include="ArcFileMutationHelper.test.fs" />
+    <Compile Include="ArcVaultHelper.test.fs" />
     <Compile Include="ArcAddExtensions.test.fs" />
+    <Compile Include="ArcDeleteHelper.test.fs" />
     <Compile Include="ArcObjectWidget.test.fs" />
     <Compile Include="ArcObjectGraphExplorer.test.fs" />
     <Compile Include="JsonDTOUnwrapper.test.fs" />
@@ -15,6 +29,7 @@
     <Compile Include="EnsureNotesFolder.test.fs" />
     <Compile Include="GitService.test.fs" />
     <Compile Include="IpcArchitectureReview.test.fs" />
+    <Compile Include="ArcFileSystemHelper.test.fs" />
     <Compile Include="RenamePathRules.test.fs" />
     <Compile Include="GitValidation.test.fs" />
     <Compile Include="SecureAuthStore.test.fs" />

@@ -34,10 +34,15 @@
     <Compile Include="Auth\SecureAuthStore.fs" />
     <Compile Include="Auth\GitLabApi.fs" />
     <Compile Include="Auth\AuthService.fs" />
+    <Compile Include="ArcVault\Types.fs" />
     <Compile Include="ArcVault\ArcVaultHelper.fs" />
+    <Compile Include="ArcVault\WatcherHelpers.fs" />
     <Compile Include="ArcVault\ArcVault.fs" />
     <Compile Include="IPC\GitLfs.fs" />
     <Compile Include="IPC\IPCHelper.fs" />
+    <Compile Include="IPC\FileSystemIO.fs" />
+    <Compile Include="IPC\Delete.fs" />
+    <Compile Include="IPC\Rename.fs" />
     <Compile Include="IPC\IGitApi.fs" />
     <Compile Include="IPC\IGitLabApi.fs" />
     <Compile Include="IPC\IArcVaultsApi.fs" />

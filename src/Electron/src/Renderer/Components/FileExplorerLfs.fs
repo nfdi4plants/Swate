@@ -1,7 +1,6 @@
 module Renderer.Components.FileExplorerLfs
 
 open Fable.Core
-open Renderer.Components.Helper.GitLfsHelper
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -66,25 +65,3 @@ let createFreeLocalLfsCopy
         | None -> ()
 
     Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy setError runCleanup
-
-let withLfsContextMenuItems
-    (item: FileItem)
-    (toggleLfsMark: FileItem -> bool -> unit)
-    (freeLocalLfsCopy: FileItem -> unit)
-    (baseItems: ContextMenuItem list)
-    : ContextMenuItem list =
-    baseItems
-    @ Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark (Some freeLocalLfsCopy)
-
-let createContextMenuItems
-    (enqueueErrorModal: ErrorModalRequest -> unit)
-    (arcScopeId: string option)
-    (baseItems: FileItem -> ContextMenuItem list)
-    : FileItem -> ContextMenuItem list =
-    let toggleLfsMark =
-        createToggleLfsMark enqueueErrorModal arcScopeId runToggleLfsMark
-
-    let freeLocalLfsCopy =
-        createFreeLocalLfsCopy enqueueErrorModal arcScopeId runFreeLocalLfsCopy
-
-    fun item -> withLfsContextMenuItems item toggleLfsMark freeLocalLfsCopy (baseItems item)
