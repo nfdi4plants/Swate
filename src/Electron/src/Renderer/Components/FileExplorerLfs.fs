@@ -65,25 +65,3 @@ let createFreeLocalLfsCopy
         | None -> ()
 
     Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy setError runCleanup
-
-let withLfsContextMenuItems
-    (item: FileItem)
-    (toggleLfsMark: FileItem -> bool -> unit)
-    (freeLocalLfsCopy: FileItem -> unit)
-    (baseItems: ContextMenuItem list)
-    : ContextMenuItem list =
-    baseItems
-    @ Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark (Some freeLocalLfsCopy)
-
-let createContextMenuItems
-    (enqueueErrorModal: ErrorModalRequest -> unit)
-    (arcScopeId: string option)
-    (baseItems: FileItem -> ContextMenuItem list)
-    : FileItem -> ContextMenuItem list =
-    let toggleLfsMark =
-        createToggleLfsMark enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runToggleLfsMark
-
-    let freeLocalLfsCopy =
-        createFreeLocalLfsCopy enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runFreeLocalLfsCopy
-
-    fun item -> withLfsContextMenuItems item toggleLfsMark freeLocalLfsCopy (baseItems item)
