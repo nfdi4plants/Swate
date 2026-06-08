@@ -31,12 +31,16 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 22
           cache: "npm"
 
       # Install npm dependencies
       - name: Install root npm dependencies
         run: npm ci
+
+      # Verify electron version
+      - name: Verify Electron version
+        run: npx electron --version
 
       # Install playwright dependencies
       - name: Install Playwright dependencies
