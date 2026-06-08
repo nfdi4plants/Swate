@@ -98,7 +98,9 @@ let private insertFileTreeEntry (root: FileTreeNode) (rootPath: string) (entry: 
                     node.children.Add(part, newNode)
                     newNode
 
-            if not isLast then
+            if isLast then
+                ignore child
+            else
                 loop child (index + 1)
 
         loop root rootParts.Length

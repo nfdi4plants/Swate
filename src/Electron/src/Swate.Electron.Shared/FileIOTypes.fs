@@ -88,3 +88,14 @@ type RenamePathRequest = {
     relativePath: string
     newName: string
 }
+
+[<RequireQualifiedAccess>]
+type FileSystemItemKind =
+    | File
+    | Folder
+
+type CreateFileSystemItemRequest = {
+    parentPath: string
+    name: string
+    kind: FileSystemItemKind
+}

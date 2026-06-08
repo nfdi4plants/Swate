@@ -7,18 +7,12 @@ open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.RenamePathRules
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Fable.Core.JsInterop
 open Main
-open Main.ArcMerge
-open Main.ArcVaultHelper
 open Node.Api
-open ARCtrl
 open ARCtrl.Contract
-open ARC
 open Main.IPC.FileSystemIO
 open Main.IPC.Delete
 open Main.IPC.Rename
@@ -38,6 +32,57 @@ let private withLoadedArcVault<'T>
             match vault.path, vault.arc with
             | Some _, Some _ -> return! operation vault
             | _ -> return Error(exn "ARC is not loaded.")
+    }
+
+let private tryResolveExistingArcRelativePath (arcPath: string) (relativePath: string) : JS.Promise<Result<string, exn>> =
+    promise {
+        match tryResolveArcRelativePath arcPath relativePath with
+        | Error pathError -> return Error pathError
+        | Ok absolutePath ->
+            let! exists = pathExistsAsync absolutePath
+
+            if exists then
+                return Ok absolutePath
+            else
+                return Error(exn $"Path '{relativePath}' does not exist.")
+    }
+
+let private showPathInFileExplorerAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
+    promise {
+        match! tryResolveExistingArcRelativePath arcPath relativePath with
+        | Error pathError -> return Error pathError
+        | Ok absolutePath ->
+            try
+                shell.showItemInFolder absolutePath
+                return Ok()
+            with shellError ->
+                return Error(exn $"Could not show '{relativePath}' in file explorer: {shellError.Message}")
+    }
+
+let private openPathWithDefaultApplicationAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
+    promise {
+        match! tryResolveExistingArcRelativePath arcPath relativePath with
+        | Error pathError -> return Error pathError
+        | Ok absolutePath ->
+            let! shellOpenResult = shell.openPath absolutePath
+
+            if String.IsNullOrWhiteSpace shellOpenResult then
+                return Ok()
+            else
+                return Error(exn $"Could not open '{relativePath}' with the default application: {shellOpenResult}")
+    }
+
+let private runLoadedArcPathAction
+    (event: IpcMainInvokeEvent)
+    (operation: string -> JS.Promise<Result<'T, exn>>)
+    : JS.Promise<Result<'T, exn>> =
+    promise {
+        try
+            return!
+                withLoadedArcVault event (fun vault ->
+                    operation vault.path.Value)
+        with e ->
+            return Error e
     }
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
@@ -138,6 +183,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    showPathInFileExplorer =
+        fun (relativePath: string) ->
+            runLoadedArcPathAction event (fun arcPath ->
+                showPathInFileExplorerAsync arcPath relativePath)
+    openPathWithDefaultApplication =
+        fun (relativePath: string) ->
+            runLoadedArcPathAction event (fun arcPath ->
+                openPathWithDefaultApplicationAsync arcPath relativePath)
     getRecentARCs = fun _ -> promise { return RECENT_ARCS.Get() }
     removeRecentARC =
         fun arcpointer -> promise {
@@ -251,7 +304,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                     for filePath in result.filePaths do
                         let absolutePath = resolveAbsolutePath filePath
-                        let! content = readUtf8FileAsync absolutePath
+                        let! content = ARCtrl.FileSystemHelper.readFileTextAsync absolutePath
 
                         importedFiles.Add {
                             Name = path.basename absolutePath
@@ -334,6 +387,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     withLoadedArcVault
                         event
                         (fun vault -> promise { return! vault.AddArcFile request })
+            with e ->
+                return Error e
+        }
+    createFileSystemItem =
+        fun (request: CreateFileSystemItemRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault event (fun vault -> promise {
+                        return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
+                    })
             with e ->
                 return Error e
         }
@@ -471,8 +534,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 match request.fileType with
                                 | DTOType.DTOTypeIsPlainTextVariant ->
                                     let directoryPath = path.dirname absolutePath
-                                    do! mkdirRecursiveAsync directoryPath
-                                    do! writeUtf8FileAsync absolutePath request.content
+                                    do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
+                                    do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
                                     do! vault.RefreshFileTree()
                                     return Ok()
                                 | DTOType.CLI -> return Error(exn "Direct writing of CLI files is not supported.")

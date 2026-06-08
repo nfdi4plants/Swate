@@ -384,6 +384,28 @@ module ArcEntityPathRules =
             isGenericFileSystemTargetAllowed normalizedRelativePath
         | _ -> false
 
+    let isGenericFileSystemParentAllowed (relativePath: string) =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+
+        if
+            String.IsNullOrWhiteSpace normalizedRelativePath
+            || PathHelpers.containsPathTraversalSegments normalizedRelativePath
+            || PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+        then
+            false
+        else
+            let segments = normalizedRelativePath |> splitPathSegments
+
+            let isArcEntityFolder =
+                segments.Length = 2 && (tryParseZone segments.[0]).IsSome
+
+            let isSafeGenericDirectoryCandidate =
+                isGenericFileSystemTargetAllowed normalizedRelativePath
+
+            (isArcEntityFolder || isSafeGenericDirectoryCandidate)
+            && (segments |> containsDisallowedGenericPathSegment |> not)
+            && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
+
     let resolveRenameSourcePath (relativePath: string) =
         match classifyRenameTarget relativePath with
         | RenamePathClassification.CanonicalEntityFileTarget(zone, identifier, _)

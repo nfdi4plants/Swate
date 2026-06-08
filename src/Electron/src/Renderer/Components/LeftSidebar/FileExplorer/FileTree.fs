@@ -20,6 +20,7 @@ module private FileTreeHelper =
 
     type FileTreeDialog =
         | CreateDialog of ArcExplorerNodeKind
+        | FileSystemCreateDialog of FileSystemCreateDraft
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
 
@@ -29,8 +30,7 @@ module private FileTreeHelper =
         | Some request ->
             match! Api.ipcArcVaultApi.addArcFile request with
             | Error saveError -> return Error saveError
-            | Ok() ->
-                return! Api.ipcArcVaultApi.openFile request.path
+            | Ok() -> return! Api.ipcArcVaultApi.openFile request.path
     }
 
 open FileTreeHelper
@@ -46,9 +46,10 @@ type FileTree =
         ]
 
     [<ReactComponent>]
-    static member FileTree() =
+    static member FileTree(rootContextMenuRef: IRefValue<Browser.Types.HTMLElement option>) =
 
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
@@ -62,9 +63,7 @@ type FileTree =
 
         React.useEffect (
             (fun () ->
-                let filePaths =
-                    effectiveFileTree
-                    |> Array.map (fun entry -> entry.path)
+                let filePaths = effectiveFileTree |> Array.map (fun entry -> entry.path)
 
                 if FileExplorerDeleteHelper.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath then
                     fileStateCtx.setSelection ArcSelection.empty
@@ -79,7 +78,7 @@ type FileTree =
             |]
         )
 
-        let fileTree : FileTreeNode option =
+        let fileTree: FileTreeNode option =
             React.useMemo (
                 (fun () ->
                     match effectiveFileTree with
@@ -188,7 +187,8 @@ type FileTree =
                 |> Promise.catch (fun exn ->
                     Renderer.Components.ARCHelper.applyViewError
                         pageStateCtx.setState
-                        $"Could not reload preview for '{selectedPath}': {exn.Message}")
+                        $"Could not reload preview for '{selectedPath}': {exn.Message}"
+                )
                 |> Promise.start
 
         React.useEffect (
@@ -196,7 +196,8 @@ type FileTree =
                 if hasObservedFileTreeUpdateRef.current then
                     reloadSelectedPreviewAfterFileTreeUpdate ()
                 else
-                    hasObservedFileTreeUpdateRef.current <- true),
+                    hasObservedFileTreeUpdateRef.current <- true
+            ),
             [| box fileStateCtx.state.FileTree |]
         )
 
@@ -222,8 +223,11 @@ type FileTree =
             setIsDialogBusy false
             setActiveDialog None
 
-        let openCreateModal kind =
-            openDialog (CreateDialog kind)
+        let openCreateModal kind = openDialog (CreateDialog kind)
+
+        let openFileSystemCreateModal kind item =
+            if canCreateFileSystemItemIn item then
+                openDialog (FileSystemCreateDialog { Parent = item; Kind = kind })
 
         let requestDeleteItem =
             FileTreeDeleteWorkflow.requestDeleteItem (Option.iter (DeleteDialog >> openDialog))
@@ -249,23 +253,31 @@ type FileTree =
         let applyCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
 
-        let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> =
-            promise {
-                let! openResult = Renderer.Components.ARCHelper.openView path
+        let applyFileSystemCreateError errorMessage =
+            errorModal.enqueue (
+                ErrorModalRequest.create (
+                    errorMessage,
+                    title = "Could not create file or folder"
+                )
+            )
 
-                match openResult with
-                | Ok loaded ->
-                    Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
-                    return Ok()
-                | Error errorMessage -> return Error errorMessage
-            }
+        let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> = promise {
+            let! openResult = Renderer.Components.ARCHelper.openView path
 
-        let activeCreateKind, activeRenameDraft, activeDeleteItem =
+            match openResult with
+            | Ok loaded ->
+                Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                return Ok()
+            | Error errorMessage -> return Error errorMessage
+        }
+
+        let activeCreateKind, activeFileSystemCreateDraft, activeRenameDraft, activeDeleteItem =
             match activeDialog with
-            | Some(CreateDialog kind) -> Some kind, None, None
-            | Some(RenameDialog renameDraft) -> None, Some renameDraft, None
-            | Some(DeleteDialog item) -> None, None, Some item
-            | None -> None, None, None
+            | Some(CreateDialog kind) -> Some kind, None, None, None
+            | Some(FileSystemCreateDialog draft) -> None, Some draft, None, None
+            | Some(RenameDialog renameDraft) -> None, None, Some renameDraft, None
+            | Some(DeleteDialog item) -> None, None, None, Some item
+            | None -> None, None, None, None
 
         let confirmDeleteItem () =
             if not isDialogBusy then
@@ -304,33 +316,95 @@ type FileTree =
                     }
                     |> Promise.catch (fun exn ->
                         setIsDialogBusy false
-                        applyCreateError exn.Message)
+                        applyCreateError exn.Message
+                    )
                     |> Promise.start
 
-        let arcCreateContextMenuItems (item: FileItem) =
-            inlineCreateKindForItem item
-            |> Option.map (fun kind ->
-                FileExplorerContextMenuItem.create
-                    $"Add {ArcExplorerNodeKind.label kind}"
-                    (arcCreateKindIcon kind)
-                    (fun () -> openCreateModal kind))
-            |> Option.toList
+        let createFileSystemItem (name: string) =
+            if not isDialogBusy then
+                match activeFileSystemCreateDraft with
+                | None -> closeDialog ()
+                | Some draft ->
+                    match tryGetItemRelativePath draft.Parent with
+                    | None -> applyFileSystemCreateError "Could not resolve the selected folder path."
+                    | Some parentPath ->
+                        setIsDialogBusy true
 
-        let deleteContextMenuItems =
-            FileTreeDeleteWorkflow.deleteContextMenuItems requestDeleteItem
+                        promise {
+                            let! createResult =
+                                Api.ipcArcVaultApi.createFileSystemItem {
+                                    parentPath = parentPath
+                                    name = name
+                                    kind = draft.Kind
+                                }
+
+                            match createResult with
+                            | Error exn -> applyFileSystemCreateError exn.Message
+                            | Ok createdPath ->
+                                let selectedPath = PathHelpers.normalizePath createdPath
+                                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                                match draft.Kind with
+                                | FileSystemItemKind.File ->
+                                    let! openResult = Api.ipcArcVaultApi.openFile selectedPath
+
+                                    match openResult with
+                                    | Ok dto ->
+                                        dto
+                                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                    | Error _ ->
+                                        FileContentDTO.create ARCtrl.Contract.DTOType.PlainText "" selectedPath
+                                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
+                                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                | FileSystemItemKind.Folder ->
+                                    setLoadedDirectoryPaths (fun current -> current.Add selectedPath)
+                                    pageStateCtx.setState None
+
+                                closeDialog ()
+                        }
+                        |> Promise.catch (fun exn -> applyFileSystemCreateError exn.Message)
+                        |> Promise.map (fun _ -> setIsDialogBusy false)
+                        |> Promise.start
 
         let renameContextMenuItems =
-            FileTreeRenameWorkflow.renameContextMenuItems requestRenameItem
+            FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
-        let baseContextMenuItems (item: FileItem) =
-            arcCreateContextMenuItems item
-            @ renameContextMenuItems item
-            @ deleteContextMenuItems item
+        let contextMenuConfig: FileTreeContextMenu.ContextMenuConfig = {
+            openItem = openPreview
+            arcRootPath = appStateCtx
+            openCreateModal = openCreateModal
+            openFileSystemCreateModal = openFileSystemCreateModal
+            requestRenameItem = requestRenameItem
+            requestDeleteItem = requestDeleteItem
+            pathActionConfig = {
+                openPathInFileExplorer = Api.ipcArcVaultApi.showPathInFileExplorer
+                openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
+                enqueueError = errorModal.enqueue
+            }
+            enqueueError = errorModal.enqueue
+            runToggleLfsMark = Renderer.Components.ARCHelper.runToggleLfsMark
+            runFreeLocalLfsCopy = Renderer.Components.ARCHelper.runFreeLocalLfsCopy
+        }
 
         let createContextMenuItems =
-            Renderer.Components.FileExplorerLfs.createContextMenuItems
-                errorModal.enqueue
-                baseContextMenuItems
+            FileTreeContextMenu.createContextMenuItems contextMenuConfig
+
+        let rootContextMenu rootItem =
+            let rootMenuItem = {
+                rootItem with
+                    Path = Some ""
+                    IsDirectory = true
+            }
+
+            Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
+                (fun _ ->
+                    FileTreeContextMenu.rootContextMenuItems contextMenuConfig rootMenuItem
+                    |> List.map (fun item -> item.ToPrimitiveContextMenuItem())
+                ),
+                ref = rootContextMenuRef,
+                onSpawn = (fun _ -> Some(box ()))
+            )
 
         let confirmRenameItem (newName: string) =
             if not isDialogBusy then
@@ -358,6 +432,21 @@ type FileTree =
                 kind = createModalKind,
                 close = closeDialog,
                 submit = createArcEntry,
+                isCreating = isDialogBusy
+            )
+
+        let activeFileSystemCreateKind =
+            activeFileSystemCreateDraft
+            |> Option.map _.Kind
+            |> Option.defaultValue FileSystemItemKind.File
+
+        let fileSystemCreateModal =
+            CreateFileSystemItemModal.Main(
+                isOpen = activeFileSystemCreateDraft.IsSome,
+                kind = activeFileSystemCreateKind,
+                parentName = (activeFileSystemCreateDraft |> Option.map _.Parent.Name),
+                close = closeDialog,
+                submit = createFileSystemItem,
                 isCreating = isDialogBusy
             )
 
@@ -400,11 +489,14 @@ type FileTree =
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
-                            showBreadcrumbs = false
+                            showBreadcrumbs = false,
+                            includeDefaultContextMenuItems = false
                         )
                     ]
                 ]
+                rootContextMenu rootItem
                 arcCreateModal
+                fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
             ]
@@ -412,6 +504,7 @@ type FileTree =
             React.Fragment [
                 FileTree.EmptyFileTreePlaceholder()
                 arcCreateModal
+                fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
             ]

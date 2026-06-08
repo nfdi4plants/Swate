@@ -1,6 +1,5 @@
 module Renderer.App
 
-
 open Elmish
 open Feliz
 open Feliz.UseElmish
@@ -127,7 +126,10 @@ let private subscribe (_model: Model) : Sub<Msg> = [
 ]
 
 [<ReactComponent>]
-let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage, setLeftSidebarTarget) =
+let private LeftActionButtons
+    (leftSidebarTarget: LeftSidebarPage)
+    setLeftSidebarTarget
+    =
     let leftSidebarCtx = Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let toggleTarget target =
@@ -185,38 +187,47 @@ let Main () =
                 Some path
         )
 
-    Context.AppStateContext.AppStateCtx.Provider(
-        model.ArcRootPath,
-        Renderer.Context.FileStateContext.FileStateCtxProvider(
-            (fun () -> Api.ipcArcVaultApi.getFileTree ()),
-            Renderer.Context.PageStateContext.PageStateCtx.Provider(
-                pageCtx,
-                ErrorModalProvider.ErrorModalProvider(
-                    Renderer.Context.AuthStateContext.Provider(
-                        Renderer.Context.GitStateContext.GitStateCtxProvider(
-                            Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
-                                Layout.Main(
-                                    children =
-                                        React.Fragment [|
-                                            children
-                                            CloseWindowController.CloseWindowController.Subscription()
-                                        |],
-                                    navbar = Renderer.Components.Navbar.Main(),
-                                    ?leftSidebar =
-                                        (if isInitializedArcVault then
-                                             Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget) |> Some
-                                         else
-                                             None),
-                                    ?leftActions =
-                                        (if isInitializedArcVault then
-                                             LeftActionButtons(model.LeftSidebarTarget, setLeftSidebarTarget) |> Some
-                                         else
-                                             None)
+    let leftSidebar =
+        if isInitializedArcVault then
+            Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget) |> Some
+        else
+            None
+
+    let leftActions =
+        if isInitializedArcVault then
+            LeftActionButtons model.LeftSidebarTarget setLeftSidebarTarget
+            |> Some
+        else
+            None
+
+    Swate.Components.Composite.ThemeSelector.ThemeProvider.ThemeProvider(
+        Swate.Components.Composite.TermSearch.TermSearchConfigProvider.TIBQueryProvider(
+            Context.AppStateContext.AppStateCtx.Provider(
+                model.ArcRootPath,
+                Renderer.Context.FileStateContext.FileStateCtxProvider(
+                    (fun () -> Api.ipcArcVaultApi.getFileTree ()),
+                    Renderer.Context.PageStateContext.PageStateCtx.Provider(
+                        pageCtx,
+                        ErrorModalProvider.ErrorModalProvider(
+                            Renderer.Context.AuthStateContext.Provider(
+                                Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                    Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
+                                        Layout.Main(
+                                            children =
+                                                React.Fragment [|
+                                                    children
+                                                    CloseWindowController.CloseWindowController.Subscription()
+                                                |],
+                                            navbar = Renderer.Components.Navbar.Main(),
+                                            ?leftSidebar = leftSidebar,
+                                            ?leftActions = leftActions
+                                        )
+                                    )
                                 )
-                            )
+                            ),
+                            ?scopeId = currentArcScopeId
                         )
-                    ),
-                    ?scopeId = currentArcScopeId
+                    )
                 )
             )
         )

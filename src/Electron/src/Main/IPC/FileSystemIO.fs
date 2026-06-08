@@ -7,6 +7,7 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
 
+
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
 
@@ -80,34 +81,18 @@ let tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) 
         else
             Error(exn "RelativePath resolves outside the ARC root.")
 
-let mkdirRecursiveAsync (directoryPath: string) : JS.Promise<unit> = promise {
-    let mkdirPromise =
-        fsPromisesDynamic?mkdir (directoryPath, createObj [ "recursive" ==> true ])
-        |> unbox<JS.Promise<obj>>
-
-    let! _ = mkdirPromise
-    return ()
-}
-
-let writeUtf8FileAsync (absolutePath: string) (content: string) : JS.Promise<unit> = promise {
-    let writePromise =
-        fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
-        |> unbox<JS.Promise<obj>>
-
-    let! _ = writePromise
-    return ()
-}
-
-let readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
-    fsPromisesDynamic?readFile (absolutePath, "utf8") |> unbox<JS.Promise<string>>
 
 let pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
-    try
-        let! _ = fsPromisesDynamic?access (absolutePath) |> unbox<JS.Promise<obj>>
+    let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
+
+    if fileExists then
         return true
-    with _ ->
-        return false
+    else
+        return! ARCtrl.FileSystemHelper.directoryExistsAsync absolutePath
 }
+
+let mkdirAsync (directoryPath: string) : JS.Promise<unit> =
+    ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
 
 let tryGetNodeErrorCode (error: exn) : string option =
     try
@@ -177,11 +162,16 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 [<RequireQualifiedAccess>]
 module ArcFileSystemHelper =
 
+    type CreateFileSystemItemPlan = {
+        ParentPath: string
+        TargetPath: string
+        Kind: FileSystemItemKind
+    }
+
     type GenericRenamePlan = {
         SourcePath: string
         TargetPath: string
     }
-        
 
     let private resolveArcRelativePathPair arcPath firstRelativePath secondRelativePath =
         match
@@ -192,6 +182,25 @@ module ArcFileSystemHelper =
         | _, Error pathError -> Error pathError
         | Ok firstAbsolutePath, Ok secondAbsolutePath -> Ok(firstAbsolutePath, secondAbsolutePath)
 
+    let private resolveCreatePathPair arcPath parentRelativePath targetRelativePath =
+        let normalizedParentPath =
+            parentRelativePath
+            |> PathHelpers.normalizeCanonicalRelativePath
+
+        let parentPath =
+            if String.IsNullOrWhiteSpace normalizedParentPath then
+                Ok(resolveAbsolutePath arcPath)
+            else
+                tryResolveArcRelativePath arcPath normalizedParentPath
+
+        match
+            parentPath,
+            tryResolveArcRelativePath arcPath targetRelativePath
+        with
+        | Error pathError, _
+        | _, Error pathError -> Error pathError
+        | Ok parentAbsolutePath, Ok targetAbsolutePath -> Ok(parentAbsolutePath, targetAbsolutePath)
+
     let private ensureTargetDoesNotExist targetAbsolutePath errorMessage = promise {
         let! targetExists = pathExistsAsync targetAbsolutePath
 
@@ -200,6 +209,54 @@ module ArcFileSystemHelper =
         else
             return Ok()
     }
+
+    let private createTargetAsync kind targetAbsolutePath =
+        match kind with
+        | FileSystemItemKind.File -> ARCtrl.FileSystemHelper.writeFileTextAsync targetAbsolutePath ""
+        | FileSystemItemKind.Folder -> mkdirAsync targetAbsolutePath
+
+    let tryBuildCreateFileSystemItemPlan
+        (request: CreateFileSystemItemRequest)
+        : Result<CreateFileSystemItemPlan, exn> =
+        match tryBuildGenericFileSystemChildPath request.parentPath request.name with
+        | Error validationError -> Error(exn validationError)
+        | Ok targetPath ->
+            Ok {
+                ParentPath = PathHelpers.normalizeCanonicalRelativePath request.parentPath
+                TargetPath = targetPath
+                Kind = request.kind
+            }
+
+    let createFileSystemItemOnDisk
+        (arcPath: string)
+        (request: CreateFileSystemItemRequest)
+        : JS.Promise<Result<string, exn>> =
+        promise {
+            match tryBuildCreateFileSystemItemPlan request with
+            | Error validationError -> return Error validationError
+            | Ok plan ->
+                match resolveCreatePathPair arcPath plan.ParentPath plan.TargetPath with
+                | Error pathError -> return Error pathError
+                | Ok(parentAbsolutePath, targetAbsolutePath) ->
+                    try
+                        let! parentIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync parentAbsolutePath
+
+                        if parentIsDirectory |> not then
+                            return Error(exn $"Cannot create item because '{plan.ParentPath}' is not a folder.")
+                        else
+                            let! targetCheck =
+                                ensureTargetDoesNotExist
+                                    targetAbsolutePath
+                                    $"A file or folder already exists at '{plan.TargetPath}'."
+
+                            match targetCheck with
+                            | Error conflictError -> return Error conflictError
+                            | Ok() ->
+                                do! createTargetAsync plan.Kind targetAbsolutePath
+                                return Ok plan.TargetPath
+                    with createError ->
+                        return Error createError
+        }
 
     let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<GenericRenamePlan, exn> =
         let requestedRelativePath =
