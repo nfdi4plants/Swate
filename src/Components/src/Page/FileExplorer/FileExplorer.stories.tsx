@@ -1,6 +1,6 @@
 import React from "react";
 import type { Meta, StoryObj } from "@storybook/react-vite";
-import { screen, within, expect, userEvent, waitFor, fireEvent } from "storybook/test";
+import { screen, within, expect, userEvent, waitFor, fireEvent, fn } from "storybook/test";
 import { FileExplorer, FileExplorerExample_Example as FileExplorerExample } from "./FileExplorer.fs.js";
 import { contextMenuItems as fileExplorerGitLfsContextMenuItems } from "./FileExplorerGitLfsHelper.fs.js";
 import {
@@ -205,6 +205,70 @@ const LfsContextMenuFileExplorer = () => {
   );
 };
 
+const CopyPathDefaultFileExplorer = () => {
+  const items = React.useMemo(
+    () => ofArray([FileTree_createFile("Relative File", "studies/A/file.txt", FileItemIcon_Document$())]),
+    [],
+  );
+
+  return (
+    <div className="swt:p-4">
+      <FileExplorer initialItems={items} />
+    </div>
+  );
+};
+
+const CopyPathResolverFileExplorer = () => {
+  const items = React.useMemo(
+    () => ofArray([FileTree_createFile("Absolute File", "studies/A/file.txt", FileItemIcon_Document$())]),
+    [],
+  );
+
+  return (
+    <div className="swt:p-4">
+      <FileExplorer
+        initialItems={items}
+        getCopyPath={(item) => (item.Path ? `C:/arc/${item.Path}` : undefined)}
+        getCopyRelativePath={(item) => item.Path ?? undefined}
+      />
+    </div>
+  );
+};
+
+const installClipboardMock = () => {
+  const writeText = fn(async () => undefined);
+  Object.defineProperty(navigator, "clipboard", {
+    value: { writeText },
+    configurable: true,
+    writable: true,
+  });
+
+  return writeText;
+};
+
+const expectContextMenuCopy = async (
+  canvasElement: HTMLElement,
+  itemLabel: string,
+  menuLabel: string,
+  expectedText: string,
+) => {
+  const writeText = installClipboardMock();
+  const canvas = within(canvasElement);
+  const targetFile = await canvas.findByText(itemLabel);
+  const fileItem = targetFile.closest("[data-file-item-id]");
+
+  await waitFor(() => expect(fileItem).toBeTruthy());
+
+  if (!fileItem) {
+    throw new Error(`Expected file item element for ${itemLabel}.`);
+  }
+
+  fireEvent.contextMenu(fileItem, { clientX: 30, clientY: 30, bubbles: true });
+  await userEvent.click(await screen.findByText(menuLabel));
+
+  await waitFor(() => expect(writeText).toHaveBeenCalledWith(expectedText));
+};
+
 const meta: Meta<typeof FileExplorerExample> = {
   title: "Page Components/FileExplorer",
   component: FileExplorerExample,
@@ -404,5 +468,29 @@ export const LfsContextMenuStates: StoryObj<typeof LfsContextMenuFileExplorer> =
 
     fireEvent.contextMenu(plainItem, { clientX: 30, clientY: 30, bubbles: true });
     await expect(screen.queryByText("Free local LFS copy")).toBeNull();
+  },
+};
+
+export const CopyPathUsesRelativePathByDefault: StoryObj<typeof CopyPathDefaultFileExplorer> = {
+  render: () => <CopyPathDefaultFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    await expectContextMenuCopy(canvasElement, "Relative File", "Copy Path", "studies/A/file.txt");
+  },
+};
+
+export const CopyPathUsesProvidedResolver: StoryObj<typeof CopyPathResolverFileExplorer> = {
+  render: () => <CopyPathResolverFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    await expectContextMenuCopy(canvasElement, "Absolute File", "Copy Path", "C:/arc/studies/A/file.txt");
+  },
+};
+
+export const CopyRelativePathUsesProvidedResolver: StoryObj<typeof CopyPathResolverFileExplorer> = {
+  render: () => <CopyPathResolverFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    await expectContextMenuCopy(canvasElement, "Absolute File", "Copy Relative Path", "studies/A/file.txt");
   },
 };

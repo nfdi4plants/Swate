@@ -4,7 +4,6 @@ open Feliz
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Layout
-open Swate.Components.Composite.ArcSelector
 open Swate.Components.Composite.Authentication.Types
 open Swate.Components.Primitive.Actionbar
 open Swate.Components.Primitive.Actionbar.Types
@@ -12,6 +11,7 @@ open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+open Renderer.Types
 
 module NavbarHelper =
 
@@ -204,6 +204,46 @@ module private Authentication =
 type Navbar =
 
     [<ReactComponent>]
+    static member private Separator() =
+        Html.div [
+            prop.className "swt:divider swt:divider-horizontal swt:mx-0"
+            prop.testId "navbar-action-separator"
+        ]
+
+    [<ReactComponent>]
+    static member private SettingsButton() =
+        let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+
+        let isActive =
+            match pageStateCtx.state with
+            | Some PageState.SettingsPage -> true
+            | _ -> false
+
+        let onToggleSettings _ =
+            if isActive then
+                pageStateCtx.setState None
+            else
+                pageStateCtx.setState (Some PageState.SettingsPage)
+
+        Html.button [
+            prop.type'.button
+            prop.className [
+                "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
+                if isActive then
+                    "swt:btn-active"
+            ]
+            prop.onClick onToggleSettings
+            prop.title "Settings"
+            prop.ariaLabel "Settings"
+            prop.testId "navbar-settings-button"
+            prop.children [
+                Html.i [
+                    prop.className "swt:iconify swt:fluent--settings-24-regular swt:size-5"
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member private SaveArcButton() =
 
         let errorCtx = useErrorModalCtx ()
@@ -271,7 +311,13 @@ type Navbar =
         let left =
             Html.div [
                 prop.className "swt:flex swt:items-center swt:gap-2"
-                prop.children [ Selector.Main(); Navbar.SaveArcButton() ]
+                prop.children [
+                    Selector.Main()
+                    Navbar.Separator()
+                    Navbar.SettingsButton()
+                    Navbar.Separator()
+                    Navbar.SaveArcButton()
+                ]
             ]
 
         let right =

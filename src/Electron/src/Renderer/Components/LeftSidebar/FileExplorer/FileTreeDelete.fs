@@ -50,11 +50,3 @@ module FileTreeDeleteWorkflow =
             |> Promise.catch (fun exn -> applyDeleteError config exn.Message)
             |> Promise.map (fun _ -> config.setIsDeleting false)
             |> Promise.start
-
-    let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem) =
-        FileExplorerContextMenuItem.whenItem
-            canDeleteItem
-            "Delete"
-            "swt:fluent--delete-24-regular"
-            requestDeleteItem
-            item

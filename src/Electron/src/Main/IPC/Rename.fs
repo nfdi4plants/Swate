@@ -57,6 +57,7 @@ module ArcRenameHelper =
                 else
                     normalizedPath
             )
+            |> Array.distinctBy PathHelpers.normalizeForComparison
 
         arc.SetFilePaths(remappedPaths)
 
@@ -118,6 +119,8 @@ module ArcRenameHelper =
                                         $"Could not load ARC from disk before renaming '{sourcePath}': {PathHelpers.formatContractErrors errors}"
                                 )
                         | Ok diskArc ->
+                            baselineArcStaticHashes diskArc
+
                             match ArcDeleteHelper.tryEnsureArcEntityResolved fileType oldIdentifier canonicalSourcePath diskArc with
                             | Error resolutionError -> return Error resolutionError
                             | Ok() ->

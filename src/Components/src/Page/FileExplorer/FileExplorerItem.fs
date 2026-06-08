@@ -54,6 +54,7 @@ type FileExplorerItem =
             label,
             action.Icon,
             action.OnClick,
+            ?className = action.ClassName,
             ?disabled = action.Disabled,
             buttonKey = $"{item.Id}-{action.Label}"
         )
