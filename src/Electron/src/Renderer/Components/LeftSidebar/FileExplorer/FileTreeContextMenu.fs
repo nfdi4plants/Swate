@@ -34,7 +34,12 @@ type ContextMenuConfig = {
 let private withDividers (groups: ContextMenuItem list list) =
     groups
     |> List.filter (List.isEmpty >> not)
-    |> List.mapi (fun index group -> if index = 0 then group else ContextMenuItems.divider :: group)
+    |> List.mapi (fun index group ->
+        if index = 0 then
+            group
+        else
+            ContextMenuItem.divider :: group
+    )
     |> List.collect id
 
 let tryGetAbsoluteItemPath (arcRootPath: string option) (item: FileItem) =
@@ -58,13 +63,7 @@ let tryGetRelativeItemPath (item: FileItem) =
     |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
 let private applyPathActionError (config: PathActionConfig) (title: string) (message: string) =
-    config.enqueueError (
-        ErrorModalRequest.create (
-            message,
-            title = title,
-            ?scopeId = config.arcScopeId
-        )
-    )
+    config.enqueueError (ErrorModalRequest.create (message, title = title, ?scopeId = config.arcScopeId))
 
 let private runPathAction
     (config: PathActionConfig)
@@ -97,25 +96,15 @@ let private pathActionContextMenuItemsForRelativePath
     =
     [
         if not item.IsDirectory then
-            ContextMenuItems.create
+            ContextMenuItem.create
                 "Open with Default Application"
                 "swt:fluent--open-24-regular"
-                (fun () ->
-                    runPathAction
-                        config
-                        "Open file failed"
-                        config.openPathWithDefaultApplication
-                        relativePath)
+                (fun () -> runPathAction config "Open file failed" config.openPathWithDefaultApplication relativePath)
 
-        ContextMenuItems.create
+        ContextMenuItem.create
             "Open Folder Location"
             "swt:fluent--folder-open-24-regular"
-            (fun () ->
-                runPathAction
-                    config
-                    "Open folder location failed"
-                    config.openPathInFileExplorer
-                    relativePath)
+            (fun () -> runPathAction config "Open folder location failed" config.openPathInFileExplorer relativePath)
     ]
 
 let pathActionContextMenuItems (config: PathActionConfig) (item: FileItem) =
@@ -126,35 +115,34 @@ let pathActionContextMenuItems (config: PathActionConfig) (item: FileItem) =
 let openContextMenuItems (config: ContextMenuConfig) (item: FileItem) =
     match tryGetRelativeItemPath item with
     | None -> []
+    | Some relativePath -> [
+        ContextMenuItem.create "Open" "swt:fluent--open-24-regular" (fun () -> config.openItem item)
+
+        yield! pathActionContextMenuItemsForRelativePath config.pathActionConfig item relativePath
+      ]
+
+let copyPathContextMenuItems (arcRootPath: string option) (item: FileItem) = [
+    match tryGetRelativeItemPath item with
     | Some relativePath ->
-        [
-            ContextMenuItems.create "Open" "swt:fluent--open-24-regular" (fun () -> config.openItem item)
+        ContextMenuItem.create "Copy Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard relativePath)
+    | None -> ()
 
-            yield! pathActionContextMenuItemsForRelativePath config.pathActionConfig item relativePath
-        ]
-
-let copyPathContextMenuItems (arcRootPath: string option) (item: FileItem) =
-    [
-        match tryGetRelativeItemPath item with
-        | Some relativePath ->
-            ContextMenuItems.create "Copy Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard relativePath)
-        | None -> ()
-
-        match tryGetAbsoluteItemPath arcRootPath item with
-        | Some fullPath ->
-            ContextMenuItems.create "Copy Full Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard fullPath)
-        | None -> ()
-    ]
+    match tryGetAbsoluteItemPath arcRootPath item with
+    | Some fullPath ->
+        ContextMenuItem.create "Copy Full Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard fullPath)
+    | None -> ()
+]
 
 let arcCreateContextMenuItems (openCreateModal: ArcExplorerNodeKind -> unit) (item: FileItem) =
     if item.IsDirectory then
         arcCreateKinds
         |> List.sortBy arcCreateKindSortOrder
         |> List.map (fun kind ->
-            ContextMenuItems.create
+            ContextMenuItem.create
                 $"Add {ArcExplorerNodeKind.label kind}"
                 (arcCreateKindIcon kind)
-                (fun () -> openCreateModal kind))
+                (fun () -> openCreateModal kind)
+        )
     else
         []
 
@@ -165,10 +153,11 @@ let fileSystemCreateContextMenuItems
     if canCreateFileSystemItemIn item then
         fileSystemCreateKinds
         |> List.map (fun kind ->
-            ContextMenuItems.create
+            ContextMenuItem.create
                 $"New {fileSystemCreateKindLabel kind}"
                 (fileSystemCreateKindIcon kind)
-                (fun () -> openFileSystemCreateModal kind item))
+                (fun () -> openFileSystemCreateModal kind item)
+        )
     else
         []
 
@@ -181,7 +170,7 @@ let rootContextMenuItems (config: ContextMenuConfig) (rootItem: FileItem) =
 let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem) =
     if canRenameItem item then
         [
-            ContextMenuItems.create "Rename" "swt:fluent--edit-24-regular" (fun () -> requestRenameItem item)
+            ContextMenuItem.create "Rename" "swt:fluent--edit-24-regular" (fun () -> requestRenameItem item)
         ]
     else
         []
@@ -189,17 +178,19 @@ let renameContextMenuItems (requestRenameItem: FileItem -> unit) (item: FileItem
 let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem) =
     if canDeleteItem item then
         [
-            ContextMenuItems.styled "Delete" "swt:fluent--delete-24-regular" "swt:text-error" (fun () ->
-                requestDeleteItem item)
+            ContextMenuItem.styled
+                "Delete"
+                "swt:fluent--delete-24-regular"
+                "swt:text-error"
+                (fun () -> requestDeleteItem item)
         ]
     else
         []
 
-let arcDeleteAndRenameContextMenuItems (config: ContextMenuConfig) (item: FileItem) =
-    [
-        yield! renameContextMenuItems config.requestRenameItem item
-        yield! deleteContextMenuItems config.requestDeleteItem item
-    ]
+let arcDeleteAndRenameContextMenuItems (config: ContextMenuConfig) (item: FileItem) = [
+    yield! renameContextMenuItems config.requestRenameItem item
+    yield! deleteContextMenuItems config.requestDeleteItem item
+]
 
 let createContextMenuItems (config: ContextMenuConfig) =
     let toggleLfsMark =
