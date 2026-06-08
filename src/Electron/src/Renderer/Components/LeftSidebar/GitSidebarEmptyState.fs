@@ -15,7 +15,7 @@ type EmptyStateAction = {
 [<Erase; Mangle(false)>]
 type GitSidebarEmptyState =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (
             title: string,
@@ -57,7 +57,7 @@ type GitSidebarEmptyState =
                         prop.className "swt:alert swt:alert-warning swt:px-3 swt:py-2 swt:text-sm"
                         prop.children [
                             Html.span [
-                                prop.className "swt:iconify swt:fluent--warning-shield-24-regular swt:size-4"
+                                prop.className "swt:iconify swt:fluent--warning-shield-20-regular swt:size-4"
                             ]
                             Html.span info
                         ]

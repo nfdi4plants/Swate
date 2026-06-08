@@ -126,11 +126,9 @@ let private subscribe (_model: Model) : Sub<Msg> = [
 ]
 
 [<ReactComponent>]
-let private LeftActionButtons
-    (leftSidebarTarget: LeftSidebarPage) 
-    setLeftSidebarTarget
-    =
-    let leftSidebarCtx = Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
+let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSidebarTarget =
+    let leftSidebarCtx =
+        Swate.Components.Composite.Layout.LeftSidebarContext.useLeftSidebarCtx ()
 
     let toggleTarget target =
         if leftSidebarTarget = target then
@@ -170,7 +168,7 @@ let Main () =
         )
 
     let children =
-        Renderer.Components.MainContent.Main.Main model.ArcRootPath model.PageState
+        Renderer.Components.MainContent.Main.Main(model.ArcRootPath, model.PageState)
 
     let setLeftSidebarTarget =
         React.useCallback ((fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)), [||])
@@ -185,8 +183,7 @@ let Main () =
 
     let leftActions =
         if isInitializedArcVault then
-            LeftActionButtons model.LeftSidebarTarget setLeftSidebarTarget
-            |> Some
+            LeftActionButtons model.LeftSidebarTarget setLeftSidebarTarget |> Some
         else
             None
 
@@ -201,18 +198,23 @@ let Main () =
                         ErrorModalProvider.ErrorModalProvider(
                             Renderer.Context.AuthStateContext.Provider(
                                 Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                    Swate.Components.Composite.AnnotationTable.AnnotationTableContextProvider.AnnotationTableContextProvider(
-                                        Layout.Main(
-                                            children =
-                                                React.Fragment [|
-                                                    children
-                                                    CloseWindowController.CloseWindowController.Subscription()
-                                                |],
-                                            navbar = Renderer.Components.Navbar.Main(),
-                                            ?leftSidebar = leftSidebar,
-                                            ?leftActions = leftActions
+                                    Swate
+                                        .Components
+                                        .Composite
+                                        .AnnotationTable
+                                        .AnnotationTableContextProvider
+                                        .AnnotationTableContextProvider(
+                                            Layout.Main(
+                                                children =
+                                                    React.Fragment [|
+                                                        children
+                                                        CloseWindowController.CloseWindowController.Subscription()
+                                                    |],
+                                                navbar = Renderer.Components.Navbar.Main(),
+                                                ?leftSidebar = leftSidebar,
+                                                ?leftActions = leftActions
+                                            )
                                         )
-                                    )
                                 )
                             )
                         )
