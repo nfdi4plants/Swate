@@ -357,10 +357,7 @@ type FileTree =
                                     let! openResult = Api.ipcArcVaultApi.openFile selectedPath
 
                                     match openResult with
-                                    | Ok dto ->
-                                        dto
-                                        |> viewLoadResultOfDto
-                                        |> applyLoadedView pageStateCtx.setState
+                                    | Ok dto -> dto |> viewLoadResultOfDto |> applyLoadedView pageStateCtx.setState
                                     | Error _ ->
                                         FileContentDTO.create FileContentType.PlainText "" selectedPath
                                         |> viewLoadResultOfDto

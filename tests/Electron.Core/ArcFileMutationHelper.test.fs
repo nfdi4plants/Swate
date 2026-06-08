@@ -138,12 +138,11 @@ Vitest.describe (
 
                 for path, expectedFileType in cases do
                     let dto =
-                        FileContentDTO.fromArcByPath path arc
-                        |> expectSome
+                        FileContentDTO.fromArcByPath path arc |> expectSome
                         <| $"Expected DTO for {path}."
 
-                    Vitest.expect(dto.fileType).toEqual(expectedFileType)
-                    Vitest.expect(dto.path).toBe(path)
+                    Vitest.expect(dto.fileType).toEqual (expectedFileType)
+                    Vitest.expect(dto.path).toBe (path)
         )
 
         Vitest.test (

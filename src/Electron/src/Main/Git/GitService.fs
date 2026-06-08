@@ -50,7 +50,12 @@ let private gitLfsDefaultThresholdMb = 1
 let private gitLfsMaximumThresholdMb = 100
 let private gitLfsDefaultDownloadLargeFiles = true
 
-<<<<<<< HEAD
+let private normalizeOptionalGitRef (value: string option) =
+    value
+    |> Option.bind Option.ofObj
+    |> Option.map _.Trim()
+    |> Option.filter (fun item -> not (String.IsNullOrWhiteSpace item))
+
 let private lfsInstallRequiredTokens = [|
     "git lfs is required for files larger than"
     "git lfs is required for this operation"
@@ -61,25 +66,6 @@ let private lfsInstallRequiredTokens = [|
     "smudge filter lfs failed"
     "clean filter 'lfs' failed"
 |]
-=======
-let private normalizeOptionalGitRef (value: string option) =
-    value
-    |> Option.bind Option.ofObj
-    |> Option.map _.Trim()
-    |> Option.filter (fun item -> not (String.IsNullOrWhiteSpace item))
-
-let private lfsInstallRequiredTokens =
-    [|
-        "git lfs is required for files larger than"
-        "git lfs is required for this operation"
-        "git: 'lfs' is not a git command"
-        "git-lfs filter-process"
-        "this repository is configured for git lfs but 'git-lfs' was not found"
-        "external filter 'git-lfs filter-process' failed"
-        "smudge filter lfs failed"
-        "clean filter 'lfs' failed"
-    |]
->>>>>>> origin/epic/SwateApp
 
 /// Classifies git/simple-git/LFS error text into the shared failure taxonomy used over IPC.
 let classifyFailureKind (message: string) =
@@ -623,22 +609,8 @@ let private ensureDefaultTrackingBranchForPull (remoteName: string) (git: ISimpl
     let! remoteBranchText = git.raw [| "branch"; "-r"; "--no-color" |]
     let! status = git.status ()
 
-<<<<<<< HEAD
-    let currentBranch =
-        status.current
-        |> Option.bind Option.ofObj
-        |> Option.map _.Trim()
-        |> Option.filter (fun branch -> not (String.IsNullOrWhiteSpace branch))
-
-    let currentTracking =
-        status.tracking
-        |> Option.bind Option.ofObj
-        |> Option.map _.Trim()
-        |> Option.filter (fun tracking -> not (String.IsNullOrWhiteSpace tracking))
-=======
-        let currentBranch = normalizeOptionalGitRef status.current
-        let currentTracking = normalizeOptionalGitRef status.tracking
->>>>>>> origin/epic/SwateApp
+    let currentBranch = normalizeOptionalGitRef status.current
+    let currentTracking = normalizeOptionalGitRef status.tracking
 
     let remoteRefs =
         remoteBranchText.Replace("\r\n", "\n").Split('\n', StringSplitOptions.RemoveEmptyEntries)
@@ -1456,9 +1428,7 @@ let previewPull
                         let upstreamRef =
                             safeBranchName
                             |> Option.map (fun safeBranch -> $"{safeRemoteName}/{safeBranch}")
-                            |> Option.orElseWith (fun () ->
-                                normalizeOptionalGitRef status.tracking
-                            )
+                            |> Option.orElseWith (fun () -> normalizeOptionalGitRef status.tracking)
 
                         match upstreamRef with
                         | None ->

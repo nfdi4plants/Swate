@@ -19,6 +19,7 @@ open Main.IPC.Rename
 open ARCtrl
 open ARCtrl.Contract
 open Swate.Electron.Shared.DTOs.NoteSearchDto
+
 let ensureNotesFolderAtArcPath =
     Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath
 
@@ -37,7 +38,10 @@ let private withLoadedArcVault<'T>
             | _ -> return Error(exn "ARC is not loaded.")
     }
 
-let private tryResolveExistingArcRelativePath (arcPath: string) (relativePath: string) : JS.Promise<Result<string, exn>> =
+let private tryResolveExistingArcRelativePath
+    (arcPath: string)
+    (relativePath: string)
+    : JS.Promise<Result<string, exn>> =
     promise {
         match tryResolveArcRelativePath arcPath relativePath with
         | Error pathError -> return Error pathError
@@ -50,19 +54,21 @@ let private tryResolveExistingArcRelativePath (arcPath: string) (relativePath: s
                 return Error(exn $"Path '{relativePath}' does not exist.")
     }
 
-let private showPathInFileExplorerAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
-    promise {
-        match! tryResolveExistingArcRelativePath arcPath relativePath with
-        | Error pathError -> return Error pathError
-        | Ok absolutePath ->
-            try
-                shell.showItemInFolder absolutePath
-                return Ok()
-            with shellError ->
-                return Error(exn $"Could not show '{relativePath}' in file explorer: {shellError.Message}")
-    }
+let private showPathInFileExplorerAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {
+    match! tryResolveExistingArcRelativePath arcPath relativePath with
+    | Error pathError -> return Error pathError
+    | Ok absolutePath ->
+        try
+            shell.showItemInFolder absolutePath
+            return Ok()
+        with shellError ->
+            return Error(exn $"Could not show '{relativePath}' in file explorer: {shellError.Message}")
+}
 
-let private openPathWithDefaultApplicationAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
+let private openPathWithDefaultApplicationAsync
+    (arcPath: string)
+    (relativePath: string)
+    : JS.Promise<Result<unit, exn>> =
     promise {
         match! tryResolveExistingArcRelativePath arcPath relativePath with
         | Error pathError -> return Error pathError
@@ -81,9 +87,7 @@ let private runLoadedArcPathAction
     : JS.Promise<Result<'T, exn>> =
     promise {
         try
-            return!
-                withLoadedArcVault event (fun vault ->
-                    operation vault.path.Value)
+            return! withLoadedArcVault event (fun vault -> operation vault.path.Value)
         with e ->
             return Error e
     }
@@ -203,12 +207,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         }
     showPathInFileExplorer =
         fun (relativePath: string) ->
-            runLoadedArcPathAction event (fun arcPath ->
-                showPathInFileExplorerAsync arcPath relativePath)
+            runLoadedArcPathAction event (fun arcPath -> showPathInFileExplorerAsync arcPath relativePath)
     openPathWithDefaultApplication =
         fun (relativePath: string) ->
-            runLoadedArcPathAction event (fun arcPath ->
-                openPathWithDefaultApplicationAsync arcPath relativePath)
+            runLoadedArcPathAction event (fun arcPath -> openPathWithDefaultApplicationAsync arcPath relativePath)
     getRecentARCs = fun _ -> promise { return RECENT_ARCS.Get() }
     removeRecentARC =
         fun arcpointer -> promise {
@@ -401,10 +403,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     addArcFile =
         fun (request: FileContentDTO) -> promise {
             try
-                return!
-                    withLoadedArcVault
-                        event
-                        (fun vault -> promise { return! vault.AddArcFile request })
+                return! withLoadedArcVault event (fun vault -> promise { return! vault.AddArcFile request })
             with e ->
                 return Error e
         }
@@ -412,9 +411,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun (request: CreateFileSystemItemRequest) -> promise {
             try
                 return!
-                    withLoadedArcVault event (fun vault -> promise {
-                        return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
-                    })
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
+                        })
             with e ->
                 return Error e
         }
@@ -438,10 +439,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             match classification with
                             | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget _
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
-                                _
-                              ) ->
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
+                                                                                              _) ->
                                 match vault.arc with
                                 | None -> return Error(exn "ARC is not loaded.")
                                 | Some arcLocal ->
@@ -462,12 +461,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
-                                normalizedGenericPath
-                              )
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
+                                                                                              normalizedGenericPath)
                             | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
-                            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_, normalizedGenericPath) ->
+                            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
+                                                                                                  normalizedGenericPath) ->
                                 if ArcEntityPathRules.isDeletePathAllowed normalizedGenericPath |> not then
                                     return
                                         Error(
@@ -479,10 +477,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
                                             arcPath
                                             normalizedGenericPath
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
-                                _
-                              ) ->
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
+                                                                                              _) ->
                                 return Error(exn "Deleting the investigation file is not supported.")
                             | ArcEntityPathRules.DeletePathClassification.ProtectedTarget _ ->
                                 return
@@ -496,8 +492,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         exn
                                             "Deletion is only allowed for safe non-ARC filesystem items inside the ARC."
                                     )
-                        }
-                    )
+                        })
             with e ->
                 return Error e
         }
@@ -529,8 +524,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
-                        }
-                    )
+                        })
             with e ->
                 return Error e
         }
