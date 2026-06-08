@@ -26,6 +26,7 @@ type PageState =
     | GitUnsupportedPage of GitUnsupportedPageData
     | ErrorPage of string
     | DataHubBrowser
+    | SettingsPage
 with
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with

@@ -1,6 +1,7 @@
 module Swate.Components.Page.FileExplorer.Types
 
 open System
+open Feliz
 
 [<RequireQualifiedAccess>]
 type FileItemIconTone =
@@ -246,23 +247,69 @@ type ContextMenuItem = {
     Icon: string
     OnClick: unit -> unit
     Disabled: bool option
-}
+    ClassName: string option
+    IsDivider: bool option
+} with
+
+    member this.ToPrimitiveContextMenuItem() =
+        if defaultArg this.IsDivider false then
+            Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(isDivider = true)
+        else
+            let isDisabled = defaultArg this.Disabled false
+
+            let className =
+                [
+                    this.ClassName
+
+                    if isDisabled then
+                        Some "swt:opacity-50"
+                ]
+                |> List.choose id
+                |> String.concat " "
+
+            Swate.Components.Primitive.ContextMenu.Types.ContextMenuItem(
+                text = Html.span [ prop.className className; prop.text this.Label ],
+                icon =
+                    Html.i [
+                        prop.className [
+                            "swt:iconify " + this.Icon
+
+                            if not (System.String.IsNullOrWhiteSpace className) then
+                                className
+                        ]
+                    ],
+                onClick =
+                    (fun _ ->
+                        if not isDisabled then
+                            this.OnClick()
+                    )
+            )
 
 [<RequireQualifiedAccess>]
-module FileExplorerContextMenuItem =
+module ContextMenuItem =
 
-    let create label icon onClick = {
+    let create (label: string) (icon: string) (onClick: unit -> unit) : ContextMenuItem = {
         Label = label
         Icon = icon
         OnClick = onClick
         Disabled = None
+        ClassName = None
+        IsDivider = None
     }
 
-    let disabled label icon = {
-        Label = label
-        Icon = icon
-        OnClick = fun () -> ()
-        Disabled = Some true
+    let styled (label: string) (icon: string) (className: string) (onClick: unit -> unit) : ContextMenuItem = {
+        (create label icon onClick) with
+            ClassName = Some className
+    }
+
+    let disabled (label: string) (icon: string) : ContextMenuItem = {
+        (create label icon ignore) with
+            Disabled = Some true
+    }
+
+    let divider: ContextMenuItem = {
+        (disabled "" "") with
+            IsDivider = Some true
     }
 
     let forItem label icon onClick item =
@@ -286,8 +333,7 @@ module FileExplorerLogic =
             if includeSelectedItem then
                 pathItems
             else
-                pathItems
-                |> List.take (max 0 (List.length pathItems - 1))
+                pathItems |> List.take (max 0 (List.length pathItems - 1))
 
         expandablePathItems
         |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
@@ -367,12 +413,9 @@ module FileExplorerLogic =
             let validIds = collectIds Set.empty items
 
             let persistedExpanded =
-                model.ExpandedIds
-                |> Set.filter (fun id -> validIds.Contains id)
+                model.ExpandedIds |> Set.filter (fun id -> validIds.Contains id)
 
-            let persistedSelectedId =
-                model.SelectedId
-                |> Option.filter validIds.Contains
+            let persistedSelectedId = model.SelectedId |> Option.filter validIds.Contains
 
             let nextSelectedId =
                 selectedItemId

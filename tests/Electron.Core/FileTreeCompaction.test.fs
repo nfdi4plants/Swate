@@ -117,6 +117,22 @@ Vitest.describe("FileIOHelper.toFileTreeNode LFS metadata", fun () ->
         let rootNode = toFileTreeNode [| rootEntry |]
 
         Vitest.expect(rootNode.lfs).toEqual(Some lfsInfo))
+
+    Vitest.test("keeps root-level generic files and folders as root children", fun () ->
+        let entries = [|
+            FileEntry.create("arc", "", true)
+            FileEntry.create("studies", "studies", true)
+            FileEntry.create("docs", "docs", true)
+            FileEntry.create("notes.txt", "notes.txt", false)
+        |]
+
+        let rootNode = toFileTreeNode entries
+
+        Vitest.expect(rootNode.children.ContainsKey("studies")).toBe(true)
+        Vitest.expect(rootNode.children.ContainsKey("docs")).toBe(true)
+        Vitest.expect(rootNode.children.ContainsKey("notes.txt")).toBe(true)
+        Vitest.expect(rootNode.children.["docs"].path).toBe("docs")
+        Vitest.expect(rootNode.children.["notes.txt"].path).toBe("notes.txt"))
 )
 
 Vitest.describe("FileTreeCreator.removePathAndDescendants", fun () ->

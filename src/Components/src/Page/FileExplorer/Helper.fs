@@ -9,4 +9,3 @@ let iconClassName (baseClasses: string list) (item: FileItem) (getItemIconClass:
         yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
         yield! getItemIconClass item |> Option.toList
     ]
-
