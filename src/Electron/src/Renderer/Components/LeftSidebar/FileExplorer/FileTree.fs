@@ -54,7 +54,6 @@ type FileTree =
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
-        let arcScopeId = appStateCtx
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
@@ -134,8 +133,7 @@ type FileTree =
                     errorModal.enqueue (
                         ErrorModalRequest.create (
                             $"File '{item.Name}' has no path.",
-                            title = "Preview failed",
-                            ?scopeId = arcScopeId
+                            title = "Preview failed"
                         )
                     )
                 | Some path when item.IsDirectory ->
@@ -239,7 +237,6 @@ type FileTree =
             FileTreeRenameWorkflow.requestRenameItem
                 (Option.iter (RenameDialog >> openDialog))
                 errorModal.enqueue
-                arcScopeId
 
         let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
@@ -255,16 +252,13 @@ type FileTree =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
         let applyCreateError errorMessage =
-            errorModal.enqueue (
-                ErrorModalRequest.create (errorMessage, title = "Could not create ARC file", ?scopeId = arcScopeId)
-            )
+            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
 
         let applyFileSystemCreateError errorMessage =
             errorModal.enqueue (
                 ErrorModalRequest.create (
                     errorMessage,
-                    title = "Could not create file or folder",
-                    ?scopeId = arcScopeId
+                    title = "Could not create file or folder"
                 )
             )
 
@@ -293,7 +287,6 @@ type FileTree =
                     closeDeleteModal = closeDialog
                     setIsDeleting = setIsDialogBusy
                     enqueueError = errorModal.enqueue
-                    arcScopeId = arcScopeId
                 }
 
         let createArcEntry kind (identifier: string) =
@@ -386,10 +379,8 @@ type FileTree =
                 openPathInFileExplorer = Api.ipcArcVaultApi.showPathInFileExplorer
                 openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
                 enqueueError = errorModal.enqueue
-                arcScopeId = arcScopeId
             }
             enqueueError = errorModal.enqueue
-            arcScopeId = arcScopeId
             runToggleLfsMark = Renderer.Components.Helper.GitLfsHelper.runToggleLfsMark
             runFreeLocalLfsCopy = Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
         }
@@ -427,7 +418,6 @@ type FileTree =
                         reloadPreviewByPath = reloadPreviewByPath
                         renamePath = Api.ipcArcVaultApi.renamePath
                         enqueueError = errorModal.enqueue
-                        arcScopeId = arcScopeId
                     }
                     newName
 

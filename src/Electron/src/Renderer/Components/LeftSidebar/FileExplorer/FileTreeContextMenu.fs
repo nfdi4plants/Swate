@@ -14,7 +14,6 @@ type PathActionConfig = {
     openPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
     openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>
     enqueueError: ErrorModalRequest -> unit
-    arcScopeId: string option
 }
 
 type ContextMenuConfig = {
@@ -26,7 +25,6 @@ type ContextMenuConfig = {
     requestDeleteItem: FileItem -> unit
     pathActionConfig: PathActionConfig
     enqueueError: ErrorModalRequest -> unit
-    arcScopeId: string option
     runToggleLfsMark: string -> bool -> JS.Promise<Result<unit, string>>
     runFreeLocalLfsCopy: string -> JS.Promise<Result<unit, string>>
 }
@@ -63,7 +61,7 @@ let tryGetRelativeItemPath (item: FileItem) =
     |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
 let private applyPathActionError (config: PathActionConfig) (title: string) (message: string) =
-    config.enqueueError (ErrorModalRequest.create (message, title = title, ?scopeId = config.arcScopeId))
+    config.enqueueError (ErrorModalRequest.create (message, title = title))
 
 let private runPathAction
     (config: PathActionConfig)
@@ -196,13 +194,11 @@ let createContextMenuItems (config: ContextMenuConfig) =
     let toggleLfsMark =
         Renderer.Components.FileExplorerLfs.createToggleLfsMark
             config.enqueueError
-            config.arcScopeId
             config.runToggleLfsMark
 
     let freeLocalLfsCopy =
         Renderer.Components.FileExplorerLfs.createFreeLocalLfsCopy
             config.enqueueError
-            config.arcScopeId
             config.runFreeLocalLfsCopy
 
     fun item ->

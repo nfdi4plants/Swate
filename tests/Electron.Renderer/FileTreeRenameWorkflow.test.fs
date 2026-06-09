@@ -133,7 +133,6 @@ let private createConfirmRenameConfig
                     return Ok()
                 }
         enqueueError = fun _ -> failwith "Did not expect rename error."
-        arcScopeId = None
     }
 
 let private expectRenameRequest probe expectedRelativePath expectedNewName =
@@ -226,7 +225,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         let mutable pendingRenameDraft: ArcRenameDraft option = None
 
         let requestRenameItem =
-            RenameWorkflow.requestRenameItem (fun draft -> pendingRenameDraft <- draft) ignore None
+            RenameWorkflow.requestRenameItem (fun draft -> pendingRenameDraft <- draft) ignore
 
         let menuItems =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem item
@@ -244,7 +243,6 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         RenameWorkflow.requestRenameItem
             (fun draft -> pendingRenameDraft <- draft)
             (fun _ -> errorCount <- errorCount + 1)
-            None
             item
 
         Vitest.expect(pendingRenameDraft).toEqual(None)
