@@ -136,80 +136,15 @@ let fileSystemCreateKindIcon =
     | FileSystemItemKind.File -> "swt:fluent--document-add-24-regular"
     | FileSystemItemKind.Folder -> "swt:fluent--folder-add-24-regular"
 
-let rec private collectSelectedDirectoryPathChain
-    (selectedTreeItemPath: string option)
-    (node: FileTreeNode)
-    (loadedPaths: Set<string>)
-    =
-    let normalizedNodePath = PathHelpers.normalizePath node.path
-
-    let isInSelectedPathChain =
-        selectedTreeItemPath
-        |> Option.exists (fun focusedPath -> PathHelpers.isSameOrDescendantPath focusedPath normalizedNodePath)
-
-    if node.isDirectory then
-        let nextLoadedPaths =
-            if isInSelectedPathChain then
-                Set.add normalizedNodePath loadedPaths
-            else
-                loadedPaths
-
-        node.children.Values
-        |> Seq.fold
-            (fun state child -> collectSelectedDirectoryPathChain selectedTreeItemPath child state)
-            nextLoadedPaths
-    else
-        loadedPaths
-
-let requiredLoadedDirectoryPaths (selectedTreeItemPath: string option) (root: FileTreeNode) =
-    let rootPathSet =
-        if root.isDirectory then
-            Set.singleton (PathHelpers.normalizePath root.path)
+let createItem (node: FileTreeNode) : FileItem =
+    let item =
+        if node.isDirectory then
+            FileTree.createFolder node.name (Some node.path) (folderIcon node.path)
         else
-            Set.empty
+            FileTree.createFile node.name (Some node.path) (fileIcon node.path)
 
-    collectSelectedDirectoryPathChain selectedTreeItemPath root rootPathSet
-
-let rec loopPaths (loadedDirectoryPaths: Set<string>) (selectedTreeItemPath: string option) (parent: FileTreeNode) =
-    match parent.isDirectory with
-    | true ->
-        let normalizedParentPath = PathHelpers.normalizePath parent.path
-        let isDirectoryLoaded = loadedDirectoryPaths.Contains normalizedParentPath
-        let hasSourceChildren = parent.children.Count > 0
-
-        let mappedChildren =
-            if isDirectoryLoaded then
-                let ra = ResizeArray(parent.children.Values)
-
-                ra.ToArray()
-                |> Array.map (fun entry -> loopPaths loadedDirectoryPaths selectedTreeItemPath entry)
-                |> Array.choose id
-                |> List.ofArray
-            else
-                []
-
-        let children =
-            if isDirectoryLoaded then Some mappedChildren
-            elif hasSourceChildren then None
-            else Some []
-
-        {
-            FileTree.createFolder parent.name (Some parent.path) (folderIcon parent.path) with
-                Id = parent.path
-                IsExpanded =
-                    selectedTreeItemPath
-                    |> Option.exists (fun focusedPath -> PathHelpers.isSameOrDescendantPath focusedPath parent.path)
-                Children = children
-        }
-        |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState parent
-        |> Some
-    | false ->
-        {
-            FileTree.createFile parent.name (Some parent.path) (fileIcon parent.path) with
-                Id = parent.path
-        }
-        |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState parent
-        |> Some
+    { item with Id = node.path }
+    |> Renderer.Components.FileExplorerLfs.withFileTreeNodeLfsState node
 
 let arcCreateKindIcon =
     function

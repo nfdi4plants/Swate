@@ -182,54 +182,6 @@ module FileTree =
         Path = path
     }
 
-    let rec addChild parentId child items =
-        items
-        |> List.map (fun item ->
-            if item.Id = parentId then
-                match item.Children with
-                | Some children -> {
-                    item with
-                        Children = Some(children @ [ child ])
-                  }
-                | None -> item
-            else
-                match item.Children with
-                | Some children -> {
-                    item with
-                        Children = Some(addChild parentId child children)
-                  }
-                | None -> item
-        )
-
-    let rec removeItem itemId items =
-        items
-        |> List.filter (fun item -> item.Id <> itemId)
-        |> List.map (fun item ->
-            match item.Children with
-            | Some children -> {
-                item with
-                    Children = Some(removeItem itemId children)
-              }
-            | None -> item
-        )
-
-    let rec toggleExpanded itemId items =
-        items
-        |> List.map (fun item ->
-            if item.Id = itemId then
-                {
-                    item with
-                        IsExpanded = not item.IsExpanded
-                }
-            else
-                match item.Children with
-                | Some children -> {
-                    item with
-                        Children = Some(toggleExpanded itemId children)
-                  }
-                | None -> item
-        )
-
     let rec getPath itemId items currentPath =
         items
         |> List.tryPick (fun i ->
@@ -251,40 +203,6 @@ module FileTree =
                 | Some children -> findItem itemId children
                 | None -> None
         )
-
-    let rec updateItem itemId updateFn items =
-        items
-        |> List.map (fun item ->
-            if item.Id = itemId then
-                updateFn item
-            else
-                match item.Children with
-                | Some children -> {
-                    item with
-                        Children = Some(updateItem itemId updateFn children)
-                  }
-                | None -> item
-        )
-
-    let rec renameItem itemId newName items =
-        updateItem
-            itemId
-            (fun item -> {
-                item with
-                    Name = newName
-                    Label = Some newName
-            })
-            items
-
-    let rec updateLFSInfo itemId isDownloaded items =
-        updateItem
-            itemId
-            (fun item -> {
-                item with
-                    Downloaded = Some isDownloaded
-                    IsLFSPointer = if isDownloaded then Some false else item.IsLFSPointer
-            })
-            items
 
     let sortItems (items: FileItem list) (enforcedOrder: string list) =
         items
@@ -448,53 +366,35 @@ module FileExplorerLogic =
     type Model = {
         Items: FileItem list
         SelectedId: string option
-        BreadcrumbPath: FileItem list
+        SelectedPath: FileItem list
         ExpandedIds: Set<string>
-        ContextMenuVisible: bool
-        ContextMenuX: float
-        ContextMenuY: float
-        ContextMenuItems: ContextMenuItem list
     }
 
     type Msg =
-        | ToggleExpanded of string
+        | SetExpanded of itemId: string * isExpanded: bool
         | SelectItem of string
-        | NavigateTo of string
-        | EnsurePathVisible of string
-        | ShowContextMenu of float * float * ContextMenuItem list
-        | HideContextMenu
         | UpdateItems of FileItem list * selectedItemId: string option option * includeSelectedItem: bool
-        | AddChild of parentId: string * child: FileItem
-        | RemoveItem of string
-        | RenameItem of string * string
-        | ToggleLFSDownload of string
 
-    let init items = {
-        Items = items
-        SelectedId = None
-        BreadcrumbPath = []
-        ExpandedIds = collectExpandedIds Set.empty items
-        ContextMenuVisible = false
-        ContextMenuX = 0.0
-        ContextMenuY = 0.0
-        ContextMenuItems = []
-    }
+    let init items =
+        {
+            Items = items
+            SelectedId = None
+            SelectedPath = []
+            ExpandedIds = collectExpandedIds Set.empty items
+        }
 
-    let rec update msg model =
+    let update msg model =
         match msg with
-        | ToggleExpanded itemId ->
-            let newItems = FileTree.toggleExpanded itemId model.Items
-
-            let newExpanded =
-                if model.ExpandedIds.Contains itemId then
-                    model.ExpandedIds.Remove itemId
-                else
+        | SetExpanded(itemId, isExpanded) ->
+            let expandedIds =
+                if isExpanded then
                     model.ExpandedIds.Add itemId
+                else
+                    model.ExpandedIds.Remove itemId
 
             {
                 model with
-                    Items = newItems
-                    ExpandedIds = newExpanded
+                    ExpandedIds = expandedIds
             }
 
         | SelectItem itemId ->
@@ -506,49 +406,11 @@ module FileExplorerLogic =
             {
                 model with
                     SelectedId = Some itemId
-                    BreadcrumbPath = path
+                    SelectedPath = path
             }
-
-        | NavigateTo itemId ->
-            if itemId = "" then
-                {
-                    model with
-                        SelectedId = None
-                        BreadcrumbPath = []
-                }
-            else
-                update (SelectItem itemId) model
-
-        | EnsurePathVisible itemId ->
-            let expandedFromPath =
-                match FileTree.getPath itemId model.Items [] with
-                | Some pathItems ->
-                    pathItems
-                    |> List.choose (fun item -> if item.Children.IsSome then Some item.Id else None)
-                    |> Set.ofList
-                | None -> Set.empty
-
-            {
-                model with
-                    ExpandedIds = Set.union model.ExpandedIds expandedFromPath
-            }
-
-        | ShowContextMenu(x, y, menuItems) -> {
-            model with
-                ContextMenuVisible = true
-                ContextMenuX = x
-                ContextMenuY = y
-                ContextMenuItems = menuItems
-          }
-
-        | HideContextMenu -> {
-            model with
-                ContextMenuVisible = false
-          }
 
         | UpdateItems(items, selectedItemId, includeSelectedItem) ->
             let validIds = collectIds Set.empty items
-            let expandedFromItems = collectExpandedIds Set.empty items
 
             let persistedExpanded =
                 model.ExpandedIds |> Set.filter (fun id -> validIds.Contains id)
@@ -560,7 +422,9 @@ module FileExplorerLogic =
                 |> Option.map (Option.filter validIds.Contains)
                 |> Option.defaultValue persistedSelectedId
 
-            let breadcrumbPath =
+            let selectionChanged = nextSelectedId <> model.SelectedId
+
+            let selectedPath =
                 match nextSelectedId with
                 | Some itemId ->
                     match FileTree.getPath itemId items [] with
@@ -569,47 +433,19 @@ module FileExplorerLogic =
                 | None -> []
 
             let expandedFromSelection =
-                nextSelectedId
-                |> Option.map (fun itemId -> expandedIdsFromPath includeSelectedItem itemId items)
-                |> Option.defaultValue Set.empty
-
+                if selectionChanged then
+                    nextSelectedId
+                    |> Option.map (fun itemId -> expandedIdsFromPath includeSelectedItem itemId items)
+                    |> Option.defaultValue Set.empty
+                else
+                    Set.empty
 
             {
                 model with
                     Items = items
                     SelectedId = nextSelectedId
-                    BreadcrumbPath = breadcrumbPath
+                    SelectedPath = selectedPath
                     ExpandedIds =
                         persistedExpanded
-                        |> Set.union expandedFromItems
                         |> Set.union expandedFromSelection
             }
-
-        | AddChild(parentId, child) ->
-            let newItems = FileTree.addChild parentId child model.Items
-            { model with Items = newItems }
-
-        | RemoveItem itemId ->
-            let newItems = FileTree.removeItem itemId model.Items
-            { model with Items = newItems }
-
-        | RenameItem(itemId, newName) ->
-            let newItems = FileTree.renameItem itemId newName model.Items
-            { model with Items = newItems }
-
-        | ToggleLFSDownload itemId ->
-            let newItems =
-                FileTree.updateItem
-                    itemId
-                    (fun item ->
-                        match item.Downloaded with
-                        | Some false -> {
-                            item with
-                                Downloaded = Some true
-                                IsLFSPointer = Some false
-                          }
-                        | _ -> item
-                    )
-                    model.Items
-
-            { model with Items = newItems }

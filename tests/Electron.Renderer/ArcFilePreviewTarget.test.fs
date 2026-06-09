@@ -2,7 +2,7 @@ module ElectronRenderer.ArcFilePreviewTargetTests
 
 open Vitest
 open ARCtrl
-open Renderer.Components.MainContent.ArcFilePreviewTarget
+open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Shared
 

@@ -35,11 +35,11 @@ module private FileExplorerHelper =
 
     let private defaultContextMenuItems
         (item: FileItem)
-        (model: FileExplorerLogic.Model)
-        (onItemClick: (FileItem -> unit) option)
+        (isExpanded: bool)
+        (selectItem: FileItem -> unit)
         (getCopyPath: FileItem -> string option)
         (getCopyRelativePath: FileItem -> string option)
-        (dispatch: FileExplorerLogic.Msg -> unit)
+        (setExpanded: FileItem -> bool -> unit)
         : Swate.Components.Page.FileExplorer.Types.ContextMenuItem list =
         let canExpandDirectory =
             match item.Children with
@@ -51,7 +51,7 @@ module private FileExplorerHelper =
                 ContextMenuItem.create
                     "Open"
                     "swt:fluent--open-24-regular"
-                    (fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch)
+                    (fun () -> selectItem item)
 
             match item.Path with
             | Some _ ->
@@ -73,30 +73,28 @@ module private FileExplorerHelper =
             | None -> ()
 
             if item.IsDirectory && canExpandDirectory then
-                let isExpanded = model.ExpandedIds.Contains item.Id
-
                 ContextMenuItem.create
                     (if isExpanded then "Collapse" else "Expand")
                     (if isExpanded then
                          "swt:fluent--folder-open-24-regular"
                      else
                          "swt:fluent--folder-24-regular")
-                    (fun () -> dispatch (FileExplorerLogic.ToggleExpanded item.Id))
+                    (fun () -> setExpanded item (not isExpanded))
         ]
 
     let getContextMenuItems
         (item: FileItem)
-        (model: FileExplorerLogic.Model)
-        (onItemClick: (FileItem -> unit) option)
+        (isExpanded: bool)
+        (selectItem: FileItem -> unit)
         (onContextMenu: (FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem list) option)
         (getCopyPath: FileItem -> string option)
         (getCopyRelativePath: FileItem -> string option)
         (includeDefaultContextMenuItems: bool)
-        (dispatch: FileExplorerLogic.Msg -> unit)
+        (setExpanded: FileItem -> bool -> unit)
         =
         let defaultItems =
             if includeDefaultContextMenuItems then
-                defaultContextMenuItems item model onItemClick getCopyPath getCopyRelativePath dispatch
+                defaultContextMenuItems item isExpanded selectItem getCopyPath getCopyRelativePath setExpanded
             else
                 []
 
@@ -121,10 +119,11 @@ type FileExplorer =
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
+            ?onDirectoryExpansionChange: FileItem -> bool -> unit,
+            ?onExpansionChange: FileItem -> bool -> unit,
             ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?useDirectoryChevronToggle: bool,
-            ?showBreadcrumbs: bool,
             ?getItemIconClass: FileItem -> string option,
             ?getCopyPath: FileItem -> string option,
             ?getCopyRelativePath: FileItem -> string option,
@@ -138,7 +137,6 @@ type FileExplorer =
             defaultArg directoryInteractionMode DirectoryInteractionMode.SingleClickToggle
 
         let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
-        let showBreadcrumbs = defaultArg showBreadcrumbs true
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let getCopyPath = defaultArg getCopyPath (fun item -> item.Path)
         let getCopyRelativePath = defaultArg getCopyRelativePath (fun _ -> None)
@@ -152,6 +150,10 @@ type FileExplorer =
 
         let model, dispatch = React.useReducer (reducer, initialModel)
         let containerRef = React.useElementRef ()
+        let onDirectoryExpansionChange =
+            onDirectoryExpansionChange
+            |> Option.orElse onExpansionChange
+            |> Option.orElse onDirectoryArrowToggle
 
         React.useEffect (
             (fun () ->
@@ -170,30 +172,42 @@ type FileExplorer =
             |]
         )
 
-        let handleDirectorySelection (item: FileItem) (ev: Browser.Types.MouseEvent) =
+        let setExpanded (item: FileItem) (willExpand: bool) =
+            let isExpanded = model.ExpandedIds.Contains item.Id
+
+            if isExpanded <> willExpand then
+                dispatch (FileExplorerLogic.SetExpanded(item.Id, willExpand))
+                onDirectoryExpansionChange |> Option.iter (fun fn -> fn item willExpand)
+
+        let selectItem (item: FileItem) =
+            dispatch (FileExplorerLogic.SelectItem item.Id)
+            onItemClick |> Option.iter (fun fn -> fn item)
+
+        let handleDirectorySelection (item: FileItem) (canExpand: bool) (ev: Browser.Types.MouseEvent) =
             ev.preventDefault ()
             ev.stopPropagation ()
-            Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch
 
-        let handleDirectoryArrowToggle (item: FileItem) (isExpanded: bool) =
-            let willExpand = not isExpanded
-            dispatch (FileExplorerLogic.ToggleExpanded item.Id)
-            onDirectoryArrowToggle |> Option.iter (fun fn -> fn item willExpand)
+            if directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
+               && canExpand
+               && not (model.ExpandedIds.Contains item.Id) then
+                setExpanded item true
+
+            selectItem item
 
         let contextMenu =
             Swate.Components.Primitive.ContextMenu.ContextMenu.ContextMenu(
                 (fun data ->
                     let item = data |> unbox<FileItem>
-
+                    let isExpanded = model.ExpandedIds.Contains item.Id
                     FileExplorerHelper.getContextMenuItems
                         item
-                        model
-                        onItemClick
+                        isExpanded
+                        selectItem
                         onContextMenu
                         getCopyPath
                         getCopyRelativePath
                         includeDefaultContextMenuItems
-                        dispatch
+                        setExpanded
                     |> List.map (fun x -> x.ToPrimitiveContextMenuItem())
                 ),
                 ref = containerRef,
@@ -214,13 +228,13 @@ type FileExplorer =
                                 let menuItems =
                                     FileExplorerHelper.getContextMenuItems
                                         item
-                                        model
-                                        onItemClick
+                                        (model.ExpandedIds.Contains item.Id)
+                                        selectItem
                                         onContextMenu
                                         getCopyPath
                                         getCopyRelativePath
                                         includeDefaultContextMenuItems
-                                        dispatch
+                                        setExpanded
 
                                 if List.isEmpty menuItems then None else Some(box item)
                             | None -> None
@@ -228,7 +242,10 @@ type FileExplorer =
                     )
             )
 
-        let selectedPathIds = model.BreadcrumbPath |> List.map _.Id |> Set.ofList
+        let selectedPathIds =
+            model.SelectedPath
+            |> List.map _.Id
+            |> Set.ofList
 
         let rec renderItem item =
             let isSelected = model.SelectedId = Some item.Id
@@ -249,7 +266,7 @@ type FileExplorer =
 
             let isExpanded = model.ExpandedIds.Contains item.Id
 
-            let canExpandDirectory =
+            let canExpand =
                 match item.Children with
                 | Some children -> not (List.isEmpty children)
                 | None -> true
@@ -277,13 +294,13 @@ type FileExplorer =
                     selectedNameClass,
                     isExpanded,
                     useDirectoryChevronToggle,
-                    canExpandDirectory,
+                    canExpand,
                     getItemIconClass,
-                    handleDirectorySelection item,
+                    handleDirectorySelection item canExpand,
                     (fun e ->
                         e.preventDefault ()
                         e.stopPropagation ()
-                        handleDirectoryArrowToggle item isExpanded
+                        setExpanded item (not isExpanded)
                     ),
                     ?onCreateItem = onCreateItem,
                     canCreateItem = canCreateItem,
@@ -298,7 +315,7 @@ type FileExplorer =
                     rowHighlightClass,
                     selectedNameClass,
                     getItemIconClass,
-                    (fun () -> Swate.Components.Page.FileExplorer.Helper.handleItemClick item onItemClick dispatch),
+                    (fun () -> selectItem item),
                     itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem
@@ -308,8 +325,6 @@ type FileExplorer =
             prop.ref containerRef
             prop.className "swt:w-full"
             prop.children [
-                //if showBreadcrumbs && not (List.isEmpty model.BreadcrumbPath) then
-                //    Breadcrumbs.Breadcrumbs(model.BreadcrumbPath, fun id -> dispatch (FileExplorerLogic.NavigateTo id))
                 Html.div [
                     prop.testId "file-explorer-scroll-container"
                     prop.className "swt:w-full swt:overflow-x-auto"

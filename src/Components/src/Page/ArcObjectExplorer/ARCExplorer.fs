@@ -195,7 +195,6 @@ module ARCExplorer =
                     onItemClick = openView,
                     onContextMenu = contextMenuItems,
                     ?selectedItemId = Some selectedItemId,
-                    showBreadcrumbs = false,
                     directoryInteractionMode = DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick,
                     useDirectoryChevronToggle = true
                 )

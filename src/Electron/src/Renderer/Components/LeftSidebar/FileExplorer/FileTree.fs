@@ -13,9 +13,10 @@ open Swate.Electron.Shared.FileIOTypes
 open Feliz
 open Fable.Core
 open ARCtrl
+open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Types
 open Helper
-open Renderer.Components.LeftSidebar.FileExplorer.Modals
+open FileTreeMaterialization
 
 module private FileTreeHelper =
 
@@ -54,17 +55,25 @@ type FileTree =
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
+        let arcScopeId =
+            appStateCtx
+            |> Option.map PathHelpers.normalizePath
+            |> Option.bind (fun path ->
+                if System.String.IsNullOrWhiteSpace path then
+                    None
+                else
+                    Some path
+            )
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
         let hasObservedFileTreeUpdateRef = React.useRef false
 
-        let effectiveFileTree =
-            React.useMemo ((fun () -> fileStateCtx.state.FileTree), [| box fileStateCtx.state.FileTree |])
-
         React.useEffect (
             (fun () ->
-                let filePaths = effectiveFileTree |> Array.map (fun entry -> entry.path)
+                let filePaths =
+                    fileStateCtx.state.FileTree
+                    |> Array.map (fun entry -> entry.path)
 
                 if FileExplorerDeleteHelper.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath then
                     fileStateCtx.setSelection ArcSelection.empty
@@ -73,7 +82,7 @@ type FileTree =
                         pageStateCtx.setState None
             ),
             [|
-                box effectiveFileTree
+                box fileStateCtx.state.FileTree
                 box fileStateCtx.state.Selection.TreePath
                 box pageStateCtx.state
             |]
@@ -82,49 +91,46 @@ type FileTree =
         let fileTree: FileTreeNode option =
             React.useMemo (
                 (fun () ->
-                    match effectiveFileTree with
+                    match fileStateCtx.state.FileTree with
                     | [||] -> None
                     | _ ->
-                        effectiveFileTree
+                        fileStateCtx.state.FileTree
                         |> toFileTreeNode
-                        |> collapseSingleChildSameNameDirectories
+                        |> collapseSingleChildSameName
                         |> Some
                 ),
-                [| box effectiveFileTree |]
+                [| box fileStateCtx.state.FileTree |]
             )
 
-        let requiredLoadedDirectories =
-            React.useMemo (
-                (fun () ->
-                    match fileTree with
-                    | Some tree -> requiredLoadedDirectoryPaths fileStateCtx.state.Selection.TreePath tree
-                    | None -> Set.empty
-                ),
-                [|
-                    box fileTree
-                    box fileStateCtx.state.Selection.TreePath
-                |]
-            )
+        let materializedState, setMaterializedState =
+            React.useStateWithUpdater FileTreeMaterialization.empty
 
-        let loadedDirectoryPaths, setLoadedDirectoryPaths =
-            React.useStateWithUpdater requiredLoadedDirectories
-
-        React.useEffect ((fun () -> setLoadedDirectoryPaths (fun _ -> requiredLoadedDirectories)), [| box fileTree |])
+        let reconciledMaterializedState =
+            reconcileMaterializedState
+                arcScopeId
+                fileStateCtx.state.Selection.TreePath
+                fileTree
+                materializedState
 
         React.useEffect (
             (fun () ->
-                setLoadedDirectoryPaths (fun current ->
-                    let next = Set.union current requiredLoadedDirectories
-
-                    if next = current then current else next
+                setMaterializedState (fun current ->
+                    if reconciledMaterializedState = current then
+                        current
+                    else
+                        reconciledMaterializedState
                 )
             ),
-            [| box requiredLoadedDirectories |]
+            [|
+                box arcScopeId
+                box fileTree
+                box fileStateCtx.state.Selection.TreePath
+            |]
         )
 
         let fileItem =
             fileTree
-            |> Option.bind (loopPaths loadedDirectoryPaths fileStateCtx.state.Selection.TreePath)
+            |> Option.map (FileTreeMaterialization.toMaterializedFileItemTree Helper.createItem reconciledMaterializedState.Paths)
 
         let openPreview (item: FileItem) =
             promise {
@@ -137,16 +143,6 @@ type FileTree =
                         )
                     )
                 | Some path when item.IsDirectory ->
-                    if not item.IsExpanded then
-                        setLoadedDirectoryPaths (fun current ->
-                            let normalizedPath = PathHelpers.normalizePath path
-
-                            if current.Contains normalizedPath then
-                                current
-                            else
-                                current.Add normalizedPath
-                        )
-
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
                     pageStateCtx.setState None
@@ -202,17 +198,12 @@ type FileTree =
             [| box fileStateCtx.state.FileTree |]
         )
 
-        let handleDirectoryArrowToggle (item: FileItem) (willExpand: bool) =
+        let handleExpansionChange (item: FileItem) (willExpand: bool) =
             if willExpand then
                 match item.Path with
                 | Some path ->
-                    setLoadedDirectoryPaths (fun current ->
-                        let normalizedPath = PathHelpers.normalizePath path
-
-                        if current.Contains normalizedPath then
-                            current
-                        else
-                            current.Add normalizedPath
+                    setMaterializedState (fun _ ->
+                        materialize path reconciledMaterializedState
                     )
                 | None -> ()
 
@@ -291,7 +282,7 @@ type FileTree =
 
         let createArcEntry kind (identifier: string) =
             if not isDialogBusy then
-                let existingPaths = effectiveFileTree |> Array.map (fun entry -> entry.path)
+                let existingPaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
 
                 match tryBuildArcCreateDraft kind identifier existingPaths with
                 | Error errorMessage -> applyCreateError errorMessage
@@ -359,7 +350,6 @@ type FileTree =
                                         let pageState = Renderer.Types.PageState.fromFileContentDTO dto
                                         pageStateCtx.setState (Some pageState)
                                 | FileSystemItemKind.Folder ->
-                                    setLoadedDirectoryPaths (fun current -> current.Add selectedPath)
                                     pageStateCtx.setState None
 
                                 closeDialog ()
@@ -481,7 +471,7 @@ type FileTree =
                         Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                             initialItems = visibleItems,
                             onItemClick = openPreview,
-                            onDirectoryArrowToggle = handleDirectoryArrowToggle,
+                            onDirectoryExpansionChange = handleExpansionChange,
                             onContextMenu = createContextMenuItems,
                             getItemIconClass = getItemIconClass,
                             canCreateItem = canCreateFromItem,
@@ -490,7 +480,6 @@ type FileTree =
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
-                            showBreadcrumbs = false,
                             includeDefaultContextMenuItems = false
                         )
                     ]
