@@ -162,8 +162,13 @@ type Main =
                                         "Note Search",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
                                     )
+                                    ButtonInfo.create (
+                                        "swt:fluent--branch-fork-24-regular swt:size-5",
+                                        "Provenance Grouping",
+                                        fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.ProvenanceGroupingPage)
+                                    )
                                 |],
-                                2
+                                3
                             )
                         ]
                     ]

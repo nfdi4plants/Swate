@@ -638,7 +638,7 @@ module internal LoadedTable =
             OutputName = Normalize.trimToOption output.Name
         }
 
-    let private candidate pair targetInputSetIds targetOutputSetIds header value unit columnIndex : CandidatePropertyValue =
+    let candidate pair targetInputSetIds targetOutputSetIds header value unit columnIndex : CandidatePropertyValue =
         {
             Header = header
             Value = value
@@ -813,8 +813,24 @@ module internal PreviousContext =
 
                             let foldState =
                                 LoadedTable.inputCharacteristicCandidates pair targetInputSetIds input
-                                @ LoadedTable.outputCharacteristicCandidates pair targetInputSetIds output
-                                @ LoadedTable.outputFactorCandidates pair targetInputSetIds output
+                                @ (output
+                                   |> ProcessOutput.tryGetCharacteristicValues
+                                   |> Option.defaultValue []
+                                   |> List.choose (fun value ->
+                                       Normalize.characteristicHeader value
+                                       |> Option.bind (fun header ->
+                                           Normalize.provenanceValue value.Value value.Unit
+                                           |> Option.map (fun (propertyValue, unit) ->
+                                               LoadedTable.candidate pair targetInputSetIds [] header propertyValue unit (tryGetCharacteristicColumnIndex value)))))
+                                @ (output
+                                   |> ProcessOutput.tryGetFactorValues
+                                   |> Option.defaultValue []
+                                   |> List.choose (fun value ->
+                                       Normalize.factorHeader value
+                                       |> Option.bind (fun header ->
+                                           Normalize.provenanceValue value.Value value.Unit
+                                           |> Option.map (fun (propertyValue, unit) ->
+                                               LoadedTable.candidate pair targetInputSetIds [] header propertyValue unit (tryGetFactorColumnIndex value)))))
                                 @ LoadedTable.processParameterCandidates pair targetInputSetIds [] proc
                                 @ LoadedTable.processComponentCandidates pair targetInputSetIds [] proc
                                 |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) foldState
