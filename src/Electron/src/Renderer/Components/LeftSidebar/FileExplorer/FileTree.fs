@@ -156,13 +156,13 @@ type FileTree =
                     let! result = openView selectedPath
 
                     match result with
-                    | Ok loaded ->
+                    | Ok pageState ->
                         console.log ("[Renderer] Received data, processing...")
-                        applyLoadedView pageStateCtx.setState loaded
+                        pageStateCtx.setState (Some pageState)
                     | Error errorMessage ->
                         let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
                         console.log ($"[Renderer] Error: {fullErrorMessage}")
-                        applyViewError pageStateCtx.setState fullErrorMessage
+                        pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
             }
             |> Promise.start
 
@@ -179,16 +179,16 @@ type FileTree =
                     let! result = openView selectedPath
 
                     match result with
-                    | Ok loaded -> applyLoadedView pageStateCtx.setState loaded
+                    | Ok pageState -> pageStateCtx.setState (Some pageState)
                     | Error errorMessage ->
-                        applyViewError
-                            pageStateCtx.setState
-                            $"Could not reload preview for '{selectedPath}': {errorMessage}"
+                        pageStateCtx.setState (
+                            Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{selectedPath}': {errorMessage}")
+                        )
                 }
                 |> Promise.catch (fun exn ->
-                    applyViewError
-                        pageStateCtx.setState
-                        $"Could not reload preview for '{selectedPath}': {exn.Message}"
+                    pageStateCtx.setState (
+                        Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{selectedPath}': {exn.Message}")
+                    )
                 )
                 |> Promise.start
 
@@ -266,8 +266,8 @@ type FileTree =
             let! openResult = openView path
 
             match openResult with
-            | Ok loaded ->
-                applyLoadedView pageStateCtx.setState loaded
+            | Ok pageState ->
+                pageStateCtx.setState (Some pageState)
                 return Ok()
             | Error errorMessage -> return Error errorMessage
         }
@@ -309,9 +309,8 @@ type FileTree =
                             let selectedPath = PathHelpers.normalizePath createdArcFileDto.path
                             fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                            createdArcFileDto
-                            |> viewLoadResultOfDto
-                            |> applyLoadedView pageStateCtx.setState
+                            let pageState = Renderer.Types.PageState.fromFileContentDTO createdArcFileDto
+                            pageStateCtx.setState (Some pageState)
 
                             closeDialog ()
                     }
@@ -350,11 +349,15 @@ type FileTree =
                                     let! openResult = Api.ipcArcVaultApi.openFile selectedPath
 
                                     match openResult with
-                                    | Ok dto -> dto |> viewLoadResultOfDto |> applyLoadedView pageStateCtx.setState
+                                    | Ok dto ->
+                                        let pageState = Renderer.Types.PageState.fromFileContentDTO dto
+                                        pageStateCtx.setState (Some pageState)
                                     | Error _ ->
-                                        FileContentDTO.create FileContentType.PlainText "" selectedPath
-                                        |> viewLoadResultOfDto
-                                        |> applyLoadedView pageStateCtx.setState
+                                        let dto =
+                                            FileContentDTO.create FileContentType.PlainText "" selectedPath
+
+                                        let pageState = Renderer.Types.PageState.fromFileContentDTO dto
+                                        pageStateCtx.setState (Some pageState)
                                 | FileSystemItemKind.Folder ->
                                     setLoadedDirectoryPaths (fun current -> current.Add selectedPath)
                                     pageStateCtx.setState None

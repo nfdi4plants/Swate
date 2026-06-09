@@ -1,7 +1,6 @@
 module Renderer.Components.MainContent.NotesDraftTarget
 
 open Feliz
-open Renderer.Components.Helper.ArcViewHelper
 open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -56,13 +55,14 @@ let NotesDraftTarget () =
 
                     match previewResult with
                     | Ok previewData ->
-                        previewData
-                        |> viewLoadResultOfDto
-                        |> applyLoadedView pageStateCtx.setState
+                        let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
+                        pageStateCtx.setState (Some pageState)
                     | Result.Error _ ->
-                        FileContentDTO.create requestFileType payload.Intent.Content payload.Intent.RelativePath
-                        |> viewLoadResultOfDto
-                        |> applyLoadedView pageStateCtx.setState
+                        let fallbackData =
+                            FileContentDTO.create requestFileType payload.Intent.Content payload.Intent.RelativePath
+
+                        let pageState = Renderer.Types.PageState.fromFileContentDTO fallbackData
+                        pageStateCtx.setState (Some pageState)
             }
             |> Promise.start
 

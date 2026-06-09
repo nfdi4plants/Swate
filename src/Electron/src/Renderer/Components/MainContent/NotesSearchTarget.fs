@@ -1,7 +1,6 @@
 module Renderer.Components.MainContent.NotesSearchTarget
 
 open Feliz
-open Renderer.Components.Helper.ArcViewHelper
 open Swate.Components.Composite
 open Swate.Components.Composite.Notes.Types
 open Swate.Components.Shared
@@ -55,13 +54,13 @@ let NotesSearchTarget () =
                 let selectedPath = PathHelpers.normalizePath relativePath
                 fileTreeCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                dto
-                |> viewLoadResultOfDto
-                |> applyLoadedView pageCtx.setState
+                let pageState = Renderer.Types.PageState.fromFileContentDTO dto
+                pageCtx.setState (Some pageState)
             | Result.Error exn ->
                 fileTreeCtx.setSelection (ArcSelection.clearExplorerNode fileTreeCtx.state.Selection)
 
-                applyViewError pageCtx.setState $"Could not open note: {exn.Message}"
+                let errorPage = Renderer.Types.PageState.ErrorPage $"Could not open note: {exn.Message}"
+                pageCtx.setState (Some errorPage)
         }
         |> Promise.start
 
