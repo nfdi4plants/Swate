@@ -28,19 +28,20 @@ type ProvenanceSide =
     | Output
 
 /// Normalized kind of an input or output table header.
-/// Mirrors the relevant ARCtrl `IOType` cases without exposing ARCtrl types.
 [<RequireQualifiedAccess>]
 type ProvenanceIOKind =
-    /// Source-like endpoint.
+    /// Source-like endpoint used by ARC/ISA adapters.
     | Source
-    /// Sample-like endpoint.
+    /// Sample-like endpoint used by ARC/ISA adapters.
     | Sample
-    /// Data/file-like endpoint.
+    /// Data/file-like endpoint used by ARC/ISA adapters.
     | Data
-    /// Material-like endpoint.
+    /// Material-like endpoint used by ARC/ISA adapters.
     | Material
-    /// Source model provided a custom input/output header kind.
+    /// ARCtrl free-text input/output header.
     | FreeText of string
+    /// Source model provided an endpoint kind that is not part of the ARC/ISA vocabulary.
+    | Custom of string
     /// Adapter could not classify the endpoint kind.
     | Unknown
 
@@ -56,14 +57,16 @@ type ProvenanceIOHeader =
 /// Normalized kind of editable provenance property.
 [<RequireQualifiedAccess>]
 type ProvenancePropertyKind =
-    /// Characteristic value on an input or output material-like endpoint.
+    /// Characteristic-like property role used by ARC/ISA adapters.
     | Characteristic
-    /// Factor value, normally on outputs.
+    /// Factor-like property role used by ARC/ISA adapters.
     | Factor
-    /// Process parameter value.
+    /// Process-parameter-like property role used by ARC/ISA adapters.
     | Parameter
-    /// Component value when source tables expose components.
+    /// Component-like property role used by ARC/ISA adapters.
     | Component
+    /// Source model provided a property role that is not part of the ARC/ISA vocabulary.
+    | Custom of string
 
 /// Small ontology term projection used for property categories, units, and term values.
 type ProvenanceTerm =
