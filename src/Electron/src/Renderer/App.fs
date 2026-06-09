@@ -168,12 +168,22 @@ let Main () =
         )
 
     let children =
-        Renderer.Components.MainContent.Main.Main model.ArcRootPath model.PageState
+        Renderer.Components.MainContent.Main.Main(model.ArcRootPath, model.PageState)
 
     let setLeftSidebarTarget =
         React.useCallback ((fun leftSidebarTarget -> dispatch (SetLeftSidebarTarget leftSidebarTarget)), [||])
 
     let isInitializedArcVault = Option.isSome model.ArcRootPath
+
+    let currentArcScopeId =
+        model.ArcRootPath
+        |> Option.map Swate.Components.Shared.PathHelpers.normalizePath
+        |> Option.bind (fun path ->
+            if System.String.IsNullOrWhiteSpace path then
+                None
+            else
+                Some path
+        )
 
     let leftSidebar =
         if isInitializedArcVault then
@@ -216,7 +226,8 @@ let Main () =
                                             )
                                         )
                                 )
-                            )
+                            ),
+                            ?scopeId = currentArcScopeId
                         )
                     )
                 )

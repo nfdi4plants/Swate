@@ -7,7 +7,7 @@ open Swate.Components.Primitive
 [<Erase; Mangle(false)>]
 type LoadingSpinner =
 
-    [<ExportDefault; NamedParams>]
+    [<ReactComponent(true)>]
     static member LoadingSpinner(?text: string, ?size: DaisyuiSize, ?color: DaisyuiColors) =
         Html.span [
             prop.className "swt:flex swt:flex-col swt:items-center swt:gap-2 swt:py-10"
@@ -23,13 +23,13 @@ type LoadingSpinner =
                         | Some(DaisyuiSize.XL) -> $"swt:loading-xl"
                         | None -> ()
                         match color with
-                        | Some DaisyuiColors.Primary -> "swt:loading-primary"
-                        | Some DaisyuiColors.Secondary -> "swt:loading-secondary"
-                        | Some DaisyuiColors.Accent -> "swt:loading-accent"
-                        | Some DaisyuiColors.Warning -> "swt:loading-warning"
-                        | Some DaisyuiColors.Error -> "swt:loading-error"
-                        | Some DaisyuiColors.Info -> "swt:loading-info"
-                        | Some DaisyuiColors.Success -> "swt:loading-success"
+                        | Some DaisyuiColors.Primary -> "swt:text-primary"
+                        | Some DaisyuiColors.Secondary -> "swt:text-secondary"
+                        | Some DaisyuiColors.Accent -> "swt:text-accent"
+                        | Some DaisyuiColors.Warning -> "swt:text-warning"
+                        | Some DaisyuiColors.Error -> "swt:text-error"
+                        | Some DaisyuiColors.Info -> "swt:text-info"
+                        | Some DaisyuiColors.Success -> "swt:text-success"
                         | None -> ()
                     ]
                 ]

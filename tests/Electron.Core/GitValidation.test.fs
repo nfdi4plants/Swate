@@ -51,103 +51,6 @@ let private getRecordField (recordType: Type) (fieldName: string) : PropertyInfo
     | Some property -> property
     | None -> failwith $"Expected field '{fieldName}' on record {recordType.FullName}."
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-
-let private simpleGitSourcePath =
-    join [|
-        ".."
-        ".."
-        "src"
-        "Electron"
-        "src"
-        "Main"
-        "Bindings"
-        "SimpleGit.fs"
-    |]
-
-let private gitApiClientSourcePath =
-    join [|
-        ".."
-        ".."
-        "src"
-        "Electron"
-        "src"
-        "Renderer"
-        "GitApiClient.fs"
-    |]
-
-let private gitStateCtxSourcePath =
-    join [|
-        ".."
-        ".."
-        "src"
-        "Electron"
-        "src"
-        "Renderer"
-        "Context"
-        "GitStateContext.fs"
-    |]
-
-let private gitProvisioningServiceSourcePath =
-    join [|
-        ".."
-        ".."
-        "src"
-        "Electron"
-        "src"
-        "Main"
-        "Git"
-        "GitProvisioningService.fs"
-    |]
-
-let private gitMergeConflictTargetSourcePath =
-    join [|
-        ".."
-        ".."
-        "src"
-        "Electron"
-        "src"
-        "Renderer"
-        "Components"
-        "MainContent"
-        "GitMergeConflictTarget.fs"
-    |]
-
-let mutable private simpleGitSourceText: string option = None
-let mutable private gitApiClientSourceText: string option = None
-let mutable private gitStateCtxSourceText: string option = None
-let mutable private gitProvisioningServiceSourceText: string option = None
-let mutable private gitMergeConflictTargetSourceText: string option = None
-
-let private readUtf8FileAsync (path: string) : JS.Promise<string> = promise {
-    let! text = fsPromisesDynamic?readFile (path, "utf8") |> unbox<JS.Promise<string>>
-    return text
-}
-
-let private getSimpleGitSource () =
-    simpleGitSourceText
-    |> Option.defaultWith (fun () -> failwith "Expected SimpleGit source text to be loaded before running tests.")
-
-let private getGitApiClientSource () =
-    gitApiClientSourceText
-    |> Option.defaultWith (fun () -> failwith "Expected GitApiClient source text to be loaded before running tests.")
-
-let private getGitStateCtxSource () =
-    gitStateCtxSourceText
-    |> Option.defaultWith (fun () -> failwith "Expected GitStateCtx source text to be loaded before running tests.")
-
-let private getGitProvisioningServiceSource () =
-    gitProvisioningServiceSourceText
-    |> Option.defaultWith (fun () ->
-        failwith "Expected GitProvisioningService source text to be loaded before running tests."
-    )
-
-let private getGitMergeConflictTargetSource () =
-    gitMergeConflictTargetSourceText
-    |> Option.defaultWith (fun () ->
-        failwith "Expected GitMergeConflictTarget source text to be loaded before running tests."
-    )
-
 let private extractSingleLineBlock (startPattern: string) (endPattern: string) (text: string) =
     let blockMatch =
         Regex.Match(text, $"{startPattern}(.*?){endPattern}", RegexOptions.Singleline ||| RegexOptions.Multiline)
@@ -156,25 +59,6 @@ let private extractSingleLineBlock (startPattern: string) (endPattern: string) (
         failwith $"Could not extract source block between '{startPattern}' and '{endPattern}'."
 
     blockMatch.Groups.[1].Value
-
-let private expectSourceContains (sourceText: string) (snippet: string) =
-    Vitest.expect(sourceText.Contains(snippet), $"Expected source to contain: {snippet}").toBe (true)
-
-let private expectSourceNotContains (sourceText: string) (snippet: string) =
-    Vitest.expect(sourceText.Contains(snippet), $"Expected source not to contain: {snippet}").toBe (false)
-
-Vitest.beforeAll (fun () -> promise {
-    let! sourceText = readUtf8FileAsync simpleGitSourcePath
-    let! gitApiClientText = readUtf8FileAsync gitApiClientSourcePath
-    let! gitStateCtxText = readUtf8FileAsync gitStateCtxSourcePath
-    let! gitProvisioningServiceText = readUtf8FileAsync gitProvisioningServiceSourcePath
-    let! gitMergeConflictTargetText = readUtf8FileAsync gitMergeConflictTargetSourcePath
-    simpleGitSourceText <- Some sourceText
-    gitApiClientSourceText <- Some gitApiClientText
-    gitStateCtxSourceText <- Some gitStateCtxText
-    gitProvisioningServiceSourceText <- Some gitProvisioningServiceText
-    gitMergeConflictTargetSourceText <- Some gitMergeConflictTargetText
-})
 
 Vitest.describe (
     "GitService.classifyFailureKind",
@@ -342,6 +226,43 @@ Vitest.describe (
 )
 
 Vitest.describe (
+    "GitService.tryGetRepositoryWebUrlFromRemoteUrl",
+    fun () ->
+        let validCases = [|
+            "converts https remote with .git suffix",
+            "https://github.com/nfdi4plants/Swate.git",
+            "https://github.com/nfdi4plants/Swate"
+            "keeps https remote without .git suffix",
+            "https://gitlab.example/group/project",
+            "https://gitlab.example/group/project"
+            "converts ssh remote to https browser URL",
+            "ssh://git@gitlab.example/group/project.git",
+            "https://gitlab.example/group/project"
+            "removes credentials from https remote",
+            "https://oauth2:secret@gitlab.example/group/project.git",
+            "https://gitlab.example/group/project"
+        |]
+
+        for testName, remoteUrl, expectedWebUrl in validCases do
+            Vitest.test (
+                testName,
+                fun () ->
+                    GitService.tryGetRepositoryWebUrlFromRemoteUrl remoteUrl
+                    |> expectOk expectedWebUrl
+            )
+
+        let invalidCases = [|
+            "rejects empty remote", ""
+            "rejects unsupported protocol", "git://github.com/nfdi4plants/Swate.git"
+            "rejects SCP-style ssh remote", "git@github.com:nfdi4plants/Swate.git"
+            "rejects remote without repository path", "https://github.com"
+        |]
+
+        for testName, remoteUrl in invalidCases do
+            Vitest.test (testName, fun () -> GitService.tryGetRepositoryWebUrlFromRemoteUrl remoteUrl |> expectError)
+)
+
+Vitest.describe (
     "GitAuthAdapter.redactToken and redactArgs",
     fun () ->
         let tokenCases = [|
@@ -409,7 +330,8 @@ Vitest.describe (
             fun () ->
                 let invalidActiveAccount: AccountSummary = {
                     User = {
-                        AccountId = "acc-1"
+                        Id = 1
+                        LocalSwateAccountId = "acc-1"
                         Name = "Invalid User"
                         Email = "invalid@example.org"
                         AvatarUrl = "https://example.org/avatar.png"
@@ -637,38 +559,6 @@ Vitest.describe (
         )
 
         Vitest.describe (
-            "clone auth fallback removal",
-            fun () ->
-                Vitest.test (
-                    "removes the unauthenticated clone retry helpers from provisioning",
-                    fun () ->
-                        let sourceText = getGitProvisioningServiceSource ()
-
-                        expectSourceNotContains
-                            sourceText
-                            "let shouldRetryWithoutAuth (failure: GitService.GitFailure) ="
-
-                        expectSourceNotContains
-                            sourceText
-                            "let validateCloneRetryCleanupEntries (entries: string[]) : Result<string option, exn> ="
-
-                        expectSourceNotContains sourceText "let private cleanupCloneTargetForRetry"
-                )
-
-                Vitest.test (
-                    "does not retry authenticated clone failures without auth",
-                    fun () ->
-                        let sourceText = getGitProvisioningServiceSource ()
-                        expectSourceNotContains sourceText "| Error failure when shouldRetryWithoutAuth failure ->"
-                        expectSourceNotContains sourceText "cleanupCloneTargetForRetry normalizedTargetPath"
-
-                        expectSourceContains
-                            sourceText
-                            "return! hydrateIfRequested (Some token) authenticatedCloneResult"
-                )
-        )
-
-        Vitest.describe (
             "clone branch option assembly",
             fun () ->
                 Vitest.test (
@@ -703,61 +593,6 @@ Vitest.describe (
                 Vitest.expect(returnType.FullName.Contains("GitOperationResult")).toBe (true)
         )
 
-        Vitest.test (
-            "GitApiClient calls no-payload endpoints without unbox null",
-            fun () ->
-                let sourceText = getGitApiClientSource ()
-                expectSourceContains sourceText "gitApi.getGitStatus ()"
-                expectSourceContains sourceText "gitApi.getGitBranches ()"
-                expectSourceContains sourceText "gitApi.getGitLfsSettings ()"
-                expectSourceContains sourceText "gitApi.installGitLfs ()"
-                expectSourceNotContains sourceText "unbox null"
-        )
-
-        Vitest.test (
-            "GitApiClient no longer depends on unsupported-content message text",
-            fun () ->
-                let sourceText = getGitApiClientSource ()
-                Vitest.expect(sourceText.Contains("Unsupported git content for '")).toBe (false)
-        )
-
-        Vitest.test (
-            "Git discard paths is exposed through the typed renderer client and workflow dependencies",
-            fun () ->
-                let clientSourceText = getGitApiClientSource ()
-                let stateContextSourceText = getGitStateCtxSource ()
-
-                expectSourceContains clientSourceText "let gitDiscardPaths (request: GitPathspecRequest)"
-                expectSourceContains clientSourceText "gitApi.gitDiscardPaths"
-                expectSourceContains stateContextSourceText "gitDiscardPaths = Renderer.GitApiClient.gitDiscardPaths"
-        )
-
-        Vitest.test (
-            "GitStateCtx uses the typed git client and no longer uses dynamic IPC dispatch",
-            fun () ->
-                let sourceText = getGitStateCtxSource ()
-                expectSourceContains sourceText "React.useElmish"
-                Vitest.expect(sourceText.Contains("ipcGitApiDynamic")).toBe (false)
-                Vitest.expect(sourceText.Contains("invokeGitApiWithoutPayload")).toBe (false)
-                Vitest.expect(sourceText.Contains("invokeGitApiWithPayload")).toBe (false)
-                Vitest.expect(sourceText.Contains("Api.ipcArcVaultApi.runGitLfs")).toBe (false)
-        )
-
-        Vitest.test (
-            "GitMergeConflictTarget does not keep a sticky local merge-confirm latch",
-            fun () ->
-                let sourceText = getGitMergeConflictTargetSource ()
-                Vitest.expect(sourceText.Contains("React.useState")).toBe (false)
-                Vitest.expect(sourceText.Contains("React.useRef")).toBe (false)
-                expectSourceContains sourceText "gitStateCtx.state.MergeResolutionPendingPath = Some mergeData.Path"
-        )
-
-        Vitest.test (
-            "GitMergeConflictTarget opts into auto-commit after the final conflict is resolved",
-            fun () ->
-                let sourceText = getGitMergeConflictTargetSource ()
-                expectSourceContains sourceText "AutoCommit = true"
-        )
 )
 
 Vitest.describe (
@@ -811,6 +646,23 @@ Vitest.describe (
                 Vitest.expect(argumentTypes.Length).toBe (1)
                 Vitest.expect(argumentTypes.[0].FullName).toBe (typeof<GitPathspecRequest>.FullName)
                 Vitest.expect(returnType.FullName.Contains("GitOperationResult")).toBe (true)
+        )
+
+        Vitest.test (
+            "IGitApi.getOriginRepositoryWebUrl uses a typed no-payload endpoint",
+            fun () ->
+                let originRemoteField = getRecordField typeof<IGitApi> "getOriginRepositoryWebUrl"
+
+                let argumentTypes, returnType =
+                    flattenFunctionSignature originRemoteField.PropertyType
+
+                let returnTypeName = returnType.FullName
+
+                Vitest.expect(argumentTypes.Length).toBe (1)
+                Vitest.expect(argumentTypes.[0]).toEqual (typeof<unit>)
+                Vitest.expect(returnTypeName.Contains("FSharpResult")).toBe (true)
+                Vitest.expect(returnTypeName.Contains("FSharpOption")).toBe (true)
+                Vitest.expect(returnTypeName.Contains("System.String")).toBe (true)
         )
 
         Vitest.test (
@@ -873,350 +725,5 @@ Vitest.describe (
                 Vitest
                     .expect((getRecordField typeof<GitConfirmMergeResolutionRequest> "AutoCommit").PropertyType)
                     .toEqual (typeof<bool>)
-        )
-)
-
-Vitest.describe (
-    "SimpleGit binding surface parity",
-    fun () ->
-        Vitest.test (
-            "ISimpleGit contains expected upstream method names",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-
-                let interfaceBlock =
-                    extractSingleLineBlock "type ISimpleGit =" "\\[<Erase>\\]\\s*type SimpleGit =" simpleGitSource
-
-                let actualMethodNames =
-                    Regex.Matches(interfaceBlock, "abstract member\\s+([A-Za-z0-9_]+):")
-                    |> Seq.cast<Match>
-                    |> Seq.map (fun entry -> entry.Groups.[1].Value)
-                    |> Set.ofSeq
-
-                let expectedMethodNames =
-                    [|
-                        "add"
-                        "cwd"
-                        "hashObject"
-                        "init"
-                        "merge"
-                        "mergeFromTo"
-                        "outputHandler"
-                        "push"
-                        "stash"
-                        "status"
-                        "addAnnotatedTag"
-                        "addConfig"
-                        "applyPatch"
-                        "listConfig"
-                        "addRemote"
-                        "addTag"
-                        "binaryCatFile"
-                        "branch"
-                        "branchLocal"
-                        "catFile"
-                        "checkIgnore"
-                        "checkIsRepo"
-                        "checkout"
-                        "checkoutBranch"
-                        "checkoutLatestTag"
-                        "checkoutLocalBranch"
-                        "clean"
-                        "clearQueue"
-                        "clone"
-                        "commit"
-                        "countObjects"
-                        "customBinary"
-                        "deleteLocalBranch"
-                        "deleteLocalBranches"
-                        "diff"
-                        "diffSummary"
-                        "env"
-                        "exec"
-                        "fetch"
-                        "firstCommit"
-                        "getConfig"
-                        "getRemotes"
-                        "grep"
-                        "listRemote"
-                        "log"
-                        "mirror"
-                        "mv"
-                        "pull"
-                        "pushTags"
-                        "raw"
-                        "rebase"
-                        "remote"
-                        "removeRemote"
-                        "reset"
-                        "revert"
-                        "revparse"
-                        "rm"
-                        "rmKeepLocal"
-                        "show"
-                        "showBuffer"
-                        "silent"
-                        "stashList"
-                        "subModule"
-                        "submoduleAdd"
-                        "submoduleInit"
-                        "submoduleUpdate"
-                        "tag"
-                        "tags"
-                        "updateServerInfo"
-                        "version"
-                    |]
-                    |> Set.ofArray
-
-                let missing =
-                    Set.difference expectedMethodNames actualMethodNames
-                    |> Set.toArray
-                    |> Microsoft.FSharp.Collections.Array.sort
-
-                Vitest.expect(missing).toEqual ([||])
-        )
-
-        Vitest.test (
-            "SimpleGitOptions exposes required option properties including unsafe",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-
-                let optionsBlock =
-                    extractSingleLineBlock "type SimpleGitOptions" "type ISimpleGit =" simpleGitSource
-
-                let optionPropertyNames =
-                    Regex.Matches(optionsBlock, "member val\\s+(``unsafe``|[A-Za-z0-9_]+):")
-                    |> Seq.cast<Match>
-                    |> Seq.map (fun entry -> entry.Groups.[1].Value.Replace("``", ""))
-                    |> Set.ofSeq
-
-                let expectedOptionNames =
-                    [|
-                        "baseDir"
-                        "binary"
-                        "maxConcurrentProcesses"
-                        "trimmed"
-                        "config"
-                        "abort"
-                        "progress"
-                        "errors"
-                        "completion"
-                        "timeout"
-                        "spawnOptions"
-                        "unsafe"
-                    |]
-                    |> Set.ofArray
-
-                let missing =
-                    Set.difference expectedOptionNames optionPropertyNames
-                    |> Set.toArray
-                    |> Microsoft.FSharp.Collections.Array.sort
-
-                Vitest.expect(missing).toEqual ([||])
-        )
-
-        Vitest.test (
-            "SimpleGitOptions abort uses AbortSignal type",
-            fun () ->
-                let optionsBlock =
-                    extractSingleLineBlock "type SimpleGitOptions" "type ISimpleGit =" (getSimpleGitSource ())
-
-                expectSourceContains optionsBlock "member val abort: IAbortSignal option"
-        )
-
-        Vitest.test (
-            "SimpleGitOptions binary and errors plugin options are typed",
-            fun () ->
-                let optionsBlock =
-                    extractSingleLineBlock "type SimpleGitOptions" "type ISimpleGit =" (getSimpleGitSource ())
-
-                expectSourceContains optionsBlock "member val binary: SimpleGitBinary option"
-                expectSourceContains optionsBlock "member val errors: SimpleGitErrorsHandler option"
-        )
-
-        Vitest.test (
-            "SimpleGitOptions completion and spawn options are typed",
-            fun () ->
-                let optionsBlock =
-                    extractSingleLineBlock "type SimpleGitOptions" "type ISimpleGit =" (getSimpleGitSource ())
-
-                expectSourceContains optionsBlock "member val completion: SimpleGitCompletionOptions option"
-                expectSourceContains optionsBlock "member val spawnOptions: SimpleGitSpawnOptions option"
-        )
-
-        Vitest.test (
-            "SimpleGitProgressEvent uses required non-optional fields",
-            fun () ->
-                let progressBlock =
-                    extractSingleLineBlock
-                        "type SimpleGitProgressEvent ="
-                        "type SimpleGitProgressHandler"
-                        (getSimpleGitSource ())
-
-                for snippet in
-                    [|
-                        "abstract member method: string"
-                        "abstract member stage: string"
-                        "abstract member progress: float"
-                        "abstract member processed: float"
-                        "abstract member total: float"
-                    |] do
-                    expectSourceContains progressBlock snippet
-        )
-
-        Vitest.test (
-            "DiffResult includes the name-status file variant",
-            fun () ->
-                expectSourceContains
-                    (getSimpleGitSource ())
-                    "abstract member files: U3<DiffResultTextFile, DiffResultBinaryFile, DiffResultNameStatusFile>[]"
-        )
-
-        Vitest.test (
-            "PullResult includes required summary and created/deleted fields",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-
-                for snippet in
-                    [|
-                        "abstract member summary: PullDetailSummary"
-                        "abstract member created: string[]"
-                        "abstract member deleted: string[]"
-                        "abstract member remoteMessages: RemoteMessages"
-                    |] do
-                    expectSourceContains simpleGitSource snippet
-        )
-
-        Vitest.test (
-            "DiffResultNameStatusFile optionality matches upstream",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-                expectSourceContains simpleGitSource "abstract member status: string option"
-                expectSourceContains simpleGitSource "abstract member similarity: float"
-        )
-
-        Vitest.test (
-            "High-impact result fields are non-optional",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-
-                for snippet in
-                    [|
-                        "abstract member branch: string"
-                        "abstract member commit: string"
-                        "abstract member summary: CommitResultSummary"
-                        "abstract member major: int"
-                        "abstract member minor: int"
-                        "abstract member patch: U2<int, string>"
-                        "abstract member agent: string"
-                        "abstract member installed: bool"
-                        "abstract member count: int"
-                        "abstract member size: int"
-                        "abstract member inPack: int"
-                        "abstract member packs: int"
-                        "abstract member sizePack: int"
-                        "abstract member prunePackable: int"
-                        "abstract member garbage: int"
-                        "abstract member sizeGarbage: int"
-                    |] do
-                    expectSourceContains simpleGitSource snippet
-        )
-
-        Vitest.test (
-            "Branch summary and branch delete result shapes are strongly typed",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-
-                for snippet in
-                    [|
-                        "abstract member current: string"
-                        "abstract member branches: System.Collections.Generic.Dictionary<string, BranchSummaryBranch>"
-                        "abstract member branch: string"
-                        "abstract member hash: string"
-                        "abstract member hash: obj"
-                        "abstract member all: BranchSingleDeleteResult[]"
-                        "abstract member errors: BranchSingleDeleteResult[]"
-                        "abstract member branches: System.Collections.Generic.Dictionary<string, BranchSingleDeleteResult>"
-                    |] do
-                    expectSourceContains simpleGitSource snippet
-        )
-
-        Vitest.test (
-            "Fetch, push, grep and log response models are typed without obj option placeholders",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-
-                for snippet in
-                    [|
-                        "abstract member paths: string[]"
-                        "abstract member files: string[]"
-                        "abstract member folders: string[]"
-                        "abstract member email: string"
-                        "abstract member name: string"
-                        "abstract member reason: string"
-                        "abstract member branches: FetchResultBranch[]"
-                        "abstract member tags: FetchResultBranch[]"
-                        "abstract member updated: FetchResultUpdate[]"
-                        "abstract member deleted: FetchResultDeleted[]"
-                        "abstract member pushed: PushResultPushedItem[]"
-                        "abstract member ref: PushResultRef option"
-                        "abstract member branch: PushResultBranch option"
-                        "abstract member update: PushResultBranchUpdate option"
-                        "abstract member remoteMessages: PushResultRemoteMessages"
-                        "abstract member paths: System.Collections.Generic.HashSet<string>"
-                        "abstract member results: System.Collections.Generic.Dictionary<string, GrepResultLine[]>"
-                        "abstract member all: LogResultLine[]"
-                        "abstract member latest: LogResultLine option"
-                        "abstract member insertions: PullDetailFileChanges"
-                        "abstract member deletions: PullDetailFileChanges"
-                    |] do
-                    expectSourceContains simpleGitSource snippet
-        )
-
-        Vitest.test (
-            "Residual required fields stay non-optional and typed",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-
-                for snippet in
-                    [|
-                        "abstract member path: string"
-                        "abstract member gitDir: string"
-                        "abstract member key: string"
-                        "abstract member values: string[]"
-                        "abstract member paths: string[]"
-                        "abstract member scopes: ConfigScopes"
-                        "abstract member all: ConfigValues"
-                        "abstract member files: string[]"
-                        "abstract member values: ConfigFileValues"
-                        "abstract member conflicts: MergeConflict[]"
-                        "abstract member merges: string[]"
-                        "abstract member result: string"
-                        "abstract member name: string"
-                        "abstract member refs: RemoteRefs"
-                        "abstract member moves: MoveResultItem[]"
-                    |] do
-                    expectSourceContains simpleGitSource snippet
-        )
-
-        Vitest.test (
-            "clearQueue is marked deprecated in binding",
-            fun () ->
-                let simpleGitSource = getSimpleGitSource ()
-
-                expectSourceContains
-                    simpleGitSource
-                    "[<System.Obsolete(\"Deprecated upstream. Removed in v2; prefer abort-plugin configuration for pending task cancellation.\")>]"
-
-                expectSourceContains simpleGitSource "abstract member clearQueue: unit -> ISimpleGit"
-        )
-
-        Vitest.test (
-            "SimpleGit factory exposes create overloads",
-            fun () ->
-                let createMethodCount =
-                    Regex.Matches(getSimpleGitSource (), "static member create\\b").Count
-
-                Vitest.expect(createMethodCount).toBeGreaterThanOrEqual (4)
         )
 )

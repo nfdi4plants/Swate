@@ -1,23 +1,25 @@
 module Main.IPC.ArcVaultsApi
 
 open System
+open Fable.Core
+open Fable.Electron
+open Fable.Electron.Main
 open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Fable.Core
-open Fable.Electron
-open Fable.Electron.Main
-open Main
+open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Node.Api
-open ARCtrl.Contract
-open Main.IPC.FileSystemIO
+open Main
 open Main.IPC.Delete
 open Main.IPC.Rename
-open Swate.Electron.Shared.DTOs.NoteSearchDto
+open Main.IPC.FileSystemIO
 
+
+let ensureNotesFolderAtArcPath =
+    Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath
 
 let private withLoadedArcVault<'T>
     (event: IpcMainInvokeEvent)
@@ -34,7 +36,10 @@ let private withLoadedArcVault<'T>
             | _ -> return Error(exn "ARC is not loaded.")
     }
 
-let private tryResolveExistingArcRelativePath (arcPath: string) (relativePath: string) : JS.Promise<Result<string, exn>> =
+let private tryResolveExistingArcRelativePath
+    (arcPath: string)
+    (relativePath: string)
+    : JS.Promise<Result<string, exn>> =
     promise {
         match tryResolveArcRelativePath arcPath relativePath with
         | Error pathError -> return Error pathError
@@ -47,19 +52,21 @@ let private tryResolveExistingArcRelativePath (arcPath: string) (relativePath: s
                 return Error(exn $"Path '{relativePath}' does not exist.")
     }
 
-let private showPathInFileExplorerAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
-    promise {
-        match! tryResolveExistingArcRelativePath arcPath relativePath with
-        | Error pathError -> return Error pathError
-        | Ok absolutePath ->
-            try
-                shell.showItemInFolder absolutePath
-                return Ok()
-            with shellError ->
-                return Error(exn $"Could not show '{relativePath}' in file explorer: {shellError.Message}")
-    }
+let private showPathInFileExplorerAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {
+    match! tryResolveExistingArcRelativePath arcPath relativePath with
+    | Error pathError -> return Error pathError
+    | Ok absolutePath ->
+        try
+            shell.showItemInFolder absolutePath
+            return Ok()
+        with shellError ->
+            return Error(exn $"Could not show '{relativePath}' in file explorer: {shellError.Message}")
+}
 
-let private openPathWithDefaultApplicationAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
+let private openPathWithDefaultApplicationAsync
+    (arcPath: string)
+    (relativePath: string)
+    : JS.Promise<Result<unit, exn>> =
     promise {
         match! tryResolveExistingArcRelativePath arcPath relativePath with
         | Error pathError -> return Error pathError
@@ -78,9 +85,7 @@ let private runLoadedArcPathAction
     : JS.Promise<Result<'T, exn>> =
     promise {
         try
-            return!
-                withLoadedArcVault event (fun vault ->
-                    operation vault.path.Value)
+            return! withLoadedArcVault event (fun vault -> operation vault.path.Value)
         with e ->
             return Error e
     }
@@ -100,18 +105,20 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 )
 
             if r.canceled then
-                return Error(exn "Cancelled")
+                return Ok None
             elif r.filePaths.Length <> 1 then
                 return Error(exn "Not exactly one path")
             else
-                let arcPath = r.filePaths |> Array.exactlyOne
+                let arcPath = r.filePaths |> Array.exactlyOne |> PathHelpers.normalizePath
+
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                return Ok(ArcOpenDisposition.path disposition)
+                return Ok(Some(ArcOpenDisposition.path disposition))
         }
     openARCByPath =
         fun (arcPath: string) -> promise {
             try
+                let arcPath = PathHelpers.normalizePath arcPath
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
                 return Ok(ArcOpenDisposition.path disposition)
@@ -136,10 +143,23 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error(exn "Not exactly one path")
             else
                 let arcContainerPath = r.filePaths |> Array.exactlyOne
-                let arcPath = ARCtrl.ArcPathHelper.combine arcContainerPath identifier
+
+                let arcPath =
+                    ARCtrl.ArcPathHelper.combine arcContainerPath identifier
+                    |> PathHelpers.normalizePath
+
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
                 return Ok(ArcOpenDisposition.path disposition)
+        }
+    ensureNotesFolder =
+        fun () -> promise {
+            try
+                match tryGetVaultAndArcPath event with
+                | Error error -> return Error error
+                | Ok(_, arcPath) -> return! ensureNotesFolderAtArcPath arcPath
+            with error ->
+                return Error error
         }
     closeARC =
         fun () -> promise {
@@ -185,12 +205,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         }
     showPathInFileExplorer =
         fun (relativePath: string) ->
-            runLoadedArcPathAction event (fun arcPath ->
-                showPathInFileExplorerAsync arcPath relativePath)
+            runLoadedArcPathAction event (fun arcPath -> showPathInFileExplorerAsync arcPath relativePath)
     openPathWithDefaultApplication =
         fun (relativePath: string) ->
-            runLoadedArcPathAction event (fun arcPath ->
-                openPathWithDefaultApplicationAsync arcPath relativePath)
+            runLoadedArcPathAction event (fun arcPath -> openPathWithDefaultApplicationAsync arcPath relativePath)
     getRecentARCs = fun _ -> promise { return RECENT_ARCS.Get() }
     removeRecentARC =
         fun arcpointer -> promise {
@@ -383,10 +401,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     addArcFile =
         fun (request: FileContentDTO) -> promise {
             try
-                return!
-                    withLoadedArcVault
-                        event
-                        (fun vault -> promise { return! vault.AddArcFile request })
+                return! withLoadedArcVault event (fun vault -> promise { return! vault.AddArcFile request })
             with e ->
                 return Error e
         }
@@ -394,9 +409,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun (request: CreateFileSystemItemRequest) -> promise {
             try
                 return!
-                    withLoadedArcVault event (fun vault -> promise {
-                        return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
-                    })
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
+                        })
             with e ->
                 return Error e
         }
@@ -411,18 +428,17 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun (relativePath: string) -> promise {
             try
                 return!
-                    withLoadedArcVault event (fun vault ->
-                        promise {
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
                             let arcPath = vault.path.Value
                             let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
                             let classification = ArcEntityPathRules.classifyDeleteTarget normalizedRelativePath
 
                             match classification with
                             | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget _
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
-                                _
-                              ) ->
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile _,
+                                                                                              _) ->
                                 match vault.arc with
                                 | None -> return Error(exn "ARC is not loaded.")
                                 | Some arcLocal ->
@@ -443,12 +459,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
-                                normalizedGenericPath
-                              )
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
+                                                                                              normalizedGenericPath)
                             | ArcEntityPathRules.DeletePathClassification.GenericTarget normalizedGenericPath
-                            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_, normalizedGenericPath) ->
+                            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget(_,
+                                                                                                  normalizedGenericPath) ->
                                 if ArcEntityPathRules.isDeletePathAllowed normalizedGenericPath |> not then
                                     return
                                         Error(
@@ -460,10 +475,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
                                             arcPath
                                             normalizedGenericPath
-                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-                                ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
-                                _
-                              ) ->
+                            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
+                                                                                              _) ->
                                 return Error(exn "Deleting the investigation file is not supported.")
                             | ArcEntityPathRules.DeletePathClassification.ProtectedTarget _ ->
                                 return
@@ -477,8 +490,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                         exn
                                             "Deletion is only allowed for safe non-ARC filesystem items inside the ARC."
                                     )
-                        }
-                    )
+                        })
             with e ->
                 return Error e
         }
@@ -486,8 +498,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         fun (request: RenamePathRequest) -> promise {
             try
                 return!
-                    withLoadedArcVault event (fun vault ->
-                        promise {
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
                             let arcPath = vault.path.Value
 
                             match ArcEntityPathRules.classifyRenameTarget request.relativePath with
@@ -509,8 +522,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
-                        }
-                    )
+                        })
             with e ->
                 return Error e
         }
@@ -532,20 +544,22 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                             try
                                 match request.fileType with
-                                | DTOType.DTOTypeIsPlainTextVariant ->
+                                | FileContentType.FileContentTypeIsPlainTextVariant ->
                                     let directoryPath = path.dirname absolutePath
                                     do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
                                     do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath request.content
                                     do! vault.RefreshFileTree()
                                     return Ok()
-                                | DTOType.CLI -> return Error(exn "Direct writing of CLI files is not supported.")
-                                | DTOType.DTOTypeIsISAFileVariant ->
+                                | FileContentType.CLI ->
+                                    return Error(exn "Direct writing of CLI files is not supported.")
+                                | FileContentType.FileContentTypeIsISAFileVariant ->
                                     return
                                         Error(
                                             exn
                                                 "Direct writing of ARC content files is not supported. Use saveArcFile for these file types to ensure ARC integrity."
                                         )
-                                | _ -> return Error(exn $"Unsupported DTOType for writing: {request.fileType}")
+                                | _ ->
+                                    return Error(exn $"Unsupported file content type for writing: {request.fileType}")
                             finally
                                 vault.isBusyWriting <- false
             with e ->
@@ -570,10 +584,10 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         match absolutePath with
                         | Error pathError -> return Error pathError
                         | Ok path ->
-                            let content = fs.readFileSync (path, "utf8")
+                            let! content = ARCtrl.FileSystemHelper.readFileTextAsync path
+                            let fileType = FileContentDTO.inferTextFileTypeFromPath relativePath
 
-                            let dto =
-                                FileContentDTO.create ARCtrl.Contract.DTOType.PlainText content relativePath
+                            let dto = FileContentDTO.create fileType content relativePath
 
                             return Ok dto
                     with e ->
@@ -616,4 +630,3 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error e
         }
 }
-

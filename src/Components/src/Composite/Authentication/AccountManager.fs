@@ -12,9 +12,10 @@ type AccountManager =
     static member private AccountRow
         (account: AccountSummary, isActive: bool, ?onSwitch: string -> unit, ?onRemove: string -> unit)
         =
+
         Html.div [
-            prop.key account.User.AccountId
-            prop.testId $"AccountRow-{account.User.AccountId}"
+            prop.key account.User.LocalSwateAccountId
+            prop.testId $"AccountRow-{account.User.LocalSwateAccountId}"
             prop.className [
                 "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:p-1.5 swt:rounded swt:text-sm"
                 if isActive then
@@ -26,10 +27,20 @@ type AccountManager =
                 Html.div [
                     prop.className "swt:flex swt:items-center swt:gap-2 swt:overflow-hidden"
                     prop.children [
-                        Html.img [
-                            prop.className "swt:w-6 swt:h-6 swt:rounded-full swt:shrink-0"
-                            prop.src account.User.AvatarUrl
-                            prop.alt account.User.Name
+                        Html.a [
+                            prop.testId $"AccountProfileLink-{account.User.LocalSwateAccountId}"
+                            prop.className "swt:shrink-0 swt:btn swt:btn-square swt:btn-ghost"
+                            prop.href (Helper.GitLabUrls.profileUrl account.User)
+                            prop.target.blank
+                            prop.rel "noopener noreferrer"
+                            prop.title "Open user profile"
+                            prop.children [
+                                Html.img [
+                                    prop.className "swt:w-6 swt:h-6 swt:rounded-full swt:shrink-0"
+                                    prop.src account.User.AvatarUrl
+                                    prop.alt account.User.Name
+                                ]
+                            ]
                         ]
                         Html.div [
                             prop.className "swt:flex swt:flex-col swt:overflow-hidden"
@@ -51,7 +62,7 @@ type AccountManager =
                                             ]
                                             Html.span [ prop.text "Token invalid" ]
                                             Html.a [
-                                                prop.testId $"RegenerateTokenLink-{account.User.AccountId}"
+                                                prop.testId $"RegenerateTokenLink-{account.User.LocalSwateAccountId}"
                                                 prop.className "swt:link swt:link-error"
                                                 prop.href (
                                                     Helper.GitLabUrls.regenerateTokenUrl account.User.TargetDataHub
@@ -72,21 +83,21 @@ type AccountManager =
                         match onSwitch with
                         | Some switchFn when not isActive ->
                             Html.button [
-                                prop.testId $"UseAccountButton-{account.User.AccountId}"
+                                prop.testId $"UseAccountButton-{account.User.LocalSwateAccountId}"
                                 prop.className "swt:btn swt:btn-xs swt:btn-ghost"
                                 prop.title "Switch to this account"
                                 prop.text "Use"
-                                prop.onClick (fun _ -> switchFn account.User.AccountId)
+                                prop.onClick (fun _ -> switchFn account.User.LocalSwateAccountId)
                             ]
                         | _ -> ()
                         match onRemove with
                         | Some removeFn ->
                             Html.button [
-                                prop.testId $"RemoveAccountButton-{account.User.AccountId}"
+                                prop.testId $"RemoveAccountButton-{account.User.LocalSwateAccountId}"
                                 prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:text-error"
                                 prop.title "Remove this account"
                                 prop.text "✕"
-                                prop.onClick (fun _ -> removeFn account.User.AccountId)
+                                prop.onClick (fun _ -> removeFn account.User.LocalSwateAccountId)
                             ]
                         | None -> ()
                     ]
@@ -96,8 +107,9 @@ type AccountManager =
 
     [<ReactComponent>]
     static member Main(accounts: AuthStateDto, ?onSwitchAccount: string -> unit, ?onRemoveAccount: string -> unit) =
-        let activeAccountId =
-            accounts.ActiveAccount |> Option.map (fun account -> account.User.AccountId)
+        let activeLocalSwateAccountId =
+            accounts.ActiveAccount
+            |> Option.map (fun account -> account.User.LocalSwateAccountId)
 
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-1 swt:mt-1 swt:pt-1 swt:border-t swt:border-base-content/10"
@@ -109,7 +121,7 @@ type AccountManager =
                     ]
 
                 for acct in accounts.StoredAccounts do
-                    let isActive = activeAccountId = Some acct.User.AccountId
+                    let isActive = activeLocalSwateAccountId = Some acct.User.LocalSwateAccountId
 
                     AccountManager.AccountRow(acct, isActive, ?onSwitch = onSwitchAccount, ?onRemove = onRemoveAccount)
             ]

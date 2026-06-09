@@ -32,7 +32,7 @@ type private LazyComponents =
     static member LazyBuildingBlockWidget
         (arcFile: ArcFiles, activeTableIndex: int option, setArcFile: ArcFiles -> unit)
         =
-        Swate.Components.Composite.Widgets.BuildingBlockWidget.Main(
+        Swate.Components.Composite.Widgets.BuildingBlockWidget.BuildingBlockWidget.Main(
             arcFile = arcFile,
             activeTableIndex = activeTableIndex,
             setArcFile = setArcFile
@@ -286,8 +286,13 @@ type Main =
                 (fun () -> {
                     arcFile = arcFile
                     activeView = activeView
+                    setActiveView = setActiveView
                 }),
-                [| box arcFile; box activeView |]
+                [|
+                    box arcFile
+                    box activeView
+                    box setActiveView
+                |]
             )
 
         let activeTableIndex = activeView.TryTableIndex

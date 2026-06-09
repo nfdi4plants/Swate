@@ -1,18 +1,19 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
-open Feliz
-open Fable.Core
-open ARCtrl
-open Renderer.Components.ARCHelper
+open Renderer.Components.Helper.ArcViewHelper
+open Renderer.Components.Helper.GitLfsHelper
 open Renderer.Components.FileExplorerDeleteHelper
-open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Swate.Components
-open Swate.Components.Shared
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Electron.Shared.FileIOTypes
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
+open Feliz
+open Fable.Core
+open ARCtrl
+open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Types
 open Helper
 open FileTreeMaterialization
@@ -54,7 +55,15 @@ type FileTree =
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
-        let arcScopeId = useCurrentArcScopeId ()
+        let arcScopeId =
+            appStateCtx
+            |> Option.map PathHelpers.normalizePath
+            |> Option.bind (fun path ->
+                if System.String.IsNullOrWhiteSpace path then
+                    None
+                else
+                    Some path
+            )
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
@@ -130,8 +139,7 @@ type FileTree =
                     errorModal.enqueue (
                         ErrorModalRequest.create (
                             $"File '{item.Name}' has no path.",
-                            title = "Preview failed",
-                            ?scopeId = arcScopeId
+                            title = "Preview failed"
                         )
                     )
                 | Some path when item.IsDirectory ->
@@ -141,16 +149,16 @@ type FileTree =
                 | Some path ->
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-                    let! result = Renderer.Components.ARCHelper.openView selectedPath
+                    let! result = openView selectedPath
 
                     match result with
-                    | Ok loaded ->
+                    | Ok pageState ->
                         console.log ("[Renderer] Received data, processing...")
-                        Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                        pageStateCtx.setState (Some pageState)
                     | Error errorMessage ->
                         let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
                         console.log ($"[Renderer] Error: {fullErrorMessage}")
-                        Renderer.Components.ARCHelper.applyViewError pageStateCtx.setState fullErrorMessage
+                        pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
             }
             |> Promise.start
 
@@ -164,19 +172,19 @@ type FileTree =
             | None -> ()
             | Some selectedPath ->
                 promise {
-                    let! result = Renderer.Components.ARCHelper.openView selectedPath
+                    let! result = openView selectedPath
 
                     match result with
-                    | Ok loaded -> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+                    | Ok pageState -> pageStateCtx.setState (Some pageState)
                     | Error errorMessage ->
-                        Renderer.Components.ARCHelper.applyViewError
-                            pageStateCtx.setState
-                            $"Could not reload preview for '{selectedPath}': {errorMessage}"
+                        pageStateCtx.setState (
+                            Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{selectedPath}': {errorMessage}")
+                        )
                 }
                 |> Promise.catch (fun exn ->
-                    Renderer.Components.ARCHelper.applyViewError
-                        pageStateCtx.setState
-                        $"Could not reload preview for '{selectedPath}': {exn.Message}"
+                    pageStateCtx.setState (
+                        Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{selectedPath}': {exn.Message}")
+                    )
                 )
                 |> Promise.start
 
@@ -220,7 +228,6 @@ type FileTree =
             FileTreeRenameWorkflow.requestRenameItem
                 (Option.iter (RenameDialog >> openDialog))
                 errorModal.enqueue
-                arcScopeId
 
         let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
@@ -236,25 +243,22 @@ type FileTree =
             inlineCreateKindForItem item |> Option.iter openCreateModal
 
         let applyCreateError errorMessage =
-            errorModal.enqueue (
-                ErrorModalRequest.create (errorMessage, title = "Could not create ARC file", ?scopeId = arcScopeId)
-            )
+            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
 
         let applyFileSystemCreateError errorMessage =
             errorModal.enqueue (
                 ErrorModalRequest.create (
                     errorMessage,
-                    title = "Could not create file or folder",
-                    ?scopeId = arcScopeId
+                    title = "Could not create file or folder"
                 )
             )
 
         let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> = promise {
-            let! openResult = Renderer.Components.ARCHelper.openView path
+            let! openResult = openView path
 
             match openResult with
-            | Ok loaded ->
-                Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState loaded
+            | Ok pageState ->
+                pageStateCtx.setState (Some pageState)
                 return Ok()
             | Error errorMessage -> return Error errorMessage
         }
@@ -274,7 +278,6 @@ type FileTree =
                     closeDeleteModal = closeDialog
                     setIsDeleting = setIsDialogBusy
                     enqueueError = errorModal.enqueue
-                    arcScopeId = arcScopeId
                 }
 
         let createArcEntry kind (identifier: string) =
@@ -297,9 +300,8 @@ type FileTree =
                             let selectedPath = PathHelpers.normalizePath createdArcFileDto.path
                             fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                            createdArcFileDto
-                            |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                            |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                            let pageState = Renderer.Types.PageState.fromFileContentDTO createdArcFileDto
+                            pageStateCtx.setState (Some pageState)
 
                             closeDialog ()
                     }
@@ -339,13 +341,14 @@ type FileTree =
 
                                     match openResult with
                                     | Ok dto ->
-                                        dto
-                                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                        let pageState = Renderer.Types.PageState.fromFileContentDTO dto
+                                        pageStateCtx.setState (Some pageState)
                                     | Error _ ->
-                                        FileContentDTO.create ARCtrl.Contract.DTOType.PlainText "" selectedPath
-                                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                                        let dto =
+                                            FileContentDTO.create FileContentType.PlainText "" selectedPath
+
+                                        let pageState = Renderer.Types.PageState.fromFileContentDTO dto
+                                        pageStateCtx.setState (Some pageState)
                                 | FileSystemItemKind.Folder ->
                                     pageStateCtx.setState None
 
@@ -369,12 +372,10 @@ type FileTree =
                 openPathInFileExplorer = Api.ipcArcVaultApi.showPathInFileExplorer
                 openPathWithDefaultApplication = Api.ipcArcVaultApi.openPathWithDefaultApplication
                 enqueueError = errorModal.enqueue
-                arcScopeId = arcScopeId
             }
             enqueueError = errorModal.enqueue
-            arcScopeId = arcScopeId
-            runToggleLfsMark = Renderer.Components.ARCHelper.runToggleLfsMark
-            runFreeLocalLfsCopy = Renderer.Components.ARCHelper.runFreeLocalLfsCopy
+            runToggleLfsMark = Renderer.Components.Helper.GitLfsHelper.runToggleLfsMark
+            runFreeLocalLfsCopy = Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
         }
 
         let createContextMenuItems =
@@ -410,7 +411,6 @@ type FileTree =
                         reloadPreviewByPath = reloadPreviewByPath
                         renamePath = Api.ipcArcVaultApi.renamePath
                         enqueueError = errorModal.enqueue
-                        arcScopeId = arcScopeId
                     }
                     newName
 

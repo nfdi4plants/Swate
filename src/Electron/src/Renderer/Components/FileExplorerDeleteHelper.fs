@@ -21,6 +21,7 @@ module FileExplorerDeleteHelper =
     let shouldResetPageStateAfterSelectionRemoval (pageState: Renderer.Types.PageState option) =
         match pageState with
         | Some(Renderer.Types.PageState.ArcFilePage _)
+        | Some(Renderer.Types.PageState.MarkdownPage _)
         | Some(Renderer.Types.PageState.TextPage _)
         | Some Renderer.Types.PageState.UnknownPage
         | Some(Renderer.Types.PageState.ErrorPage _) -> true
@@ -28,6 +29,7 @@ module FileExplorerDeleteHelper =
 
     let private shouldReloadPageStateAfterSelectedFileUpdate (pageState: Renderer.Types.PageState option) =
         match pageState with
+        | Some(Renderer.Types.PageState.MarkdownPage _)
         | Some(Renderer.Types.PageState.TextPage _)
         | Some Renderer.Types.PageState.UnknownPage
         | Some(Renderer.Types.PageState.ErrorPage _) -> true

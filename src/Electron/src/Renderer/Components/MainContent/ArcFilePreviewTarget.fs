@@ -1,19 +1,78 @@
 module Renderer.Components.MainContent.ArcFilePreviewTarget
 
 open Feliz
-open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent
-open Swate.Components.Page.ArcFileEditor
+open Swate.Components.Page.ArcFileEditor.Types
+open Swate.Components.Composite.AnnotationTable
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
+let deleteSelectedTable
+    (arcFile: ArcFiles)
+    (tableIndex: int)
+    (setArcFile: ArcFiles -> unit)
+    (setActiveView: ActiveView -> unit)
+    =
+    arcFile.ArcTables().RemoveTableAt tableIndex
+
+    arcFile |> ArcFiles.refreshRef |> setArcFile
+    setActiveView ActiveView.Metadata
+
+[<ReactComponent>]
+let private TableNavbarActions
+    (props: ArcFileEditorHeaderProps, setArcFile: ArcFiles -> unit)
+    =
+    let isDeleteModalOpen, setIsDeleteModalOpen = React.useState false
+
+    match props.activeView with
+    | ActiveView.Table tableIndex when tableIndex >= 0 && tableIndex < props.arcFile.Tables().Count ->
+        let tableName = props.arcFile.Tables().[tableIndex].Name
+        let deleteLabel = $"Delete Table: {tableName}"
+
+        let openDeleteModal =
+            fun _ -> setIsDeleteModalOpen true
+
+        let confirmDelete () =
+            deleteSelectedTable
+                props.arcFile
+                tableIndex
+                setArcFile
+                props.setActiveView
+
+        React.Fragment [
+            ResetTableConfirmationModal.ResetTableConfirmationModal(
+                isDeleteModalOpen,
+                setIsDeleteModalOpen,
+                confirmDelete,
+                tableName = tableName
+            )
+            Html.div [
+                prop.className "swt:flex swt:items-center swt:gap-2"
+                prop.children [
+                    Html.button [
+                        prop.type'.button
+                        prop.className
+                            "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm swt:hover:bg-error swt:hover:text-error-content swt:hover:border-error"
+                        prop.onClick openDeleteModal
+                        prop.title deleteLabel
+                        prop.ariaLabel deleteLabel
+                        prop.children [
+                            Html.i [
+                                prop.className "swt:iconify swt:fluent--delete-20-filled swt:size-5"
+                            ]
+                        ]
+                    ]
+                ]
+            ]
+        ]
+    | _ -> Html.none
+
 [<ReactComponent>]
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
-    let arcScopeId = useCurrentArcScopeId ()
 
     let setArcFileInMemory (nextArcFile: ArcFiles) =
         promise {
@@ -23,8 +82,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 errorModal.enqueue (
                     ErrorModalRequest.create (
                         exn.Message,
-                        title = "Could not update ARC in memory",
-                        ?scopeId = arcScopeId
+                        title = "Could not update ARC in memory"
                     )
                 )
         }
@@ -44,7 +102,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 | Ok() -> ()
                 | Error exn ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create (exn.Message, title = "Could not save ARC file", ?scopeId = arcScopeId)
+                        ErrorModalRequest.create (exn.Message, title = "Could not save ARC file")
                     )
             }
             |> Promise.start
@@ -56,7 +114,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 | Ok paths -> return paths
                 | Error exn ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create (exn.Message, title = "Could not pick files", ?scopeId = arcScopeId)
+                        ErrorModalRequest.create (exn.Message, title = "Could not pick files")
                     )
 
                     return [||]
@@ -65,4 +123,15 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
         )
 
-    Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(arcFile, setArcFile, pickFilePaths)
+    let trailingNavbarElements =
+        React.useCallback (
+            (fun props -> TableNavbarActions(props, setArcFile)),
+            [| box setArcFile |]
+        )
+
+    Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
+        arcFile,
+        setArcFile,
+        pickFilePaths,
+        trailingNavbarElements = trailingNavbarElements
+    )
