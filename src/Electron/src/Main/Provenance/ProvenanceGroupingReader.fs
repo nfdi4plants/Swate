@@ -32,6 +32,6 @@ let loadTable (selection: ProvenanceTableSelectionDto) (arc: ARC) : ProvenanceLo
 
     {
         Selection = selection
-        Model = result.Model
+        Model = result.Model |> ProvenanceModelDto.ofModel
         Warnings = result.Warnings |> List.toArray
     }

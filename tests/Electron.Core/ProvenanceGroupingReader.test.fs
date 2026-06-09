@@ -1,9 +1,15 @@
 module ElectronCore.ProvenanceGroupingReaderTests
 
 open ARCtrl
+open Fable.Core
+open Fable.Core.JsInterop
 open Main.Provenance
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
+open Swate.Components.Shared.ProvenanceGrouping.Types
 open Vitest
+
+[<Emit("structuredClone($0)")>]
+let private structuredClone<'T> (value: 'T) : 'T = jsNative
 
 let private oa name = OntologyAnnotation.create (name = name)
 let private text value = CompositeCell.createFreeText value
@@ -103,18 +109,78 @@ Vitest.describe("ProvenanceGroupingReader", fun () ->
             }
 
         let result = ProvenanceGroupingReader.loadTable assaySelection arc
+        let model = ProvenanceModelDto.toModel result.Model
+
         let sampleA =
-            result.Model.InputSets
+            model.InputSets
             |> Map.toSeq
             |> Seq.map snd
             |> Seq.find (fun set -> set.Name = "sample-a")
 
         let valueNames =
             sampleA.PropertyValueIds
-            |> List.map (fun id -> result.Model.PropertyValues.[id].Header.Category.Name)
+            |> List.map (fun id -> model.PropertyValues.[id].Header.Category.Name)
 
         Vitest.expect(result.Selection).toEqual(assaySelection)
-        Vitest.expect(result.Model.LoadedTableName).toBe("assay-table")
+        Vitest.expect(model.LoadedTableName).toBe("assay-table")
         Vitest.expect(valueNames |> List.contains "Organism").toBe(true)
+    )
+
+    Vitest.test("loadTable result is safe to clone across Electron IPC", fun () ->
+        let arc = arcFixture ()
+        let assaySelection =
+            {
+                Scope = ProvenanceTableScopeDto.Assay
+                ParentIdentifier = "assay-1"
+                TableName = "assay-table"
+                DisplayLabel = "Assay assay-1 / assay-table"
+            }
+
+        let result = ProvenanceGroupingReader.loadTable assaySelection arc
+        let cloned = structuredClone result
+        let model = ProvenanceModelDto.toModel cloned.Model
+
+        Vitest.expect(cloned.Selection).toEqual(assaySelection)
+        Vitest.expect(model.LoadedTableName).toBe("assay-table")
+    )
+
+    Vitest.test("loadTable DTO encodes model kinds and values as clone-safe records", fun () ->
+        let arc = arcFixture ()
+        let assaySelection =
+            {
+                Scope = ProvenanceTableScopeDto.Assay
+                ParentIdentifier = "assay-1"
+                TableName = "assay-table"
+                DisplayLabel = "Assay assay-1 / assay-table"
+            }
+
+        let result = ProvenanceGroupingReader.loadTable assaySelection arc
+        let propertyValue =
+            result.Model.PropertyValues
+            |> Array.map _.Value
+            |> Array.find (fun value -> value.Header.Category.Name = "Organism")
+
+        Vitest.expect(propertyValue.Header.Kind.Id).toBe("arc-isa:property:characteristic")
+        Vitest.expect(propertyValue.Header.Kind.Label).toBe("Characteristic")
+        Vitest.expect((box propertyValue.Value)?Kind).toBe("Term")
+
+        let cloned = structuredClone result
+        let model = ProvenanceModelDto.toModel cloned.Model
+        let sampleA =
+            model.InputSets
+            |> Map.toSeq
+            |> Seq.map snd
+            |> Seq.find (fun set -> set.Name = "sample-a")
+
+        let organism =
+            sampleA.PropertyValueIds
+            |> List.map (fun id -> model.PropertyValues.[id])
+            |> List.find (fun value -> value.Header.Category.Name = "Organism")
+
+        match organism.Value with
+        | ProvenanceValue.Term term ->
+            Vitest.expect(term.Name).toBe("Plant")
+        | other ->
+            failwithf "Expected organism value to round-trip as term, got %A" other
     )
 )

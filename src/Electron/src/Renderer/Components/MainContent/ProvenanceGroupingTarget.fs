@@ -90,11 +90,13 @@ let ProvenanceGroupingTarget () =
                 promise {
                     match! Api.ipcArcVaultApi.loadProvenanceTable selection with
                     | Ok result ->
+                        let model = ProvenanceModelDto.toModel result.Model
+
                         setState (fun current ->
                             {
                                 current with
                                     Selected = Some result.Selection
-                                    Session = Some(Session.init result.Model)
+                                    Session = Some(Session.init model)
                                     Warnings = result.Warnings |> Array.toList
                                     Patches = []
                                     IsLoading = false
