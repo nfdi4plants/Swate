@@ -9,13 +9,16 @@ open Swate.Components.Shared
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
-let private resetTables (arcFile: ArcFiles) =
-    let tables = arcFile.ArcTables()
+let deleteSelectedTable
+    (arcFile: ArcFiles)
+    (tableIndex: int)
+    (setArcFile: ArcFiles -> unit)
+    (setActiveView: ActiveView -> unit)
+    =
+    arcFile.ArcTables().RemoveTableAt tableIndex
 
-    for removeIndex = tables.TableCount - 1 downto 0 do
-        tables.RemoveTableAt removeIndex
-
-    ArcFiles.refreshRef arcFile
+    arcFile |> ArcFiles.refreshRef |> setArcFile
+    setActiveView ActiveView.Metadata
 
 [<ReactComponent>]
 let private TableNavbarActions
@@ -25,19 +28,25 @@ let private TableNavbarActions
 
     match props.activeView with
     | ActiveView.Table tableIndex when tableIndex >= 0 && tableIndex < props.arcFile.Tables().Count ->
+        let tableName = props.arcFile.Tables().[tableIndex].Name
+        let deleteLabel = $"Delete Table: {tableName}"
 
         let openDeleteModal =
             fun _ -> setIsDeleteModalOpen true
 
         let confirmDelete () =
-            props.arcFile |> resetTables |> setArcFile
-            props.setActiveView ActiveView.Metadata
+            deleteSelectedTable
+                props.arcFile
+                tableIndex
+                setArcFile
+                props.setActiveView
 
         React.Fragment [
             ResetTableConfirmationModal.ResetTableConfirmationModal(
                 isDeleteModalOpen,
                 setIsDeleteModalOpen,
-                confirmDelete
+                confirmDelete,
+                tableName = tableName
             )
             Html.div [
                 prop.className "swt:flex swt:items-center swt:gap-2"
@@ -47,8 +56,8 @@ let private TableNavbarActions
                         prop.className
                             "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm swt:hover:bg-error swt:hover:text-error-content swt:hover:border-error"
                         prop.onClick openDeleteModal
-                        prop.title "Reset"
-                        prop.ariaLabel "Reset tables"
+                        prop.title deleteLabel
+                        prop.ariaLabel deleteLabel
                         prop.children [
                             Html.i [
                                 prop.className "swt:iconify swt:fluent--delete-20-filled swt:size-5"
