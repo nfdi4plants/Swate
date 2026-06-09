@@ -137,6 +137,7 @@ Vitest.describe("FileExplorer delete helpers", fun () ->
         Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some PageState.UnknownPage)).toBe(true)
         Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some(PageState.ErrorPage "err"))).toBe(true)
         Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some PageState.NotesDraftPage)).toBe(false)
+        Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (Some PageState.ProvenanceGroupingPage)).toBe(false)
         Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval None).toBe(false)
     )
 

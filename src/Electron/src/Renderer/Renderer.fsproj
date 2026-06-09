@@ -50,6 +50,7 @@
     <Compile Include="Components\MainContent\GitUnsupportedTarget.fs" />
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
+    <Compile Include="Components\MainContent\ProvenanceGroupingTarget.fs" />
     <Compile Include="Components\MainContent\PageSelector.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
     <Compile Include="Components\CloseWindowController.fs" />

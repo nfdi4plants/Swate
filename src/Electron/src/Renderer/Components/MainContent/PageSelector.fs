@@ -5,6 +5,7 @@ open Renderer.Types
 open Swate.Electron.Shared
 open Renderer.Components.MainContent.ArcFilePreviewTarget
 open Renderer.Components.MainContent.DataHubBrowserTarget
+open Renderer.Components.MainContent.ProvenanceGroupingTarget
 open Renderer.Components.MainContent.EmptySelectionTarget
 open Renderer.Components.MainContent.ErrorViewTarget
 open Renderer.Components.MainContent.NotesDraftTarget
@@ -35,6 +36,7 @@ let Main (appRootPath: ArcRootPath) (pageState: PageState option) =
     | Some _, Some(PageState.ErrorPage errMsg) -> ErrorViewTarget errMsg
     | Some _, Some PageState.NotesDraftPage -> NotesDraftTarget()
     | Some _, Some PageState.NotesSearchPage -> NotesSearchTarget()
+    | Some _, Some PageState.ProvenanceGroupingPage -> ProvenanceGroupingTarget()
     | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData
     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
     | Some _, Some(PageState.GitUnsupportedPage unsupportedPage) ->
