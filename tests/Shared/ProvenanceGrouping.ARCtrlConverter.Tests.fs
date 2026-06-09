@@ -140,6 +140,41 @@ let private arcFixtureWithDuplicateTemperatureColumns () =
         assays = ResizeArray [ assay ]
     )
 
+let private previousStudyTableWithOutputContext () =
+    table
+        "study-table"
+        [
+            CompositeHeader.Input IOType.Source
+            CompositeHeader.Characteristic(oa "Organism")
+            CompositeHeader.Output IOType.Sample
+            CompositeHeader.Characteristic(oa "Tissue")
+            CompositeHeader.Factor(oa "Batch")
+        ]
+        [
+            [ text "source-a"; term "Plant"; text "sample-a"; term "Leaf"; term "B1" ]
+            [ text "source-b"; term "Plant"; text "sample-b"; term "Root"; term "B2" ]
+        ]
+
+let private arcFixtureWithPreviousOutputContext () =
+    let study =
+        ArcStudy.create (
+            identifier = "study-1",
+            tables = ResizeArray [ previousStudyTableWithOutputContext () ],
+            registeredAssayIdentifiers = ResizeArray [ "assay-1" ]
+        )
+
+    let assay =
+        ArcAssay.create (
+            identifier = "assay-1",
+            tables = ResizeArray [ loadedAssayTable () ]
+        )
+
+    ARC(
+        identifier = "arc-1",
+        studies = ResizeArray [ study ],
+        assays = ResizeArray [ assay ]
+    )
+
 let private arcFixtureWithDuplicatePreviousColumns () =
     let study =
         ArcStudy.create (
@@ -301,6 +336,43 @@ let tests =
             Expect.equal location.Table.ParentIdentifier "study-1" "Collapsed previous value should remember parent identifier."
             Expect.equal location.Table.TableName "study-table" "Collapsed previous value should remember source table."
             Expect.equal location.OutputNames [ "sample-a" ] "Collapsed previous value should remember where it pointed to."
+
+        testCase "collapses connected previous output property values into loaded input context" <| fun _ ->
+            let result =
+                fromLoadedArc
+                    {
+                        LoadedTable = loadedTable
+                        IncludePreviousContext = true
+                    }
+                    (arcFixtureWithPreviousOutputContext ())
+
+            let sampleA =
+                result.Model.InputSets
+                |> Map.toSeq
+                |> Seq.map snd
+                |> Seq.find (fun set -> set.Name = "sample-a")
+
+            let values =
+                sampleA.PropertyValueIds
+                |> List.map (fun id -> result.Model.PropertyValues.[id])
+
+            let tissue =
+                values
+                |> List.find (fun value -> value.Header.Category.Name = "Tissue")
+
+            let batch =
+                values
+                |> List.find (fun value -> value.Header.Category.Name = "Batch")
+
+            expectText "Leaf" tissue.Value
+            expectText "B1" batch.Value
+
+            let tissueLocation = result.Index.PropertyValueLocations.[tissue.Id]
+            Expect.equal tissueLocation.Table.Scope ArcTableScope.Study "Previous output characteristic should keep study scope."
+            Expect.equal tissueLocation.OutputNames [ "sample-a" ] "Previous output characteristic should keep the connected previous output name."
+
+            let batchLocation = result.Index.PropertyValueLocations.[batch.Id]
+            Expect.equal batchLocation.OutputNames [ "sample-a" ] "Previous output factor should keep the connected previous output name."
 
         testCase "identical duplicate loaded values collapse to one model value and one representative writeback location" <| fun _ ->
             let result =

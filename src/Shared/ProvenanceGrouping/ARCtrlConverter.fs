@@ -660,7 +660,7 @@ module internal LoadedTable =
                 |> Option.map (fun (propertyValue, unit) ->
                     candidate pair targetInputSetIds [] header propertyValue unit (tryGetCharacteristicColumnIndex value))))
 
-    let private outputCharacteristicCandidates pair targetOutputSetIds (output: ProcessOutput) =
+    let outputCharacteristicCandidates pair targetOutputSetIds (output: ProcessOutput) =
         output
         |> ProcessOutput.tryGetCharacteristicValues
         |> Option.defaultValue []
@@ -671,7 +671,7 @@ module internal LoadedTable =
                 |> Option.map (fun (propertyValue, unit) ->
                     candidate pair [] targetOutputSetIds header propertyValue unit (tryGetCharacteristicColumnIndex value))))
 
-    let private outputFactorCandidates pair targetOutputSetIds (output: ProcessOutput) =
+    let outputFactorCandidates pair targetOutputSetIds (output: ProcessOutput) =
         output
         |> ProcessOutput.tryGetFactorValues
         |> Option.defaultValue []
@@ -778,12 +778,12 @@ module internal PreviousContext =
                     |> List.collect (fun proc ->
                         LoadedTable.processPairs proc
                         |> List.map (fun (input, output) ->
-                            LoadedTable.pairContext tableRef.Location proc input output, proc, input)))
+                            LoadedTable.pairContext tableRef.Location proc input output, proc, input, output)))
 
             let rec walk frontier visited currentState =
                 let matches =
                     pairs
-                    |> List.choose (fun (pair, proc, input) ->
+                    |> List.choose (fun (pair, proc, input, output) ->
                         let pairKey =
                             Normalize.stableId (
                                 Normalize.locationParts pair.Location
@@ -798,7 +798,7 @@ module internal PreviousContext =
                         | Some outputName when not (Set.contains pairKey visited) ->
                             frontier
                             |> Map.tryFind outputName
-                            |> Option.map (fun targetSetIds -> pairKey, pair, proc, input, targetSetIds)
+                            |> Option.map (fun targetSetIds -> pairKey, pair, proc, input, output, targetSetIds)
                         | _ ->
                             None)
 
@@ -808,11 +808,13 @@ module internal PreviousContext =
                 | _ ->
                     let nextState, nextFrontier, nextVisited =
                         matches
-                        |> List.fold (fun (foldState, foldFrontier, foldVisited) (pairKey, pair, proc, input, targetSetIds) ->
+                        |> List.fold (fun (foldState, foldFrontier, foldVisited) (pairKey, pair, proc, input, output, targetSetIds) ->
                             let targetInputSetIds = targetSetIds |> Set.toList
 
                             let foldState =
                                 LoadedTable.inputCharacteristicCandidates pair targetInputSetIds input
+                                @ LoadedTable.outputCharacteristicCandidates pair targetInputSetIds output
+                                @ LoadedTable.outputFactorCandidates pair targetInputSetIds output
                                 @ LoadedTable.processParameterCandidates pair targetInputSetIds [] proc
                                 @ LoadedTable.processComponentCandidates pair targetInputSetIds [] proc
                                 |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) foldState
