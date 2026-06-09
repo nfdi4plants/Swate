@@ -27,46 +27,38 @@ type ProvenanceSide =
     /// Select loaded output endpoints or render an output-side display group.
     | Output
 
-/// Normalized kind of an input or output table header.
-[<RequireQualifiedAccess>]
-type ProvenanceIOKind =
-    /// Source-like endpoint used by ARC/ISA adapters.
-    | Source
-    /// Sample-like endpoint used by ARC/ISA adapters.
-    | Sample
-    /// Data/file-like endpoint used by ARC/ISA adapters.
-    | Data
-    /// Material-like endpoint used by ARC/ISA adapters.
-    | Material
-    /// ARCtrl free-text input/output header.
-    | FreeText of string
-    /// Source model provided an endpoint kind that is not part of the ARC/ISA vocabulary.
-    | Custom of string
-    /// Adapter could not classify the endpoint kind.
-    | Unknown
+/// Source-provided endpoint or property role.
+/// Adapters choose stable IDs for their own source model, for example ARC/ISA or another process format.
+type ProvenanceKind =
+    {
+        /// Stable role identifier owned by the adapter that created the model.
+        Id: string
+        /// Human-readable label for display and fallback header creation.
+        Label: string
+    }
+
+module ProvenanceKind =
+
+    let create id label : ProvenanceKind =
+        {
+            Id = id
+            Label = label
+        }
+
+    let displayName (kind: ProvenanceKind) =
+        if System.String.IsNullOrWhiteSpace kind.Label then
+            kind.Id
+        else
+            kind.Label
 
 /// Header metadata for a loaded input/output endpoint.
 type ProvenanceIOHeader =
     {
-        /// Normalized input/output kind used for behavior decisions.
-        Kind: ProvenanceIOKind
+        /// Adapter-provided endpoint role.
+        Kind: ProvenanceKind
         /// Original or display-ready header text, such as `Input [Sample Name]`.
         Text: string
     }
-
-/// Normalized kind of editable provenance property.
-[<RequireQualifiedAccess>]
-type ProvenancePropertyKind =
-    /// Characteristic-like property role used by ARC/ISA adapters.
-    | Characteristic
-    /// Factor-like property role used by ARC/ISA adapters.
-    | Factor
-    /// Process-parameter-like property role used by ARC/ISA adapters.
-    | Parameter
-    /// Component-like property role used by ARC/ISA adapters.
-    | Component
-    /// Source model provided a property role that is not part of the ARC/ISA vocabulary.
-    | Custom of string
 
 /// Small ontology term projection used for property categories, units, and term values.
 type ProvenanceTerm =
@@ -94,8 +86,8 @@ type ProvenanceValue =
 /// Property key used for grouping, editing, and writeback.
 type ProvenancePropertyHeader =
     {
-        /// Category family, such as characteristic, factor, or parameter.
-        Kind: ProvenancePropertyKind
+        /// Adapter-provided property role.
+        Kind: ProvenanceKind
         /// Category term, such as Species, Temperature, or Replicate.
         Category: ProvenanceTerm
     }

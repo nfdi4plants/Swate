@@ -12,21 +12,19 @@ open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 open Swate.Components.Shared.ProvenanceGrouping.Session
 
-(* TODO: Restore when integration tests match the implemented module paths.
 module ProvenanceGroupingState = Swate.Components.Composite.ProvenanceGrouping.State
-module ProvenanceGroupingHelper = Swate.Components.Composite.ProvenanceGrouping.Helper
+module ProvenanceGroupingValueAssignment = Swate.Components.Composite.ProvenanceGrouping.ValueAssignment
 module ProvenanceGroupingTypes = Swate.Components.Composite.ProvenanceGrouping.Types
-*)
 
 let typeTests =
     testList "Types" [
         testCase "loaded input set carries the actual input name" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
             let inputSet =
                 {
                     Id = "input-a"
                     TableName = "assay-table"
-                    Header = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+                    Header = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
                     Name = "Input A"
                     PropertyValueIds = [ "pv-species-a" ]
                     InheritedPropertyValueIds = Map.empty
@@ -63,7 +61,7 @@ let typeTests =
                 {
                     Id = "input-a"
                     TableName = "assay-table"
-                    Header = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+                    Header = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
                     Name = "Input A"
                     PropertyValueIds = []
                     InheritedPropertyValueIds = Map.empty
@@ -94,9 +92,11 @@ let typeTests =
                 (removed.InheritedPropertyValueIds.ContainsKey "connection-a")
                 "Explicit removal should drop only the requested connection entry."
 
-        testCase "custom endpoint and property kinds keep the editor model source agnostic" <| fun _ ->
-            let customEndpoint = ioHeader (ProvenanceIOKind.Custom "Plate well") "Input [Plate well]"
-            let customProperty = propertyHeader (ProvenancePropertyKind.Custom "quality-score") "Quality Score"
+        testCase "adapter endpoint and property kinds keep the editor model source agnostic" <| fun _ ->
+            let customEndpointKind = ProvenanceKind.create "external:endpoint:plate-well" "Plate well"
+            let customPropertyKind = ProvenanceKind.create "external:property:quality-score" "Quality Score"
+            let customEndpoint = ioHeader customEndpointKind "Input [Plate well]"
+            let customProperty = propertyHeader customPropertyKind "Quality Score"
 
             let built =
                 model
@@ -113,18 +113,18 @@ let typeTests =
             let input = built.InputSets.["input-well-a1"]
             let value = built.PropertyValues.["pv-quality"]
 
-            Expect.equal input.Header.Kind (ProvenanceIOKind.Custom "Plate well") "Endpoint kind should not require an ISA IO type."
-            Expect.equal value.Header.Kind (ProvenancePropertyKind.Custom "quality-score") "Property kind should not require an ISA property family."
+            Expect.equal input.Header.Kind customEndpointKind "Endpoint kind should not require an ISA IO type."
+            Expect.equal value.Header.Kind customPropertyKind "Property kind should not require an ISA property family."
             Expect.equal input.Name "A1" "Custom process endpoints should still use ProvenanceSet.Name for display."
     ]
 
 let modelTests =
     testList "Model" [
         testCase "direct model builder preserves loaded names and repeated distinct property values" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let built =
                 model
@@ -149,8 +149,8 @@ let modelTests =
             Expect.equal built.PropertyValues.Count 3 "Distinct repeated values should remain separate model values."
 
         testCase "direct model builder keeps previous-context anchors without previous first-class sets" <| fun _ ->
-            let previousTreatment = propertyHeader ProvenancePropertyKind.Characteristic "Previous Treatment"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let previousTreatment = propertyHeader FixtureKinds.characteristicProperty "Previous Treatment"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let built =
                 model
@@ -175,10 +175,10 @@ let modelTests =
     ]
 
 let private validModel () =
-    let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-    let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
-    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+    let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+    let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+    let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+    let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
     model
         "assay-table"
@@ -214,8 +214,8 @@ let groupingTests =
             Expect.equal (groups |> List.map (fun group -> group.Members.Head.Name)) [ "Input A"; "Input B"; "Input C" ] "No grouping should preserve loaded input names."
 
         testCase "multi-value grouping uses the complete value set as one group key" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let built =
                 model
@@ -263,7 +263,7 @@ let groupingTests =
 
         testCase "grouped members retain non-grouping property values for editing" <| fun _ ->
             let model = sampleModel ()
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
             let groups = displayGroups model ProvenanceSide.Input [ { Header = species } ]
             let inputA =
                 groups
@@ -276,11 +276,11 @@ let groupingTests =
                 "Grouping by Species must not hide Temperature from the member editing surface."
 
         testCase "outputs expose input properties inherited through current loaded connections" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let temperature = propertyHeader ProvenancePropertyKind.Parameter "Temperature"
-            let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let temperature = propertyHeader FixtureKinds.parameterProperty "Temperature"
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let built =
                 model
@@ -313,9 +313,9 @@ let groupingTests =
                 "An output should expose its own properties plus properties inherited from all directly connected loaded inputs."
 
         testCase "output inheritance follows the current loaded connection set" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let build connections =
                 model
@@ -359,8 +359,8 @@ let groupingTests =
                 "Adding a connection should add that input's properties to the output's effective properties."
 
         testCase "grouping collapses identical equal values for one set into one display member" <| fun _ ->
-            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let built =
                 model
@@ -383,8 +383,8 @@ let groupingTests =
             Expect.equal members.Head.PropertyValueIds [ "pv-rep-1a"; "pv-rep-1b" ] "Collapsed display membership should keep all underlying property value IDs."
 
         testCase "grouping keeps equal text with different units separate" <| fun _ ->
-            let temperature = propertyHeader ProvenancePropertyKind.Parameter "Temperature"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let temperature = propertyHeader FixtureKinds.parameterProperty "Temperature"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let celsius = term "C"
             let fahrenheit = term "F"
@@ -408,8 +408,8 @@ let groupingTests =
             Expect.equal groups.Length 2 "Values with the same scalar value but different units must not collapse."
 
         testCase "scoped input grouping uses multiple own values as one value-set group" <| fun _ ->
-            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let built =
                 model
@@ -445,9 +445,9 @@ let groupingTests =
             Expect.equal groupedValues [ ProvenanceValue.Text "1"; ProvenanceValue.Text "2" ] "An input with multiple values for the same grouping key must appear in one combined value-set group."
 
         testCase "both-side grouping lets inputs inherit missing values from direct connected outputs" <| fun _ ->
-            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let built =
                 model
@@ -485,9 +485,9 @@ let groupingTests =
             Expect.equal groupedValues [ ProvenanceValue.Text "1"; ProvenanceValue.Text "2" ] "A missing input property should inherit direct connected output values as one combined value-set group."
 
         testCase "both-side grouping prefers input values over inherited output values" <| fun _ ->
-            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let built =
                 model
@@ -524,7 +524,7 @@ let groupingTests =
             Expect.equal groupedValues [ ProvenanceValue.Text "3" ] "An input's own values should be used before direct connected output values are considered."
 
         testCase "displayGroups works for input-only loaded models" <| fun _ ->
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let built =
                 model
@@ -543,7 +543,7 @@ let groupingTests =
 
         testCase "displayConnections expands to represented loaded set pairs only" <| fun _ ->
             let model = validModel ()
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
             let inputGroups = displayGroups model ProvenanceSide.Input [ { Header = species } ]
             let outputGroups = displayGroups model ProvenanceSide.Output []
             let connections = displayConnections model inputGroups outputGroups
@@ -556,7 +556,7 @@ let groupingTests =
             Expect.equal representedIds [ "connection-a"; "connection-b"; "connection-c"; "connection-d" ] "Display lines should represent real loaded connections only."
 
         testCase "displayConnections returns no lines when one side is absent" <| fun _ ->
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let built =
                 model
@@ -576,9 +576,9 @@ let groupingTests =
     ]
 
 let private sourceFromLoadedMembershipModel () =
-    let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+    let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+    let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+    let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
     let pvId = "pv-species-a"
     let setAId = "input-a"
@@ -616,7 +616,7 @@ let editTests =
 
         testCase "createLoadedPropertyValue adds occurrence to target loaded set" <| fun _ ->
             let model = validModel ()
-            let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
 
             let command =
                 {
@@ -651,8 +651,8 @@ let editTests =
                 failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
 
         testCase "createLoadedPropertyValue is a no-op when an identical loaded value already exists on the same target" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let built =
                 model
@@ -673,8 +673,8 @@ let editTests =
                 failwithf "Expected a no-op duplicate create, got %A" other
 
         testCase "copyPropertyValueToLoadedTarget is a no-op when the target already has an identical value" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let built =
                 model
@@ -695,8 +695,8 @@ let editTests =
                 failwithf "Expected a no-op duplicate copy, got %A" other
 
         testCase "createLoadedSet adds the missing output side to an input-only loaded model" <| fun _ ->
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let built =
                 model
@@ -719,7 +719,7 @@ let editTests =
                 failwithf "Expected AddLoadedSet patch, got %A" other
 
         testCase "createLoadedSet is a no-op when the same loaded endpoint already exists" <| fun _ ->
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
 
             let built =
                 model
@@ -738,8 +738,8 @@ let editTests =
                 failwithf "Expected no-op duplicate create, got %A" other
 
         testCase "connectSets works after the missing side was created on a partial model" <| fun _ ->
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let built =
                 model
@@ -883,10 +883,10 @@ let sessionTests =
                 failwithf "Expected layer addition success, got %A" error
 
         testCase "addLayer carries output properties inherited through loaded connections" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-            let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
 
             let initial =
                 model
@@ -980,7 +980,7 @@ let sessionTests =
                 | Error error -> failwithf "Unexpected addLayer error: %A" error
 
             let projectedId = (Session.activePair layered).Model.InputSets |> Map.toList |> List.exactlyOne |> fst
-            let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
             let command =
                 {
                     Target = ProvenancePropertyTarget.InputSets [ projectedId ]
@@ -1012,7 +1012,7 @@ let sessionTests =
 
             let projectedId = (Session.activePair layered).Model.InputSets |> Map.toList |> List.exactlyOne |> fst
             let previousBefore = layered.Pairs.["pair-1"].Model.OutputSets.["output-d"]
-            let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
             let command =
                 {
                     Target = ProvenancePropertyTarget.InputSets [ projectedId ]
@@ -1058,7 +1058,7 @@ let sessionTests =
                 |> Session.addLayer { SelectedSets = [ ProvenanceSide.Output, "output-a" ] }
                 |> function Ok(next, _) -> next | Error error -> failwithf "%A" error
 
-            let outputHeader = ioHeader ProvenanceIOKind.Data "Output [Data]"
+            let outputHeader = ioHeader FixtureKinds.dataEndpoint "Output [Data]"
             let created =
                 match Session.createLoadedSet { Side = ProvenanceSide.Output; Header = outputHeader; Name = "Raw file" } layered with
                 | Ok(next, _) -> next
@@ -1108,7 +1108,7 @@ let sessionTests =
                 {
                     Target = ProvenancePropertyTarget.Connections [ "connection-a" ]
                     CopiedFrom = None
-                    Header = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+                    Header = propertyHeader FixtureKinds.parameterProperty "Analysis"
                     Value = ProvenanceValue.Text "Microscopy"
                     Unit = None
                 }
@@ -1132,7 +1132,7 @@ let sessionTests =
 
             let pair2 = Session.activePair layered
             let projectedId = pair2.Model.InputSets |> Map.toList |> List.exactlyOne |> fst
-            let foreignHeader = propertyHeader ProvenancePropertyKind.Parameter "Foreign"
+            let foreignHeader = propertyHeader FixtureKinds.parameterProperty "Foreign"
             let foreignValue =
                 propertyValue "pv-foreign" foreignHeader (ProvenanceValue.Text "stale") None None
             let pollutedInput =
@@ -1158,7 +1158,7 @@ let sessionTests =
                         Pairs = layered.Pairs |> Map.add pair2.Id pollutedPair2
                 }
 
-            let outputHeader = ioHeader ProvenanceIOKind.Data "Output [Data]"
+            let outputHeader = ioHeader FixtureKinds.dataEndpoint "Output [Data]"
             let withOutput =
                 Session.createLoadedSet { Side = ProvenanceSide.Output; Header = outputHeader; Name = "Pair 2 Output" } polluted
                 |> function
@@ -1176,7 +1176,7 @@ let sessionTests =
                 |> Map.toList
                 |> List.exactlyOne
                 |> fst
-            let syncHeader = propertyHeader ProvenancePropertyKind.Parameter "Sync"
+            let syncHeader = propertyHeader FixtureKinds.parameterProperty "Sync"
             let command =
                 {
                     Target = ProvenancePropertyTarget.Connections [ pair2ConnectionId ]
@@ -1206,7 +1206,7 @@ let sessionTests =
                 {
                     Target = ProvenancePropertyTarget.Connections [ "missing-connection" ]
                     CopiedFrom = None
-                    Header = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+                    Header = propertyHeader FixtureKinds.parameterProperty "Analysis"
                     Value = ProvenanceValue.Text "Microscopy"
                     Unit = None
                 }
@@ -1218,24 +1218,22 @@ let sessionTests =
                 failwithf "Expected missing-connection session error, got %A" other
     ]
 
-(* TODO: These tests reference types from Swate.Components.Composite.ProvenanceGrouping
-   that need corresponding module aliases updated. Uncomment when the integration tests meet those modules.
 let uiStateTests =
     testList "UI state" [
         testCase "toggleSideGrouping applies grouping only to the selected layer side" <| fun _ ->
             let session = Session.init (sampleModel ())
             let pair = Session.activePair session
             let state = ProvenanceGroupingState.init session
-            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+            let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
 
-            let next = ProvenanceGroupingState.toggleSideGrouping pair.RightLayerId ProvenanceSide.Output replicate state
+            let next = ProvenanceGroupingState.GroupingAssignments.toggleSide pair.RightLayerId ProvenanceSide.Output replicate state
 
             Expect.equal
-                (ProvenanceGroupingState.layerState pair.LeftLayerId next).GroupingAssignments
+                (ProvenanceGroupingState.Layers.get pair.LeftLayerId next).GroupingAssignments
                 []
                 "Side-only output grouping should not change the input layer state."
             Expect.equal
-                (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
+                (ProvenanceGroupingState.Layers.get pair.RightLayerId next).GroupingAssignments
                 [ { Key = { Header = replicate }; Scope = GroupingScope.Output } ]
                 "Side-only output grouping should be stored as an output-scoped assignment."
 
@@ -1243,17 +1241,17 @@ let uiStateTests =
             let session = Session.init (sampleModel ())
             let pair = Session.activePair session
             let state = ProvenanceGroupingState.init session
-            let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
+            let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
 
-            let next = ProvenanceGroupingState.toggleBothGrouping pair.LeftLayerId pair.RightLayerId replicate state
+            let next = ProvenanceGroupingState.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId replicate state
             let expected = [ { Key = { Header = replicate }; Scope = GroupingScope.Both } ]
 
             Expect.equal
-                (ProvenanceGroupingState.layerState pair.LeftLayerId next).GroupingAssignments
+                (ProvenanceGroupingState.Layers.get pair.LeftLayerId next).GroupingAssignments
                 expected
                 "Both-side grouping should be visible from the input layer."
             Expect.equal
-                (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
+                (ProvenanceGroupingState.Layers.get pair.RightLayerId next).GroupingAssignments
                 expected
                 "Both-side grouping should be visible from the output layer."
 
@@ -1261,20 +1259,20 @@ let uiStateTests =
             let session = Session.init (sampleModel ())
             let pair = Session.activePair session
             let state = ProvenanceGroupingState.init session
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
 
             let selected =
-                ProvenanceGroupingState.toggleSideGrouping pair.LeftLayerId ProvenanceSide.Input species state
+                ProvenanceGroupingState.GroupingAssignments.toggleSide pair.LeftLayerId ProvenanceSide.Input species state
 
             let next =
-                ProvenanceGroupingState.moveGrouping pair.Id pair.LeftLayerId pair.RightLayerId ProvenanceSide.Output species selected
+                ProvenanceGroupingState.GroupingAssignments.move pair.Id pair.LeftLayerId pair.RightLayerId ProvenanceSide.Output species selected
 
             Expect.equal
-                (ProvenanceGroupingState.layerState pair.LeftLayerId next).GroupingAssignments
+                (ProvenanceGroupingState.Layers.get pair.LeftLayerId next).GroupingAssignments
                 []
                 "Dragging a property away should remove it from the source layer."
             Expect.equal
-                (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
+                (ProvenanceGroupingState.Layers.get pair.RightLayerId next).GroupingAssignments
                 [ { Key = { Header = species }; Scope = GroupingScope.Output } ]
                 "Dragging a property to output should make it output-only."
             Expect.equal
@@ -1286,7 +1284,7 @@ let uiStateTests =
             let session = Session.init (sampleModel ())
             let pair = Session.activePair session
             let state = ProvenanceGroupingState.init session
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
             let key = { Header = species }
             let sideAssignment = { Key = key; Scope = GroupingScope.Input }
             let bothAssignment = { Key = key; Scope = GroupingScope.Both }
@@ -1300,21 +1298,21 @@ let uiStateTests =
                 }
 
             let next =
-                ProvenanceGroupingState.toggleBothGrouping pair.LeftLayerId pair.RightLayerId species inconsistent
+                ProvenanceGroupingState.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId species inconsistent
 
             Expect.equal
-                (ProvenanceGroupingState.layerState pair.LeftLayerId next).GroupingAssignments
+                (ProvenanceGroupingState.Layers.get pair.LeftLayerId next).GroupingAssignments
                 [ sideAssignment ]
                 "Removing a both-side grouping should not silently drop an existing side-specific assignment for the same key."
             Expect.equal
-                (ProvenanceGroupingState.layerState pair.RightLayerId next).GroupingAssignments
+                (ProvenanceGroupingState.Layers.get pair.RightLayerId next).GroupingAssignments
                 []
                 "Only the both-side assignment should be removed from the opposite layer."
 
         testCase "property value drop plan adds only when every group member has no value for the property" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let treatment = propertyHeader ProvenancePropertyKind.Characteristic "Treatment"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
             let model =
                 model
                     "assay-table"
@@ -1347,7 +1345,7 @@ let uiStateTests =
                     Unit = None
                 }
 
-            match ProvenanceGroupingHelper.planPropertyValueDrop source group model with
+            match ProvenanceGroupingValueAssignment.planPropertyValueDrop source group model with
             | Ok(ProvenanceGroupingTypes.ValueAssignmentPlan.AddCurrent command) ->
                 Expect.equal command.Target (ProvenancePropertyTarget.InputSets [ "input-a"; "input-b" ]) "Add plan should target all current group members."
                 Expect.equal command.Header treatment "Add plan should preserve the dropped property."
@@ -1357,15 +1355,15 @@ let uiStateTests =
             let mixedSource : ProvenanceGroupingTypes.ValueAssignmentSource =
                 { source with Header = species }
 
-            match ProvenanceGroupingHelper.planPropertyValueDrop mixedSource group model with
+            match ProvenanceGroupingValueAssignment.planPropertyValueDrop mixedSource group model with
             | Error(ProvenanceGroupingTypes.ValueAssignmentError.MixedPropertyValueCounts header) ->
                 Expect.equal header species "Mixed zero/one members should reject the drop for that property."
             | other ->
                 failwithf "Expected a mixed-count rejection, got %A" other
 
         testCase "property value drop plan warns only when every group member has exactly one value" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
             let model =
                 model
                     "assay-table"
@@ -1399,7 +1397,7 @@ let uiStateTests =
                     Unit = None
                 }
 
-            match ProvenanceGroupingHelper.planPropertyValueDrop source group model with
+            match ProvenanceGroupingValueAssignment.planPropertyValueDrop source group model with
             | Ok(ProvenanceGroupingTypes.ValueAssignmentPlan.ConfirmOverwrite warning) ->
                 Expect.equal warning.ExistingValueIds [ "pv-input-a-species"; "pv-input-b-species" ] "Overwrite warning should target the one editable value per member."
                 Expect.equal warning.Header species "Warning should keep the overwritten property."
@@ -1407,8 +1405,8 @@ let uiStateTests =
                 failwithf "Expected an overwrite warning, got %A" other
 
         testCase "property value drop plan rejects members with multiple values for the same property" <| fun _ ->
-            let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-            let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
             let model =
                 model
                     "assay-table"
@@ -1443,14 +1441,13 @@ let uiStateTests =
                     Unit = None
                 }
 
-            match ProvenanceGroupingHelper.planPropertyValueDrop source group model with
+            match ProvenanceGroupingValueAssignment.planPropertyValueDrop source group model with
             | Error(ProvenanceGroupingTypes.ValueAssignmentError.MultiplePropertyValues(header, setIds)) ->
                 Expect.equal header species "Multi-value members should reject the drop for that property."
                 Expect.equal setIds [ "input-b" ] "The rejection should identify the multi-value member."
             | other ->
                 failwithf "Expected a multiple-value rejection, got %A" other
     ]
-*)
 
 let tests =
     testList "ProvenanceGrouping" [
@@ -1460,5 +1457,5 @@ let tests =
         editTests
         fixtureTests
         sessionTests
-        // uiStateTests
+        uiStateTests
     ]

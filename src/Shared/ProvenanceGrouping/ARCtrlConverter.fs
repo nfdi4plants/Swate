@@ -204,6 +204,24 @@ module internal TableLookup =
 
 module internal Normalize =
 
+    module ArcKinds =
+
+        let private endpoint id label =
+            ProvenanceKind.create $"arc-isa:endpoint:{id}" label
+
+        let private property id label =
+            ProvenanceKind.create $"arc-isa:property:{id}" label
+
+        let sourceEndpoint = endpoint "source" "Source"
+        let sampleEndpoint = endpoint "sample" "Sample"
+        let dataEndpoint = endpoint "data" "Data"
+        let materialEndpoint = endpoint "material" "Material"
+        let freeTextEndpoint text = endpoint $"free-text:{text}" text
+        let characteristicProperty = property "characteristic" "Characteristic"
+        let factorProperty = property "factor" "Factor"
+        let parameterProperty = property "parameter" "Parameter"
+        let componentProperty = property "component" "Component"
+
     let trimToOption (value: string) =
         if isNull value then
             None
@@ -259,11 +277,11 @@ module internal Normalize =
 
     let ioKindFromARCtrl (ioType: IOType) =
         match ioType with
-        | IOType.Source -> ProvenanceIOKind.Source
-        | IOType.Sample -> ProvenanceIOKind.Sample
-        | IOType.Data -> ProvenanceIOKind.Data
-        | IOType.Material -> ProvenanceIOKind.Material
-        | IOType.FreeText text -> ProvenanceIOKind.FreeText text
+        | IOType.Source -> ArcKinds.sourceEndpoint
+        | IOType.Sample -> ArcKinds.sampleEndpoint
+        | IOType.Data -> ArcKinds.dataEndpoint
+        | IOType.Material -> ArcKinds.materialEndpoint
+        | IOType.FreeText text -> ArcKinds.freeTextEndpoint text
 
     let ioHeaderFromHeader (header: CompositeHeader) : ProvenanceIOHeader option =
         match header with
@@ -289,21 +307,21 @@ module internal Normalize =
     let characteristicHeader (value: MaterialAttributeValue) =
         value.Category
         |> Option.bind (fun category -> category.CharacteristicType)
-        |> propertyHeader ProvenancePropertyKind.Characteristic
+        |> propertyHeader ArcKinds.characteristicProperty
 
     let factorHeader (value: FactorValue) =
         value.Category
         |> Option.bind (fun category -> category.FactorType)
-        |> propertyHeader ProvenancePropertyKind.Factor
+        |> propertyHeader ArcKinds.factorProperty
 
     let parameterHeader (value: ProcessParameterValue) =
         value.Category
         |> Option.bind (fun category -> category.ParameterName)
-        |> propertyHeader ProvenancePropertyKind.Parameter
+        |> propertyHeader ArcKinds.parameterProperty
 
     let componentHeader (value: Component) =
         value.ComponentType
-        |> propertyHeader ProvenancePropertyKind.Component
+        |> propertyHeader ArcKinds.componentProperty
 
     let normalizeUnit unit =
         unit
@@ -555,7 +573,7 @@ module internal Dedup =
             @ Normalize.locationParts candidate.WritebackLocation.Table
             @ [
                 candidate.WritebackLocation.ProcessName |> Option.defaultValue ""
-                string candidate.Header.Kind
+                candidate.Header.Kind.Id
                 candidate.Header.Category.Name
                 String.concat "|" inputNames
                 String.concat "|" outputNames
@@ -638,7 +656,7 @@ module internal LoadedTable =
             OutputName = Normalize.trimToOption output.Name
         }
 
-    let candidate pair targetInputSetIds targetOutputSetIds header value unit columnIndex : CandidatePropertyValue =
+    let private candidate pair targetInputSetIds targetOutputSetIds header value unit columnIndex : CandidatePropertyValue =
         {
             Header = header
             Value = value
@@ -660,7 +678,7 @@ module internal LoadedTable =
                 |> Option.map (fun (propertyValue, unit) ->
                     candidate pair targetInputSetIds [] header propertyValue unit (tryGetCharacteristicColumnIndex value))))
 
-    let outputCharacteristicCandidates pair targetOutputSetIds (output: ProcessOutput) =
+    let private outputCharacteristicCandidatesForTargets pair targetInputSetIds targetOutputSetIds (output: ProcessOutput) =
         output
         |> ProcessOutput.tryGetCharacteristicValues
         |> Option.defaultValue []
@@ -669,9 +687,15 @@ module internal LoadedTable =
             |> Option.bind (fun header ->
                 Normalize.provenanceValue value.Value value.Unit
                 |> Option.map (fun (propertyValue, unit) ->
-                    candidate pair [] targetOutputSetIds header propertyValue unit (tryGetCharacteristicColumnIndex value))))
+                    candidate pair targetInputSetIds targetOutputSetIds header propertyValue unit (tryGetCharacteristicColumnIndex value))))
 
-    let outputFactorCandidates pair targetOutputSetIds (output: ProcessOutput) =
+    let outputCharacteristicCandidates pair targetOutputSetIds output =
+        outputCharacteristicCandidatesForTargets pair [] targetOutputSetIds output
+
+    let previousOutputCharacteristicCandidates pair targetInputSetIds output =
+        outputCharacteristicCandidatesForTargets pair targetInputSetIds [] output
+
+    let private outputFactorCandidatesForTargets pair targetInputSetIds targetOutputSetIds (output: ProcessOutput) =
         output
         |> ProcessOutput.tryGetFactorValues
         |> Option.defaultValue []
@@ -680,7 +704,13 @@ module internal LoadedTable =
             |> Option.bind (fun header ->
                 Normalize.provenanceValue value.Value value.Unit
                 |> Option.map (fun (propertyValue, unit) ->
-                    candidate pair [] targetOutputSetIds header propertyValue unit (tryGetFactorColumnIndex value))))
+                    candidate pair targetInputSetIds targetOutputSetIds header propertyValue unit (tryGetFactorColumnIndex value))))
+
+    let outputFactorCandidates pair targetOutputSetIds output =
+        outputFactorCandidatesForTargets pair [] targetOutputSetIds output
+
+    let previousOutputFactorCandidates pair targetInputSetIds output =
+        outputFactorCandidatesForTargets pair targetInputSetIds [] output
 
     let processParameterCandidates pair targetInputSetIds targetOutputSetIds (proc: Process) =
         proc.ParameterValues
@@ -813,24 +843,8 @@ module internal PreviousContext =
 
                             let foldState =
                                 LoadedTable.inputCharacteristicCandidates pair targetInputSetIds input
-                                @ (output
-                                   |> ProcessOutput.tryGetCharacteristicValues
-                                   |> Option.defaultValue []
-                                   |> List.choose (fun value ->
-                                       Normalize.characteristicHeader value
-                                       |> Option.bind (fun header ->
-                                           Normalize.provenanceValue value.Value value.Unit
-                                           |> Option.map (fun (propertyValue, unit) ->
-                                               LoadedTable.candidate pair targetInputSetIds [] header propertyValue unit (tryGetCharacteristicColumnIndex value)))))
-                                @ (output
-                                   |> ProcessOutput.tryGetFactorValues
-                                   |> Option.defaultValue []
-                                   |> List.choose (fun value ->
-                                       Normalize.factorHeader value
-                                       |> Option.bind (fun header ->
-                                           Normalize.provenanceValue value.Value value.Unit
-                                           |> Option.map (fun (propertyValue, unit) ->
-                                               LoadedTable.candidate pair targetInputSetIds [] header propertyValue unit (tryGetFactorColumnIndex value)))))
+                                @ LoadedTable.previousOutputCharacteristicCandidates pair targetInputSetIds output
+                                @ LoadedTable.previousOutputFactorCandidates pair targetInputSetIds output
                                 @ LoadedTable.processParameterCandidates pair targetInputSetIds [] proc
                                 @ LoadedTable.processComponentCandidates pair targetInputSetIds [] proc
                                 |> List.fold (fun candidateState candidate -> Dedup.addCandidateProperty candidate candidateState) foldState

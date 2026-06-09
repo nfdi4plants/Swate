@@ -116,9 +116,7 @@ module PatchPreview =
             | ProvenanceTablePatch.UpdatePropertyValue(_, _, _, value, unit') ->
                 $"UpdatePropertyValue:{valueKind value}:{unitName unit'}{valueMetadata value}"
             | ProvenanceTablePatch.AddLoadedSet(_, _, header, _) ->
-                match header.Kind with
-                | ProvenanceIOKind.FreeText text -> $"AddLoadedSet:FreeText:{text}"
-                | kind -> $"AddLoadedSet:{kind}"
+                $"AddLoadedSet:{header.Kind.Id}:{ProvenanceKind.displayName header.Kind}"
             | ProvenanceTablePatch.AddLoadedPropertyValue(_, _, _, value, unit') ->
                 $"AddLoadedPropertyValue:{valueKind value}:{unitName unit'}{valueMetadata value}"
             | ProvenanceTablePatch.AddLoadedConnection _ -> "AddLoadedConnection")

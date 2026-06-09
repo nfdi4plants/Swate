@@ -93,31 +93,19 @@ module private TermSearchMapping =
             TermAccession = term.id
         })
 
-/// Converts provenance kind unions to and from select option values.
+/// Creates editor-owned generic provenance kinds for user-created values.
 module private KindNames =
 
-    let endpointKindName kind =
-        match kind with
-        | ProvenanceIOKind.Source -> "Source"
-        | ProvenanceIOKind.Sample -> "Sample"
-        | ProvenanceIOKind.Data -> "Data"
-        | ProvenanceIOKind.Material -> "Material"
-        | ProvenanceIOKind.FreeText _ -> "FreeText"
-        | ProvenanceIOKind.Unknown -> "Sample"
+    let editorProperty =
+        ProvenanceKind.create "editor:property" "Property"
 
-    let propertyKindName kind =
-        match kind with
-        | ProvenancePropertyKind.Characteristic -> "Characteristic"
-        | ProvenancePropertyKind.Factor -> "Factor"
-        | ProvenancePropertyKind.Parameter -> "Parameter"
-        | ProvenancePropertyKind.Component -> "Component"
+    let endpointFromLabel (label: string) =
+        let trimmed = label.Trim()
 
-    let propertyKindFromName value =
-        match value with
-        | "Characteristic" -> ProvenancePropertyKind.Characteristic
-        | "Factor" -> ProvenancePropertyKind.Factor
-        | "Component" -> ProvenancePropertyKind.Component
-        | _ -> ProvenancePropertyKind.Parameter
+        if System.String.IsNullOrWhiteSpace trimmed then
+            ProvenanceKind.create "editor:endpoint" "Endpoint"
+        else
+            ProvenanceKind.create $"editor:endpoint:{System.Uri.EscapeDataString trimmed}" trimmed
 
 [<Erase; Mangle(false)>]
 type Controls =
@@ -491,12 +479,10 @@ type Controls =
             ?label: string,
             ?debug: bool
         ) : ReactElement =
-        let propertyKind, setPropertyKind =
-            React.useState (
-                header
-                |> Option.map (fun known -> known.Kind)
-                |> Option.defaultValue ProvenancePropertyKind.Parameter
-            )
+        let propertyKind =
+            header
+            |> Option.map (fun known -> known.Kind)
+            |> Option.defaultValue KindNames.editorProperty
 
         let categoryTerm, setCategoryTerm =
             React.useState (header |> Option.map (fun known -> known.Category))
@@ -553,21 +539,6 @@ type Controls =
                     )
                     prop.children [
                         if header.IsNone then
-                            Html.label [ prop.className "swt:label"; prop.text "Property kind" ]
-
-                            Html.select [
-                                prop.ariaLabel "Property kind"
-                                prop.className "swt:select swt:select-bordered swt:select-sm"
-                                prop.value (KindNames.propertyKindName propertyKind)
-                                prop.onChange (KindNames.propertyKindFromName >> setPropertyKind)
-                                prop.children [
-                                    Html.option [ prop.value "Characteristic"; prop.text "Characteristic" ]
-                                    Html.option [ prop.value "Factor"; prop.text "Factor" ]
-                                    Html.option [ prop.value "Parameter"; prop.text "Parameter" ]
-                                    Html.option [ prop.value "Component"; prop.text "Component" ]
-                                ]
-                            ]
-
                             Html.label [
                                 prop.className "swt:label"
                                 prop.text "Property category"
@@ -732,21 +703,14 @@ type Controls =
     static member AddEndpointPopover
         (
             side: ProvenanceSide,
-            defaultKind: ProvenanceIOKind,
+            defaultKind: ProvenanceKind,
             onCreate: CreateLoadedSetCommand -> unit,
             ?debug: bool,
             ?key: string
         ) =
         let sideName = SideLabels.sideName side
         let name, setName = React.useState ""
-        let kind, setKind = React.useState defaultKind
-
-        let initialFreeText =
-            match defaultKind with
-            | ProvenanceIOKind.FreeText text -> text
-            | _ -> ""
-
-        let freeText, setFreeText = React.useState initialFreeText
+        let endpointLabel, setEndpointLabel = React.useState (ProvenanceKind.displayName defaultKind)
 
         Popover.Simple(
             trigger =
@@ -766,7 +730,10 @@ type Controls =
 
                         onCreate {
                             Side = side
-                            Header = Endpoints.endpointHeader side kind
+                            Header =
+                                endpointLabel
+                                |> KindNames.endpointFromLabel
+                                |> Endpoints.endpointHeader side
                             Name = name
                         }
                     )
@@ -778,42 +745,13 @@ type Controls =
                             prop.value name
                             prop.onChange setName
                         ]
-                        Html.label [ prop.className "swt:label"; prop.text "Kind" ]
-                        Html.select [
-                            prop.ariaLabel "Kind"
-                            prop.className "swt:select swt:select-bordered swt:select-sm"
-                            prop.value (KindNames.endpointKindName kind)
-                            prop.onChange (fun (value: string) ->
-                                match value with
-                                | "Source" -> setKind ProvenanceIOKind.Source
-                                | "Sample" -> setKind ProvenanceIOKind.Sample
-                                | "Data" -> setKind ProvenanceIOKind.Data
-                                | "Material" -> setKind ProvenanceIOKind.Material
-                                | "FreeText" -> setKind (ProvenanceIOKind.FreeText freeText)
-                                | _ -> setKind ProvenanceIOKind.Sample
-                            )
-                            prop.children [
-                                Html.option [ prop.value "Source"; prop.text "Source" ]
-                                Html.option [ prop.value "Sample"; prop.text "Sample" ]
-                                Html.option [ prop.value "Data"; prop.text "Data" ]
-                                Html.option [ prop.value "Material"; prop.text "Material" ]
-                                Html.option [ prop.value "FreeText"; prop.text "Custom header" ]
-                            ]
+                        Html.label [ prop.className "swt:label"; prop.text "Endpoint kind" ]
+                        Html.input [
+                            prop.ariaLabel "Endpoint kind"
+                            prop.className "swt:input swt:input-bordered swt:input-sm"
+                            prop.value endpointLabel
+                            prop.onChange setEndpointLabel
                         ]
-                        match kind with
-                        | ProvenanceIOKind.FreeText _ ->
-                            Html.label [ prop.className "swt:label"; prop.text "Endpoint header" ]
-
-                            Html.input [
-                                prop.ariaLabel "Endpoint header"
-                                prop.className "swt:input swt:input-bordered swt:input-sm"
-                                prop.value freeText
-                                prop.onChange (fun text ->
-                                    setFreeText text
-                                    setKind (ProvenanceIOKind.FreeText text)
-                                )
-                            ]
-                        | _ -> Html.none
                         Html.button [
                             prop.type'.submit
                             prop.className "swt:btn swt:btn-primary swt:btn-sm"

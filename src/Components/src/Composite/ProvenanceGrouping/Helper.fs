@@ -59,13 +59,7 @@ module DragDrop =
         $"{encode term.Name}|{encode source}|{encode accession}"
 
     let propertyHeaderIdentity (header: ProvenancePropertyHeader) =
-        let kind =
-            match header.Kind with
-            | ProvenancePropertyKind.Characteristic -> "Characteristic"
-            | ProvenancePropertyKind.Factor -> "Factor"
-            | ProvenancePropertyKind.Parameter -> "Parameter"
-            | ProvenancePropertyKind.Component -> "Component"
-        $"{kind}:{termIdentity header.Category}"
+        $"{encode header.Kind.Id}:{termIdentity header.Category}"
 
     let propertyValueIdentity (propertyValue: ProvenancePropertyValue) =
         let value =
@@ -201,38 +195,27 @@ module Endpoints =
 
     open Swate.Components.Shared.ProvenanceGrouping.Types
 
-    let defaultEndpointKind side (model: ProvenanceModel) =
+    let fallbackKind : ProvenanceKind =
+        ProvenanceKind.create "editor:endpoint" "Endpoint"
+
+    let defaultEndpointKind side (model: ProvenanceModel) : ProvenanceKind =
         let oppositeSets =
             match side with
             | ProvenanceSide.Input -> model.OutputSets
             | ProvenanceSide.Output -> model.InputSets
 
         match oppositeSets |> Map.toList |> List.map (fun (_, set) -> set.Header.Kind) |> List.distinct with
-        | [ ProvenanceIOKind.Unknown ]
-        | [] -> ProvenanceIOKind.Sample
+        | [] -> fallbackKind
         | [ kind ] -> kind
-        | _ -> ProvenanceIOKind.Sample
+        | _ -> fallbackKind
 
-    let endpointKindIdentity kind =
-        match kind with
-        | ProvenanceIOKind.Source -> "Source"
-        | ProvenanceIOKind.Sample -> "Sample"
-        | ProvenanceIOKind.Data -> "Data"
-        | ProvenanceIOKind.Material -> "Material"
-        | ProvenanceIOKind.FreeText text -> $"FreeText:{text}"
-        | ProvenanceIOKind.Unknown -> "Unknown"
+    let endpointKindIdentity (kind: ProvenanceKind) =
+        kind.Id
 
-    let endpointHeader side kind =
+    let endpointHeader side (kind: ProvenanceKind) =
         let prefix = if side = ProvenanceSide.Input then "Input" else "Output"
-        let text =
-            match kind with
-            | ProvenanceIOKind.Source -> $"{prefix} [Source Name]"
-            | ProvenanceIOKind.Sample -> $"{prefix} [Sample Name]"
-            | ProvenanceIOKind.Data -> $"{prefix} [Data]"
-            | ProvenanceIOKind.Material -> $"{prefix} [Material]"
-            | ProvenanceIOKind.FreeText text -> text
-            | ProvenanceIOKind.Unknown -> $"{prefix} [Unknown]"
-        { Kind = kind; Text = text }
+        let label = ProvenanceKind.displayName kind
+        { Kind = kind; Text = $"{prefix} [{label}]" }
 
 /// Projects the active session pair into renderable groups, connections, and layer commands.
 module Display =

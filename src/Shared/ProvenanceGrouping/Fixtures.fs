@@ -10,6 +10,21 @@ let term name =
         TermAccession = None
     }
 
+module FixtureKinds =
+
+    let endpoint id label =
+        ProvenanceKind.create $"fixture:endpoint:{id}" label
+
+    let property id label =
+        ProvenanceKind.create $"fixture:property:{id}" label
+
+    let sampleEndpoint = endpoint "sample" "Sample"
+    let dataEndpoint = endpoint "data" "Data"
+    let characteristicProperty = property "characteristic" "Characteristic"
+    let factorProperty = property "factor" "Factor"
+    let parameterProperty = property "parameter" "Parameter"
+    let componentProperty = property "component" "Component"
+
 let ioHeader kind text =
     {
         Kind = kind
@@ -86,13 +101,13 @@ let model
     |> ProvenanceModel.refreshInheritedOutputProperties
 
 let sampleModel () : ProvenanceModel =
-    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
-    let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
-    let temperature = propertyHeader ProvenancePropertyKind.Parameter "Temperature"
-    let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
-    let replicate = propertyHeader ProvenancePropertyKind.Parameter "Replicate"
-    let previousTreatment = propertyHeader ProvenancePropertyKind.Characteristic "Previous Treatment"
+    let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+    let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+    let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+    let temperature = propertyHeader FixtureKinds.parameterProperty "Temperature"
+    let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+    let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+    let previousTreatment = propertyHeader FixtureKinds.characteristicProperty "Previous Treatment"
 
     let propertyValues =
         [
@@ -143,8 +158,8 @@ let sampleSession () : ProvenanceSession =
     sampleModel () |> Session.init
 
 let inputOnlyModel () : ProvenanceModel =
-    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-    let species = propertyHeader ProvenancePropertyKind.Characteristic "Species"
+    let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+    let species = propertyHeader FixtureKinds.characteristicProperty "Species"
 
     model
         "input-only-table"
@@ -154,8 +169,8 @@ let inputOnlyModel () : ProvenanceModel =
         []
 
 let outputOnlyModel () : ProvenanceModel =
-    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
-    let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+    let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+    let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
 
     model
         "output-only-table"
@@ -165,9 +180,9 @@ let outputOnlyModel () : ProvenanceModel =
         []
 
 let switchablePropertyModel () : ProvenanceModel =
-    let inputHeader = ioHeader ProvenanceIOKind.Sample "Input [Sample Name]"
-    let outputHeader = ioHeader ProvenanceIOKind.Sample "Output [Sample Name]"
-    let batch = propertyHeader ProvenancePropertyKind.Parameter "Batch"
+    let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+    let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+    let batch = propertyHeader FixtureKinds.parameterProperty "Batch"
 
     model
         "switchable-table"
@@ -191,7 +206,7 @@ let switchablePropertyModel () : ProvenanceModel =
 
 let typedSampleModel () : ProvenanceModel =
     let baseModel = sampleModel ()
-    let instrument = propertyHeader ProvenancePropertyKind.Parameter "Instrument"
+    let instrument = propertyHeader FixtureKinds.parameterProperty "Instrument"
     let degreeCelsius =
         {
             Name = "degree Celsius"
@@ -233,8 +248,8 @@ let typedSampleModel () : ProvenanceModel =
     }
 
 let dataOutputOnlyModel () : ProvenanceModel =
-    let outputHeader = ioHeader ProvenanceIOKind.Data "Output [Data]"
-    let analysis = propertyHeader ProvenancePropertyKind.Parameter "Analysis"
+    let outputHeader = ioHeader FixtureKinds.dataEndpoint "Output [Data]"
+    let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
 
     model
         "data-output-only-table"

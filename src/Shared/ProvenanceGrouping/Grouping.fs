@@ -66,7 +66,7 @@ let valueText (value: ProvenanceValue) (unit: ProvenanceTerm option) =
     | None -> text
 
 let private groupingKeySortText (key: GroupingKey) =
-    sprintf "%A:%s" key.Header.Kind key.Header.Category.Name
+    sprintf "%s:%s" key.Header.Kind.Id key.Header.Category.Name
 
 let private groupingValuesText keyValueSeparator keySeparator values =
     values

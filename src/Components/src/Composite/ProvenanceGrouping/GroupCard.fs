@@ -25,7 +25,7 @@ module private GroupCardData =
         | values ->
             values
             |> List.groupBy (fun value -> value.Key)
-            |> List.sortBy (fun (key, _) -> $"{key.Header.Kind}:{key.Header.Category.Name}")
+            |> List.sortBy (fun (key, _) -> $"{key.Header.Kind.Id}:{key.Header.Category.Name}")
             |> List.map (fun (key, groupedValues) ->
                 let valuesText =
                     groupedValues
