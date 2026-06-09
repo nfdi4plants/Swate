@@ -2,10 +2,10 @@ module Main.Auth.SecureAuthStore
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
+open Thoth.Json.Core
 
 [<Literal>]
 let private activeAccountFileName = "active-account.json"
@@ -65,7 +65,10 @@ let private getAuthDir () =
     dir
 
 let private encryptedFilePath (localSwateAccountId: string) =
-    join [| getAuthDir (); $"{localSwateAccountId}-credentials.enc" |]
+    join [|
+        getAuthDir ()
+        $"{localSwateAccountId}-credentials.enc"
+    |]
 
 let private metaFilePath (localSwateAccountId: string) =
     join [| getAuthDir (); $"{localSwateAccountId}-meta.json" |]
@@ -78,6 +81,44 @@ let private isSafeLocalSwateAccountId (localSwateAccountId: string) : bool =
     && localSwateAccountId.Length <= 256
     && localSwateAccountId
        |> Seq.forall (fun c -> System.Char.IsLetterOrDigit c || c = '_' || c = '-')
+
+let private authMetadataDecoder (localSwateAccountId: string) : Decoder<AuthMetadata> =
+    Decode.object (fun get -> {
+        LocalSwateAccountId = localSwateAccountId
+        Id = get.Required.Field "id" Decode.int
+        Name = get.Required.Field "name" Decode.string
+        Email = get.Required.Field "email" Decode.string
+        AvatarUrl = get.Required.Field "avatarUrl" Decode.string
+        TargetDataHub = get.Required.Field "targetDataHub" Decode.string
+        DateAdded =
+            get.Optional.Field "dateAdded" Decode.string
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.defaultWith Swate.Components.DateTimeExtensions.getUtcNowISO
+        TokenInvalid = get.Optional.Field "tokenInvalid" Decode.bool |> Option.defaultValue false
+    })
+
+let private activeLocalSwateAccountIdDecoder: Decoder<string option> =
+    Decode.object (fun get ->
+        get.Optional.Field "localSwateAccountId" Decode.string
+        |> Option.filter isSafeLocalSwateAccountId
+    )
+
+let private tryDecodeAuthMetadata (localSwateAccountId: string) (raw: string) : AuthMetadata option =
+    try
+        if not (isSafeLocalSwateAccountId localSwateAccountId) then
+            None
+        else
+            ARCtrl.Json.Decode.fromJsonString (authMetadataDecoder localSwateAccountId) raw
+            |> Some
+            |> Option.filter (fun metadata -> metadata.Id > 0)
+    with _ ->
+        None
+
+let private tryDecodeActiveLocalSwateAccountId (raw: string) : string option =
+    try
+        ARCtrl.Json.Decode.fromJsonString activeLocalSwateAccountIdDecoder raw
+    with _ ->
+        None
 
 let private tryGetAccountPaths (localSwateAccountId: string) : (string * string) option =
     if isSafeLocalSwateAccountId localSwateAccountId then
@@ -152,53 +193,9 @@ let tryLoad (localSwateAccountId: string) : StoredCredential option =
                     let buffer = bufferFromBase64 base64
                     let token = safeStorage.decryptString buffer
                     let metaRaw = readFileSync metaPath TextEncoding.Utf8
-                    let meta: obj = JS.JSON.parse metaRaw
-                    let name: string = meta?name
-                    let email: string = meta?email
-                    let avatarUrl: string = meta?avatarUrl
-                    let targetDataHub: string = meta?targetDataHub
-                    let storedLocalSwateAccountId: string = meta?localSwateAccountId
-                    let id: int =
-                        try
-                            let value: int = meta?id
-                            value
-                        with _ ->
-                            -1
 
-                    let dateAdded: string =
-                        try
-                            let value: string = meta?dateAdded
-
-                            if String.IsNullOrWhiteSpace value then
-                                Swate.Components.DateTimeExtensions.getUtcNowISO ()
-                            else
-                                value
-                        with _ ->
-                            Swate.Components.DateTimeExtensions.getUtcNowISO ()
-
-                    let tokenInvalid: bool =
-                        try
-                            let value: bool = meta?tokenInvalid
-                            value
-                        with _ ->
-                            false
-
-                    if not (isSafeLocalSwateAccountId storedLocalSwateAccountId) || id <= 0 then
-                        None
-                    else
-                        Some {
-                            Metadata = {
-                                LocalSwateAccountId = storedLocalSwateAccountId
-                                Id = id
-                                Name = name
-                                Email = email
-                                AvatarUrl = avatarUrl
-                                TargetDataHub = targetDataHub
-                                DateAdded = dateAdded
-                                TokenInvalid = tokenInvalid
-                            }
-                            Token = token
-                        }
+                    tryDecodeAuthMetadata localSwateAccountId metaRaw
+                    |> Option.map (fun metadata -> { Metadata = metadata; Token = token })
     with _ ->
         None
 
@@ -252,10 +249,7 @@ let getActiveLocalSwateAccountId () : string option =
 
         if existsSync path then
             let raw = readFileSync path TextEncoding.Utf8
-            let parsed: obj = JS.JSON.parse raw
-            let id: string = parsed?localSwateAccountId
-
-            if not (isSafeLocalSwateAccountId id) then None else Some id
+            tryDecodeActiveLocalSwateAccountId raw
         else
             None
     with _ ->

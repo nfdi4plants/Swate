@@ -24,7 +24,7 @@ open IPCTypesHelper
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
-    openARC: unit -> JS.Promise<Result<string, exn>>
+    openARC: unit -> JS.Promise<Result<string option, exn>>
     /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
     openARCByPath: string -> JS.Promise<Result<string, exn>>
     /// Create ARC via folder dialog. Main decides disposition.

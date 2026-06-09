@@ -1,24 +1,22 @@
 module Main.IPC.ArcVaultsApi
 
 open System
+open Fable.Core
+open Fable.Electron
+open Fable.Electron.Main
 open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Fable.Core
-open Fable.Electron
-open Fable.Electron.Main
-open Main
-open Main.ArcVaultHelper
+open Swate.Electron.Shared.DTOs.NoteSearchDto
 open Node.Api
-open Main.IPC.FileSystemIO
+open Main
 open Main.IPC.Delete
 open Main.IPC.Rename
-open ARCtrl
-open ARCtrl.Contract
-open Swate.Electron.Shared.DTOs.NoteSearchDto
+open Main.IPC.FileSystemIO
+
 
 let ensureNotesFolderAtArcPath =
     Main.Notes.NoteScaffolding.ensureNotesFolderAtArcPath
@@ -107,7 +105,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 )
 
             if r.canceled then
-                return Error(exn "Cancelled")
+                return Ok None
             elif r.filePaths.Length <> 1 then
                 return Error(exn "Not exactly one path")
             else
@@ -115,7 +113,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                 let windowId = windowIdFromIpcEvent event
                 let! disposition = ARC_VAULTS.OpenOrFocusArc(windowId, arcPath)
-                return Ok(ArcOpenDisposition.path disposition)
+                return Ok(Some(ArcOpenDisposition.path disposition))
         }
     openARCByPath =
         fun (arcPath: string) -> promise {

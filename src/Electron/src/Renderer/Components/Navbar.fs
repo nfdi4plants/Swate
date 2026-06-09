@@ -143,7 +143,6 @@ module private Authentication =
                 }
 
                 let! result = Api.ipcAuthApi.signIn request
-                console.log result
 
                 match result with
                 | Ok authResult when authResult.Success -> ()
