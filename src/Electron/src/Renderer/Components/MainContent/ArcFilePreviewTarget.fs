@@ -2,23 +2,13 @@ module Renderer.Components.MainContent.ArcFilePreviewTarget
 
 open Feliz
 open Renderer.Components.MainContent
+open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
-
-let deleteSelectedTable
-    (arcFile: ArcFiles)
-    (tableIndex: int)
-    (setArcFile: ArcFiles -> unit)
-    (setActiveView: ActiveView -> unit)
-    =
-    arcFile.ArcTables().RemoveTableAt tableIndex
-
-    arcFile |> ArcFiles.refreshRef |> setArcFile
-    setActiveView ActiveView.Metadata
 
 [<ReactComponent>]
 let private TableNavbarActions
