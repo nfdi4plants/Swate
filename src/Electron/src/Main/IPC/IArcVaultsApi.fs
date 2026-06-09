@@ -17,6 +17,7 @@ open Main.IPC.FileSystemIO
 open Main.IPC.Delete
 open Main.IPC.Rename
 open Swate.Electron.Shared.DTOs.NoteSearchDto
+open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 
 
 let private withLoadedArcVault<'T>
@@ -347,6 +348,30 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                         let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
                         return Ok(notes |> Array.map NoteSearchNoteDto.ofNote)
+            with e ->
+                return Error e
+        }
+    listProvenanceTables =
+        fun () -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return Ok(Main.Provenance.ProvenanceGroupingReader.listTables vault.arc.Value)
+                        })
+            with e ->
+                return Error e
+        }
+    loadProvenanceTable =
+        fun (selection: ProvenanceTableSelectionDto) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return Ok(Main.Provenance.ProvenanceGroupingReader.loadTable selection vault.arc.Value)
+                        })
             with e ->
                 return Error e
         }
