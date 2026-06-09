@@ -42,26 +42,22 @@ let withFileTreeNodeLfsState (node: FileTreeNode) (item: FileItem) : FileItem =
 
 let createToggleLfsMark
     (enqueueErrorModal: ErrorModalRequest -> unit)
-    (arcScopeId: string option)
     (runToggle: string -> bool -> JS.Promise<Result<unit, string>>)
     : (FileItem -> bool -> unit) =
     let setError (errorMsg: string option) =
         match errorMsg with
-        | Some msg ->
-            enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS update failed", ?scopeId = arcScopeId))
+        | Some msg -> enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS update failed"))
         | None -> ()
 
     Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark setError runToggle
 
 let createFreeLocalLfsCopy
     (enqueueErrorModal: ErrorModalRequest -> unit)
-    (arcScopeId: string option)
     (runCleanup: string -> JS.Promise<Result<unit, string>>)
     : (FileItem -> unit) =
     let setError (errorMsg: string option) =
         match errorMsg with
-        | Some msg ->
-            enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS cleanup failed", ?scopeId = arcScopeId))
+        | Some msg -> enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS cleanup failed"))
         | None -> ()
 
     Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy setError runCleanup

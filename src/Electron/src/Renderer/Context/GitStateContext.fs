@@ -55,6 +55,7 @@ module private Helper =
     let dependencies: GitDependencies = {
         getGitStatus = Renderer.GitApiClient.getGitStatus
         getGitBranches = Renderer.GitApiClient.getGitBranches
+        getOriginRemoteRepositoryWebUrl = Renderer.GitApiClient.getOriginRepositoryWebUrl
         getGitLfsSettings = Renderer.GitApiClient.getGitLfsSettings
         loadDiffPage =
             fun requestedPath -> promise {
@@ -188,11 +189,9 @@ let GitStateCtxProvider (children: ReactElement) =
     let confirmMergeResolutionAction request =
         dispatch (ConfirmMergeResolutionRequested request)
 
-    let pruneLfsCache () =
-        dispatch PruneLfsCacheRequested
+    let pruneLfsCache () = dispatch PruneLfsCacheRequested
 
-    let dedupLfsStorage () =
-        dispatch DedupLfsStorageRequested
+    let dedupLfsStorage () = dispatch DedupLfsStorageRequested
 
     React.useEffect ((fun () -> dispatch (ArcPathChanged appStateCtx)), [| box appStateCtx |])
 

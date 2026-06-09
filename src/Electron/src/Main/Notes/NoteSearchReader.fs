@@ -2,22 +2,23 @@ module Main.NoteSearchReader
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
 open Swate.Components.Composite.Notes.Editor
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Components.Composite.Notes.Types
 open Swate.Components.Shared
-
-let private fsPromisesDynamic: obj = importAll "fs/promises"
+open Main.Bindings.Filesystem
+open Main.Notes.NoteConstants
 
 let private isNoteMarkdownPath (relativePath: string) =
     let normalizedPath = PathHelpers.normalizeSeparators relativePath
     let lowered = normalizedPath.ToLowerInvariant()
-    lowered.StartsWith("notes/") && lowered.EndsWith(".md")
+
+    lowered.StartsWith(NotesRootFolderPrefix)
+    && lowered.EndsWith(NoteMarkdownExtension)
 
 let private readUtf8FileAsync (absolutePath: string) : JS.Promise<string> =
-    fsPromisesDynamic?readFile (absolutePath, "utf8") |> unbox<JS.Promise<string>>
+    readFileAsync absolutePath TextEncoding.Utf8
 
 let private parseNote (relativePath: string) (content: string) =
     match NoteConversion.tryDecodeMarkdownFrontmatter content with

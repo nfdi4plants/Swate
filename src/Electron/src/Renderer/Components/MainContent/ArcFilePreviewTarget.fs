@@ -1,7 +1,6 @@
 module Renderer.Components.MainContent.ArcFilePreviewTarget
 
 open Feliz
-open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent
 open Swate.Components.Page.ArcFileEditor
 open Swate.Components
@@ -13,7 +12,6 @@ open Swate.Components.Primitive.ErrorModal.Types
 let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let errorModal = useErrorModalCtx ()
-    let arcScopeId = useCurrentArcScopeId ()
 
     let setArcFileInMemory (nextArcFile: ArcFiles) =
         promise {
@@ -23,8 +21,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 errorModal.enqueue (
                     ErrorModalRequest.create (
                         exn.Message,
-                        title = "Could not update ARC in memory",
-                        ?scopeId = arcScopeId
+                        title = "Could not update ARC in memory"
                     )
                 )
         }
@@ -44,7 +41,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 | Ok() -> ()
                 | Error exn ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create (exn.Message, title = "Could not save ARC file", ?scopeId = arcScopeId)
+                        ErrorModalRequest.create (exn.Message, title = "Could not save ARC file")
                     )
             }
             |> Promise.start
@@ -56,7 +53,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 | Ok paths -> return paths
                 | Error exn ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create (exn.Message, title = "Could not pick files", ?scopeId = arcScopeId)
+                        ErrorModalRequest.create (exn.Message, title = "Could not pick files")
                     )
 
                     return [||]

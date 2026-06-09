@@ -5,6 +5,7 @@ import {
   QueuedEntry,
   BatchEntry,
   ScopedQueueEntry,
+  ProviderScopedQueueEntry,
 } from "./Provider.fs.js";
 
 const meta = {
@@ -113,5 +114,26 @@ export const ScopedDismissKeepsOtherArcEntries: Story = {
     });
 
     expect(await screen.findByText("ARC B error")).toBeInTheDocument();
+  }
+};
+
+export const ProviderScopeDismissKeepsExplicitOtherArcEntries: Story = {
+  render: () => <ProviderScopedQueueEntry />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: /queue provider scoped errors/i }));
+
+    expect(await screen.findByText("Provider ARC error")).toBeInTheDocument();
+    expect(screen.getByText("There are 2 more error modal(s) waiting.")).toBeInTheDocument();
+
+    await userEvent.click(screen.getByRole("button", { name: /^dismiss related errors$/i }));
+
+    await waitFor(() => {
+      expect(screen.queryByText("Provider ARC error")).not.toBeInTheDocument();
+      expect(screen.queryByText("Provider ARC follow-up error")).not.toBeInTheDocument();
+    });
+
+    expect(await screen.findByText("Explicit other ARC error")).toBeInTheDocument();
   }
 };

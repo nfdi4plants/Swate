@@ -25,6 +25,23 @@ let reducer (queue: ErrorModalEntry list) (msg: ErrorModalMsg) =
 let entriesInScope (scopeId: string option) (queue: ErrorModalEntry list) =
     queue |> List.filter (fun entry -> entry.ScopeId = scopeId)
 
+let withDefaultRequestScope (scopeId: string option) (request: ErrorModalRequest) =
+    match request.ScopeId with
+    | Some _ -> request
+    | None -> { request with ScopeId = scopeId }
+
+let withDefaultBatchScope (scopeId: string option) (batch: ErrorModalBatch) =
+    let batchScope =
+        match batch.ScopeId with
+        | Some _ -> batch.ScopeId
+        | None -> scopeId
+
+    {
+        batch with
+            ScopeId = batchScope
+            Errors = batch.Errors |> List.map (withDefaultRequestScope batchScope)
+    }
+
 let dismissSingleRequest (dismissById: string -> unit) (request: ErrorModalRequest) =
     request.OnDismiss |> Option.iter (fun callback -> callback ())
     dismissById request.Id

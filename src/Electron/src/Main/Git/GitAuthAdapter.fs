@@ -42,8 +42,44 @@ let toConfigEntries (args: string[]) =
 /// Builds a git process environment that disables terminal prompts.
 /// All Git entry points should use this so Electron never blocks waiting for credentials.
 let createNonInteractiveEnv () : obj =
-    // Keep all existing environment variables and disable git interactive prompts.
-    emitJsExpr () "{ ...process.env, GIT_TERMINAL_PROMPT: '0' }"
+    // Keep existing env variables but drop unsafe git/editor overrides that simple-git rejects by default.
+    emitJsExpr
+        ()
+        """
+        (() => {
+            const blocked = new Set([
+                'editor',
+                'git_askpass',
+                'git_config_global',
+                'git_config_system',
+                'git_config_count',
+                'git_config',
+                'git_editor',
+                'git_exec_path',
+                'git_external_diff',
+                'git_pager',
+                'git_proxy_command',
+                'git_template_dir',
+                'git_sequence_editor',
+                'git_ssh',
+                'git_ssh_command',
+                'pager',
+                'prefix',
+                'ssh_askpass'
+            ]);
+            const source = process.env ?? {};
+            const safeEnv = {};
+
+            for (const [key, value] of Object.entries(source)) {
+                if (!blocked.has(String(key).toLowerCase())) {
+                    safeEnv[key] = value;
+                }
+            }
+
+            safeEnv.GIT_TERMINAL_PROMPT = '0';
+            return safeEnv;
+        })()
+        """
 
 /// Applies the non-interactive environment to a simple-git instance.
 let applyNonInteractiveEnv (git: ISimpleGit) = git.env (createNonInteractiveEnv ())

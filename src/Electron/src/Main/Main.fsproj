@@ -12,6 +12,8 @@
     <Compile Include="Bindings\Path.fs" />
     <Compile Include="Bindings\NodeBindings.fs" />
     <Compile Include="Bindings\SimpleGit.fs" />
+    <Compile Include="Notes\NoteConstants.fs" />
+    <Compile Include="Notes\NoteScaffolding.fs" />
     <Compile Include="Notes\NoteSearchReader.fs" />
     <Compile Include="SettingsStore.fs" />
     <Compile Include="RecentArcStore.fs" />
