@@ -17,7 +17,9 @@
     <Compile Include="Context\AuthStateContext.fs" />
     <Compile Include="Context\GitWorkflow.fs" />
     <Compile Include="Context\GitStateContext.fs" />
-    <Compile Include="Components\ARCHelper.fs" />
+    <Compile Include="Components\Helper\ArcViewHelper.fs" />
+    <Compile Include="Components\Helper\GitLfsHelper.fs" />
+    <Compile Include="Components\Helper\ArcVaultHelper.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
@@ -33,13 +35,16 @@
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeDelete.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTree.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Main.fs" />
-    <Compile Include="Components\LeftSidebar\GitSidebarEmptyState.fs" />
-    <Compile Include="Components\LeftSidebar\GitSidebarPanel.fs" />
+    <Compile Include="Components\LeftSidebar\Git\Types.fs" />
+    <Compile Include="Components\LeftSidebar\Git\GitSidebarEmptyState.fs" />
+    <Compile Include="Components\LeftSidebar\Git\GitSidebarPanel.fs" />
     <Compile Include="Components\LeftSidebar\Main.fs" />
     <Compile Include="Components\MainContent\Types.fs" />
     <Compile Include="Components\MainContent\Helper.fs" />
+    <Compile Include="Components\MainContent\SettingsPageTarget.fs" />
     <Compile Include="Components\MainContent\ArcFilePreviewTarget.fs" />
     <Compile Include="Components\MainContent\TextPreviewTarget.fs" />
+    <Compile Include="Components\MainContent\MarkdownEditorTarget.fs" />
     <Compile Include="Components\MainContent\UnknownPreviewTarget.fs" />
     <Compile Include="Components\MainContent\ErrorViewTarget.fs" />
     <Compile Include="Components\MainContent\LandingDraftTarget.fs" />
@@ -50,7 +55,6 @@
     <Compile Include="Components\MainContent\GitUnsupportedTarget.fs" />
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
-    <Compile Include="Components\MainContent\PageSelector.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
     <Compile Include="Components\Navbar.fs" />

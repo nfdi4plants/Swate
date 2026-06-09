@@ -2,17 +2,18 @@ module Main.Auth.SecureAuthStore
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
 open Fable.Electron.Main
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
+open Thoth.Json.Core
 
 [<Literal>]
 let private activeAccountFileName = "active-account.json"
 
 /// Non-secret metadata stored in plaintext JSON alongside the encrypted blob.
 type AuthMetadata = {
-    AccountId: string
+    LocalSwateAccountId: string
+    Id: int
     Name: string
     Email: string
     AvatarUrl: string
@@ -63,24 +64,65 @@ let private getAuthDir () =
     mkdirSync dir (MkdirOptions(recursive = true))
     dir
 
-let private encryptedFilePath (accountId: string) =
-    join [| getAuthDir (); $"{accountId}-credentials.enc" |]
+let private encryptedFilePath (localSwateAccountId: string) =
+    join [|
+        getAuthDir ()
+        $"{localSwateAccountId}-credentials.enc"
+    |]
 
-let private metaFilePath (accountId: string) =
-    join [| getAuthDir (); $"{accountId}-meta.json" |]
+let private metaFilePath (localSwateAccountId: string) =
+    join [| getAuthDir (); $"{localSwateAccountId}-meta.json" |]
 
 let private activeAccountFilePath () =
     join [| getAuthDir (); activeAccountFileName |]
 
-let private isSafeAccountId (accountId: string) : bool =
-    not (System.String.IsNullOrWhiteSpace accountId)
-    && accountId.Length <= 256
-    && accountId
+let private isSafeLocalSwateAccountId (localSwateAccountId: string) : bool =
+    not (System.String.IsNullOrWhiteSpace localSwateAccountId)
+    && localSwateAccountId.Length <= 256
+    && localSwateAccountId
        |> Seq.forall (fun c -> System.Char.IsLetterOrDigit c || c = '_' || c = '-')
 
-let private tryGetAccountPaths (accountId: string) : (string * string) option =
-    if isSafeAccountId accountId then
-        Some(encryptedFilePath accountId, metaFilePath accountId)
+let private authMetadataDecoder (localSwateAccountId: string) : Decoder<AuthMetadata> =
+    Decode.object (fun get -> {
+        LocalSwateAccountId = localSwateAccountId
+        Id = get.Required.Field "id" Decode.int
+        Name = get.Required.Field "name" Decode.string
+        Email = get.Required.Field "email" Decode.string
+        AvatarUrl = get.Required.Field "avatarUrl" Decode.string
+        TargetDataHub = get.Required.Field "targetDataHub" Decode.string
+        DateAdded =
+            get.Optional.Field "dateAdded" Decode.string
+            |> Option.filter (String.IsNullOrWhiteSpace >> not)
+            |> Option.defaultWith Swate.Components.DateTimeExtensions.getUtcNowISO
+        TokenInvalid = get.Optional.Field "tokenInvalid" Decode.bool |> Option.defaultValue false
+    })
+
+let private activeLocalSwateAccountIdDecoder: Decoder<string option> =
+    Decode.object (fun get ->
+        get.Optional.Field "localSwateAccountId" Decode.string
+        |> Option.filter isSafeLocalSwateAccountId
+    )
+
+let private tryDecodeAuthMetadata (localSwateAccountId: string) (raw: string) : AuthMetadata option =
+    try
+        if not (isSafeLocalSwateAccountId localSwateAccountId) then
+            None
+        else
+            ARCtrl.Json.Decode.fromJsonString (authMetadataDecoder localSwateAccountId) raw
+            |> Some
+            |> Option.filter (fun metadata -> metadata.Id > 0)
+    with _ ->
+        None
+
+let private tryDecodeActiveLocalSwateAccountId (raw: string) : string option =
+    try
+        ARCtrl.Json.Decode.fromJsonString activeLocalSwateAccountIdDecoder raw
+    with _ ->
+        None
+
+let private tryGetAccountPaths (localSwateAccountId: string) : (string * string) option =
+    if isSafeLocalSwateAccountId localSwateAccountId then
+        Some(encryptedFilePath localSwateAccountId, metaFilePath localSwateAccountId)
     else
         None
 
@@ -89,8 +131,8 @@ let private normalizeAccountIdentity (targetDataHub: string) (email: string) : s
     let normalizedEmail = email.Trim().ToLowerInvariant()
     $"{host}|{normalizedEmail}"
 
-/// Generate a deterministic filesystem-safe account ID from host and email.
-let generateAccountId (targetDataHub: string) (email: string) : string =
+/// Generate a deterministic filesystem-safe local account key from host and email.
+let generateLocalSwateAccountId (targetDataHub: string) (email: string) : string =
     normalizeAccountIdentity targetDataHub email |> sha256Hex
 
 // ── public API ───────────────────────────────────────────────────────
@@ -105,19 +147,20 @@ let store (credential: StoredCredential) : Result<unit, string> =
     try
         if not (isAvailable ()) then
             Error "Electron safe storage is not available on this system."
-        elif not (isSafeAccountId credential.Metadata.AccountId) then
+        elif not (isSafeLocalSwateAccountId credential.Metadata.LocalSwateAccountId) then
             Error "Invalid account identifier format."
         else
-            let accountId = credential.Metadata.AccountId
+            let localSwateAccountId = credential.Metadata.LocalSwateAccountId
             let encrypted: Node.Buffer.Buffer = safeStorage.encryptString credential.Token
             let base64 = bufferToBase64 encrypted
-            let tmpEnc = encryptedFilePath accountId + ".tmp"
+            let tmpEnc = encryptedFilePath localSwateAccountId + ".tmp"
             writeFileSync tmpEnc base64 TextEncoding.Utf8
-            renameSync tmpEnc (encryptedFilePath accountId)
+            renameSync tmpEnc (encryptedFilePath localSwateAccountId)
 
             let metaJson =
                 JS.JSON.stringify {|
-                    accountId = credential.Metadata.AccountId
+                    localSwateAccountId = credential.Metadata.LocalSwateAccountId
+                    id = credential.Metadata.Id
                     name = credential.Metadata.Name
                     email = credential.Metadata.Email
                     avatarUrl = credential.Metadata.AvatarUrl
@@ -126,19 +169,19 @@ let store (credential: StoredCredential) : Result<unit, string> =
                     tokenInvalid = credential.Metadata.TokenInvalid
                 |}
 
-            let tmpMeta = metaFilePath accountId + ".tmp"
+            let tmpMeta = metaFilePath localSwateAccountId + ".tmp"
             writeFileSync tmpMeta metaJson TextEncoding.Utf8
-            renameSync tmpMeta (metaFilePath accountId)
+            renameSync tmpMeta (metaFilePath localSwateAccountId)
             Ok()
     with ex ->
         Error $"Failed to store auth credentials: {ex.Message}"
 
-let tryLoad (accountId: string) : StoredCredential option =
+let tryLoad (localSwateAccountId: string) : StoredCredential option =
     try
         if not (isAvailable ()) then
             None
         else
-            match tryGetAccountPaths accountId with
+            match tryGetAccountPaths localSwateAccountId with
             | None -> None
             | Some(enc, metaPath) ->
                 if not (existsSync enc) then
@@ -150,46 +193,9 @@ let tryLoad (accountId: string) : StoredCredential option =
                     let buffer = bufferFromBase64 base64
                     let token = safeStorage.decryptString buffer
                     let metaRaw = readFileSync metaPath TextEncoding.Utf8
-                    let meta: obj = JS.JSON.parse metaRaw
-                    let name: string = meta?name
-                    let email: string = meta?email
-                    let avatarUrl: string = meta?avatarUrl
-                    let targetDataHub: string = meta?targetDataHub
-                    let storedAccountId: string = meta?accountId
 
-                    let dateAdded: string =
-                        try
-                            let value: string = meta?dateAdded
-
-                            if String.IsNullOrWhiteSpace value then
-                                Swate.Components.DateTimeExtensions.getUtcNowISO ()
-                            else
-                                value
-                        with _ ->
-                            Swate.Components.DateTimeExtensions.getUtcNowISO ()
-
-                    let tokenInvalid: bool =
-                        try
-                            let value: bool = meta?tokenInvalid
-                            value
-                        with _ ->
-                            false
-
-                    if not (isSafeAccountId storedAccountId) then
-                        None
-                    else
-                        Some {
-                            Metadata = {
-                                AccountId = storedAccountId
-                                Name = name
-                                Email = email
-                                AvatarUrl = avatarUrl
-                                TargetDataHub = targetDataHub
-                                DateAdded = dateAdded
-                                TokenInvalid = tokenInvalid
-                            }
-                            Token = token
-                        }
+                    tryDecodeAuthMetadata localSwateAccountId metaRaw
+                    |> Option.map (fun metadata -> { Metadata = metadata; Token = token })
     with _ ->
         None
 
@@ -205,17 +211,17 @@ let loadAll () : StoredCredential list =
             files
             |> Array.choose (fun f ->
                 if f.EndsWith("-meta.json") then
-                    let accountId = f.Replace("-meta.json", "")
-                    tryLoad accountId
+                    let localSwateAccountId = f.Replace("-meta.json", "")
+                    tryLoad localSwateAccountId
                 else
                     None
             )
             |> Array.toList
     with _ -> []
 
-let remove (accountId: string) : unit =
+let remove (localSwateAccountId: string) : unit =
     try
-        match tryGetAccountPaths accountId with
+        match tryGetAccountPaths localSwateAccountId with
         | None -> ()
         | Some(enc, metaPath) ->
             if existsSync enc then
@@ -237,28 +243,25 @@ let clearAll () : unit =
     with _ ->
         ()
 
-let getActiveAccountId () : string option =
+let getActiveLocalSwateAccountId () : string option =
     try
         let path = activeAccountFilePath ()
 
         if existsSync path then
             let raw = readFileSync path TextEncoding.Utf8
-            let parsed: obj = JS.JSON.parse raw
-            let id: string = parsed?accountId
-
-            if not (isSafeAccountId id) then None else Some id
+            tryDecodeActiveLocalSwateAccountId raw
         else
             None
     with _ ->
         None
 
-let setActiveAccountId (accountId: string option) : unit =
+let setActiveLocalSwateAccountId (localSwateAccountId: string option) : unit =
     try
         let path = activeAccountFilePath ()
 
-        match accountId with
-        | Some id when isSafeAccountId id ->
-            let json = JS.JSON.stringify {| accountId = id |}
+        match localSwateAccountId with
+        | Some id when isSafeLocalSwateAccountId id ->
+            let json = JS.JSON.stringify {| localSwateAccountId = id |}
             let tmp = path + ".tmp"
             writeFileSync tmp json TextEncoding.Utf8
             renameSync tmp path

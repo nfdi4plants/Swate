@@ -1,45 +1,27 @@
 module Renderer.Components.InitState
 
 open Feliz
-
-open Fable.Core
-
+open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.CardGrid
-
-module private InitStateHelper =
-    let openARC =
-        fun () -> promise {
-            let! r = Api.ipcArcVaultApi.openARC ()
-
-            match r with
-            | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
-            | Ok _ -> ()
-        }
-
-    let createARC =
-        fun identifier -> promise {
-            let! r = Api.ipcArcVaultApi.createARC identifier
-
-            match r with
-            | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
-            | Ok _ -> ()
-        }
-
-open InitStateHelper
+open Swate.Components.Primitive.ErrorModal.Context
 
 [<ReactComponent>]
 let CreateNewArcModalContent (close: unit -> unit) =
 
     let isValid, setIsValid = React.useState (true)
     let temp, setTemp = React.useState ("")
+    let errorModal = useErrorModalCtx ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+
+    let onCreateArcError =
+        createErrorModalCallback errorModal.enqueue "Could not create ARC" appStateCtx
 
     let handleSubmit =
         fun () ->
             if isValid then
-                console.log ("Starting Create ARC:", temp)
-                createARC temp |> Promise.start
+                createArc onCreateArcError temp |> Promise.start
 
             close ()
 
@@ -91,6 +73,11 @@ let InitState () =
 
     let modalIsOpen, setModalIsOpen = React.useState (false)
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let errorModal = useErrorModalCtx ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+
+    let onOpenArcError =
+        createErrorModalCallback errorModal.enqueue "Could not open ARC" appStateCtx
 
     React.Fragment [
         BaseModal.BaseModal(modalIsOpen, setModalIsOpen, CreateNewArcModalContent(fun () -> setModalIsOpen false))
@@ -102,7 +89,7 @@ let InitState () =
                     ],
                     "Open ARC",
                     "Open a locally existing ARC!",
-                    (openARC >> Promise.start)
+                    (fun _ -> openArc onOpenArcError |> Promise.start)
                 )
                 CardGrid.CardGridButton(
                     Html.i [
@@ -110,7 +97,7 @@ let InitState () =
                     ],
                     "New ARC",
                     "Create a new ARC!",
-                    (fun _ -> setModalIsOpen (not modalIsOpen))
+                    (fun _ -> setModalIsOpen true)
                 )
                 CardGrid.CardGridButton(
                     Html.i [

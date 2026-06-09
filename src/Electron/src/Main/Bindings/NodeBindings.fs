@@ -4,8 +4,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 
 let childProcessDynamic: obj = importAll "node:child_process"
-let fsPromisesDynamic: obj = importAll "fs/promises"
-let pathDynamic: obj = importAll "path"
+
+[<Emit("process.platform")>]
+let processPlatform () : string = jsNative
 
 [<Emit("$0.length")>]
 let bufferLength (buffer: obj) : int = jsNative

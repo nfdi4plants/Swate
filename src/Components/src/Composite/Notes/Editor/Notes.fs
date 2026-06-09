@@ -25,8 +25,7 @@ type Notes =
 
         let createPayload (target: NotesTarget) (relativePath: string) =
             match draft.DateCreated with
-            | None ->
-                setError (Some "Date Created is required.")
+            | None -> setError (Some "Date Created is required.")
             | Some dateCreated ->
                 let content = NoteConversion.formatMarkdown draft
 
@@ -44,55 +43,45 @@ type Notes =
                 onSubmit payload
 
         let toggleExistingTargetSelector () =
-            uiState
-            |> State.toggleExistingTargetSelector
-            |> setUiState
+            uiState |> State.toggleExistingTargetSelector |> setUiState
 
         let submitToExisting () =
             if Validation.isRequiredDataValid draft |> not then
                 setError (Some "Please enter a Title and a Date Created value before submitting.")
             else
                 match draft.SelectedExistingTarget with
-                | None ->
-                    setError (Some "Select a Study or Assay target first.")
+                | None -> setError (Some "Select a Study or Assay target first.")
                 | Some targetRef ->
                     match draft.DateCreated with
-                    | None ->
-                        setError (Some "Date Created is required.")
+                    | None -> setError (Some "Date Created is required.")
                     | Some dateCreated ->
                         match NoteConversion.resolveProtocolName draft with
-                        | None ->
-                            setError (Some "Title is invalid for protocol naming. Choose a different title.")
+                        | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
                         | Some protocolName ->
                             match NoteConversion.mkExistingTargetRelativePath targetRef dateCreated protocolName with
-                            | None ->
-                                setError (Some "Could not resolve a safe target path.")
-                            | Some relativePath ->
-                                createPayload (NotesTarget.ExistingTarget targetRef) relativePath
+                            | None -> setError (Some "Could not resolve a safe target path.")
+                            | Some relativePath -> createPayload (NotesTarget.ExistingTarget targetRef) relativePath
 
         let submitNewRootNote () =
             if Validation.isRequiredDataValid draft |> not then
                 setError (Some "Please enter a Title and a Date Created value before submitting.")
             else
                 match draft.DateCreated with
-                | None ->
-                    setError (Some "Date Created is required.")
+                | None -> setError (Some "Date Created is required.")
                 | Some dateCreated ->
                     match NoteConversion.resolveProtocolName draft with
-                    | None ->
-                        setError (Some "Title is invalid for protocol naming. Choose a different title.")
+                    | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
                     | Some protocolName ->
                         match NoteConversion.mkNewRootNoteRelativePath dateCreated protocolName with
-                        | None ->
-                            setError (Some "Could not resolve a safe note path.")
-                        | Some relativePath ->
-                            createPayload NotesTarget.NewRootNote relativePath
+                        | None -> setError (Some "Could not resolve a safe note path.")
+                        | Some relativePath -> createPayload NotesTarget.NewRootNote relativePath
 
         Html.div [
             prop.className "swt:p-8 swt:flex swt:justify-center swt:overflow-y-auto"
             prop.children [
                 Html.div [
-                    prop.className "swt:w-full swt:max-w-4xl swt:rounded-box swt:border swt:border-base-300 swt:bg-base-200 swt:p-6 swt:space-y-4"
+                    prop.className
+                        "swt:w-full swt:max-w-4xl swt:rounded-box swt:border swt:border-base-300 swt:bg-base-200 swt:p-6 swt:space-y-4 swt:h-fit"
                     prop.children [
                         Html.h2 [
                             prop.className "swt:text-3xl swt:font-bold swt:text-primary"
@@ -114,7 +103,8 @@ type Notes =
                                 | None -> "Create in Existing Target"
 
                             Html.div [
-                                prop.className "swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:space-y-3"
+                                prop.className
+                                    "swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:space-y-3"
                                 prop.children [
                                     Html.h3 [
                                         prop.className "swt:text-lg swt:font-semibold"
@@ -122,7 +112,12 @@ type Notes =
                                     ]
                                     TargetSelector.Main(
                                         draft.SelectedExistingTarget,
-                                        (fun target -> setDraft { draft with SelectedExistingTarget = target }),
+                                        (fun target ->
+                                            setDraft {
+                                                draft with
+                                                    SelectedExistingTarget = target
+                                            }
+                                        ),
                                         availableExistingTargets,
                                         uiState.IsSubmitting
                                     )

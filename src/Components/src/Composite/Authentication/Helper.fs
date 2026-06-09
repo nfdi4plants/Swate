@@ -47,6 +47,10 @@ module GitLabUrls =
         let normalizedBaseUrl = baseUrl.TrimEnd('/')
         $"{normalizedBaseUrl}/-/user_settings/personal_access_tokens?name=swate-electron"
 
+    let profileUrl (user: Types.AuthUserDto) =
+        let normalizedBaseUrl = user.TargetDataHub.TrimEnd('/')
+        $"{normalizedBaseUrl}/-/u/{user.Id}"
+
 [<Literal>]
 let Default_DataHub_Url = "https://git.nfdi4plants.org/"
 
