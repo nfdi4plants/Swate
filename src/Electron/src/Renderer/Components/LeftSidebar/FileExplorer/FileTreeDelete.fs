@@ -12,15 +12,13 @@ module FileTreeDeleteWorkflow =
         closeDeleteModal: unit -> unit
         setIsDeleting: bool -> unit
         enqueueError: ErrorModalRequest -> unit
-        arcScopeId: string option
     }
 
     let private applyDeleteError (config: ConfirmDeleteConfig) (errorMessage: string) =
         config.enqueueError (
             ErrorModalRequest.create (
                 errorMessage,
-                title = "Could not delete item",
-                ?scopeId = config.arcScopeId
+                title = "Could not delete item"
             )
         )
 
@@ -50,11 +48,3 @@ module FileTreeDeleteWorkflow =
             |> Promise.catch (fun exn -> applyDeleteError config exn.Message)
             |> Promise.map (fun _ -> config.setIsDeleting false)
             |> Promise.start
-
-    let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem) =
-        FileExplorerContextMenuItem.whenItem
-            canDeleteItem
-            "Delete"
-            "swt:fluent--delete-24-regular"
-            requestDeleteItem
-            item

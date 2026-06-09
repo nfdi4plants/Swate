@@ -12,6 +12,7 @@ open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 module RenameWorkflow = Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameWorkflow
+module FileTreeContextMenu = Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 
 let rec private waitUntil (predicate: unit -> bool, attempts: int) =
     promise {
@@ -74,7 +75,7 @@ Vitest.describe("FileTreeRenameHelper", fun () ->
 )
 
 let private getRenameMenuItems (item: FileItem) =
-    RenameWorkflow.renameContextMenuItems (fun _ -> ()) item
+    FileTreeContextMenu.renameContextMenuItems (fun _ -> ()) item
 
 let private expectRenameMenuVisibility expectedCount item =
     let menuItems = getRenameMenuItems item
@@ -132,7 +133,6 @@ let private createConfirmRenameConfig
                     return Ok()
                 }
         enqueueError = fun _ -> failwith "Did not expect rename error."
-        arcScopeId = None
     }
 
 let private expectRenameRequest probe expectedRelativePath expectedNewName =
@@ -225,10 +225,10 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         let mutable pendingRenameDraft: ArcRenameDraft option = None
 
         let requestRenameItem =
-            RenameWorkflow.requestRenameItem (fun draft -> pendingRenameDraft <- draft) ignore None
+            RenameWorkflow.requestRenameItem (fun draft -> pendingRenameDraft <- draft) ignore
 
         let menuItems =
-            RenameWorkflow.renameContextMenuItems requestRenameItem item
+            FileTreeContextMenu.renameContextMenuItems requestRenameItem item
 
         Vitest.expect(menuItems.Length).toBe(1)
         menuItems.[0].OnClick()
@@ -243,7 +243,6 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
         RenameWorkflow.requestRenameItem
             (fun draft -> pendingRenameDraft <- draft)
             (fun _ -> errorCount <- errorCount + 1)
-            None
             item
 
         Vitest.expect(pendingRenameDraft).toEqual(None)
@@ -274,7 +273,7 @@ Vitest.describe("FileTreeRenameWorkflow", fun () ->
                 renderToBody (
                     Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
                         initialItems = items,
-                        getItemActions = RenameWorkflow.renameContextMenuItems onRenameItem
+                        getItemActions = FileTreeContextMenu.renameContextMenuItems onRenameItem
                     )
                 )
 

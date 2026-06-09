@@ -376,15 +376,17 @@ module ArcVaultExtensions =
             match this.path with
             | Some _ -> swatefailfn this.window.id "Unable to open ARC in vault bound to ARC."
             | None ->
+                let normalizedPath = PathHelpers.normalizePath path
+
                 let sendMsg =
                     Remoting.createIpc ()
                     |> Remoting.withWindow this.window
                     |> Remoting.buildProxySender<IPathChangeRendererApi>
 
-                swatelogfn this.window.id "path: %s" path
-                this.path <- Some path
+                swatelogfn this.window.id "path: %s" normalizedPath
+                this.path <- Some normalizedPath
                 do! this.Startup()
-                sendMsg.pathChange (Some path)
+                sendMsg.pathChange (Some normalizedPath)
         }
 
         member this.CreateARC(path: string, identifier: string) = promise {
@@ -392,24 +394,26 @@ module ArcVaultExtensions =
             | Some _, _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to path."
             | _, Some _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to ARC."
             | None, None ->
+                let normalizedPath = PathHelpers.normalizePath path
+
                 let sendMsg =
                     Remoting.createIpc ()
                     |> Remoting.withWindow this.window
                     |> Remoting.buildProxySender<IPathChangeRendererApi>
 
                 let arc = ARC(identifier)
-                this.path <- Some path
+                this.path <- Some normalizedPath
                 this.SetArc(arc)
                 this.RefreshHasUnsavedArcChangesFlag()
                 this.isBusyWriting <- true
 
                 try
-                    do! arc.WriteAsync(path)
+                    do! arc.WriteAsync(normalizedPath)
                 finally
                     this.isBusyWriting <- false
 
                 do! this.Startup()
-                sendMsg.pathChange (Some path)
+                sendMsg.pathChange (Some normalizedPath)
         }
 
         /// Load file entries from disk and push the file tree to the renderer.
@@ -465,7 +469,8 @@ type ArcVaults() =
 
     /// Centralized side-effect: update recent ARCs store and broadcast to all windows.
     member private this.TrackRecentAndBroadcast(arcPath: string) =
-        RECENT_ARCS.Add(arcPath) |> ignore
+        let normalizedArcPath = PathHelpers.normalizePath arcPath
+        RECENT_ARCS.Add(normalizedArcPath) |> ignore
         this.BroadcastRecentARCs()
 
     member this.DisposeVault(id: int) =
@@ -608,7 +613,8 @@ type ArcVaults() =
         | false, _ -> None
 
     member this.TryGetVaultByPath(path: string) =
-        this.Vaults.Values |> Seq.tryFind (fun v -> v.path = Some path)
+        this.Vaults.Values
+        |> Seq.tryFind (fun v -> v.path |> Option.exists (fun vaultPath -> PathHelpers.pathsEqual vaultPath path))
 
     // ── ARC Lifecycle Controller ──────────────────────────────────────────
     // All open/create/focus decisions are made here.
@@ -617,53 +623,57 @@ type ArcVaults() =
     /// Open an existing ARC at the given path.
     /// Decision: already-open → focus, calling window empty → open there, else → new window.
     member this.OpenOrFocusArc(callingWindowId: int, arcPath: string) = promise {
-        match this.TryGetVaultByPath arcPath with
+        let normalizedArcPath = PathHelpers.normalizePath arcPath
+
+        match this.TryGetVaultByPath normalizedArcPath with
         | Some vault ->
             vault.window.focus ()
-            this.TrackRecentAndBroadcast(arcPath)
-            return ArcOpenDisposition.FocusedExisting arcPath
+            this.TrackRecentAndBroadcast(normalizedArcPath)
+            return ArcOpenDisposition.FocusedExisting normalizedArcPath
         | None ->
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
-                do! vault.OpenARC(arcPath)
+                do! vault.OpenARC(normalizedArcPath)
                 do! vault.RefreshFileTree()
-                this.TrackRecentAndBroadcast(arcPath)
-                return ArcOpenDisposition.OpenedInCurrent arcPath
+                this.TrackRecentAndBroadcast(normalizedArcPath)
+                return ArcOpenDisposition.OpenedInCurrent normalizedArcPath
             | _ ->
-                let! newWindowId = this.RegisterVaultWithArc(arcPath)
+                let! newWindowId = this.RegisterVaultWithArc(normalizedArcPath)
 
                 match this.TryGetVault newWindowId with
                 | Some newVault -> do! newVault.RefreshFileTree()
                 | None -> ()
 
-                this.TrackRecentAndBroadcast(arcPath)
-                return ArcOpenDisposition.OpenedInNewWindow arcPath
+                this.TrackRecentAndBroadcast(normalizedArcPath)
+                return ArcOpenDisposition.OpenedInNewWindow normalizedArcPath
     }
 
     /// Create a new ARC at the given path with the given identifier.
     /// Decision: path already open → focus, calling window empty → create there, else → new window.
     member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
-        match this.TryGetVaultByPath arcPath with
+        let normalizedArcPath = PathHelpers.normalizePath arcPath
+
+        match this.TryGetVaultByPath normalizedArcPath with
         | Some vault ->
             vault.window.focus ()
-            this.TrackRecentAndBroadcast(arcPath)
-            return ArcOpenDisposition.FocusedExisting arcPath
+            this.TrackRecentAndBroadcast(normalizedArcPath)
+            return ArcOpenDisposition.FocusedExisting normalizedArcPath
         | None ->
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
-                do! vault.CreateARC(arcPath, identifier)
+                do! vault.CreateARC(normalizedArcPath, identifier)
                 do! vault.RefreshFileTree()
-                this.TrackRecentAndBroadcast(arcPath)
-                return ArcOpenDisposition.CreatedInCurrent arcPath
+                this.TrackRecentAndBroadcast(normalizedArcPath)
+                return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
             | _ ->
-                let! newWindowId = this.RegisterVaultWithNewArc(arcPath, identifier)
+                let! newWindowId = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
 
                 match this.TryGetVault newWindowId with
                 | Some newVault -> do! newVault.RefreshFileTree()
                 | None -> ()
 
-                this.TrackRecentAndBroadcast(arcPath)
-                return ArcOpenDisposition.CreatedInNewWindow arcPath
+                this.TrackRecentAndBroadcast(normalizedArcPath)
+                return ArcOpenDisposition.CreatedInNewWindow normalizedArcPath
     }
 
 

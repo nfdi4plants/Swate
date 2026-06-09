@@ -1,8 +1,9 @@
-module Renderer.Components.LeftSidebar.GitSidebarPanel
+module Renderer.Components.LeftSidebar.Git.GitSidebarPanel
 
+open Browser.Dom
 open Feliz
+open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Components.Primitive.ErrorModal.Types
 
 let mutable private gitVersionCheckStarted = false
 
@@ -15,6 +16,10 @@ let Main () =
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
     let remoteProjectName, setRemoteProjectName = React.useState ""
     let errorCtx = useErrorModalCtx ()
+    let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+
+    let onOpenArcError =
+        createErrorModalCallback errorCtx.enqueue "Error opening ARC" appStateCtx
 
     React.useEffectOnce (fun () ->
         if not gitVersionCheckStarted then
@@ -45,23 +50,15 @@ let Main () =
 
     let openArc =
         fun _ ->
-            promise {
-                let! r = Api.ipcArcVaultApi.openARC ()
-
-                match r with
-                | Error e ->
-                    errorCtx.enqueue (
-                        ErrorModalRequest.create (e.Message, title = "Error opening ARC")
-                    )
-                | Ok _ -> ()
-            }
+            Renderer.Components.Helper.ArcVaultHelper.openArc onOpenArcError
             |> Promise.start
 
     match gitStateCtx.state.CurrentArcPath with
     | None ->
-        Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
+        Renderer.Components.LeftSidebar.Git.GitSidebarEmptyState.Main(
             title = "Open an ARC to use Git features",
             description = "Source control becomes available after you open or download an ARC.",
+            iconClassName = "swt:fluent--folder-open-24-regular",
             primaryAction = {
                 Label = "Open ARC"
                 IconClassName = "swt:fluent--folder-open-24-regular"
@@ -78,9 +75,10 @@ let Main () =
     | Some _ when
         gitStateCtx.state.RepositoryAvailability = Renderer.Context.GitWorkflow.GitRepositoryAvailability.MissingRepository
         ->
-        Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
+        Renderer.Components.LeftSidebar.Git.GitSidebarEmptyState.Main(
             title = "Initialize Git for this ARC",
             description = "The selected ARC folder is not a Git repository yet.",
+            iconClassName = "swt:fluent--branch-fork-24-regular",
             primaryAction = {
                 Label =
                     if
@@ -166,5 +164,12 @@ let Main () =
             downloadLargeFiles = gitStateCtx.state.DownloadLargeFiles,
             lfsAutoTrackThresholdMb = gitStateCtx.state.LfsAutoTrackThresholdMb,
             remoteActionsEnabled = remoteActionsEnabled,
+            canOpenRemoteRepository = gitStateCtx.state.OriginRemoteRepositoryWebUrl.IsSome,
+            onOpenRemoteRepository =
+                (fun () ->
+                    match gitStateCtx.state.OriginRemoteRepositoryWebUrl with
+                    | Some repositoryWebUrl -> window.``open`` (repositoryWebUrl, "_blank") |> ignore
+                    | None -> ()
+                ),
             ?remoteActionsWarning = remoteActionsWarning
         )

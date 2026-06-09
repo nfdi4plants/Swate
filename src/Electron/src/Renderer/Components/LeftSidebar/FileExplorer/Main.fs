@@ -109,14 +109,14 @@ type Main =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let errorModalCtx = useErrorModalCtx ()
+        let arcNameContextMenuRef = React.useElementRef ()
 
         let copyArcPathToClipboard =
             copyArcPathToClipboard (fun ex ->
                 errorModalCtx.enqueue (
                     ErrorModalRequest.create (
                         $"Failed to copy path: {ex.Message}",
-                        title = "Copy path failed",
-                        ?scopeId = appStateCtx
+                        title = "Copy path failed"
                     )
                 )
             )
@@ -127,8 +127,7 @@ type Main =
                 errorModalCtx.enqueue (
                     ErrorModalRequest.create (
                         $"Failed to open folder: {ex.Message}",
-                        title = "Open folder failed",
-                        ?scopeId = appStateCtx
+                        title = "Open folder failed"
                     )
                 )
             )
@@ -166,16 +165,21 @@ type Main =
                             )
                         ]
                     ]
-                    Swate.Components.Composite.ArcVaultActions.ArcVaultActions.ArcVaultActions(
-                        path,
-                        copyArcPathToClipboard,
-                        openArcFolderInFileExplorer
-                    )
+                    Html.div [
+                        prop.ref arcNameContextMenuRef
+                        prop.children [
+                            Swate.Components.Composite.ArcVaultActions.ArcVaultActions.ArcVaultActions(
+                                path,
+                                copyArcPathToClipboard,
+                                openArcFolderInFileExplorer
+                            )
+                        ]
+                    ]
                     Html.div [
                         prop.testId "left-sidebar-file-explorer-tree"
                         prop.className
                             "swt:flex-1 swt:min-h-0 swt:overflow-y-auto swt:overflow-x-auto swt:[scrollbar-gutter:stable]"
-                        prop.children [ FileTree.FileTree() ]
+                        prop.children [ FileTree.FileTree(rootContextMenuRef = arcNameContextMenuRef) ]
                     ]
                 ]
             ]

@@ -7,6 +7,7 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Composite.Widgets
+open Swate.Components.Composite.Widgets.BuildingBlockWidget
 open Swate.Components.Page.ArcFileEditor.EmptyTableView
 
 [<Erase; Mangle(false)>]
@@ -30,7 +31,6 @@ type Modals =
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text "Select a building block",
-            // TODO: This does not correctly mirror look from Client/
             children = BuildingBlockWidget.Main(arcFile, activeTableIndex, setArcFileAndClose),
             className = "swt:max-w-3xl"
         )
@@ -54,7 +54,11 @@ type Modals =
             setIsOpen = setIsOpen,
             header = Html.text "Select template(s)",
             children =
-                Swate.Components.Composite.Widgets.TemplateWidget.TemplateWidget(arcFile, activeTableIndex, setArcFileAndClose),
+                Swate.Components.Composite.Widgets.TemplateWidget.TemplateWidget(
+                    arcFile,
+                    activeTableIndex,
+                    setArcFileAndClose
+                ),
             className = "swt:flex swt:min-w-fit"
         )
 
@@ -191,4 +195,3 @@ type Modals =
                 ],
             className = "swt:max-w-3xl"
         )
-

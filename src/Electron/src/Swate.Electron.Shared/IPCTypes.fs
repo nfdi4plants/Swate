@@ -24,11 +24,13 @@ open IPCTypesHelper
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
-    openARC: unit -> JS.Promise<Result<string, exn>>
+    openARC: unit -> JS.Promise<Result<string option, exn>>
     /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
     openARCByPath: string -> JS.Promise<Result<string, exn>>
     /// Create ARC via folder dialog. Main decides disposition.
     createARC: string -> JS.Promise<Result<string, exn>>
+    /// Ensure ARC notes scaffolding exists for the ARCVault root path.
+    ensureNotesFolder: unit -> JS.Promise<Result<unit, exn>>
     closeARC: unit -> JS.Promise<Result<unit, exn>>
     getOpenPath: unit -> JS.Promise<string option>
     getRecentARCs: unit -> JS.Promise<ARCPointer[]>
@@ -41,6 +43,8 @@ type IArcVaultsApi = {
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
     openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>
+    showPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
+    openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>
     readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
     /// Persists the active in-memory ARC scaffold to disk.
     saveArcFile: unit -> JS.Promise<Result<unit, exn>>
@@ -48,6 +52,8 @@ type IArcVaultsApi = {
     setArcFileInMemory: FileContentDTO -> JS.Promise<Result<unit, exn>>
     /// Adds a new ARC entity from the file tree. The file watcher performs the follow-up merge and file-tree update.
     addArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
+    /// Creates a generic file or folder inside a safe ARC directory.
+    createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>
     /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
@@ -63,6 +69,7 @@ type IGitApi = {
     checkGitVersions: unit -> JS.Promise<Result<unit, exn>>
     getGitStatus: unit -> JS.Promise<Result<GitStatusDto, exn>>
     getGitBranches: unit -> JS.Promise<Result<GitBranchRefDto[], exn>>
+    getOriginRepositoryWebUrl: unit -> JS.Promise<Result<string option, exn>>
     getGitLfsSettings: unit -> JS.Promise<Result<GitLfsSettingsDto, exn>>
     previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, exn>>
     getGitDiffSummary: unit -> JS.Promise<Result<GitDiffSummaryDto, exn>>

@@ -14,6 +14,7 @@ const noopWithPaths = (_paths: string[]) => {};
 const noopWithBranch = (_branchName: string) => {};
 const noopWithThreshold = (_thresholdMb: number) => {};
 const noopWithDownloadPreference = (_downloadLargeFiles: boolean) => {};
+const noopOpenRemoteRepository = () => {};
 const noopSelectChange = (_change: unknown) =>
   Promise.resolve(FSharpResult$2_Ok<void, string>(undefined));
 
@@ -285,9 +286,12 @@ export const AdvancedActions: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    canOpenRemoteRepository: true,
+    onOpenRemoteRepository: noopOpenRemoteRepository,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeEnabled();
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
@@ -707,12 +711,36 @@ export const RemoteActionsDisabled: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeDisabled();
     await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toBeDisabled();
     await expect(
       canvas.getByTestId("GitSidebarRemoteAuthWarning"),
     ).toHaveTextContent(
       "Sign in to a DataHub account to use fetch, pull, push, or update.",
     );
+  },
+};
+
+const openRemoteRepositorySpy = fn();
+
+export const OpenRemoteRepositoryButton: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+    canOpenRemoteRepository: true,
+    onOpenRemoteRepository: openRemoteRepositorySpy,
+  },
+  play: async ({ canvasElement }) => {
+    openRemoteRepositorySpy.mockClear();
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeEnabled();
+    await userEvent.click(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton"));
+    await expect(openRemoteRepositorySpy).toHaveBeenCalledTimes(1);
   },
 };
 

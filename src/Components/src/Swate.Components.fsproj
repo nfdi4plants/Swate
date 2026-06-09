@@ -95,6 +95,8 @@
     <Compile Include="Primitive\Icons.fs" />
     <Compile Include="Primitive\Buttons\Buttons.fs" />
     <Compile Include="Primitive\LoadingSpinner\LoadingSpinner.fs" />
+    <Compile Include="Primitive\Blankslate\Types.fs" />
+    <Compile Include="Primitive\Blankslate\Blankslate.fs" />
     <Compile Include="Primitive\Popover\Context.fs" />
     <Compile Include="Primitive\Popover\Popover.fs" />
     <Compile Include="Primitive\Select\Types.fs" />
@@ -193,7 +195,8 @@
     <Compile Include="Composite\Widgets\Types.fs" />
     <Compile Include="Composite\Widgets\LocalStorage.fs" />
     <Compile Include="Composite\Widgets\Context.fs" />
-    <Compile Include="Composite\Widgets\BuildingBlockWidget.fs" />
+    <Compile Include="Composite\Widgets\BuildingBlockWidget\Dropdown.fs" />
+    <Compile Include="Composite\Widgets\BuildingBlockWidget\BuildingBlockWidget.fs" />
     <Compile Include="Composite\Widgets\FilePickerWidget.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\Types.fs" />
     <Compile Include="Composite\Widgets\DataAnnotator\Helper.fs" />

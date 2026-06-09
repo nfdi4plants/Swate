@@ -5,7 +5,6 @@ open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open ARCtrl.Contract
 
 [<ReactComponent>]
 let NotesDraftTarget () =
@@ -30,8 +29,11 @@ let NotesDraftTarget () =
                         Error = None
                 }
 
+                let requestFileType =
+                    FileContentDTO.inferTextFileTypeFromPath payload.Intent.RelativePath
+
                 let request: FileContentDTO =
-                    FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
+                    FileContentDTO.create requestFileType payload.Intent.Content payload.Intent.RelativePath
 
                 let! writeResult = Api.ipcArcVaultApi.writeFile request
 
@@ -53,13 +55,14 @@ let NotesDraftTarget () =
 
                     match previewResult with
                     | Ok previewData ->
-                        previewData
-                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                        let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
+                        pageStateCtx.setState (Some pageState)
                     | Result.Error _ ->
-                        FileContentDTO.create DTOType.PlainText payload.Intent.Content payload.Intent.RelativePath
-                        |> Renderer.Components.ARCHelper.viewLoadResultOfDto
-                        |> Renderer.Components.ARCHelper.applyLoadedView pageStateCtx.setState
+                        let fallbackData =
+                            FileContentDTO.create requestFileType payload.Intent.Content payload.Intent.RelativePath
+
+                        let pageState = Renderer.Types.PageState.fromFileContentDTO fallbackData
+                        pageStateCtx.setState (Some pageState)
             }
             |> Promise.start
 

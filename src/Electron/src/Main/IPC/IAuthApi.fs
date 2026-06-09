@@ -69,18 +69,18 @@ let api: IAuthApi = {
                 return Error(exn "Failed to list accounts.")
         }
     setActiveAccount =
-        fun (accountId: string) -> promise {
+        fun (localSwateAccountId: string) -> promise {
             try
-                let state = AuthService.setActiveAccount accountId
+                let state = AuthService.setActiveAccount localSwateAccountId
                 broadcastAccountsUpdate ()
                 return Ok state
             with _ ->
                 return Error(exn "Failed to switch active account.")
         }
     removeAccount =
-        fun (accountId: string) -> promise {
+        fun (localSwateAccountId: string) -> promise {
             try
-                AuthService.removeAccount accountId
+                AuthService.removeAccount localSwateAccountId
                 broadcastAccountsUpdate ()
                 return Ok()
             with _ ->

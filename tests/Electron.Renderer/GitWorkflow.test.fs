@@ -181,14 +181,12 @@ delete globalThis.__swateGitLabCreateProjectFetches;
 """)>]
 let private cleanupGitLabCreateProjectFetchSpy () : unit = jsNative
 
-let private manyChangedFiles count =
-    [|
-        for index in 0 .. count - 1 do
-            changedFile (sprintf "src/file-%03i.txt" index) "M" " " false
-    |]
+let private manyChangedFiles count = [|
+    for index in 0 .. count - 1 do
+        changedFile (sprintf "src/file-%03i.txt" index) "M" " " false
+|]
 
-let private joinLines (lines: string array) =
-    String.concat "\n" lines + "\n"
+let private joinLines (lines: string array) = String.concat "\n" lines + "\n"
 
 let private buildAddedFileDiff (path: string) (lines: string array) =
     [
@@ -231,6 +229,7 @@ let private unexpectedPromise<'T> (name: string) : JS.Promise<Result<'T, string>
 let private defaultDependencies: GitDependencies = {
     getGitStatus = fun () -> unexpectedPromise "getGitStatus"
     getGitBranches = fun () -> unexpectedPromise "getGitBranches"
+    getOriginRemoteRepositoryWebUrl = fun () -> promise { return Ok None }
     getGitLfsSettings = fun () -> unexpectedPromise "getGitLfsSettings"
     loadDiffPage = fun path -> unexpectedPromise $"loadDiffPage:{path}"
     loadMergeConflictPage = fun path -> unexpectedPromise $"loadMergeConflictPage:{path}"
@@ -406,24 +405,19 @@ Vitest.describe (
                 installGitLabCreateProjectFetchSpy ()
 
                 try
-                    let! result =
-                        GitLabApi.CreateProject(
-                            "https://gitlab.example/",
-                            "token-123",
-                            " My ARC Project "
-                        )
+                    let! result = GitLabApi.CreateProject("https://gitlab.example/", "token-123", " My ARC Project ")
 
                     match result with
                     | Error err -> failwith err.GitLabErrorToString
                     | Ok project ->
-                        Vitest.expect(project.name).toBe("My ARC Project")
-                        Vitest.expect(project.path_with_namespace).toBe("carol/my-arc-project")
+                        Vitest.expect(project.name).toBe ("My ARC Project")
+                        Vitest.expect(project.path_with_namespace).toBe ("carol/my-arc-project")
 
                     let body = lastGitLabCreateProjectBody ()
 
-                    Vitest.expect(getProperty<string> body "name").toBe("My ARC Project")
-                    Vitest.expect(getProperty<bool> body "initialize_with_readme").toBe(false)
-                    Vitest.expect(hasOwnProperty body "path").toBe(false)
+                    Vitest.expect(getProperty<string> body "name").toBe ("My ARC Project")
+                    Vitest.expect(getProperty<bool> body "initialize_with_readme").toBe (false)
+                    Vitest.expect(hasOwnProperty body "path").toBe (false)
                 finally
                     cleanupGitLabCreateProjectFetchSpy ()
             }
@@ -456,8 +450,8 @@ Vitest.describe (
                 let nextModel, cmd = update deps ignore PruneLfsCacheRequested model
                 let! _ = collectMessages cmd
 
-                Vitest.expect(confirmedMessage.IsSome).toBe(true)
-                Vitest.expect(nextModel.BusyOperation).toBe(None)
+                Vitest.expect(confirmedMessage.IsSome).toBe (true)
+                Vitest.expect(nextModel.BusyOperation).toBe (None)
             }
         )
 
@@ -470,12 +464,14 @@ Vitest.describe (
                         ArcSessionId = 1
                 }
 
-                let nextModel, _cmd = update defaultDependencies ignore (WriteRequested DedupLfsStorage) model
+                let nextModel, _cmd =
+                    update defaultDependencies ignore (WriteRequested DedupLfsStorage) model
 
-                Vitest.expect(nextModel.BusyOperation).toEqual(Some GitBusyOperation.DeduplicatingGitLfsStorage)
+                Vitest.expect(nextModel.BusyOperation).toEqual (Some GitBusyOperation.DeduplicatingGitLfsStorage)
             }
         )
 )
+
 Vitest.describe (
     "GitWorkflow update command flow",
     fun () ->
@@ -532,6 +528,7 @@ Vitest.describe (
                     Status = Ok(statusForBranch "feature/stale")
                     Branches = Ok [| localBranch "feature/stale" true true |]
                     LfsSettings = Ok(lfsSettings 9 false)
+                    OriginRemoteRepositoryWebUrl = Some "https://example.org/feature/stale"
                 }
 
                 let nextState, cmd =
@@ -570,6 +567,73 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "RefreshRequested stores origin repository URL from refresh metadata",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 3 true) }
+                        getOriginRemoteRepositoryWebUrl =
+                            fun () -> promise { return Ok(Some "https://github.com/nfdi4plants/Swate") }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                }
+
+                let requestingState, requestCmd = update deps ignore RefreshRequested state
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, nextCmd =
+                    match requestMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message requestingState
+                    | _ -> failwith "Expected refresh completion message."
+
+                let! nextMessages = collectMessages nextCmd
+
+                Vitest
+                    .expect(nextState.OriginRemoteRepositoryWebUrl)
+                    .toEqual (Some "https://github.com/nfdi4plants/Swate")
+
+                Vitest.expect(nextMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "RefreshRequested keeps refresh successful when origin repository URL lookup fails",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        getGitStatus = fun () -> promise { return Ok cleanStatus }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 2 false) }
+                        getOriginRemoteRepositoryWebUrl = fun () -> promise { return Error "origin lookup failed" }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                }
+
+                let requestingState, requestCmd = update deps ignore RefreshRequested state
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, nextCmd =
+                    match requestMessages with
+                    | [| (RefreshCompleted _ as message) |] -> update deps ignore message requestingState
+                    | _ -> failwith "Expected refresh completion message."
+
+                let! nextMessages = collectMessages nextCmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(nextState.OriginRemoteRepositoryWebUrl).toEqual (None)
+                Vitest.expect(nextMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
             "RefreshCompleted records missing-repository state instead of leaving the sidebar in generic error mode",
             fun () -> promise {
                 let clearedPages = ResizeArray<PageState option>()
@@ -587,7 +651,10 @@ Vitest.describe (
                     update
                         defaultDependencies
                         setPageState
-                        (RefreshCompleted(1, Error "git status failed (Unknown): The selected ARC path is not a git repository."))
+                        (RefreshCompleted(
+                            1,
+                            Error "git status failed (Unknown): The selected ARC path is not a git repository."
+                        ))
                         state
 
                 let! messages = collectMessages cmd
@@ -900,8 +967,7 @@ Vitest.describe (
                 let deps = {
                     defaultDependencies with
                         initGitRepository = fun path -> promise { return Ok path }
-                        createDataHubProject =
-                            fun _ -> promise { return Error warningMessage }
+                        createDataHubProject = fun _ -> promise { return Error warningMessage }
                         getGitStatus = fun () -> promise { return Ok cleanStatus }
                         getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
                         getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 1 false) }
@@ -1069,13 +1135,19 @@ Vitest.describe (
                 }
 
                 let stateAfterRequest, requestCmd =
-                    update deps clearedPages.Add (WriteRequested(DiscardSelection [| "README.md"; "docs/guide.md" |])) initialState
+                    update
+                        deps
+                        clearedPages.Add
+                        (WriteRequested(DiscardSelection [| "README.md"; "docs/guide.md" |]))
+                        initialState
 
                 let! requestMessages = collectMessages requestCmd
 
                 let nextState, finishCmd =
                     match requestMessages with
-                    | [| WriteCompleted(_, DiscardSelection _, Ok(Completed(UnitSuccess(_, GitPageChange.Clear, Some None, None)))) |] ->
+                    | [| WriteCompleted(_,
+                                        DiscardSelection _,
+                                        Ok(Completed(UnitSuccess(_, GitPageChange.Clear, Some None, None)))) |] ->
                         update deps clearedPages.Add requestMessages[0] stateAfterRequest
                     | _ -> failwith "Expected discard to clear the open diff after refreshing git status."
 
@@ -1341,7 +1413,12 @@ Vitest.describe (
                         previewGitPull =
                             fun _ -> promise {
                                 previewCalls <- previewCalls + 1
-                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.SafeToPull
+                                        Message = None
+                                    }
                             }
                         gitPull =
                             fun _ -> promise {
@@ -1400,14 +1477,20 @@ Vitest.describe (
                 let deps = {
                     defaultDependencies with
                         getGitStatus = fun () -> promise { return Ok(statusForBranch "feature/new-branch") }
-                        getGitBranches = fun () -> promise { return Ok [| localBranch "feature/new-branch" true false |] }
+                        getGitBranches =
+                            fun () -> promise { return Ok [| localBranch "feature/new-branch" true false |] }
                         getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
                         gitStagePaths = fun _ -> promise { return Ok okOperationResult }
                         gitCommit = fun _ -> promise { return Ok okOperationResult }
                         previewGitPull =
                             fun _ -> promise {
                                 previewCalls <- previewCalls + 1
-                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.SafeToPull
+                                        Message = None
+                                    }
                             }
                         gitPull =
                             fun _ -> promise {
@@ -1473,7 +1556,12 @@ Vitest.describe (
                         previewGitPull =
                             fun _ -> promise {
                                 previewCalled <- true
-                                return Ok { Status = GitPullPreflightStatus.SafeToPull; Message = None }
+
+                                return
+                                    Ok {
+                                        Status = GitPullPreflightStatus.SafeToPull
+                                        Message = None
+                                    }
                             }
                         getGitStatus = fun () -> promise { return Ok cleanStatus }
                         getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
@@ -1534,7 +1622,11 @@ Vitest.describe (
 
                 let nextState, finishCmd =
                     match requestMessages with
-                    | [| WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteConfirmation(UnitSuccess(_, _, _, Some warningText), _, GitPendingRemoteAction.CompletePrimarySavePush))) |] ->
+                    | [| WriteCompleted(_,
+                                        PrimarySave _,
+                                        Ok(CompletedWithPendingRemoteConfirmation(UnitSuccess(_, _, _, Some warningText),
+                                                                                  _,
+                                                                                  GitPendingRemoteAction.CompletePrimarySavePush))) |] ->
                         let updatedState, cmd = update deps ignore requestMessages[0] stateAfterWriteRequest
                         Vitest.expect(warningText).toContain ("saved locally")
                         updatedState, cmd
@@ -1627,12 +1719,7 @@ Vitest.describe (
                 let stateAfterRequest, cmd = update deps ignore UpdateFromOnlineRequested state
 
                 let! nextState, finishCmd =
-                    updateFromSingleMessage
-                        deps
-                        ignore
-                        "Expected update preflight to complete."
-                        stateAfterRequest
-                        cmd
+                    updateFromSingleMessage deps ignore "Expected update preflight to complete." stateAfterRequest cmd
 
                 let! messages = collectMessages finishCmd
 
@@ -1678,17 +1765,16 @@ Vitest.describe (
                 let stateAfterRequest, cmd = update deps ignore UpdateFromOnlineRequested state
 
                 let! nextState, finishCmd =
-                    updateFromSingleMessage
-                        deps
-                        ignore
-                        "Expected update preflight to complete."
-                        stateAfterRequest
-                        cmd
+                    updateFromSingleMessage deps ignore "Expected update preflight to complete." stateAfterRequest cmd
 
                 let! messages = collectMessages finishCmd
 
                 Vitest.expect(messages).toEqual ([||])
-                Vitest.expect(nextState.PendingConfirmation |> Option.map _.Title).toEqual (Some "Update could not be previewed")
+
+                Vitest
+                    .expect(nextState.PendingConfirmation |> Option.map _.Title)
+                    .toEqual (Some "Update could not be previewed")
+
                 Vitest
                     .expect(nextState.PendingConfirmation |> Option.map _.Message |> Option.defaultValue "")
                     .toContain ("could not determine safely")
@@ -1878,16 +1964,14 @@ Vitest.describe (
         Vitest.test (
             "GitDiffViewer virtualizes large added-file diffs instead of mounting every rendered row",
             fun () ->
-                let lines =
-                    [| for index in 0 .. 599 -> $"Generated renderer diff line {index + 1}" |]
+                let lines = [|
+                    for index in 0..599 -> $"Generated renderer diff line {index + 1}"
+                |]
 
                 let markup =
                     renderToStaticMarkup (
                         Html.div [
-                            prop.style [
-                                style.width 960
-                                style.height 480
-                            ]
+                            prop.style [ style.width 960; style.height 480 ]
                             prop.children [
                                 Swate.Components.Page.GitDiffViewer.Viewer(
                                     wordDiffText = buildAddedFileDiff "notes/renderer-large.txt" lines,
@@ -1899,10 +1983,21 @@ Vitest.describe (
                         ]
                     )
 
-                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-virtual-content\"")).toBe (true)
-                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-0\"")).toBe (true)
-                Vitest.expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-599\"")).toBe (false)
-                Vitest.expect(countOccurrences "data-testid=\"renderer-large-diff-comparison-scroll-row-" markup).toBeLessThan (120)
+                Vitest
+                    .expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-virtual-content\""))
+                    .toBe (true)
+
+                Vitest
+                    .expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-0\""))
+                    .toBe (true)
+
+                Vitest
+                    .expect(markup.Contains("data-testid=\"renderer-large-diff-comparison-scroll-row-599\""))
+                    .toBe (false)
+
+                Vitest
+                    .expect(countOccurrences "data-testid=\"renderer-large-diff-comparison-scroll-row-" markup)
+                    .toBeLessThan (120)
         )
 
         Vitest.test (
@@ -1925,19 +2020,18 @@ Vitest.describe (
         Vitest.test (
             "GitMergeConflictViewer virtualizes long conflict blocks instead of mounting every rendered row",
             fun () ->
-                let currentLines =
-                    [| for index in 0 .. 239 -> $"Current renderer conflict line {index + 1}" |]
+                let currentLines = [|
+                    for index in 0..239 -> $"Current renderer conflict line {index + 1}"
+                |]
 
-                let incomingLines =
-                    [| for index in 0 .. 239 -> $"Incoming renderer conflict line {index + 1}" |]
+                let incomingLines = [|
+                    for index in 0..239 -> $"Incoming renderer conflict line {index + 1}"
+                |]
 
                 let markup =
                     renderToStaticMarkup (
                         Html.div [
-                            prop.style [
-                                style.width 960
-                                style.height 520
-                            ]
+                            prop.style [ style.width 960; style.height 520 ]
                             prop.children [
                                 Swate.Components.Page.GitMergeConflictViewer.Viewer(
                                     mergeConflictContent = buildSingleConflictDocument currentLines incomingLines,
@@ -1947,9 +2041,17 @@ Vitest.describe (
                         ]
                     )
 
-                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-virtual-content\"")).toBe (true)
-                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-row-0\"")).toBe (true)
-                Vitest.expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-row-239\"")).toBe (false)
+                Vitest
+                    .expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-virtual-content\""))
+                    .toBe (true)
+
+                Vitest
+                    .expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-row-0\""))
+                    .toBe (true)
+
+                Vitest
+                    .expect(markup.Contains("data-testid=\"renderer-large-merge-conflict-1-scroll-row-239\""))
+                    .toBe (false)
         )
 
         Vitest.test (
@@ -2013,7 +2115,7 @@ Vitest.describe (
             fun () -> promise {
                 let! container, cleanup =
                     renderToBody (
-                        Renderer.Components.LeftSidebar.GitSidebarEmptyState.Main(
+                        Renderer.Components.LeftSidebar.Git.GitSidebarEmptyState.Main(
                             title = "Initialize Git for this ARC",
                             description = "The selected ARC folder is not a Git repository yet.",
                             primaryAction = {
@@ -2074,14 +2176,12 @@ Vitest.describe (
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
                             remoteActionsEnabled = false,
-                            remoteActionsWarning =
-                                "Sign in to a DataHub account to use fetch, pull, push, or update."
+                            remoteActionsWarning = "Sign in to a DataHub account to use fetch, pull, push, or update."
                         )
                     )
 
                 let updateButton =
-                    container.querySelector ("[data-testid='GitSidebarUpdateArcButton']")
-                    :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarUpdateArcButton']") :?> HTMLButtonElement
 
                 Vitest.expect(updateButton.disabled).toBe (true)
                 Vitest.expect(container.textContent.Contains("Sign in to a DataHub account")).toBe (true)
@@ -2185,7 +2285,7 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.textContent.Contains("studies/s-study-01/protocol.md")).toBe (true)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusIcon-3']")).not.toBeNull ()
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeStatusIcon-3']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -2197,10 +2297,7 @@ Vitest.describe (
                 let! container, cleanup =
                     renderToBody (
                         Html.div [
-                            prop.style [
-                                style.width 340
-                                style.height 760
-                            ]
+                            prop.style [ style.width 340; style.height 760 ]
                             prop.children [
                                 Swate.Components.Page.GitSidebar.Main(
                                     status = {
@@ -2241,35 +2338,45 @@ Vitest.describe (
                         ]
                     )
 
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")).not.toBeNull ()
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")).not.toBeNull ()
-                Vitest.expect(container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']").length).toBe(3)
+                Vitest
+                    .expect(container.querySelector ("[data-testid='GitSidebarChangedFilesScrollContainer']"))
+                    .not.toBeNull ()
+
+                Vitest
+                    .expect(container.querySelector ("[data-testid='GitSidebarChangedFilesVirtualContent']"))
+                    .not.toBeNull ()
+
+                Vitest.expect(container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']").length).toBe (3)
+
                 Vitest
                     .expect(
                         container
                             .querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")
-                            .getAttribute("role")
+                            .getAttribute ("role")
                     )
-                    .toBe("region")
+                    .toBe ("region")
+
                 Vitest
                     .expect(
                         container
                             .querySelector("[data-testid='GitSidebarChangedFilesScrollContainer']")
-                            .getAttribute("aria-label")
+                            .getAttribute ("aria-label")
                     )
-                    .toBe("Changed files")
+                    .toBe ("Changed files")
+
                 Vitest
                     .expect(
                         container
                             .querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")
-                            .getAttribute("role")
+                            .getAttribute ("role")
                     )
-                    .toBe("list")
-                Vitest.expect(container.querySelectorAll("[role='listitem']").length).toBe(3)
+                    .toBe ("list")
+
+                Vitest.expect(container.querySelectorAll("[role='listitem']").length).toBe (3)
+
                 Vitest
-                    .expect(container.querySelector("[role='listitem'] [data-testid='GitSidebarChangeRow-0']"))
-                    .not
-                    .toBeNull()
+                    .expect(container.querySelector ("[role='listitem'] [data-testid='GitSidebarChangeRow-0']"))
+                    .not.toBeNull ()
 
                 cleanup ()
             }
@@ -2281,10 +2388,7 @@ Vitest.describe (
                 let! container, cleanup =
                     renderToBody (
                         Html.div [
-                            prop.style [
-                                style.width 340
-                                style.height 760
-                            ]
+                            prop.style [ style.width 340; style.height 760 ]
                             prop.children [
                                 Swate.Components.Page.GitSidebar.Main(
                                     status = {
@@ -2326,9 +2430,13 @@ Vitest.describe (
                     )
 
                 Vitest.expect(container.textContent.Contains("400 files")).toBe (true)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangedFilesVirtualContent']")).not.toBeNull ()
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-399']")).toBeNull ()
+
+                Vitest
+                    .expect(container.querySelector ("[data-testid='GitSidebarChangedFilesVirtualContent']"))
+                    .not.toBeNull ()
+
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-399']")).toBeNull ()
 
                 cleanup ()
             }
@@ -2355,11 +2463,7 @@ Vitest.describe (
                 let! container, cleanup =
                     renderToBody (
                         Html.div [
-                            prop.style [
-                                style.width 340
-                                style.height 760
-                                style.overflow.hidden
-                            ]
+                            prop.style [ style.width 340; style.height 760; style.overflow.hidden ]
                             prop.children [
                                 Html.div [
                                     prop.style [
@@ -2418,17 +2522,20 @@ Vitest.describe (
 
                 // With 200 items, only a subset should be rendered (visible + overscan).
                 // If virtualization is broken, all 200 items would be in the DOM.
-                let boundedHost = container.querySelector("[data-testid='GitSidebarBoundedHost']") :?> HTMLElement
+                let boundedHost =
+                    container.querySelector ("[data-testid='GitSidebarBoundedHost']") :?> HTMLElement
 
                 for expectedClass in boundedWrapperClasses do
                     Vitest.expect(boundedHost.classList.contains expectedClass).toBe (true)
 
                 Vitest.expect(boundedHost.classList.contains "swt:w-full").toBe (false)
 
-                let renderedRows = container.querySelectorAll("[data-testid^='GitSidebarChangeRow-']")
-                Vitest.expect(renderedRows.length).toBeLessThan(200)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeRow-199']")).toBeNull ()
+                let renderedRows =
+                    container.querySelectorAll ("[data-testid^='GitSidebarChangeRow-']")
+
+                Vitest.expect(renderedRows.length).toBeLessThan (200)
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeRow-199']")).toBeNull ()
 
                 cleanup ()
             }
@@ -2478,7 +2585,7 @@ Vitest.describe (
 
                 Vitest.expect(container.textContent.Contains("git: D.")).toBe (false)
                 Vitest.expect(container.textContent.Contains("Deleted")).toBe (false)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarChangeStatusIcon-0']")).not.toBeNull ()
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarChangeStatusIcon-0']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -2537,7 +2644,9 @@ Vitest.describe (
                         ]
                     )
 
-                let statusSlot = container.querySelector("[data-testid='GitSidebarChangeStatusSlot-0']") :?> HTMLElement
+                let statusSlot =
+                    container.querySelector ("[data-testid='GitSidebarChangeStatusSlot-0']") :?> HTMLElement
+
                 Vitest.expect(statusSlot.className.Contains("swt:ml-auto")).toBe (true)
                 Vitest.expect(statusSlot.className.Contains("swt:shrink-0")).toBe (true)
 
@@ -2587,8 +2696,11 @@ Vitest.describe (
                         )
                     )
 
-                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
-                let thirdRow = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+                let firstRow =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                let thirdRow =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
 
                 firstRow.click ()
                 do! Promise.sleep 0
@@ -2601,7 +2713,10 @@ Vitest.describe (
 
                 Vitest.expect(container.querySelectorAll("[data-testid='GitSidebarPrimarySaveButton']").length).toBe (1)
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
-                Vitest.expect(container.querySelectorAll("[data-testid^='GitSidebarCommitSelectionCheckbox-']").length).toBe (0)
+
+                Vitest
+                    .expect(container.querySelectorAll("[data-testid^='GitSidebarCommitSelectionCheckbox-']").length)
+                    .toBe (0)
 
                 cleanup ()
             }
@@ -2634,8 +2749,11 @@ Vitest.describe (
                         )
                     )
 
-                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
-                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+                let row0 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                let row2 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
 
                 row0.click ()
                 do! Promise.sleep 0
@@ -2646,14 +2764,13 @@ Vitest.describe (
                 row2.dispatchEvent ctrlClick |> ignore
                 do! Promise.sleep 0
 
-                let hoverEvent =
-                    createMouseEvent "mouseenter" (createObj [ "bubbles" ==> true ])
+                let hoverEvent = createMouseEvent "mouseenter" (createObj [ "bubbles" ==> true ])
 
                 row0.dispatchEvent hoverEvent |> ignore
                 do! Promise.sleep 0
 
                 let discardButton =
-                    container.querySelector("[data-testid='GitSidebarDiscardChangeButton-0']") :?> HTMLElement
+                    container.querySelector ("[data-testid='GitSidebarDiscardChangeButton-0']") :?> HTMLElement
 
                 discardButton.click ()
                 do! Promise.sleep 0
@@ -2708,10 +2825,17 @@ Vitest.describe (
                         )
                     )
 
-                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
-                let row1 = container.querySelector("[data-testid='GitSidebarChangeRow-1']") :?> HTMLElement
-                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
-                let messageInput = container.querySelector("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+                let row0 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                let row1 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-1']") :?> HTMLElement
+
+                let row2 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
 
                 row0.click ()
                 do! Promise.sleep 0
@@ -2730,7 +2854,7 @@ Vitest.describe (
                 do! Promise.sleep 0
 
                 let saveButton =
-                    container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
 
                 Vitest.expect(saveButton.disabled).toBe (false)
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
@@ -2787,9 +2911,14 @@ Vitest.describe (
                         )
                     )
 
-                let row0 = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
-                let row2 = container.querySelector("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
-                let messageInput = container.querySelector("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
+                let row0 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
+                let row2 =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-2']") :?> HTMLElement
+
+                let messageInput =
+                    container.querySelector ("[data-testid='GitSidebarCommitMessageInput']") :?> HTMLTextAreaElement
 
                 row0.click ()
                 do! Promise.sleep 0
@@ -2797,7 +2926,11 @@ Vitest.describe (
                 let ctrlShiftClick =
                     createMouseEvent
                         "click"
-                        (createObj [ "bubbles" ==> true; "ctrlKey" ==> true; "shiftKey" ==> true ])
+                        (createObj [
+                            "bubbles" ==> true
+                            "ctrlKey" ==> true
+                            "shiftKey" ==> true
+                        ])
 
                 row2.dispatchEvent ctrlShiftClick |> ignore
                 do! Promise.sleep 0
@@ -2806,7 +2939,7 @@ Vitest.describe (
                 do! Promise.sleep 0
 
                 let saveButton =
-                    container.querySelector("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
+                    container.querySelector ("[data-testid='GitSidebarPrimarySaveButton']") :?> HTMLButtonElement
 
                 Vitest.expect(saveButton.disabled).toBe (false)
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
@@ -2815,7 +2948,13 @@ Vitest.describe (
 
                 Vitest
                     .expect(capturedSelection |> Option.map _.Paths)
-                    .toEqual (Some [| "src/file-000.txt"; "src/file-001.txt"; "src/file-002.txt" |])
+                    .toEqual (
+                        Some [|
+                            "src/file-000.txt"
+                            "src/file-001.txt"
+                            "src/file-002.txt"
+                        |]
+                    )
 
                 cleanup ()
             }
@@ -2866,12 +3005,14 @@ Vitest.describe (
                         )
                     )
 
-                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let firstRow =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+
                 firstRow.click ()
                 do! Promise.sleep 0
 
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
-                Vitest.expect(container.querySelector("[data-testid='GitSidebarErrorNotice']")).not.toBeNull ()
+                Vitest.expect(container.querySelector ("[data-testid='GitSidebarErrorNotice']")).not.toBeNull ()
 
                 cleanup ()
             }
@@ -2922,7 +3063,8 @@ Vitest.describe (
                         )
                     )
 
-                let firstRow = container.querySelector("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
+                let firstRow =
+                    container.querySelector ("[data-testid='GitSidebarChangeRow-0']") :?> HTMLElement
 
                 firstRow.click ()
                 do! Promise.sleep 0
@@ -2975,10 +3117,9 @@ Vitest.describe (
                     )
 
                 let statusIcon =
-                    container.querySelector("[data-testid='GitSidebarChangeStatusIcon-0']") :?> HTMLElement
+                    container.querySelector ("[data-testid='GitSidebarChangeStatusIcon-0']") :?> HTMLElement
 
-                let clickEvent =
-                    createMouseEvent "click" (createObj [ "bubbles" ==> true ])
+                let clickEvent = createMouseEvent "click" (createObj [ "bubbles" ==> true ])
 
                 statusIcon.dispatchEvent clickEvent |> ignore
                 do! Promise.sleep 0
@@ -3011,7 +3152,9 @@ Vitest.describe (
                         )
                     )
 
-                let saveSection = container.querySelector("[data-testid='GitSidebarCommitSection']") :?> HTMLElement
+                let saveSection =
+                    container.querySelector ("[data-testid='GitSidebarCommitSection']") :?> HTMLElement
+
                 let legacyCard = firstElementChild saveSection
                 Vitest.expect(legacyCard.className.Contains("swt:rounded-box")).toBe (false)
                 Vitest.expect(legacyCard.className.Contains("swt:border")).toBe (false)
