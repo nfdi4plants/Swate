@@ -62,14 +62,16 @@ type UiState =
         Error: string option
     }
 
-[<Mangle(false)>]
-module Exports =
+/// Builds demo sessions used by ProvenanceGrouping stories and browser tests.
+module StoryFixtures =
+
     let createSampleSession () = sampleSession ()
     let createInputOnlySession () = inputOnlyModel () |> Session.init
     let createOutputOnlySession () = outputOnlyModel () |> Session.init
     let createSwitchablePropertySession () = switchablePropertyModel () |> Session.init
     let createTypedSampleSession () = typedSampleModel () |> Session.init
     let createDataOutputOnlySession () = dataOutputOnlyModel () |> Session.init
+
     let createRetaggedTypedSampleSession () =
         let model = typedSampleModel ()
         let propertyValue = model.PropertyValues.["pv-output-a-instrument"]
@@ -86,6 +88,9 @@ module Exports =
                     |> Map.add propertyValue.Id { propertyValue with Value = ProvenanceValue.Term retagged }
         }
         |> Session.init
+
+/// Converts emitted table patches into compact strings for Storybook assertions.
+module PatchPreview =
 
     let private valueKind value =
         match value with
@@ -118,3 +123,14 @@ module Exports =
                 $"AddLoadedPropertyValue:{valueKind value}:{unitName unit'}{valueMetadata value}"
             | ProvenanceTablePatch.AddLoadedConnection _ -> "AddLoadedConnection")
         |> ResizeArray
+
+[<Mangle(false)>]
+module Exports =
+    let createSampleSession () = StoryFixtures.createSampleSession ()
+    let createInputOnlySession () = StoryFixtures.createInputOnlySession ()
+    let createOutputOnlySession () = StoryFixtures.createOutputOnlySession ()
+    let createSwitchablePropertySession () = StoryFixtures.createSwitchablePropertySession ()
+    let createTypedSampleSession () = StoryFixtures.createTypedSampleSession ()
+    let createDataOutputOnlySession () = StoryFixtures.createDataOutputOnlySession ()
+    let createRetaggedTypedSampleSession () = StoryFixtures.createRetaggedTypedSampleSession ()
+    let patchDetails patches = PatchPreview.patchDetails patches
