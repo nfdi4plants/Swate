@@ -1,7 +1,6 @@
 module Renderer.Components.MainContent.ArcFilePreviewTarget
 
 open Feliz
-open Renderer.Components.ARCHelper
 open Renderer.Components.MainContent
 open Swate.Components.Page.ArcFileEditor
 open Swate.Components

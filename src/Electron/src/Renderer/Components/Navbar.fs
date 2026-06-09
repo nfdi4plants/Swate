@@ -1,6 +1,7 @@
 namespace Renderer.Components
 
 open Feliz
+open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Composite.Layout
@@ -18,31 +19,19 @@ module NavbarHelper =
     module Selector =
 
         /// Unified open: main process decides current window / new window / focus existing.
-        let openARC =
-            fun _ ->
-                promise {
-                    let! r = Api.ipcArcVaultApi.openARC ()
-
-                    match r with
-                    | Error e -> console.error (Fable.Core.JS.JSON.stringify e.Message)
-                    | Ok _ -> ()
-                }
-                |> Promise.start
+        let openARC (onError: string -> unit) () =
+            Renderer.Components.Helper.ArcVaultHelper.openArc onError |> Promise.start
 
         /// Click on a recent ARC: main process decides open-or-focus.
-        let openArcByPath (clickedARC: ARCPointer) =
-            promise {
-                match! Api.ipcArcVaultApi.openARCByPath clickedARC.path with
-                | Ok _ -> ()
-                | Error exn -> console.error (Fable.Core.JS.JSON.stringify exn.Message)
-            }
+        let openArcByPath (onError: string -> unit) (clickedARC: ARCPointer) =
+            Renderer.Components.Helper.ArcVaultHelper.openArcByPath onError clickedARC.path
             |> Promise.start
 
-        let rmvRecentArc (pointer: ARCPointer) =
+        let rmvRecentArc (onError: string -> unit) (pointer: ARCPointer) =
             promise {
                 match! Api.ipcArcVaultApi.removeRecentARC pointer with
                 | Ok _ -> ()
-                | Error exn -> console.error (Fable.Core.JS.JSON.stringify exn.Message)
+                | Error exn -> onError exn.Message
             }
             |> Promise.start
 
@@ -55,14 +44,12 @@ type private Selector =
         ButtonInfo.create ("swt:fluent--folder-open-24-regular swt:size-5", "Open an existing ARC", onClick)
 
     static member DownloadArcActionBtn(onClick: Browser.Types.MouseEvent -> unit) =
-        ButtonInfo.create (
-            "swt:fluent--cloud-beaker-24-regular swt:size-5",
-            "Download ARC from DataHub",
-            onClick
-        )
+        ButtonInfo.create ("swt:fluent--cloud-beaker-24-regular swt:size-5", "Download ARC from DataHub", onClick)
 
     [<ReactComponent>]
-    static member private Actionbar(setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit) =
+    static member private Actionbar
+        (setNewArcModalIsOpen: bool -> unit, toggleSelector: unit -> unit, onArcError: string -> unit)
+        =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
 
         let onCreateARC =
@@ -72,7 +59,7 @@ type private Selector =
 
         let onOpenARC =
             fun _ ->
-                NavbarHelper.Selector.openARC ()
+                NavbarHelper.Selector.openARC onArcError ()
                 toggleSelector ()
 
         let openDataHubBrowser =
@@ -93,6 +80,10 @@ type private Selector =
     static member Main() =
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let newArcModalIsOpen, setNewArcModalIsOpen = React.useState false
+        let errorCtx = useErrorModalCtx ()
+
+        let onArcError =
+            createErrorModalCallback errorCtx.enqueue "ARC action failed" appStateCtx
 
         let recentArcs =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -122,10 +113,10 @@ type private Selector =
             )
             Swate.Components.Composite.ArcSelector.ArcSelector.Main(
                 recentArcs.state,
-                NavbarHelper.Selector.openArcByPath,
-                rmvRecentArc = NavbarHelper.Selector.rmvRecentArc,
+                NavbarHelper.Selector.openArcByPath onArcError,
+                rmvRecentArc = NavbarHelper.Selector.rmvRecentArc onArcError,
                 onOpenChange = onOpen,
-                actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle),
+                actionbar = Selector.Actionbar(setNewArcModalIsOpen, selectorControlRef.current.toggle, onArcError),
                 isLoading = recentArcs.isLoading,
                 controlRef = selectorControlRef,
                 ?currentlyOpenArcPath = appStateCtx
@@ -172,9 +163,9 @@ module private Authentication =
             }
             |> Promise.start
 
-        let onSwitchAccount (accountId: string) =
+        let onSwitchAccount (localSwateAccountId: string) =
             promise {
-                match! Api.ipcAuthApi.setActiveAccount accountId with
+                match! Api.ipcAuthApi.setActiveAccount localSwateAccountId with
                 | Ok _ ->
                     match! Api.ipcAuthApi.revalidate () with
                     | Ok _ -> ()
@@ -183,9 +174,9 @@ module private Authentication =
             }
             |> Promise.start
 
-        let onRemoveAccount (accountId: string) =
+        let onRemoveAccount (localSwateAccountId: string) =
             promise {
-                match! Api.ipcAuthApi.removeAccount accountId with
+                match! Api.ipcAuthApi.removeAccount localSwateAccountId with
                 | Ok _ -> ()
                 | Error _ -> ()
             }
@@ -207,7 +198,6 @@ type Navbar =
     static member private Separator() =
         Html.div [
             prop.className "swt:divider swt:divider-horizontal swt:mx-0"
-            prop.testId "navbar-action-separator"
         ]
 
     [<ReactComponent>]
@@ -228,7 +218,7 @@ type Navbar =
         Html.button [
             prop.type'.button
             prop.className [
-                "swt:btn swt:btn-square swt:btn-ghost swt:btn-sm"
+                "swt:btn swt:btn-outline swt:btn-square swt:btn-sm"
                 if isActive then
                     "swt:btn-active"
             ]
@@ -265,10 +255,7 @@ type Navbar =
                 onError =
                     fun ex ->
                         errorCtx.enqueue (
-                            ErrorModalRequest.create (
-                                ex.Message,
-                                title = "Error checking for unsaved changes"
-                            )
+                            ErrorModalRequest.create (ex.Message, title = "Error checking for unsaved changes")
                         )
                 dependencies = [||]
             }
@@ -281,13 +268,7 @@ type Navbar =
 
                     match! Api.ipcArcVaultApi.saveArcFile () with
                     | Ok _ -> ()
-                    | Error ex ->
-                        errorCtx.enqueue (
-                            ErrorModalRequest.create (
-                                ex.Message,
-                                title = "Error saving ARC"
-                            )
-                        )
+                    | Error ex -> errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
                 }
                 |> Promise.start
 
@@ -308,14 +289,14 @@ type Navbar =
     [<ReactComponent>]
     static member Main() =
 
+        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
+
         let left =
             Html.div [
                 prop.className "swt:flex swt:items-center swt:gap-2"
                 prop.children [
-                    Selector.Main()
-                    Navbar.Separator()
                     Navbar.SettingsButton()
-                    Navbar.Separator()
+                    Selector.Main()
                     Navbar.SaveArcButton()
                 ]
             ]
@@ -325,8 +306,9 @@ type Navbar =
                 prop.className "swt:flex swt:items-center"
                 prop.children [
                     Authentication.UserAvatar()
-                    Html.div [ prop.className "swt:divider swt:divider-horizontal" ]
-                    Layout.LeftSidebarToggleBtn()
+                    if appStateCtx.IsSome then
+                        Navbar.Separator()
+                        Layout.LeftSidebarToggleBtn()
                 ]
             ]
 

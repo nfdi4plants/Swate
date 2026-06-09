@@ -50,16 +50,19 @@ let verifyToken (baseUrl: string) (pat: string) : JS.Promise<Result<AuthUserDto,
             let! json =
                 response.json<
                     {|
+                        id: int
                         name: string
                         email: string
                         avatar_url: string
                     |}
                  > ()
 
-            let accountId = SecureAuthStore.generateAccountId baseUrl json.email
+            let localSwateAccountId =
+                SecureAuthStore.generateLocalSwateAccountId baseUrl json.email
 
             let user: AuthUserDto = {
-                AccountId = accountId
+                Id = json.id
+                LocalSwateAccountId = localSwateAccountId
                 Name = json.name
                 Email = json.email
                 AvatarUrl = json.avatar_url

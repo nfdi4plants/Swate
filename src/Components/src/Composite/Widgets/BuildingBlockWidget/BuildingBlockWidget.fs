@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.Widgets
+namespace Swate.Components.Composite.Widgets.BuildingBlockWidget
 
 open ARCtrl
 open Fable.Core
@@ -10,8 +10,6 @@ open Swate.Components.Composite.AnnotationTable.Context
 open Swate.Components.Composite.TermSearch
 open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Composite.Widgets.Context
-open Swate.Components.Composite.Widgets.Types
-
 
 module private BuildingBlockWidgetState =
 
@@ -79,47 +77,26 @@ module private BuildingBlockWidgetState =
         | CompositeHeaderDiscriminate.Freetext -> failwith "Freetext header type is not yet implemented"
 
     let tryCreateCompositeCellFromState (state: Model) =
-        match state.HeaderArg, state.BodyCellType, state.BodyArg with
-        | Some(U2.Case2 IOType.Data), _, _ -> CompositeCell.emptyData |> Some
-        | _, CompositeCellDiscriminate.Term, Some(U2.Case2 oa) -> CompositeCell.createTerm oa |> Some
-        | _, CompositeCellDiscriminate.Unitized, Some(U2.Case2 oa) -> CompositeCell.createUnitized ("", oa) |> Some
-        | _, CompositeCellDiscriminate.Text, Some(U2.Case1 text) -> CompositeCell.createFreeText text |> Some
-        | _ -> None
+        let isDataHeader =
+            state.TryHeaderIO() |> Option.exists (fun ioType -> ioType = IOType.Data)
+
+        if isDataHeader then
+            CompositeCell.emptyData |> Some
+        else
+            match state.BodyCellType, state.BodyArg with
+            | CompositeCellDiscriminate.Term, Some(U2.Case2 oa) -> CompositeCell.createTerm oa |> Some
+            | CompositeCellDiscriminate.Unitized, Some(U2.Case2 oa) -> CompositeCell.createUnitized ("", oa) |> Some
+            | CompositeCellDiscriminate.Text, Some(U2.Case1 text) -> CompositeCell.createFreeText text |> Some
+            | _ -> None
 
     let isValidColumn (header: CompositeHeader) =
         header.IsFeaturedColumn
         || (header.IsTermColumn && header.ToTerm().NameText.Length > 0)
         || header.IsSingleColumn
 
-[<Erase; Mangle(false)>]
-type BuildingBlockWidget =
+module private BuildingBlockWidgetView =
 
-    static member private HeaderOptions: (string * CompositeHeaderDiscriminate)[] = [|
-        "Input", CompositeHeaderDiscriminate.Input
-        "Parameter", CompositeHeaderDiscriminate.Parameter
-        "Factor", CompositeHeaderDiscriminate.Factor
-        "Characteristic", CompositeHeaderDiscriminate.Characteristic
-        "Component", CompositeHeaderDiscriminate.Component
-        "Output", CompositeHeaderDiscriminate.Output
-        "Comment", CompositeHeaderDiscriminate.Comment
-        "Date", CompositeHeaderDiscriminate.Date
-        "Performer", CompositeHeaderDiscriminate.Performer
-        "ProtocolDescription", CompositeHeaderDiscriminate.ProtocolDescription
-        "ProtocolREF", CompositeHeaderDiscriminate.ProtocolREF
-        "ProtocolType", CompositeHeaderDiscriminate.ProtocolType
-        "ProtocolUri", CompositeHeaderDiscriminate.ProtocolUri
-        "ProtocolVersion", CompositeHeaderDiscriminate.ProtocolVersion
-    |]
-
-    static member private IOTypeOptions: (string * IOType)[] = [|
-        "Source", IOType.Source
-        "Sample", IOType.Sample
-        "Material", IOType.Material
-        "Data", IOType.Data
-        "Free Text", IOType.FreeText ""
-    |]
-
-    static member private disabledState(message: string) =
+    let disabledState (message: string) =
         Html.div [
             prop.className "swt:flex swt:flex-col swt:gap-2 swt:min-w-80 swt:p-2"
             prop.children [
@@ -134,85 +111,26 @@ type BuildingBlockWidget =
             ]
         ]
 
+[<Erase; Mangle(false)>]
+type BuildingBlockWidget =
+
     [<ReactComponent>]
     static member private HeaderControls
         (
             state: BuildingBlockWidgetState.Model,
-            setState: BuildingBlockWidgetState.Model -> unit,
+            setCommentHeader: string -> unit,
             setHeaderTerm: Term option -> unit,
             setHeaderIOType: CompositeHeaderDiscriminate -> IOType -> unit,
             setHeaderCellType: CompositeHeaderDiscriminate -> unit
         ) =
 
-        let createDropdown () =
-            Html.div [
-                prop.className "swt:join swt:w-full"
-                prop.children [
-                    Html.select [
-                        prop.className "swt:select swt:join-item swt:border-current"
-                        prop.valueOrDefault (state.HeaderCellType.ToString())
-                        prop.onChange (fun (value: string) ->
-                            BuildingBlockWidget.HeaderOptions
-                            |> Array.tryFind (fun (label, _) -> label = value)
-                            |> Option.iter (fun (_, nextHeaderType) -> setHeaderCellType nextHeaderType)
-                        )
-                        prop.children [
-                            for _, headerType in BuildingBlockWidget.HeaderOptions do
-                                Html.option [
-                                    prop.value (headerType.ToString())
-                                    prop.text (headerType.ToString())
-                                ]
-                        ]
-                    ]
-                    if state.HeaderCellType.HasIOType() then
-                        let selectedIOTypeLabel =
-                            state.TryHeaderIO()
-                            |> Option.map (fun ioType ->
-                                BuildingBlockWidget.IOTypeOptions
-                                |> Array.tryFind (fun (_, candidate) ->
-                                    match ioType, candidate with
-                                    | IOType.FreeText _, IOType.FreeText _ -> true
-                                    | _ -> ioType = candidate
-                                )
-                                |> Option.map fst
-                                |> Option.defaultValue "Free Text"
-                            )
-                            |> Option.defaultValue "Source"
-
-                        Html.select [
-                            prop.className "swt:select swt:join-item swt:border-current"
-                            prop.valueOrDefault selectedIOTypeLabel
-                            prop.onChange (fun (value: string) ->
-                                BuildingBlockWidget.IOTypeOptions
-                                |> Array.tryFind (fun (label, _) -> label = value)
-                                |> Option.iter (fun (_, ioType) -> setHeaderIOType state.HeaderCellType ioType)
-                            )
-                            prop.children [
-                                for _, ioType in BuildingBlockWidget.IOTypeOptions do
-                                    Html.option [
-                                        prop.value (
-                                            match ioType with
-                                            | IOType.FreeText _ -> "Free Text"
-                                            | _ -> ioType.ToString()
-                                        )
-                                        prop.text (
-                                            match ioType with
-                                            | IOType.FreeText _ -> "Free Text"
-                                            | _ -> ioType.ToString()
-                                        )
-                                    ]
-                            ]
-                        ]
-                ]
-            ]
-
         let headerInput () =
             if state.HeaderCellType = CompositeHeaderDiscriminate.Comment then
                 Html.input [
-                    prop.className "swt:input swt:border-current"
+                    prop.className "swt:input swt:border-current swt:join-item swt:w-full"
                     prop.valueOrDefault state.CommentHeader
                     prop.placeholder "Comment header"
-                    prop.onChange (fun (value: string) -> setState { state with CommentHeader = value })
+                    prop.onChange setCommentHeader
                 ]
             elif state.HeaderCellType.HasOA() then
                 TermSearch.TermSearch(
@@ -224,7 +142,7 @@ type BuildingBlockWidget =
                 match state.TryHeaderIO() with
                 | Some(IOType.FreeText freeText) ->
                     Html.input [
-                        prop.className "swt:input swt:border-current"
+                        prop.className "swt:input swt:border-current swt:join-item swt:w-full"
                         prop.valueOrDefault freeText
                         prop.placeholder "Input/Output text"
                         prop.onChange (fun (value: string) ->
@@ -233,7 +151,7 @@ type BuildingBlockWidget =
                     ]
                 | Some ioType ->
                     Html.input [
-                        prop.className "swt:input swt:border-current"
+                        prop.className "swt:input swt:border-current swt:join-item swt:w-full"
                         prop.readOnly true
                         prop.valueOrDefault (ioType.ToString())
                     ]
@@ -246,13 +164,21 @@ type BuildingBlockWidget =
             prop.children [
                 Html.div [
                     prop.className "swt:join swt:w-full"
-                    prop.children [ createDropdown (); headerInput () ]
+                    prop.children [
+                        BuildingBlockDropdown.Main(
+                            state.HeaderCellType,
+                            state.TryHeaderIO(),
+                            setHeaderCellType,
+                            setHeaderIOType
+                        )
+                        headerInput ()
+                    ]
                 ]
             ]
         ]
 
     [<ReactComponent>]
-    static member private TermSearchComponent
+    static member private BodyControls
         (
             state: BuildingBlockWidgetState.Model,
             setState: BuildingBlockWidgetState.Model -> unit,
@@ -266,6 +192,7 @@ type BuildingBlockWidget =
                         prop.style [ style.position.relative ]
                         prop.children [
                             Html.button [
+                                prop.type'.button
                                 prop.className [
                                     "swt:btn swt:join-item swt:border swt:border-base-content!"
                                     if state.BodyCellType = CompositeCellDiscriminate.Term then
@@ -282,6 +209,7 @@ type BuildingBlockWidget =
                                 )
                             ]
                             Html.button [
+                                prop.type'.button
                                 prop.className [
                                     "swt:btn swt:join-item swt:border swt:border-base-content!"
                                     if state.BodyCellType = CompositeCellDiscriminate.Unitized then
@@ -319,10 +247,10 @@ type BuildingBlockWidget =
 
         let annotationCtx = useAnnotationTableStateCtx ()
 
-        let widgetCtx = useWidgetControllerCtx ()
+        let _widgetCtx = useWidgetControllerCtx ()
 
         match arcFile.TryGetActiveTable(activeTableIndex) with
-        | None -> BuildingBlockWidget.disabledState "Switch to a table tab to add a building block."
+        | None -> BuildingBlockWidgetView.disabledState "Switch to a table tab to add a building block."
         | Some(_, table) ->
             let selectedColumnIndex =
                 annotationCtx.state
@@ -357,6 +285,9 @@ type BuildingBlockWidget =
                         }
 
                 setState nextState
+
+            let setCommentHeader (value: string) =
+                setState { state with CommentHeader = value }
 
             let setHeaderIOType (headerType: CompositeHeaderDiscriminate) (ioType: IOType) =
                 setState {
@@ -424,12 +355,12 @@ type BuildingBlockWidget =
                     prop.children [
                         BuildingBlockWidget.HeaderControls(
                             state,
-                            setState,
+                            setCommentHeader,
                             setHeaderTerm,
                             setHeaderIOType,
                             setHeaderCellType
                         )
-                        BuildingBlockWidget.TermSearchComponent(state, setState, setBodyTerm)
+                        BuildingBlockWidget.BodyControls(state, setState, setBodyTerm)
                         Html.div [
                             prop.className "swt:flex swt:justify-center"
                             prop.children [
