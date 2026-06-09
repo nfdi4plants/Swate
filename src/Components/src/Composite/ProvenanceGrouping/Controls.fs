@@ -99,13 +99,22 @@ module private KindNames =
     let editorProperty =
         ProvenanceKind.create "editor:property" "Property"
 
+    let private normalized (label: string) =
+        label.Trim()
+
     let endpointFromLabel (label: string) =
-        let trimmed = label.Trim()
+        let trimmed = normalized label
 
         if System.String.IsNullOrWhiteSpace trimmed then
             ProvenanceKind.create "editor:endpoint" "Endpoint"
         else
             ProvenanceKind.create $"editor:endpoint:{System.Uri.EscapeDataString trimmed}" trimmed
+
+    let endpointFromDefaultOrLabel (defaultKind: ProvenanceKind) (label: string) =
+        if normalized label = normalized (ProvenanceKind.displayName defaultKind) then
+            defaultKind
+        else
+            endpointFromLabel label
 
 [<Erase; Mangle(false)>]
 type Controls =
@@ -732,7 +741,7 @@ type Controls =
                             Side = side
                             Header =
                                 endpointLabel
-                                |> KindNames.endpointFromLabel
+                                |> KindNames.endpointFromDefaultOrLabel defaultKind
                                 |> Endpoints.endpointHeader side
                             Name = name
                         }

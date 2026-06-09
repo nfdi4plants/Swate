@@ -19,6 +19,11 @@ module private GroupCardData =
         |> List.distinct
         |> List.choose (fun id -> model.PropertyValues.TryFind id)
 
+    let memberValues (member': DisplayMember) (model: ProvenanceModel) =
+        member'.PropertyValueIds
+        |> List.distinct
+        |> List.choose (fun id -> model.PropertyValues.TryFind id)
+
     let title (group: DisplayGroup) =
         match group.GroupingValues with
         | [] -> group.Members.Head.Name
@@ -53,6 +58,8 @@ type GroupCard =
             ?debug: bool,
             ?key: string
         ) =
+        let hoveredMemberId, setHoveredMemberId = React.useState<ProvenanceSetId option> None
+
         let droppable =
             DndKit.useDroppable (
                 {|
@@ -73,6 +80,11 @@ type GroupCard =
 
         let values = GroupCardData.values group model
         let title = GroupCardData.title group
+        let isGroup = group.Members.Length > 1
+        let memberDetailsPosition =
+            match side with
+            | ProvenanceSide.Input -> "swt:left-full swt:ml-2"
+            | ProvenanceSide.Output -> "swt:right-full swt:mr-2"
 
         Html.article [
             match key with
@@ -122,13 +134,14 @@ type GroupCard =
                             "Select group",
                             (fun _ -> onSelect ())
                         )
-                        Buttons.QuickAccessButton(
-                            Html.i [
-                                prop.className "swt:iconify swt:fluent--info-20-regular swt:size-4"
-                            ],
-                            "Show members",
-                            (fun _ -> onExpand ())
-                        )
+                        if isGroup then
+                            Buttons.QuickAccessButton(
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--info-20-regular swt:size-4"
+                                ],
+                                "Show members",
+                                (fun _ -> onExpand ())
+                            )
                     ]
                 ]
                 Html.div [
@@ -138,12 +151,56 @@ type GroupCard =
                             Controls.ValueLabel(value, ?debug = debug, key = DragDrop.propertyValueIdentity value)
                     ]
                 ]
-                if expanded then
+                if isGroup && expanded then
                     Html.ul [
                         prop.className "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2 swt:text-sm"
                         prop.children [
                             for member' in group.Members do
-                                Html.li [ prop.text member'.Name ]
+                                let memberValues = GroupCardData.memberValues member' model
+                                let isHovered = hoveredMemberId = Some member'.SetId
+
+                                Html.li [
+                                    prop.className "swt:relative"
+                                    prop.children [
+                                        Html.div [
+                                            prop.tabIndex 0
+                                            prop.ariaLabel $"Show values for {member'.Name}"
+                                            prop.className "swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
+                                            if defaultArg debug false then
+                                                prop.testId $"provenance-group-member-{side}-{member'.SetId}"
+                                            prop.onMouseEnter (fun _ -> setHoveredMemberId (Some member'.SetId))
+                                            prop.onMouseLeave (fun _ -> setHoveredMemberId None)
+                                            prop.onFocus (fun _ -> setHoveredMemberId (Some member'.SetId))
+                                            prop.onBlur (fun _ -> setHoveredMemberId None)
+                                            prop.text member'.Name
+                                        ]
+
+                                        if isHovered then
+                                            Html.div [
+                                                prop.className [
+                                                    "swt:absolute swt:top-0 swt:z-30 swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg"
+                                                    memberDetailsPosition
+                                                ]
+                                                if defaultArg debug false then
+                                                    prop.testId $"provenance-member-values-{side}-{member'.SetId}"
+                                                prop.children [
+                                                    if memberValues.IsEmpty then
+                                                        Html.p [
+                                                            prop.className "swt:text-xs swt:text-base-content/60"
+                                                            prop.text "No property values"
+                                                        ]
+                                                    else
+                                                        Html.div [
+                                                            prop.className "swt:flex swt:flex-wrap swt:gap-1"
+                                                            prop.children [
+                                                                for value in memberValues do
+                                                                    Controls.ValueLabel(value, key = $"member:{member'.SetId}:{DragDrop.propertyValueIdentity value}")
+                                                            ]
+                                                        ]
+                                                ]
+                                            ]
+                                    ]
+                                ]
                         ]
                     ]
             ]

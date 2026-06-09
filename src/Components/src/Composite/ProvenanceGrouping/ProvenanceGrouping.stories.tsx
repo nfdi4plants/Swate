@@ -132,6 +132,39 @@ export const GroupsByPropertiesAndShowsMembers: Story = {
   },
 };
 
+export const ExpandedGroupsShowMemberHoverValues: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    expect(within(canvas.getByText('Input A').closest('article')!).queryByRole('button', { name: 'Show members' }))
+      .not.toBeInTheDocument();
+
+    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    const grouped = await waitFor(() => {
+      const heading = canvas
+        .getAllByText('Species: Arabidopsis')
+        .find((element) => element.tagName === 'H3');
+      expect(heading).toBeDefined();
+      return heading!.closest('article')!;
+    });
+
+    await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
+    const member = within(grouped).getByTestId('provenance-group-member-Input-input-a');
+
+    expect(within(grouped).queryByTestId('provenance-member-values-Input-input-a')).not.toBeInTheDocument();
+    await userEvent.hover(member);
+
+    await waitFor(() => {
+      const details = within(grouped).getByTestId('provenance-member-values-Input-input-a');
+      expect(details).toHaveTextContent('Species: Arabidopsis');
+      expect(details).toHaveTextContent('Temperature: 12 C');
+    });
+
+    await userEvent.unhover(member);
+  },
+};
+
 export const GroupsBothSidesFromOutputProperty: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -353,14 +386,23 @@ export const RemeasuresConnectionsAfterGroupExpansion: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+
+    const grouped = await waitFor(() => {
+      const heading = canvas
+        .getAllByText('Species: Arabidopsis')
+        .find((element) => element.tagName === 'H3');
+      expect(heading).toBeDefined();
+      return heading!.closest('article')!;
+    });
+
     const before = await waitFor(() => {
       const paths = canvas.getAllByTestId('provenance-connection').map((connector) => connector.getAttribute('d'));
       expect(paths.length).toBeGreaterThan(0);
       return paths;
     });
 
-    const inputA = canvas.getByText('Input A').closest('article')!;
-    await userEvent.click(within(inputA).getByRole('button', { name: 'Show members' }));
+    await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
 
     await waitFor(() => {
       const after = canvas.getAllByTestId('provenance-connection').map((connector) => connector.getAttribute('d'));
@@ -535,12 +577,12 @@ export const CreatesMatchingDataEndpointForOneSidedModel: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-input'));
-    expect(screen.getByRole('combobox', { name: 'Kind' })).toHaveValue('Data');
+    expect(screen.getByRole('textbox', { name: /Endpoint kind/i })).toHaveValue('Data');
     await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'New Input');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
 
     await waitFor(() =>
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedSet:Data'),
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedSet:fixture:endpoint:data:Data'),
     );
   },
 };
@@ -553,7 +595,7 @@ export const RefreshesEndpointKindAfterControlledSessionReplacement: Story = {
     await userEvent.click(canvas.getByRole('button', { name: /Replace endpoint context/i }));
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-input'));
 
-    expect(screen.getByRole('combobox', { name: 'Kind' })).toHaveValue('Sample');
+    expect(screen.getByRole('textbox', { name: /Endpoint kind/i })).toHaveValue('Sample');
   },
 };
 
@@ -563,13 +605,15 @@ export const CreatesFreeTextEndpointHeader: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
-    await userEvent.selectOptions(screen.getByRole('combobox', { name: 'Kind' }), 'FreeText');
-    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint header/i }), 'Derived data');
+    await userEvent.clear(screen.getByRole('textbox', { name: /Endpoint kind/i }));
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint kind/i }), 'Derived data');
     await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Custom Output');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
 
     await waitFor(() =>
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedSet:FreeText:Derived data'),
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent(
+        'AddLoadedSet:editor:endpoint:Derived%20data:Derived data',
+      ),
     );
   },
 };
