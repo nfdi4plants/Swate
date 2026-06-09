@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net10.0</TargetFramework>
@@ -24,7 +24,11 @@
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRenameHelper.fs" />
-    <Compile Include="Components\LeftSidebar\FileExplorer\CreateArcFileModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeContextMenu.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Modals\CreateArcFileModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Modals\CreateFileSystemItemModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Modals\FileTreeRenameModal.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\Modals\FileTreeDeleteModal.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRename.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeDelete.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTree.fs" />
@@ -46,6 +50,7 @@
     <Compile Include="Components\MainContent\GitUnsupportedTarget.fs" />
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
+    <Compile Include="Components\MainContent\PageSelector.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
     <Compile Include="Components\Navbar.fs" />

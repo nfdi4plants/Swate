@@ -746,6 +746,15 @@ type GitMergeConflictViewer =
                     GitMergeConflictViewerInternal.reconcileSessionResolvedText observedResolvedText None current
             )
 
+        let commitNormalizedSession nextResolvedText nextEntries =
+            let nextSessionState =
+                GitMergeConflictViewerInternal.normalizeSessionEntries
+                    nextResolvedText
+                    sessionState.NextEntryId
+                    nextEntries
+
+            commitSessionAndResolvedText nextSessionState nextResolvedText
+
         let handleResolvedTextChange (event: Browser.Types.Event) =
             let textarea = event.target :?> Browser.Types.HTMLTextAreaElement
             let normalizedNextValue = GitTextComparisonCore.Text.normalizeLineEndings textarea.value
@@ -810,13 +819,7 @@ type GitMergeConflictViewer =
                     )
                     |> GitMergeConflictViewerInternal.shiftResolvedEntryOffsetsAfter block.StartIndex delta
 
-                let nextSessionState =
-                    GitMergeConflictViewerInternal.normalizeSessionEntries
-                        nextResolvedText
-                        sessionState.NextEntryId
-                        nextEntries
-
-                commitSessionAndResolvedText nextSessionState nextResolvedText
+                commitNormalizedSession nextResolvedText nextEntries
             | None ->
                 syncSessionToObservedResolvedText ()
 
@@ -848,13 +851,7 @@ type GitMergeConflictViewer =
                     )
                     |> GitMergeConflictViewerInternal.shiftResolvedEntryOffsetsAfter resolution.StartIndex delta
 
-                let nextSessionState =
-                    GitMergeConflictViewerInternal.normalizeSessionEntries
-                        nextResolvedText
-                        sessionState.NextEntryId
-                        nextEntries
-
-                commitSessionAndResolvedText nextSessionState nextResolvedText
+                commitNormalizedSession nextResolvedText nextEntries
             | None ->
                 syncSessionToObservedResolvedText ()
 

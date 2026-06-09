@@ -1,212 +1,267 @@
 module ElectronCore.ArcAddExtensionsTests
 
 open Fable.Core
-open Fable.Core.JsInterop
-open Fable.Electron
-open Fable.Electron.Main
 open Main.ArcMerge
 open Main.ArcVault
 open Main.Bindings.Path
+open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open ARCtrl
 open ARCtrl.Contract
 open Vitest
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private osDynamic: obj = importAll "os"
-
-let private expectLoadedArc (result: Result<ARC, string[]>) =
-    match result with
-    | Ok arc -> arc
-    | Error errors -> failwith (errors |> String.concat "\n")
-
 let private expectSome (value: 'T option) (message: string) : 'T =
     match value with
     | Some value -> value
     | None -> failwith message
 
-let private createTempDirectoryAsync () : JS.Promise<string> =
-    let prefix =
-        join [|
-            osDynamic?tmpdir () |> unbox<string>
-            "swate-addasync-"
-        |]
+let private pathExistsAsync = TestHelpers.pathExistsAsync
+let private loadArcAsync = TestHelpers.loadArcAsync
+let private testWindow = TestHelpers.testWindow
 
-    fsPromisesDynamic?mkdtemp (prefix) |> unbox<JS.Promise<string>>
+let private withTempArc =
+    TestHelpers.withTempArcWith "swate-add-arc-file-" "AddArcFileArc"
 
-let private removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
-    let! _ =
-        fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
-        |> unbox<JS.Promise<obj>>
+Vitest.describe (
+    "ARC AddArcFileAsync",
+    fun () ->
+        Vitest.test (
+            "adds an assay and creates the canonical assay file",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        do! arc.AddArcFileAsync(arcPath, ArcFiles.Assay(ArcAssay("NewAssay")))
 
-    return ()
-}
+                        let canonicalPath = join [| arcPath; "assays"; "NewAssay"; "isa.assay.xlsx" |]
+                        let! exists = pathExistsAsync canonicalPath
+                        Vitest.expect(exists).toBe (true)
 
-let private pathExistsAsync (path: string) : JS.Promise<bool> = promise {
-    try
-        let! _ = fsPromisesDynamic?access (path) |> unbox<JS.Promise<obj>>
-        return true
-    with _ ->
-        return false
-}
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe (true)
+                    })
+        )
 
-let private withTempArc (seedArc: ARC -> unit) (testBody: string -> JS.Promise<unit>) : JS.Promise<unit> = promise {
-    let! rootPath = createTempDirectoryAsync ()
-    let arcPath = join [| rootPath; "arc" |]
+        Vitest.test (
+            "adds the file explorer default assay via vault add path",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let assay = ArcAssay.init "New Assay"
+                        assay.InitTable("New Assay Table") |> ignore
+                        let vault = ArcVault(testWindow ())
+                        let! loadedArc = loadArcAsync arcPath
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
 
-    try
-        let arc = ARC("AddAsyncArc")
-        seedArc arc
-        do! arc.WriteAsync arcPath
-        do! testBody arcPath
-        do! removeDirectoryAsync rootPath
-    with error ->
-        do! removeDirectoryAsync rootPath
-        return raise error
-}
+                        let request =
+                            FileContentDTO.fromArcFile (ArcFiles.Assay assay) |> expectSome
+                            <| "Expected default assay DTO."
 
-let private loadArcAsync (arcPath: string) : JS.Promise<ARC> = promise {
-    let! loaded = ARC.tryLoadAsync arcPath
-    return expectLoadedArc loaded
-}
+                        match! vault.AddArcFile request with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
 
-let private testWindow () =
-    createObj [
-        "id" ==> 0
-        "title" ==> ""
-    ]
-    |> unbox<BrowserWindow>
+                        let canonicalPath = join [| arcPath; "assays"; "New Assay"; "isa.assay.xlsx" |]
+                        let! exists = pathExistsAsync canonicalPath
+                        Vitest.expect(exists).toBe (true)
 
-Vitest.describe("ARC AddAsync", fun () ->
-    Vitest.test("adds an assay and creates the canonical assay file", fun () ->
-        withTempArc ignore (fun arcPath -> promise {
-            let! arc = loadArcAsync arcPath
-            do! arc.AddAsync(arcPath, ArcFiles.Assay(ArcAssay("NewAssay")))
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.ContainsAssay("New Assay")).toBe (true)
+                        Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
+                        Vitest.expect(vault.arc.Value.hasInMemoryChanges ()).toBe (false)
+                        Vitest.expect(vault.isBusyWriting).toBe (false)
+                    })
+        )
 
-            let canonicalPath = join [| arcPath; "assays"; "NewAssay"; "isa.assay.xlsx" |]
-            let! exists = pathExistsAsync canonicalPath
-            Vitest.expect(exists).toBe(true)
+        Vitest.test (
+            "vault add rejects duplicate entities",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("ExistingAssay")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = loadArcAsync arcPath
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
 
-            let! reloadedArc = loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe(true)
-        }))
+                        let request =
+                            FileContentDTO.fromArcFile (ArcFiles.Assay(ArcAssay("ExistingAssay")))
+                            |> expectSome
+                            <| "Expected duplicate assay DTO."
 
-    Vitest.test("adds a study and creates the canonical study file", fun () ->
-        withTempArc ignore (fun arcPath -> promise {
-            let! arc = loadArcAsync arcPath
-            do! arc.AddAsync(arcPath, ArcFiles.Study(ArcStudy("NewStudy"), []))
+                        match! vault.AddArcFile request with
+                        | Ok() -> failwith "Expected duplicate entity add to fail."
+                        | Error error ->
+                            Vitest.expect(error.Message).toContain ("already contains assay")
+                            Vitest.expect(vault.isBusyWriting).toBe (false)
+                    })
+        )
 
-            let canonicalPath = join [| arcPath; "studies"; "NewStudy"; "isa.study.xlsx" |]
-            let! exists = pathExistsAsync canonicalPath
-            Vitest.expect(exists).toBe(true)
+        Vitest.test (
+            "adds a study and creates the canonical study file",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        do! arc.AddArcFileAsync(arcPath, ArcFiles.Study(ArcStudy("NewStudy"), []))
 
-            let! reloadedArc = loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsStudy("NewStudy")).toBe(true)
-        }))
+                        let canonicalPath = join [| arcPath; "studies"; "NewStudy"; "isa.study.xlsx" |]
+                        let! exists = pathExistsAsync canonicalPath
+                        Vitest.expect(exists).toBe (true)
 
-    Vitest.test("adds a run and creates the canonical run file", fun () ->
-        withTempArc ignore (fun arcPath -> promise {
-            let! arc = loadArcAsync arcPath
-            do! arc.AddAsync(arcPath, ArcFiles.Run(ArcRun("NewRun")))
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.ContainsStudy("NewStudy")).toBe (true)
+                    })
+        )
 
-            let canonicalPath = join [| arcPath; "runs"; "NewRun"; "isa.run.xlsx" |]
-            let! exists = pathExistsAsync canonicalPath
-            Vitest.expect(exists).toBe(true)
+        Vitest.test (
+            "adds a run and creates the canonical run file",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        do! arc.AddArcFileAsync(arcPath, ArcFiles.Run(ArcRun("NewRun")))
 
-            let! reloadedArc = loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsRun("NewRun")).toBe(true)
-        }))
+                        let canonicalPath = join [| arcPath; "runs"; "NewRun"; "isa.run.xlsx" |]
+                        let! exists = pathExistsAsync canonicalPath
+                        Vitest.expect(exists).toBe (true)
 
-    Vitest.test("adds a workflow and creates the canonical workflow file", fun () ->
-        withTempArc ignore (fun arcPath -> promise {
-            let! arc = loadArcAsync arcPath
-            do! arc.AddAsync(arcPath, ArcFiles.Workflow(ArcWorkflow("NewWorkflow")))
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.ContainsRun("NewRun")).toBe (true)
+                    })
+        )
 
-            let canonicalPath = join [| arcPath; "workflows"; "NewWorkflow"; "isa.workflow.xlsx" |]
-            let! exists = pathExistsAsync canonicalPath
-            Vitest.expect(exists).toBe(true)
+        Vitest.test (
+            "adds a workflow and creates the canonical workflow file",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        do! arc.AddArcFileAsync(arcPath, ArcFiles.Workflow(ArcWorkflow("NewWorkflow")))
 
-            let! reloadedArc = loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsWorkflow("NewWorkflow")).toBe(true)
-        }))
+                        let canonicalPath =
+                            join [|
+                                arcPath
+                                "workflows"
+                                "NewWorkflow"
+                                "isa.workflow.xlsx"
+                            |]
 
-    Vitest.test("rejects duplicate entity identifiers", fun () ->
-        withTempArc (fun arc -> arc.AddAssay(ArcAssay("ExistingAssay"))) (fun arcPath -> promise {
-            let! arc = loadArcAsync arcPath
-            let! addResult = arc.TryAddAsync(arcPath, ArcFiles.Assay(ArcAssay("ExistingAssay")))
+                        let! exists = pathExistsAsync canonicalPath
+                        Vitest.expect(exists).toBe (true)
 
-            match addResult with
-            | Ok _ -> failwith "Expected duplicate assay add to fail."
-            | Error errors ->
-                Vitest.expect(errors.[0]).toContain("already contains assay")
-        }))
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.ContainsWorkflow("NewWorkflow")).toBe (true)
+                    })
+        )
 
-    Vitest.test("rejects unsupported ARC file kinds", fun () ->
-        withTempArc ignore (fun arcPath -> promise {
-            let! arc = loadArcAsync arcPath
+        Vitest.test (
+            "rejects duplicate entity identifiers",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("ExistingAssay")))
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        let! addResult = arc.TryAddArcFileAsync(arcPath, ArcFiles.Assay(ArcAssay("ExistingAssay")))
 
-            let unsupportedArcFiles = [|
-                ArcFiles.Investigation(ArcInvestigation("Investigation")), "investigation"
-                ArcFiles.DataMap(None, DataMap.init()), "datamap"
-                ArcFiles.Template(Template.init "Template"), "template"
-            |]
+                        match addResult with
+                        | Ok _ -> failwith "Expected duplicate assay add to fail."
+                        | Error errors -> Vitest.expect(errors.[0]).toContain ("already contains assay")
+                    })
+        )
 
-            for arcFile, expectedMessage in unsupportedArcFiles do
-                let! addResult = arc.TryAddAsync(arcPath, arcFile)
+        Vitest.test (
+            "rejects unsupported ARC file kinds",
+            fun () ->
+                withTempArc
+                    ignore
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
 
-                match addResult with
-                | Ok _ -> failwith $"Expected {expectedMessage} add to fail."
-                | Error errors -> Vitest.expect(errors.[0]).toContain(expectedMessage)
-        }))
+                        let unsupportedArcFiles = [|
+                            ArcFiles.Investigation(ArcInvestigation("Investigation")), "investigation"
+                            ArcFiles.DataMap(None, DataMap.init ()), "datamap"
+                            ArcFiles.Template(Template.init "Template"), "template"
+                        |]
 
-    Vitest.test("keeps existing entities when adding a new one", fun () ->
-        withTempArc (fun arc -> arc.AddStudy(ArcStudy("ExistingStudy"))) (fun arcPath -> promise {
-            let! arc = loadArcAsync arcPath
-            do! arc.AddAsync(arcPath, ArcFiles.Assay(ArcAssay("NewAssay")))
+                        for arcFile, expectedMessage in unsupportedArcFiles do
+                            let! addResult = arc.TryAddArcFileAsync(arcPath, arcFile)
 
-            let! reloadedArc = loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsStudy("ExistingStudy")).toBe(true)
-            Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe(true)
-        }))
+                            match addResult with
+                            | Ok _ -> failwith $"Expected {expectedMessage} add to fail."
+                            | Error errors -> Vitest.expect(errors.[0]).toContain (expectedMessage)
+                    })
+        )
 
-    Vitest.test("ApplyArcFileAndSave adds new entities and updates existing entities through the same IPC-facing path", fun () ->
-        withTempArc (fun arc -> arc.AddAssay(ArcAssay("ExistingAssay", title = "Old title"))) (fun arcPath -> promise {
-            let! loadedArc = loadArcAsync arcPath
-            let dirtyAssay = loadedArc.GetAssay("ExistingAssay")
-            dirtyAssay.Title <- Some "Unsaved local title"
+        // Vitest.test("does not mutate the in-memory ARC when add contracts fail", fun () ->
+        //     withTempArc ignore (fun arcPath -> promise {
+        //         let! arc = loadArcAsync arcPath
+        //         do! mkdirRecursiveAsync (join [| arcPath; "assays" |])
+        //         do! writeUtf8FileAsync (join [| arcPath; "assays"; "NewAssay" |]) "conflicting file"
 
-            let vault = ArcVault(testWindow ())
-            vault.path <- Some arcPath
-            vault.SetArc loadedArc
-            vault.SetHasUnsavedArcChanges true
+        //         let! addResult = arc.TryAddArcFileAsync(arcPath, ArcFiles.Assay(ArcAssay("NewAssay")))
 
-            let newAssayRequest =
-                FileContentDTO.fromArcFile(ArcFiles.Assay(ArcAssay("NewAssay")))
-                |> expectSome <| "Expected new assay DTO."
+        //         match addResult with
+        //         | Ok _ -> failwith "Expected assay add to fail because the assay folder path is already a file."
+        //         | Error _ -> ()
 
-            match! vault.ApplyArcFileAndSave newAssayRequest with
-            | Error error -> failwith error.Message
-            | Ok() -> ()
+        //         Vitest.expect(arc.ContainsAssay("NewAssay")).toBe(false)
+        //     }))
 
-            let! reloadedAfterAdd = loadArcAsync arcPath
-            Vitest.expect(reloadedAfterAdd.ContainsAssay("NewAssay")).toBe(true)
-            Vitest.expect(reloadedAfterAdd.GetAssay("ExistingAssay").Title).toEqual(Some "Old title")
-            Vitest.expect(vault.hasUnsavedArcChanges).toBe(true)
+        Vitest.test (
+            "keeps existing entities when adding a new one",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddStudy(ArcStudy("ExistingStudy")))
+                    (fun arcPath -> promise {
+                        let! arc = loadArcAsync arcPath
+                        do! arc.AddArcFileAsync(arcPath, ArcFiles.Assay(ArcAssay("NewAssay")))
 
-            let updatedExistingAssay = ArcAssay("ExistingAssay", title = "Updated title")
+                        let! reloadedArc = loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.ContainsStudy("ExistingStudy")).toBe (true)
+                        Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe (true)
+                    })
+        )
 
-            let existingAssayRequest =
-                FileContentDTO.fromArcFile(ArcFiles.Assay updatedExistingAssay)
-                |> expectSome <| "Expected existing assay DTO."
+        Vitest.test (
+            "AddArcFile uses the scoped ARC add path without persisting unrelated dirty in-memory edits",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("ExistingAssay", title = "Old title")))
+                    (fun arcPath -> promise {
+                        let! loadedArc = loadArcAsync arcPath
+                        loadedArc.GetAssay("ExistingAssay").Title <- Some "Unsaved local title"
 
-            match! vault.ApplyArcFileAndSave existingAssayRequest with
-            | Error error -> failwith error.Message
-            | Ok() -> ()
+                        let vault = ArcVault(testWindow ())
+                        vault.path <- Some arcPath
+                        vault.SetArc loadedArc
+                        vault.RefreshHasUnsavedArcChangesFlag()
 
-            let! reloadedArc = loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe(true)
-            Vitest.expect(reloadedArc.GetAssay("ExistingAssay").Title).toEqual(Some "Updated title")
-            Vitest.expect(vault.hasUnsavedArcChanges).toBe(false)
-        }))
+                        let newAssayRequest =
+                            FileContentDTO.fromArcFile (ArcFiles.Assay(ArcAssay("NewAssay"))) |> expectSome
+                            <| "Expected new assay DTO."
+
+                        match! vault.AddArcFile newAssayRequest with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        let! reloadedAfterAdd = loadArcAsync arcPath
+                        Vitest.expect(reloadedAfterAdd.ContainsAssay("NewAssay")).toBe (true)
+                        Vitest.expect(reloadedAfterAdd.GetAssay("ExistingAssay").Title).toEqual (Some "Old title")
+
+                        let inMemoryArc = vault.arc |> expectSome <| "Expected vault ARC."
+                        Vitest.expect(inMemoryArc.ContainsAssay("NewAssay")).toBe (true)
+                        Vitest.expect(inMemoryArc.GetAssay("ExistingAssay").Title).toEqual (Some "Unsaved local title")
+                        Vitest.expect(inMemoryArc.GetAssay("NewAssay").StaticHash).not.toBe (0)
+                        Vitest.expect(vault.hasUnsavedArcChanges).toBe (true)
+                        Vitest.expect(vault.isBusyWriting).toBe (false)
+                    })
+        )
 )

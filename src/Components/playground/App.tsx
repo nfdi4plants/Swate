@@ -1,31 +1,31 @@
 import React, { Fragment } from 'react';
-import TermSearch from '../src/TermSearch/TermSearch.fs.ts';
-import {Entry as Table} from '../src/Table/Table.fs.ts';
-import {Entry as AnnotationTable} from '../src/AnnotationTable/AnnotationTable.fs.ts';
-import AnnotationTableCtxProvider from '../src/AnnotationTable/AnnotationTableContextProvider.fs.ts';
-import {Example as ContextMenuExample, ContextMenu} from '../src/GenericComponents/ContextMenu.fs.ts';
+import TermSearch from '../src/Composite/TermSearch/TermSearch.fs.ts';
+import {Entry as Table} from '../src/Composite/Table/Table.fs.ts';
+import {Entry as AnnotationTable} from '../src/Composite/AnnotationTable/AnnotationTable.fs.ts';
+import AnnotationTableCtxProvider from '../src/Composite/AnnotationTable/ContextProvider.fs.ts';
+import {Example as ContextMenuExample, ContextMenu} from '../src/Primitive/ContextMenu/ContextMenu.fs.ts';
 import {TIBApi} from '../src/Api/TIBApi.fs.ts';
-import {Entry as TemplateFilter} from '../src/Template/TemplateFilter.fs.ts';
-import {Entry as ComboBox} from '../src/GenericComponents/ComboBox.fs.ts';
-import {Entry as Select} from '../src/GenericComponents/Select.fs.ts';
-import {Entry as BaseModal} from '../src/GenericComponents/BaseModal.fs.ts';
-import { Wizard as LandingWizard } from '../src/Landing/Landing.fs.ts';
-import { Exports_createLandingDraft as createLandingDraft, Exports_createLandingUiState as createLandingUiState } from '../src/Landing/Types.fs.ts';
-import {TIBQueryProvider as TermSearchConfigProvider} from '../src/TermSearch/TermSearchConfigProvider.fs.ts';
-import {Entry as TermSearchConfigSetter} from '../src/TermSearch/TermSearchConfigSetter.fs.ts';
+import {Entry as TemplateFilter} from '../src/Composite/TemplateBrowser/TemplateFilter.fs.ts';
+import {Entry as ComboBox} from '../src/Primitive/ComboBox/ComboBox.fs.ts';
+import {Entry as Select} from '../src/Primitive/Select/Select.fs.ts';
+import {Entry as BaseModal} from '../src/Primitive/BaseModal/BaseModal.fs.ts';
+import { Wizard as LandingWizard } from '../src/Page/Landing/Landing.fs.ts';
+import { Exports_createLandingDraft as createLandingDraft, Exports_createLandingUiState as createLandingUiState } from '../src/Page/Landing/Types.fs.ts';
+import {TIBQueryProvider as TermSearchConfigProvider} from '../src/Composite/TermSearch/ConfigProvider.fs.ts';
+import {Entry as TermSearchConfigSetter} from '../src/Composite/TermSearch/ConfigSetter.fs.ts';
 import { Term } from '../../Shared/Database.fs.ts';
-import {Entry as DataMapTable} from '../src/DataMapTable/DataMapTable.fs.ts';
-import {Entry as Layout} from '../src/Layout/Layout.fs.js'
-import {FileExplorerExample_Example} from '../src/FileExplorer/FileExplorer.fs.ts'
-import {Entry as WidgetController} from '../src/Widgets/Widgets.fs.ts';
-import {Entry as NoteSearch} from '../src/Notes/NoteSearch/NoteSearchComponent.fs.ts'
-import {Entry as TextInputWithMarkdown} from '../src/MarkdownText/TextInputWithMarkdown.fs.ts';
-import {Entry as AuthButton} from '../src/Authentication/Authentication.fs.ts';
+import {Entry as DataMapTable} from '../src/Composite/DataMapTable/DataMapTable.fs.ts';
+import {Entry as Layout} from '../src/Composite/Layout/Layout.fs.js'
+import {FileExplorerExample_Example} from '../src/Page/FileExplorer/FileExplorer.fs.ts'
+import {Entry as WidgetController} from '../src/Composite/Widgets/Widgets.fs.ts';
+// import {Entry as NoteSearch} from '../src/Composite/Notes/NoteSearch/NoteSearchComponent.fs.ts'
+import {Entry as TextInputWithMarkdown} from '../src/Composite/MarkdownText/TextInputWithMarkdown.fs.ts';
+import {Entry as AuthButton} from '../src/Composite/Authentication/Authentication.fs.ts';
 // import {Entry as DataHubSidebarEntry} from '../src/DataHub/DataHubSidebar.fs.ts';
-import {GitLabEntry as DataHubBrowser} from '../src/DataHub/DataHubBrowser.fs.ts';
-import {Entry as ARCSelectorEntry} from '../src/ARCSelector/Selector.fs.ts';
-import {Entry as ArcFileEditor} from '../src/ArcFileEditor/ArcFileEditor.fs.ts';
-import {Entry as SettingsPage} from '../src/PageComponents/SettingsPage/SettingsPage.fs.ts';
+import {GitLabEntry as DataHubBrowser} from '../src/Page/DataHubBrowser/DataHubBrowser.fs.ts';
+import {Entry as ARCSelectorEntry} from '../src/Composite/ArcSelector/ArcSelector.fs.ts';
+import {Entry as ArcFileEditor} from '../src/Page/ArcFileEditor/ArcFileEditor.fs.ts';
+import {Entry as SettingsPage} from '../src/Page/SettingsPage/SettingsPage.fs.ts';
 
 function TermSearchContainer() {
   const [term, setTerm] = React.useState(undefined);

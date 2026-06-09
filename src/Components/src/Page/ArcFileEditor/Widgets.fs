@@ -27,61 +27,6 @@ module private WidgetsHelper =
         | WidgetType.DataAnnotator -> "Data Annotator", Icons.DataAnnotator()
         | WidgetType.Playground -> "Playground", Icons.Templates()
 
-// let createWidgets
-//     (arcFileState: ArcFiles)
-//     (activeView: WidgetHostView)
-//     (activeTableIndex: int option)
-//     (setArcFileState: ArcFiles -> unit)
-//     (templateImportType: TableJoinOptions)
-//     (setTemplateImportType: TableJoinOptions -> unit)
-//     (templateServices: TemplateWidgetServices)
-//     (widgetServices: ArcFileEditorWidgetServices)
-//     : Map<WidgetType, WidgetDefinition> =
-//     [
-//         WidgetType.BuildingBlock,
-//         {|
-//             prefix = "ADD_BUILDINGBLOCK"
-//             content = BuildingBlockWidget.Main(arcFileState, activeTableIndex, setArcFileState)
-//         |}
-//         WidgetType.Template,
-//         {|
-//             prefix = "ADD_TEMPLATE"
-//             content =
-//                 TemplateWidget.Main(
-//                     arcFileState,
-//                     activeTableIndex,
-//                     setArcFileState,
-//                     templateImportType,
-//                     setTemplateImportType,
-//                     templateServices
-//                 )
-//         |}
-//         WidgetType.FilePicker,
-//         {|
-//             prefix = "FILEPICKER"
-//             content =
-//                 FilePickerWidget.Main(
-//                     arcFileState,
-//                     activeTableIndex,
-//                     setArcFileState,
-//                     widgetServices.filePickerServices
-//                 )
-//         |}
-//         WidgetType.DataAnnotator,
-//         {|
-//             prefix = "DATAANNOTATOR"
-//             content =
-//                 DataAnnotatorWidget.Main(
-//                     arcFileState,
-//                     activeView,
-//                     activeTableIndex,
-//                     setArcFileState,
-//                     widgetServices.dataAnnotatorServices
-//                 )
-//         |}
-//     ]
-//     |> Map.ofList
-
 open WidgetsHelper
 
 [<Erase; Mangle(false)>]
@@ -122,7 +67,8 @@ type Main =
             children: ReactElement,
             buildingBlockWidget: ReactElement,
             templateWidget: ReactElement,
-            filePickerWidget: ReactElement
+            filePickerWidget: ReactElement,
+            dataAnnotatorWidget: ReactElement
         ) =
         let widgets: Map<WidgetType, WidgetDefinition> =
             React.useMemo (
@@ -143,6 +89,11 @@ type Main =
                             prefix = "FILEPICKER"
                             content = filePickerWidget
                         |}
+                        WidgetType.DataAnnotator,
+                        {|
+                            prefix = "DATAANNOTATOR"
+                            content = dataAnnotatorWidget
+                        |}
                     ]
                     |> Map.ofList
                 ),
@@ -150,8 +101,8 @@ type Main =
                     box buildingBlockWidget
                     box templateWidget
                     box filePickerWidget
+                    box dataAnnotatorWidget
                 |]
             )
 
         Widget.WidgetController(widgets, children = children)
-

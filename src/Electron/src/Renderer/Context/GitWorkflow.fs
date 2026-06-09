@@ -407,6 +407,22 @@ let private applyRefreshResult (refreshResult: GitRefreshResult) (model: GitStat
             PendingRefreshWarningNotice = None
     }
 
+let private applyWriteSuccessModel model success =
+    match success with
+    | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->
+        let refreshedModel = applyRefreshResult refreshResult model
+
+        let selectionAdjustedModel =
+            match selectedChangePathOverride with
+            | Some selectedChangePath -> {
+                refreshedModel with
+                    SelectedChangePath = selectedChangePath
+              }
+            | None -> refreshedModel
+
+        selectionAdjustedModel, pageChange, warningMessage
+    | CloneSuccess _ -> model, GitPageChange.NoChange, None
+
 let nextRefreshRequestId (model: GitState) = model.RefreshRequestId + 1
 
 let nextPageLoadRequestId (model: GitState) = model.PageLoadRequestId + 1
@@ -1472,21 +1488,7 @@ let update
 
         nextModel, cmd
     | WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteConfirmation(success, dialog, pendingRemoteAction))) ->
-        let baseModel, pageChange, warningMessage =
-            match success with
-            | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->
-                let refreshedModel = applyRefreshResult refreshResult model
-
-                let selectionAdjustedModel =
-                    match selectedChangePathOverride with
-                    | Some selectedChangePath -> {
-                        refreshedModel with
-                            SelectedChangePath = selectedChangePath
-                      }
-                    | None -> refreshedModel
-
-                selectionAdjustedModel, pageChange, warningMessage
-            | CloneSuccess _ -> model, GitPageChange.NoChange, None
+        let baseModel, pageChange, warningMessage = applyWriteSuccessModel model success
 
         let nextModel = {
             baseModel with
@@ -1502,21 +1504,7 @@ let update
 
         nextModel, applyPageChangeCmd setPageState pageChange
     | WriteCompleted(_, PrimarySave _, Ok(CompletedWithPendingRemoteFailure(success, message))) ->
-        let baseModel, pageChange, warningMessage =
-            match success with
-            | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->
-                let refreshedModel = applyRefreshResult refreshResult model
-
-                let selectionAdjustedModel =
-                    match selectedChangePathOverride with
-                    | Some selectedChangePath -> {
-                        refreshedModel with
-                            SelectedChangePath = selectedChangePath
-                      }
-                    | None -> refreshedModel
-
-                selectionAdjustedModel, pageChange, warningMessage
-            | CloneSuccess _ -> model, GitPageChange.NoChange, None
+        let baseModel, pageChange, warningMessage = applyWriteSuccessModel model success
 
         let nextModel = {
             baseModel with
@@ -1540,21 +1528,7 @@ let update
         let nextModel = writeErrorModel message model
         nextModel, resolveCloneReplyCmd request (Error message)
     | WriteCompleted(_, request, Ok(Completed success)) ->
-        let baseModel, pageChange, warningMessage =
-            match success with
-            | UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, warningMessage) ->
-                let refreshedModel = applyRefreshResult refreshResult model
-
-                let selectionAdjustedModel =
-                    match selectedChangePathOverride with
-                    | Some selectedChangePath -> {
-                        refreshedModel with
-                            SelectedChangePath = selectedChangePath
-                      }
-                    | None -> refreshedModel
-
-                selectionAdjustedModel, pageChange, warningMessage
-            | CloneSuccess _ -> model, GitPageChange.NoChange, None
+        let baseModel, pageChange, warningMessage = applyWriteSuccessModel model success
 
         let nextModel = {
             baseModel with

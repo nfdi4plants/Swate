@@ -26,10 +26,69 @@ Vitest.describe("RenamePathRules", fun () ->
         Vitest.expect(result).toEqual(Error "Rename target is identical to the current path.")
     )
 
-    Vitest.test("ArcDeletePathRules.isRenamePathAllowed only allows entity folders", fun () ->
-        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay").toBe(true)
-        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe(false)
-        Vitest.expect(ArcDeletePathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe(false)
+    Vitest.test("ArcEntityPathRules.isRenamePathAllowed allows entity folders and safe generic descendants", fun () ->
+        Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay").toBe(true)
+        Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe(false)
+        Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe(true)
+        Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "test.fsx").toBe(true)
+    )
+
+    Vitest.test("generic filesystem targets are limited to safe non-canonical paths", fun () ->
+        let allowedTargets = [
+            "assays/AssayA/protocols/protocol.md"
+            "studies/StudyA/resources"
+            "workflows/WorkflowA/scripts/workflow.cwl"
+            "runs/RunA/data.txt"
+            "test.fsx"
+            "notes/custom.md"
+        ]
+
+        allowedTargets
+        |> List.iter (fun path -> Vitest.expect(ArcEntityPathRules.isGenericFileSystemTargetAllowed path).toBe(true))
+
+        let rejectedTargets = [
+            ""
+            "assays"
+            "assays/AssayA"
+            "assays/AssayA/isa.assay.xlsx"
+            "assays/AssayA/isa.datamap.xlsx"
+            "assays/AssayA/readme.md"
+            "assays/AssayA/.git/config"
+            "../assays/AssayA/custom.txt"
+            "isa.investigation.xlsx"
+        ]
+
+        rejectedTargets
+        |> List.iter (fun path -> Vitest.expect(ArcEntityPathRules.isGenericFileSystemTargetAllowed path).toBe(false))
+    )
+
+    Vitest.test("root-level generic filesystem child paths are allowed for safe targets only", fun () ->
+        match tryBuildGenericFileSystemChildPath "" "docs" with
+        | Ok targetPath -> Vitest.expect(targetPath).toBe("docs")
+        | Error errorMessage -> failwith errorMessage
+
+        match tryBuildGenericFileSystemChildPath "" "notes.txt" with
+        | Ok targetPath -> Vitest.expect(targetPath).toBe("notes.txt")
+        | Error errorMessage -> failwith errorMessage
+
+        let rejectedRootTargets = [
+            "studies"
+            "assays"
+            "workflows"
+            "runs"
+            "isa.investigation.xlsx"
+            ".git"
+            ".gitkeep"
+            "readme.md"
+            "../escape"
+        ]
+
+        rejectedRootTargets
+        |> List.iter (fun name ->
+            match tryBuildGenericFileSystemChildPath "" name with
+            | Ok targetPath -> failwith $"Expected root target '{targetPath}' to be rejected."
+            | Error _ -> ()
+        )
     )
 )
 

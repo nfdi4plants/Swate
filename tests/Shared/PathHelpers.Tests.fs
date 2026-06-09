@@ -101,22 +101,22 @@ let tests =
 
         testCase "classifyDeleteTarget identifies canonical entity files" <| fun _ ->
             let classification =
-                ArcDeletePathRules.classifyDeleteTarget "assays/MyAssay/isa.assay.xlsx"
+                ArcEntityPathRules.classifyDeleteTarget "assays/MyAssay/isa.assay.xlsx"
 
             match classification with
-            | ArcDeletePathRules.DeletePathClassification.CanonicalFileTarget(
-                ArcDeletePathRules.CanonicalArcFileTarget.EntityFile(ArcDeletePathRules.AddZone.Assays, "MyAssay"),
+            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
+                ArcEntityPathRules.CanonicalArcFileTarget.EntityFile(ArcEntityPathRules.AddZone.Assays, "MyAssay"),
                 _
               ) -> ()
             | _ -> failwith "Expected canonical assay entity file classification."
 
         testCase "classifyDeleteTarget identifies entity folders" <| fun _ ->
             let classification =
-                ArcDeletePathRules.classifyDeleteTarget "studies/MyStudy"
+                ArcEntityPathRules.classifyDeleteTarget "studies/MyStudy"
 
             match classification with
-            | ArcDeletePathRules.DeletePathClassification.EntityFolderTarget(
-                ArcDeletePathRules.AddZone.Studies,
+            | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget(
+                ArcEntityPathRules.AddZone.Studies,
                 "MyStudy",
                 _
               ) -> ()
@@ -124,17 +124,21 @@ let tests =
 
         testCase "isDeletePathAllowed keeps broad add-zone descendants" <| fun _ ->
             Expect.isTrue
-                (ArcDeletePathRules.isDeletePathAllowed "assays/MyAssay/notes/custom.txt")
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/notes/custom.txt")
                 "Any descendant under add zones should remain deletable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isDeletePathAllowed "test.fsx")
+                "Safe root-level generic files should be deletable."
 
         testCase "isDeletePathAllowed rejects protected targets" <| fun _ ->
             Expect.isFalse
-                (ArcDeletePathRules.isDeletePathAllowed "workflows/MyWorkflow/readme.md")
+                (ArcEntityPathRules.isDeletePathAllowed "workflows/MyWorkflow/readme.md")
                 "Protected files should remain non-deletable."
 
         testCase "buildFallbackUnlinkPaths maps entity folder to canonical files" <| fun _ ->
             let fallbackPaths =
-                ArcDeletePathRules.buildFallbackUnlinkPaths "runs/MyRun"
+                ArcEntityPathRules.buildFallbackUnlinkPaths "runs/MyRun"
 
             Expect.equal
                 fallbackPaths
@@ -146,7 +150,7 @@ let tests =
 
         testCase "buildFallbackUnlinkPaths keeps canonical file targets as-is" <| fun _ ->
             let fallbackPaths =
-                ArcDeletePathRules.buildFallbackUnlinkPaths "workflows/MyFlow/isa.datamap.xlsx"
+                ArcEntityPathRules.buildFallbackUnlinkPaths "workflows/MyFlow/isa.datamap.xlsx"
 
             Expect.equal
                 fallbackPaths
@@ -155,11 +159,11 @@ let tests =
 
         testCase "classifyRenameTarget maps canonical ARC file paths to dedicated rename variants" <| fun _ ->
             let classification =
-                ArcDeletePathRules.classifyRenameTarget "assays/MyAssay/isa.assay.xlsx"
+                ArcEntityPathRules.classifyRenameTarget "assays/MyAssay/isa.assay.xlsx"
 
             match classification with
-            | ArcDeletePathRules.RenamePathClassification.CanonicalEntityFileTarget(
-                ArcDeletePathRules.AddZone.Assays,
+            | ArcEntityPathRules.RenamePathClassification.CanonicalEntityFileTarget(
+                ArcEntityPathRules.AddZone.Assays,
                 "MyAssay",
                 _
               ) -> ()
@@ -167,34 +171,38 @@ let tests =
 
         testCase "resolveRenameSourcePath redirects canonical ARC files to their entity folder" <| fun _ ->
             Expect.equal
-                (ArcDeletePathRules.resolveRenameSourcePath "runs/MyRun/isa.run.xlsx")
+                (ArcEntityPathRules.resolveRenameSourcePath "runs/MyRun/isa.run.xlsx")
                 "runs/MyRun"
                 "Renaming a canonical ARC file should rename the parent entity folder."
 
-        testCase "isRenamePathAllowed only allows entity folders" <| fun _ ->
+        testCase "isRenamePathAllowed allows entity folders and safe generic descendants" <| fun _ ->
             Expect.isFalse
-                (ArcDeletePathRules.isRenamePathAllowed "")
+                (ArcEntityPathRules.isRenamePathAllowed "")
                 "ARC root must not be renameable."
 
             Expect.isFalse
-                (ArcDeletePathRules.isRenamePathAllowed "studies")
+                (ArcEntityPathRules.isRenamePathAllowed "studies")
                 "Add-zone roots must stay protected."
 
             Expect.isFalse
-                (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy/isa.study.xlsx")
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/isa.study.xlsx")
                 "Canonical ARC files should not be renameable."
 
             Expect.isTrue
-                (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy")
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy")
                 "Entity folders should be renameable."
 
-            Expect.isFalse
-                (ArcDeletePathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
-                "Generic descendants should not be renameable."
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
+                "Safe generic descendants should be renameable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "test.fsx")
+                "Safe root-level generic files should be renameable."
 
         testCase "buildCanonicalEntityPaths returns entity and datamap canonical files" <| fun _ ->
             let paths =
-                ArcDeletePathRules.buildCanonicalEntityPaths ArcDeletePathRules.AddZone.Workflows "MyWorkflow"
+                ArcEntityPathRules.buildCanonicalEntityPaths ArcEntityPathRules.AddZone.Workflows "MyWorkflow"
 
             Expect.equal
                 paths

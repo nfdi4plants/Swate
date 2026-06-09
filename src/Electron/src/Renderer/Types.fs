@@ -1,7 +1,6 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
-open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -19,7 +18,7 @@ type PageState =
     | ArcFilePage of ArcFiles
     | TextPage of string
     | UnknownPage
-    | LandingDraftPage
+    //| LandingDraftPage
     | NotesDraftPage
     | NotesSearchPage
     | GitDiffPage of GitDiffViewDataDto
@@ -27,6 +26,7 @@ type PageState =
     | GitUnsupportedPage of GitUnsupportedPageData
     | ErrorPage of string
     | DataHubBrowser
+    | SettingsPage
 with
     static member fromFileContentDTO(dto: FileContentDTO) : PageState =
         match dto.fileType with
