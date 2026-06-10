@@ -55,10 +55,9 @@ let private getAllArcFilePathsIgnoringGitMetadataAsync (arcPath: string) =
 
 let private isGitMetadataContract (contract: Contract) =
     isGitMetadataPath contract.Path
-    ||
-    match contract.Operation, contract.DTO with
-    | Operation.RENAME, Some(DTO.Text targetPath) -> isGitMetadataPath targetPath
-    | _ -> false
+    || match contract.Operation, contract.DTO with
+       | Operation.RENAME, Some(DTO.Text targetPath) -> isGitMetadataPath targetPath
+       | _ -> false
 
 /// Loads an ARC while enforcing that Git metadata never enters its filesystem model.
 let tryLoadArcIgnoringGitMetadataAsync (arcPath: string) = promise {
