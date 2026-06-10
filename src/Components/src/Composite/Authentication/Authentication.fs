@@ -157,9 +157,11 @@ type Authentication =
         ]
 
     [<ReactComponent>]
-    static member private NotAuthenticatedView(dataHubUrl, setDataHubUrl, onSignIn: SignInInformation -> unit, setError: exn option -> unit) =
+    static member private NotAuthenticatedView
+        (dataHubUrl, setDataHubUrl, onSignIn: SignInInformation -> unit, setError: exn option -> unit)
+        =
 
-        
+
         let pat, setPat = React.useState ""
 
         Html.div [
@@ -282,10 +284,13 @@ type Authentication =
 
         let onRegenerateToken (account: AccountSummary) =
             setShowAddAccount true
+
             setDataHubUrl {
                 Name = account.User.TargetDataHub
                 Url = account.User.TargetDataHub
-                Description = Some "A browser window with prefilled scopes for regenerating your token will open. Please generate a new token and use it to sign in again."
+                Description =
+                    Some
+                        "A browser window with prefilled scopes for regenerating your token will open. Please generate a new token and use it to sign in again."
             }
 
         let content =
@@ -312,15 +317,15 @@ type Authentication =
                                 prop.children [
                                     AccountManager.Main(
                                         accounts,
+                                        onRegenerateToken = onRegenerateToken,
                                         ?onSwitchAccount = onSwitchAccount,
-                                        ?onRemoveAccount = onRemoveAccount,
-                                        onRegenerateToken = onRegenerateToken
+                                        ?onRemoveAccount = onRemoveAccount
                                     )
                                     Authentication.LogoutBtn onLogout
                                     Authentication.AddAnotherAccountBtn(fun () -> setShowAddAccount true)
                                 ]
                             ]
-                        | None -> Authentication.NotAuthenticatedView(dataHubUrl, setDataHubUrl, onSignIn, setError)
+                    | None -> Authentication.NotAuthenticatedView(dataHubUrl, setDataHubUrl, onSignIn, setError)
                 ),
                 [|
                     box activeUser
@@ -344,14 +349,20 @@ type Authentication =
                 Html.div [
                     prop.className "swt:indicator swt:indicator-bottom"
                     prop.children [
-                        if activeUser.IsSome && accounts.ActiveAccount.IsSome && accounts.ActiveAccount.Value.TokenInvalid then
+                        if
+                            activeUser.IsSome
+                            && accounts.ActiveAccount.IsSome
+                            && accounts.ActiveAccount.Value.TokenInvalid
+                        then
                             Html.span [
                                 prop.testId "TokenInvalidIndicator"
                                 prop.className "swt:indicator-item"
+                                prop.ariaLabel "Your token is invalid. Please update your token or remove the account."
+                                prop.title "Your token is invalid. Please update your token or remove the account."
                                 prop.children [
                                     Html.i [
+                                        prop.ariaHidden true
                                         prop.className "swt:iconify swt:fluent--warning-12-filled swt:text-error"
-                                        prop.title "Your token is invalid. Please update your token or remove the account."
                                     ]
                                 ]
                             ]

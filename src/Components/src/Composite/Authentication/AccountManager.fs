@@ -10,8 +10,13 @@ type AccountManager =
 
     [<ReactComponent>]
     static member private AccountRow
-        (account: AccountSummary, isActive: bool, ?onSwitch: string -> unit, ?onRemove: string -> unit, ?onRegenerateToken: AccountSummary -> unit)
-        =
+        (
+            account: AccountSummary,
+            isActive: bool,
+            onRegenerateToken: AccountSummary -> unit,
+            ?onSwitch: string -> unit,
+            ?onRemove: string -> unit
+        ) =
 
         Html.div [
             prop.key account.User.LocalSwateAccountId
@@ -61,24 +66,25 @@ type AccountManager =
                                                 prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4"
                                             ]
                                             Html.span [ prop.text "Token invalid" ]
-                                            match onRegenerateToken with
-                                            | Some regenerateFn ->
-                                                Html.a [
-                                                    prop.testId $"RegenerateTokenLink-{account.User.LocalSwateAccountId}"
-                                                    prop.className "swt:link swt:link-error"
-                                                    prop.href (
-                                                        Helper.GitLabUrls.prefillGitLabPATScopes account.User.TargetDataHub
+                                            Html.a [
+                                                prop.testId $"RegenerateTokenLink-{account.User.LocalSwateAccountId}"
+                                                prop.className "swt:link swt:link-error"
+                                                prop.href (
+                                                    Helper.GitLabUrls.prefillGitLabPATScopes account.User.TargetDataHub
+                                                )
+                                                prop.onClick (fun e ->
+                                                    e.stopPropagation ()
+                                                    onRegenerateToken account
+
+                                                    onRemove
+                                                    |> Option.iter (fun removeFn ->
+                                                        removeFn account.User.LocalSwateAccountId
                                                     )
-                                                    prop.onClick (fun e -> 
-                                                        e.stopPropagation()
-                                                        regenerateFn account
-                                                        onRemove |> Option.iter (fun removeFn -> removeFn account.User.LocalSwateAccountId)
-                                                    )
-                                                    prop.target.blank
-                                                    prop.rel "noopener noreferrer"
-                                                    prop.text "Regenerate token"
-                                                ]
-                                            | None -> ()
+                                                )
+                                                prop.target.blank
+                                                prop.rel "noopener noreferrer"
+                                                prop.text "Regenerate token"
+                                            ]
                                         ]
                                     ]
                             ]
@@ -114,7 +120,13 @@ type AccountManager =
         ]
 
     [<ReactComponent>]
-    static member Main(accounts: AuthStateDto, ?onSwitchAccount: string -> unit, ?onRemoveAccount: string -> unit, ?onRegenerateToken: AccountSummary -> unit) =
+    static member Main
+        (
+            accounts: AuthStateDto,
+            onRegenerateToken: AccountSummary -> unit,
+            ?onSwitchAccount: string -> unit,
+            ?onRemoveAccount: string -> unit
+        ) =
         let activeLocalSwateAccountId =
             accounts.ActiveAccount
             |> Option.map (fun account -> account.User.LocalSwateAccountId)
@@ -131,6 +143,12 @@ type AccountManager =
                 for acct in accounts.StoredAccounts do
                     let isActive = activeLocalSwateAccountId = Some acct.User.LocalSwateAccountId
 
-                    AccountManager.AccountRow(acct, isActive, ?onSwitch = onSwitchAccount, ?onRemove = onRemoveAccount, ?onRegenerateToken = onRegenerateToken)
+                    AccountManager.AccountRow(
+                        acct,
+                        isActive,
+                        onRegenerateToken = onRegenerateToken,
+                        ?onSwitch = onSwitchAccount,
+                        ?onRemove = onRemoveAccount
+                    )
             ]
         ]
