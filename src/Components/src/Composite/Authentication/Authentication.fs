@@ -157,9 +157,9 @@ type Authentication =
         ]
 
     [<ReactComponent>]
-    static member private NotAuthenticatedView(onSignIn: SignInInformation -> unit, setError: exn option -> unit) =
+    static member private NotAuthenticatedView(dataHubUrl, setDataHubUrl, onSignIn: SignInInformation -> unit, setError: exn option -> unit) =
 
-        let datahubUrl, setDataHubUrl = React.useState Helper.Default_DataHub
+        
         let pat, setPat = React.useState ""
 
         Html.div [
@@ -190,12 +190,12 @@ type Authentication =
                         ]
                     ]
                 ]
-                Authentication.DataHubSelect(datahubUrl, setDataHubUrl)
+                Authentication.DataHubSelect(dataHubUrl, setDataHubUrl)
                 Html.a [
                     prop.testId "GeneratePatLink"
                     prop.className "swt:link swt:link-info swt:text-sm swt:text-center swt:py-2"
                     prop.text "Click here to generate a new GitLab Personal Access Token"
-                    prop.href (Helper.GitLabUrls.prefillGitLabPATScopes datahubUrl.Url)
+                    prop.href (Helper.GitLabUrls.prefillGitLabPATScopes dataHubUrl.Url)
                     prop.target.blank
                     prop.rel "noopener noreferrer"
                 ]
@@ -205,11 +205,11 @@ type Authentication =
                     prop.text "Sign In"
                     prop.disabled (
                         System.String.IsNullOrWhiteSpace pat
-                        || System.String.IsNullOrWhiteSpace datahubUrl.Url
+                        || System.String.IsNullOrWhiteSpace dataHubUrl.Url
                     )
                     prop.onClick (fun _ ->
                         onSignIn {
-                            GitLabBaseUrl = datahubUrl.Url
+                            GitLabBaseUrl = dataHubUrl.Url
                             PersonalAccessToken = pat
                             OnErrorCallback = fun ex -> setError (Some ex)
                         }
@@ -257,6 +257,7 @@ type Authentication =
         let showAddAccount, setShowAddAccount = React.useState false
 
         let activeUser = accounts.ActiveUser()
+        let dataHubUrl, setDataHubUrl = React.useState Helper.Default_DataHub
 
         let onSignIn =
             fun signInInfo ->
@@ -279,6 +280,14 @@ type Authentication =
                 [| box activeUser; box isLoading; box error |]
             )
 
+        let onRegenerateToken (account: AccountSummary) =
+            setShowAddAccount true
+            setDataHubUrl {
+                Name = account.User.TargetDataHub
+                Url = account.User.TargetDataHub
+                Description = Some "A browser window with prefilled scopes for regenerating your token will open. Please generate a new token and use it to sign in again."
+            }
+
         let content =
             React.useMemo (
                 (fun () ->
@@ -294,7 +303,7 @@ type Authentication =
                                         prop.onClick (fun _ -> setShowAddAccount false)
                                         prop.text "\u2190 Back to account"
                                     ]
-                                    Authentication.NotAuthenticatedView(onSignIn, setError)
+                                    Authentication.NotAuthenticatedView(dataHubUrl, setDataHubUrl, onSignIn, setError)
                                 ]
                             ]
                         else
@@ -304,13 +313,14 @@ type Authentication =
                                     AccountManager.Main(
                                         accounts,
                                         ?onSwitchAccount = onSwitchAccount,
-                                        ?onRemoveAccount = onRemoveAccount
+                                        ?onRemoveAccount = onRemoveAccount,
+                                        onRegenerateToken = onRegenerateToken
                                     )
                                     Authentication.LogoutBtn onLogout
                                     Authentication.AddAnotherAccountBtn(fun () -> setShowAddAccount true)
                                 ]
                             ]
-                    | None -> Authentication.NotAuthenticatedView(onSignIn, setError)
+                        | None -> Authentication.NotAuthenticatedView(dataHubUrl, setDataHubUrl, onSignIn, setError)
                 ),
                 [|
                     box activeUser
@@ -331,11 +341,27 @@ type Authentication =
             Dropdown.Main(
                 isOpen,
                 setIsOpen,
-                Html.button [
-                    prop.testId "UserButtonToggle"
-                    prop.onClick (fun _ -> setIsOpen (not isOpen))
-                    prop.className "swt:btn swt:btn-circle swt:btn-sm"
-                    prop.children [ ToggleContent ]
+                Html.div [
+                    prop.className "swt:indicator swt:indicator-bottom"
+                    prop.children [
+                        if activeUser.IsSome && accounts.ActiveAccount.IsSome && accounts.ActiveAccount.Value.TokenInvalid then
+                            Html.span [
+                                prop.testId "TokenInvalidIndicator"
+                                prop.className "swt:indicator-item"
+                                prop.children [
+                                    Html.i [
+                                        prop.className "swt:iconify swt:fluent--warning-12-filled swt:text-error"
+                                        prop.title "Your token is invalid. Please update your token or remove the account."
+                                    ]
+                                ]
+                            ]
+                        Html.button [
+                            prop.testId "UserButtonToggle"
+                            prop.onClick (fun _ -> setIsOpen (not isOpen))
+                            prop.className "swt:btn swt:btn-circle swt:btn-sm"
+                            prop.children [ ToggleContent ]
+                        ]
+                    ]
                 ],
                 Html.div [ prop.testId "UserDropdownContent"; prop.children content ],
                 contentClassName =
@@ -429,6 +455,19 @@ type Authentication =
                                 }
                                 DateAdded = "2026-01-02T00:00:00.0000000Z"
                                 TokenInvalid = false
+                            }
+                            {
+                                User = {
+                                    Id = 3
+                                    LocalSwateAccountId = "acc-3"
+                                    Name = "Mr Lazy"
+                                    Email = "lazy@example.org"
+                                    AvatarUrl =
+                                        "https://www.gravatar.com/avatar/33333333333333333333333333333333?d=mp&f=y"
+                                    TargetDataHub = "https://git.nfdi4plants.org/"
+                                }
+                                DateAdded = "2022-01-02T00:00:00.0000000Z"
+                                TokenInvalid = true
                             }
                         |]
                     }
