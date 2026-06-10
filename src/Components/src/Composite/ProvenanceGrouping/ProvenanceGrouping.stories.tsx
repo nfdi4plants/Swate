@@ -228,7 +228,7 @@ export const PropertyRailExpandsValuesAndAddControls: Story = {
     expect(arabidopsis).toBeInTheDocument();
     expect(arabidopsis).toHaveClass('swt:btn');
     expect(arabidopsis).toHaveClass('swt:btn-primary');
-    expect(arabidopsis).toHaveClass('swt:w-fit');
+    expect(arabidopsis).toHaveClass('swt:w-full');
     expect(arabidopsis).toHaveClass('swt:cursor-grab');
     expect(arabidopsis.querySelector('[class*="re-order-dots"]')).not.toBeInTheDocument();
     expect(panel.getByText('Chlamydomonas')).toBeInTheDocument();
@@ -472,7 +472,10 @@ export const ExpandedGroupsRenderMemberLevelConnections: Story = {
   },
 };
 
-export const ExpandedPropertyValuesRenderValueConnections: Story = {
+const connectionKeys = (paths: HTMLElement[]) =>
+  paths.map((path) => path.getAttribute('data-provenance-connection-key') ?? '');
+
+export const ExpandedPropertyValuesConnectToEveryMatchingGroup: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -480,26 +483,61 @@ export const ExpandedPropertyValuesRenderValueConnections: Story = {
 
     await waitFor(() => {
       const paths = canvas.getAllByTestId('provenance-value-connection');
-      expect(paths.length).toBeGreaterThan(0);
+      // Arabidopsis chip -> Input A/B/C, Chlamydomonas chip -> Input D.
+      expect(paths).toHaveLength(4);
       expect(paths.every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
     });
+
+    // Expanding Species swaps its header lines for the per-value lines above.
+    const headerKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'));
+    expect(headerKeys.some((key) => key.includes('Species'))).toBe(false);
   },
 };
 
-export const PropertyHeaderConnectionsRenderVisualPaths: Story = {
+export const CollapsedPropertiesConnectToMatchingGroupsAutomatically: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
-    const propertyHandle = inputRail.getAllByTestId('provenance-connection-handle-Input-PropertyHeader')[0];
-    const inputA = canvas.getByText('Input A').closest('article')!;
-
-    await dragByPointer(propertyHandle, inputA);
 
     await waitFor(() => {
       const paths = canvas.getAllByTestId('provenance-property-connection');
-      expect(paths.length).toBeGreaterThan(0);
       expect(paths.every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
+      // Species has Arabidopsis on Input A/B/C and Chlamydomonas on Input D; lines to
+      // groups closer than the minimum connector distance are intentionally skipped.
+      const speciesLines = connectionKeys(paths).filter((key) => key.includes('Species'));
+      expect(speciesLines.length).toBeGreaterThanOrEqual(3);
+    });
+
+    // Property headers expose no draggable connection handles; their connectors derive
+    // from the values they contain.
+    expect(canvas.queryByTestId('provenance-connection-handle-Input-PropertyHeader')).not.toBeInTheDocument();
+    expect(canvas.queryByTestId('provenance-connection-handle-Output-PropertyHeader')).not.toBeInTheDocument();
+  },
+};
+
+export const AssignedValueConnectionsFollowModelData: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const source = await railValue(canvas, 'Output', 'Analysis', 'Mass Spectrometry');
+
+    await waitFor(() => {
+      // Mass Spectrometry -> Output B at least; Output A may sit below the minimum
+      // connector distance. Output D has no Analysis value yet, so no line reaches it.
+      const keys = connectionKeys(canvas.getAllByTestId('provenance-value-connection'));
+      expect(keys.length).toBeGreaterThanOrEqual(2);
+      expect(keys.some((key) => key.includes('output-d'))).toBe(false);
+    });
+
+    const handle = within(source as HTMLElement).getByTestId('provenance-connection-handle-Output-PropertyValue');
+    const target = canvas.getByText('Output D').closest('article')!;
+    await dragByPointer(handle, target);
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
+      // The committed value immediately yields a Mass Spectrometry line to Output D.
+      const keys = connectionKeys(canvas.getAllByTestId('provenance-value-connection'));
+      expect(keys.some((key) => key.includes('output-d'))).toBe(true);
     });
   },
 };
@@ -529,7 +567,7 @@ export const ConnectionDetailsDoNotExposePropertyCreation: Story = {
     const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
     await userEvent.click(connector);
 
-    const details = canvas.getByTestId('provenance-connection-details');
+    const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
     expect(details).toHaveTextContent('Connection IDs');
     expect(within(details).queryByText(/Add value/i)).not.toBeInTheDocument();
     expect(within(details).queryByText(/Add property/i)).not.toBeInTheDocument();

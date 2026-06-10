@@ -41,7 +41,9 @@ module private ConnectorMeasure =
     let pathBetweenPoints start finish =
         let deltaX = finish.X - start.X
         let direction = if deltaX >= 0. then 1. else -1.
-        let bend = max 48. (abs deltaX / 2.)
+        // The bend scales with the horizontal span, so connectors between nearby
+        // endpoints stay short stubs instead of looping past their targets.
+        let bend = max 8. (abs deltaX / 2.)
         let firstControlX = start.X + direction * bend
         let secondControlX = finish.X - direction * bend
         Some $"M {start.X} {start.Y} C {firstControlX} {start.Y}, {secondControlX} {finish.Y}, {finish.X} {finish.Y}"
@@ -50,6 +52,27 @@ module private ConnectorMeasure =
         match tryHandle container source, tryHandle container target with
         | Some sourceNode, Some targetNode ->
             pathBetweenPoints (center container sourceNode) (center container targetNode)
+        | _ -> None
+
+    /// Rail connectors shorter than this are skipped entirely so dense layouts do not
+    /// fill the rail gutters with overlapping stubs.
+    let minimumConnectorDistance = 24.
+
+    let private distanceBetween start finish =
+        let deltaX = finish.X - start.X
+        let deltaY = finish.Y - start.Y
+        sqrt (deltaX * deltaX + deltaY * deltaY)
+
+    let pathBetweenDistantHandles container source target =
+        match tryHandle container source, tryHandle container target with
+        | Some sourceNode, Some targetNode ->
+            let start = center container sourceNode
+            let finish = center container targetNode
+
+            if distanceBetween start finish < minimumConnectorDistance then
+                None
+            else
+                pathBetweenPoints start finish
         | _ -> None
 
 /// Builds handle references used by overlay measurements.
@@ -76,6 +99,24 @@ module private ConnectorHandles =
             Kind = ConnectionHandleKind.PropertyValue
             Side = side
             Id = propertyValueId
+            ParentGroupId = None
+        }
+
+    let propertyHeader side header : ConnectionHandleRef =
+        {
+            Kind = ConnectionHandleKind.PropertyHeader
+            Side = side
+            Id = DragDrop.propertyHeaderIdentity header
+            ParentGroupId = None
+        }
+
+    /// Measurement-only anchor on the property-facing card edge; rail connectors end here
+    /// instead of at the draggable group handle on the opposite edge.
+    let propertyAnchor side groupId : ConnectionHandleRef =
+        {
+            Kind = ConnectionHandleKind.GroupPropertyAnchor
+            Side = side
+            Id = groupId
             ParentGroupId = None
         }
 
@@ -179,61 +220,75 @@ module private ConnectorPaths =
                         )))
         )
 
-    let propertyConnections container pairId uiState =
-        State.VisualConnections.forPair pairId uiState
-        |> List.choose (fun connection ->
-            ConnectorMeasure.pathBetweenHandles container connection.Source connection.Target
-            |> Option.map (
-                measured
-                    $"property:{DragDrop.connectionHandleIdentity connection.Source}:{DragDrop.connectionHandleIdentity connection.Target}"
-                    "provenance-property-connection"
-                    "swt:text-secondary swt:pointer-events-none"
-                    (Some "4 4")
-                    None
-                    None
-            ))
-
-    let private expandedKeys pairId side uiState =
+    let private expandedHeaders pairId side uiState =
         uiState.ExpandedProperties
         |> Set.toList
         |> List.choose (fun (expandedPairId, expandedSide, key) ->
-            if expandedPairId = pairId && expandedSide = side then Some key else None)
+            if expandedPairId = pairId && expandedSide = side then Some key.Header else None)
 
-    let private valueConnectionsForSide container pairId (model: ProvenanceModel) side groups uiState =
-        let keys = expandedKeys pairId side uiState
+    let private memberHasMatchingValue (model: ProvenanceModel) predicate (member': DisplayMember) =
+        member'.PropertyValueIds
+        |> List.exists (fun propertyValueId ->
+            model.PropertyValues.TryFind propertyValueId |> Option.exists predicate)
 
-        [
-            for key in keys do
-                for group in groups do
-                    let matchingValueIds =
-                        group.Members
-                        |> List.collect (fun member' -> member'.PropertyValueIds)
-                        |> List.distinct
-                        |> List.filter (fun propertyValueId ->
-                            model.PropertyValues.TryFind propertyValueId
-                            |> Option.exists (fun propertyValue -> propertyValue.Header = key.Header))
+    let private groupsMatching model predicate groups =
+        groups
+        |> List.filter (fun (group: DisplayGroup) ->
+            group.Members |> List.exists (memberHasMatchingValue model predicate))
 
-                    for propertyValueId in matchingValueIds do
-                        ConnectorMeasure.pathBetweenHandles
+    /// Dashed rail connectors derived from model data only: a collapsed property draws one
+    /// line per same-side group containing any value for that property, and an expanded
+    /// property instead draws one line per value chip and group containing that exact value.
+    /// Rail chips deduplicate equal values, so chips match by value, not by occurrence ID.
+    let private railConnectionsForSide container pairId (model: ProvenanceModel) side groups uiState =
+        let expanded = expandedHeaders pairId side uiState
+
+        PropertyRails.propertyRailHeadersForSide pairId side model uiState
+        |> List.collect (fun header ->
+            if expanded |> List.contains header then
+                PropertyRails.propertyValuesForSideHeader pairId side header model uiState
+                |> List.collect (fun chip ->
+                    let matchesChip (propertyValue: ProvenancePropertyValue) =
+                        propertyValue.Header = chip.Header
+                        && propertyValue.Value = chip.Value
+                        && propertyValue.Unit = chip.Unit
+
+                    groupsMatching model matchesChip groups
+                    |> List.choose (fun group ->
+                        ConnectorMeasure.pathBetweenDistantHandles
                             container
-                            (ConnectorHandles.value side propertyValueId)
-                            (ConnectorHandles.group side group.Id)
+                            (ConnectorHandles.value side chip.Id)
+                            (ConnectorHandles.propertyAnchor side group.Id)
                         |> Option.map (
                             measured
-                                $"value:{side}:{propertyValueId}:{group.Id}"
+                                $"value:{side}:{chip.Id}:{group.Id}"
                                 "provenance-value-connection"
                                 "swt:text-accent swt:pointer-events-none"
                                 (Some "3 6")
                                 None
                                 None
-                        )
-        ]
-        |> List.choose id
+                        )))
+            else
+                groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
+                |> List.choose (fun group ->
+                    ConnectorMeasure.pathBetweenDistantHandles
+                        container
+                        (ConnectorHandles.propertyHeader side header)
+                        (ConnectorHandles.propertyAnchor side group.Id)
+                    |> Option.map (
+                        measured
+                            $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{group.Id}"
+                            "provenance-property-connection"
+                            "swt:text-secondary swt:pointer-events-none"
+                            (Some "4 4")
+                            None
+                            None
+                    )))
 
-    let valueConnections container pairId model inputGroups outputGroups uiState =
+    let railConnections container pairId model inputGroups outputGroups uiState =
         [
-            yield! valueConnectionsForSide container pairId model ProvenanceSide.Input inputGroups uiState
-            yield! valueConnectionsForSide container pairId model ProvenanceSide.Output outputGroups uiState
+            yield! railConnectionsForSide container pairId model ProvenanceSide.Input inputGroups uiState
+            yield! railConnectionsForSide container pairId model ProvenanceSide.Output outputGroups uiState
         ]
 
     let liveConnection uiState =
@@ -252,8 +307,7 @@ module private ConnectorPaths =
 
     let all container pairId model inputGroups outputGroups connections uiState =
         [
-            yield! valueConnections container pairId model inputGroups outputGroups uiState
-            yield! propertyConnections container pairId uiState
+            yield! railConnections container pairId model inputGroups outputGroups uiState
             yield! groupConnections container connections
             yield! memberConnections container pairId model connections uiState
             match liveConnection uiState with
@@ -351,6 +405,7 @@ type ConnectorOverlay =
                         | None -> ()
                         if defaultArg debug false then
                             svg.custom ("data-testid", measured.TestId)
+                            svg.custom ("data-provenance-connection-key", measured.Key)
                         match measured.InteractiveConnection with
                         | Some connection ->
                             svg.custom ("tabIndex", "0")

@@ -31,7 +31,9 @@ module Styles =
 
     let propertyValueButtonClasses isDragging =
         [
-            "swt:btn swt:btn-sm swt:btn-primary swt:w-fit swt:max-w-full swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
+            // Full width keeps every chip the same size regardless of text length, so the
+            // connection handles line up at the rail edge on both sides.
+            "swt:btn swt:btn-sm swt:btn-primary swt:w-full swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
             yield! draggableButtonClasses isDragging
         ]
 
@@ -88,6 +90,7 @@ module DragDrop =
         | ConnectionHandleKind.GroupMember -> "GroupMember"
         | ConnectionHandleKind.PropertyHeader -> "PropertyHeader"
         | ConnectionHandleKind.PropertyValue -> "PropertyValue"
+        | ConnectionHandleKind.GroupPropertyAnchor -> "GroupPropertyAnchor"
 
     let private tryHandleKind value =
         match value with
@@ -95,6 +98,7 @@ module DragDrop =
         | "GroupMember" -> Some ConnectionHandleKind.GroupMember
         | "PropertyHeader" -> Some ConnectionHandleKind.PropertyHeader
         | "PropertyValue" -> Some ConnectionHandleKind.PropertyValue
+        | "GroupPropertyAnchor" -> Some ConnectionHandleKind.GroupPropertyAnchor
         | _ -> None
 
     let connectionHandleIdentity (handle: ConnectionHandleRef) =
@@ -176,7 +180,6 @@ module ConnectionRouting =
         | ConnectGroups of inputGroupId: string * outputGroupId: string
         | ConnectMembers of inputGroupId: string * outputGroupId: string * inputSetId: ProvenanceSetId * outputSetId: ProvenanceSetId
         | ConnectMemberToGroup of inputGroupId: string * outputGroupId: string * memberSetId: ProvenanceSetId * memberSide: ProvenanceSide
-        | ConnectPropertyHeaderToGroup of source: ConnectionHandleRef * target: ConnectionHandleRef
         | ConnectPropertyValueToGroup of source: ConnectionHandleRef * target: ConnectionHandleRef
 
     let private oppositeSides left right = left.Side <> right.Side
@@ -224,8 +227,6 @@ module ConnectionRouting =
                         source.Id, targetParent
 
                 ConnectionAction.ConnectMemberToGroup(inputGroupId, outputGroupId, target.Id, target.Side))
-        | ConnectionHandleKind.PropertyHeader, ConnectionHandleKind.GroupCard when sameSide source target ->
-            Some(ConnectionAction.ConnectPropertyHeaderToGroup(source, target))
         | ConnectionHandleKind.PropertyValue, ConnectionHandleKind.GroupCard when sameSide source target ->
             Some(ConnectionAction.ConnectPropertyValueToGroup(source, target))
         | _ ->

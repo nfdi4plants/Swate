@@ -69,6 +69,19 @@ type GroupCard =
 
         let title = GroupCardData.title group
         let isGroup = group.Members.Length > 1
+
+        // Two anchors at opposite card edges: the group-facing edge carries the draggable
+        // group connection handle, the property-facing edge is measurement-only and is
+        // where property/value connectors from the same-side rail attach.
+        let groupHandleEdge, propertyAnchorEdge =
+            match side with
+            | ProvenanceSide.Input ->
+                "swt:absolute swt:top-1/2 swt:right-0 swt:translate-x-1/2 swt:-translate-y-1/2 swt:z-10",
+                "swt:top-1/2 swt:left-0 swt:-translate-x-1/2 swt:-translate-y-1/2"
+            | ProvenanceSide.Output ->
+                "swt:absolute swt:top-1/2 swt:left-0 swt:-translate-x-1/2 swt:-translate-y-1/2 swt:z-10",
+                "swt:top-1/2 swt:right-0 swt:translate-x-1/2 swt:-translate-y-1/2"
+
         let groupHandle : ConnectionHandleRef =
             {
                 Kind = ConnectionHandleKind.GroupCard
@@ -76,6 +89,15 @@ type GroupCard =
                 Id = group.Id
                 ParentGroupId = None
             }
+
+        let propertyAnchor : ConnectionHandleRef =
+            {
+                Kind = ConnectionHandleKind.GroupPropertyAnchor
+                Side = side
+                Id = group.Id
+                ParentGroupId = None
+            }
+
         let memberDetailsPosition =
             match side with
             | ProvenanceSide.Input -> "swt:left-full swt:ml-2"
@@ -89,7 +111,7 @@ type GroupCard =
             prop.custom ("data-provenance-group-node", DragDrop.groupNodeId side group.Id)
             prop.custom ("data-provenance-group-drop-id", DragDrop.groupDropId side group.Id)
             prop.className [
-                "swt:rounded-box swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm swt:space-y-2"
+                "swt:relative swt:flex swt:flex-col swt:gap-2 swt:rounded-box swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm"
                 if selected then
                     "swt:border-primary swt:bg-primary/5"
                 else
@@ -100,14 +122,22 @@ type GroupCard =
             if defaultArg debug false then
                 prop.testId $"provenance-group-{side}-{group.Id}"
             prop.children [
+                Controls.ConnectionAnchor(propertyAnchor, propertyAnchorEdge, ?debug = debug)
+                Controls.ConnectionHandle(
+                    groupHandle,
+                    label = "Connect group",
+                    className = groupHandleEdge,
+                    ?debug = debug
+                )
                 Html.div [
                     prop.className "swt:flex swt:items-start swt:gap-2"
                     prop.children [
                         Html.h3 [
-                            prop.className "swt:grow swt:font-semibold"
+                            prop.className
+                                "swt:grow swt:min-w-0 swt:break-words swt:line-clamp-2 swt:font-semibold swt:@max-xs/provenancePanel:text-sm"
+                            prop.title title
                             prop.text title
                         ]
-                        Controls.ConnectionHandle(groupHandle, label = "Connect group", ?debug = debug)
                         Buttons.QuickAccessButton(
                             Html.i [
                                 prop.className "swt:iconify swt:fluent--checkmark-circle-20-regular swt:size-4"
@@ -155,7 +185,7 @@ type GroupCard =
                                                 Html.div [
                                                     prop.tabIndex 0
                                                     prop.ariaLabel $"Show values for {member'.Name}"
-                                                    prop.className "swt:min-w-0 swt:grow swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
+                                                    prop.className "swt:min-w-0 swt:grow swt:truncate swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
                                                     if defaultArg debug false then
                                                         prop.testId $"provenance-group-member-{side}-{member'.SetId}"
                                                     prop.onMouseEnter (fun _ -> setHoveredMemberId (Some member'.SetId))

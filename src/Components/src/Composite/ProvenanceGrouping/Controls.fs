@@ -121,7 +121,9 @@ module private KindNames =
 type Controls =
 
     [<ReactComponent>]
-    static member ConnectionHandle(handle: ConnectionHandleRef, ?label: string, ?debug: bool, ?key: string) =
+    static member ConnectionHandle
+        (handle: ConnectionHandleRef, ?label: string, ?className: string, ?debug: bool, ?key: string)
+        =
         let draggable =
             DndKit.useDraggable (
                 {|
@@ -159,9 +161,27 @@ type Controls =
                     "swt:opacity-100 swt:ring-2 swt:ring-primary"
                 if draggable.isDragging then
                     "swt:opacity-100 swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
+                match className with
+                | Some className -> className
+                | None -> ()
             ]
             if defaultArg debug false then
                 prop.testId $"provenance-connection-handle-{handle.Side}-{handle.Kind}"
+        ]
+
+    /// Measurement-only connector endpoint: the overlay reads its position, but it is
+    /// never draggable or droppable and never receives pointer events.
+    [<ReactComponent>]
+    static member ConnectionAnchor(handle: ConnectionHandleRef, className: string, ?debug: bool) =
+        Html.span [
+            prop.ariaHidden true
+            prop.custom ("data-provenance-connection-node", DragDrop.connectionHandleNodeId handle)
+            prop.className [
+                "swt:pointer-events-none swt:absolute swt:size-px"
+                className
+            ]
+            if defaultArg debug false then
+                prop.testId $"provenance-connection-anchor-{handle.Side}-{handle.Kind}"
         ]
 
     [<ReactComponent>]
@@ -267,20 +287,116 @@ type Controls =
             |> List.exists (fun assignment -> assignment.Key.Header = header && assignment.Scope = GroupingScope.Both)
 
         let sideName = SideLabels.sideName side
-        let propertyHandle : ConnectionHandleRef =
-            {
-                Kind = ConnectionHandleKind.PropertyHeader
-                Side = side
-                Id = DragDrop.propertyHeaderIdentity header
-                ParentGroupId = None
-            }
 
-        let propertyHandleElement =
-            Controls.ConnectionHandle(
-                propertyHandle,
-                label = $"Connect {header.Category.Name} property",
+        // Property headers are never draggable connection sources; the overlay derives
+        // their connectors from model data and only needs this anchor to measure the
+        // group-facing edge of the header row.
+        let propertyAnchor =
+            Controls.ConnectionAnchor(
+                {
+                    Kind = ConnectionHandleKind.PropertyHeader
+                    Side = side
+                    Id = DragDrop.propertyHeaderIdentity header
+                    ParentGroupId = None
+                },
+                (match side with
+                 | ProvenanceSide.Input -> "swt:top-1/2 swt:right-0 swt:translate-x-1/2 swt:-translate-y-1/2"
+                 | ProvenanceSide.Output -> "swt:top-1/2 swt:left-0 swt:-translate-x-1/2 swt:-translate-y-1/2"),
                 ?debug = debug
             )
+
+        let propertyButton =
+            Html.button [
+                prop.type'.button
+                if canSwitch then
+                    prop.ref draggable.setNodeRef
+                    yield! prop.spread (!!draggable.attributes)
+                    yield! prop.spread (!!draggable.listeners)
+                prop.className [
+                    "swt:btn swt:btn-sm swt:h-auto swt:min-h-8 swt:py-1 swt:grow swt:min-w-0 swt:justify-start"
+                    "swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
+                    if sideSelected then
+                        "swt:btn-primary"
+                    else
+                        "swt:btn-outline"
+                    if canSwitch then
+                        yield! Styles.draggableButtonClasses draggable.isDragging
+                ]
+                if defaultArg debug false then
+                    prop.testId $"provenance-property-{side}-{header.Category.Name}"
+                prop.onClick (fun _ -> onToggleSide header)
+                prop.children [
+                    Html.span [
+                        prop.className "swt:grow swt:min-w-0 swt:break-words swt:line-clamp-2 swt:text-left"
+                        prop.text header.Category.Name
+                    ]
+                ]
+            ]
+
+        let expandButton =
+            Html.button [
+                prop.type'.button
+                prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+                if defaultArg debug false then
+                    prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
+                prop.ariaLabel (
+                    if expanded then
+                        $"Collapse {header.Category.Name} values"
+                    else
+                        $"Expand {header.Category.Name} values"
+                )
+                prop.onClick (fun _ -> onToggleExpanded header)
+                prop.children [
+                    Html.i [
+                        prop.className [
+                            "swt:iconify swt:size-4"
+                            if expanded then
+                                "swt:fluent--chevron-up-20-regular"
+                            else
+                                "swt:fluent--chevron-down-20-regular"
+                        ]
+                    ]
+                ]
+            ]
+
+        let bothButton =
+            Html.button [
+                prop.type'.button
+                prop.className [
+                    "swt:btn swt:btn-sm swt:btn-square"
+                    if bothSelected then
+                        "swt:btn-primary"
+                    else
+                        "swt:btn-outline"
+                ]
+                if defaultArg debug false then
+                    prop.testId $"provenance-property-both-{side}-{header.Category.Name}"
+                prop.ariaLabel $"Group {header.Category.Name} on both sides"
+                prop.onClick (fun _ -> onToggleBoth header)
+                prop.children [
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--link-multiple-20-regular swt:size-4"
+                    ]
+                ]
+            ]
+
+        let swapButton =
+            if canSwitch then
+                Controls.PropertySwapButton(side, header, onSwitch, ?debug = debug)
+            else
+                Html.button [
+                    prop.type'.button
+                    prop.disabled true
+                    prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+                    prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
+                    if defaultArg debug false then
+                        prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
+                    prop.children [
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4"
+                        ]
+                    ]
+                ]
 
         Html.div [
             match key with
@@ -289,96 +405,22 @@ type Controls =
             prop.className "swt:flex swt:flex-col swt:gap-1"
             prop.children [
                 Html.div [
-                    prop.className "swt:flex swt:items-center swt:gap-1"
+                    prop.className "swt:relative swt:flex swt:items-center swt:gap-1"
                     prop.children [
-                        if side = ProvenanceSide.Output then
-                            propertyHandleElement
-                        Html.button [
-                            prop.type'.button
-                            if canSwitch then
-                                prop.ref draggable.setNodeRef
-                                yield! prop.spread (!!draggable.attributes)
-                                yield! prop.spread (!!draggable.listeners)
-                            prop.className [
-                                "swt:btn swt:btn-sm swt:grow swt:min-w-0 swt:justify-start"
-                                if sideSelected then
-                                    "swt:btn-primary"
-                                else
-                                    "swt:btn-outline"
-                                if canSwitch then
-                                    yield! Styles.draggableButtonClasses draggable.isDragging
-                            ]
-                            if defaultArg debug false then
-                                prop.testId $"provenance-property-{side}-{header.Category.Name}"
-                            prop.onClick (fun _ -> onToggleSide header)
-                            prop.children [
-                                Html.span [
-                                    prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-left"
-                                    prop.text header.Category.Name
-                                ]
-                            ]
-                        ]
-                        if side = ProvenanceSide.Input then
-                            propertyHandleElement
-                        Html.button [
-                            prop.type'.button
-                            prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
-                            if defaultArg debug false then
-                                prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
-                            prop.ariaLabel (
-                                if expanded then
-                                    $"Collapse {header.Category.Name} values"
-                                else
-                                    $"Expand {header.Category.Name} values"
-                            )
-                            prop.onClick (fun _ -> onToggleExpanded header)
-                            prop.children [
-                                Html.i [
-                                    prop.className [
-                                        "swt:iconify swt:size-4"
-                                        if expanded then
-                                            "swt:fluent--chevron-up-20-regular"
-                                        else
-                                            "swt:fluent--chevron-down-20-regular"
-                                    ]
-                                ]
-                            ]
-                        ]
-                        Html.button [
-                            prop.type'.button
-                            prop.className [
-                                "swt:btn swt:btn-sm swt:btn-square"
-                                if bothSelected then
-                                    "swt:btn-primary"
-                                else
-                                    "swt:btn-outline"
-                            ]
-                            if defaultArg debug false then
-                                prop.testId $"provenance-property-both-{side}-{header.Category.Name}"
-                            prop.ariaLabel $"Group {header.Category.Name} on both sides"
-                            prop.onClick (fun _ -> onToggleBoth header)
-                            prop.children [
-                                Html.i [
-                                    prop.className "swt:iconify swt:fluent--link-multiple-20-regular swt:size-4"
-                                ]
-                            ]
-                        ]
-                        if canSwitch then
-                            Controls.PropertySwapButton(side, header, onSwitch, ?debug = debug)
-                        else
-                            Html.button [
-                                prop.type'.button
-                                prop.disabled true
-                                prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
-                                prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
-                                if defaultArg debug false then
-                                    prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
-                                prop.children [
-                                    Html.i [
-                                        prop.className "swt:iconify swt:fluent--arrow-swap-20-regular swt:size-4"
-                                    ]
-                                ]
-                            ]
+                        propertyAnchor
+                        // The property text button hugs the group-facing edge so connectors
+                        // attach directly to it; the controls sit on the rail-facing side.
+                        match side with
+                        | ProvenanceSide.Input ->
+                            swapButton
+                            bothButton
+                            expandButton
+                            propertyButton
+                        | ProvenanceSide.Output ->
+                            propertyButton
+                            expandButton
+                            bothButton
+                            swapButton
                     ]
                 ]
                 if expanded then
@@ -766,7 +808,7 @@ type Controls =
                 | Some ProvenanceSide.Output, Some handle -> handle
                 | _ -> Html.none
                 Html.span [
-                    prop.className "swt:min-w-0 swt:truncate"
+                    prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-left"
                     prop.text label
                 ]
                 match side, valueHandle with

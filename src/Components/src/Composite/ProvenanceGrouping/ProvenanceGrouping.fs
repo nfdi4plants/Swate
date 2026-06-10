@@ -41,7 +41,9 @@ module private Splitter =
         let left = ratios.Left.ToString(CultureInfo.InvariantCulture)
         let middle = ratios.Middle.ToString(CultureInfo.InvariantCulture)
         let right = ratios.Right.ToString(CultureInfo.InvariantCulture)
-        $"minmax(10rem, {left}fr) 0.75rem minmax(28rem, {middle}fr) 0.75rem minmax(10rem, {right}fr)"
+        // The splitter tracks double as connector gutters, keeping a minimum distance
+        // between the rails and the cards their connectors attach to.
+        $"minmax(10rem, {left}fr) 2.5rem minmax(28rem, {middle}fr) 2.5rem minmax(10rem, {right}fr)"
 
     let testId side =
         match side with
@@ -329,23 +331,10 @@ module private DragHandlers =
         match ConnectionRouting.action source target with
         | Some(ConnectionRouting.ConnectionAction.ConnectGroups(inputGroupId, outputGroupId)) ->
             routeGroupConnection context inputGroupId outputGroupId
-        | Some(ConnectionRouting.ConnectionAction.ConnectMembers(inputGroupId, outputGroupId, inputSetId, outputSetId)) ->
+        | Some(ConnectionRouting.ConnectionAction.ConnectMembers(_, _, inputSetId, outputSetId)) ->
             context.ConnectSetPairs [ inputSetId, outputSetId ]
-            State.ManualConnections.add
-                {
-                    PairId = context.Pair.Id
-                    InputGroupId = inputGroupId
-                    OutputGroupId = outputGroupId
-                    InputSetId = inputSetId
-                    OutputSetId = outputSetId
-                }
-                context.UiState
-            |> context.SetUiState
         | Some(ConnectionRouting.ConnectionAction.ConnectMemberToGroup(inputGroupId, outputGroupId, memberSetId, memberSide)) ->
             routeMemberToGroupConnection context inputGroupId outputGroupId memberSetId memberSide
-        | Some(ConnectionRouting.ConnectionAction.ConnectPropertyHeaderToGroup(source, target)) ->
-            State.VisualConnections.add { PairId = context.Pair.Id; Source = source; Target = target } context.UiState
-            |> context.SetUiState
         | Some(ConnectionRouting.ConnectionAction.ConnectPropertyValueToGroup(source, target)) ->
             routePropertyValueDrop context target.Side target.Id source.Id
         | None -> ()
@@ -577,7 +566,7 @@ module private EditorSurface =
             | ProvenanceSide.Output -> "Output"
 
         Html.div [
-            prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-3"
+            prop.className "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-3"
             prop.children [
                 for group in groups do
                     GroupCard.Main(
@@ -851,7 +840,9 @@ type ProvenanceGrouping =
                             ]
                             Splitter.handle Splitter.Left (startPanelDrag Splitter.Left) debug
                             Html.div [
-                                prop.className "swt:@container/provenancePanel swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-4"
+                                // The wide column gap is the gutter the group-to-group
+                                // connectors are drawn in.
+                                prop.className "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-12"
                                 prop.children [
                                     EditorSurface.groupColumn
                                         ProvenanceSide.Input

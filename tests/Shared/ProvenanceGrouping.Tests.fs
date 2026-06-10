@@ -1385,6 +1385,35 @@ let uiStateTests =
                 (Some(ConnectionRouting.ConnectionAction.ConnectMembers("input:g", "output:g", "input-a", "output-a")))
                 "Opposite-side member handles should create a manual member connection action."
 
+        testCase "connection routing assigns dragged values but never property headers" <| fun _ ->
+            let handle kind side id : ProvenanceGroupingTypes.ConnectionHandleRef =
+                {
+                    Kind = kind
+                    Side = side
+                    Id = id
+                    ParentGroupId = None
+                }
+
+            let valueHandle = handle ProvenanceGroupingTypes.ConnectionHandleKind.PropertyValue ProvenanceSide.Input "pv-input-a-species"
+            let headerHandle = handle ProvenanceGroupingTypes.ConnectionHandleKind.PropertyHeader ProvenanceSide.Input "species"
+            let sameSideGroup = handle ProvenanceGroupingTypes.ConnectionHandleKind.GroupCard ProvenanceSide.Input "input:input-b"
+            let oppositeGroup = handle ProvenanceGroupingTypes.ConnectionHandleKind.GroupCard ProvenanceSide.Output "output:output-a"
+
+            Expect.equal
+                (ConnectionRouting.action valueHandle sameSideGroup)
+                (Some(ConnectionRouting.ConnectionAction.ConnectPropertyValueToGroup(valueHandle, sameSideGroup)))
+                "Value chip handles should assign their value to a same-side group."
+
+            Expect.equal
+                (ConnectionRouting.action valueHandle oppositeGroup)
+                None
+                "Value chip handles should not connect across sides."
+
+            Expect.equal
+                (ConnectionRouting.action headerHandle sameSideGroup)
+                None
+                "Property headers have no drag connection; their connectors derive from model data."
+
         testCase "member resolution prompt can be converted into a manual resolution pair" <| fun _ ->
             let session = Session.init (sampleModel ())
             let pair = Session.activePair session

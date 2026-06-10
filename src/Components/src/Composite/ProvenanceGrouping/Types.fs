@@ -62,6 +62,9 @@ type ConnectionHandleKind =
     | GroupMember
     | PropertyHeader
     | PropertyValue
+    /// Measurement-only anchor on the property-facing edge of a group card.
+    /// Property and value connectors attach here; it is never draggable or droppable.
+    | GroupPropertyAnchor
 
 type ConnectionHandleRef =
     {
@@ -84,15 +87,6 @@ type LiveConnectionDrag =
         Current: ConnectionPoint
     }
 
-type ManualMemberConnection =
-    {
-        PairId: ProvenancePairId
-        InputGroupId: string
-        OutputGroupId: string
-        InputSetId: ProvenanceSetId
-        OutputSetId: ProvenanceSetId
-    }
-
 type PendingMemberResolution =
     {
         PairId: ProvenancePairId
@@ -109,13 +103,6 @@ type ManualResolutionPair =
         OutputGroupId: string
     }
 
-type VisualConnection =
-    {
-        PairId: ProvenancePairId
-        Source: ConnectionHandleRef
-        Target: ConnectionHandleRef
-    }
-
 type UiState =
     {
         LayerStates: Map<ProvenanceLayerId, LayerViewState>
@@ -124,12 +111,9 @@ type UiState =
         PaletteValues: Map<ProvenancePairId * ProvenanceSide, ProvenancePropertyValue list>
         PendingOverwrite: ValueAssignmentWarning option
         PanelRatios: Map<ProvenancePairId, PanelRatios>
-        ActiveConnectionHandle: ConnectionHandleRef option
         LiveConnectionDrag: LiveConnectionDrag option
         PendingMemberResolution: PendingMemberResolution option
         ManualResolutionPairs: ManualResolutionPair list
-        ManualMemberConnections: ManualMemberConnection list
-        VisualConnections: VisualConnection list
         SelectedInputs: Set<ProvenancePairId * string>
         SelectedOutputs: Set<ProvenancePairId * string>
         Detail: ProvenanceDetail option
