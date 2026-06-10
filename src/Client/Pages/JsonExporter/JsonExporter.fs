@@ -118,7 +118,10 @@ type FileExporter =
                 Html.div [
                     Html.p "Export Swate annotation tables to official JSON."
                     Html.ul [
-                        Html.li [ Html.b "ARCtrl"; Html.text ": A simple ARCtrl specific format." ]
+                        Html.li [
+                            Html.b "ARCtrl"
+                            Html.text ": A simple ARCtrl specific format."
+                        ]
                         Html.li [
                             Html.b "ARCtrl Compressed"
                             Html.text ": A compressed ARCtrl specific format."

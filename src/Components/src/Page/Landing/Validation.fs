@@ -9,7 +9,11 @@ module Validation =
 
     let toOptionalString (value: string) =
         let trimmed = value.Trim()
-        if String.IsNullOrWhiteSpace trimmed then None else Some trimmed
+
+        if String.IsNullOrWhiteSpace trimmed then
+            None
+        else
+            Some trimmed
 
     let isRequiredDataValid (draft: LandingDraft) =
         not (String.IsNullOrWhiteSpace draft.Title)
@@ -33,9 +37,7 @@ module Validation =
             None
 
     let private generateSafeIdentifierFromTitle (title: string) =
-        title
-        |> tryNormalizeIdentifier
-        |> Option.defaultValue "Experiment"
+        title |> tryNormalizeIdentifier |> Option.defaultValue "Experiment"
 
     let resolveIdentifier (draft: LandingDraft) =
         match toOptionalString draft.Identifier with

@@ -65,7 +65,8 @@ type ArcVault(window: BrowserWindow) =
 
     /// Indicates whether a captured watcher event is eligible to update the in-memory ARC.
     member this.IsFileWatcherArcMergeEligible =
-        not this.isBusyWritingValue && this.fileWatcherOwnWriteArcMergeSuppressionTimeout.IsNone
+        not this.isBusyWritingValue
+        && this.fileWatcherOwnWriteArcMergeSuppressionTimeout.IsNone
 
     /// Indicates whether a close confirmation dialog is currently open.
     member val isCloseRequestPending: bool = false with get, set
@@ -81,7 +82,7 @@ type ArcVault(window: BrowserWindow) =
     member this.RefreshHasUnsavedArcChangesFlag() =
         /// Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
         if this.arc.IsSome then
-            let hasNewChanges = this.arc.Value.hasInMemoryChanges()
+            let hasNewChanges = this.arc.Value.hasInMemoryChanges ()
             let valueIsChanging = this.hasUnsavedArcChanges <> hasNewChanges
             this.hasUnsavedArcChanges <- hasNewChanges
 
@@ -103,13 +104,12 @@ module ArcVaultExtensions =
                         "Unable to reload ARC after file watcher event: %s"
                         (PathHelpers.formatContractErrors loadError)
                 | Ok reloadedArc ->
-                    let! mergeResult =
-                        promise {
-                            try
-                                return Ok(ARC.merge arcLocal reloadedArc events)
-                            with mergeError ->
-                                return Error mergeError
-                        }
+                    let! mergeResult = promise {
+                        try
+                            return Ok(ARC.merge arcLocal reloadedArc events)
+                        with mergeError ->
+                            return Error mergeError
+                    }
 
                     match mergeResult with
                     | Error mergeError ->
@@ -265,13 +265,7 @@ module ArcVaultExtensions =
 
                     try
                         match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
-                        | Error errors ->
-                            return
-                                Error(
-                                    exn(
-                                        PathHelpers.formatContractErrors errors
-                                    )
-                                )
+                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
                         | Ok _ ->
                             match! ARC.tryLoadAsync arcPath with
                             | Ok persistedArc ->
@@ -285,7 +279,7 @@ module ArcVaultExtensions =
 
                                 return
                                     Error(
-                                        exn(
+                                        exn (
                                             "Added ARC file, but could not reload the persisted hash baseline: "
                                             + (PathHelpers.formatContractErrors loadErrors)
                                         )
@@ -324,11 +318,7 @@ module ArcVaultExtensions =
         member this.LoadArc() = promise {
             if this.path.IsSome then
                 match! tryLoadArcWithZeroByteRepair this.window.id this.path.Value with
-                | Error e ->
-                    swatefailfn
-                        this.window.id
-                        "Unable to load ARC: %s"
-                        (PathHelpers.formatContractErrors e)
+                | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
                 | Ok arc ->
                     this.SetArc(arc)
                     this.RefreshHasUnsavedArcChangesFlag()

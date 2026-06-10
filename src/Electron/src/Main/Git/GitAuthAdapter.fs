@@ -112,7 +112,10 @@ let private buildLfsEndpointUrl (remoteUrl: string) =
 let private tryBuildScopedAuthUrl (remoteUrl: string) =
     let mutable uri = Unchecked.defaultof<Uri>
 
-    if Uri.TryCreate(remoteUrl, UriKind.Absolute, &uri) && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) then
+    if
+        Uri.TryCreate(remoteUrl, UriKind.Absolute, &uri)
+        && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
+    then
         let authority =
             if uri.IsDefaultPort then
                 uri.Host
@@ -132,8 +135,7 @@ let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (r
     | Some scopeUrl ->
         yield "-c"
         yield $"http.{scopeUrl}.extraHeader=Authorization: {authorizationValue}"
-    | _ ->
-        ()
+    | _ -> ()
 
     match remoteName, remoteUrl with
     | Some name, Some url when url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ->
@@ -152,8 +154,7 @@ let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (r
         yield $"lfs.{plainLfsUrl}.access=basic"
         yield "-c"
         yield $"lfs.{authenticatedLfsUrl}.access=basic"
-    | _ ->
-        ()
+    | _ -> ()
 |]
 
 /// Creates auth data for lower-level spawned commands such as `git lfs push`.
@@ -203,10 +204,7 @@ let redactToken (text: string) : string =
                 MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]")
             )
         |> fun t ->
-            tokenHeaderRedactPattern.Replace(
-                t,
-                MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]")
-            )
+            tokenHeaderRedactPattern.Replace(t, MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]"))
         |> fun t -> credentialUrlPattern.Replace(t, "$1[REDACTED]@")
 
 /// Redacts each command argument for diagnostic output.

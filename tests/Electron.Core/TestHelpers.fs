@@ -15,11 +15,7 @@ let expectLoadedArc (result: Result<ARC, string[]>) =
     | Error errors -> failwith (errors |> String.concat "\n")
 
 let createTempDirectoryAsync (tempPrefix: string) : JS.Promise<string> =
-    let prefix =
-        join [|
-            osDynamic?tmpdir () |> unbox<string>
-            tempPrefix
-        |]
+    let prefix = join [| osDynamic?tmpdir () |> unbox<string>; tempPrefix |]
 
     fsPromisesDynamic?mkdtemp (prefix) |> unbox<JS.Promise<string>>
 

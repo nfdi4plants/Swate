@@ -196,7 +196,9 @@ module Helper =
             prop.children [
                 Html.label [
                     prop.className "swt:label"
-                    prop.children [ Html.span [ prop.className "swt:label-text"; prop.text label ] ]
+                    prop.children [
+                        Html.span [ prop.className "swt:label-text"; prop.text label ]
+                    ]
                 ]
                 Html.input [
                     prop.className "swt:input"
@@ -364,12 +366,18 @@ module Helper =
                             readOnlyFormElement (pub.PubMedID, "PubMedID")
                         ]
                         Html.div [ readOnlyFormElement (pub.Authors, "Authors") ]
-                        Html.div [ readOnlyFormElement (pub.Status |> Option.map _.ToString(), "Status") ]
+                        Html.div [
+                            readOnlyFormElement (pub.Status |> Option.map _.ToString(), "Status")
+                        ]
                         Html.div [
                             prop.className "swt:is-flex swt:is-justify-content-flex-end"
                             prop.style [ style.gap (length.rem 1) ]
                             prop.children [
-                                Html.button [ prop.className "swt:btn"; prop.text "back"; prop.onClick back ]
+                                Html.button [
+                                    prop.className "swt:btn"
+                                    prop.text "back"
+                                    prop.onClick back
+                                ]
                                 Html.button [
                                     prop.className "swt:btn swt:btn-success"
                                     prop.text "confirm"
@@ -510,11 +518,7 @@ type FormComponents =
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [
-                BaseModal.ErrorModalObsolete(
-                    error.IsSome,
-                    (fun _ -> setError None),
-                    error |> Option.defaultValue ""
-                )
+                BaseModal.ErrorModalObsolete(error.IsSome, (fun _ -> setError None), error |> Option.defaultValue "")
                 if label.IsSome then
                     Generic.FieldTitle label.Value
                 if extendedElements.IsSome then
@@ -713,7 +717,11 @@ type FormComponents =
                 ]
                 match isError with
                 | None -> Html.none
-                | Some msg -> Html.p [ prop.className "swt:text-error swt:text-sm swt:mt-1"; prop.text msg ]
+                | Some msg ->
+                    Html.p [
+                        prop.className "swt:text-error swt:text-sm swt:mt-1"
+                        prop.text msg
+                    ]
             ]
         ]
 
@@ -1438,7 +1446,9 @@ type FormComponents =
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
 
-        Generic.Collapse [ Generic.CollapseTitle(title, doi, countFilledFieldsString ()) ] [
+        Generic.Collapse [
+            Generic.CollapseTitle(title, doi, countFilledFieldsString ())
+        ] [
             createFieldTextInput (input.Title, "Title", fun s -> input.Title <- s)
             Helper.cardFormGroup [
                 FormComponents.PubMedIDInput(
@@ -1525,7 +1535,9 @@ type FormComponents =
             let filled = fields |> List.choose id |> _.Length
             $"{filled}/{all}"
 
-        Generic.Collapse [ Generic.CollapseTitle(name, version, countFilledFieldsString ()) ] [
+        Generic.Collapse [
+            Generic.CollapseTitle(name, version, countFilledFieldsString ())
+        ] [
             createFieldTextInput (input.Name, "Name", fun s -> input.Name <- s)
             Helper.cardFormGroup [
                 createFieldTextInput (input.Version, "Version", fun s -> input.Version <- s)

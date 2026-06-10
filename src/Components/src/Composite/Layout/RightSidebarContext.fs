@@ -8,8 +8,7 @@ type RightSidebarState<'A> = {
     setIsOpen: bool -> unit
     sidebarType: 'A
     setSidebarType: 'A -> unit
-}
-with
+} with
 
     static member Empty<'A>() : RightSidebarState<'A> = {
         isOpen = false
@@ -24,7 +23,8 @@ type RightSidebarCtxState = {
     sidebarType: obj
     setSidebarType: obj -> unit
 } with
-     static member Empty : RightSidebarCtxState = {
+
+    static member Empty: RightSidebarCtxState = {
         isOpen = false
         setIsOpen = ignore
         sidebarType = null

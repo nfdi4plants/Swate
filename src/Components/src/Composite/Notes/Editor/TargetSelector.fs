@@ -34,12 +34,11 @@ module TargetSelector =
             | NotesTargetKind.Study -> "study"
             | NotesTargetKind.Assay -> "assay"
 
-        let optionValue (target: ExistingTargetRef) = $"{kindToken target.Kind}::{target.Name}"
+        let optionValue (target: ExistingTargetRef) =
+            $"{kindToken target.Kind}::{target.Name}"
 
         let selectedValue =
-            selectedTarget
-            |> Option.map optionValue
-            |> Option.defaultValue ""
+            selectedTarget |> Option.map optionValue |> Option.defaultValue ""
 
         Html.div [
             prop.className "swt:space-y-2"
@@ -69,8 +68,11 @@ module TargetSelector =
                                 | Some kind ->
                                     availableTargets
                                     |> Seq.toArray
-                                    |> Array.tryFind (fun target -> target.Kind = kind && target.Name = selectedParts.[1])
-                                    |> setSelectedTarget)
+                                    |> Array.tryFind (fun target ->
+                                        target.Kind = kind && target.Name = selectedParts.[1]
+                                    )
+                                    |> setSelectedTarget
+                    )
                     prop.children [
                         Html.option [
                             prop.value ""

@@ -314,10 +314,13 @@ module private Internals =
         avatar_url = group.avatar_url
     }
 
-    let toExploreProjectPagedResponse (response: PagedResponse<GitLabProjectResponse>) : PagedResponse<ExploreProjectDto> = {
-        Items = response.Items |> Array.map toExploreProjectDto
-        Pagination = response.Pagination
-    }
+    let toExploreProjectPagedResponse
+        (response: PagedResponse<GitLabProjectResponse>)
+        : PagedResponse<ExploreProjectDto> =
+        {
+            Items = response.Items |> Array.map toExploreProjectDto
+            Pagination = response.Pagination
+        }
 
     let toCurrentUserDto (user: GitLabCurrentUserResponse) : CurrentUserDto = {
         id = user.id
@@ -428,7 +431,9 @@ type GitLabApi =
         return response |> Result.map Internals.toCurrentUserDto
     }
 
-    static member CreateProject(baseUrl: string, pat: string, projectName: string) : JS.Promise<Result<ExploreProjectDto, GitLabError>> =
+    static member CreateProject
+        (baseUrl: string, pat: string, projectName: string)
+        : JS.Promise<Result<ExploreProjectDto, GitLabError>> =
         promise {
             let normalizedName = projectName.Trim()
 

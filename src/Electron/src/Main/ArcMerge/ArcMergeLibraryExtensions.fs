@@ -75,8 +75,7 @@ module ArcMergeHelper =
         arcLocal.License <- remoteSnapshot.License
 
     let private tryFindEntityIndex id getIdentifier entities =
-        entities
-        |> Seq.tryFindIndex (fun entity -> getIdentifier entity = id)
+        entities |> Seq.tryFindIndex (fun entity -> getIdentifier entity = id)
 
     let private applyEntityAddOrChange
         (id: string)
@@ -99,10 +98,7 @@ module ArcMergeHelper =
                 let discCopy = copyEntity remoteEntity
 
                 if not hasDataMapEvent then
-                    let preservedDataMap =
-                        getLocal idx
-                        |> getDataMap
-                        |> cloneDataMapOption
+                    let preservedDataMap = getLocal idx |> getDataMap |> cloneDataMapOption
 
                     setDataMap discCopy preservedDataMap
 
@@ -121,10 +117,7 @@ module ArcMergeHelper =
         =
         match tryGetLocal id, tryGetRemote id with
         | Some localEntity, Some remoteEntity ->
-            remoteEntity
-            |> getDataMap
-            |> cloneDataMapOption
-            |> setDataMap localEntity
+            remoteEntity |> getDataMap |> cloneDataMapOption |> setDataMap localEntity
         | _ -> ()
 
     let private applyDataMapUnlink
@@ -151,7 +144,10 @@ module ArcMergeHelper =
                 id
                 (Set.contains id dataMapEvents.Assays)
                 (fun id -> arcRemote.TryGetAssay(id))
-                (fun id -> arcLocal.Assays |> tryFindEntityIndex id (fun (assay: ArcAssay) -> assay.Identifier))
+                (fun id ->
+                    arcLocal.Assays
+                    |> tryFindEntityIndex id (fun (assay: ArcAssay) -> assay.Identifier)
+                )
                 (fun idx -> arcLocal.Assays.[idx])
                 (fun idx assay -> arcLocal.Assays.[idx] <- assay)
                 (fun assay -> arcLocal.AddAssay(assay))
@@ -177,7 +173,10 @@ module ArcMergeHelper =
                 id
                 (Set.contains id dataMapEvents.Studies)
                 (fun id -> arcRemote.TryGetStudy(id))
-                (fun id -> arcLocal.Studies |> tryFindEntityIndex id (fun (study: ArcStudy) -> study.Identifier))
+                (fun id ->
+                    arcLocal.Studies
+                    |> tryFindEntityIndex id (fun (study: ArcStudy) -> study.Identifier)
+                )
                 (fun idx -> arcLocal.Studies.[idx])
                 (fun idx study -> arcLocal.Studies.[idx] <- study)
                 (fun study -> arcLocal.AddStudy(study))
@@ -229,7 +228,10 @@ module ArcMergeHelper =
                 id
                 (Set.contains id dataMapEvents.Workflows)
                 (fun id -> arcRemote.TryGetWorkflow(id))
-                (fun id -> arcLocal.Workflows |> tryFindEntityIndex id (fun (workflow: ArcWorkflow) -> workflow.Identifier))
+                (fun id ->
+                    arcLocal.Workflows
+                    |> tryFindEntityIndex id (fun (workflow: ArcWorkflow) -> workflow.Identifier)
+                )
                 (fun idx -> arcLocal.Workflows.[idx])
                 (fun idx workflow -> arcLocal.Workflows.[idx] <- workflow)
                 (fun workflow -> arcLocal.AddWorkflow(workflow))
@@ -257,7 +259,7 @@ module ArcMergeLibraryExtensions =
 
     type ARC with
         static member merge (arcLocal: ARC) (arcRemote: ARC) (events: FileEvent list) : ARC =
-            if not (arcLocal.hasInMemoryChanges()) then
+            if not (arcLocal.hasInMemoryChanges ()) then
                 arcRemote.Copy()
             elif events.IsEmpty then
                 arcLocal.Copy()
@@ -267,11 +269,6 @@ module ArcMergeLibraryExtensions =
                 let dataMapEvents = ArcMergeHelper.buildDataMapEventIndex parsedEvents
 
                 for event in parsedEvents do
-                    ArcMergeHelper.applyEntityEvent
-                        mergedArc
-                        arcRemote
-                        dataMapEvents
-                        event.EntityRef
-                        event.EventName
+                    ArcMergeHelper.applyEntityEvent mergedArc arcRemote dataMapEvents event.EntityRef event.EventName
 
                 mergedArc

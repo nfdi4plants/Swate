@@ -56,94 +56,102 @@ let private deleteItemOrFail arcPath relativePath = promise {
 
 let private expectRelativePathExists arcPath relativePath expected = promise {
     let! exists = TestHelpers.pathExistsAsync (absoluteArcPath arcPath relativePath)
-    Vitest.expect(exists).toBe(expected)
+    Vitest.expect(exists).toBe (expected)
 }
 
 let private writeRelativeFileAsync arcPath relativePath content = promise {
     let absolutePath = absoluteArcPath arcPath relativePath
-    let! _ = fsPromisesDynamic?writeFile (absolutePath, content, "utf8") |> unbox<JS.Promise<obj>>
+
+    let! _ =
+        fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
+        |> unbox<JS.Promise<obj>>
+
     return ()
 }
 
-Vitest.describe("ArcFileSystemHelper generic filesystem operations", fun () ->
+Vitest.describe (
+    "ArcFileSystemHelper generic filesystem operations",
+    fun () ->
 
-    Vitest.test("creates generic folders through the ARCtrl-backed create path", fun () ->
-        withAssayArc (fun arcPath -> promise {
-            match!
-                ArcFileSystemHelper.createFileSystemItemOnDisk
-                    arcPath
-                    (createItemRequest "assays/AssayA" "attachments" FileSystemItemKind.Folder)
-            with
-            | Error error -> failwith error.Message
-            | Ok createdPath ->
-                Vitest.expect(createdPath).toBe("assays/AssayA/attachments")
+        Vitest.test (
+            "creates generic folders through the ARCtrl-backed create path",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    match!
+                        ArcFileSystemHelper.createFileSystemItemOnDisk
+                            arcPath
+                            (createItemRequest "assays/AssayA" "attachments" FileSystemItemKind.Folder)
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok createdPath ->
+                        Vitest.expect(createdPath).toBe ("assays/AssayA/attachments")
 
-                let! isDirectory =
-                    ARCtrl.FileSystemHelper.directoryExistsAsync (absoluteArcPath arcPath createdPath)
+                        let! isDirectory =
+                            ARCtrl.FileSystemHelper.directoryExistsAsync (absoluteArcPath arcPath createdPath)
 
-                Vitest.expect(isDirectory).toBe(true)
-        }))
+                        Vitest.expect(isDirectory).toBe (true)
+                })
+        )
 
-    Vitest.test("creates generic files and folders at the ARC root", fun () ->
-        withAssayArc (fun arcPath -> promise {
-            let! folderPath =
-                createItemOrFail
-                    arcPath
-                    (createItemRequest "" "docs" FileSystemItemKind.Folder)
+        Vitest.test (
+            "creates generic files and folders at the ARC root",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let! folderPath = createItemOrFail arcPath (createItemRequest "" "docs" FileSystemItemKind.Folder)
 
-            Vitest.expect(folderPath).toBe("docs")
+                    Vitest.expect(folderPath).toBe ("docs")
 
-            let! isDirectory =
-                ARCtrl.FileSystemHelper.directoryExistsAsync (absoluteArcPath arcPath folderPath)
+                    let! isDirectory =
+                        ARCtrl.FileSystemHelper.directoryExistsAsync (absoluteArcPath arcPath folderPath)
 
-            Vitest.expect(isDirectory).toBe(true)
+                    Vitest.expect(isDirectory).toBe (true)
 
-            let! filePath =
-                createItemOrFail
-                    arcPath
-                    (createItemRequest "" "notes.txt" FileSystemItemKind.File)
+                    let! filePath = createItemOrFail arcPath (createItemRequest "" "notes.txt" FileSystemItemKind.File)
 
-            Vitest.expect(filePath).toBe("notes.txt")
+                    Vitest.expect(filePath).toBe ("notes.txt")
 
-            let! isFile =
-                ARCtrl.FileSystemHelper.fileExistsAsync (absoluteArcPath arcPath filePath)
+                    let! isFile = ARCtrl.FileSystemHelper.fileExistsAsync (absoluteArcPath arcPath filePath)
 
-            Vitest.expect(isFile).toBe(true)
-        }))
+                    Vitest.expect(isFile).toBe (true)
+                })
+        )
 
-    Vitest.test("renames generic files and rejects destination conflicts", fun () ->
-        withAssayArc (fun arcPath -> promise {
-            do! writeRelativeFileAsync arcPath "assays/AssayA/old.txt" "old"
+        Vitest.test (
+            "renames generic files and rejects destination conflicts",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! writeRelativeFileAsync arcPath "assays/AssayA/old.txt" "old"
 
-            do!
-                renameItemOrFail
-                    arcPath
-                    (renameRequest "assays/AssayA/old.txt" "new.txt")
+                    do! renameItemOrFail arcPath (renameRequest "assays/AssayA/old.txt" "new.txt")
 
-            do! expectRelativePathExists arcPath "assays/AssayA/old.txt" false
-            do! expectRelativePathExists arcPath "assays/AssayA/new.txt" true
+                    do! expectRelativePathExists arcPath "assays/AssayA/old.txt" false
+                    do! expectRelativePathExists arcPath "assays/AssayA/new.txt" true
 
-            do! writeRelativeFileAsync arcPath "assays/AssayA/conflict.txt" "conflict"
+                    do! writeRelativeFileAsync arcPath "assays/AssayA/conflict.txt" "conflict"
 
-            match!
-                ArcFileSystemHelper.renameGenericFileSystemItemOnDisk
-                    arcPath
-                    (renameRequest "assays/AssayA/new.txt" "conflict.txt")
-            with
-            | Ok _ -> failwith "Expected generic rename conflict to fail."
-            | Error error -> Vitest.expect(error.Message).toContain("destination already exists")
-        }))
+                    match!
+                        ArcFileSystemHelper.renameGenericFileSystemItemOnDisk
+                            arcPath
+                            (renameRequest "assays/AssayA/new.txt" "conflict.txt")
+                    with
+                    | Ok _ -> failwith "Expected generic rename conflict to fail."
+                    | Error error -> Vitest.expect(error.Message).toContain ("destination already exists")
+                })
+        )
 
-    Vitest.test("deletes generic files while leaving the ARC entity intact", fun () ->
-        withAssayArc (fun arcPath -> promise {
-            let createdFilePath = "assays/AssayA/protocol.md"
-            do! writeRelativeFileAsync arcPath createdFilePath "protocol"
-            do! expectRelativePathExists arcPath createdFilePath true
+        Vitest.test (
+            "deletes generic files while leaving the ARC entity intact",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let createdFilePath = "assays/AssayA/protocol.md"
+                    do! writeRelativeFileAsync arcPath createdFilePath "protocol"
+                    do! expectRelativePathExists arcPath createdFilePath true
 
-            do! deleteItemOrFail arcPath createdFilePath
-            do! expectRelativePathExists arcPath createdFilePath false
+                    do! deleteItemOrFail arcPath createdFilePath
+                    do! expectRelativePathExists arcPath createdFilePath false
 
-            let! reloadedArc = TestHelpers.loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsAssay("AssayA")).toBe(true)
-        }))
+                    let! reloadedArc = TestHelpers.loadArcAsync arcPath
+                    Vitest.expect(reloadedArc.ContainsAssay("AssayA")).toBe (true)
+                })
+        )
 )

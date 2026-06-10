@@ -16,28 +16,28 @@ module private ARCObjectWidgetHelper =
     let widgetContainerClass =
         "swt:flex swt:flex-col swt:gap-3 swt:p-2 swt:w-[72rem] swt:max-w-[95vw] swt:h-[70vh] swt:max-h-[80vh]"
 
-    let iconClassName(baseClasses: string list, item: FileItem) =
-        [
-            yield! baseClasses
-            yield item.Icon |> FileItemIcon.className
-            yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
-        ]
+    let iconClassName (baseClasses: string list, item: FileItem) = [
+        yield! baseClasses
+        yield item.Icon |> FileItemIcon.className
+        yield! item.IconTone |> Option.map FileItemIconTone.className |> Option.toList
+    ]
 
-    let rec private tryFindItemWithAncestors(itemId: string, items: FileItem list) =
+    let rec private tryFindItemWithAncestors (itemId: string, items: FileItem list) =
         let rec loop (ancestorsRev: FileItem list) (currentItems: FileItem list) =
             currentItems
             |> List.tryPick (fun item ->
                 if item.Id = itemId then
                     Some(item, List.rev ancestorsRev)
                 else
-                    item.Children |> Option.bind (loop (item :: ancestorsRev)))
+                    item.Children |> Option.bind (loop (item :: ancestorsRev))
+            )
 
         loop [] items
 
-    let private shouldShowInExplorer(item: FileItem) =
+    let private shouldShowInExplorer (item: FileItem) =
         item.Selectable && item.ItemType <> "empty"
 
-    let private collectVisibleDescendants(selectedItem: FileItem) =
+    let private collectVisibleDescendants (selectedItem: FileItem) =
         let rec loop (visibleAncestorsRev: string list) (currentItems: FileItem list) =
             currentItems
             |> List.collect (fun item ->
@@ -61,27 +61,26 @@ module private ARCObjectWidgetHelper =
                     else
                         visibleAncestorsRev
 
-                current @ loop nextVisibleAncestorsRev (item.Children |> Option.defaultValue []))
+                current @ loop nextVisibleAncestorsRev (item.Children |> Option.defaultValue [])
+            )
 
-        selectedItem.Children
-        |> Option.defaultValue []
-        |> loop []
+        selectedItem.Children |> Option.defaultValue [] |> loop []
 
-    let private contextItems(ancestors: FileItem list, selectedItem: FileItem) =
+    let private contextItems (ancestors: FileItem list, selectedItem: FileItem) =
         (ancestors @ [ selectedItem ])
         |> List.map (fun item -> {
             Item = item
             IsCurrent = item.Id = selectedItem.Id
         })
 
-    let private fallbackSectionLabel(depth: int) =
+    let private fallbackSectionLabel (depth: int) =
         match depth with
         | 0 -> "Current"
         | 1 -> "Children"
         | 2 -> "Grandchildren"
         | depth -> $"Level {depth}"
 
-    let private sectionObjectLabel(depth: int, items: ARCObjectExplorerVisibleItem list) =
+    let private sectionObjectLabel (depth: int, items: ARCObjectExplorerVisibleItem list) =
         let labels =
             items
             |> List.map (fun item -> item.Item.ItemType)
@@ -92,16 +91,16 @@ module private ARCObjectWidgetHelper =
         | [] -> fallbackSectionLabel depth
         | labels -> String.concat " / " labels
 
-    let private sectionDescription(depth: int, objectLabel: string) =
+    let private sectionDescription (depth: int, objectLabel: string) =
         match depth with
         | 0 -> $"Selected {objectLabel} object."
         | 1 -> $"Visible {objectLabel} objects directly under the selected ARC object."
         | _ -> $"Visible {objectLabel} objects at this hierarchy level."
 
-    let private sections(selectedItem: FileItem, descendants: ARCObjectExplorerVisibleItem list) =
+    let private sections (selectedItem: FileItem, descendants: ARCObjectExplorerVisibleItem list) =
         if List.isEmpty descendants then
             let label =
-                sectionObjectLabel(
+                sectionObjectLabel (
                     0,
                     [
                         {
@@ -115,7 +114,7 @@ module private ARCObjectWidgetHelper =
             [
                 {
                     Label = label
-                    Description = sectionDescription(0, label)
+                    Description = sectionDescription (0, label)
                     Items = [
                         {
                             Item = selectedItem
@@ -130,31 +129,33 @@ module private ARCObjectWidgetHelper =
             |> List.groupBy (fun item -> item.Depth)
             |> List.sortBy fst
             |> List.map (fun (depth, items) ->
-                let label = sectionObjectLabel(depth, items)
+                let label = sectionObjectLabel (depth, items)
 
                 {
                     Label = label
-                    Description = sectionDescription(depth, label)
+                    Description = sectionDescription (depth, label)
                     Items = items
-                })
+                }
+            )
 
-    let getExplorerItems(selectedId: string option, items: FileItem list) =
+    let getExplorerItems (selectedId: string option, items: FileItem list) =
         selectedId
-        |> Option.bind (fun itemId -> tryFindItemWithAncestors(itemId, items))
+        |> Option.bind (fun itemId -> tryFindItemWithAncestors (itemId, items))
         |> Option.map (fun (selectedItem, ancestors) ->
             let descendants = collectVisibleDescendants selectedItem
 
             {
                 SourceName = selectedItem.Name
                 SourceId = selectedItem.Id
-                ContextItems = contextItems(ancestors, selectedItem)
-                Sections = sections(selectedItem, descendants)
-            })
+                ContextItems = contextItems (ancestors, selectedItem)
+                Sections = sections (selectedItem, descendants)
+            }
+        )
 
 module ARCObjectWidgetData =
 
-    let getExplorerItems(selectedId: string option, items: FileItem list) =
-        ARCObjectWidgetHelper.getExplorerItems(selectedId, items)
+    let getExplorerItems (selectedId: string option, items: FileItem list) =
+        ARCObjectWidgetHelper.getExplorerItems (selectedId, items)
 
 [<Erase; Mangle(false)>]
 type ARCObjectWidget =
@@ -167,7 +168,8 @@ type ARCObjectWidget =
             |> Seq.choose (fun index ->
                 kindFilterOptions
                 |> Array.tryItem index
-                |> Option.map (fun option -> option.label))
+                |> Option.map (fun option -> option.label)
+            )
             |> Array.ofSeq
 
         let summary =
@@ -176,10 +178,7 @@ type ARCObjectWidget =
             elif selectedLabels.Length = kindFilterOptions.Length then
                 "All kinds"
             else
-                let truncated =
-                    selectedLabels
-                    |> Array.truncate 2
-                    |> String.concat ", "
+                let truncated = selectedLabels |> Array.truncate 2 |> String.concat ", "
 
                 if selectedLabels.Length > 2 then
                     $"{truncated} +{selectedLabels.Length - 2}"
@@ -190,8 +189,7 @@ type ARCObjectWidget =
             prop.title "Filter visible ARC object kinds"
             prop.type'.button
             prop.tabIndex -1
-            prop.className
-                "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:pointer-events-none swt:max-w-[18rem]"
+            prop.className "swt:btn swt:btn-sm swt:btn-outline swt:gap-2 swt:pointer-events-none swt:max-w-[18rem]"
             prop.children [
                 Icons.Filter("swt:size-4")
                 Html.span [
@@ -214,7 +212,12 @@ type ARCObjectWidget =
         let placeholder = defaultArg placeholder "Search visible objects..."
         let inputValue, setInputValue = React.useState ""
         let showInitialResults = System.String.IsNullOrWhiteSpace inputValue
-        let visibleItems = if showInitialResults then items |> Array.truncate 10 else items
+
+        let visibleItems =
+            if showInitialResults then
+                items |> Array.truncate 10
+            else
+                items
 
         let filterFn =
             fun (props: {| item: 'a; search: string |}) ->
@@ -223,7 +226,8 @@ type ARCObjectWidget =
                 if System.String.IsNullOrWhiteSpace search then
                     true
                 else
-                    (itemToString props.item).IndexOf(search, System.StringComparison.OrdinalIgnoreCase) >= 0
+                    (itemToString props.item).IndexOf(search, System.StringComparison.OrdinalIgnoreCase)
+                    >= 0
 
         let itemRenderer =
             fun
@@ -274,7 +278,8 @@ type ARCObjectWidget =
             onChange =
                 (fun _ item ->
                     setInputValue ""
-                    onSelect item),
+                    onSelect item
+                ),
             placeholder = placeholder,
             inputLeadingVisual = Icons.MagnifyingClass("swt:opacity-60"),
             labelClassName = "swt:w-72 swt:max-w-[42vw] swt:input-sm",
@@ -286,22 +291,21 @@ type ARCObjectWidget =
                     if visibleItems.Length > 0 then
                         data.setActiveIndex (Some 0)
                     else
-                        data.setActiveIndex None),
+                        data.setActiveIndex None
+                ),
             noResultsRenderer =
                 (fun () ->
                     Html.li [
                         prop.className "swt:p-4 swt:text-sm swt:opacity-70"
                         prop.text "No matching ARC objects found."
-                    ])
+                    ]
+                )
         )
 
     [<ReactComponent>]
     static member SearchActionForExplorerItems
-        (
-            items: (string * string option * FileItem)[],
-            onSelectItem: FileItem -> unit,
-            ?placeholder: string
-        ) =
+        (items: (string * string option * FileItem)[], onSelectItem: FileItem -> unit, ?placeholder: string)
+        =
         ARCObjectWidget.SearchAction(
             items,
             (fun (name, _, _) -> name),
@@ -347,7 +351,10 @@ type ARCObjectWidget =
                                     kindFilterOptions,
                                     selectedKindIndices,
                                     setSelectedKindIndices,
-                                    triggerRenderFn = (fun _ -> ARCObjectWidget.KindFilterTrigger(kindFilterOptions, selectedKindIndices)),
+                                    triggerRenderFn =
+                                        (fun _ ->
+                                            ARCObjectWidget.KindFilterTrigger(kindFilterOptions, selectedKindIndices)
+                                        ),
                                     middleware = [|
                                         FloatingUI.Middleware.flip ()
                                         FloatingUI.Middleware.shift ()
@@ -381,7 +388,7 @@ type ARCObjectWidget =
         let contextIconSizeClass = defaultArg contextIconSizeClass "swt:text-base"
         let compactEntityTiles = defaultArg compactEntityTiles false
         let stickyContextBreadcrumb = defaultArg stickyContextBreadcrumb false
-        let explorerItems = ARCObjectWidgetHelper.getExplorerItems(selectedItemId, items)
+        let explorerItems = ARCObjectWidgetHelper.getExplorerItems (selectedItemId, items)
 
         let itemTypeLabel (item: FileItem) =
             if System.String.IsNullOrWhiteSpace item.ItemType then
@@ -406,18 +413,26 @@ type ARCObjectWidget =
 
         let iconTile sourceName (entry: ARCObjectExplorerVisibleItem) isCurrentTarget =
             let item = entry.Item
-            let tileMinHeightClass = if compactEntityTiles then "swt:min-h-16" else "swt:min-h-20"
+
+            let tileMinHeightClass =
+                if compactEntityTiles then
+                    "swt:min-h-16"
+                else
+                    "swt:min-h-20"
 
             Html.button [
                 prop.type'.button
                 prop.className [
                     $"swt:flex swt:w-full swt:min-w-0 swt:flex-col swt:items-center swt:justify-center swt:gap-2 swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 {tileMinHeightClass} swt:text-center swt:transition-colors hover:swt:border-primary/60 hover:swt:bg-base-200/60"
-                    if isCurrentTarget then "swt:border-primary swt:bg-primary/10"
+                    if isCurrentTarget then
+                        "swt:border-primary swt:bg-primary/10"
                 ]
                 prop.onClick (fun _ -> onItemClick item)
                 prop.children [
                     Html.i [
-                        prop.className (ARCObjectWidgetHelper.iconClassName([ "swt:iconify"; tileIconSizeClass ], item))
+                        prop.className (
+                            ARCObjectWidgetHelper.iconClassName ([ "swt:iconify"; tileIconSizeClass ], item)
+                        )
                     ]
                     Html.div [
                         prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-1 swt:w-full"
@@ -438,19 +453,19 @@ type ARCObjectWidget =
         let contextItem (entry: ARCObjectExplorerContextItem) =
             let sharedChildren = [
                 Html.i [
-                    prop.className (ARCObjectWidgetHelper.iconClassName([ "swt:iconify"; contextIconSizeClass ], entry.Item))
+                    prop.className (
+                        ARCObjectWidgetHelper.iconClassName ([ "swt:iconify"; contextIconSizeClass ], entry.Item)
+                    )
                 ]
                 Html.div [
                     prop.className "swt:flex swt:min-w-0 swt:flex-col swt:leading-tight swt:text-left"
                     prop.children [
                         Html.span [
-                            prop.className "swt:text-[0.65rem] swt:uppercase swt:tracking-wide swt:opacity-60 swt:truncate"
+                            prop.className
+                                "swt:text-[0.65rem] swt:uppercase swt:tracking-wide swt:opacity-60 swt:truncate"
                             prop.text (itemTypeLabel entry.Item)
                         ]
-                        Html.span [
-                            prop.className "swt:truncate"
-                            prop.text entry.Item.Name
-                        ]
+                        Html.span [ prop.className "swt:truncate"; prop.text entry.Item.Name ]
                     ]
                 ]
             ]
@@ -521,10 +536,7 @@ type ARCObjectWidget =
                         prop.className tileGridClass
                         prop.children [
                             for visibleItem in section.Items do
-                                iconTile
-                                    sourceName
-                                    visibleItem
-                                    (visibleItem.Item.Id = sourceId)
+                                iconTile sourceName visibleItem (visibleItem.Item.Id = sourceId)
                         ]
                     ]
                 ]
@@ -537,8 +549,7 @@ type ARCObjectWidget =
                 match explorerItems with
                 | Some explorerItems ->
                     let selectedContextItem =
-                        explorerItems.ContextItems
-                        |> List.tryFind (fun entry -> entry.IsCurrent)
+                        explorerItems.ContextItems |> List.tryFind (fun entry -> entry.IsCurrent)
 
                     let contextContainerClasses = [
                         "swt:flex swt:flex-col swt:rounded-xl swt:border swt:border-base-300 swt:bg-base-100 swt:p-4"
@@ -563,7 +574,8 @@ type ARCObjectWidget =
                                                     prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
                                                     prop.children [
                                                         Html.span [
-                                                            prop.className "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
+                                                            prop.className
+                                                                "swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
                                                             prop.text "Selected"
                                                         ]
                                                         Html.span [
@@ -571,7 +583,8 @@ type ARCObjectWidget =
                                                             prop.text (itemTypeLabel selectedItem.Item)
                                                         ]
                                                         Html.span [
-                                                            prop.className "swt:text-sm swt:font-semibold swt:wrap-break-word"
+                                                            prop.className
+                                                                "swt:text-sm swt:font-semibold swt:wrap-break-word"
                                                             prop.text selectedItem.Item.Name
                                                         ]
                                                     ]
@@ -580,7 +593,8 @@ type ARCObjectWidget =
                                             if not stickyContextBreadcrumb then
                                                 Html.p [
                                                     prop.className "swt:text-sm swt:opacity-70"
-                                                    prop.text "Follow the parent chain left to right to understand where the current ARC object sits in the visible hierarchy."
+                                                    prop.text
+                                                        "Follow the parent chain left to right to understand where the current ARC object sits in the visible hierarchy."
                                                 ]
                                         ]
                                     ]
@@ -590,7 +604,8 @@ type ARCObjectWidget =
                                             for index, contextEntry in explorerItems.ContextItems |> List.indexed do
                                                 if index > 0 then
                                                     Html.span [
-                                                        prop.className "swt:flex swt:flex-none swt:items-center swt:opacity-40"
+                                                        prop.className
+                                                            "swt:flex swt:flex-none swt:items-center swt:opacity-40"
                                                         prop.children [ Icons.ChevronRight() ]
                                                     ]
 
@@ -621,7 +636,9 @@ type ARCObjectWidget =
         ]
 
     [<ReactComponent>]
-    static member Main(?navbar: ReactElement, ?treePane: ReactElement, ?explorerPane: ReactElement, ?detailsPane: ReactElement) =
+    static member Main
+        (?navbar: ReactElement, ?treePane: ReactElement, ?explorerPane: ReactElement, ?detailsPane: ReactElement)
+        =
         Html.div [
             prop.className ARCObjectWidgetHelper.widgetContainerClass
             prop.children [
@@ -634,7 +651,8 @@ type ARCObjectWidget =
                         ]
                         Html.p [
                             prop.className "swt:text-sm swt:opacity-70"
-                            prop.text "Select an object in the tree to inspect its parent chain and visible descendants, or the selected object itself when it is a leaf."
+                            prop.text
+                                "Select an object in the tree to inspect its parent chain and visible descendants, or the selected object itself when it is a leaf."
                         ]
                     ]
                 ]
@@ -652,5 +670,3 @@ type ARCObjectWidget =
                 ]
             ]
         ]
-
-

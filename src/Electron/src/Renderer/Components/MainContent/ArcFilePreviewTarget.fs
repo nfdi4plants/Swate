@@ -11,9 +11,7 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
 
 [<ReactComponent>]
-let private TableNavbarActions
-    (props: ArcFileEditorHeaderProps, setArcFile: ArcFiles -> unit)
-    =
+let private TableNavbarActions (props: ArcFileEditorHeaderProps, setArcFile: ArcFiles -> unit) =
     let isDeleteModalOpen, setIsDeleteModalOpen = React.useState false
 
     match props.activeView with
@@ -21,15 +19,10 @@ let private TableNavbarActions
         let tableName = props.arcFile.Tables().[tableIndex].Name
         let deleteLabel = $"Delete Table: {tableName}"
 
-        let openDeleteModal =
-            fun _ -> setIsDeleteModalOpen true
+        let openDeleteModal = fun _ -> setIsDeleteModalOpen true
 
         let confirmDelete () =
-            deleteSelectedTable
-                props.arcFile
-                tableIndex
-                setArcFile
-                props.setActiveView
+            deleteSelectedTable props.arcFile tableIndex setArcFile props.setActiveView
 
         React.Fragment [
             ResetTableConfirmationModal.ResetTableConfirmationModal(
@@ -69,12 +62,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             match! Helper.setArcFileInMemory nextArcFile with
             | Ok() -> ()
             | Error exn ->
-                errorModal.enqueue (
-                    ErrorModalRequest.create (
-                        exn.Message,
-                        title = "Could not update ARC in memory"
-                    )
-                )
+                errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not update ARC in memory"))
         }
         |> Promise.start
 
@@ -91,9 +79,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 match! Helper.saveArcFile arcFile with
                 | Ok() -> ()
                 | Error exn ->
-                    errorModal.enqueue (
-                        ErrorModalRequest.create (exn.Message, title = "Could not save ARC file")
-                    )
+                    errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not save ARC file"))
             }
             |> Promise.start
 
@@ -103,9 +89,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
                 match! Api.ipcArcVaultApi.pickArcPaths () with
                 | Ok paths -> return paths
                 | Error exn ->
-                    errorModal.enqueue (
-                        ErrorModalRequest.create (exn.Message, title = "Could not pick files")
-                    )
+                    errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not pick files"))
 
                     return [||]
             }),
@@ -114,10 +98,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
         )
 
     let trailingNavbarElements =
-        React.useCallback (
-            (fun props -> TableNavbarActions(props, setArcFile)),
-            [| box setArcFile |]
-        )
+        React.useCallback ((fun props -> TableNavbarActions(props, setArcFile)), [| box setArcFile |])
 
     Swate.Components.Page.ArcFileEditor.Main.ArcFileEditor(
         arcFile,

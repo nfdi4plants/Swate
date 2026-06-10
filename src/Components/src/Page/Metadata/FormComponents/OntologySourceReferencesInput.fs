@@ -32,11 +32,8 @@ type OntologySourceReferencesInput =
 
     [<ReactComponent>]
     static member private OntologySourceReferenceInput
-        (
-            input: OntologySourceReference,
-            setter: OntologySourceReference -> unit,
-            ?deleteButton: MouseEvent -> unit
-        ) =
+        (input: OntologySourceReference, setter: OntologySourceReference -> unit, ?deleteButton: MouseEvent -> unit)
+        =
         let name = Option.defaultValue "<name>" input.Name
         let version = Option.defaultValue "<version>" input.Version
 
@@ -51,7 +48,11 @@ type OntologySourceReferencesInput =
             )
 
         LayoutComponents.Collapse [
-            LayoutComponents.CollapseTitle(name, version, OntologySourceReferencesInputHelper.countFilledFieldsString input)
+            LayoutComponents.CollapseTitle(
+                name,
+                version,
+                OntologySourceReferencesInputHelper.countFilledFieldsString input
+            )
         ] [
             createFieldTextInput (input.Name, "Name", fun value -> input.Name <- value)
             Helpers.cardFormGroup [

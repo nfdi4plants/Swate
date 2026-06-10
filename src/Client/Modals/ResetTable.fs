@@ -9,6 +9,7 @@ type ResetTable =
     [<ReactComponent>]
     static member Main(isOpen, setIsOpen, dispatch) =
 
-        let reset () = Spreadsheet.Reset |> SpreadsheetMsg |> dispatch
+        let reset () =
+            Spreadsheet.Reset |> SpreadsheetMsg |> dispatch
 
         ResetTableConfirmationModal.ResetTableConfirmationModal(isOpen, setIsOpen, reset)

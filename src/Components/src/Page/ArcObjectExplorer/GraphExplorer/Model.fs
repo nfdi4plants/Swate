@@ -23,12 +23,12 @@ type Data = {
     selector: string option
     selectorFormat: string option //URL option
     encodingFormat: string option
-    additionalProperty: PropertyValue []
+    additionalProperty: PropertyValue[]
 }
 
 type DataKinds = {
-    Files : Data []
-    FragmentSelector : Data []
+    Files: Data[]
+    FragmentSelector: Data[]
 }
 
 type Material = {
@@ -36,17 +36,17 @@ type Material = {
     type': string
     additionalType: string option
     name: string
-    additionalProperty: PropertyValue []
+    additionalProperty: PropertyValue[]
 }
 
 type MaterialKinds = {
-    Sources : Material []
-    Samples : Material []
+    Sources: Material[]
+    Samples: Material[]
 }
 
 type ProcessType = {
-    Materials : MaterialKinds []
-    Data : DataKinds []
+    Materials: MaterialKinds[]
+    Data: DataKinds[]
 }
 
 type LabProcess = {
@@ -54,12 +54,12 @@ type LabProcess = {
     type': string
     additionalType: string option
     name: string
-    inputs: ProcessType [] //objects
-    outputs: ProcessType [] //results
-    Materials: Material []
-    Data: Data []
+    inputs: ProcessType[] //objects
+    outputs: ProcessType[] //results
+    Materials: Material[]
+    Data: Data[]
     executesProtocol: string //Id of parent protocol
-    parameterValue: PropertyValue []
+    parameterValue: PropertyValue[]
 }
 
 type FormalParameter = {
@@ -84,10 +84,10 @@ type LabProtocol = {
     type': string
     additionalType: string option
     name: string option
-    parameters: FormalParameter []
+    parameters: FormalParameter[]
     description: string option
     intendedUse: (DefinedTerm * string) option
-    processes: LabProcess []
+    processes: LabProcess[]
     additionalProperty: PropertyValue option
     version: string option
     url: string option //URL
@@ -107,38 +107,29 @@ type Dataset = {
     identifier: string
     name: string option
     description: string option
-    about: LabProtocol []
-    hasPart: Dataset [] //Sub dataset or data files
-    additionalProperty: PropertyValue []
+    about: LabProtocol[]
+    hasPart: Dataset[] //Sub dataset or data files
+    additionalProperty: PropertyValue[]
 }
 
 type DatasetKinds = {
-    Studies: Dataset []
-    Assays: Dataset []
-    Workflows: Dataset []
-    Runs: Dataset []
+    Studies: Dataset[]
+    Assays: Dataset[]
+    Workflows: Dataset[]
+    Runs: Dataset[]
 }
 
-type ARCGraph = {
-    path: string
-    Datasets: DatasetKinds
-}
+type ARCGraph = { path: string; Datasets: DatasetKinds }
 
 type ARCObjects =
-    | Arc of ARCGraph []
-    | Datasets of Dataset []
-    | Protocols of LabProtocol []
-    | FormalParameters of FormalParameter []
-    | Processes of LabProcess []
+    | Arc of ARCGraph[]
+    | Datasets of Dataset[]
+    | Protocols of LabProtocol[]
+    | FormalParameters of FormalParameter[]
+    | Processes of LabProcess[]
 
 let sanitizeSegment (value: string) =
-    value
-        .Trim()
-        .ToLowerInvariant()
-        .Replace(" ", "-")
-        .Replace("/", "-")
-        .Replace("\\", "-")
-        .Replace(":", "-")
+    value.Trim().ToLowerInvariant().Replace(" ", "-").Replace("/", "-").Replace("\\", "-").Replace(":", "-")
 
 type GraphProcessEndpointValueType =
     | Material

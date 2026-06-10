@@ -23,28 +23,25 @@ type MarkdownFilePickerAdapter = {
     ResolveMarkdownPath: MarkdownPromptFile -> JS.Promise<string>
 }
 
-type MarkdownPromptPlugin =
-    {
-        Title: string
-        Description: string option
-        Placeholder: string
-        SubmitButtonText: string
-        Validate: string -> Result<unit, string>
-        Apply: string -> int -> int -> string -> string * (int * int)
-        // None defaults to text prompt mode for backwards compatibility.
-        InputMode: MarkdownPromptInputMode option
-        // Applies to file mode only.
-        Accept: string option
-        AllowMultiple: bool option
-        // Applies to file mode only.
-        ApplyFiles: (string -> int -> int -> (MarkdownPromptFile * string) list -> string * (int * int)) option
-    }
+type MarkdownPromptPlugin = {
+    Title: string
+    Description: string option
+    Placeholder: string
+    SubmitButtonText: string
+    Validate: string -> Result<unit, string>
+    Apply: string -> int -> int -> string -> string * (int * int)
+    // None defaults to text prompt mode for backwards compatibility.
+    InputMode: MarkdownPromptInputMode option
+    // Applies to file mode only.
+    Accept: string option
+    AllowMultiple: bool option
+    // Applies to file mode only.
+    ApplyFiles: (string -> int -> int -> (MarkdownPromptFile * string) list -> string * (int * int)) option
+}
 
-type MarkdownToolbarPlugin =
-    {
-        Id: string
-        Command: ICommand
-        Enabled: bool
-        Prompt: MarkdownPromptPlugin option
-    }
-
+type MarkdownToolbarPlugin = {
+    Id: string
+    Command: ICommand
+    Enabled: bool
+    Prompt: MarkdownPromptPlugin option
+}

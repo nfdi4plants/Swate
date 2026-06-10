@@ -29,8 +29,7 @@ module MarkdownPluginPromptModal =
     }
 
     [<ReactComponent>]
-    let View
-        (props: ViewProps) =
+    let View (props: ViewProps) =
         let isOpen = props.IsOpen
         let setIsOpen = props.SetIsOpen
         let promptViewModel = props.PromptViewModel
@@ -50,9 +49,7 @@ module MarkdownPluginPromptModal =
 
         let isFilePrompt = promptViewModel.InputMode = MarkdownPromptInputMode.File
 
-        let promptDescription =
-            promptViewModel.Description
-            |> Option.map Html.text
+        let promptDescription = promptViewModel.Description |> Option.map Html.text
 
         let promptFileKey (file: MarkdownPromptFile) =
             let hostPath = file.HostPath |> Option.defaultValue ""

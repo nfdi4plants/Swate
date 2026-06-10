@@ -3,7 +3,7 @@ module Bundle
 
 open ProjectInfo
 
-let Client(forSwate: bool) =
+let Client (forSwate: bool) =
 
     run
         "dotnet"
@@ -23,12 +23,18 @@ let Client(forSwate: bool) =
         ]
         ProjectPaths.clientPath
 
-let All() =
+let All () =
     [
         runAsync
             "server"
             "dotnet"
-            [ "publish"; "-c"; "Release"; "-o"; ProjectPaths.deployPath ]
+            [
+                "publish"
+                "-c"
+                "Release"
+                "-o"
+                ProjectPaths.deployPath
+            ]
             ProjectPaths.serverPath
         runAsync
             "client"

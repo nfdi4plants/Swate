@@ -1786,7 +1786,10 @@ type Main =
                         InteropLogging.Msg.create InteropLogging.Info $"The annotation table {excelTable.name} is valid"
                     ]
 
-                | Result.Error ex -> return [ InteropLogging.Msg.create InteropLogging.Error ex.Message ]
+                | Result.Error ex ->
+                    return [
+                        InteropLogging.Msg.create InteropLogging.Error ex.Message
+                    ]
         }
 
     /// <summary>
@@ -1928,7 +1931,10 @@ type Main =
 
                 return []
 
-            | Result.Error exn -> return [ InteropLogging.Msg.create InteropLogging.Error exn.Message ]
+            | Result.Error exn ->
+                return [
+                    InteropLogging.Msg.create InteropLogging.Error exn.Message
+                ]
         }
 
     /// <summary>
@@ -2173,7 +2179,10 @@ type Main =
                             msgText
 
                     return [ InteropLogging.Msg.create InteropLogging.Info msg ]
-                | Result.Error ex -> return [ InteropLogging.Msg.create InteropLogging.Error ex.Message ]
+                | Result.Error ex ->
+                    return [
+                        InteropLogging.Msg.create InteropLogging.Error ex.Message
+                    ]
             | None -> return [ InteropLogging.NoActiveTableMsg ]
         }
 

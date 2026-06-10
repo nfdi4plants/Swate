@@ -56,6 +56,7 @@ type ArcSelection = {
     TreePath: string option
     ExplorerNodeId: string option
 } with
+
     static member Empty = {
         TreePath = None
         ExplorerNodeId = None
@@ -64,8 +65,7 @@ type ArcSelection = {
 [<RequireQualifiedAccess>]
 module ArcSelection =
 
-    let private normalizeTreePath =
-        Option.map PathHelpers.normalizePath
+    let private normalizeTreePath = Option.map PathHelpers.normalizePath
 
     let empty = ArcSelection.Empty
 

@@ -138,10 +138,7 @@ type SelectiveImportModal =
                                     prop.className "swt:checkbox"
                                     prop.onChange (fun (b: bool) -> setActive b)
                                 ]
-                                Html.span [
-                                    prop.className "swt:text-sm"
-                                    prop.text "Import"
-                                ]
+                                Html.span [ prop.className "swt:text-sm"; prop.text "Import" ]
                             ]
                         ]
                     ]
@@ -234,7 +231,10 @@ type SelectiveImportModal =
                 Html.div [
                     prop.className "swt:collapse"
                     prop.children [
-                        Html.input [ prop.type'.checkbox; prop.className "swt:min-h-0 swt:h-5" ]
+                        Html.input [
+                            prop.type'.checkbox
+                            prop.className "swt:min-h-0 swt:h-5"
+                        ]
                         Html.div [
                             prop.className [
                                 "swt:flex swt:items-center swt:collapse-title swt:p-1 swt:min-h-0 swt:h-5 swt:text-sm swt:font-bold swt:space-x-2"

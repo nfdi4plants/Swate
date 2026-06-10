@@ -17,21 +17,25 @@ module GitLfsService = Main.Git.GitLfsService
 module GitTokenProvider = Main.Git.GitTokenProvider
 module JsonDecoder = Main.Git.JsonDecoder
 
-Vitest.describe("Git LFS JSON decoding", fun () ->
-    let assertParseFailure (json: string) (expectedReason: string option) =
-        try
-            parseLsFiles json |> ignore
-            failwith "Expected parseLsFiles to fail for incomplete or malformed Git LFS JSON."
-        with ex ->
-            Vitest.expect(ex.Message.Contains("Failed to parse git lfs ls-files JSON")).toBe(true)
+Vitest.describe (
+    "Git LFS JSON decoding",
+    fun () ->
+        let assertParseFailure (json: string) (expectedReason: string option) =
+            try
+                parseLsFiles json |> ignore
+                failwith "Expected parseLsFiles to fail for incomplete or malformed Git LFS JSON."
+            with ex ->
+                Vitest.expect(ex.Message.Contains("Failed to parse git lfs ls-files JSON")).toBe (true)
 
-            match expectedReason with
-            | Some reason -> Vitest.expect(ex.Message.Contains(reason)).toBe(true)
-            | None -> ()
+                match expectedReason with
+                | Some reason -> Vitest.expect(ex.Message.Contains(reason)).toBe (true)
+                | None -> ()
 
-    Vitest.test("parseLsFiles decodes complete records unchanged", fun () ->
-        let json =
-            """{
+        Vitest.test (
+            "parseLsFiles decodes complete records unchanged",
+            fun () ->
+                let json =
+                    """{
   "files": [
     {
       "name": "folder/file.psd",
@@ -45,21 +49,24 @@ Vitest.describe("Git LFS JSON decoding", fun () ->
   ]
 }"""
 
-        let files = parseLsFiles json
-        Vitest.expect(files.Length).toBe(1)
+                let files = parseLsFiles json
+                Vitest.expect(files.Length).toBe (1)
 
-        let file = files.[0]
-        Vitest.expect(file.name).toBe("folder/file.psd")
-        Vitest.expect(file.size).toBe(42)
-        Vitest.expect(file.checkout).toBe(true)
-        Vitest.expect(file.downloaded).toBe(true)
-        Vitest.expect(file.``oid_type``).toBe("sha256")
-        Vitest.expect(file.oid).toBe("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
-        Vitest.expect(file.version).toBe("https://git-lfs.github.com/spec/v1"))
+                let file = files.[0]
+                Vitest.expect(file.name).toBe ("folder/file.psd")
+                Vitest.expect(file.size).toBe (42)
+                Vitest.expect(file.checkout).toBe (true)
+                Vitest.expect(file.downloaded).toBe (true)
+                Vitest.expect(file.``oid_type``).toBe ("sha256")
+                Vitest.expect(file.oid).toBe ("0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef")
+                Vitest.expect(file.version).toBe ("https://git-lfs.github.com/spec/v1")
+        )
 
-    Vitest.test("parseLsFiles throws when required fields are missing", fun () ->
-        let json =
-            """{
+        Vitest.test (
+            "parseLsFiles throws when required fields are missing",
+            fun () ->
+                let json =
+                    """{
   "files": [
     {
       "name": "nested/asset.psd",
@@ -72,11 +79,14 @@ Vitest.describe("Git LFS JSON decoding", fun () ->
   ]
 }"""
 
-        assertParseFailure json (Some "downloaded"))
+                assertParseFailure json (Some "downloaded")
+        )
 
-    Vitest.test("parseLsFiles throws when name is blank or whitespace", fun () ->
-        let json =
-            """{
+        Vitest.test (
+            "parseLsFiles throws when name is blank or whitespace",
+            fun () ->
+                let json =
+                    """{
   "files": [
     {
       "name": "   ",
@@ -90,11 +100,14 @@ Vitest.describe("Git LFS JSON decoding", fun () ->
   ]
 }"""
 
-        assertParseFailure json (Some "non-empty"))
+                assertParseFailure json (Some "non-empty")
+        )
 
-    Vitest.test("parseLsFiles throws when mixed arrays contain invalid entries", fun () ->
-        let json =
-            """{
+        Vitest.test (
+            "parseLsFiles throws when mixed arrays contain invalid entries",
+            fun () ->
+                let json =
+                    """{
   "files": [
     {
       "name": "valid/file.psd",
@@ -116,17 +129,21 @@ Vitest.describe("Git LFS JSON decoding", fun () ->
   ]
 }"""
 
-        assertParseFailure json (Some "downloaded"))
+                assertParseFailure json (Some "downloaded")
+        )
 
-    Vitest.test("parseLsFiles accepts null or missing files containers as empty output", fun () ->
-        let withNullFiles = """{ "files": null }"""
-        let withMissingFiles = """{}"""
+        Vitest.test (
+            "parseLsFiles accepts null or missing files containers as empty output",
+            fun () ->
+                let withNullFiles = """{ "files": null }"""
+                let withMissingFiles = """{}"""
 
-        let nullFiles = parseLsFiles withNullFiles
-        let missingFiles = parseLsFiles withMissingFiles
+                let nullFiles = parseLsFiles withNullFiles
+                let missingFiles = parseLsFiles withMissingFiles
 
-        Vitest.expect(nullFiles.Length).toBe(0)
-        Vitest.expect(missingFiles.Length).toBe(0))
+                Vitest.expect(nullFiles.Length).toBe (0)
+                Vitest.expect(missingFiles.Length).toBe (0)
+        )
 )
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -218,7 +235,9 @@ let private expectErrorResult<'T> (result: Result<'T, exn>) =
     | Error error -> error
 
 let private gitServiceIntegrationTimeoutMs = 120000
-let private gitLfsIntegrationTestOptions = TestOptions(timeout = gitServiceIntegrationTimeoutMs)
+
+let private gitLfsIntegrationTestOptions =
+    TestOptions(timeout = gitServiceIntegrationTimeoutMs)
 
 [<Emit("Buffer.from($0, 'utf8')")>]
 let private utf8Buffer (text: string) : obj = jsNative
@@ -240,11 +259,13 @@ let private runSimpleGitResult
 
 let private createRawOnlyGit (rawHandler: string[] -> JS.Promise<string>) : ISimpleGit =
     createObj [
-        "raw" ==> (fun (command: obj) ->
+        "raw"
+        ==> (fun (command: obj) ->
             match command with
             | :? (string array) as commands -> rawHandler commands
             | :? string as singleCommand -> rawHandler [| singleCommand |]
-            | _ -> failwith "Unexpected raw command payload.")
+            | _ -> failwith "Unexpected raw command payload."
+        )
     ]
     |> unbox<ISimpleGit>
 
@@ -267,7 +288,9 @@ let private splitNonEmptyLines (text: string) =
 let private testRemoteHost = "git.local.test"
 let private testRemoteToken = "swate-test-token"
 let private testRemoteUrl = $"https://{testRemoteHost}/origin.git"
-let private testAuthenticatedRemoteUrl = $"https://oauth2:{testRemoteToken}@{testRemoteHost}/origin.git"
+
+let private testAuthenticatedRemoteUrl =
+    $"https://oauth2:{testRemoteToken}@{testRemoteHost}/origin.git"
 
 let private toFileRemoteUrl (path: string) =
     let normalized = path.Replace("\\", "/")
@@ -279,8 +302,23 @@ let private toFileRemoteUrl (path: string) =
 
 let private configureLocalRemoteRewrite (git: ISimpleGit) (remotePath: string) = promise {
     let localRemoteUrl = toFileRemoteUrl remotePath
-    let! _ = git.raw [| "config"; "--add"; $"url.{localRemoteUrl}.insteadOf"; testRemoteUrl |]
-    let! _ = git.raw [| "config"; "--add"; $"url.{localRemoteUrl}.insteadOf"; testAuthenticatedRemoteUrl |]
+
+    let! _ =
+        git.raw [|
+            "config"
+            "--add"
+            $"url.{localRemoteUrl}.insteadOf"
+            testRemoteUrl
+        |]
+
+    let! _ =
+        git.raw [|
+            "config"
+            "--add"
+            $"url.{localRemoteUrl}.insteadOf"
+            testAuthenticatedRemoteUrl
+        |]
+
     return ()
 }
 
@@ -484,7 +522,12 @@ Vitest.describe (
 
                         Vitest.expect(createdBranchStatus.Current |> Option.defaultValue "").toBe (featureBranchName)
 
-                        let! checkoutBaseBranchResult = GitService.checkoutBranch context.RepoPath { Name = initialBranch; StartPoint = None }
+                        let! checkoutBaseBranchResult =
+                            GitService.checkoutBranch context.RepoPath {
+                                Name = initialBranch
+                                StartPoint = None
+                            }
+
                         expectOk "checkout initial branch" checkoutBaseBranchResult |> ignore
 
                         let! baseBranchStatus =
@@ -494,7 +537,12 @@ Vitest.describe (
 
                         Vitest.expect(baseBranchStatus.Current |> Option.defaultValue "").toBe (initialBranch)
 
-                        let! checkoutFeatureBranchResult = GitService.checkoutBranch context.RepoPath { Name = featureBranchName; StartPoint = None }
+                        let! checkoutFeatureBranchResult =
+                            GitService.checkoutBranch context.RepoPath {
+                                Name = featureBranchName
+                                StartPoint = None
+                            }
+
                         expectOk "checkout feature branch" checkoutFeatureBranchResult |> ignore
 
                         let! featureBranchStatus =
@@ -568,7 +616,9 @@ Vitest.describe (
                         let! stageResult = GitService.stagePaths context.RepoPath [| "tracked.txt"; "scratch.txt" |]
                         expectOk "stage selected changes" stageResult |> ignore
 
-                        let! discardResult = GitService.discardPaths context.RepoPath [| "tracked.txt"; "scratch.txt" |]
+                        let! discardResult =
+                            GitService.discardPaths context.RepoPath [| "tracked.txt"; "scratch.txt" |]
+
                         expectOk "discard selected changes" discardResult |> ignore
 
                         let! status =
@@ -579,14 +629,13 @@ Vitest.describe (
                         let! trackedContent =
                             fsPromisesDynamic?readFile (trackedPath, "utf8") |> unbox<JS.Promise<string>>
 
-                        let! untrackedExists =
-                            promise {
-                                try
-                                    let! _ = fsPromisesDynamic?stat untrackedPath |> unbox<JS.Promise<obj>>
-                                    return true
-                                with _ ->
-                                    return false
-                            }
+                        let! untrackedExists = promise {
+                            try
+                                let! _ = fsPromisesDynamic?stat untrackedPath |> unbox<JS.Promise<obj>>
+                                return true
+                            with _ ->
+                                return false
+                        }
 
                         Vitest.expect(status.IsClean).toBe (true)
                         Vitest.expect(trackedContent).toBe ("first\nsecond\n")
@@ -662,7 +711,8 @@ Vitest.describe (
 
                         Vitest.expect(preview.Status).toEqual (GitPullPreflightStatus.SafeToPull)
                     })
-            })
+            }
+        )
 
         Vitest.test (
             "previewPull reports WouldRequireMergeResolution when local and fetched upstream change the same lines differently",
@@ -718,7 +768,8 @@ Vitest.describe (
 
                         Vitest.expect(preview.Status).toEqual (GitPullPreflightStatus.WouldRequireMergeResolution)
                     })
-            })
+            }
+        )
 
         Vitest.test (
             "previewPull returns Indeterminate when HEAD is detached",
@@ -743,7 +794,8 @@ Vitest.describe (
 
                         Vitest.expect(preview.Status).toEqual (GitPullPreflightStatus.Indeterminate)
                     })
-            })
+            }
+        )
 
         Vitest.test (
             "previewPull returns Indeterminate when no upstream tracking branch can be resolved",
@@ -760,6 +812,7 @@ Vitest.describe (
                         expectOk "commit no-upstream base" commitBase |> ignore
 
                         let! _ = GitService.createBranch context.RepoPath "feature/no-upstream" None
+
                         let! status =
                             unwrapResultAsync
                                 (GitService.getStatus context.RepoPath)
@@ -774,7 +827,8 @@ Vitest.describe (
 
                         Vitest.expect(preview.Status).toEqual (GitPullPreflightStatus.Indeterminate)
                     })
-            })
+            }
+        )
 
         Vitest.test (
             "commit keeps the staged version when the working tree changes again before commit",
@@ -822,6 +876,7 @@ Vitest.describe (
                 let remoteBranchTip = "9999999999999999999999999999999999999999"
                 let remoteOnlyTip = "3c1332ae987944dcdf3f68977206561b4cb1a2dc"
                 let lfsObjectId = "abababababababababababababababababababababababababababababababab"
+
                 let pointerContent =
                     $"version https://git-lfs.github.com/spec/v1\noid sha256:{lfsObjectId}\nsize 18\n"
 
@@ -829,17 +884,18 @@ Vitest.describe (
                 let mutable batchCheckStdin = None
                 let mutable revListStdin = None
                 let mutable batchCheckStdin = None
-                let optimizedRevListArgs =
-                    [|
-                        "rev-list"
-                        "--objects"
-                        "--no-object-names"
-                        "--stdin"
-                        "--ignore-missing"
-                        "--filter=blob:limit=1024"
-                        "--filter=object:type=blob"
-                        "--filter-provided-objects"
-                    |]
+
+                let optimizedRevListArgs = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                    "--filter=blob:limit=1024"
+                    "--filter=object:type=blob"
+                    "--filter-provided-objects"
+                |]
+
                 let catFileBatchCheckArgs = [| "cat-file"; "--batch-check" |]
                 let catFileBatchArgs = [| "cat-file"; "--batch"; "--buffer" |]
 
@@ -853,11 +909,10 @@ Vitest.describe (
                         | [| "ls-remote"; "--refs"; "origin" |] ->
                             return
                                 $"{remoteBranchTip}\trefs/heads/main\n{remoteOnlyTip}\trefs/merge-requests/1/merge\n"
-                        | _ ->
-                            return failwith $"Unexpected raw command: {commandText}"
+                        | _ -> return failwith $"Unexpected raw command: {commandText}"
                     })
 
-                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
                     fun request -> promise {
                         let commandText = String.concat " " request.Arguments
 
@@ -894,8 +949,7 @@ Vitest.describe (
                                 StderrText = ""
                                 TimedOut = false
                             }
-                        | _ ->
-                            return failwith $"Unexpected spawned command: {commandText}"
+                        | _ -> return failwith $"Unexpected spawned command: {commandText}"
                     }
 
                 let! plan =
@@ -923,23 +977,25 @@ Vitest.describe (
                 let candidateBlobId = "1111111111111111111111111111111111111111"
                 let remoteTip = "9999999999999999999999999999999999999999"
                 let lfsObjectId = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+
                 let pointerContent =
                     $"version https://git-lfs.github.com/spec/v1\noid sha256:{lfsObjectId}\nsize 18\n"
 
                 let pointerSize = utf8ByteLength pointerContent
                 let mutable batchCheckStdin = None
                 let mutable revListStdin = None
-                let optimizedRevListArgs =
-                    [|
-                        "rev-list"
-                        "--objects"
-                        "--no-object-names"
-                        "--stdin"
-                        "--ignore-missing"
-                        "--filter=blob:limit=1024"
-                        "--filter=object:type=blob"
-                        "--filter-provided-objects"
-                    |]
+
+                let optimizedRevListArgs = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                    "--filter=blob:limit=1024"
+                    "--filter=object:type=blob"
+                    "--filter-provided-objects"
+                |]
+
                 let catFileBatchCheckArgs = [| "cat-file"; "--batch-check" |]
                 let catFileBatchArgs = [| "cat-file"; "--batch"; "--buffer" |]
 
@@ -950,13 +1006,11 @@ Vitest.describe (
                         match command with
                         | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
                             return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
-                        | [| "ls-remote"; "--refs"; "origin" |] ->
-                            return $"{remoteTip}\trefs/heads/main\n"
-                        | _ ->
-                            return failwith $"Unexpected raw command: {commandText}"
+                        | [| "ls-remote"; "--refs"; "origin" |] -> return $"{remoteTip}\trefs/heads/main\n"
+                        | _ -> return failwith $"Unexpected raw command: {commandText}"
                     })
 
-                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
                     fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
                         let commandText = String.concat " " request.Arguments
 
@@ -993,8 +1047,7 @@ Vitest.describe (
                                 StderrText = ""
                                 TimedOut = false
                             }
-                        | _ ->
-                            return failwith $"Unexpected spawned command: {commandText}"
+                        | _ -> return failwith $"Unexpected spawned command: {commandText}"
                     }
 
                 let! plan =
@@ -1171,7 +1224,7 @@ Vitest.describe (
                 let mutable recordedArgs = [||]
                 let mutable recordedStdin = None
 
-                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
                     fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
                         recordedArgs <- request.Arguments
                         recordedStdin <- request.StandardInput
@@ -1186,29 +1239,22 @@ Vitest.describe (
                     }
 
                 let! result =
-                    GitLfsService.uploadObjects
-                        fakeSpawnedGit
-                        commandAuth
-                        "C:/repo"
-                        "origin"
-                        "refs/heads/main"
-                        [| lfsObjectId |]
+                    GitLfsService.uploadObjects fakeSpawnedGit commandAuth "C:/repo" "origin" "refs/heads/main" [|
+                        lfsObjectId
+                    |]
 
                 expectOkResult "upload exact object ids" result |> ignore
 
-                let expectedArgs =
-                    [|
-                        yield! commandAuth.ConfigArgs
-                        yield "lfs"
-                        yield "push"
-                        yield "--object-id"
-                        yield "origin"
-                        yield "--stdin"
-                    |]
+                let expectedArgs = [|
+                    yield! commandAuth.ConfigArgs
+                    yield "lfs"
+                    yield "push"
+                    yield "--object-id"
+                    yield "origin"
+                    yield "--stdin"
+                |]
 
-                Vitest.expect(recordedArgs).toEqual (
-                    expectedArgs
-                )
+                Vitest.expect(recordedArgs).toEqual (expectedArgs)
                 Vitest.expect(recordedStdin).toEqual (Some $"{lfsObjectId}\n")
             }
         )
@@ -1282,12 +1328,14 @@ Vitest.describe (
 
                 expectOk "execute push workflow with exact upload" result |> ignore
 
-                Vitest.expect(events.ToArray()).toEqual (
-                    [|
-                        "upload:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
-                        "push:skip=true"
-                    |]
-                )
+                Vitest
+                    .expect(events.ToArray())
+                    .toEqual (
+                        [|
+                            "upload:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+                            "push:skip=true"
+                        |]
+                    )
             }
         )
 
@@ -1341,8 +1389,7 @@ Vitest.describe (
                         match command with
                         | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
                             return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
-                        | [| "ls-remote"; "--refs"; "origin" |] ->
-                            return $"{remoteTip}\trefs/heads/main\n"
+                        | [| "ls-remote"; "--refs"; "origin" |] -> return $"{remoteTip}\trefs/heads/main\n"
                         | [| "cat-file"; "-t"; currentObjectId |] when currentObjectId = candidateBlobId ->
                             return "blob\n"
                         | [| "cat-file"; "-s"; currentObjectId |] when currentObjectId = candidateBlobId ->
@@ -1351,27 +1398,32 @@ Vitest.describe (
                             return $"version https://git-lfs.github.com/spec/v1\noid sha256:{lfsObjectId}\nsize 18\n"
                         | [| "for-each-ref"; "--format=%(refname)"; "refs/remotes/origin" |] ->
                             return failwith "Legacy local remote-ref fallback must not run in this test."
-                        | _ ->
-                            return failwith $"Unexpected raw command: {commandText}"
+                        | _ -> return failwith $"Unexpected raw command: {commandText}"
                     })
 
                 let seenRevListModes = ResizeArray<string>()
                 let batchCheckArgs = [| "cat-file"; "--batch-check" |]
-                let optimizedRevListArgs =
-                    [|
-                        "rev-list"
-                        "--objects"
-                        "--no-object-names"
-                        "--stdin"
-                        "--ignore-missing"
-                        "--filter=blob:limit=1024"
-                        "--filter=object:type=blob"
-                        "--filter-provided-objects"
-                    |]
-                let fallbackRevListArgs =
-                    [| "rev-list"; "--objects"; "--no-object-names"; "--stdin"; "--ignore-missing" |]
 
-                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                let optimizedRevListArgs = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                    "--filter=blob:limit=1024"
+                    "--filter=object:type=blob"
+                    "--filter-provided-objects"
+                |]
+
+                let fallbackRevListArgs = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                |]
+
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
                     fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
                         let commandText = String.concat " " request.Arguments
 
@@ -1404,8 +1456,7 @@ Vitest.describe (
                                 StderrText = ""
                                 TimedOut = false
                             }
-                        | _ ->
-                            return failwith $"Unexpected spawned command: {commandText}"
+                        | _ -> return failwith $"Unexpected spawned command: {commandText}"
                     }
 
                 let! plan =
@@ -1437,27 +1488,27 @@ Vitest.describe (
                 }
 
                 let calls = ResizeArray<string>()
-                let objectIdUploadArgs =
-                    [|
-                        "-c"
-                        "http.extraHeader=Authorization: Basic TEST"
-                        "lfs"
-                        "push"
-                        "--object-id"
-                        "origin"
-                        "--stdin"
-                    |]
-                let refSpecUploadArgs =
-                    [|
-                        "-c"
-                        "http.extraHeader=Authorization: Basic TEST"
-                        "lfs"
-                        "push"
-                        "origin"
-                        "refs/heads/main"
-                    |]
 
-                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                let objectIdUploadArgs = [|
+                    "-c"
+                    "http.extraHeader=Authorization: Basic TEST"
+                    "lfs"
+                    "push"
+                    "--object-id"
+                    "origin"
+                    "--stdin"
+                |]
+
+                let refSpecUploadArgs = [|
+                    "-c"
+                    "http.extraHeader=Authorization: Basic TEST"
+                    "lfs"
+                    "push"
+                    "origin"
+                    "refs/heads/main"
+                |]
+
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
                     fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
                         let commandText = String.concat " " request.Arguments
                         calls.Add commandText
@@ -1479,26 +1530,24 @@ Vitest.describe (
                                 StderrText = ""
                                 TimedOut = false
                             }
-                        | _ ->
-                            return failwith $"Unexpected spawned command: {commandText}"
+                        | _ -> return failwith $"Unexpected spawned command: {commandText}"
                     }
 
                 let! result =
-                    GitLfsService.uploadObjects
-                        fakeSpawnedGit
-                        commandAuth
-                        "C:/repo"
-                        "origin"
-                        "refs/heads/main"
-                        [| lfsObjectId |]
+                    GitLfsService.uploadObjects fakeSpawnedGit commandAuth "C:/repo" "origin" "refs/heads/main" [|
+                        lfsObjectId
+                    |]
 
                 expectOkResult "upload fallback" result |> ignore
-                Vitest.expect(calls.ToArray()).toEqual (
-                    [|
-                        "-c http.extraHeader=Authorization: Basic TEST lfs push --object-id origin --stdin"
-                        "-c http.extraHeader=Authorization: Basic TEST lfs push origin refs/heads/main"
-                    |]
-                )
+
+                Vitest
+                    .expect(calls.ToArray())
+                    .toEqual (
+                        [|
+                            "-c http.extraHeader=Authorization: Basic TEST lfs push --object-id origin --stdin"
+                            "-c http.extraHeader=Authorization: Basic TEST lfs push origin refs/heads/main"
+                        |]
+                    )
             }
         )
 
@@ -1507,17 +1556,17 @@ Vitest.describe (
             fun () -> promise {
                 let remoteTip = "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
                 let batchCheckArgs = [| "cat-file"; "--batch-check" |]
-                let optimizedRevListArgs =
-                    [|
-                        "rev-list"
-                        "--objects"
-                        "--no-object-names"
-                        "--stdin"
-                        "--ignore-missing"
-                        "--filter=blob:limit=1024"
-                        "--filter=object:type=blob"
-                        "--filter-provided-objects"
-                    |]
+
+                let optimizedRevListArgs = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                    "--filter=blob:limit=1024"
+                    "--filter=object:type=blob"
+                    "--filter-provided-objects"
+                |]
 
                 let fakeGit =
                     createRawOnlyGit (fun command -> promise {
@@ -1526,15 +1575,13 @@ Vitest.describe (
                         match command with
                         | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
                             return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
-                        | [| "ls-remote"; "--refs"; "origin" |] ->
-                            return $"{remoteTip}\trefs/heads/main\n"
+                        | [| "ls-remote"; "--refs"; "origin" |] -> return $"{remoteTip}\trefs/heads/main\n"
                         | [| "for-each-ref"; "--format=%(refname)"; "refs/remotes/origin" |] ->
                             return failwith "Legacy local remote-ref fallback must not run for planner timeouts."
-                        | _ ->
-                            return failwith $"Unexpected raw command: {commandText}"
+                        | _ -> return failwith $"Unexpected raw command: {commandText}"
                     })
 
-                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
                     fun request -> promise {
                         let commandText = String.concat " " request.Arguments
 
@@ -1579,19 +1626,25 @@ Vitest.describe (
             fun () -> promise {
                 let remoteTip = "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
                 let batchCheckArgs = [| "cat-file"; "--batch-check" |]
-                let optimizedRevListArgs =
-                    [|
-                        "rev-list"
-                        "--objects"
-                        "--no-object-names"
-                        "--stdin"
-                        "--ignore-missing"
-                        "--filter=blob:limit=1024"
-                        "--filter=object:type=blob"
-                        "--filter-provided-objects"
-                    |]
-                let fallbackRevListArgs =
-                    [| "rev-list"; "--objects"; "--no-object-names"; "--stdin"; "--ignore-missing" |]
+
+                let optimizedRevListArgs = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                    "--filter=blob:limit=1024"
+                    "--filter=object:type=blob"
+                    "--filter-provided-objects"
+                |]
+
+                let fallbackRevListArgs = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                |]
 
                 let fakeGit =
                     createRawOnlyGit (fun command -> promise {
@@ -1600,15 +1653,13 @@ Vitest.describe (
                         match command with
                         | [| "push"; "--porcelain"; "--dry-run"; "origin"; "refs/heads/main" |] ->
                             return "To origin\n* [new branch] refs/heads/main -> refs/heads/main\nDone\n"
-                        | [| "ls-remote"; "--refs"; "origin" |] ->
-                            return $"{remoteTip}\trefs/heads/main\n"
+                        | [| "ls-remote"; "--refs"; "origin" |] -> return $"{remoteTip}\trefs/heads/main\n"
                         | [| "for-each-ref"; "--format=%(refname)"; "refs/remotes/origin" |] ->
                             return failwith "Legacy local remote-ref fallback must not run for planner timeouts."
-                        | _ ->
-                            return failwith $"Unexpected raw command: {commandText}"
+                        | _ -> return failwith $"Unexpected raw command: {commandText}"
                     })
 
-                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
                     fun request -> promise {
                         let commandText = String.concat " " request.Arguments
 
@@ -1637,8 +1688,7 @@ Vitest.describe (
                                 StderrText = ""
                                 TimedOut = true
                             }
-                        | _ ->
-                            return failwith $"Unexpected spawned command: {commandText}"
+                        | _ -> return failwith $"Unexpected spawned command: {commandText}"
                     }
 
                 let! plan =
@@ -1665,7 +1715,7 @@ Vitest.describe (
                     Environment = createObj []
                 }
 
-                let fakeSpawnedGit : GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
                     fun _ -> promise {
                         return {
                             ExitCode = -1
@@ -1677,13 +1727,9 @@ Vitest.describe (
                     }
 
                 let! result =
-                    GitLfsService.uploadObjects
-                        fakeSpawnedGit
-                        commandAuth
-                        "C:/repo"
-                        "origin"
-                        "refs/heads/main"
-                        [| "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff" |]
+                    GitLfsService.uploadObjects fakeSpawnedGit commandAuth "C:/repo" "origin" "refs/heads/main" [|
+                        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                    |]
 
                 let failure = expectErrorResult result
                 Vitest.expect(failure.Message.Contains("timed out")).toBe (true)
@@ -1758,7 +1804,10 @@ Vitest.describe (
 
                         let! failure =
                             unwrapResultAsync
-                                (GitService.checkoutBranch context.RepoPath { Name = "missing/local-branch"; StartPoint = None })
+                                (GitService.checkoutBranch context.RepoPath {
+                                    Name = "missing/local-branch"
+                                    StartPoint = None
+                                })
                                 expectError
 
                         Vitest.expect(failure.Message.Contains("does not exist in the local repository")).toBe (true)
@@ -1814,10 +1863,20 @@ Vitest.describe (
 
                         Vitest.expect(poisonedStatus.Tracking).toEqual (Some $"origin/{initialBranch}")
 
-                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath { Name = initialBranch; StartPoint = None }
+                        let! checkoutBaseResult =
+                            GitService.checkoutBranch context.RepoPath {
+                                Name = initialBranch
+                                StartPoint = None
+                            }
+
                         expectOk "checkout base branch" checkoutBaseResult |> ignore
 
-                        let! checkoutFeatureResult = GitService.checkoutBranch context.RepoPath { Name = featureBranchName; StartPoint = None }
+                        let! checkoutFeatureResult =
+                            GitService.checkoutBranch context.RepoPath {
+                                Name = featureBranchName
+                                StartPoint = None
+                            }
+
                         expectOk "checkout feature branch" checkoutFeatureResult |> ignore
 
                         let! featureStatus =
@@ -1935,7 +1994,9 @@ Vitest.describe (
                         let! featureCommitResult = GitService.commit context.RepoPath "test: feature change"
                         expectOk "commit feature change" featureCommitResult |> ignore
 
-                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath { Name = baseBranch; StartPoint = None }
+                        let! checkoutBaseResult =
+                            GitService.checkoutBranch context.RepoPath { Name = baseBranch; StartPoint = None }
+
                         expectOk "checkout base branch" checkoutBaseResult |> ignore
 
                         do! writeUtf8FileAsync filePath "main change\n"
@@ -2033,7 +2094,9 @@ Vitest.describe (
                         let! featureCommitResult = GitService.commit context.RepoPath "test: feature change"
                         expectOk "commit feature change" featureCommitResult |> ignore
 
-                        let! checkoutBaseResult = GitService.checkoutBranch context.RepoPath { Name = baseBranch; StartPoint = None }
+                        let! checkoutBaseResult =
+                            GitService.checkoutBranch context.RepoPath { Name = baseBranch; StartPoint = None }
+
                         expectOk "checkout base branch" checkoutBaseResult |> ignore
 
                         do! writeUtf8FileAsync filePath "main change\n"
@@ -2093,202 +2156,212 @@ Vitest.describe (
             }
         )
 
-        Vitest.describe ("GitService.freeLocalLfsCopy", fun () ->
-            Vitest.test (
-                "freeLocalLfsCopy replaces a clean checked-out LFS file with a pointer",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
+        Vitest.describe (
+            "GitService.freeLocalLfsCopy",
+            fun () ->
+                Vitest.test (
+                    "freeLocalLfsCopy replaces a clean checked-out LFS file with a pointer",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
 
-                            let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
-                            expectOk "free local lfs copy" result |> ignore
+                                let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                                expectOk "free local lfs copy" result |> ignore
 
-                            let! statusAfterCleanup =
-                                unwrapResultAsync
-                                    (GitService.getStatus context.RepoPath)
-                                    (expectOk "git status after lfs cleanup")
+                                let! statusAfterCleanup =
+                                    unwrapResultAsync
+                                        (GitService.getStatus context.RepoPath)
+                                        (expectOk "git status after lfs cleanup")
 
-                            Vitest.expect(statusAfterCleanup.Files.Length).toBe(0)
+                                Vitest.expect(statusAfterCleanup.Files.Length).toBe (0)
 
-                            let! listing =
-                                context.Git.raw [| "lfs"; "ls-files"; "-l"; "--size"; "--json"; "--include=data.bin" |]
+                                let! listing =
+                                    context.Git.raw [|
+                                        "lfs"
+                                        "ls-files"
+                                        "-l"
+                                        "--size"
+                                        "--json"
+                                        "--include=data.bin"
+                                    |]
 
-                            Vitest.expect(listing.Contains("\"checkout\": false")).toBe(true)
-                        })
-                }
-            )
+                                Vitest.expect(listing.Contains("\"checkout\": false")).toBe (true)
+                            })
+                    }
+                )
 
-            Vitest.test (
-                "freeLocalLfsCopy rejects dirty files and keeps the full local file",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            let filePath = join [| context.RepoPath; "data.bin" |]
-                            let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
+                Vitest.test (
+                    "freeLocalLfsCopy rejects dirty files and keeps the full local file",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let filePath = join [| context.RepoPath; "data.bin" |]
+                                let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
 
-                            do! writeUtf8FileAsync filePath "changed locally\n"
+                                do! writeUtf8FileAsync filePath "changed locally\n"
 
-                            let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
-                            let failure = expectError result
-                            Vitest.expect(failure.Message.Contains("local changes")).toBe(true)
+                                let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("local changes")).toBe (true)
 
-                            let! statusAfterFailure =
-                                unwrapResultAsync
-                                    (GitService.getStatus context.RepoPath)
-                                    (expectOk "git status after failed lfs cleanup")
+                                let! statusAfterFailure =
+                                    unwrapResultAsync
+                                        (GitService.getStatus context.RepoPath)
+                                        (expectOk "git status after failed lfs cleanup")
 
-                            Vitest.expect(statusAfterFailure.Files.Length).toBeGreaterThan(0)
-                        })
-                }
-            )
+                                Vitest.expect(statusAfterFailure.Files.Length).toBeGreaterThan (0)
+                            })
+                    }
+                )
 
-            Vitest.test (
-                "freeLocalLfsCopy rejects staged changes and keeps the staged file content",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            let filePath = join [| context.RepoPath; "data.bin" |]
-                            let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
+                Vitest.test (
+                    "freeLocalLfsCopy rejects staged changes and keeps the staged file content",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let filePath = join [| context.RepoPath; "data.bin" |]
+                                let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
 
-                            do! writeUtf8FileAsync filePath "staged change\n"
-                            let! _ = context.Git.raw [| "add"; "data.bin" |]
+                                do! writeUtf8FileAsync filePath "staged change\n"
+                                let! _ = context.Git.raw [| "add"; "data.bin" |]
 
-                            let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
-                            let failure = expectError result
-                            Vitest.expect(failure.Message.Contains("local changes")).toBe(true)
+                                let! result = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("local changes")).toBe (true)
 
-                            let! contentAfter =
-                                fsPromisesDynamic?readFile (filePath, "utf8")
-                                |> unbox<JS.Promise<string>>
+                                let! contentAfter =
+                                    fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
 
-                            Vitest.expect(contentAfter).toBe("staged change\n")
-                        })
-                }
-            )
+                                Vitest.expect(contentAfter).toBe ("staged change\n")
+                            })
+                    }
+                )
 
-            Vitest.test (
-                "freeLocalLfsCopy rejects an invalid path traversal request",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            let! result = GitService.freeLocalLfsCopy context.RepoPath "../outside.bin"
-                            let failure = expectError result
-                            Vitest.expect(failure.Message.Contains("traversal")).toBe(true)
-                        })
-                }
-            )
+                Vitest.test (
+                    "freeLocalLfsCopy rejects an invalid path traversal request",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let! result = GitService.freeLocalLfsCopy context.RepoPath "../outside.bin"
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("traversal")).toBe (true)
+                            })
+                    }
+                )
 
-            Vitest.test (
-                "freeLocalLfsCopy rejects a file that is not tracked by LFS",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            let plainPath = join [| context.RepoPath; "plain.txt" |]
-                            do! writeUtf8FileAsync plainPath "plain text\n"
-                            let! _ = context.Git.raw [| "add"; "plain.txt" |]
-                            let! _ = context.Git.raw [| "commit"; "-m"; "test: add plain file" |]
+                Vitest.test (
+                    "freeLocalLfsCopy rejects a file that is not tracked by LFS",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let plainPath = join [| context.RepoPath; "plain.txt" |]
+                                do! writeUtf8FileAsync plainPath "plain text\n"
+                                let! _ = context.Git.raw [| "add"; "plain.txt" |]
+                                let! _ = context.Git.raw [| "commit"; "-m"; "test: add plain file" |]
 
-                            let! result = GitService.freeLocalLfsCopy context.RepoPath "plain.txt"
-                            let failure = expectError result
-                            Vitest.expect(failure.Message.Contains("not tracked")).toBe(true)
-                        })
-                }
-            )
+                                let! result = GitService.freeLocalLfsCopy context.RepoPath "plain.txt"
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("not tracked")).toBe (true)
+                            })
+                    }
+                )
         )
 
-        Vitest.describe ("GitService LFS storage maintenance", fun () ->
-            Vitest.test (
-                "pruneLfsCache rejects a dirty working tree",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            do! writeUtf8FileAsync (join [| context.RepoPath; "untracked.txt" |]) "dirty\n"
+        Vitest.describe (
+            "GitService LFS storage maintenance",
+            fun () ->
+                Vitest.test (
+                    "pruneLfsCache rejects a dirty working tree",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                do! writeUtf8FileAsync (join [| context.RepoPath; "untracked.txt" |]) "dirty\n"
 
-                            let! result = GitService.pruneLfsCache context.RepoPath
-                            let failure = expectError result
-                            Vitest.expect(failure.Message.Contains("clean working tree")).toBe(true)
-                        })
-                }
-            )
+                                let! result = GitService.pruneLfsCache context.RepoPath
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("clean working tree")).toBe (true)
+                            })
+                    }
+                )
 
-            Vitest.test (
-                "pruneLfsCache rejects repositories with custom lfs.storage",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
-                            let! _ = context.Git.raw [| "add"; "file.txt" |]
-                            let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
-                            let! _ = context.Git.raw [| "config"; "lfs.storage"; "custom-lfs" |]
+                Vitest.test (
+                    "pruneLfsCache rejects repositories with custom lfs.storage",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
+                                let! _ = context.Git.raw [| "add"; "file.txt" |]
+                                let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
+                                let! _ = context.Git.raw [| "config"; "lfs.storage"; "custom-lfs" |]
 
-                            let! result = GitService.pruneLfsCache context.RepoPath
-                            let failure = expectError result
-                            Vitest.expect(failure.Message.Contains("lfs.storage")).toBe(true)
-                        })
-                }
-            )
+                                let! result = GitService.pruneLfsCache context.RepoPath
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("lfs.storage")).toBe (true)
+                            })
+                    }
+                )
 
-            Vitest.test (
-                "pruneLfsCache reports origin verification failures",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
-                            let! _ = context.Git.raw [| "add"; "file.txt" |]
-                            let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
+                Vitest.test (
+                    "pruneLfsCache reports origin verification failures",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
+                                let! _ = context.Git.raw [| "add"; "file.txt" |]
+                                let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
 
-                            let! result = GitService.pruneLfsCache context.RepoPath
-                            let failure = expectError result
-                            Vitest.expect(failure.Message.Contains("Remote URL is empty.")).toBe(true)
-                        })
-                }
-            )
+                                let! result = GitService.pruneLfsCache context.RepoPath
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("Remote URL is empty.")).toBe (true)
+                            })
+                    }
+                )
 
-            Vitest.test (
-                "dedupLfsStorage rejects a dirty working tree",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            do! writeUtf8FileAsync (join [| context.RepoPath; "untracked.txt" |]) "dirty\n"
+                Vitest.test (
+                    "dedupLfsStorage rejects a dirty working tree",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                do! writeUtf8FileAsync (join [| context.RepoPath; "untracked.txt" |]) "dirty\n"
 
-                            let! result = GitService.dedupLfsStorage context.RepoPath
-                            let failure = expectError result
-                            Vitest.expect(failure.Message.Contains("clean working tree")).toBe(true)
-                        })
-                }
-            )
+                                let! result = GitService.dedupLfsStorage context.RepoPath
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("clean working tree")).toBe (true)
+                            })
+                    }
+                )
 
-            Vitest.test (
-                "dedupLfsStorage returns either success or an Unknown failure with a message",
-                gitLfsIntegrationTestOptions,
-                fun () -> promise {
-                    do!
-                        withTempRepository (fun context -> promise {
-                            do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
-                            let! _ = context.Git.raw [| "add"; "file.txt" |]
-                            let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
-                            let! _ = context.Git.raw [| "lfs"; "install"; "--local" |]
+                Vitest.test (
+                    "dedupLfsStorage returns either success or an Unknown failure with a message",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                do! writeUtf8FileAsync (join [| context.RepoPath; "file.txt" |]) "content\n"
+                                let! _ = context.Git.raw [| "add"; "file.txt" |]
+                                let! _ = context.Git.raw [| "commit"; "-m"; "test: initial" |]
+                                let! _ = context.Git.raw [| "lfs"; "install"; "--local" |]
 
-                            let! result = GitService.dedupLfsStorage context.RepoPath
+                                let! result = GitService.dedupLfsStorage context.RepoPath
 
-                            match result with
-                            | Ok _ -> Vitest.expect(true).toBe(true)
-                            | Error failure ->
-                                Vitest.expect(failure.Kind).toEqual(GitFailureKind.Unknown)
-                                Vitest.expect(String.IsNullOrWhiteSpace(failure.Message)).toBe(false)
-                        })
-                }
-            )
+                                match result with
+                                | Ok _ -> Vitest.expect(true).toBe (true)
+                                | Error failure ->
+                                    Vitest.expect(failure.Kind).toEqual (GitFailureKind.Unknown)
+                                    Vitest.expect(String.IsNullOrWhiteSpace(failure.Message)).toBe (false)
+                            })
+                    }
+                )
         )
 
         Vitest.test (

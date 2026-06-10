@@ -28,10 +28,7 @@ type GitLfsResult = {
     Error: string
 }
 
-type GitLfsProgressDto = {
-    RequestId: string
-    Message: string
-}
+type GitLfsProgressDto = { RequestId: string; Message: string }
 
 [<RequireQualifiedAccess>]
 type GitFailureKind =
@@ -75,10 +72,7 @@ type GitMergeConflictViewDataDto = {
     MergeConflictContent: string
 }
 
-type GitUnsupportedContentDto = {
-    Path: string
-    Reason: string option
-}
+type GitUnsupportedContentDto = { Path: string; Reason: string option }
 
 [<RequireQualifiedAccess>]
 type GitPageLoadResultDto<'T> =

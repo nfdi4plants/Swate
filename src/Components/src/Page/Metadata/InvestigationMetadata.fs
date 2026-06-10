@@ -19,12 +19,7 @@ type InvestigationMetadata =
             LayoutComponents.BoxedField(
                 "Investigation Metadata",
                 content = [
-                    TextInput.TextInput(
-                        investigation.Identifier,
-                        (fun _ -> ()),
-                        label = "Identifier",
-                        disabled = true
-                    )
+                    TextInput.TextInput(investigation.Identifier, (fun _ -> ()), label = "Identifier", disabled = true)
                     TextInput.TextInput(
                         defaultArg investigation.Title "",
                         (fun value ->
@@ -97,4 +92,3 @@ type InvestigationMetadata =
                 ]
             )
         ]
-

@@ -55,6 +55,7 @@ type FileTree =
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
+
         let arcScopeId =
             appStateCtx
             |> Option.map PathHelpers.normalizePath
@@ -71,9 +72,7 @@ type FileTree =
 
         React.useEffect (
             (fun () ->
-                let filePaths =
-                    fileStateCtx.state.FileTree
-                    |> Array.map (fun entry -> entry.path)
+                let filePaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
 
                 if FileExplorerDeleteHelper.isSelectionMissing filePaths fileStateCtx.state.Selection.TreePath then
                     fileStateCtx.setSelection ArcSelection.empty
@@ -106,11 +105,7 @@ type FileTree =
             React.useStateWithUpdater FileTreeMaterialization.empty
 
         let reconciledMaterializedState =
-            reconcileMaterializedState
-                arcScopeId
-                fileStateCtx.state.Selection.TreePath
-                fileTree
-                materializedState
+            reconcileMaterializedState arcScopeId fileStateCtx.state.Selection.TreePath fileTree materializedState
 
         React.useEffect (
             (fun () ->
@@ -130,17 +125,16 @@ type FileTree =
 
         let fileItem =
             fileTree
-            |> Option.map (FileTreeMaterialization.toMaterializedFileItemTree Helper.createItem reconciledMaterializedState.Paths)
+            |> Option.map (
+                FileTreeMaterialization.toMaterializedFileItemTree Helper.createItem reconciledMaterializedState.Paths
+            )
 
         let openPreview (item: FileItem) =
             promise {
                 match item.Path with
                 | None ->
                     errorModal.enqueue (
-                        ErrorModalRequest.create (
-                            $"File '{item.Name}' has no path.",
-                            title = "Preview failed"
-                        )
+                        ErrorModalRequest.create ($"File '{item.Name}' has no path.", title = "Preview failed")
                     )
                 | Some path when item.IsDirectory ->
                     let selectedPath = PathHelpers.normalizePath path
@@ -178,12 +172,18 @@ type FileTree =
                     | Ok pageState -> pageStateCtx.setState (Some pageState)
                     | Error errorMessage ->
                         pageStateCtx.setState (
-                            Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{selectedPath}': {errorMessage}")
+                            Some(
+                                Renderer.Types.PageState.ErrorPage
+                                    $"Could not reload preview for '{selectedPath}': {errorMessage}"
+                            )
                         )
                 }
                 |> Promise.catch (fun exn ->
                     pageStateCtx.setState (
-                        Some(Renderer.Types.PageState.ErrorPage $"Could not reload preview for '{selectedPath}': {exn.Message}")
+                        Some(
+                            Renderer.Types.PageState.ErrorPage
+                                $"Could not reload preview for '{selectedPath}': {exn.Message}"
+                        )
                     )
                 )
                 |> Promise.start
@@ -201,10 +201,7 @@ type FileTree =
         let handleExpansionChange (item: FileItem) (willExpand: bool) =
             if willExpand then
                 match item.Path with
-                | Some path ->
-                    setMaterializedState (fun _ ->
-                        materialize path reconciledMaterializedState
-                    )
+                | Some path -> setMaterializedState (fun _ -> materialize path reconciledMaterializedState)
                 | None -> ()
 
         let openDialog dialog =
@@ -225,9 +222,7 @@ type FileTree =
             FileTreeDeleteWorkflow.requestDeleteItem (Option.iter (DeleteDialog >> openDialog))
 
         let requestRenameItem =
-            FileTreeRenameWorkflow.requestRenameItem
-                (Option.iter (RenameDialog >> openDialog))
-                errorModal.enqueue
+            FileTreeRenameWorkflow.requestRenameItem (Option.iter (RenameDialog >> openDialog)) errorModal.enqueue
 
         let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
@@ -246,12 +241,7 @@ type FileTree =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
 
         let applyFileSystemCreateError errorMessage =
-            errorModal.enqueue (
-                ErrorModalRequest.create (
-                    errorMessage,
-                    title = "Could not create file or folder"
-                )
-            )
+            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create file or folder"))
 
         let reloadPreviewByPath (path: string) : JS.Promise<Result<unit, string>> = promise {
             let! openResult = openView path
@@ -282,7 +272,8 @@ type FileTree =
 
         let createArcEntry kind (identifier: string) =
             if not isDialogBusy then
-                let existingPaths = fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
+                let existingPaths =
+                    fileStateCtx.state.FileTree |> Array.map (fun entry -> entry.path)
 
                 match tryBuildArcCreateDraft kind identifier existingPaths with
                 | Error errorMessage -> applyCreateError errorMessage
@@ -344,13 +335,11 @@ type FileTree =
                                         let pageState = Renderer.Types.PageState.fromFileContentDTO dto
                                         pageStateCtx.setState (Some pageState)
                                     | Error _ ->
-                                        let dto =
-                                            FileContentDTO.create FileContentType.PlainText "" selectedPath
+                                        let dto = FileContentDTO.create FileContentType.PlainText "" selectedPath
 
                                         let pageState = Renderer.Types.PageState.fromFileContentDTO dto
                                         pageStateCtx.setState (Some pageState)
-                                | FileSystemItemKind.Folder ->
-                                    pageStateCtx.setState None
+                                | FileSystemItemKind.Folder -> pageStateCtx.setState None
 
                                 closeDialog ()
                         }

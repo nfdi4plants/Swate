@@ -24,16 +24,8 @@ module FileTreeRenameWorkflow =
         enqueueError: ErrorModalRequest -> unit
     }
 
-    let private enqueueRenameError
-        (enqueueError: ErrorModalRequest -> unit)
-        (errorMessage: string)
-        =
-        enqueueError (
-            ErrorModalRequest.create (
-                errorMessage,
-                title = "Could not rename item"
-            )
-        )
+    let private enqueueRenameError (enqueueError: ErrorModalRequest -> unit) (errorMessage: string) =
+        enqueueError (ErrorModalRequest.create (errorMessage, title = "Could not rename item"))
 
     let private applyRenameError (config: ConfirmRenameConfig) (errorMessage: string) =
         enqueueRenameError config.enqueueError errorMessage
@@ -46,9 +38,7 @@ module FileTreeRenameWorkflow =
         match pageState with
         | Some(Renderer.Types.PageState.ArcFilePage arcFile) ->
             arcFile.TryGetRelativePath()
-            |> Option.bind (fun arcFilePath ->
-                tryRemapSelectionPath sourcePath targetPath (Some arcFilePath)
-            )
+            |> Option.bind (fun arcFilePath -> tryRemapSelectionPath sourcePath targetPath (Some arcFilePath))
         | _ -> None
 
     let requestRenameItem

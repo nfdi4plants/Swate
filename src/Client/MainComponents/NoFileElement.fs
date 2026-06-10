@@ -246,7 +246,10 @@ type NoFileElement =
             prop.children [
                 Html.div [
                     prop.className "swt:grid swt:grid-cols-1 swt:@md/main:grid-cols-2 swt:gap-4"
-                    prop.children [ Helper.createNewFile dispatch; Helper.uploadNewTable dispatch ]
+                    prop.children [
+                        Helper.createNewFile dispatch
+                        Helper.uploadNewTable dispatch
+                    ]
                 ]
             ]
         ]

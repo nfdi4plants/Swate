@@ -92,16 +92,16 @@ module Spreadsheet =
 
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
-                let nextState =
-                    {
-                        state with
-                            ArcFile = Some arcFile
-                            ActiveView = ActiveView.Forward(arcFile, state.ActiveView)
-                    }
+                let nextState = {
+                    state with
+                        ArcFile = Some arcFile
+                        ActiveView = ActiveView.Forward(arcFile, state.ActiveView)
+                }
 
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState = Spreadsheet.Model.init (arcFile, ActiveView.Forward(arcFile, ActiveView.Metadata))
+                let nextState =
+                    Spreadsheet.Model.init (arcFile, ActiveView.Forward(arcFile, ActiveView.Metadata))
 
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation(range, oa) ->

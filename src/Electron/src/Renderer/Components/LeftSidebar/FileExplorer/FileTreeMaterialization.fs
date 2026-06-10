@@ -9,10 +9,7 @@ type MaterializedState = {
     Paths: Set<string>
 }
 
-let empty = {
-    ArcScopeId = None
-    Paths = Set.empty
-}
+let empty = { ArcScopeId = None; Paths = Set.empty }
 
 let materialize path state =
     let normalizedPath = PathHelpers.normalizePath path
@@ -43,7 +40,8 @@ let private requiredMaterializedDirectoryPaths
         selectedTreeItemPath
         |> Option.map (fun selectedPath ->
             validDirectoryPaths
-            |> Set.filter (fun directoryPath -> PathHelpers.isSameOrDescendantPath selectedPath directoryPath))
+            |> Set.filter (fun directoryPath -> PathHelpers.isSameOrDescendantPath selectedPath directoryPath)
+        )
         |> Option.defaultValue Set.empty
 
     if root.isDirectory then
@@ -64,7 +62,9 @@ let reconcileMaterializedState
       }
     | Some root ->
         let validDirectoryPaths = collectDirectoryPaths root Set.empty
-        let requiredPaths = requiredMaterializedDirectoryPaths selectedTreeItemPath root validDirectoryPaths
+
+        let requiredPaths =
+            requiredMaterializedDirectoryPaths selectedTreeItemPath root validDirectoryPaths
 
         let persistedPaths =
             if current.ArcScopeId = arcScopeId then
@@ -84,17 +84,16 @@ let rec toMaterializedFileItemTree
     =
     if parent.isDirectory then
         let normalizedParentPath = PathHelpers.normalizePath parent.path
-        let isDirectoryMaterialized = materializedDirectoryPaths.Contains normalizedParentPath
+
+        let isDirectoryMaterialized =
+            materializedDirectoryPaths.Contains normalizedParentPath
+
         let hasSourceChildren = parent.children.Count > 0
 
         let mappedChildren =
             if isDirectoryMaterialized then
                 parent.children.Values
-                |> Seq.map (
-                    toMaterializedFileItemTree
-                        createItem
-                        materializedDirectoryPaths
-                )
+                |> Seq.map (toMaterializedFileItemTree createItem materializedDirectoryPaths)
                 |> List.ofSeq
             else
                 []

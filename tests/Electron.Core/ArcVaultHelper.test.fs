@@ -41,80 +41,103 @@ let private addDataMapToAllEntityTypes (arc: ARC) =
     run.DataMap <- Some(DataMap.init ())
     arc.AddRun(run)
 
-Vitest.describe("ArcVaultHelper", fun () ->
-    Vitest.test("file watcher polling defaults to Windows only", fun () ->
-        Vitest.expect(shouldUsePollingByDefault "win32").toBe(true)
-        Vitest.expect(shouldUsePollingByDefault "WIN32").toBe(true)
-        Vitest.expect(shouldUsePollingByDefault "linux").toBe(false)
-        Vitest.expect(shouldUsePollingByDefault "darwin").toBe(false)
-    )
+Vitest.describe (
+    "ArcVaultHelper",
+    fun () ->
+        Vitest.test (
+            "file watcher polling defaults to Windows only",
+            fun () ->
+                Vitest.expect(shouldUsePollingByDefault "win32").toBe (true)
+                Vitest.expect(shouldUsePollingByDefault "WIN32").toBe (true)
+                Vitest.expect(shouldUsePollingByDefault "linux").toBe (false)
+                Vitest.expect(shouldUsePollingByDefault "darwin").toBe (false)
+        )
 
-    Vitest.test("LoadArc reports load errors without crashing the printf formatter", fun () -> promise {
-        let! rootPath = TestHelpers.createTempDirectoryAsync "swate-load-arc-error-"
+        Vitest.test (
+            "LoadArc reports load errors without crashing the printf formatter",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-load-arc-error-"
 
-        try
-            let vault = ArcVault(TestHelpers.testWindow ())
-            vault.path <- Some rootPath
+                try
+                    let vault = ArcVault(TestHelpers.testWindow ())
+                    vault.path <- Some rootPath
 
-            let mutable capturedError: exn option = None
+                    let mutable capturedError: exn option = None
 
-            try
-                do! vault.LoadArc()
-            with error ->
-                capturedError <- Some error
+                    try
+                        do! vault.LoadArc()
+                    with error ->
+                        capturedError <- Some error
 
-            match capturedError with
-            | None ->
-                do! TestHelpers.removeDirectoryAsync rootPath
-                return failwith "Expected LoadArc to fail for an invalid ARC folder."
-            | Some error ->
-                Vitest.expect(error.Message).toContain("[Swate-0] Unable to load ARC:")
-                Vitest.expect(error.Message).not.toContain("fmt.cont")
-                do! TestHelpers.removeDirectoryAsync rootPath
-        with error ->
-            do! TestHelpers.removeDirectoryAsync rootPath
-            return raise error
-    })
+                    match capturedError with
+                    | None ->
+                        do! TestHelpers.removeDirectoryAsync rootPath
+                        return failwith "Expected LoadArc to fail for an invalid ARC folder."
+                    | Some error ->
+                        Vitest.expect(error.Message).toContain ("[Swate-0] Unable to load ARC:")
+                        Vitest.expect(error.Message).not.toContain ("fmt.cont")
+                        do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
 
-    Vitest.test("LoadArc repairs zero-byte canonical ARC workbooks before retrying", fun () ->
-        TestHelpers.withTempArcWith "swate-load-arc-repair-" "RepairArc" ignore (fun arcPath -> promise {
-            let assayFolder = join [| arcPath; "assays"; "New Assay" |]
-            let assayFile = join [| assayFolder; "isa.assay.xlsx" |]
+        Vitest.test (
+            "LoadArc repairs zero-byte canonical ARC workbooks before retrying",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-load-arc-repair-"
+                    "RepairArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let assayFolder = join [| arcPath; "assays"; "New Assay" |]
+                        let assayFile = join [| assayFolder; "isa.assay.xlsx" |]
 
-            do! mkdirRecursiveAsync assayFolder
-            do! writeFileAsync assayFile ""
+                        do! mkdirRecursiveAsync assayFolder
+                        do! writeFileAsync assayFile ""
 
-            let vault = ArcVault(TestHelpers.testWindow ())
-            vault.path <- Some arcPath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
 
-            do! vault.LoadArc()
+                        do! vault.LoadArc()
 
-            Vitest.expect(vault.arc.IsSome).toBe(true)
-            Vitest.expect(vault.arc.Value.ContainsAssay("New Assay")).toBe(true)
-            Vitest.expect(vault.hasUnsavedArcChanges).toBe(false)
-            Vitest.expect(vault.arc.Value.hasInMemoryChanges()).toBe(false)
+                        Vitest.expect(vault.arc.IsSome).toBe (true)
+                        Vitest.expect(vault.arc.Value.ContainsAssay("New Assay")).toBe (true)
+                        Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
+                        Vitest.expect(vault.arc.Value.hasInMemoryChanges ()).toBe (false)
 
-            let! reloadedArc = TestHelpers.loadArcAsync arcPath
-            Vitest.expect(reloadedArc.ContainsAssay("New Assay")).toBe(true)
-        })
-    )
+                        let! reloadedArc = TestHelpers.loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.ContainsAssay("New Assay")).toBe (true)
+                    })
+        )
 
-    Vitest.test("LoadArc baselines loaded datamap hashes without marking the ARC dirty", fun () ->
-        TestHelpers.withTempArcWith "swate-load-arc-datamap-baseline-" "DatamapBaselineArc" addDataMapToAllEntityTypes (fun arcPath -> promise {
-            let vault = ArcVault(TestHelpers.testWindow ())
-            vault.path <- Some arcPath
+        Vitest.test (
+            "LoadArc baselines loaded datamap hashes without marking the ARC dirty",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-load-arc-datamap-baseline-"
+                    "DatamapBaselineArc"
+                    addDataMapToAllEntityTypes
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
 
-            do! vault.LoadArc()
+                        do! vault.LoadArc()
 
-            Vitest.expect(vault.arc.IsSome).toBe(true)
-            Vitest.expect(vault.hasUnsavedArcChanges).toBe(false)
-            Vitest.expect(vault.arc.Value.hasInMemoryChanges()).toBe(false)
+                        Vitest.expect(vault.arc.IsSome).toBe (true)
+                        Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
+                        Vitest.expect(vault.arc.Value.hasInMemoryChanges ()).toBe (false)
 
-            let loadedArc = vault.arc.Value
-            Vitest.expect(loadedArc.GetAssay("Assay With DataMap").DataMap.Value.StaticHash).not.toBe(0)
-            Vitest.expect(loadedArc.GetStudy("Study With DataMap").DataMap.Value.StaticHash).not.toBe(0)
-            Vitest.expect(loadedArc.GetWorkflow("Workflow With DataMap").DataMap.Value.StaticHash).not.toBe(0)
-            Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.Value.StaticHash).not.toBe(0)
-        })
-    )
+                        let loadedArc = vault.arc.Value
+                        Vitest.expect(loadedArc.GetAssay("Assay With DataMap").DataMap.Value.StaticHash).not.toBe (0)
+                        Vitest.expect(loadedArc.GetStudy("Study With DataMap").DataMap.Value.StaticHash).not.toBe (0)
+
+                        Vitest
+                            .expect(loadedArc.GetWorkflow("Workflow With DataMap").DataMap.Value.StaticHash)
+                            .not.toBe (0)
+
+                        Vitest.expect(loadedArc.GetRun("Run With DataMap").DataMap.Value.StaticHash).not.toBe (0)
+                    })
+        )
 )

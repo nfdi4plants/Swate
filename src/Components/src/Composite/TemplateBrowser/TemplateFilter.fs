@@ -326,9 +326,7 @@ module private TemplateFilterAux =
 [<Erase; Mangle(false)>]
 type TemplateFilter =
 
-    static member TokenBadge
-        (token: FilterToken, remove: FilterToken -> unit, ?key: obj)
-        =
+    static member TokenBadge(token: FilterToken, remove: FilterToken -> unit, ?key: obj) =
         Html.div [
             prop.className "swt:h-(--size) swt:flex swt:items-center"
             prop.children [
@@ -354,8 +352,7 @@ type TemplateFilter =
         (
             availableTokens: ResizeArray<FilterToken>,
             tokens: ResizeArray<FilterToken>,
-            setTokens:
-                (ResizeArray<FilterToken> -> ResizeArray<FilterToken>) -> unit,
+            setTokens: (ResizeArray<FilterToken> -> ResizeArray<FilterToken>) -> unit,
             ?className: string,
             ?key: obj
         ) =
@@ -363,12 +360,7 @@ type TemplateFilter =
         let inputValue, setInputValue = React.useState ""
 
         let searchFn =
-            fun
-                (props:
-                    {|
-                        item: FilterToken
-                        search: string
-                    |}) ->
+            fun (props: {| item: FilterToken; search: string |}) ->
                 let str = props.search.ToLower()
                 props.item.NameText.ToLower().Contains(str)
 
@@ -535,8 +527,7 @@ type TemplateFilter =
     static member TemplateFilter(templates: Template[], ?templateSearchClassName: string, ?key: obj) =
 
         /// This context is used to provide the filtered templates to the rest of the application
-        let filteredTemplatesCtx =
-            useFilteredTemplateCtx ()
+        let filteredTemplatesCtx = useFilteredTemplateCtx ()
 
         /// This constant is used to display available tags in the combo box
         let availableCommunities: Organisation[] =
@@ -575,8 +566,7 @@ type TemplateFilter =
 
         /// This constant is used to display available communities in the community filter
 
-        let tokens, setTokens =
-            React.useStateWithUpdater (ResizeArray<FilterToken>())
+        let tokens, setTokens = React.useStateWithUpdater (ResizeArray<FilterToken>())
 
 
         let filter =
@@ -669,4 +659,3 @@ type TemplateFilter =
                 )
             ]
         )
-

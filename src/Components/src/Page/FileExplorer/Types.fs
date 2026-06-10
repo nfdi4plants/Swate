@@ -375,13 +375,12 @@ module FileExplorerLogic =
         | SelectItem of string
         | UpdateItems of FileItem list * selectedItemId: string option option * includeSelectedItem: bool
 
-    let init items =
-        {
-            Items = items
-            SelectedId = None
-            SelectedPath = []
-            ExpandedIds = collectExpandedIds Set.empty items
-        }
+    let init items = {
+        Items = items
+        SelectedId = None
+        SelectedPath = []
+        ExpandedIds = collectExpandedIds Set.empty items
+    }
 
     let update msg model =
         match msg with
@@ -392,10 +391,7 @@ module FileExplorerLogic =
                 else
                     model.ExpandedIds.Remove itemId
 
-            {
-                model with
-                    ExpandedIds = expandedIds
-            }
+            { model with ExpandedIds = expandedIds }
 
         | SelectItem itemId ->
             let path =
@@ -445,7 +441,5 @@ module FileExplorerLogic =
                     Items = items
                     SelectedId = nextSelectedId
                     SelectedPath = selectedPath
-                    ExpandedIds =
-                        persistedExpanded
-                        |> Set.union expandedFromSelection
+                    ExpandedIds = persistedExpanded |> Set.union expandedFromSelection
             }

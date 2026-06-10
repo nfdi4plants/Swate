@@ -13,19 +13,21 @@ module private ARCObjectExplorerHelper =
                 if item.Id = itemId then
                     Some(item, parent)
                 else
-                    item.Children |> Option.bind (loop (Some item)))
+                    item.Children |> Option.bind (loop (Some item))
+            )
 
         loop None items
 
-    let flattenFileItemsWithParent(items: FileItem list) =
+    let flattenFileItemsWithParent (items: FileItem list) =
         let rec loop (parent: FileItem option) (currentItems: FileItem list) =
             currentItems
             |> List.collect (fun item ->
-                (item, parent) :: (item.Children |> Option.defaultValue [] |> loop (Some item)))
+                (item, parent) :: (item.Children |> Option.defaultValue [] |> loop (Some item))
+            )
 
         loop None items
 
-    let tryGetStoryItemKind(item: FileItem) =
+    let tryGetStoryItemKind (item: FileItem) =
         ARCObjectFixture.StoryMeta
         |> Map.tryFind item.Id
         |> Option.map (fun (_, kind, _, _, _) -> kind)
@@ -33,15 +35,14 @@ module private ARCObjectExplorerHelper =
             if item.Children |> Option.exists (List.isEmpty >> not) then
                 Some "Group"
             else
-                None)
+                None
+        )
 
-    let filterStoryItemsByKinds(visibleKinds: Set<string>, items: FileItem list) =
+    let filterStoryItemsByKinds (visibleKinds: Set<string>, items: FileItem list) =
         let rec loop (item: FileItem) =
-            let filteredChildren =
-                item.Children |> Option.map (List.choose loop)
+            let filteredChildren = item.Children |> Option.map (List.choose loop)
 
-            let hasVisibleChildren =
-                filteredChildren |> Option.exists (List.isEmpty >> not)
+            let hasVisibleChildren = filteredChildren |> Option.exists (List.isEmpty >> not)
 
             let itemKind = tryGetStoryItemKind item
 
@@ -50,21 +51,30 @@ module private ARCObjectExplorerHelper =
 
             match itemKind with
             | Some "ARC" ->
-                Some { item with Children = filteredChildren }
+                Some {
+                    item with
+                        Children = filteredChildren
+                }
             | Some "Group" ->
                 if hasVisibleChildren then
-                    Some { item with Children = filteredChildren }
+                    Some {
+                        item with
+                            Children = filteredChildren
+                    }
                 else
                     None
             | _ ->
                 if isVisibleKind || hasVisibleChildren then
-                    Some { item with Children = filteredChildren }
+                    Some {
+                        item with
+                            Children = filteredChildren
+                    }
                 else
                     None
 
         items |> List.choose loop
 
-    let storySearchItems(items: FileItem list) =
+    let storySearchItems (items: FileItem list) =
         flattenFileItemsWithParent items
         |> List.choose (fun (item, parent) ->
             match tryGetStoryItemKind item with
@@ -79,11 +89,13 @@ module private ARCObjectExplorerHelper =
                             |> Option.map (fun parentItem -> $"Parent: {parentItem.Name}")
                             |> Option.toList
 
-                        String.concat " | " ([ metaKind; role ] @ parentPart))
+                        String.concat " | " ([ metaKind; role ] @ parentPart)
+                    )
                     |> Option.defaultValue kind
 
                 Some(item.Name, Some subtitle, item)
-            | None -> None)
+            | None -> None
+        )
         |> List.sortBy (fun (name, _, _) -> name.ToLowerInvariant())
         |> List.toArray
 
@@ -104,10 +116,7 @@ type ARCObjectExplorer =
                     prop.onClick (fun _ -> setIsOpen true)
                 ]
                 if isOpen then
-                    Html.div [
-                        prop.className "swt:mt-6"
-                        prop.children children
-                    ]
+                    Html.div [ prop.className "swt:mt-6"; prop.children children ]
             ]
         ]
 
@@ -118,17 +127,20 @@ type ARCObjectExplorer =
         let selectedKindIndices, setSelectedKindIndices =
             React.useState (KindFilter.defaultSelectedIndices KindFilter.arcObjectExplorerOptions)
 
-        let items =
-            React.useMemo ((fun () -> ARCObjectFixture.StoryItems()), [||])
+        let items = React.useMemo ((fun () -> ARCObjectFixture.StoryItems()), [||])
 
-        let visibleKinds = KindFilter.selectedLabels KindFilter.arcObjectExplorerOptions selectedKindIndices
+        let visibleKinds =
+            KindFilter.selectedLabels KindFilter.arcObjectExplorerOptions selectedKindIndices
 
-        let filteredItems = ARCObjectExplorerHelper.filterStoryItemsByKinds(visibleKinds, items)
+        let filteredItems =
+            ARCObjectExplorerHelper.filterStoryItemsByKinds (visibleKinds, items)
 
         let visibleSelectedId =
             Some selectedId
             |> Option.filter (fun itemId ->
-                ARCObjectExplorerHelper.tryFindItemAndParent itemId filteredItems |> Option.isSome)
+                ARCObjectExplorerHelper.tryFindItemAndParent itemId filteredItems
+                |> Option.isSome
+            )
 
         let selectedMeta =
             visibleSelectedId
@@ -192,9 +204,13 @@ type ARCObjectExplorer =
                         Html.div [
                             prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-200/40 swt:p-3"
                             prop.children [
-                                Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-2"; prop.text "Properties" ]
+                                Html.h5 [
+                                    prop.className "swt:text-sm swt:font-semibold swt:mb-2"
+                                    prop.text "Properties"
+                                ]
                                 Html.dl [
-                                    prop.className "swt:grid swt:grid-cols-[auto_1fr] swt:gap-x-3 swt:gap-y-2 swt:text-sm"
+                                    prop.className
+                                        "swt:grid swt:grid-cols-[auto_1fr] swt:gap-x-3 swt:gap-y-2 swt:text-sm"
                                     prop.children [
                                         Html.dt [ prop.className "swt:font-medium"; prop.text "Type" ]
                                         Html.dd kind
@@ -211,30 +227,38 @@ type ARCObjectExplorer =
                             Html.div [
                                 prop.className "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
                                 prop.children [
-                                    Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-2"; prop.text "Metadata" ]
+                                    Html.h5 [
+                                        prop.className "swt:text-sm swt:font-semibold swt:mb-2"
+                                        prop.text "Metadata"
+                                    ]
                                     Html.dl [
-                                        prop.className "swt:grid swt:grid-cols-[auto_1fr] swt:gap-x-3 swt:gap-y-2 swt:text-sm"
+                                        prop.className
+                                            "swt:grid swt:grid-cols-[auto_1fr] swt:gap-x-3 swt:gap-y-2 swt:text-sm"
                                         prop.children [
                                             for label, value in rows do
                                                 Html.dt [ prop.className "swt:font-medium"; prop.text label ]
-                                                Html.dd [
-                                                    prop.className "swt:break-words"
-                                                    prop.text value
-                                                ]
+                                                Html.dd [ prop.className "swt:break-words"; prop.text value ]
                                         ]
                                     ]
                                 ]
                             ]
                         | None -> Html.none
                         Html.div [
-                            prop.className "swt:flex-1 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+                            prop.className
+                                "swt:flex-1 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
                             prop.children [
-                                Html.h5 [ prop.className "swt:text-sm swt:font-semibold swt:mb-2"; prop.text "Notes" ]
-                                Html.p [ prop.className "swt:text-sm swt:opacity-80"; prop.text description ]
+                                Html.h5 [
+                                    prop.className "swt:text-sm swt:font-semibold swt:mb-2"
+                                    prop.text "Notes"
+                                ]
+                                Html.p [
+                                    prop.className "swt:text-sm swt:opacity-80"
+                                    prop.text description
+                                ]
                             ]
-                         ]
-                     ]
-                 ]
+                        ]
+                    ]
+                ]
             | None ->
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-3 swt:h-full"
@@ -245,12 +269,17 @@ type ARCObjectExplorer =
                             prop.children [
                                 Html.p [
                                     prop.className "swt:text-sm swt:text-center swt:opacity-70"
-                                    prop.text "The current selection is hidden by the active kind filter. Adjust the filter or pick a visible ARC object."
+                                    prop.text
+                                        "The current selection is hidden by the active kind filter. Adjust the filter or pick a visible ARC object."
                                 ]
                             ]
                         ]
                     ]
                 ]
 
-        ARCObjectWidget.Main(navbar = navbar, treePane = treePane, explorerPane = explorerPane, detailsPane = detailsPane)
-
+        ARCObjectWidget.Main(
+            navbar = navbar,
+            treePane = treePane,
+            explorerPane = explorerPane,
+            detailsPane = detailsPane
+        )

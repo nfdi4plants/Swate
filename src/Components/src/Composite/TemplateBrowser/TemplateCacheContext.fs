@@ -21,4 +21,3 @@ let TemplateCacheCtx =
 
 [<Hook>]
 let useTemplateCacheCtx () = React.useContext TemplateCacheCtx
-

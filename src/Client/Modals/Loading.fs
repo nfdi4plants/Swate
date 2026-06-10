@@ -6,7 +6,9 @@ open Feliz
 
 type Loading =
     static member Component = //Daisy.loading [ loading.ring; loading.lg ]
-        Html.span [ prop.className "swt:loading swt:loading-ring swt:loading-lg" ]
+        Html.span [
+            prop.className "swt:loading swt:loading-ring swt:loading-lg"
+        ]
 
     static member Modal(rmv: _ -> unit) =
         //Daisy.modal.div [

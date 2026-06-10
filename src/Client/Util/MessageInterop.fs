@@ -41,11 +41,13 @@ module MessageInteropHelper =
                 Fable.Core.JS.setTimeout
                     (fun () ->
                         PendingRequests.Remove(payload.requestId) |> ignore
-                        reject (new TimeoutException("Request timed out")))
+                        reject (new TimeoutException("Request timed out"))
+                    )
                     5000
 
             PendingRequests.Add(payload.requestId, (resolve, reject))
-            target().postMessage (payload, "*"))
+            target().postMessage (payload, "*")
+        )
 
     let rec private getReturnType typ =
         if Reflection.FSharpType.IsFunction typ then
@@ -202,7 +204,8 @@ module MessageInteropHelper =
                             Promise.lift p
                         |> Promise.map (fun (payload: IMessagePayload) ->
                             let result: IMessagePayload = {| payload with api = None |}
-                            result)
+                            result
+                        )
 
                     target().postMessage (payload, "*")
                 }

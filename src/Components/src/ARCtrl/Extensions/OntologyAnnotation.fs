@@ -14,6 +14,7 @@ module OntologyAnnotationHelper =
 
 type OntologyAnnotation with
     static member empty() = OntologyAnnotation.create ()
+
     static member from(term: Shared.Database.Term) =
         let comments =
             ResizeArray [

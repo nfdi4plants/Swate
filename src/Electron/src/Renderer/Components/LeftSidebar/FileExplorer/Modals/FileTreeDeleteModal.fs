@@ -9,13 +9,8 @@ type FileTreeDeleteModal =
 
     [<ReactComponent>]
     static member Main
-        (
-            isOpen: bool,
-            itemName: string option,
-            close: unit -> unit,
-            submit: unit -> unit,
-            ?isDeleting: bool
-        ) =
+        (isOpen: bool, itemName: string option, close: unit -> unit, submit: unit -> unit, ?isDeleting: bool)
+        =
 
         let setIsOpen isOpen =
             if not isOpen then

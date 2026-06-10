@@ -197,4 +197,3 @@ let update (loadRepos: ExploreLoadRequest -> JS.Promise<Result<ExploreLoadResult
                     IsLoading = false
             },
             Cmd.none
-
