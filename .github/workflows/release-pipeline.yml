@@ -45,11 +45,6 @@ jobs:
       - name: Install root npm dependencies
         run: npm ci
 
-      # Install component npm dependencies
-      - name: Install component npm dependencies
-        working-directory: src/Components
-        run: npm ci
-
       # Install playwright dependencies
       - name: Install Playwright dependencies
         working-directory: src/Components
@@ -112,12 +107,7 @@ jobs:
 
       # Install npm dependencies
       - name: Install root dependencies
-        run: npm i
-
-      # Install component npm dependencies
-      - name: Install components dependencies
-        run: npm i
-        working-directory: src/Components
+        run: npm ci
 
       - name: Run release for ${{ matrix.target }}
         env:
