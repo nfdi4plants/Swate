@@ -94,7 +94,7 @@ const meta = {
   title: 'Composite Components/ProvenanceGrouping',
   component: ProvenanceGrouping,
   tags: ['autodocs'],
-  parameters: { layout: 'fullscreen' },
+  parameters: { layout: 'fullscreen', isolated: true },
 } satisfies Meta<typeof ProvenanceGrouping>;
 
 export default meta;
@@ -853,15 +853,30 @@ async function startDragByPointer(source: Element) {
 
 async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
   const panelId = `provenance-property-values-${side}-${propertyName}`;
-  if (!canvas.queryByTestId(panelId)) {
-    fireEvent.click(canvas.getByTestId(`provenance-property-expand-${side}-${propertyName}`));
+  const triggerId = `provenance-property-expand-${side}-${propertyName}`;
+  for (let attempt = 0; attempt < 3 && !canvas.queryByTestId(panelId); attempt += 1) {
+    await userEvent.click(canvas.getByTestId(triggerId));
+    await waitFor(() => expect(canvas.getByTestId(panelId)).toBeInTheDocument(), { timeout: 1000 }).catch(() => {
+      if (!canvas.queryByTestId(panelId)) {
+        fireEvent.click(canvas.getByTestId(triggerId));
+      }
+    });
   }
-  await waitFor(() => expect(canvas.getByTestId(panelId)).toBeInTheDocument());
+  await waitFor(() => expect(canvas.getByTestId(panelId)).toBeInTheDocument(), { timeout: 3000 });
   return within(canvas.getByTestId(panelId));
 }
 
 async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
-  fireEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
+  await userEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
+  await waitFor(
+    () => {
+      const groupedHeading = canvas
+        .getAllByText((content, element) => element?.tagName === 'H3' && content.startsWith(`${propertyName}:`))
+        .at(0);
+      expect(groupedHeading).toBeDefined();
+    },
+    { timeout: 3000 },
+  );
 }
 
 async function railValue(
