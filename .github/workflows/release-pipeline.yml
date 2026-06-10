@@ -43,7 +43,7 @@ jobs:
 
       # Install npm dependencies
       - name: Install root npm dependencies
-        run: npm ci
+        run: npm i
 
       # Install playwright dependencies
       - name: Install Playwright dependencies
@@ -107,7 +107,7 @@ jobs:
 
       # Install npm dependencies
       - name: Install root dependencies
-        run: npm ci
+        run: npm i
 
       - name: Run release for ${{ matrix.target }}
         env:
