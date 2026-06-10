@@ -93,5 +93,5 @@ jobs:
 
       # publish swate-app
       - name: Publish swate-app
-        run: npm publish
         working-directory: src/Electron
+        run: npm run publish
