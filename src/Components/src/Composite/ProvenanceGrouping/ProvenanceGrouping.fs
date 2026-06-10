@@ -824,7 +824,12 @@ type ProvenanceGrouping =
                         prop.children [
                             ConnectorOverlay.Main(
                                 surfaceRef,
+                                pair.Id,
+                                pair.Model,
+                                inputGroups,
+                                outputGroups,
                                 connections,
+                                uiState,
                                 (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
                                 debug = debug)
                             Html.div [

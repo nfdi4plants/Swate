@@ -428,6 +428,80 @@ export const RendersConnectionsForQuotedGroupingValues: Story = {
   },
 };
 
+export const ShowsLiveConnectionPreviewWhileDraggingHandle: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByText('Input C').closest('article')!;
+    const handle = within(input).getByTestId('provenance-connection-handle-Input-GroupCard');
+
+    await startDragByPointer(handle);
+
+    await waitFor(() => {
+      const preview = canvas.getByTestId('provenance-live-connection');
+      expect(preview.getAttribute('d')).toMatch(/^M\s+\d/);
+    });
+
+    fireEvent.pointerUp(document, { button: 0, buttons: 0, isPrimary: true, pointerId: 1 });
+  },
+};
+
+export const ExpandedGroupsRenderMemberLevelConnections: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    fireEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+
+    const grouped = await waitFor(() => {
+      const heading = canvas
+        .getAllByText('Species: Arabidopsis')
+        .find((element) => element.tagName === 'H3');
+      expect(heading).toBeDefined();
+      return heading!.closest('article')!;
+    });
+
+    await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
+
+    await waitFor(() => {
+      const paths = canvas.getAllByTestId('provenance-member-connection');
+      expect(paths.length).toBeGreaterThan(0);
+      expect(paths.every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
+    });
+  },
+};
+
+export const ExpandedPropertyValuesRenderValueConnections: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expandProperty(canvas, 'Input', 'Species');
+
+    await waitFor(() => {
+      const paths = canvas.getAllByTestId('provenance-value-connection');
+      expect(paths.length).toBeGreaterThan(0);
+      expect(paths.every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
+    });
+  },
+};
+
+export const PropertyHeaderConnectionsRenderVisualPaths: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
+    const propertyHandle = inputRail.getAllByTestId('provenance-connection-handle-Input-PropertyHeader')[0];
+    const inputA = canvas.getByText('Input A').closest('article')!;
+
+    await dragByPointer(propertyHandle, inputA);
+
+    await waitFor(() => {
+      const paths = canvas.getAllByTestId('provenance-property-connection');
+      expect(paths.length).toBeGreaterThan(0);
+      expect(paths.every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
+    });
+  },
+};
+
 export const CreatesPropertyValueFromRail: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
