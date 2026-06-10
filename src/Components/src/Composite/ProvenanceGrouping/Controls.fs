@@ -12,6 +12,7 @@ open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Session
+open Swate.Components.Composite.ProvenanceGrouping.Types
 open Swate.Components.Composite.TermSearch
 open Swate.Components.Composite.TermSearch.Types
 
@@ -120,6 +121,50 @@ module private KindNames =
 type Controls =
 
     [<ReactComponent>]
+    static member ConnectionHandle(handle: ConnectionHandleRef, ?label: string, ?debug: bool, ?key: string) =
+        let draggable =
+            DndKit.useDraggable (
+                {|
+                    id = DragDrop.connectionHandleDragId handle
+                |}
+            )
+
+        let droppable =
+            DndKit.useDroppable (
+                {|
+                    id = DragDrop.connectionHandleDropId handle
+                |}
+            )
+
+        let setNodeRef node =
+            draggable.setNodeRef node
+            droppable.setNodeRef node
+
+        Html.span [
+            match key with
+            | Some key -> prop.key key
+            | None -> ()
+            prop.ref setNodeRef
+            yield! prop.spread (!!draggable.attributes)
+            yield! prop.spread (!!draggable.listeners)
+            prop.role.button
+            prop.tabIndex 0
+            prop.ariaLabel (label |> Option.defaultValue "Connect")
+            prop.custom ("data-provenance-connection-node", DragDrop.connectionHandleNodeId handle)
+            prop.custom ("data-provenance-connection-drop-id", DragDrop.connectionHandleDropId handle)
+            prop.className [
+                "swt:inline-flex swt:size-3 swt:shrink-0 swt:cursor-crosshair swt:items-center swt:justify-center swt:rounded-full swt:border swt:border-primary swt:bg-primary/70 swt:align-middle swt:opacity-55 swt:transition"
+                "hover:swt:opacity-100 focus:swt:opacity-100 focus:swt:outline-none focus:swt:ring-2 focus:swt:ring-primary/40"
+                if droppable.isOver then
+                    "swt:opacity-100 swt:ring-2 swt:ring-primary"
+                if draggable.isDragging then
+                    "swt:opacity-100 swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
+            ]
+            if defaultArg debug false then
+                prop.testId $"provenance-connection-handle-{handle.Side}-{handle.Kind}"
+        ]
+
+    [<ReactComponent>]
     static member LayerTabs
         (session: ProvenanceSession, onSelect: ProvenancePairId -> unit, onAddLayer: unit -> unit, ?debug: bool)
         =
@@ -222,6 +267,20 @@ type Controls =
             |> List.exists (fun assignment -> assignment.Key.Header = header && assignment.Scope = GroupingScope.Both)
 
         let sideName = SideLabels.sideName side
+        let propertyHandle : ConnectionHandleRef =
+            {
+                Kind = ConnectionHandleKind.PropertyHeader
+                Side = side
+                Id = DragDrop.propertyHeaderIdentity header
+                ParentGroupId = None
+            }
+
+        let propertyHandleElement =
+            Controls.ConnectionHandle(
+                propertyHandle,
+                label = $"Connect {header.Category.Name} property",
+                ?debug = debug
+            )
 
         Html.div [
             match key with
@@ -232,6 +291,8 @@ type Controls =
                 Html.div [
                     prop.className "swt:flex swt:items-center swt:gap-1"
                     prop.children [
+                        if side = ProvenanceSide.Output then
+                            propertyHandleElement
                         Html.button [
                             prop.type'.button
                             if canSwitch then
@@ -257,6 +318,8 @@ type Controls =
                                 ]
                             ]
                         ]
+                        if side = ProvenanceSide.Input then
+                            propertyHandleElement
                         Html.button [
                             prop.type'.button
                             prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
@@ -329,6 +392,7 @@ type Controls =
                                     propertyValue,
                                     draggable = true,
                                     showHeader = false,
+                                    side = side,
                                     ?debug = debug,
                                     key = DragDrop.propertyValueIdentity propertyValue
                                 )
@@ -638,7 +702,14 @@ type Controls =
 
     [<ReactComponent>]
     static member ValueChip
-        (propertyValue: ProvenancePropertyValue, ?draggable: bool, ?showHeader: bool, ?debug: bool, ?key: string)
+        (
+            propertyValue: ProvenancePropertyValue,
+            ?draggable: bool,
+            ?showHeader: bool,
+            ?side: ProvenanceSide,
+            ?debug: bool,
+            ?key: string
+        )
         : ReactElement =
         let canDrag = defaultArg draggable true
         let showHeader = defaultArg showHeader true
@@ -658,11 +729,26 @@ type Controls =
             else
                 text
 
-        Html.button [
+        let valueHandle =
+            side
+            |> Option.map (fun side ->
+                Controls.ConnectionHandle(
+                    {
+                        Kind = ConnectionHandleKind.PropertyValue
+                        Side = side
+                        Id = propertyValue.Id
+                        ParentGroupId = None
+                    },
+                    label = $"Connect {propertyValue.Header.Category.Name} value",
+                    ?debug = debug
+                ))
+
+        Html.div [
             match key with
             | Some key -> prop.key key
             | None -> ()
-            prop.type'.button
+            prop.role.button
+            prop.tabIndex 0
             if canDrag then
                 prop.ref drag.setNodeRef
                 yield! prop.spread (!!drag.attributes)
@@ -676,10 +762,16 @@ type Controls =
                 prop.testId $"provenance-value-{propertyValue.Id}"
             prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"
             prop.children [
+                match side, valueHandle with
+                | Some ProvenanceSide.Output, Some handle -> handle
+                | _ -> Html.none
                 Html.span [
                     prop.className "swt:min-w-0 swt:truncate"
                     prop.text label
                 ]
+                match side, valueHandle with
+                | Some ProvenanceSide.Input, Some handle -> handle
+                | _ -> Html.none
             ]
         ]
 

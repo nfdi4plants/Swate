@@ -2,6 +2,7 @@ namespace Swate.Components.Composite.ProvenanceGrouping
 
 open System.Globalization
 open Fable.Core
+open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.JsBindings
 open Swate.Components.Shared.ProvenanceGrouping.Types
@@ -26,7 +27,7 @@ type private DragContext =
         Publish: SessionResult -> unit
         SetUiState: UiState -> unit
         Lookups: EditorLookups
-        ConnectGroups: DisplayGroup -> DisplayGroup -> unit
+        ConnectSetPairs: (ProvenanceSetId * ProvenanceSetId) list -> unit
     }
 
 /// Resizable three-panel surface helpers.
@@ -135,12 +136,9 @@ module private EditorActions =
         | propertyValueIds ->
             apply session [] propertyValueIds |> publish
 
-    let connectGroups session publish inputGroup outputGroup =
-        [
-            for input in inputGroup.Members do
-                for output in outputGroup.Members do
-                    input.SetId, output.SetId
-        ]
+    let connectSetPairs session publish pairs =
+        pairs
+        |> List.distinct
         |> List.fold
             (fun (result: SessionResult) (inputId, outputId) ->
                 result
@@ -150,55 +148,264 @@ module private EditorActions =
             (Ok(session, []))
         |> publish
 
+    let orderedMemberPairs (inputGroup: DisplayGroup) (outputGroup: DisplayGroup) =
+        if inputGroup.Members.Length = outputGroup.Members.Length then
+            List.zip inputGroup.Members outputGroup.Members
+            |> List.map (fun (input, output) -> input.SetId, output.SetId)
+            |> Some
+        else
+            None
+
+    let allMemberPairs (inputGroup: DisplayGroup) (outputGroup: DisplayGroup) =
+        [
+            for input in inputGroup.Members do
+                for output in outputGroup.Members do
+                    input.SetId, output.SetId
+        ]
+
+/// Reads the current DOM position of a connection handle relative to the editor surface.
+module private HandleMeasure =
+
+    let private tryDocumentNode (handle: ConnectionHandleRef) =
+        let node: Browser.Types.HTMLElement =
+            !!Browser.Dom.document.querySelector($"[data-provenance-connection-node='{DragDrop.connectionHandleNodeId handle}']")
+
+        if isNull node then None else Some node
+
+    let tryCenter (surface: Browser.Types.HTMLElement) (handle: ConnectionHandleRef) =
+        match tryDocumentNode handle with
+        | Some node ->
+            let origin = surface.getBoundingClientRect ()
+            let rect = node.getBoundingClientRect ()
+
+            Some
+                {
+                    X = rect.left - origin.left + float surface.scrollLeft + rect.width / 2.
+                    Y = rect.top - origin.top + float surface.scrollTop + rect.height / 2.
+                }
+        | None -> None
+
+    let tryViewportCenter (handle: ConnectionHandleRef) =
+        tryDocumentNode handle
+        |> Option.map (fun node ->
+            let rect = node.getBoundingClientRect ()
+            {
+                X = rect.left + rect.width / 2.
+                Y = rect.top + rect.height / 2.
+            })
+
+/// Resolves destination handles from final pointer coordinates when DnD reports
+/// the active handle as its own drop target.
+module private DropHitTesting =
+
+    [<Emit("document.elementsFromPoint($0, $1)")>]
+    let private elementsFromPoint (_x: float) (_y: float) : Browser.Types.HTMLElement[] = jsNative
+
+    [<Emit("$0.closest($1)")>]
+    let private closest (_element: Browser.Types.HTMLElement) (_selector: string) : Browser.Types.HTMLElement = jsNative
+
+    let private attribute name (element: Browser.Types.HTMLElement) =
+        let value = element.getAttribute name
+        if isNull value then None else Some value
+
+    let private closestAttribute selector attributeName (element: Browser.Types.HTMLElement) =
+        let node = closest element selector
+        if isNull node then None else attribute attributeName node
+
+    let private endpoint source (event: DndKit.IDndKitEvent) =
+        HandleMeasure.tryViewportCenter source
+        |> Option.map (fun start ->
+            {
+                X = start.X + event.delta.x
+                Y = start.Y + event.delta.y
+            })
+
+    let private targetHandleAt point source =
+        elementsFromPoint point.X point.Y
+        |> Array.tryPick (fun element ->
+            closestAttribute
+                "[data-provenance-connection-drop-id]"
+                "data-provenance-connection-drop-id"
+                element
+            |> Option.bind DragDrop.tryConnectionDropId
+            |> Option.bind (fun target -> if target = source then None else Some target))
+
+    let private targetGroupAt point =
+        elementsFromPoint point.X point.Y
+        |> Array.tryPick (fun element ->
+            closestAttribute "[data-provenance-group-drop-id]" "data-provenance-group-drop-id" element
+            |> Option.bind DragDrop.tryDropId
+            |> Option.map (fun (side, groupId) ->
+                {
+                    Kind = ConnectionHandleKind.GroupCard
+                    Side = side
+                    Id = groupId
+                    ParentGroupId = None
+                }))
+
+    let connectionTarget source event =
+        endpoint source event
+        |> Option.bind (fun point ->
+            targetHandleAt point source
+            |> Option.orElseWith (fun () -> targetGroupAt point))
+
 /// DnD event handlers that translate library events into session or UI state changes.
 module private DragHandlers =
 
-    let handleStart setActiveDrag (event: DndKit.IDndKitEvent) =
-        DragDrop.tryDragId (string event.active.id)
-        |> setActiveDrag
+    let handleStart (surfaceRef: IRefValue<Browser.Types.HTMLElement option>) setActiveDrag setUiState uiState (event: DndKit.IDndKitEvent) =
+        let payload = DragDrop.tryDragId (string event.active.id)
+        setActiveDrag payload
+
+        match payload, surfaceRef.current with
+        | Some(DragDrop.Payload.ConnectionHandle handle), Some surface ->
+            HandleMeasure.tryCenter surface handle
+            |> Option.iter (fun point -> State.LiveConnection.start handle point uiState |> setUiState)
+        | _ -> ()
+
+    let handleMove setUiState uiState (event: DndKit.IDndKitMoveEvent) =
+        match uiState.LiveConnectionDrag with
+        | Some live ->
+            State.LiveConnection.moveTo
+                {
+                    X = live.Start.X + event.delta.x
+                    Y = live.Start.Y + event.delta.y
+                }
+                uiState
+            |> setUiState
+        | None -> ()
 
     let private layerIdForSide pair side =
         match side with
         | ProvenanceSide.Input -> pair.LeftLayerId
         | ProvenanceSide.Output -> pair.RightLayerId
 
-    let handleEnd context (event: DndKit.IDndKitEvent) =
-        if isNull event.over then
-            ()
-        else
-            let dragPayload = DragDrop.tryDragId (string event.active.id)
-            let groupDrop = DragDrop.tryDropId (string event.over.id)
-            let propertyDrop = DragDrop.tryPropertyDropId (string event.over.id)
+    let private routePropertyValueDrop context side groupId propertyValueId =
+        match context.Lookups.FindGroup side groupId, context.Lookups.FindPropertyValue propertyValueId with
+        | Some group, Some propertyValue ->
+            match ValueAssignment.planPropertyValueDrop (context.Lookups.SourceForValue propertyValueId propertyValue) group context.Pair.Model with
+            | Ok(ValueAssignmentPlan.AddCurrent command) ->
+                Session.createCurrentLoadedPropertyValue command context.Session |> context.Publish
+            | Ok(ValueAssignmentPlan.ConfirmOverwrite warning) ->
+                State.Overwrite.set warning context.UiState |> context.SetUiState
+            | Error error ->
+                context.SetUiState { context.UiState with Error = Some(AssignmentErrors.text error) }
+        | _ -> ()
 
-            match dragPayload, groupDrop, propertyDrop with
-            | Some(DragDrop.Payload.PropertyValue propertyValueId), Some(side, groupId), _ ->
-                match context.Lookups.FindGroup side groupId, context.Lookups.FindPropertyValue propertyValueId with
-                | Some group, Some propertyValue ->
-                    match ValueAssignment.planPropertyValueDrop (context.Lookups.SourceForValue propertyValueId propertyValue) group context.Pair.Model with
-                    | Ok(ValueAssignmentPlan.AddCurrent command) ->
-                        Session.createCurrentLoadedPropertyValue command context.Session |> context.Publish
-                    | Ok(ValueAssignmentPlan.ConfirmOverwrite warning) ->
-                        State.Overwrite.set warning context.UiState |> context.SetUiState
-                    | Error error ->
-                        context.SetUiState { context.UiState with Error = Some(AssignmentErrors.text error) }
-                | _ -> ()
-            | Some(DragDrop.Payload.Group(ProvenanceSide.Input, inputGroupId)), Some(ProvenanceSide.Output, outputGroupId), _ ->
-                match context.Lookups.FindGroup ProvenanceSide.Input inputGroupId, context.Lookups.FindGroup ProvenanceSide.Output outputGroupId with
-                | Some inputGroup, Some outputGroup -> context.ConnectGroups inputGroup outputGroup
-                | _ -> ()
-            | Some(DragDrop.Payload.PropertyHeader(sourceSide, headerId)), _, Some targetSide when sourceSide <> targetSide ->
-                match context.Lookups.FindHeader headerId with
-                | Some header when PropertyRails.canSwitchHeader header context.Pair.Model ->
-                    State.GroupingAssignments.move
-                        context.Pair.Id
-                        (layerIdForSide context.Pair sourceSide)
-                        (layerIdForSide context.Pair targetSide)
-                        targetSide
-                        header
-                        context.UiState
-                    |> context.SetUiState
-                | _ -> ()
+    let private routeGroupConnection context inputGroupId outputGroupId =
+        match context.Lookups.FindGroup ProvenanceSide.Input inputGroupId, context.Lookups.FindGroup ProvenanceSide.Output outputGroupId with
+        | Some inputGroup, Some outputGroup ->
+            match EditorActions.orderedMemberPairs inputGroup outputGroup with
+            | Some pairs ->
+                context.ConnectSetPairs pairs
+            | None ->
+                State.MemberResolution.request
+                    {
+                        PairId = context.Pair.Id
+                        InputGroupId = inputGroup.Id
+                        OutputGroupId = outputGroup.Id
+                        InputMemberCount = inputGroup.Members.Length
+                        OutputMemberCount = outputGroup.Members.Length
+                    }
+                    context.UiState
+                |> context.SetUiState
+        | _ -> ()
+
+    let private routeMemberToGroupConnection context inputGroupId outputGroupId memberSetId memberSide =
+        match context.Lookups.FindGroup ProvenanceSide.Input inputGroupId, context.Lookups.FindGroup ProvenanceSide.Output outputGroupId with
+        | Some inputGroup, Some outputGroup ->
+            let pairs =
+                match memberSide with
+                | ProvenanceSide.Input ->
+                    outputGroup.Members
+                    |> List.map (fun output -> memberSetId, output.SetId)
+                | ProvenanceSide.Output ->
+                    inputGroup.Members
+                    |> List.map (fun input -> input.SetId, memberSetId)
+
+            context.ConnectSetPairs pairs
+        | _ -> ()
+
+    let private routeConnectionHandle context source target =
+        match ConnectionRouting.action source target with
+        | Some(ConnectionRouting.ConnectionAction.ConnectGroups(inputGroupId, outputGroupId)) ->
+            routeGroupConnection context inputGroupId outputGroupId
+        | Some(ConnectionRouting.ConnectionAction.ConnectMembers(inputGroupId, outputGroupId, inputSetId, outputSetId)) ->
+            context.ConnectSetPairs [ inputSetId, outputSetId ]
+            State.ManualConnections.add
+                {
+                    PairId = context.Pair.Id
+                    InputGroupId = inputGroupId
+                    OutputGroupId = outputGroupId
+                    InputSetId = inputSetId
+                    OutputSetId = outputSetId
+                }
+                context.UiState
+            |> context.SetUiState
+        | Some(ConnectionRouting.ConnectionAction.ConnectMemberToGroup(inputGroupId, outputGroupId, memberSetId, memberSide)) ->
+            routeMemberToGroupConnection context inputGroupId outputGroupId memberSetId memberSide
+        | Some(ConnectionRouting.ConnectionAction.ConnectPropertyHeaderToGroup(source, target)) ->
+            State.VisualConnections.add { PairId = context.Pair.Id; Source = source; Target = target } context.UiState
+            |> context.SetUiState
+        | Some(ConnectionRouting.ConnectionAction.ConnectPropertyValueToGroup(source, target)) ->
+            routePropertyValueDrop context target.Side target.Id source.Id
+        | None -> ()
+
+    let private routeExistingValueAndPropertyDrags context dragPayload groupDrop propertyDrop =
+        match dragPayload, groupDrop, propertyDrop with
+        | Some(DragDrop.Payload.PropertyValue propertyValueId), Some(side, groupId), _ ->
+            routePropertyValueDrop context side groupId propertyValueId
+        | Some(DragDrop.Payload.PropertyHeader(sourceSide, headerId)), _, Some targetSide when sourceSide <> targetSide ->
+            match context.Lookups.FindHeader headerId with
+            | Some header when PropertyRails.canSwitchHeader header context.Pair.Model ->
+                State.GroupingAssignments.move
+                    context.Pair.Id
+                    (layerIdForSide context.Pair sourceSide)
+                    (layerIdForSide context.Pair targetSide)
+                    targetSide
+                    header
+                    context.UiState
+                |> context.SetUiState
             | _ -> ()
+        | _ -> ()
+
+    let handleEnd context (event: DndKit.IDndKitEvent) =
+        let dragPayload = DragDrop.tryDragId (string event.active.id)
+        let groupDrop, propertyDrop, connectionDrop =
+            if isNull event.over then
+                None, None, None
+            else
+                DragDrop.tryDropId (string event.over.id),
+                DragDrop.tryPropertyDropId (string event.over.id),
+                DragDrop.tryConnectionDropId (string event.over.id)
+
+        match dragPayload, connectionDrop with
+        | Some(DragDrop.Payload.ConnectionHandle source), Some target ->
+            let resolvedTarget =
+                if target = source then
+                    DropHitTesting.connectionTarget source event
+                else
+                    Some target
+
+            resolvedTarget
+            |> Option.iter (routeConnectionHandle context source)
+        | Some(DragDrop.Payload.ConnectionHandle source), None ->
+            let resolvedTarget =
+                match groupDrop with
+                | Some(side, groupId) ->
+                    Some
+                        {
+                            Kind = ConnectionHandleKind.GroupCard
+                            Side = side
+                            Id = groupId
+                            ParentGroupId = None
+                        }
+                | None ->
+                    DropHitTesting.connectionTarget source event
+
+            resolvedTarget
+            |> Option.iter (routeConnectionHandle context source)
+        | _ ->
+            routeExistingValueAndPropertyDrags context dragPayload groupDrop propertyDrop
 
 /// Alert and detail panels rendered around the main grouping surface.
 module private EditorPanels =
@@ -248,6 +455,63 @@ module private EditorPanels =
                         Html.button [
                             prop.type'.button
                             prop.className "swt:btn swt:btn-ghost swt:btn-sm"
+                            prop.onClick (fun _ -> onCancel ())
+                            prop.text "Cancel"
+                        ]
+                    ]
+                ]
+            ]
+        ]
+
+    let memberResolutionPrompt debug (pending: PendingMemberResolution) onAllToAll onManual onCancel =
+        let memberText count side =
+            if count = 1 then
+                $"{count} {side} member"
+            else
+                $"{count} {side} members"
+        let inputMemberText = memberText pending.InputMemberCount "input"
+        let outputMemberText = memberText pending.OutputMemberCount "output"
+
+        Html.div [
+            prop.className "swt:alert swt:alert-warning swt:items-start"
+            if debug then prop.testId "provenance-member-resolution-prompt"
+            prop.children [
+                Html.i [ prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5" ]
+                Html.div [
+                    prop.className "swt:flex swt:flex-col swt:gap-1"
+                    prop.children [
+                        Html.strong "Resolve member mismatch"
+                        Html.span [
+                            prop.className "swt:text-sm"
+                            prop.text $"This connection has {inputMemberText} and {outputMemberText}."
+                        ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "swt:ml-auto swt:flex swt:gap-2"
+                    prop.children [
+                        Html.button [
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-warning swt:btn-sm"
+                            prop.ariaLabel "Create all-to-all connections"
+                            if debug then prop.testId "provenance-member-resolution-all-to-all"
+                            prop.onClick (fun _ -> onAllToAll pending)
+                            prop.text "All-to-all"
+                        ]
+                        Html.button [
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-outline swt:btn-sm"
+                            prop.ariaLabel "Resolve manually"
+                            if debug then prop.testId "provenance-member-resolution-manual"
+                            prop.onPointerUp (fun _ -> onManual pending)
+                            prop.onClick (fun _ -> onManual pending)
+                            prop.text "Resolve manually"
+                        ]
+                        Html.button [
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-ghost swt:btn-sm"
+                            prop.ariaLabel "Cancel member resolution"
+                            if debug then prop.testId "provenance-member-resolution-cancel"
                             prop.onClick (fun _ -> onCancel ())
                             prop.text "Cancel"
                         ]
@@ -306,7 +570,7 @@ module private EditorSurface =
             (fun header -> PropertyRails.canSwitchHeader header model),
             debug = debug)
 
-    let groupColumn side (pair: ProvenanceLayerPair) model (groups: DisplayGroup list) endpointKind createSet uiState toggleSelection toggleDetail debug =
+    let groupColumn side (pair: ProvenanceLayerPair) model (groups: DisplayGroup list) endpointKind createSet uiState isExpanded toggleSelection toggleDetail debug =
         let keyPrefix =
             match side with
             | ProvenanceSide.Input -> "Input"
@@ -321,7 +585,7 @@ module private EditorSurface =
                         group,
                         model,
                         State.Selection.contains pair.Id side group.Id uiState,
-                        State.Detail.isGroupExpanded side group.Id uiState,
+                        isExpanded side group.Id,
                         (fun () -> toggleSelection side group.Id),
                         (fun () -> toggleDetail side group.Id),
                         debug = debug,
@@ -370,6 +634,11 @@ type ProvenanceGrouping =
         let inputEndpointKind = Endpoints.defaultEndpointKind ProvenanceSide.Input pair.Model
         let outputEndpointKind = Endpoints.defaultEndpointKind ProvenanceSide.Output pair.Model
         let lookups = EditorLookups.create pair uiState inputGroups outputGroups
+
+        let applyUiState update =
+            let next = update latestUiState.current
+            latestUiState.current <- next
+            setUiState next
 
         let commitPanelRatio side clientX =
             match surfaceRef.current with
@@ -438,7 +707,7 @@ type ProvenanceGrouping =
             match result with
             | Ok(next, patches) ->
                 let nextUiState = State.Layers.ensure next uiState
-                setUiState { nextUiState with Error = None; PendingOverwrite = None }
+                setUiState { nextUiState with Error = None; PendingOverwrite = None; PendingMemberResolution = None }
                 onChange { Session = next; Patches = patches }
             | Error error ->
                 setUiState { uiState with Error = Some(string error) }
@@ -469,8 +738,39 @@ type ProvenanceGrouping =
         let confirmPendingOverwrite =
             EditorActions.confirmPendingOverwrite session publish setUiState uiState
 
-        let connectGroups =
-            EditorActions.connectGroups session publish
+        let connectSetPairs =
+            EditorActions.connectSetPairs session publish
+
+        let resolveAllToAll (pending: PendingMemberResolution) =
+            match lookups.FindGroup ProvenanceSide.Input pending.InputGroupId, lookups.FindGroup ProvenanceSide.Output pending.OutputGroupId with
+            | Some inputGroup, Some outputGroup ->
+                EditorActions.allMemberPairs inputGroup outputGroup
+                |> connectSetPairs
+            | _ ->
+                State.MemberResolution.clearPending uiState |> setUiState
+
+        let isManuallyResolving side groupId =
+            uiState.ManualResolutionPairs
+            |> List.exists (fun resolution ->
+                resolution.PairId = pair.Id
+                && ((side = ProvenanceSide.Input && resolution.InputGroupId = groupId)
+                    || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId)))
+
+        let isConnectedToExpanded side groupId =
+            connections
+            |> List.exists (fun connection ->
+                match side with
+                | ProvenanceSide.Input ->
+                    connection.SourceGroupId = groupId
+                    && State.Detail.isGroupExpanded ProvenanceSide.Output connection.TargetGroupId uiState
+                | ProvenanceSide.Output ->
+                    connection.TargetGroupId = groupId
+                    && State.Detail.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId uiState)
+
+        let isGroupExpanded side groupId =
+            State.Detail.isGroupExpanded side groupId uiState
+            || isManuallyResolving side groupId
+            || isConnectedToExpanded side groupId
 
         let dragContext =
             {
@@ -480,7 +780,7 @@ type ProvenanceGrouping =
                 Publish = publish
                 SetUiState = setUiState
                 Lookups = lookups
-                ConnectGroups = connectGroups
+                ConnectSetPairs = connectSetPairs
             }
 
         let content =
@@ -504,6 +804,15 @@ type ProvenanceGrouping =
                             warning
                             confirmPendingOverwrite
                             (fun () -> State.Overwrite.clear uiState |> setUiState)
+                    | None -> Html.none
+                    match uiState.PendingMemberResolution with
+                    | Some pending ->
+                        EditorPanels.memberResolutionPrompt
+                            debug
+                            pending
+                            resolveAllToAll
+                            (fun pending -> applyUiState (State.MemberResolution.chooseManual pending))
+                            (fun () -> applyUiState State.MemberResolution.clearPending)
                     | None -> Html.none
                     Html.div [
                         prop.ref surfaceRef
@@ -547,6 +856,7 @@ type ProvenanceGrouping =
                                         inputEndpointKind
                                         createSet
                                         uiState
+                                        isGroupExpanded
                                         toggleSelection
                                         toggleGroupDetail
                                         debug
@@ -558,6 +868,7 @@ type ProvenanceGrouping =
                                         outputEndpointKind
                                         createSet
                                         uiState
+                                        isGroupExpanded
                                         toggleSelection
                                         toggleGroupDetail
                                         debug
@@ -590,11 +901,16 @@ type ProvenanceGrouping =
         DndKit.DndContext(
             sensors = sensors,
             collisionDetection = DndKit.pointerWithin,
-            onDragStart = DragHandlers.handleStart setActiveDrag,
-            onDragCancel = (fun _ -> setActiveDrag None),
+            onDragStart = DragHandlers.handleStart surfaceRef setActiveDrag setUiState uiState,
+            onDragMove = DragHandlers.handleMove setUiState uiState,
+            onDragCancel = (fun _ ->
+                setActiveDrag None
+                State.LiveConnection.clear uiState |> setUiState),
             onDragEnd = (fun event ->
                 setActiveDrag None
-                DragHandlers.handleEnd dragContext event),
+                let clearedUiState = State.LiveConnection.clear uiState
+                setUiState clearedUiState
+                DragHandlers.handleEnd { dragContext with UiState = clearedUiState } event),
             children =
                 React.Fragment [
                     content

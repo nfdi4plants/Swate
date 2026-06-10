@@ -52,10 +52,10 @@ module DndKit =
     type IDndKitEvent =
         abstract member active: HTMLElement
         abstract member over: HTMLElement
+        abstract member delta: ICoordinates
 
     type IDndKitMoveEvent =
         inherit IDndKitEvent
-        abstract member delta: ICoordinates
 
     [<Import("closestCenter", "@dnd-kit/core")>]
     let closestCenter: obj = jsNative

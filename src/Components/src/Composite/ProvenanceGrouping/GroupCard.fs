@@ -1,7 +1,6 @@
 namespace Swate.Components.Composite.ProvenanceGrouping
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
@@ -9,6 +8,7 @@ open Swate.Components.Primitive.Buttons
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
+open Swate.Components.Composite.ProvenanceGrouping.Types
 
 /// Derives display text and property chips for one provenance group card.
 module private GroupCardData =
@@ -67,20 +67,15 @@ type GroupCard =
                 |}
             )
 
-        let draggable =
-            DndKit.useDraggable (
-                {|
-                    id = DragDrop.groupDragId side group.Id
-                |}
-            )
-
-        let setNodeRef node =
-            droppable.setNodeRef node
-            draggable.setNodeRef node
-
-        let values = GroupCardData.values group model
         let title = GroupCardData.title group
         let isGroup = group.Members.Length > 1
+        let groupHandle : ConnectionHandleRef =
+            {
+                Kind = ConnectionHandleKind.GroupCard
+                Side = side
+                Id = group.Id
+                ParentGroupId = None
+            }
         let memberDetailsPosition =
             match side with
             | ProvenanceSide.Input -> "swt:left-full swt:ml-2"
@@ -90,8 +85,9 @@ type GroupCard =
             match key with
             | Some key -> prop.key key
             | None -> ()
-            prop.ref setNodeRef
+            prop.ref droppable.setNodeRef
             prop.custom ("data-provenance-group-node", DragDrop.groupNodeId side group.Id)
+            prop.custom ("data-provenance-group-drop-id", DragDrop.groupDropId side group.Id)
             prop.className [
                 "swt:rounded-box swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm swt:space-y-2"
                 if selected then
@@ -100,7 +96,6 @@ type GroupCard =
                     "swt:border-base-300"
                 if droppable.isOver then
                     "swt:ring-2 swt:ring-primary"
-                yield! Styles.dragIndicatorClasses draggable.isDragging
             ]
             if defaultArg debug false then
                 prop.testId $"provenance-group-{side}-{group.Id}"
@@ -112,21 +107,7 @@ type GroupCard =
                             prop.className "swt:grow swt:font-semibold"
                             prop.text title
                         ]
-                        Html.button [
-                            prop.type'.button
-                            yield! prop.spread (!!draggable.attributes)
-                            yield! prop.spread (!!draggable.listeners)
-                            prop.className [
-                                "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm"
-                                yield! Styles.draggableButtonClasses draggable.isDragging
-                            ]
-                            prop.ariaLabel "Connect group"
-                            prop.children [
-                                Html.i [
-                                    prop.className "swt:iconify swt:fluent--link-20-regular swt:size-4"
-                                ]
-                            ]
-                        ]
+                        Controls.ConnectionHandle(groupHandle, label = "Connect group", ?debug = debug)
                         Buttons.QuickAccessButton(
                             Html.i [
                                 prop.className "swt:iconify swt:fluent--checkmark-circle-20-regular swt:size-4"
@@ -144,35 +125,52 @@ type GroupCard =
                             )
                     ]
                 ]
-                Html.div [
-                    prop.className "swt:flex swt:flex-wrap swt:gap-1"
-                    prop.children [
-                        for value in values do
-                            Controls.ValueLabel(value, ?debug = debug, key = DragDrop.propertyValueIdentity value)
-                    ]
-                ]
-                if isGroup && expanded then
+                if expanded then
                     Html.ul [
                         prop.className "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2 swt:text-sm"
                         prop.children [
                             for member' in group.Members do
                                 let memberValues = GroupCardData.memberValues member' model
                                 let isHovered = hoveredMemberId = Some member'.SetId
+                                let memberHandle : ConnectionHandleRef =
+                                    {
+                                        Kind = ConnectionHandleKind.GroupMember
+                                        Side = side
+                                        Id = member'.SetId
+                                        ParentGroupId = Some group.Id
+                                    }
 
                                 Html.li [
                                     prop.className "swt:relative"
                                     prop.children [
                                         Html.div [
-                                            prop.tabIndex 0
-                                            prop.ariaLabel $"Show values for {member'.Name}"
-                                            prop.className "swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
-                                            if defaultArg debug false then
-                                                prop.testId $"provenance-group-member-{side}-{member'.SetId}"
-                                            prop.onMouseEnter (fun _ -> setHoveredMemberId (Some member'.SetId))
-                                            prop.onMouseLeave (fun _ -> setHoveredMemberId None)
-                                            prop.onFocus (fun _ -> setHoveredMemberId (Some member'.SetId))
-                                            prop.onBlur (fun _ -> setHoveredMemberId None)
-                                            prop.text member'.Name
+                                            prop.className "swt:flex swt:items-center swt:gap-2"
+                                            prop.children [
+                                                if side = ProvenanceSide.Output then
+                                                    Controls.ConnectionHandle(
+                                                        memberHandle,
+                                                        label = $"Connect {member'.Name}",
+                                                        ?debug = debug
+                                                    )
+                                                Html.div [
+                                                    prop.tabIndex 0
+                                                    prop.ariaLabel $"Show values for {member'.Name}"
+                                                    prop.className "swt:min-w-0 swt:grow swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
+                                                    if defaultArg debug false then
+                                                        prop.testId $"provenance-group-member-{side}-{member'.SetId}"
+                                                    prop.onMouseEnter (fun _ -> setHoveredMemberId (Some member'.SetId))
+                                                    prop.onMouseLeave (fun _ -> setHoveredMemberId None)
+                                                    prop.onFocus (fun _ -> setHoveredMemberId (Some member'.SetId))
+                                                    prop.onBlur (fun _ -> setHoveredMemberId None)
+                                                    prop.text member'.Name
+                                                ]
+                                                if side = ProvenanceSide.Input then
+                                                    Controls.ConnectionHandle(
+                                                        memberHandle,
+                                                        label = $"Connect {member'.Name}",
+                                                        ?debug = debug
+                                                    )
+                                            ]
                                         ]
 
                                         if isHovered then
