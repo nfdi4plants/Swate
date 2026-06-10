@@ -95,3 +95,5 @@ jobs:
       - name: Publish swate-app
         working-directory: src/Electron
         run: npm run publish
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
