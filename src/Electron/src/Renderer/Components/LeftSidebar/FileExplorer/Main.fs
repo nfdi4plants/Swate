@@ -116,8 +116,7 @@ type Main =
                 errorModalCtx.enqueue (
                     ErrorModalRequest.create (
                         $"Failed to copy path: {ex.Message}",
-                        title = "Copy path failed",
-                        ?scopeId = appStateCtx
+                        title = "Copy path failed"
                     )
                 )
             )
@@ -128,8 +127,7 @@ type Main =
                 errorModalCtx.enqueue (
                     ErrorModalRequest.create (
                         $"Failed to open folder: {ex.Message}",
-                        title = "Open folder failed",
-                        ?scopeId = appStateCtx
+                        title = "Open folder failed"
                     )
                 )
             )

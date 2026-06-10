@@ -175,6 +175,16 @@ let Main () =
 
     let isInitializedArcVault = Option.isSome model.ArcRootPath
 
+    let currentArcScopeId =
+        model.ArcRootPath
+        |> Option.map Swate.Components.Shared.PathHelpers.normalizePath
+        |> Option.bind (fun path ->
+            if System.String.IsNullOrWhiteSpace path then
+                None
+            else
+                Some path
+        )
+
     let leftSidebar =
         if isInitializedArcVault then
             Renderer.Components.LeftSidebar.Main.Main(model.LeftSidebarTarget) |> Some
@@ -216,7 +226,8 @@ let Main () =
                                             )
                                         )
                                 )
-                            )
+                            ),
+                            ?scopeId = currentArcScopeId
                         )
                     )
                 )

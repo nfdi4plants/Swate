@@ -49,7 +49,8 @@ let openArc (onError: string -> unit) : JS.Promise<bool> =
         | Error exn ->
             onError exn.Message
             return false
-        | Ok _ ->
+        | Ok None -> return false
+        | Ok(Some _) ->
             do! ensureNotesFolderIfEnabled onError
             return true
     }

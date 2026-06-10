@@ -144,10 +144,10 @@ let toFileTreeNode (fileEntries: FileEntry[]) =
 
     rootElement
 
-let rec collapseSingleChildSameNameDirectories (node: FileTreeNode) : FileTreeNode =
+let rec collapseSingleChildSameName (node: FileTreeNode) : FileTreeNode =
     let collapsedChildren =
         node.children.Values
-        |> Seq.map collapseSingleChildSameNameDirectories
+        |> Seq.map collapseSingleChildSameName
         |> Seq.toList
 
     let childrenByName = Dictionary<string, FileTreeNode>()

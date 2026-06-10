@@ -24,6 +24,7 @@
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeMaterialization.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRenameHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeContextMenu.fs" />
@@ -42,6 +43,7 @@
     <Compile Include="Components\MainContent\Types.fs" />
     <Compile Include="Components\MainContent\Helper.fs" />
     <Compile Include="Components\MainContent\SettingsPageTarget.fs" />
+    <Compile Include="Components\MainContent\ArcFilePreviewTargetHelper.fs" />
     <Compile Include="Components\MainContent\ArcFilePreviewTarget.fs" />
     <Compile Include="Components\MainContent\TextPreviewTarget.fs" />
     <Compile Include="Components\MainContent\MarkdownEditorTarget.fs" />

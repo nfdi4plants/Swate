@@ -30,7 +30,7 @@ Vitest.describe("FileIOHelper.collapseSingleChildSameNameDirectories", fun () ->
         let outerA = directoryNode "A" "arc/A" [ innerA ]
         let root = directoryNode "arc" "arc" [ outerA ]
 
-        let collapsed = collapseSingleChildSameNameDirectories root
+        let collapsed = collapseSingleChildSameName root
         let mergedA = onlyChild collapsed
         let mergedLeaf = onlyChild mergedA
 
@@ -45,7 +45,7 @@ Vitest.describe("FileIOHelper.collapseSingleChildSameNameDirectories", fun () ->
         let level1 = directoryNode "A" "arc/A" [ level2 ]
         let root = directoryNode "arc" "arc" [ level1 ]
 
-        let collapsed = collapseSingleChildSameNameDirectories root
+        let collapsed = collapseSingleChildSameName root
         let mergedA = onlyChild collapsed
 
         Vitest.expect(mergedA.path).toBe("arc/A/A/A")
@@ -57,7 +57,7 @@ Vitest.describe("FileIOHelper.collapseSingleChildSameNameDirectories", fun () ->
         let outerA = directoryNode "A" "arc/A" [ sameNameChild; siblingFile ]
         let root = directoryNode "arc" "arc" [ outerA ]
 
-        let collapsed = collapseSingleChildSameNameDirectories root
+        let collapsed = collapseSingleChildSameName root
         let topA = onlyChild collapsed
         let childPaths =
             topA.children.Values
@@ -73,7 +73,7 @@ Vitest.describe("FileIOHelper.collapseSingleChildSameNameDirectories", fun () ->
         let outerA = directoryNode "A" "arc/A" [ innerB ]
         let root = directoryNode "arc" "arc" [ outerA ]
 
-        let collapsed = collapseSingleChildSameNameDirectories root
+        let collapsed = collapseSingleChildSameName root
         let topA = onlyChild collapsed
         let childB = onlyChild topA
 
@@ -88,7 +88,7 @@ Vitest.describe("FileIOHelper.collapseSingleChildSameNameDirectories", fun () ->
         let outerData = directoryNode "Data" "arc/Data" [ innerData ]
         let root = directoryNode "arc" "arc" [ outerData ]
 
-        let collapsed = collapseSingleChildSameNameDirectories root
+        let collapsed = collapseSingleChildSameName root
         let mergedData = onlyChild collapsed
 
         Vitest.expect(mergedData.path).toBe("arc/Data/data")

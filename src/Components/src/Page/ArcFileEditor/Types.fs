@@ -57,4 +57,5 @@ type ActiveView =
 type ArcFileEditorHeaderProps = {
     arcFile: ArcFiles
     activeView: ActiveView
+    setActiveView: ActiveView -> unit
 }

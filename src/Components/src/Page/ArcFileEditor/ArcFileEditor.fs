@@ -286,8 +286,13 @@ type Main =
                 (fun () -> {
                     arcFile = arcFile
                     activeView = activeView
+                    setActiveView = setActiveView
                 }),
-                [| box arcFile; box activeView |]
+                [|
+                    box arcFile
+                    box activeView
+                    box setActiveView
+                |]
             )
 
         let activeTableIndex = activeView.TryTableIndex

@@ -10,7 +10,6 @@ let private createConfig () : PathActionConfig = {
     openPathInFileExplorer = fun _ -> promise { return Ok() }
     openPathWithDefaultApplication = fun _ -> promise { return Ok() }
     enqueueError = ignore
-    arcScopeId = None
 }
 
 let private createContextMenuConfig () : ContextMenuConfig = {
@@ -22,7 +21,6 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     requestDeleteItem = ignore
     pathActionConfig = createConfig ()
     enqueueError = ignore
-    arcScopeId = None
     runToggleLfsMark = fun _ _ -> promise { return Ok() }
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
 }

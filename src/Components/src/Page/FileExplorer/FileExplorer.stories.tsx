@@ -116,6 +116,56 @@ const SelectedPathFileExplorer = () => {
   );
 };
 
+const InitiallyExpandedFileExplorer = () => {
+  const items = React.useMemo(() => {
+    const child = createStableFile("Initially Visible.txt", "arc/initially-expanded/Initially Visible.txt", "initial-child");
+    const folder = Object.assign(
+      createStableFolder("Initially Expanded", "arc/initially-expanded", "initial-folder", [child]),
+      { IsExpanded: true },
+    );
+
+    return ofArray([folder]);
+  }, []);
+
+  return (
+    <div className="swt:p-4">
+      <FileExplorer initialItems={items} />
+    </div>
+  );
+};
+
+const ExpansionRefreshFileExplorer = () => {
+  const [lazyFolderLoaded, setLazyFolderLoaded] = React.useState(false);
+
+  const items = React.useMemo(() => {
+    const selectedFile = createStableFile("selected-report.txt", "arc/selected-parent/selected-report.txt", "selected-file");
+    const selectedParent = createStableFolder("Selected Parent", "arc/selected-parent", "selected-parent", [selectedFile]);
+    const lazyChild = createStableFile("Lazy Child.txt", "arc/lazy-folder/Lazy Child.txt", "lazy-child");
+    const lazyFolder = createStableFolder(
+      "Lazy Folder",
+      "arc/lazy-folder",
+      "lazy-folder",
+      lazyFolderLoaded ? [lazyChild] : undefined,
+    );
+
+    return ofArray([selectedParent, lazyFolder]);
+  }, [lazyFolderLoaded]);
+
+  return (
+    <div className="swt:p-4">
+      <FileExplorer
+        initialItems={items}
+        selectedItemId="selected-file"
+        onDirectoryExpansionChange={(item, willExpand) => {
+          if (item.Id === "lazy-folder" && willExpand) {
+            setLazyFolderLoaded(true);
+          }
+        }}
+      />
+    </div>
+  );
+};
+
 const DeleteActionFileExplorer = () => {
   const [lastDeleted, setLastDeleted] = React.useState<string>("none");
   const [lastAction, setLastAction] = React.useState<string>("none");
@@ -317,6 +367,52 @@ export const DirectoryArrowsReflectLoadability: StoryObj<typeof LazyLoadDirector
   },
 };
 
+export const SelectingLazyDirectoryMaterializesChildren: StoryObj<typeof LazyLoadDirectoryFileExplorer> = {
+  render: () => <LazyLoadDirectoryFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.queryByText("Lazy Child.txt")).toBeNull();
+    await userEvent.click(await canvas.findByText("Lazy Folder"));
+
+    await waitFor(() => expect(canvas.getByText("Lazy Child.txt")).toBeInTheDocument());
+    await expect(canvas.getByRole("button", { name: "Collapse Lazy Folder" })).toBeInTheDocument();
+  },
+};
+
+export const ContextMenuExpansionMaterializesChildren: StoryObj<typeof LazyLoadDirectoryFileExplorer> = {
+  render: () => <LazyLoadDirectoryFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const lazyFolder = await canvas.findByText("Lazy Folder");
+    const lazyFolderItem = lazyFolder.closest("[data-file-item-id]");
+
+    await waitFor(() => expect(lazyFolderItem).toBeTruthy());
+
+    if (!lazyFolderItem) {
+      throw new Error("Expected lazy folder item for context menu test.");
+    }
+
+    fireEvent.contextMenu(lazyFolderItem, { clientX: 24, clientY: 24, bubbles: true });
+    await userEvent.click(await screen.findByText("Expand"));
+
+    await waitFor(() => expect(canvas.getByText("Lazy Child.txt")).toBeInTheDocument());
+  },
+};
+
+export const InitialExpandedHintIsApplied: StoryObj<typeof InitiallyExpandedFileExplorer> = {
+  render: () => <InitiallyExpandedFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(await canvas.findByText("Initially Visible.txt")).toBeInTheDocument();
+    await expect(canvas.getByRole("button", { name: "Collapse Initially Expanded" })).toBeInTheDocument();
+  },
+};
+
 export const SelectedFileHighlightPersistsAfterParentReopen: StoryObj<typeof SelectedPathFileExplorer> = {
   render: () => <SelectedPathFileExplorer />,
 
@@ -340,6 +436,23 @@ export const SelectedFileHighlightPersistsAfterParentReopen: StoryObj<typeof Sel
     const selectedFileLabelAfterReopen = await canvas.findByText("selected-report.txt");
     await expect(selectedFileLabelAfterReopen).toHaveClass(/swt:font-semibold/);
     await expect(selectedFileLabelAfterReopen).toHaveClass(/swt:text-primary/);
+  },
+};
+
+export const CollapsedDirectoryStaysClosedAfterLazySiblingLoads: StoryObj<typeof ExpansionRefreshFileExplorer> = {
+  render: () => <ExpansionRefreshFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(await canvas.findByRole("button", { name: "Collapse Selected Parent" }));
+    await waitFor(() => expect(canvas.queryByText("selected-report.txt")).toBeNull());
+
+    await userEvent.click(await canvas.findByRole("button", { name: "Expand Lazy Folder" }));
+    await waitFor(() => expect(canvas.getByText("Lazy Child.txt")).toBeInTheDocument());
+
+    await expect(canvas.queryByText("selected-report.txt")).toBeNull();
+    await expect(canvas.getByRole("button", { name: "Expand Selected Parent" })).toBeInTheDocument();
   },
 };
 
