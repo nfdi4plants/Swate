@@ -857,6 +857,44 @@ export const CopiesValueOntoAGroup: Story = {
   },
 };
 
+export const ResizesThreePanelLayout: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const surface = canvas.getByTestId('provenance-surface');
+    const leftSplitter = canvas.getByTestId('provenance-left-splitter');
+    const before = surface.getAttribute('style');
+    const surfaceRect = surface.getBoundingClientRect();
+    const splitterRect = leftSplitter.getBoundingClientRect();
+
+    fireEvent.pointerDown(leftSplitter, {
+      clientX: splitterRect.left + 2,
+      clientY: splitterRect.top + 8,
+      button: 0,
+      buttons: 1,
+      isPrimary: true,
+      pointerId: 11,
+    });
+    fireEvent.pointerMove(document, {
+      clientX: surfaceRect.left + surfaceRect.width * 0.32,
+      clientY: splitterRect.top + 8,
+      button: 0,
+      buttons: 1,
+      isPrimary: true,
+      pointerId: 11,
+    });
+    fireEvent.pointerUp(document, {
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId: 11,
+    });
+
+    await waitFor(() => expect(surface.getAttribute('style')).not.toEqual(before));
+    expect(surface.getAttribute('style')).toContain('grid-template-columns');
+  },
+};
+
 export const ConnectsGroups: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

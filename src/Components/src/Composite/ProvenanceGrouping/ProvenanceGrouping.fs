@@ -1,5 +1,6 @@
 namespace Swate.Components.Composite.ProvenanceGrouping
 
+open System.Globalization
 open Fable.Core
 open Feliz
 open Swate.Components.JsBindings
@@ -27,6 +28,40 @@ type private DragContext =
         Lookups: EditorLookups
         ConnectGroups: DisplayGroup -> DisplayGroup -> unit
     }
+
+/// Resizable three-panel surface helpers.
+module private Splitter =
+
+    type SplitterSide =
+        | Left
+        | Right
+
+    let template (ratios: PanelRatios) =
+        let left = ratios.Left.ToString(CultureInfo.InvariantCulture)
+        let middle = ratios.Middle.ToString(CultureInfo.InvariantCulture)
+        let right = ratios.Right.ToString(CultureInfo.InvariantCulture)
+        $"minmax(10rem, {left}fr) 0.75rem minmax(28rem, {middle}fr) 0.75rem minmax(10rem, {right}fr)"
+
+    let testId side =
+        match side with
+        | Left -> "provenance-left-splitter"
+        | Right -> "provenance-right-splitter"
+
+    let handle side onPointerDown debug =
+        Html.div [
+            prop.className "swt:group swt:flex swt:min-h-full swt:cursor-col-resize swt:items-stretch swt:justify-center swt:rounded hover:swt:bg-base-300/60"
+            prop.onPointerDown onPointerDown
+            prop.style [ style.custom ("touch-action", "none") ]
+            prop.custom ("role", "separator")
+            prop.custom ("aria-orientation", "vertical")
+            prop.ariaLabel "Resize provenance panels"
+            if debug then prop.testId (testId side)
+            prop.children [
+                Html.div [
+                    prop.className "swt:my-2 swt:w-1 swt:rounded-full swt:bg-base-content/15 swt:transition-colors group-hover:swt:bg-base-content/35"
+                ]
+            ]
+        ]
 
 /// Resolves drag payload ids and display ids against the active pair and UI palette.
 module private EditorLookups =
@@ -278,7 +313,7 @@ module private EditorSurface =
             | ProvenanceSide.Output -> "Output"
 
         Html.div [
-            prop.className "swt:flex swt:flex-col swt:gap-3"
+            prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-3"
             prop.children [
                 for group in groups do
                     GroupCard.Main(
@@ -323,12 +358,72 @@ type ProvenanceGrouping =
         let rawUiState, setUiState = React.useState (State.init session)
         let activeDrag, setActiveDrag = React.useState<DragDrop.Payload option> None
         let surfaceRef = React.useElementRef ()
+        let splitDrag = React.useRef (None: Splitter.SplitterSide option)
 
         let uiState = State.Layers.ensure session rawUiState
         let pair, inputGroups, outputGroups, connections = Display.displayPair session uiState
+        let latestUiState = React.useRef uiState
+        let activePairId = React.useRef pair.Id
+        latestUiState.current <- uiState
+        activePairId.current <- pair.Id
+        let panelRatios = State.PanelLayout.get pair.Id uiState
         let inputEndpointKind = Endpoints.defaultEndpointKind ProvenanceSide.Input pair.Model
         let outputEndpointKind = Endpoints.defaultEndpointKind ProvenanceSide.Output pair.Model
         let lookups = EditorLookups.create pair uiState inputGroups outputGroups
+
+        let commitPanelRatio side clientX =
+            match surfaceRef.current with
+            | None -> ()
+            | Some surface ->
+                let rect = surface.getBoundingClientRect ()
+                let rawPercent =
+                    if rect.width <= 0. then
+                        0.
+                    else
+                        ((clientX - rect.left) / rect.width) * 100.
+
+                let splitPercent =
+                    rawPercent
+                    |> max 0.
+                    |> min 100.
+                    |> round
+                    |> int
+
+                let current = latestUiState.current
+                let next =
+                    match side with
+                    | Splitter.Left -> State.PanelLayout.setLeft activePairId.current splitPercent current
+                    | Splitter.Right -> State.PanelLayout.setRight activePairId.current (100 - splitPercent) current
+
+                latestUiState.current <- next
+                setUiState next
+
+        React.useEffectOnce (fun () ->
+            let onMove =
+                fun (event: Browser.Types.PointerEvent) ->
+                    match splitDrag.current with
+                    | Some side -> commitPanelRatio side event.clientX
+                    | None -> ()
+
+            let stopDragging =
+                fun (_: Browser.Types.PointerEvent) ->
+                    splitDrag.current <- None
+
+            Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
+            Browser.Dom.document.addEventListener ("pointerup", unbox stopDragging)
+            Browser.Dom.document.addEventListener ("pointercancel", unbox stopDragging)
+
+            FsReact.createDisposable (fun () ->
+                Browser.Dom.document.removeEventListener ("pointermove", unbox onMove)
+                Browser.Dom.document.removeEventListener ("pointerup", unbox stopDragging)
+                Browser.Dom.document.removeEventListener ("pointercancel", unbox stopDragging)
+            )
+        )
+
+        let startPanelDrag side (event: Browser.Types.PointerEvent) =
+            event.preventDefault ()
+            splitDrag.current <- Some side
+            commitPanelRatio side event.clientX
 
         let pointerSensor =
             DndKit.useSensor (
@@ -412,60 +507,80 @@ type ProvenanceGrouping =
                     | None -> Html.none
                     Html.div [
                         prop.ref surfaceRef
-                        prop.className "swt:relative swt:grid swt:grid-cols-[minmax(10rem,12rem)_minmax(16rem,1fr)_6rem_minmax(16rem,1fr)_minmax(10rem,12rem)] swt:gap-4 swt:items-start"
+                        prop.className "swt:relative swt:grid swt:min-w-0 swt:items-start"
+                        prop.style [
+                            style.custom ("grid-template-columns", Splitter.template panelRatios)
+                        ]
+                        if debug then prop.testId "provenance-surface"
                         prop.children [
                             ConnectorOverlay.Main(
                                 surfaceRef,
                                 connections,
                                 (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
                                 debug = debug)
-                            EditorSurface.propertyRail
-                                ProvenanceSide.Input
-                                pair
-                                pair.Model
-                                uiState
-                                (State.Layers.get pair.LeftLayerId uiState).GroupingAssignments
-                                (fun header -> toggleSideGrouping pair.LeftLayerId ProvenanceSide.Input header)
-                                (fun header -> State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState |> setUiState)
-                                (fun header -> State.GroupingAssignments.move pair.Id pair.LeftLayerId pair.RightLayerId ProvenanceSide.Output header uiState |> setUiState)
-                                (fun header -> togglePropertyExpanded ProvenanceSide.Input header)
-                                (fun header value unit -> addPaletteValue ProvenanceSide.Input header value unit)
-                                debug
-                            EditorSurface.groupColumn
-                                ProvenanceSide.Input
-                                pair
-                                pair.Model
-                                inputGroups
-                                inputEndpointKind
-                                createSet
-                                uiState
-                                toggleSelection
-                                toggleGroupDetail
-                                debug
-                            Html.div [ prop.className "swt:min-h-full" ]
-                            EditorSurface.groupColumn
-                                ProvenanceSide.Output
-                                pair
-                                pair.Model
-                                outputGroups
-                                outputEndpointKind
-                                createSet
-                                uiState
-                                toggleSelection
-                                toggleGroupDetail
-                                debug
-                            EditorSurface.propertyRail
-                                ProvenanceSide.Output
-                                pair
-                                pair.Model
-                                uiState
-                                (State.Layers.get pair.RightLayerId uiState).GroupingAssignments
-                                (fun header -> toggleSideGrouping pair.RightLayerId ProvenanceSide.Output header)
-                                (fun header -> State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState |> setUiState)
-                                (fun header -> State.GroupingAssignments.move pair.Id pair.RightLayerId pair.LeftLayerId ProvenanceSide.Input header uiState |> setUiState)
-                                (fun header -> togglePropertyExpanded ProvenanceSide.Output header)
-                                (fun header value unit -> addPaletteValue ProvenanceSide.Output header value unit)
-                                debug
+                            Html.div [
+                                prop.className "swt:@container/provenancePanel swt:min-w-0 swt:overflow-hidden"
+                                prop.children [
+                                    EditorSurface.propertyRail
+                                        ProvenanceSide.Input
+                                        pair
+                                        pair.Model
+                                        uiState
+                                        (State.Layers.get pair.LeftLayerId uiState).GroupingAssignments
+                                        (fun header -> toggleSideGrouping pair.LeftLayerId ProvenanceSide.Input header)
+                                        (fun header -> State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState |> setUiState)
+                                        (fun header -> State.GroupingAssignments.move pair.Id pair.LeftLayerId pair.RightLayerId ProvenanceSide.Output header uiState |> setUiState)
+                                        (fun header -> togglePropertyExpanded ProvenanceSide.Input header)
+                                        (fun header value unit -> addPaletteValue ProvenanceSide.Input header value unit)
+                                        debug
+                                ]
+                            ]
+                            Splitter.handle Splitter.Left (startPanelDrag Splitter.Left) debug
+                            Html.div [
+                                prop.className "swt:@container/provenancePanel swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-4"
+                                prop.children [
+                                    EditorSurface.groupColumn
+                                        ProvenanceSide.Input
+                                        pair
+                                        pair.Model
+                                        inputGroups
+                                        inputEndpointKind
+                                        createSet
+                                        uiState
+                                        toggleSelection
+                                        toggleGroupDetail
+                                        debug
+                                    EditorSurface.groupColumn
+                                        ProvenanceSide.Output
+                                        pair
+                                        pair.Model
+                                        outputGroups
+                                        outputEndpointKind
+                                        createSet
+                                        uiState
+                                        toggleSelection
+                                        toggleGroupDetail
+                                        debug
+                                ]
+                            ]
+                            Splitter.handle Splitter.Right (startPanelDrag Splitter.Right) debug
+                            Html.div [
+                                prop.className "swt:@container/provenancePanel swt:min-w-0 swt:overflow-hidden"
+                                prop.children [
+                                    EditorSurface.propertyRail
+                                        ProvenanceSide.Output
+                                        pair
+                                        pair.Model
+                                        uiState
+                                        (State.Layers.get pair.RightLayerId uiState).GroupingAssignments
+                                        (fun header -> toggleSideGrouping pair.RightLayerId ProvenanceSide.Output header)
+                                        (fun header -> State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState |> setUiState)
+                                        (fun header -> State.GroupingAssignments.move pair.Id pair.RightLayerId pair.LeftLayerId ProvenanceSide.Input header uiState |> setUiState)
+                                        (fun header -> togglePropertyExpanded ProvenanceSide.Output header)
+                                        (fun header value unit -> addPaletteValue ProvenanceSide.Output header value unit)
+                                        debug
+                                ]
+                            ]
                         ]
                     ]
                     EditorPanels.connectionDetails debug connections uiState.Detail

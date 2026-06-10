@@ -373,7 +373,7 @@ type Controls =
         Html.aside [
             prop.ref droppable.setNodeRef
             prop.className [
-                "swt:flex swt:flex-col swt:gap-2 swt:min-w-44"
+                "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
                 if droppable.isOver then
                     "swt:ring-2 swt:ring-primary swt:rounded"
             ]
