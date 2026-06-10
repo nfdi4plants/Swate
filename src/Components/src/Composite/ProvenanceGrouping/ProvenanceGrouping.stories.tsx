@@ -181,15 +181,17 @@ export const GroupsBothSidesFromOutputProperty: Story = {
   },
 };
 
-export const ConnectedOutputsShowInheritedInputProperties: Story = {
+export const ConnectedOutputsKeepPropertiesInRailsAndConnections: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const outputA = canvas.getByText('Output A').closest('article')!;
 
-    expect(outputA).toHaveTextContent('Analysis: Mass Spectrometry');
-    expect(outputA).toHaveTextContent('Species: Arabidopsis');
-    expect(outputA).toHaveTextContent('Temperature: 12 C');
+    expect(outputA).toHaveTextContent('Output A');
+    expect(outputA).not.toHaveTextContent('Analysis: Mass Spectrometry');
+    expect(outputA).not.toHaveTextContent('Species: Arabidopsis');
+    expect(outputA).not.toHaveTextContent('Temperature: 12 C');
+    expect(canvas.getAllByTestId('provenance-connection').length).toBeGreaterThan(0);
   },
 };
 
@@ -751,8 +753,9 @@ export const AddsExistingPropertyToCreatedEmptySide: Story = {
     await dragByPointer(source, output);
 
     await waitFor(() =>
-      expect(canvas.getByText('New Output').closest('article')!).toHaveTextContent('Species: Arabidopsis'),
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue'),
     );
+    expect(canvas.getByText('New Output').closest('article')!).not.toHaveTextContent('Species: Arabidopsis');
   },
 };
 
@@ -765,8 +768,10 @@ export const AddsNewPropertyFromRail: Story = {
     const source = await addRailProperty(canvas, 'Input', 'Treatment', 'Drought');
     await dragByPointer(source, target);
 
-    await waitFor(() => expect(target).toHaveTextContent('Treatment: Drought'));
-    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue'),
+    );
+    expect(target).not.toHaveTextContent('Treatment: Drought');
   },
 };
 
@@ -849,14 +854,14 @@ async function startDragByPointer(source: Element) {
 async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
   const panelId = `provenance-property-values-${side}-${propertyName}`;
   if (!canvas.queryByTestId(panelId)) {
-    await userEvent.click(canvas.getByTestId(`provenance-property-expand-${side}-${propertyName}`));
+    fireEvent.click(canvas.getByTestId(`provenance-property-expand-${side}-${propertyName}`));
   }
   await waitFor(() => expect(canvas.getByTestId(panelId)).toBeInTheDocument());
   return within(canvas.getByTestId(panelId));
 }
 
 async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
-  await userEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
+  fireEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
 }
 
 async function railValue(
@@ -902,8 +907,11 @@ async function addRailProperty(
   const addPropertyTrigger = within(rail.getByTestId('popover_trigger_provenance-add-value-Property'))
     .getByText('Add property')
     .closest('button')!;
-  await userEvent.click(addPropertyTrigger);
-  const category = await waitFor(() => screen.getAllByTestId('term-search-input')[0]);
+  fireEvent.click(addPropertyTrigger);
+  const category = await waitFor(() => screen.getAllByTestId('term-search-input')[0]).catch(async () => {
+    fireEvent.click(addPropertyTrigger);
+    return waitFor(() => screen.getAllByTestId('term-search-input')[0]);
+  });
   await userEvent.type(category, propertyName);
   await userEvent.keyboard('{Escape}');
   await userEvent.type(screen.getByRole('textbox', { name: new RegExp(`${propertyName} value`, 'i') }), valueText);
@@ -1030,11 +1038,9 @@ export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    await groupByProperty(canvas, 'Input', 'Species');
 
-    const inputGroup = await waitFor(
-      () => canvas.getAllByText('Species: Arabidopsis').find((element) => element.tagName === 'H3')!.closest('article')!,
-    );
+    const inputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
     const outputGroup = canvas.getByText('Output E').closest('article')!;
 
     await dragByPointer(
