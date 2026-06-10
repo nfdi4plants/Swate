@@ -80,7 +80,7 @@ type ArcVault(window: BrowserWindow) =
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
-        /// Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
+        // Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
         if this.arc.IsSome then
             let hasNewChanges = this.arc.Value.hasInMemoryChanges ()
             let valueIsChanging = this.hasUnsavedArcChanges <> hasNewChanges
