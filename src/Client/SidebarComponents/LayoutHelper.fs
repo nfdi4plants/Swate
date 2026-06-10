@@ -42,7 +42,10 @@ type SidebarLayout =
         ]
 
     static member Header(txt: string) =
-        Html.h3 [ prop.className "swt:text-lg swt:font-semibold"; prop.text txt ]
+        Html.h3 [
+            prop.className "swt:text-lg swt:font-semibold"
+            prop.text txt
+        ]
 
     static member Description(content: ReactElement) =
         Html.div [

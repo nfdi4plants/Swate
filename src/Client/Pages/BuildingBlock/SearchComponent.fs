@@ -142,6 +142,7 @@ type SearchComponent =
                                     |> Option.map (fun term -> term |> (OntologyAnnotation.from >> U2.Case1))
 
                                 BuildingBlock.UpdateHeaderArg case |> BuildingBlockMsg |> dispatch
+
                             let input = model.AddBuildingBlockState.TryHeaderOA()
 
                             Swate.Components.Composite.TermSearch.TermSearch.TermSearch(
@@ -194,8 +195,7 @@ type SearchComponent =
     static member Main(model: Model, dispatch) : ReactElement =
         let state_bb, setState_bb = React.useState (BuildingBlockUIState.init)
 
-        let ctx =
-            useAnnotationTableStateCtx ()
+        let ctx = useAnnotationTableStateCtx ()
 
         let xIndex =
             ctx.state
@@ -210,8 +210,7 @@ type SearchComponent =
         Html.div [
             Html.form [
                 prop.className "swt:flex swt:flex-col swt:gap-4 swt:p-2"
-                prop.onSubmit (fun ev -> ev.preventDefault ()
-                )
+                prop.onSubmit (fun ev -> ev.preventDefault ())
                 prop.children [
                     SearchComponent.SearchBuildingBlockHeaderElement(state_bb, setState_bb, model, dispatch)
                     if model.AddBuildingBlockState.HeaderCellType.IsTermColumn() then

@@ -588,4 +588,3 @@ type ArcObjectExplorerContent =
                         | None -> Html.none
                 ]
             ]
-

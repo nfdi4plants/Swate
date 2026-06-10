@@ -192,14 +192,10 @@ let arcDeleteAndRenameContextMenuItems (config: ContextMenuConfig) (item: FileIt
 
 let createContextMenuItems (config: ContextMenuConfig) =
     let toggleLfsMark =
-        Renderer.Components.FileExplorerLfs.createToggleLfsMark
-            config.enqueueError
-            config.runToggleLfsMark
+        Renderer.Components.FileExplorerLfs.createToggleLfsMark config.enqueueError config.runToggleLfsMark
 
     let freeLocalLfsCopy =
-        Renderer.Components.FileExplorerLfs.createFreeLocalLfsCopy
-            config.enqueueError
-            config.runFreeLocalLfsCopy
+        Renderer.Components.FileExplorerLfs.createFreeLocalLfsCopy config.enqueueError config.runFreeLocalLfsCopy
 
     fun item ->
         withDividers [

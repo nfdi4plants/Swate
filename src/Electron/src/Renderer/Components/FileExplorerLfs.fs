@@ -46,7 +46,7 @@ let createToggleLfsMark
     : (FileItem -> bool -> unit) =
     let setError (errorMsg: string option) =
         match errorMsg with
-        | Some msg -> enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS update failed"))
+        | Some msg -> enqueueErrorModal (ErrorModalRequest.create (msg, title = "Git LFS update failed"))
         | None -> ()
 
     Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark setError runToggle
@@ -57,7 +57,7 @@ let createFreeLocalLfsCopy
     : (FileItem -> unit) =
     let setError (errorMsg: string option) =
         match errorMsg with
-        | Some msg -> enqueueErrorModal (ErrorModalRequest.create(msg, title = "Git LFS cleanup failed"))
+        | Some msg -> enqueueErrorModal (ErrorModalRequest.create (msg, title = "Git LFS cleanup failed"))
         | None -> ()
 
     Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy setError runCleanup

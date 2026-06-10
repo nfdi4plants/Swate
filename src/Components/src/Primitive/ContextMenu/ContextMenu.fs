@@ -147,7 +147,9 @@ type ContextMenu =
 
                                         listContentRef.current.AddRange(
                                             children
-                                            |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
+                                            |> List.map (fun child ->
+                                                child.kbdbutton |> Option.map (fun kbd -> kbd.label)
+                                            )
                                         )
 
                                         let rect: ClientRect =
@@ -171,6 +173,7 @@ type ContextMenu =
                                         myClearTimeout ()
 
                                         allowMouseUpCloseRef.current <- false
+
                                         timeout.current <-
                                             Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
 

@@ -288,11 +288,7 @@ type Main =
                     activeView = activeView
                     setActiveView = setActiveView
                 }),
-                [|
-                    box arcFile
-                    box activeView
-                    box setActiveView
-                |]
+                [| box arcFile; box activeView; box setActiveView |]
             )
 
         let activeTableIndex = activeView.TryTableIndex

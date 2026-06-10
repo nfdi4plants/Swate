@@ -17,14 +17,14 @@ let private createTableState rowCount =
     let assay = ArcAssay.init "TestAssay"
     assay.AddTable table
 
-    Spreadsheet.Model.init(ArcFiles.Assay assay, Spreadsheet.ActiveView.Table 0)
+    Spreadsheet.Model.init (ArcFiles.Assay assay, Spreadsheet.ActiveView.Table 0)
 
 let private createEmptyTableState () =
     let table = ArcTable.init "EmptyTable"
     let assay = ArcAssay.init "TestAssay"
     assay.AddTable table
 
-    Spreadsheet.Model.init(ArcFiles.Assay assay, Spreadsheet.ActiveView.Table 0)
+    Spreadsheet.Model.init (ArcFiles.Assay assay, Spreadsheet.ActiveView.Table 0)
 
 let private addDataAnnotation selectors rowCount =
     let state = createTableState rowCount
@@ -52,7 +52,8 @@ let private addDataAnnotationToEmptyTable selectors =
 
 let Main =
     testList "Spreadsheet Data Annotator" [
-        testCase "pads shorter selector lists to existing table row count" <| fun _ ->
+        testCase "pads shorter selector lists to existing table row count"
+        <| fun _ ->
             let nextState = addDataAnnotation [| "row=2" |] 3
             let outputColumn = nextState.ActiveTable.GetOutputColumn()
 
@@ -67,7 +68,8 @@ let Main =
             Expect.equal secondCell.FilePath None "Remaining rows should stay empty."
             Expect.equal secondCell.Selector None "Remaining rows should stay empty."
 
-        testCase "extends table rows when selector list is longer than current table" <| fun _ ->
+        testCase "extends table rows when selector list is longer than current table"
+        <| fun _ ->
             let nextState = addDataAnnotation [| "row=1"; "row=2"; "row=3" |] 1
             let outputColumn = nextState.ActiveTable.GetOutputColumn()
 
@@ -79,7 +81,8 @@ let Main =
             Expect.equal thirdCell.FilePath (Some "test.csv") "Newly added rows should receive annotation data."
             Expect.equal thirdCell.Selector (Some "row=3") "Selectors should be written in order."
 
-        testCase "creates the first data column for an empty table" <| fun _ ->
+        testCase "creates the first data column for an empty table"
+        <| fun _ ->
             let nextState = addDataAnnotationToEmptyTable [| "row=1"; "row=2" |]
             let outputColumn = nextState.ActiveTable.GetOutputColumn()
 

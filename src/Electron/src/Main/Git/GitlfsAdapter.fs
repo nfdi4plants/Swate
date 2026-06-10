@@ -28,136 +28,127 @@ type GitSpawnResult = {
 }
 
 /// Runs `git` without a shell and captures stdout/stderr for callers that need exact output or stdin support.
-let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> =
-    promise {
-        let! result =
-            Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
-                let spawnOptions =
-                    createObj [
-                        "shell" ==> false
-                        "windowsHide" ==> true
+let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promise {
+    let! result =
+        Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
+            let spawnOptions =
+                createObj [
+                    "shell" ==> false
+                    "windowsHide" ==> true
 
-                        match request.WorkingDirectory with
-                        | Some value -> "cwd" ==> value
-                        | None -> ()
+                    match request.WorkingDirectory with
+                    | Some value -> "cwd" ==> value
+                    | None -> ()
 
-                        match request.Environment with
-                        | Some value -> "env" ==> value
-                        | None -> ()
-                    ]
+                    match request.Environment with
+                    | Some value -> "env" ==> value
+                    | None -> ()
+                ]
 
-                let proc: obj = childProcessDynamic?spawn ("git", request.Arguments, spawnOptions)
-                let stdoutChunks = ResizeArray<obj>()
-                let stderrChunks = ResizeArray<string>()
-                let mutable finished = false
-                let mutable timedOut = false
+            let proc: obj = childProcessDynamic?spawn ("git", request.Arguments, spawnOptions)
+            let stdoutChunks = ResizeArray<obj>()
+            let stderrChunks = ResizeArray<string>()
+            let mutable finished = false
+            let mutable timedOut = false
 
-                let finish exitCode =
-                    if not finished then
-                        finished <- true
+            let finish exitCode =
+                if not finished then
+                    finished <- true
 
-                        let stdoutBuffer = bufferConcat (stdoutChunks.ToArray())
+                    let stdoutBuffer = bufferConcat (stdoutChunks.ToArray())
 
-                        resolve {
-                            ExitCode = exitCode
-                            StdoutBuffer = stdoutBuffer
-                            StdoutText = bufferToUtf8String stdoutBuffer
-                            StderrText = String.Concat(stderrChunks.ToArray())
-                            TimedOut = timedOut
-                        }
+                    resolve {
+                        ExitCode = exitCode
+                        StdoutBuffer = stdoutBuffer
+                        StdoutText = bufferToUtf8String stdoutBuffer
+                        StderrText = String.Concat(stderrChunks.ToArray())
+                        TimedOut = timedOut
+                    }
 
-                proc?stdout?on ("data", fun d -> stdoutChunks.Add d) |> ignore
+            proc?stdout?on ("data", fun d -> stdoutChunks.Add d) |> ignore
 
-                proc?stderr?on (
-                    "data",
-                    fun d -> stderrChunks.Add(d?toString ("utf8") |> unbox<string>)
+            proc?stderr?on ("data", fun d -> stderrChunks.Add(d?toString ("utf8") |> unbox<string>))
+            |> ignore
+
+            let timeoutId =
+                request.TimeoutMs
+                |> Option.map (fun timeoutMs ->
+                    Fable.Core.JS.setTimeout
+                        (fun () ->
+                            if not finished then
+                                timedOut <- true
+                                stderrChunks.Add $"Git command timed out after {timeoutMs} ms."
+                                proc?kill ("SIGTERM") |> ignore
+                        )
+                        timeoutMs
                 )
-                |> ignore
 
-                let timeoutId =
-                    request.TimeoutMs
-                    |> Option.map (fun timeoutMs ->
-                        Fable.Core.JS.setTimeout
-                            (fun () ->
-                                if not finished then
-                                    timedOut <- true
-                                    stderrChunks.Add $"Git command timed out after {timeoutMs} ms."
-                                    proc?kill ("SIGTERM") |> ignore)
-                            timeoutMs
+            proc?on (
+                "close",
+                fun code ->
+                    timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                    finish (if isNull code then -1 else int (unbox<float> code))
+            )
+            |> ignore
+
+            proc?on (
+                "error",
+                fun error ->
+                    timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+
+                    stderrChunks.Add(
+                        error
+                        |> Option.ofObj
+                        |> Option.map string
+                        |> Option.defaultValue "Failed to start git process."
                     )
 
-                proc?on (
-                    "close",
-                    fun code ->
-                        timeoutId |> Option.iter Fable.Core.JS.clearTimeout
-                        finish (if isNull code then -1 else int (unbox<float> code))
-                )
-                |> ignore
-
-                proc?on (
-                    "error",
-                    fun error ->
-                        timeoutId |> Option.iter Fable.Core.JS.clearTimeout
-                        stderrChunks.Add(
-                            error
-                            |> Option.ofObj
-                            |> Option.map string
-                            |> Option.defaultValue "Failed to start git process."
-                        )
-                        finish -1
-                )
-                |> ignore
-
-                match request.StandardInput with
-                | Some input ->
-                    proc?stdin?setDefaultEncoding ("utf8") |> ignore
-                    proc?stdin?``end`` (input) |> ignore
-                | None ->
-                    proc?stdin?``end`` () |> ignore
+                    finish -1
             )
+            |> ignore
 
-        return result
-    }
+            match request.StandardInput with
+            | Some input ->
+                proc?stdin?setDefaultEncoding ("utf8") |> ignore
+                proc?stdin?``end`` (input) |> ignore
+            | None -> proc?stdin?``end`` () |> ignore
+        )
+
+    return result
+}
 
 /// Runs a small git command and returns stdout text, or None on command failure.
 /// Used for feature probes where failure should not surface as a user-facing Git error.
-let tryExecGitText
-    (workingDirectory: string option)
-    (timeoutMs: int)
-    (args: string[])
-    : Promise<string option> =
-    promise {
-        let! output =
-            Fable.Core.JS.Constructors.Promise.Create(fun resolve _reject ->
-                let options =
-                    createObj [
-                        "encoding" ==> "utf8"
-                        "stdio" ==> "pipe"
-                        "shell" ==> false
-                        "timeout" ==> timeoutMs
+let tryExecGitText (workingDirectory: string option) (timeoutMs: int) (args: string[]) : Promise<string option> = promise {
+    let! output =
+        Fable.Core.JS.Constructors.Promise.Create(fun resolve _reject ->
+            let options =
+                createObj [
+                    "encoding" ==> "utf8"
+                    "stdio" ==> "pipe"
+                    "shell" ==> false
+                    "timeout" ==> timeoutMs
 
-                        match workingDirectory with
-                        | Some value -> "cwd" ==> value
-                        | None -> ()
-                    ]
+                    match workingDirectory with
+                    | Some value -> "cwd" ==> value
+                    | None -> ()
+                ]
 
-                childProcessDynamic?execFile (
-                    "git",
-                    args,
-                    options,
-                    fun (error: obj) (stdout: obj) (_stderr: obj) ->
-                        if error |> Option.ofObj |> Option.isSome then
-                            resolve None
-                        else
-                            stdout
-                            |> Option.ofObj
-                            |> Option.map string
-                            |> resolve
-                )
-                |> ignore)
+            childProcessDynamic?execFile (
+                "git",
+                args,
+                options,
+                fun (error: obj) (stdout: obj) (_stderr: obj) ->
+                    if error |> Option.ofObj |> Option.isSome then
+                        resolve None
+                    else
+                        stdout |> Option.ofObj |> Option.map string |> resolve
+            )
+            |> ignore
+        )
 
-        return output
-    }
+    return output
+}
 
 
 /// Adapter contract for Git LFS commands. Main services depend on this shape instead of direct child-process calls.
@@ -194,20 +185,13 @@ type NodeGitLfsAdapter() =
         |> _.Trim()
         |> _.ToLowerInvariant()
 
-    let validateRepoPath (repoPath: string) : Promise<bool> =
-        promise {
-            let! output =
-                tryExecGitText
-                    (Some repoPath)
-                    repoValidationTimeoutMs
-                    [| "rev-parse"; "--is-inside-work-tree" |]
+    let validateRepoPath (repoPath: string) : Promise<bool> = promise {
+        let! output = tryExecGitText (Some repoPath) repoValidationTimeoutMs [| "rev-parse"; "--is-inside-work-tree" |]
 
-            return
-                output
-                |> Option.exists (fun text ->
-                    text.Trim().Equals("true", System.StringComparison.OrdinalIgnoreCase)
-                )
-        }
+        return
+            output
+            |> Option.exists (fun text -> text.Trim().Equals("true", System.StringComparison.OrdinalIgnoreCase))
+    }
 
     let validateRepoPathSync (repoPath: string) =
         try
@@ -380,8 +364,7 @@ type NodeGitLfsAdapter() =
                                     request.TimeoutMs
                                     onProgress
                                     cancelCheck
-                        | _ ->
-                            return result
+                        | _ -> return result
         }
 
     let installGitLfs
@@ -389,12 +372,13 @@ type NodeGitLfsAdapter() =
         (onProgress: string -> unit)
         (cancelCheck: unit -> bool)
         : Promise<GitLfsResult> =
-        promise {
-            return! runProcess [ "lfs"; "install" ] None timeoutMs onProgress cancelCheck
-        }
+        promise { return! runProcess [ "lfs"; "install" ] None timeoutMs onProgress cancelCheck }
 
     let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
-        if not (validateRepoPathSync repoRoot) || System.String.IsNullOrWhiteSpace relativePath then
+        if
+            not (validateRepoPathSync repoRoot)
+            || System.String.IsNullOrWhiteSpace relativePath
+        then
             false
         else
             try

@@ -20,18 +20,14 @@ module PathHelpers =
         normalizeSeparators path |> fun normalized -> normalized.Trim('/').Trim()
 
     let normalizeCanonicalRelativePath (path: string) =
-        path
-        |> normalizeRelativePath
-        |> normalizePath
+        path |> normalizeRelativePath |> normalizePath
 
     let normalizeForComparison (path: string) =
         normalizeSeparators path
         |> fun normalized -> normalized.Trim().TrimEnd('/').ToLowerInvariant()
 
     let normalizePathForFsComparison (path: string) =
-        path
-        |> normalizePath
-        |> normalizeForComparison
+        path |> normalizePath |> normalizeForComparison
 
     let isSameOrDescendantPath (path: string) (ancestorPath: string) =
         let normalizedPath = normalizePath path
@@ -47,7 +43,8 @@ module PathHelpers =
 
         not (String.IsNullOrWhiteSpace normalizedPath)
         && not (String.IsNullOrWhiteSpace normalizedAncestorPath)
-        && (normalizedPath = normalizedAncestorPath || normalizedPath.StartsWith(normalizedAncestorPath + "/"))
+        && (normalizedPath = normalizedAncestorPath
+            || normalizedPath.StartsWith(normalizedAncestorPath + "/"))
 
     let containsPathTraversalSegments (path: string) =
         normalizeSeparators path
@@ -67,9 +64,7 @@ module PathHelpers =
         candidates |> Seq.exists (fun candidate -> pathsEqual candidate path)
 
     let getNameFromPath (path: string) =
-        normalizePath path
-        |> fun normalized -> normalized.Split('/')
-        |> Array.last
+        normalizePath path |> (fun normalized -> normalized.Split('/')) |> Array.last
 
     let tryGetParentPath (path: string) =
         let normalizedPath = normalizePath path
@@ -80,17 +75,15 @@ module PathHelpers =
         else
             Some(normalizedPath.Substring(0, separatorIndex))
 
-    let private tryResolveDatamapPreviewPath
-        (normalizedPath: string)
-        (folderName: string)
-        (targetFileName: string)
-        =
-        let pathSegments = normalizedPath.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
+    let private tryResolveDatamapPreviewPath (normalizedPath: string) (folderName: string) (targetFileName: string) =
+        let pathSegments =
+            normalizedPath.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
 
         match pathSegments with
-        | [| firstSegment; _; lastSegment |]
-            when String.Equals(firstSegment, folderName, StringComparison.OrdinalIgnoreCase)
-                 && String.Equals(lastSegment, "isa.datamap.xlsx", StringComparison.OrdinalIgnoreCase) ->
+        | [| firstSegment; _; lastSegment |] when
+            String.Equals(firstSegment, folderName, StringComparison.OrdinalIgnoreCase)
+            && String.Equals(lastSegment, "isa.datamap.xlsx", StringComparison.OrdinalIgnoreCase)
+            ->
             tryGetParentPath normalizedPath
             |> Option.map (fun folderPath -> $"{folderPath}/{targetFileName}")
         | _ -> None
@@ -109,8 +102,7 @@ module PathHelpers =
 
     /// normalizes the path and splits it into parts
     let getPathParts (path: string) =
-        normalizePath path
-        |> fun p -> p.Split('/')
+        normalizePath path |> fun p -> p.Split('/')
 
     let getFileName (path: string) = path |> getPathParts |> Array.last
 
@@ -156,8 +148,7 @@ module ArcEntityPathRules =
     let private disallowedGenericPathSegments = [ ".git" ]
 
     let private normalizeRelativePath (path: string) =
-        path
-        |> PathHelpers.normalizeCanonicalRelativePath
+        path |> PathHelpers.normalizeCanonicalRelativePath
 
     let private splitPathSegments (path: string) =
         path.Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
@@ -218,7 +209,10 @@ module ArcEntityPathRules =
 
     let private containsDisallowedGenericPathSegment (segments: string[]) =
         segments
-        |> Array.exists (fun segment -> disallowedGenericPathSegments |> List.exists (fun blocked -> PathHelpers.pathsEqual segment blocked))
+        |> Array.exists (fun segment ->
+            disallowedGenericPathSegments
+            |> List.exists (fun blocked -> PathHelpers.pathsEqual segment blocked)
+        )
 
     /// Parses canonical ARC file targets from the tail of a path and supports absolute paths.
     let tryParseCanonicalArcFileTarget (path: string) =
@@ -327,18 +321,16 @@ module ArcEntityPathRules =
         let fallbackPaths =
             match classifyDeleteTarget relativePath with
             | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, normalizedRelativePath)
-            | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.DataMapFile _, normalizedRelativePath) ->
-                [ normalizedRelativePath ]
-            | DeletePathClassification.EntityFolderTarget(zone, identifier, _) ->
-                [
-                    canonicalEntityFilePath zone identifier
-                    canonicalDataMapFilePath zone identifier
-                ]
+            | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.DataMapFile _, normalizedRelativePath) -> [
+                normalizedRelativePath
+              ]
+            | DeletePathClassification.EntityFolderTarget(zone, identifier, _) -> [
+                canonicalEntityFilePath zone identifier
+                canonicalDataMapFilePath zone identifier
+              ]
             | _ -> []
 
-        fallbackPaths
-        |> Seq.distinctBy PathHelpers.normalizeForComparison
-        |> Seq.toList
+        fallbackPaths |> Seq.distinctBy PathHelpers.normalizeForComparison |> Seq.toList
 
     let classifyRenameTarget (relativePath: string) =
         let normalizedRelativePath = normalizeRelativePath relativePath
@@ -396,8 +388,7 @@ module ArcEntityPathRules =
         else
             let segments = normalizedRelativePath |> splitPathSegments
 
-            let isArcEntityFolder =
-                segments.Length = 2 && (tryParseZone segments.[0]).IsSome
+            let isArcEntityFolder = segments.Length = 2 && (tryParseZone segments.[0]).IsSome
 
             let isSafeGenericDirectoryCandidate =
                 isGenericFileSystemTargetAllowed normalizedRelativePath
@@ -426,8 +417,7 @@ module ArcEntityPathRules =
         | RenamePathClassification.CanonicalDataMapFileTarget(zone, identifier, _) -> Some(zone, identifier)
         | _ -> None
 
-    let buildCanonicalEntityPaths zone identifier =
-        [
-            canonicalEntityFilePath zone identifier
-            canonicalDataMapFilePath zone identifier
-        ]
+    let buildCanonicalEntityPaths zone identifier = [
+        canonicalEntityFilePath zone identifier
+        canonicalDataMapFilePath zone identifier
+    ]

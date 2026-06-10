@@ -61,9 +61,7 @@ module PluginTextInputHelpers =
                 file.Name.ToLowerInvariant()
 
         let mimeLower =
-            file.MimeType
-            |> Option.defaultValue ""
-            |> fun mime -> mime.ToLowerInvariant()
+            file.MimeType |> Option.defaultValue "" |> (fun mime -> mime.ToLowerInvariant())
 
         if token.StartsWith "." then
             not (String.IsNullOrWhiteSpace fileNameLower) && fileNameLower.EndsWith token
@@ -104,60 +102,56 @@ module PluginTextInputHelpers =
 
     let normalizePath (path: string) = path.Replace("\\", "/")
 
-    let toPromptFile (file: File) : MarkdownPromptFile =
-        {
-            Name = file.name
-            MimeType =
-                if String.IsNullOrWhiteSpace file.``type`` then
-                    None
-                else
-                    Some file.``type``
-            // Browser fallback cannot reliably resolve host filesystem paths.
-            HostPath = None
-            BrowserFile = Some file
-        }
+    let toPromptFile (file: File) : MarkdownPromptFile = {
+        Name = file.name
+        MimeType =
+            if String.IsNullOrWhiteSpace file.``type`` then
+                None
+            else
+                Some file.``type``
+        // Browser fallback cannot reliably resolve host filesystem paths.
+        HostPath = None
+        BrowserFile = Some file
+    }
 
-    let resolvePromptFilePath (filePickerAdapter: MarkdownFilePickerAdapter option) (file: MarkdownPromptFile) =
-        promise {
-            // Fallback path strategy when no host resolver is provided.
-            let fallbackPath =
-                match file.HostPath with
-                | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> normalizePath hostPath
-                | _ -> file.Name
+    let resolvePromptFilePath (filePickerAdapter: MarkdownFilePickerAdapter option) (file: MarkdownPromptFile) = promise {
+        // Fallback path strategy when no host resolver is provided.
+        let fallbackPath =
+            match file.HostPath with
+            | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> normalizePath hostPath
+            | _ -> file.Name
 
-            match filePickerAdapter with
-            | Some adapter ->
-                // Preferred substitution point for runtime-specific link/path mapping.
-                let! resolvedPath = adapter.ResolveMarkdownPath file
+        match filePickerAdapter with
+        | Some adapter ->
+            // Preferred substitution point for runtime-specific link/path mapping.
+            let! resolvedPath = adapter.ResolveMarkdownPath file
 
-                if String.IsNullOrWhiteSpace resolvedPath then
-                    return fallbackPath
-                else
-                    return normalizePath resolvedPath
-            | None -> return fallbackPath
-        }
+            if String.IsNullOrWhiteSpace resolvedPath then
+                return fallbackPath
+            else
+                return normalizePath resolvedPath
+        | None -> return fallbackPath
+    }
 
-    let promptViewModel (activePrompt: MarkdownPromptPlugin option) : PromptViewModel =
-        {
-            Title =
-                activePrompt
-                |> Option.map (fun prompt -> prompt.Title)
-                |> Option.defaultValue "Plugin action"
-            Description = activePrompt |> Option.bind (fun prompt -> prompt.Description)
-            Placeholder =
-                activePrompt
-                |> Option.map (fun prompt -> prompt.Placeholder)
-                |> Option.defaultValue ""
-            SubmitButtonText =
-                activePrompt
-                |> Option.map (fun prompt -> prompt.SubmitButtonText)
-                |> Option.defaultValue "Apply"
-            InputMode = activePromptInputMode activePrompt
-            AcceptTypes = activePromptAcceptTypes activePrompt
-            AllowMultipleFiles = activePromptAllowsMultipleFiles activePrompt
-        }
+    let promptViewModel (activePrompt: MarkdownPromptPlugin option) : PromptViewModel = {
+        Title =
+            activePrompt
+            |> Option.map (fun prompt -> prompt.Title)
+            |> Option.defaultValue "Plugin action"
+        Description = activePrompt |> Option.bind (fun prompt -> prompt.Description)
+        Placeholder =
+            activePrompt
+            |> Option.map (fun prompt -> prompt.Placeholder)
+            |> Option.defaultValue ""
+        SubmitButtonText =
+            activePrompt
+            |> Option.map (fun prompt -> prompt.SubmitButtonText)
+            |> Option.defaultValue "Apply"
+        InputMode = activePromptInputMode activePrompt
+        AcceptTypes = activePromptAcceptTypes activePrompt
+        AllowMultipleFiles = activePromptAllowsMultipleFiles activePrompt
+    }
 
     let tryFindPluginForCommand (activePlugins: MarkdownToolbarPlugin list) (command: ICommand) =
         activePlugins
         |> List.tryFind (fun plugin -> plugin.Command.keyCommand = command.keyCommand)
-

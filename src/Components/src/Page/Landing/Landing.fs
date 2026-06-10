@@ -39,14 +39,14 @@ type Landing =
                     Conversion.toSubmitPayload draft target |> onSubmit
                 else
                     setError (Some "Title and Description are required.")
-            | None ->
-                setError (Some "Select Study or Assay before creating.")
+            | None -> setError (Some "Select Study or Assay before creating.")
 
         Html.div [
             prop.className "swt:p-8 swt:flex swt:justify-center"
             prop.children [
                 Html.div [
-                    prop.className "swt:w-full swt:max-w-3xl swt:rounded-box swt:border swt:border-base-300 swt:bg-base-200 swt:p-6 swt:space-y-4"
+                    prop.className
+                        "swt:w-full swt:max-w-3xl swt:rounded-box swt:border swt:border-base-300 swt:bg-base-200 swt:p-6 swt:space-y-4"
                     prop.children [
                         Html.h2 [
                             prop.className "swt:text-3xl swt:font-bold swt:text-primary"
@@ -60,7 +60,8 @@ type Landing =
                         Actions.ContinueButton(continueToQuestions, uiState.Error)
                         if uiState.ShowQuestions then
                             Html.div [
-                                prop.className "swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:space-y-3"
+                                prop.className
+                                    "swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:space-y-3"
                                 prop.children [
                                     Html.h3 [
                                         prop.className "swt:text-lg swt:font-semibold"

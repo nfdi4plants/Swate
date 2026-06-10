@@ -4,6 +4,7 @@ const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 module.exports = {
   packagerConfig: {
     asar: true,
+    executableName: 'swate',
   },
   rebuildConfig: {},
   makers: [
@@ -63,4 +64,18 @@ module.exports = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
+  publishers: [
+    {
+      name: '@electron-forge/publisher-github',
+      config: {
+        repository: {
+          owner: 'nfdi4plants',
+          name: 'Swate'
+        },
+        authToken: process.env.GITHUB_TOKEN,
+        prerelease: true,
+        draft: true
+      },
+    }
+  ]
 };

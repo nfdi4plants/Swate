@@ -9,44 +9,59 @@ let private investigationEvent name = {
     Path = "isa.investigation.xlsx"
 }
 
-Vitest.describe("investigation events", fun () ->
-    Vitest.test("add event copies all investigation fields from disc", fun () ->
-        let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
-        arcLocal.Title <- Some "User Title"
-        arcRemote.Title <- Some "Disc Title"
-        arcRemote.Description <- Some "Disc Desc"
+Vitest.describe (
+    "investigation events",
+    fun () ->
+        Vitest.test (
+            "add event copies all investigation fields from disc",
+            fun () ->
+                let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
+                arcLocal.Title <- Some "User Title"
+                arcRemote.Title <- Some "Disc Title"
+                arcRemote.Description <- Some "Disc Desc"
 
-        let merged = ARC.merge arcLocal arcRemote [ investigationEvent EventName.Add ]
+                let merged = ARC.merge arcLocal arcRemote [ investigationEvent EventName.Add ]
 
-        Vitest.expect(merged.Title).toEqual(Some "Disc Title")
-        Vitest.expect(merged.Description).toEqual(Some "Disc Desc"))
+                Vitest.expect(merged.Title).toEqual (Some "Disc Title")
+                Vitest.expect(merged.Description).toEqual (Some "Disc Desc")
+        )
 
-    Vitest.test("change event copies all investigation fields from disc", fun () ->
-        let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
-        arcLocal.Title <- Some "User Title"
-        arcRemote.Title <- Some "Disc Title"
-        arcRemote.Contacts <- ResizeArray([ Person(lastName = "Smith") ])
+        Vitest.test (
+            "change event copies all investigation fields from disc",
+            fun () ->
+                let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
+                arcLocal.Title <- Some "User Title"
+                arcRemote.Title <- Some "Disc Title"
+                arcRemote.Contacts <- ResizeArray([ Person(lastName = "Smith") ])
 
-        let merged = ARC.merge arcLocal arcRemote [ investigationEvent EventName.Change ]
+                let merged = ARC.merge arcLocal arcRemote [ investigationEvent EventName.Change ]
 
-        Vitest.expect(merged.Title).toEqual(Some "Disc Title")
-        Vitest.expect(merged.Contacts.Count).toBe(1))
+                Vitest.expect(merged.Title).toEqual (Some "Disc Title")
+                Vitest.expect(merged.Contacts.Count).toBe (1)
+        )
 
-    Vitest.test("unlink event is a no-op (cannot delete investigation without destroying ARC)", fun () ->
-        let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
-        arcLocal.Title <- Some "User Title"
-        arcRemote.Title <- Some "Disc Title"
+        Vitest.test (
+            "unlink event is a no-op (cannot delete investigation without destroying ARC)",
+            fun () ->
+                let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
+                arcLocal.Title <- Some "User Title"
+                arcRemote.Title <- Some "Disc Title"
 
-        let merged = ARC.merge arcLocal arcRemote [ investigationEvent EventName.Unlink ]
+                let merged = ARC.merge arcLocal arcRemote [ investigationEvent EventName.Unlink ]
 
-        Vitest.expect(merged.Title).toEqual(Some "User Title"))
+                Vitest.expect(merged.Title).toEqual (Some "User Title")
+        )
 
-    Vitest.test("investigation change event does not pull in new disc entities", fun () ->
-        let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
-        arcLocal.Title <- Some "User Title"
-        arcRemote.InitAssay("Extra Disc Assay") |> ignore
+        Vitest.test (
+            "investigation change event does not pull in new disc entities",
+            fun () ->
+                let arcLocal, arcRemote = MockData.createTwoCleanCopies ()
+                arcLocal.Title <- Some "User Title"
+                arcRemote.InitAssay("Extra Disc Assay") |> ignore
 
-        let merged = ARC.merge arcLocal arcRemote [ investigationEvent EventName.Change ]
+                let merged = ARC.merge arcLocal arcRemote [ investigationEvent EventName.Change ]
 
-        Vitest.expect(merged.AssayCount).toBe(1)
-        Vitest.expect(merged.ContainsAssay("Extra Disc Assay")).toBe(false)))
+                Vitest.expect(merged.AssayCount).toBe (1)
+                Vitest.expect(merged.ContainsAssay("Extra Disc Assay")).toBe (false)
+        )
+)

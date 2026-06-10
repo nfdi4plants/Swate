@@ -136,10 +136,7 @@ type Blankslate =
                             Html.div [
                                 prop.className [
                                     "swt:flex swt:flex-wrap swt:justify-center swt:gap-x-4 swt:gap-y-1"
-                                    if primaryActions.IsEmpty then
-                                        "swt:mt-4"
-                                    else
-                                        "swt:mt-1"
+                                    if primaryActions.IsEmpty then "swt:mt-4" else "swt:mt-1"
                                 ]
                                 prop.children (secondaryActions |> List.map Blankslate.SecondaryActionButton)
                             ]

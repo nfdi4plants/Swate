@@ -147,7 +147,9 @@ type ErrorModalProvider =
                                     Html.button [
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.text request.DismissLabel
-                                        prop.onClick (fun _ -> Helper.dismissSingleRequest modalState.dismissById request)
+                                        prop.onClick (fun _ ->
+                                            Helper.dismissSingleRequest modalState.dismissById request
+                                        )
                                     ]
                                 ]
                             ]

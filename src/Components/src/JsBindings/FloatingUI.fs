@@ -95,9 +95,7 @@ module FloatingUI =
     type OutsidePressGuard = Browser.Types.Event -> bool
 
     [<AllowNullLiteral; Global>]
-    type DismissPropagation
-        [<ParamObject; Emit("$0")>]
-        (?escapeKey: bool, ?outsidePress: bool) =
+    type DismissPropagation [<ParamObject; Emit("$0")>] (?escapeKey: bool, ?outsidePress: bool) =
         member val escapeKey = escapeKey
         member val outsidePress = outsidePress
 
@@ -303,13 +301,7 @@ type FloatingUI =
     static member useTransitionStatus(context: obj) : FloatingUI.UseTransitionStatusReturn = jsNative
 
     [<ReactComponent("FloatingPortal", "@floating-ui/react")>]
-    static member FloatingPortal
-        (
-            children: ReactElement,
-            ?root: obj,
-            ?id: string,
-            ?preserveTabOrder: bool
-        ) =
+    static member FloatingPortal(children: ReactElement, ?root: obj, ?id: string, ?preserveTabOrder: bool) =
         React.Imported()
 
     [<ReactComponent("FloatingOverlay", "@floating-ui/react")>]

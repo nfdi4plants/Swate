@@ -10,7 +10,8 @@ open Types
 
 let private normalizeNodePath (path: string) = PathHelpers.normalizePath path
 
-let private pathSegments (path: string) = path |> normalizeNodePath |> getNonEmptyPathParts
+let private pathSegments (path: string) =
+    path |> normalizeNodePath |> getNonEmptyPathParts
 
 let private lowerInvariant (value: string) = value.ToLowerInvariant()
 
@@ -62,7 +63,9 @@ let private folderIcon (path: string) =
     let segments = pathSegments path
 
     match segments |> Array.tryHead |> Option.map lowerInvariant, segments.Length with
-    | Some rootSegment, 1 -> iconForArcCollectionFolder rootSegment |> Option.defaultValue FileItemIcon.Folder
+    | Some rootSegment, 1 ->
+        iconForArcCollectionFolder rootSegment
+        |> Option.defaultValue FileItemIcon.Folder
     | Some "studies", 2 -> FileItemIcon.Study
     | Some "assays", 2 -> FileItemIcon.Assay
     | Some "workflows", 2 -> FileItemIcon.Workflow
@@ -80,8 +83,12 @@ let private fileIcon (path: string) =
     | None ->
         match iconForArcWorkbookFile fileName with
         | Some icon -> icon
-        | None when (segments |> Array.tryHead |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
-                     && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase) ->
+        | None when
+            (segments
+             |> Array.tryHead
+             |> Option.exists (fun segment -> String.Equals(segment, "notes", StringComparison.OrdinalIgnoreCase)))
+            && fileName.EndsWith(".md", StringComparison.OrdinalIgnoreCase)
+            ->
             FileItemIcon.Note
         | None when fileName.EndsWith(".xlsx", StringComparison.OrdinalIgnoreCase) -> FileItemIcon.Table
         | None -> FileItemIcon.Document
@@ -122,7 +129,8 @@ let canCreateFileSystemItemIn (item: FileItem) =
     && (tryGetItemRelativePath item
         |> Option.exists (fun path ->
             String.IsNullOrWhiteSpace path
-            || ArcEntityPathRules.isGenericFileSystemParentAllowed path))
+            || ArcEntityPathRules.isGenericFileSystemParentAllowed path
+        ))
 
 let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
 

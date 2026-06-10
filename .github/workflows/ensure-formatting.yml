@@ -1,0 +1,32 @@
+name: Ensure Fantomas Code Formatting
+
+on:
+  pull_request: # Triggers on pull requests
+  workflow_dispatch: # Allows manual runs from the Actions tab
+
+jobs:
+  check-formatting:
+    name: Check code formatting with Fantomas
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+      # Set up .NET
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      - name: Check /build
+        run: dotnet fantomas ./build --check
+
+      - name: Check /src
+        run: dotnet fantomas ./src --check
+
+      - name: Check /tests
+        run: dotnet fantomas ./tests --check

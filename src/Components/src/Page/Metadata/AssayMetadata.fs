@@ -81,4 +81,3 @@ type AssayMetadata =
                 ]
             )
         ]
-

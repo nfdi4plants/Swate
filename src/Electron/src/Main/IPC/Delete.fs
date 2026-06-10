@@ -55,15 +55,10 @@ module ArcDeleteHelper =
     let tryEnsureArcEntityResolved fileType identifier relativePath (arc: ARC) =
         match arc.TryArcFileByPath(relativePath) with
         | Some arcFile when arcFileMatchesEntity fileType identifier arcFile -> Ok()
-        | _ ->
-            Error(
-                exn
-                    $"ARC does not contain {entityKindForFileType fileType} with identifier '{identifier}'."
-            )
+        | _ -> Error(exn $"ARC does not contain {entityKindForFileType fileType} with identifier '{identifier}'.")
 
     let canonicalEntityFilePath zone identifier =
-        ArcEntityPathRules.buildCanonicalEntityPaths zone identifier
-        |> List.head
+        ArcEntityPathRules.buildCanonicalEntityPaths zone identifier |> List.head
 
     let private mergeDeletedEntityFromDisk arcPath canonicalFilePath (arcLocal: ARC) = promise {
         match! ARC.tryLoadAsync arcPath with
@@ -77,15 +72,12 @@ module ArcDeleteHelper =
             baselineArcStaticHashes diskArc
             // The IPC delete path suppresses watcher ARC merges, so apply the same unlink event explicitly.
             let mergedArc =
-                ARC.merge
-                    arcLocal
-                    diskArc
-                    [
-                        {
-                            EventName = EventName.Unlink
-                            Path = canonicalFilePath
-                        }
-                    ]
+                ARC.merge arcLocal diskArc [
+                    {
+                        EventName = EventName.Unlink
+                        Path = canonicalFilePath
+                    }
+                ]
 
             syncArcStaticHashes diskArc mergedArc
             return Ok mergedArc
@@ -95,22 +87,17 @@ module ArcDeleteHelper =
         match ArcEntityPathRules.classifyDeleteTarget relativePath with
         | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
             Ok(arcFileTypeForZone zone, identifier, normalizedRelativePath, canonicalEntityFilePath zone identifier)
-        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcEntityPathRules.CanonicalArcFileTarget.EntityFile(zone, identifier),
-            normalizedRelativePath
-          ) ->
+        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.EntityFile(zone,
+                                                                                                                               identifier),
+                                                                          normalizedRelativePath) ->
             Ok(arcFileTypeForZone zone, identifier, normalizedRelativePath, normalizedRelativePath)
-        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
-            _
-          )
+        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
+                                                                          _)
         | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget _
         | ArcEntityPathRules.DeletePathClassification.GenericTarget _ ->
             Error(exn "Generic filesystem delete paths do not use ARC entity delete contracts.")
-        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-            ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
-            _
-          ) ->
+        | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
+                                                                          _) ->
             Error(exn "Deleting the investigation file is not supported.")
         | ArcEntityPathRules.DeletePathClassification.ProtectedTarget _ ->
             Error(exn "Deleting protected files (for example .gitkeep or readme.md) is not allowed.")
@@ -118,36 +105,30 @@ module ArcDeleteHelper =
             Error(exn "Deletion is not allowed for this path.")
 
     /// Deletes ARC entities through ARCtrl contracts while preserving unrelated dirty in-memory edits.
-    let deleteArcEntityAsync (arcPath: string) (relativePath: string) (arc: ARC) : JS.Promise<Result<ARC, exn>> =
-        promise {
-            match tryGetEntityDeleteTarget relativePath with
-            | Error validationError -> return Error validationError
-            | Ok(fileType, identifier, normalizedRelativePath, canonicalFilePath) ->
-                try
-                    match! ARC.tryLoadAsync arcPath with
-                    | Error errors ->
-                        return
-                            Error(
-                                exn
-                                    $"Could not load ARC from disk before deleting '{normalizedRelativePath}': {PathHelpers.formatContractErrors errors}"
-                            )
-                    | Ok diskArc ->
-                        match tryEnsureArcEntityResolved fileType identifier canonicalFilePath diskArc with
-                        | Error resolutionError -> return Error resolutionError
-                        | Ok() ->
-                            match! removeFromDiskAsync fileType identifier arcPath diskArc with
-                            | Error errors ->
-                                return
-                                    Error(
-                                        exn
-                                            $"Could not delete ARC entity at '{normalizedRelativePath}': {PathHelpers.formatContractErrors errors}"
-                                    )
-                            | Ok _ ->
-                                return! mergeDeletedEntityFromDisk arcPath canonicalFilePath arc
-                with deleteError ->
+    let deleteArcEntityAsync (arcPath: string) (relativePath: string) (arc: ARC) : JS.Promise<Result<ARC, exn>> = promise {
+        match tryGetEntityDeleteTarget relativePath with
+        | Error validationError -> return Error validationError
+        | Ok(fileType, identifier, normalizedRelativePath, canonicalFilePath) ->
+            try
+                match! ARC.tryLoadAsync arcPath with
+                | Error errors ->
                     return
                         Error(
                             exn
-                                $"Could not delete ARC entity at '{normalizedRelativePath}': {deleteError.Message}"
+                                $"Could not load ARC from disk before deleting '{normalizedRelativePath}': {PathHelpers.formatContractErrors errors}"
                         )
-        }
+                | Ok diskArc ->
+                    match tryEnsureArcEntityResolved fileType identifier canonicalFilePath diskArc with
+                    | Error resolutionError -> return Error resolutionError
+                    | Ok() ->
+                        match! removeFromDiskAsync fileType identifier arcPath diskArc with
+                        | Error errors ->
+                            return
+                                Error(
+                                    exn
+                                        $"Could not delete ARC entity at '{normalizedRelativePath}': {PathHelpers.formatContractErrors errors}"
+                                )
+                        | Ok _ -> return! mergeDeletedEntityFromDisk arcPath canonicalFilePath arc
+            with deleteError ->
+                return Error(exn $"Could not delete ARC entity at '{normalizedRelativePath}': {deleteError.Message}")
+    }

@@ -14,10 +14,7 @@ module SharedFields =
         Html.fieldSet [
             prop.className "swt:fieldset"
             prop.children [
-                Html.legend [
-                    prop.className "swt:fieldset-legend"
-                    prop.text title
-                ]
+                Html.legend [ prop.className "swt:fieldset-legend"; prop.text title ]
                 Html.div [
                     prop.className "swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
                     prop.children [ content ]
@@ -27,11 +24,8 @@ module SharedFields =
 
     [<ReactComponent>]
     let Main
-        (
-            draft: LandingDraft,
-            setDraft: LandingDraft -> unit,
-            onImportPersons: (unit -> JS.Promise<Person[]>) option
-        ) =
+        (draft: LandingDraft, setDraft: LandingDraft -> unit, onImportPersons: (unit -> JS.Promise<Person[]>) option)
+        =
         React.Fragment [
             TextInput.TextInput(
                 draft.Identifier,
@@ -52,19 +46,19 @@ module SharedFields =
                 isArea = true,
                 placeholder = "Experiment description"
             )
-            BoxedHelperField "Involved People" (
-                PersonsInput.PersonsInput(
+            BoxedHelperField
+                "Involved People"
+                (PersonsInput.PersonsInput(
                     draft.InvolvedPeople,
                     (fun persons -> setDraft { draft with InvolvedPeople = persons }),
                     ?onImportPersons = onImportPersons
-                )
-            )
-            BoxedHelperField "Comments" (
-                CommentsInput.CommentsInput(
+                ))
+            BoxedHelperField
+                "Comments"
+                (CommentsInput.CommentsInput(
                     draft.Comments,
                     (fun comments -> setDraft { draft with Comments = comments })
-                )
-            )
+                ))
             TextInput.TextInput(
                 draft.MainText,
                 (fun value -> setDraft { draft with MainText = value }),
@@ -75,12 +69,10 @@ module SharedFields =
             Html.fieldSet [
                 prop.className "swt:fieldset"
                 prop.children [
-                    Html.legend [
-                        prop.className "swt:fieldset-legend"
-                        prop.text "Files"
-                    ]
+                    Html.legend [ prop.className "swt:fieldset-legend"; prop.text "Files" ]
                     Html.div [
-                        prop.className "swt:border swt:border-dashed swt:border-base-content/30 swt:rounded-box swt:p-4 swt:bg-base-100"
+                        prop.className
+                            "swt:border swt:border-dashed swt:border-base-content/30 swt:rounded-box swt:p-4 swt:bg-base-100"
                         prop.children [
                             Html.p [
                                 prop.className "swt:opacity-70"
@@ -91,4 +83,3 @@ module SharedFields =
                 ]
             ]
         ]
-

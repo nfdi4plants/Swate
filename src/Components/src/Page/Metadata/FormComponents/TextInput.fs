@@ -120,17 +120,12 @@ type TextInput =
 
     [<ReactComponent>]
     static member CollectionOfStrings
-        (
-            values: ResizeArray<string>,
-            setValues: ResizeArray<string> -> unit,
-            ?label: string
-        ) =
+        (values: ResizeArray<string>, setValues: ResizeArray<string> -> unit, ?label: string)
+        =
         InputSequence.InputSequence(
             values,
             (fun () -> ""),
             setValues,
-            (fun (value, setValue, remove) ->
-                TextInput.TextInput(value, setValue, rmv = remove)
-            ),
+            (fun (value, setValue, remove) -> TextInput.TextInput(value, setValue, rmv = remove)),
             ?label = label
         )

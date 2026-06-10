@@ -114,10 +114,7 @@ type Main =
         let copyArcPathToClipboard =
             copyArcPathToClipboard (fun ex ->
                 errorModalCtx.enqueue (
-                    ErrorModalRequest.create (
-                        $"Failed to copy path: {ex.Message}",
-                        title = "Copy path failed"
-                    )
+                    ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
                 )
             )
             >> Promise.start
@@ -125,10 +122,7 @@ type Main =
         let openArcFolderInFileExplorer =
             openArcFolderInFileExplorer (fun ex ->
                 errorModalCtx.enqueue (
-                    ErrorModalRequest.create (
-                        $"Failed to open folder: {ex.Message}",
-                        title = "Open folder failed"
-                    )
+                    ErrorModalRequest.create ($"Failed to open folder: {ex.Message}", title = "Open folder failed")
                 )
             )
             >> Promise.start
@@ -179,7 +173,9 @@ type Main =
                         prop.testId "left-sidebar-file-explorer-tree"
                         prop.className
                             "swt:flex-1 swt:min-h-0 swt:overflow-y-auto swt:overflow-x-auto swt:[scrollbar-gutter:stable]"
-                        prop.children [ FileTree.FileTree(rootContextMenuRef = arcNameContextMenuRef) ]
+                        prop.children [
+                            FileTree.FileTree(rootContextMenuRef = arcNameContextMenuRef)
+                        ]
                     ]
                 ]
             ]

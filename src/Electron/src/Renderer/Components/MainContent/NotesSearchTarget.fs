@@ -59,7 +59,9 @@ let NotesSearchTarget () =
             | Result.Error exn ->
                 fileTreeCtx.setSelection (ArcSelection.clearExplorerNode fileTreeCtx.state.Selection)
 
-                let errorPage = Renderer.Types.PageState.ErrorPage $"Could not open note: {exn.Message}"
+                let errorPage =
+                    Renderer.Types.PageState.ErrorPage $"Could not open note: {exn.Message}"
+
                 pageCtx.setState (Some errorPage)
         }
         |> Promise.start

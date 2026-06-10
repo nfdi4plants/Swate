@@ -14,18 +14,17 @@ module Preview =
 
     let private ensureMermaidInitialized () =
         if not MermaidInitialized then
-            Mermaid.instance.initialize (
-                createObj [
-                    "startOnLoad" ==> false
-                    "securityLevel" ==> "strict"
-                ]
-            )
+            Mermaid.instance.initialize (createObj [ "startOnLoad" ==> false; "securityLevel" ==> "strict" ])
 
             MermaidInitialized <- true
 
     let private tryGetClassName (props: obj) =
         let className: obj = props?className
-        if isNullOrUndefined className then None else Some(string className)
+
+        if isNullOrUndefined className then
+            None
+        else
+            Some(string className)
 
     let private tryGetCode (props: obj) =
         let node: obj = props?node
@@ -45,7 +44,11 @@ module Preview =
                         Some(string children)
         else
             let children: obj = node?children
-            if isNullOrUndefined children then None else Some(ReactMDEditor.getCodeString children)
+
+            if isNullOrUndefined children then
+                None
+            else
+                Some(ReactMDEditor.getCodeString children)
 
     [<ReactComponent>]
     let private CodeRenderer (props: obj) =
@@ -61,6 +64,7 @@ module Preview =
                 let rawId = Guid.NewGuid().ToString "N"
                 sprintf "mermaid-%s" rawId
             )
+
         let svg, setSvg = React.useState (None: string option)
         let renderError, setRenderError = React.useState (None: string option)
 
@@ -73,14 +77,17 @@ module Preview =
                     else
                         ensureMermaidInitialized ()
 
-                        Mermaid.instance.render(renderId.current, code)
+                        Mermaid.instance.render (renderId.current, code)
                         |> Promise.map (fun result ->
                             setRenderError None
-                            setSvg (Some result.svg))
+                            setSvg (Some result.svg)
+                        )
                         |> Promise.catch (fun err ->
                             setSvg None
-                            setRenderError (Some $"Mermaid render error: {string err}"))
-                        |> Promise.start),
+                            setRenderError (Some $"Mermaid render error: {string err}")
+                        )
+                        |> Promise.start
+            ),
             [| box isMermaid; box code |]
         )
 
@@ -111,4 +118,3 @@ module Preview =
     let components = createObj [ "code" ==> CodeRenderer ]
 
     let rehypePlugins: obj[] = [| ReactMDEditor.rehypeSanitize |]
-

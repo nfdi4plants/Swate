@@ -70,7 +70,8 @@ type SettingsPage =
 
     [<ReactComponent>]
     static member private General(?onAutoCreateNotesFolderEnabled: unit -> unit) =
-        let onAutoCreateNotesFolderEnabled = defaultArg onAutoCreateNotesFolderEnabled ignore
+        let onAutoCreateNotesFolderEnabled =
+            defaultArg onAutoCreateNotesFolderEnabled ignore
 
         LayoutComponents.BoxedField(
             "General",
@@ -107,7 +108,8 @@ type SettingsPage =
 
     [<ReactComponent>]
     static member SettingsPage(?onAutoCreateNotesFolderEnabled: unit -> unit) =
-        let onAutoCreateNotesFolderEnabled = defaultArg onAutoCreateNotesFolderEnabled ignore
+        let onAutoCreateNotesFolderEnabled =
+            defaultArg onAutoCreateNotesFolderEnabled ignore
 
         LayoutComponents.Section [
             SettingsPage.General(onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled)
@@ -118,11 +120,11 @@ type SettingsPage =
 
     [<ReactComponent>]
     static member Entry(?onAutoCreateNotesFolderEnabled: unit -> unit) =
-        let onAutoCreateNotesFolderEnabled = defaultArg onAutoCreateNotesFolderEnabled ignore
+        let onAutoCreateNotesFolderEnabled =
+            defaultArg onAutoCreateNotesFolderEnabled ignore
 
         ThemeProvider.ThemeProvider(
             TermSearchConfigProvider.TIBQueryProvider(
                 SettingsPage.SettingsPage(onAutoCreateNotesFolderEnabled = onAutoCreateNotesFolderEnabled)
             )
         )
-

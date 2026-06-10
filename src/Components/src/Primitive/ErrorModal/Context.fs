@@ -38,9 +38,11 @@ type ErrorModalHostContext = {
         dismissAll = ignore
     }
 
-let ErrorModalCtx = React.createContext<ErrorModalActionsContext> (ErrorModalActionsContext.Empty)
+let ErrorModalCtx =
+    React.createContext<ErrorModalActionsContext> (ErrorModalActionsContext.Empty)
 
-let ErrorModalStateCtx = React.createContext<ErrorModalHostContext> (ErrorModalHostContext.Empty)
+let ErrorModalStateCtx =
+    React.createContext<ErrorModalHostContext> (ErrorModalHostContext.Empty)
 
 [<Hook>]
 let useErrorModalCtx () = React.useContext ErrorModalCtx

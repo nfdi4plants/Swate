@@ -16,17 +16,11 @@ type private GraphFileItemAppearance = {
 }
 
 let private normalizeText (value: string) =
-    if String.IsNullOrWhiteSpace value then
-        None
-    else
-        Some value
+    if String.IsNullOrWhiteSpace value then None else Some value
 
-let private asOptionalText (value: string) =
-    normalizeText value
+let private asOptionalText (value: string) = normalizeText value
 
-let private asOptionalTextOption (value: string option) =
-    value
-    |> Option.bind normalizeText
+let private asOptionalTextOption (value: string option) = value |> Option.bind normalizeText
 
 let private graphKindForDataset =
     function
@@ -47,12 +41,9 @@ let private optionalRowFromOption label (value: string option) =
     |> Option.defaultValue []
 
 let private optionalRow label value =
-    value
-    |> Some
-    |> optionalRowFromOption label
+    value |> Some |> optionalRowFromOption label
 
-let private optionalOptionRow label value =
-    optionalRowFromOption label value
+let private optionalOptionRow label value = optionalRowFromOption label value
 
 let private addMeta (nodeId: string) (meta: GraphNodeMeta) (metaById: Map<string, GraphNodeMeta>) =
     metaById |> Map.add nodeId meta
@@ -64,21 +55,15 @@ let private mapFoldIndexed
     : 'mapped list * 'state =
     let rec loop index currentState mappedRev remainingItems =
         match remainingItems with
-        | [] ->
-            List.rev mappedRev, currentState
+        | [] -> List.rev mappedRev, currentState
         | item :: tail ->
-            let mappedItem, nextState =
-                folder index currentState item
+            let mappedItem, nextState = folder index currentState item
 
             loop (index + 1) nextState (mappedItem :: mappedRev) tail
 
     loop 0 state [] items
 
-let private createGroupNode
-    (groupNodeId: string)
-    (groupLabel: string)
-    (children: ArcExplorerNode list)
-    =
+let private createGroupNode (groupNodeId: string) (groupLabel: string) (children: ArcExplorerNode list) =
     ArcExplorerNode.create (
         groupNodeId,
         groupLabel,
@@ -87,69 +72,48 @@ let private createGroupNode
         children = children
     )
 
-let private optionalGroupNode
-    (groupNodeId: string)
-    (groupLabel: string)
-    (children: ArcExplorerNode list)
-    =
+let private optionalGroupNode (groupNodeId: string) (groupLabel: string) (children: ArcExplorerNode list) =
     if List.isEmpty children then
         None
     else
         Some(createGroupNode groupNodeId groupLabel children)
 
 let private propertyValueDisplayName (propertyValue: PropertyValue) =
-    propertyValue.name
-    |> asOptionalText
-    |> Option.defaultValue propertyValue.id
+    propertyValue.name |> asOptionalText |> Option.defaultValue propertyValue.id
 
 let private formatPropertyValue (propertyValue: PropertyValue) =
     let propertyLabel = propertyValueDisplayName propertyValue
 
     match propertyValue.value with
-    | Some propertyContent when String.IsNullOrWhiteSpace propertyContent |> not ->
-        $"{propertyLabel}={propertyContent}"
-    | _ ->
-        propertyLabel
+    | Some propertyContent when String.IsNullOrWhiteSpace propertyContent |> not -> $"{propertyLabel}={propertyContent}"
+    | _ -> propertyLabel
 
 let private optionalRowsFromPropertyList label (values: PropertyValue list) =
     if List.isEmpty values then
         []
     else
-        values
-        |> List.map formatPropertyValue
-        |> String.concat "; "
-        |> row label
+        values |> List.map formatPropertyValue |> String.concat "; " |> row label
 
 let private optionalRowsFromPropertyValues label (values: PropertyValue array) =
-    values
-    |> Array.toList
-    |> optionalRowsFromPropertyList label
+    values |> Array.toList |> optionalRowsFromPropertyList label
 
 let private optionalRowsFromPropertyOption label (value: PropertyValue option) =
-    value
-    |> Option.toList
-    |> optionalRowsFromPropertyList label
+    value |> Option.toList |> optionalRowsFromPropertyList label
 
-let private propertyValueRows
-    (ownerLabel: string)
-    (fieldLabel: string)
-    (index: int)
-    (propertyValue: PropertyValue)
-    =
-    [
-        yield! row "Owner Kind" ownerLabel
-        yield! row "Source Field" fieldLabel
-        yield! row "Index" (string (index + 1))
-        yield! row "Type" propertyValue.type'
-        yield! row "Id" propertyValue.id
-        yield! row "Name" propertyValue.name
-        yield! optionalOptionRow "Value" propertyValue.value
-        yield! optionalOptionRow "Unit" propertyValue.unit
-        yield! optionalOptionRow "Name TAN" propertyValue.nameTAN
-        yield! optionalOptionRow "Value TAN" propertyValue.valueTAN
-        yield! optionalOptionRow "Unit TAN" propertyValue.unitTAN
-        yield! optionalOptionRow "Additional Type" propertyValue.additionalType
-    ]
+let private propertyValueRows (ownerLabel: string) (fieldLabel: string) (index: int) (propertyValue: PropertyValue) = [
+    yield! row "Owner Kind" ownerLabel
+    yield! row "Source Field" fieldLabel
+    yield! row "Index" (string (index + 1))
+    yield! row "Type" propertyValue.type'
+    yield! row "Id" propertyValue.id
+    yield! row "Name" propertyValue.name
+    yield! optionalOptionRow "Value" propertyValue.value
+    yield! optionalOptionRow "Unit" propertyValue.unit
+    yield! optionalOptionRow "Name TAN" propertyValue.nameTAN
+    yield! optionalOptionRow "Value TAN" propertyValue.valueTAN
+    yield! optionalOptionRow "Unit TAN" propertyValue.unitTAN
+    yield! optionalOptionRow "Additional Type" propertyValue.additionalType
+]
 
 let private propertyValueNode
     (ownerNodeId: string)
@@ -183,7 +147,8 @@ let private propertyValueNode
         Description = Some $"{fieldLabel} entry attached to {ownerLabel.ToLowerInvariant()}."
         Rows = propertyValueRows ownerLabel fieldLabel index propertyValue
         CaseExamples = [
-            "PropertyValue", "{ id = \"prop:region\"; type' = \"PropertyValue\"; name = \"Region\"; value = Some \"Field-01\" }"
+            "PropertyValue",
+            "{ id = \"prop:region\"; type' = \"PropertyValue\"; name = \"Region\"; value = Some \"Field-01\" }"
         ]
     }
 
@@ -201,28 +166,27 @@ let private propertyValueGroupNode
     (metaById: Map<string, GraphNodeMeta>)
     =
     match values with
-    | [] ->
-        None, metaById
+    | [] -> None, metaById
     | values ->
         let valueNodes, nextState =
             values
-            |> mapFoldIndexed (fun index state propertyValue ->
-                propertyValueNode
-                    ownerNodeId
-                    groupKey
-                    fieldLabel
-                    ownerLabel
-                    ownerTag
-                    isReference
-                    index
-                    propertyValue
-                    state) metaById
+            |> mapFoldIndexed
+                (fun index state propertyValue ->
+                    propertyValueNode
+                        ownerNodeId
+                        groupKey
+                        fieldLabel
+                        ownerLabel
+                        ownerTag
+                        isReference
+                        index
+                        propertyValue
+                        state
+                )
+                metaById
 
         let groupNode =
-            createGroupNode
-                $"{ownerNodeId}:group:{groupKey}"
-                groupLabel
-                valueNodes
+            createGroupNode $"{ownerNodeId}:group:{groupKey}" groupLabel valueNodes
 
         Some groupNode, nextState
 
@@ -230,7 +194,8 @@ let private arcObjectCaseExamples = [
     "Arc", "Arc([| { path = \"C:/example/arc-graph\"; Datasets = ... } |])"
     "Datasets", "Datasets([| { type' = Study; identifier = \"study-drought-response\"; ... } |])"
     "Protocols", "Protocols([| { name = Some \"LC-MS Measurement\"; processes = [| ... |] } |])"
-    "FormalParameters", "FormalParameters([| { name = Some \"Instrument Model\"; defaultValue = Some \"Q Exactive\" } |])"
+    "FormalParameters",
+    "FormalParameters([| { name = Some \"Instrument Model\"; defaultValue = Some \"Q Exactive\" } |])"
     "Processes", "Processes([| { name = \"Extract metabolites\"; inputs = [| ... |]; outputs = [| ... |] } |])"
 ]
 
@@ -242,80 +207,76 @@ let private datasetCaseExamples = [
 ]
 
 let private processCaseExamples = [
-    "LabProcess", "LabProcess(name = \"Extract metabolites\", inputs = [| ... |], outputs = [| ... |], Materials = [| ... |], Data = [| ... |])"
+    "LabProcess",
+    "LabProcess(name = \"Extract metabolites\", inputs = [| ... |], outputs = [| ... |], Materials = [| ... |], Data = [| ... |])"
     "Input Bundle", "{ Materials = [| { Sources = [| ... |]; Samples = [| ... |] } |]; Data = [| ... |] }"
 ]
 
 let private processTypeCaseExamples = [
     "Source", "Materials = [| { Sources = [| { id = \"source:leaf-a\"; ... } |]; Samples = [||] } |]"
     "Sample", "Materials = [| { Sources = [||]; Samples = [| { id = \"sample:leaf-a\"; ... } |] } |]"
-    "Files", "Data = [| { Files = [| { path = \"assays/metabolomics/feature-table.tsv\"; ... } |]; FragmentSelector = [||] } |]"
-    "FragmentSelector", "Data = [| { Files = [||]; FragmentSelector = [| { selector = Some \"mz=100-1000\"; ... } |] } |]"
+    "Files",
+    "Data = [| { Files = [| { path = \"assays/metabolomics/feature-table.tsv\"; ... } |]; FragmentSelector = [||] } |]"
+    "FragmentSelector",
+    "Data = [| { Files = [||]; FragmentSelector = [| { selector = Some \"mz=100-1000\"; ... } |] } |]"
 ]
 
-let private flattenDatasetKinds (datasetKinds: DatasetKinds) =
-    [
-        yield! datasetKinds.Studies |> Array.toList
-        yield! datasetKinds.Assays |> Array.toList
-        yield! datasetKinds.Workflows |> Array.toList
-        yield! datasetKinds.Runs |> Array.toList
-    ]
+let private flattenDatasetKinds (datasetKinds: DatasetKinds) = [
+    yield! datasetKinds.Studies |> Array.toList
+    yield! datasetKinds.Assays |> Array.toList
+    yield! datasetKinds.Workflows |> Array.toList
+    yield! datasetKinds.Runs |> Array.toList
+]
 
 let private collectArcGraphs (arcObjects: ARCObjects list) =
     arcObjects
-    |> List.choose (function
-        | ARCObjects.Arc arcs -> Some (arcs |> Array.toList)
-        | _ -> None)
+    |> List.choose (
+        function
+        | ARCObjects.Arc arcs -> Some(arcs |> Array.toList)
+        | _ -> None
+    )
     |> List.concat
 
 let private materialKindsEndpoints (materialKindsValues: MaterialKinds array) =
     materialKindsValues
     |> Array.toList
-    |> List.collect (fun materialKinds ->
-        [
-            yield!
-                materialKinds.Sources
-                |> Array.toList
-                |> List.map (fun material -> MaterialEndpoint("Source", material))
+    |> List.collect (fun materialKinds -> [
+        yield!
+            materialKinds.Sources
+            |> Array.toList
+            |> List.map (fun material -> MaterialEndpoint("Source", material))
 
-            yield!
-                materialKinds.Samples
-                |> Array.toList
-                |> List.map (fun material -> MaterialEndpoint("Sample", material))
-        ])
+        yield!
+            materialKinds.Samples
+            |> Array.toList
+            |> List.map (fun material -> MaterialEndpoint("Sample", material))
+    ])
 
 let private dataKindsEndpoints (dataKindsValues: DataKinds array) =
     dataKindsValues
     |> Array.toList
-    |> List.collect (fun dataKinds ->
-        [
-            yield!
-                dataKinds.Files
-                |> Array.toList
-                |> List.map (fun data -> DataEndpoint("File", data))
+    |> List.collect (fun dataKinds -> [
+        yield!
+            dataKinds.Files
+            |> Array.toList
+            |> List.map (fun data -> DataEndpoint("File", data))
 
-            yield!
-                dataKinds.FragmentSelector
-                |> Array.toList
-                |> List.map (fun data -> DataEndpoint("Fragment Selector", data))
-        ])
+        yield!
+            dataKinds.FragmentSelector
+            |> Array.toList
+            |> List.map (fun data -> DataEndpoint("Fragment Selector", data))
+    ])
 
 let private processTypeEndpoints (processType: ProcessType) =
     materialKindsEndpoints processType.Materials
     @ dataKindsEndpoints processType.Data
 
 let private inferMaterialRole (material: Material) =
-    let normalizedType =
-        material.type'
-            .Trim()
-            .ToLowerInvariant()
+    let normalizedType = material.type'.Trim().ToLowerInvariant()
 
-    if normalizedType.Contains("source") then
-        "Source"
-    elif normalizedType.Contains("sample") then
-        "Sample"
-    else
-        "Material"
+    if normalizedType.Contains("source") then "Source"
+    elif normalizedType.Contains("sample") then "Sample"
+    else "Material"
 
 let private inferDataRole (data: Data) =
     let hasSelector =
@@ -327,7 +288,11 @@ let private inferDataRole (data: Data) =
         |> Option.defaultValue ""
         |> fun value -> value.Trim().ToLowerInvariant()
 
-    if hasSelector || additionalType.Contains("fragmentselector") || additionalType.Contains("fragment selector") then
+    if
+        hasSelector
+        || additionalType.Contains("fragmentselector")
+        || additionalType.Contains("fragment selector")
+    then
         "Fragment Selector"
     else
         "File"
@@ -347,16 +312,7 @@ let private processLevelEndpoints (processValue: LabProcess) =
 
 let private endpointIdentity =
     function
-    | MaterialEndpoint(_, material) ->
-        String.Join(
-            "|",
-            [
-                "material"
-                material.id
-                material.name
-                material.type'
-            ]
-        )
+    | MaterialEndpoint(_, material) -> String.Join("|", [ "material"; material.id; material.name; material.type' ])
     | DataEndpoint(_, data) ->
         String.Join(
             "|",
@@ -372,15 +328,9 @@ let private endpointIdentity =
 let private unassociatedProcessEndpoints (processValue: LabProcess) =
     let ioEndpointKeys =
         [
-            yield!
-                processValue.inputs
-                |> Array.toList
-                |> List.collect processTypeEndpoints
+            yield! processValue.inputs |> Array.toList |> List.collect processTypeEndpoints
 
-            yield!
-                processValue.outputs
-                |> Array.toList
-                |> List.collect processTypeEndpoints
+            yield! processValue.outputs |> Array.toList |> List.collect processTypeEndpoints
         ]
         |> List.map endpointIdentity
         |> Set.ofList
@@ -403,10 +353,8 @@ let private processEndpointDisplayName =
 
 let private processEndpointPresentation =
     function
-    | MaterialEndpoint(materialRole, _) ->
-        "Material", materialRole, GraphExplorerNodeKind.Material
-    | DataEndpoint(dataRole, _) ->
-        "Data", dataRole, GraphExplorerNodeKind.Data
+    | MaterialEndpoint(materialRole, _) -> "Material", materialRole, GraphExplorerNodeKind.Material
+    | DataEndpoint(dataRole, _) -> "Data", dataRole, GraphExplorerNodeKind.Data
 
 let private processEndpointValueType =
     function
@@ -415,33 +363,31 @@ let private processEndpointValueType =
 
 let private processEndpointRows =
     function
-    | MaterialEndpoint(materialRole, material) ->
-        [
-            yield! row "Value Type" "Material"
-            yield! row "Material DU Cases" "Sources | Samples"
-            yield! row "Data DU Cases" "Files | FragmentSelector"
-            yield! row "Material Role" materialRole
-            yield! row "Material Name" material.name
-            yield! row "Material Type" material.type'
-            yield! row "Material Id" material.id
-            yield! optionalOptionRow "Additional Type" material.additionalType
-            yield! optionalRowsFromPropertyValues "Additional Property" material.additionalProperty
-        ]
-    | DataEndpoint(dataRole, data) ->
-        [
-            yield! row "Value Type" "Data"
-            yield! row "Material DU Cases" "Sources | Samples"
-            yield! row "Data DU Cases" "Files | FragmentSelector"
-            yield! row "Data Role" dataRole
-            yield! row "Path" data.path
-            yield! row "Data Type" data.type'
-            yield! optionalOptionRow "Data Id" data.id
-            yield! optionalOptionRow "Additional Type" data.additionalType
-            yield! optionalOptionRow "Selector" data.selector
-            yield! optionalOptionRow "Selector Format" data.selectorFormat
-            yield! optionalOptionRow "Encoding Format" data.encodingFormat
-            yield! optionalRowsFromPropertyValues "Additional Property" data.additionalProperty
-        ]
+    | MaterialEndpoint(materialRole, material) -> [
+        yield! row "Value Type" "Material"
+        yield! row "Material DU Cases" "Sources | Samples"
+        yield! row "Data DU Cases" "Files | FragmentSelector"
+        yield! row "Material Role" materialRole
+        yield! row "Material Name" material.name
+        yield! row "Material Type" material.type'
+        yield! row "Material Id" material.id
+        yield! optionalOptionRow "Additional Type" material.additionalType
+        yield! optionalRowsFromPropertyValues "Additional Property" material.additionalProperty
+      ]
+    | DataEndpoint(dataRole, data) -> [
+        yield! row "Value Type" "Data"
+        yield! row "Material DU Cases" "Sources | Samples"
+        yield! row "Data DU Cases" "Files | FragmentSelector"
+        yield! row "Data Role" dataRole
+        yield! row "Path" data.path
+        yield! row "Data Type" data.type'
+        yield! optionalOptionRow "Data Id" data.id
+        yield! optionalOptionRow "Additional Type" data.additionalType
+        yield! optionalOptionRow "Selector" data.selector
+        yield! optionalOptionRow "Selector Format" data.selectorFormat
+        yield! optionalOptionRow "Encoding Format" data.encodingFormat
+        yield! optionalRowsFromPropertyValues "Additional Property" data.additionalProperty
+      ]
 
 let private flattenNodes (nodes: ArcExplorerNode list) =
     let rec collect (node: ArcExplorerNode) =
@@ -462,17 +408,17 @@ let private createReferenceChildren
                 |> Option.orElse (Some "Reference entry in a top-level index layer.")
     }
 
-    let rec createReferenceNode
-        (sourceNode: ArcExplorerNode)
-        (state: Map<string, GraphNodeMeta>)
-        =
+    let rec createReferenceNode (sourceNode: ArcExplorerNode) (state: Map<string, GraphNodeMeta>) =
         let referenceId = $"{categoryNodeId}:ref:{sourceNode.id}"
 
         let childReferenceNodes, afterChildren =
             sourceNode.children
-            |> List.fold (fun (childrenRev, currentState) child ->
-                let childReferenceNode, nextState = createReferenceNode child currentState
-                childReferenceNode :: childrenRev, nextState) ([], state)
+            |> List.fold
+                (fun (childrenRev, currentState) child ->
+                    let childReferenceNode, nextState = createReferenceNode child currentState
+                    childReferenceNode :: childrenRev, nextState
+                )
+                ([], state)
             |> fun (childrenRev, currentState) -> List.rev childrenRev, currentState
 
         let referenceNode =
@@ -500,9 +446,12 @@ let private createReferenceChildren
     nodes
     |> List.distinctBy _.id
     |> List.sortBy (fun node -> node.name.ToLowerInvariant())
-    |> List.fold (fun (childrenRev, state) node ->
-        let referenceNode, nextState = createReferenceNode node state
-        referenceNode :: childrenRev, nextState) ([], metaById)
+    |> List.fold
+        (fun (childrenRev, state) node ->
+            let referenceNode, nextState = createReferenceNode node state
+            referenceNode :: childrenRev, nextState
+        )
+        ([], metaById)
     |> fun (childrenRev, state) -> List.rev childrenRev, state
 
 let private createCategoryLayer
@@ -514,6 +463,7 @@ let private createCategoryLayer
     (metaById: Map<string, GraphNodeMeta>)
     =
     let categoryNodeId = $"graph:{categoryKey}"
+
     let referenceChildren, metaAfterChildren =
         createReferenceChildren categoryNodeId candidates metaById
 
@@ -531,9 +481,7 @@ let private createCategoryLayer
         KindLabel = graphKindLabel GraphExplorerNodeKind.Arc
         RoleLabel = "Canonical"
         Description = Some description
-        Rows = [
-            yield! row "Entries" (string referenceChildren.Length)
-        ]
+        Rows = [ yield! row "Entries" (string referenceChildren.Length) ]
         CaseExamples = caseExamples
     }
 
@@ -559,14 +507,18 @@ let private categoryLayerDescriptors = [
         LayerKey = "protocols"
         LayerLabel = "Protocols"
         Description = "Top-level index of all protocol nodes."
-        CaseExamples = [ "Protocol", "Protocol(name = Some \"LC-MS Measurement\", processes = [| ... |])" ]
+        CaseExamples = [
+            "Protocol", "Protocol(name = Some \"LC-MS Measurement\", processes = [| ... |])"
+        ]
         MatchTag = GraphNodeTag.Protocol
     }
     {
         LayerKey = "formal-parameters"
         LayerLabel = "FormalParameters"
         Description = "Top-level index of all formal parameter nodes."
-        CaseExamples = [ "FormalParameter", "FormalParameter(name = Some \"Instrument Model\", defaultValue = Some \"Q Exactive\")" ]
+        CaseExamples = [
+            "FormalParameter", "FormalParameter(name = Some \"Instrument Model\", defaultValue = Some \"Q Exactive\")"
+        ]
         MatchTag = GraphNodeTag.FormalParameter
     }
     {
@@ -609,18 +561,17 @@ let private collectCategoryCandidates
         |> Map.ofList
 
     nodes
-    |> List.fold (fun acc node ->
-        let maybeTag =
-            metaById
-            |> Map.tryFind node.id
-            |> Option.bind _.Tag
+    |> List.fold
+        (fun acc node ->
+            let maybeTag = metaById |> Map.tryFind node.id |> Option.bind _.Tag
 
-        match maybeTag with
-        | Some tag when Map.containsKey tag acc ->
-            let existingNodes = acc |> Map.find tag
-            acc |> Map.add tag (node :: existingNodes)
-        | _ ->
-            acc) candidateIndex
+            match maybeTag with
+            | Some tag when Map.containsKey tag acc ->
+                let existingNodes = acc |> Map.find tag
+                acc |> Map.add tag (node :: existingNodes)
+            | _ -> acc
+        )
+        candidateIndex
     |> Map.map (fun _ candidatesRev -> List.rev candidatesRev)
 
 let private createCategoryLayers
@@ -629,22 +580,23 @@ let private createCategoryLayers
     (metaById: Map<string, GraphNodeMeta>)
     =
     descriptors
-    |> List.fold (fun (layersRev, state) descriptor ->
-        let candidates =
-            candidatesByTag
-            |> Map.tryFind descriptor.MatchTag
-            |> Option.defaultValue []
+    |> List.fold
+        (fun (layersRev, state) descriptor ->
+            let candidates =
+                candidatesByTag |> Map.tryFind descriptor.MatchTag |> Option.defaultValue []
 
-        let layerNode, nextState =
-            createCategoryLayer
-                descriptor.LayerKey
-                descriptor.LayerLabel
-                descriptor.Description
-                descriptor.CaseExamples
-                candidates
-                state
+            let layerNode, nextState =
+                createCategoryLayer
+                    descriptor.LayerKey
+                    descriptor.LayerLabel
+                    descriptor.Description
+                    descriptor.CaseExamples
+                    candidates
+                    state
 
-        layerNode :: layersRev, nextState) ([], metaById)
+            layerNode :: layersRev, nextState
+        )
+        ([], metaById)
     |> fun (layersRev, state) -> List.rev layersRev, state
 
 let private processEndpointNode
@@ -658,9 +610,7 @@ let private processEndpointNode
     (metaById: Map<string, GraphNodeMeta>)
     =
     let processTypeSegment =
-        processTypeIndex
-        |> Option.map string
-        |> Option.defaultValue "na"
+        processTypeIndex |> Option.map string |> Option.defaultValue "na"
 
     let nodeId = $"{processNodeId}:{directionKey}:{processTypeSegment}:{endpointIndex}"
     let displayName = processEndpointDisplayName endpoint
@@ -700,25 +650,24 @@ let private processEndpointNode
             children = (additionalPropertyGroupNode |> Option.toList)
         )
 
-    let meta =
-        {
-            Tag = Some(GraphNodeTag.ProcessEndpoint (processEndpointValueType endpoint))
-            GraphKind = graphKind
-            KindLabel = graphKindLabel graphKind
-            RoleLabel = endpointRole
-            Description = Some $"{subtypeLabel} endpoint in process {directionLabel.ToLowerInvariant()} bundle."
-            Rows = [
-                yield! row "Endpoint Direction" directionLabel
-                yield!
-                    processTypeIndex
-                    |> Option.map (fun index -> row "ProcessType Index" (string (index + 1)))
-                    |> Option.defaultValue []
-                yield! row "Endpoint Index" (string (endpointIndex + 1))
-                yield! row "Relationship Role" relationshipRole
-                yield! processEndpointRows endpoint
-            ]
-            CaseExamples = processTypeCaseExamples
-        }
+    let meta = {
+        Tag = Some(GraphNodeTag.ProcessEndpoint(processEndpointValueType endpoint))
+        GraphKind = graphKind
+        KindLabel = graphKindLabel graphKind
+        RoleLabel = endpointRole
+        Description = Some $"{subtypeLabel} endpoint in process {directionLabel.ToLowerInvariant()} bundle."
+        Rows = [
+            yield! row "Endpoint Direction" directionLabel
+            yield!
+                processTypeIndex
+                |> Option.map (fun index -> row "ProcessType Index" (string (index + 1)))
+                |> Option.defaultValue []
+            yield! row "Endpoint Index" (string (endpointIndex + 1))
+            yield! row "Relationship Role" relationshipRole
+            yield! processEndpointRows endpoint
+        ]
+        CaseExamples = processTypeCaseExamples
+    }
 
     node, addMeta nodeId meta metaAfterPropertyValues
 
@@ -737,7 +686,8 @@ let private indexedEndpointsFromProcessTypes (processTypes: ProcessType array) =
             ProcessTypeIndex = Some processTypeIndex
             EndpointIndex = endpointIndex
             Value = endpoint
-        }))
+        })
+    )
     |> List.concat
 
 let private indexedEndpointsFromEndpoints (endpoints: ProcessEndpointValue list) =
@@ -760,19 +710,22 @@ let private processEndpointGroupNode
     =
     let endpointNodesWithKinds, nextState =
         indexedEndpoints
-        |> List.fold (fun (nodesRev, state) indexedEndpoint ->
-            let node, updatedState =
-                processEndpointNode
-                    processNodeId
-                    directionKey
-                    directionLabel
-                    indexedEndpoint.ProcessTypeIndex
-                    indexedEndpoint.EndpointIndex
-                    indexedEndpoint.Value
-                    isReference
-                    state
+        |> List.fold
+            (fun (nodesRev, state) indexedEndpoint ->
+                let node, updatedState =
+                    processEndpointNode
+                        processNodeId
+                        directionKey
+                        directionLabel
+                        indexedEndpoint.ProcessTypeIndex
+                        indexedEndpoint.EndpointIndex
+                        indexedEndpoint.Value
+                        isReference
+                        state
 
-            (indexedEndpoint.Value, node) :: nodesRev, updatedState) ([], metaById)
+                (indexedEndpoint.Value, node) :: nodesRev, updatedState
+            )
+            ([], metaById)
         |> fun (nodesRev, state) -> List.rev nodesRev, state
 
     let endpointCount = endpointNodesWithKinds.Length
@@ -784,28 +737,30 @@ let private processEndpointGroupNode
                 |> List.choose (fun (endpoint, node) ->
                     match endpoint with
                     | MaterialEndpoint _ -> Some node
-                    | DataEndpoint _ -> None)
+                    | DataEndpoint _ -> None
+                )
 
             let dataNodes =
                 endpointNodesWithKinds
                 |> List.choose (fun (endpoint, node) ->
                     match endpoint with
                     | MaterialEndpoint _ -> None
-                    | DataEndpoint _ -> Some node)
+                    | DataEndpoint _ -> Some node
+                )
 
             [
-                yield! optionalGroupNode $"{processNodeId}:{directionKey}:group:material" "Material" materialNodes |> Option.toList
-                yield! optionalGroupNode $"{processNodeId}:{directionKey}:group:data" "Data" dataNodes |> Option.toList
+                yield!
+                    optionalGroupNode $"{processNodeId}:{directionKey}:group:material" "Material" materialNodes
+                    |> Option.toList
+                yield!
+                    optionalGroupNode $"{processNodeId}:{directionKey}:group:data" "Data" dataNodes
+                    |> Option.toList
             ]
         else
-            endpointNodesWithKinds
-            |> List.map snd
+            endpointNodesWithKinds |> List.map snd
 
     let groupNode =
-        createGroupNode
-            $"{processNodeId}:{directionKey}"
-            groupLabel
-            groupedChildren
+        createGroupNode $"{processNodeId}:{directionKey}" groupLabel groupedChildren
 
     groupNode, nextState, endpointCount
 
@@ -848,26 +803,21 @@ let private processEndpointGroupNodeFromEndpoints
         metaById
 
 let private processDisplayName (processValue: LabProcess) =
-    processValue.name
-    |> asOptionalText
-    |> Option.defaultValue "Unnamed process"
+    processValue.name |> asOptionalText |> Option.defaultValue "Unnamed process"
 
 let private summarizeProcessNames (processes: LabProcess list) =
-    processes
-    |> List.map processDisplayName
-    |> String.concat "; "
+    processes |> List.map processDisplayName |> String.concat "; "
 
 let private formatIntendedUse (intendedUse: (DefinedTerm * string) option) =
     intendedUse
     |> Option.map (fun (definedTerm, intendedUseValue) ->
         let termLabel =
-            definedTerm.name
-            |> asOptionalText
-            |> Option.defaultValue definedTerm.id
+            definedTerm.name |> asOptionalText |> Option.defaultValue definedTerm.id
 
         match intendedUseValue |> asOptionalText with
         | Some value -> $"{termLabel}: {value}"
-        | None -> termLabel)
+        | None -> termLabel
+    )
 
 let private formalParameterNode
     (parentNodeId: string)
@@ -898,16 +848,13 @@ let private formalParameterNode
         Description = Some "Formal parameter definition from the graph model."
         Rows = rows
         CaseExamples = [
-            "FormalParameter", "{ id = \"fp:instrument\"; name = Some \"Instrument Model\"; defaultValue = Some \"Q Exactive\" }"
+            "FormalParameter",
+            "{ id = \"fp:instrument\"; name = Some \"Instrument Model\"; defaultValue = Some \"Q Exactive\" }"
         ]
     }
 
     let node =
-        ArcExplorerNode.create (
-            nodeId,
-            parameterName,
-            arcKindForGraphKind GraphExplorerNodeKind.FormalParameter
-        )
+        ArcExplorerNode.create (nodeId, parameterName, arcKindForGraphKind GraphExplorerNodeKind.FormalParameter)
 
     node, addMeta nodeId meta metaById
 
@@ -921,13 +868,26 @@ let private processNode
     let processNodeId = $"{parentNodeId}:process:{sanitizeSegment processName}:{index}"
 
     let inputNodeGroup, metaAfterInput, inputEndpointCount =
-        processEndpointGroupNodeFromProcessTypes processNodeId "input" "Input" "Inputs" processValue.inputs true metaById
+        processEndpointGroupNodeFromProcessTypes
+            processNodeId
+            "input"
+            "Input"
+            "Inputs"
+            processValue.inputs
+            true
+            metaById
 
     let outputNodeGroup, metaAfterOutput, outputEndpointCount =
-        processEndpointGroupNodeFromProcessTypes processNodeId "output" "Output" "Outputs" processValue.outputs false metaAfterInput
+        processEndpointGroupNodeFromProcessTypes
+            processNodeId
+            "output"
+            "Output"
+            "Outputs"
+            processValue.outputs
+            false
+            metaAfterInput
 
-    let unassociatedEndpoints =
-        unassociatedProcessEndpoints processValue
+    let unassociatedEndpoints = unassociatedProcessEndpoints processValue
 
     let unassociatedNodeGroup, metaAfterUnassociated, unassociatedEndpointCount =
         processEndpointGroupNodeFromEndpoints
@@ -983,13 +943,12 @@ let private processNode
             processNodeId,
             processName,
             arcKindForGraphKind GraphExplorerNodeKind.Process,
-            children =
-                [
-                    inputNodeGroup
-                    outputNodeGroup
-                    unassociatedNodeGroup
-                    yield! parameterValueGroupNode |> Option.toList
-                ]
+            children = [
+                inputNodeGroup
+                outputNodeGroup
+                unassociatedNodeGroup
+                yield! parameterValueGroupNode |> Option.toList
+            ]
         )
 
     node, addMeta processNodeId processMeta metaAfterParameterValues
@@ -1010,14 +969,16 @@ let private protocolNode
     let formalParameterNodes, metaAfterParameters =
         protocol.parameters
         |> Array.toList
-        |> mapFoldIndexed (fun parameterIndex state parameter ->
-            formalParameterNode nodeId parameterIndex parameter state) metaById
+        |> mapFoldIndexed
+            (fun parameterIndex state parameter -> formalParameterNode nodeId parameterIndex parameter state)
+            metaById
 
     let processNodes, metaAfterProcesses =
         protocol.processes
         |> Array.toList
-        |> mapFoldIndexed (fun processIndex state processValue ->
-            processNode nodeId processIndex processValue state) metaAfterParameters
+        |> mapFoldIndexed
+            (fun processIndex state processValue -> processNode nodeId processIndex processValue state)
+            metaAfterParameters
 
     let additionalPropertyGroupNode, metaAfterAdditionalProperties =
         propertyValueGroupNode
@@ -1031,12 +992,15 @@ let private protocolNode
             (protocol.additionalProperty |> Option.toList)
             metaAfterProcesses
 
-    let children =
-        [
-            yield! optionalGroupNode $"{nodeId}:group:formal-parameters" "Formal Parameters" formalParameterNodes |> Option.toList
-            yield! optionalGroupNode $"{nodeId}:group:processes" "Processes" processNodes |> Option.toList
-            yield! additionalPropertyGroupNode |> Option.toList
-        ]
+    let children = [
+        yield!
+            optionalGroupNode $"{nodeId}:group:formal-parameters" "Formal Parameters" formalParameterNodes
+            |> Option.toList
+        yield!
+            optionalGroupNode $"{nodeId}:group:processes" "Processes" processNodes
+            |> Option.toList
+        yield! additionalPropertyGroupNode |> Option.toList
+    ]
 
     let processNames = protocol.processes |> Array.toList |> summarizeProcessNames
 
@@ -1076,9 +1040,7 @@ let private protocolNode
     node, addMeta nodeId meta metaAfterAdditionalProperties
 
 let private datasetDisplayName (dataset: Dataset) =
-    dataset.name
-    |> asOptionalTextOption
-    |> Option.defaultValue dataset.identifier
+    dataset.name |> asOptionalTextOption |> Option.defaultValue dataset.identifier
 
 let rec private datasetNode
     (scopeNodeId: string)
@@ -1089,22 +1051,22 @@ let rec private datasetNode
     let kindLabel = dataset.type'.ToString()
     let datasetKind = graphKindForDataset dataset.type'
     let title = datasetDisplayName dataset
-    let nodeId = $"{scopeNodeId}:{kindLabel.ToLowerInvariant()}:{sanitizeSegment dataset.identifier}:{index}"
+
+    let nodeId =
+        $"{scopeNodeId}:{kindLabel.ToLowerInvariant()}:{sanitizeSegment dataset.identifier}:{index}"
 
     let aboutProtocols = dataset.about |> Array.toList
 
     let aboutProtocolNames =
         aboutProtocols
-        |> List.map (fun protocol ->
-            protocol.name
-            |> asOptionalTextOption
-            |> Option.defaultValue "Unnamed protocol")
+        |> List.map (fun protocol -> protocol.name |> asOptionalTextOption |> Option.defaultValue "Unnamed protocol")
         |> String.concat "; "
 
     let protocolNodes, metaAfterProtocols =
         aboutProtocols
-        |> mapFoldIndexed (fun protocolIndex state protocol ->
-            protocolNode nodeId protocolIndex protocol state) metaById
+        |> mapFoldIndexed
+            (fun protocolIndex state protocol -> protocolNode nodeId protocolIndex protocol state)
+            metaById
 
     let hasPartDatasets = dataset.hasPart |> Array.toList
 
@@ -1123,12 +1085,15 @@ let rec private datasetNode
             (dataset.additionalProperty |> Array.toList)
             metaAfterParts
 
-    let children =
-        [
-            yield! optionalGroupNode $"{nodeId}:group:protocols" "Protocols" protocolNodes |> Option.toList
-            yield! optionalGroupNode $"{nodeId}:group:has-part" "DataSets" partDatasetGroups |> Option.toList
-            yield! additionalPropertyGroupNode |> Option.toList
-        ]
+    let children = [
+        yield!
+            optionalGroupNode $"{nodeId}:group:protocols" "Protocols" protocolNodes
+            |> Option.toList
+        yield!
+            optionalGroupNode $"{nodeId}:group:has-part" "DataSets" partDatasetGroups
+            |> Option.toList
+        yield! additionalPropertyGroupNode |> Option.toList
+    ]
 
     let rows = [
         yield! row "Identifier" dataset.identifier
@@ -1154,63 +1119,50 @@ let rec private datasetNode
     }
 
     let node =
-        ArcExplorerNode.create (
-            nodeId,
-            title,
-            arcKindForGraphKind datasetKind,
-            children = children
-        )
+        ArcExplorerNode.create (nodeId, title, arcKindForGraphKind datasetKind, children = children)
 
     node, addMeta nodeId meta metaAfterAdditionalProperties
 
-and private groupedDatasetNodes
-    (scopeNodeId: string)
-    (datasets: Dataset list)
-    (metaById: Map<string, GraphNodeMeta>)
-    =
+and private groupedDatasetNodes (scopeNodeId: string) (datasets: Dataset list) (metaById: Map<string, GraphNodeMeta>) =
     datasets
     |> List.groupBy (fun dataset -> dataset.type')
     |> List.sortBy (fun (kind, _) -> kind)
-    |> List.fold (fun (groupsRev, state) (datasetKind, groupedDatasets) ->
-        let sortedDatasets =
-            groupedDatasets
-            |> List.sortBy (fun dataset -> (datasetDisplayName dataset).ToLowerInvariant())
+    |> List.fold
+        (fun (groupsRev, state) (datasetKind, groupedDatasets) ->
+            let sortedDatasets =
+                groupedDatasets
+                |> List.sortBy (fun dataset -> (datasetDisplayName dataset).ToLowerInvariant())
 
-        let datasetNodes, nextState =
-            sortedDatasets
-            |> mapFoldIndexed (fun datasetIndex state' dataset ->
-                datasetNode scopeNodeId datasetIndex dataset state') state
+            let datasetNodes, nextState =
+                sortedDatasets
+                |> mapFoldIndexed
+                    (fun datasetIndex state' dataset -> datasetNode scopeNodeId datasetIndex dataset state')
+                    state
 
-        let groupNode =
-            createGroupNode
-                $"{scopeNodeId}:group:{(datasetKind.ToString()).ToLowerInvariant()}"
-                (datasetKind.ToString())
-                datasetNodes
+            let groupNode =
+                createGroupNode
+                    $"{scopeNodeId}:group:{(datasetKind.ToString()).ToLowerInvariant()}"
+                    (datasetKind.ToString())
+                    datasetNodes
 
-        groupNode :: groupsRev, nextState) ([], metaById)
+            groupNode :: groupsRev, nextState
+        )
+        ([], metaById)
     |> fun (groupsRev, state) -> List.rev groupsRev, state
 
-let private arcNode
-    (arcIndex: int)
-    (model: ARCGraph)
-    (metaById: Map<string, GraphNodeMeta>)
-    =
+let private arcNode (arcIndex: int) (model: ARCGraph) (metaById: Map<string, GraphNodeMeta>) =
     let rootName =
         if String.IsNullOrWhiteSpace model.path then
             $"ARC Graph {arcIndex + 1}"
         else
             PathHelpers.getNameFromPath model.path
 
-    let rootPath =
-        model.path
-        |> asOptionalText
-        |> Option.map PathHelpers.normalizePath
+    let rootPath = model.path |> asOptionalText |> Option.map PathHelpers.normalizePath
 
     let arcNodeId = $"graph:arc:{arcIndex}"
     let datasets = flattenDatasetKinds model.Datasets
 
-    let groupNodes, metaAfterGroups =
-        groupedDatasetNodes arcNodeId datasets metaById
+    let groupNodes, metaAfterGroups = groupedDatasetNodes arcNodeId datasets metaById
 
     let arcNode =
         ArcExplorerNode.create (
@@ -1243,11 +1195,9 @@ let toArcExplorerNodesWithMetaFromArcObjects (arcObjects: ARCObjects list) =
 
     let arcNodes, metaAfterArcs =
         arcGraphs
-        |> mapFoldIndexed (fun arcIndex state model ->
-            arcNode arcIndex model state) Map.empty
+        |> mapFoldIndexed (fun arcIndex state model -> arcNode arcIndex model state) Map.empty
 
-    let canonicalRoots =
-        arcNodes
+    let canonicalRoots = arcNodes
 
     let allNodeId = "graph:all"
 
@@ -1270,32 +1220,24 @@ let toArcExplorerNodesWithMetaFromArcObjects (arcObjects: ARCObjects list) =
             yield! row "Arc Entries" (string arcNodes.Length)
         ]
         CaseExamples = [
-            "ARCObjects", "Arc | Datasets | Protocols | FormalParameters | Processes (non-Arc entries are ignored in canonical tree)"
+            "ARCObjects",
+            "Arc | Datasets | Protocols | FormalParameters | Processes (non-Arc entries are ignored in canonical tree)"
         ]
     }
 
-    let canonicalNodes =
-        flattenNodes canonicalRoots
+    let canonicalNodes = flattenNodes canonicalRoots
 
     let candidatesByTag =
-        collectCategoryCandidates
-            categoryLayerDescriptors
-            canonicalNodes
-            metaAfterArcs
+        collectCategoryCandidates categoryLayerDescriptors canonicalNodes metaAfterArcs
 
-    let allWithMetaById =
-        metaAfterArcs
-        |> addMeta allNodeId allMeta
+    let allWithMetaById = metaAfterArcs |> addMeta allNodeId allMeta
 
     let categoryLayerNodes, metaById =
-        createCategoryLayers
-            categoryLayerDescriptors
-            candidatesByTag
-            allWithMetaById
+        createCategoryLayers categoryLayerDescriptors candidatesByTag allWithMetaById
 
     allNode :: categoryLayerNodes, metaById
 
-let private graphAppearanceByKind : Map<GraphExplorerNodeKind, GraphFileItemAppearance> =
+let private graphAppearanceByKind: Map<GraphExplorerNodeKind, GraphFileItemAppearance> =
     Map.ofList [
         GraphExplorerNodeKind.Arc,
         {
@@ -1394,13 +1336,14 @@ let private fileItemForGraphNode
             Selectable = node.isSelectable
     }
 
-let rec private toGraphFileItem
-    (nodeMetaById: Map<string, GraphNodeMeta>)
-    (node: ArcExplorerNode)
-    =
+let rec private toGraphFileItem (nodeMetaById: Map<string, GraphNodeMeta>) (node: ArcExplorerNode) =
     let graphKind = graphKindForNodeId node.id node.kind nodeMetaById
     let children = node.children |> List.map (toGraphFileItem nodeMetaById)
-    let isDirectory = graphKind = GraphExplorerNodeKind.Arc || graphKind = GraphExplorerNodeKind.Group || not (List.isEmpty children)
+
+    let isDirectory =
+        graphKind = GraphExplorerNodeKind.Arc
+        || graphKind = GraphExplorerNodeKind.Group
+        || not (List.isEmpty children)
 
     if isDirectory then
         {
@@ -1411,10 +1354,7 @@ let rec private toGraphFileItem
     else
         fileItemForGraphNode nodeMetaById FileTree.createFile node
 
-let toGraphFileItems
-    (nodeMetaById: Map<string, GraphNodeMeta>)
-    (nodes: ArcExplorerNode list)
-    =
+let toGraphFileItems (nodeMetaById: Map<string, GraphNodeMeta>) (nodes: ArcExplorerNode list) =
     nodes |> List.map (toGraphFileItem nodeMetaById)
 
 let toArcExplorerNodesWithMetaFromArcs (models: ARCGraph list) =
@@ -1423,6 +1363,4 @@ let toArcExplorerNodesWithMetaFromArcs (models: ARCGraph list) =
 let toArcExplorerNodesWithMeta (model: ARCGraph) =
     toArcExplorerNodesWithMetaFromArcs [ model ]
 
-let toArcExplorerNodes (model: ARCGraph) =
-    toArcExplorerNodesWithMeta model |> fst
-
+let toArcExplorerNodes (model: ARCGraph) = toArcExplorerNodesWithMeta model |> fst

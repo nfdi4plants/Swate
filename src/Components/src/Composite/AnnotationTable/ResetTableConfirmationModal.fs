@@ -9,12 +9,8 @@ type ResetTableConfirmationModal =
 
     [<ReactComponent>]
     static member ResetTableConfirmationModal
-        (
-            isOpen: bool,
-            setIsOpen: bool -> unit,
-            onDelete: unit -> unit,
-            ?tableName: string
-        ) =
+        (isOpen: bool, setIsOpen: bool -> unit, onDelete: unit -> unit, ?tableName: string)
+        =
         let close () = setIsOpen false
 
         let content =
@@ -26,8 +22,7 @@ type ResetTableConfirmationModal =
             | None ->
                 React.Fragment [
                     Html.p [
-                        prop.innerHtml
-                            "Careful, this will delete <b>all</b> tables and <b>all</b> table history!"
+                        prop.innerHtml "Careful, this will delete <b>all</b> tables and <b>all</b> table history!"
                     ]
                     Html.p [
                         prop.innerHtml "There is no option to recover any information deleted in this way."
@@ -47,11 +42,7 @@ type ResetTableConfirmationModal =
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text "Attention!",
-            children =
-                Html.div [
-                    prop.className "swt:prose"
-                    prop.children [ content ]
-                ],
+            children = Html.div [ prop.className "swt:prose"; prop.children [ content ] ],
             footer =
                 React.Fragment [
                     Html.button [

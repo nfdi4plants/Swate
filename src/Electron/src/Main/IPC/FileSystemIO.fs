@@ -151,12 +151,8 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
         exn
             $"Cannot rename '{sourcePath}' to '{targetPath}'. Windows reported a permission or file-lock conflict. If the destination already exists, choose a different name and close apps that may be using these paths."
     | Some "ENOTEMPTY"
-    | Some "EEXIST" ->
-        exn
-            $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
-    | Some "ENOENT" ->
-        exn
-            $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
+    | Some "EEXIST" -> exn $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
+    | Some "ENOENT" -> exn $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
     | _ -> renameError
 
 [<RequireQualifiedAccess>]
@@ -175,8 +171,7 @@ module ArcFileSystemHelper =
 
     let private resolveArcRelativePathPair arcPath firstRelativePath secondRelativePath =
         match
-            tryResolveArcRelativePath arcPath firstRelativePath,
-            tryResolveArcRelativePath arcPath secondRelativePath
+            tryResolveArcRelativePath arcPath firstRelativePath, tryResolveArcRelativePath arcPath secondRelativePath
         with
         | Error pathError, _
         | _, Error pathError -> Error pathError
@@ -184,8 +179,7 @@ module ArcFileSystemHelper =
 
     let private resolveCreatePathPair arcPath parentRelativePath targetRelativePath =
         let normalizedParentPath =
-            parentRelativePath
-            |> PathHelpers.normalizeCanonicalRelativePath
+            parentRelativePath |> PathHelpers.normalizeCanonicalRelativePath
 
         let parentPath =
             if String.IsNullOrWhiteSpace normalizedParentPath then
@@ -193,10 +187,7 @@ module ArcFileSystemHelper =
             else
                 tryResolveArcRelativePath arcPath normalizedParentPath
 
-        match
-            parentPath,
-            tryResolveArcRelativePath arcPath targetRelativePath
-        with
+        match parentPath, tryResolveArcRelativePath arcPath targetRelativePath with
         | Error pathError, _
         | _, Error pathError -> Error pathError
         | Ok parentAbsolutePath, Ok targetAbsolutePath -> Ok(parentAbsolutePath, targetAbsolutePath)
@@ -260,8 +251,7 @@ module ArcFileSystemHelper =
 
     let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<GenericRenamePlan, exn> =
         let requestedRelativePath =
-            request.relativePath
-            |> PathHelpers.normalizeCanonicalRelativePath
+            request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
 
         match tryBuildGenericFileSystemRenameTargetPath requestedRelativePath request.newName with
         | Error validationError -> Error(exn validationError)
@@ -290,8 +280,7 @@ module ArcFileSystemHelper =
                     match targetCheck with
                     | Error conflictError -> return Error conflictError
                     | Ok() ->
-                        let! renameResult =
-                            renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
+                        let! renameResult = renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
 
                         match renameResult with
                         | Ok() -> return Ok()
@@ -305,38 +294,31 @@ module ArcFileSystemHelper =
                                 )
         }
 
-    let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
-        promise {
-            let normalizedRelativePath = 
-                relativePath
-                |> PathHelpers.normalizeCanonicalRelativePath
+    let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {
+        let normalizedRelativePath =
+            relativePath |> PathHelpers.normalizeCanonicalRelativePath
 
-            let isGenericDeleteTarget =
-                match ArcEntityPathRules.classifyDeleteTarget normalizedRelativePath with
-                | ArcEntityPathRules.DeletePathClassification.GenericTarget _
-                | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-                    ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
-                    _
-                  )
-                | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget _ ->
-                    ArcEntityPathRules.isDeletePathAllowed normalizedRelativePath
-                | _ -> false
+        let isGenericDeleteTarget =
+            match ArcEntityPathRules.classifyDeleteTarget normalizedRelativePath with
+            | ArcEntityPathRules.DeletePathClassification.GenericTarget _
+            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
+                                                                              _)
+            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget _ ->
+                ArcEntityPathRules.isDeletePathAllowed normalizedRelativePath
+            | _ -> false
 
-            if not isGenericDeleteTarget then
-                return Error(exn "Generic filesystem delete is only supported for safe non-entity paths.")
-            else
-                match tryResolveArcRelativePath arcPath normalizedRelativePath with
-                | Error pathError -> return Error pathError
-                | Ok absolutePath ->
-                    try
-                        let! _ =
-                            fsPromisesDynamic?rm (
-                                absolutePath,
-                                createObj [ "recursive" ==> true; "force" ==> false ]
-                            )
-                            |> unbox<JS.Promise<obj>>
+        if not isGenericDeleteTarget then
+            return Error(exn "Generic filesystem delete is only supported for safe non-entity paths.")
+        else
+            match tryResolveArcRelativePath arcPath normalizedRelativePath with
+            | Error pathError -> return Error pathError
+            | Ok absolutePath ->
+                try
+                    let! _ =
+                        fsPromisesDynamic?rm (absolutePath, createObj [ "recursive" ==> true; "force" ==> false ])
+                        |> unbox<JS.Promise<obj>>
 
-                        return Ok()
-                    with deleteError ->
-                        return Error deleteError
-        }
+                    return Ok()
+                with deleteError ->
+                    return Error deleteError
+    }

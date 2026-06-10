@@ -39,26 +39,32 @@ let private expectMetadataView activeView =
     | Some ActiveView.Metadata -> ()
     | _ -> failwith "Expected the metadata view to be activated after table deletion."
 
-Vitest.describe("ArcFilePreviewTarget table deletion", fun () ->
-    Vitest.test("deletes only the selected middle table and preserves metadata", fun () ->
-        let arcFile, assay = createAssayArcFile [| "First"; "Selected"; "Last" |]
+Vitest.describe (
+    "ArcFilePreviewTarget table deletion",
+    fun () ->
+        Vitest.test (
+            "deletes only the selected middle table and preserves metadata",
+            fun () ->
+                let arcFile, assay = createAssayArcFile [| "First"; "Selected"; "Last" |]
 
-        let publishedArcFile, activeView = deleteSelectedTable arcFile 1
+                let publishedArcFile, activeView = deleteSelectedTable arcFile 1
 
-        Vitest.expect(assay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual([| "First"; "Last" |])
-        expectMetadataPreserved assay
-        Vitest.expect(publishedArcFile.IsSome).toBe(true)
-        expectMetadataView activeView
-    )
+                Vitest.expect(assay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual ([| "First"; "Last" |])
+                expectMetadataPreserved assay
+                Vitest.expect(publishedArcFile.IsSome).toBe (true)
+                expectMetadataView activeView
+        )
 
-    Vitest.test("deletes the only table while preserving metadata", fun () ->
-        let arcFile, assay = createAssayArcFile [| "Only Table" |]
+        Vitest.test (
+            "deletes the only table while preserving metadata",
+            fun () ->
+                let arcFile, assay = createAssayArcFile [| "Only Table" |]
 
-        let publishedArcFile, activeView = deleteSelectedTable arcFile 0
+                let publishedArcFile, activeView = deleteSelectedTable arcFile 0
 
-        Vitest.expect(assay.Tables.Count).toBe(0)
-        expectMetadataPreserved assay
-        Vitest.expect(publishedArcFile.IsSome).toBe(true)
-        expectMetadataView activeView
-    )
+                Vitest.expect(assay.Tables.Count).toBe (0)
+                expectMetadataPreserved assay
+                Vitest.expect(publishedArcFile.IsSome).toBe (true)
+                expectMetadataView activeView
+        )
 )

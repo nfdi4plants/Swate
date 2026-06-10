@@ -4,8 +4,7 @@ open System
 open Swate.Components.Shared
 
 let private normalizeRelativePath (path: string) =
-    path
-    |> PathHelpers.normalizeCanonicalRelativePath
+    path |> PathHelpers.normalizeCanonicalRelativePath
 
 let validateRenameName (newName: string) =
     let normalizedNewName = newName.Trim()
@@ -69,7 +68,8 @@ let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
             if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath then
                 Ok targetPath
             else
-                Error "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
+                Error
+                    "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
 
 let tryBuildGenericFileSystemRenameTargetPath (sourcePath: string) (newName: string) =
     let normalizedSourcePath = normalizeRelativePath sourcePath
@@ -83,4 +83,5 @@ let tryBuildGenericFileSystemRenameTargetPath (sourcePath: string) (newName: str
             if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath then
                 Ok targetPath
             else
-                Error "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."
+                Error
+                    "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."

@@ -93,8 +93,7 @@ type FilePicker =
     [<ReactComponentAttribute>]
     static member ActionButtons (model: Model) dispatch =
 
-        let ctx =
-            useAnnotationTableStateCtx ()
+        let ctx = useAnnotationTableStateCtx ()
 
         let selectedCells =
             ctx.state

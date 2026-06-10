@@ -16,18 +16,10 @@ let internal unsafeOptions =
     )
 
 let internal standardTimeout =
-    SimpleGitTimeoutOptions(
-        block = 30000,
-        stdOut = true,
-        stdErr = true
-    )
+    SimpleGitTimeoutOptions(block = 30000, stdOut = true, stdErr = true)
 
 let internal syncTimeout =
-    SimpleGitTimeoutOptions(
-        block = 120000,
-        stdOut = false,
-        stdErr = false
-    )
+    SimpleGitTimeoutOptions(block = 120000, stdOut = false, stdErr = false)
 
 /// Creates the standard simple-git options used by Main Git services.
 /// maxConcurrentProcesses is intentionally one to serialize commands for a repository-scoped instance.

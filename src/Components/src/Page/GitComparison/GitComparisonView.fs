@@ -28,10 +28,7 @@ module internal GitComparisonView =
                 if className.IsSome then
                     className.Value
             ]
-            prop.children [
-                leading
-                trailing
-            ]
+            prop.children [ leading; trailing ]
         ]
 
     let PanelShell
@@ -62,8 +59,5 @@ module internal GitComparisonView =
                 if className.IsSome then
                     className.Value
             ]
-            prop.children [
-                header
-                body
-            ]
+            prop.children [ header; body ]
         ]

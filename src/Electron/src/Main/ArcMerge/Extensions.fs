@@ -11,10 +11,7 @@ module ArcMergeExtensions =
     let cleanDataMapStaticHash (dataMap: DataMap) =
         let hash = dataMap.GetHashCode()
 
-        if hash = 0 then
-            cleanEmptyDataMapStaticHash
-        else
-            hash
+        if hash = 0 then cleanEmptyDataMapStaticHash else hash
 
     type DataMap with
         member this.hasInMemoryChanges() : bool =
@@ -25,7 +22,7 @@ module ArcMergeExtensions =
 
     let private hasStaticHashOrDataMapChanges staticHash lightHash (dataMap: DataMap option) =
         staticHash <> lightHash
-        || (dataMap |> Option.exists (fun dm -> dm.hasInMemoryChanges()))
+        || (dataMap |> Option.exists (fun dm -> dm.hasInMemoryChanges ()))
 
     let private syncDataMapStaticHash (sourceDataMap: DataMap option) (targetDataMap: DataMap option) =
         match sourceDataMap, targetDataMap with
@@ -42,8 +39,7 @@ module ArcMergeExtensions =
             targetEntity
             |> getIdentifier
             |> tryGetSource
-            |> Option.iter (fun sourceEntity ->
-                syncEntityStaticHash sourceEntity targetEntity)
+            |> Option.iter (fun sourceEntity -> syncEntityStaticHash sourceEntity targetEntity)
 
     /// Syncs static hashes from source ARC to target ARC for matching entities.
     /// This keeps ARCtrl update contract generation scoped to actual changes.
@@ -60,7 +56,8 @@ module ArcMergeExtensions =
             (fun (study: ArcStudy) -> study.Identifier)
             (fun sourceStudy targetStudy ->
                 targetStudy.StaticHash <- sourceStudy.StaticHash
-                syncDataMapStaticHash sourceStudy.DataMap targetStudy.DataMap)
+                syncDataMapStaticHash sourceStudy.DataMap targetStudy.DataMap
+            )
 
         syncEntityStaticHashes
             target.Assays
@@ -68,7 +65,8 @@ module ArcMergeExtensions =
             (fun (assay: ArcAssay) -> assay.Identifier)
             (fun sourceAssay targetAssay ->
                 targetAssay.StaticHash <- sourceAssay.StaticHash
-                syncDataMapStaticHash sourceAssay.DataMap targetAssay.DataMap)
+                syncDataMapStaticHash sourceAssay.DataMap targetAssay.DataMap
+            )
 
         syncEntityStaticHashes
             target.Workflows
@@ -76,7 +74,8 @@ module ArcMergeExtensions =
             (fun (workflow: ArcWorkflow) -> workflow.Identifier)
             (fun sourceWorkflow targetWorkflow ->
                 targetWorkflow.StaticHash <- sourceWorkflow.StaticHash
-                syncDataMapStaticHash sourceWorkflow.DataMap targetWorkflow.DataMap)
+                syncDataMapStaticHash sourceWorkflow.DataMap targetWorkflow.DataMap
+            )
 
         syncEntityStaticHashes
             target.Runs
@@ -84,7 +83,8 @@ module ArcMergeExtensions =
             (fun (run: ArcRun) -> run.Identifier)
             (fun sourceRun targetRun ->
                 targetRun.StaticHash <- sourceRun.StaticHash
-                syncDataMapStaticHash sourceRun.DataMap targetRun.DataMap)
+                syncDataMapStaticHash sourceRun.DataMap targetRun.DataMap
+            )
 
     /// Copies ARC and preserves static hashes so unchanged entities are not treated as newly created.
     let copyArcPreservingStaticHashes (arc: ARC) : ARC =
@@ -114,18 +114,18 @@ module ArcMergeExtensions =
 
             if not isDirty then
                 for assay in this.Assays do
-                    isDirty <- isDirty || assay.hasInMemoryChanges()
+                    isDirty <- isDirty || assay.hasInMemoryChanges ()
 
             if not isDirty then
                 for study in this.Studies do
-                    isDirty <- isDirty || study.hasInMemoryChanges()
+                    isDirty <- isDirty || study.hasInMemoryChanges ()
 
             if not isDirty then
                 for run in this.Runs do
-                    isDirty <- isDirty || run.hasInMemoryChanges()
+                    isDirty <- isDirty || run.hasInMemoryChanges ()
 
             if not isDirty then
                 for workflow in this.Workflows do
-                    isDirty <- isDirty || workflow.hasInMemoryChanges()
+                    isDirty <- isDirty || workflow.hasInMemoryChanges ()
 
             isDirty

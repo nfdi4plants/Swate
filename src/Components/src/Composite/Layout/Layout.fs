@@ -597,4 +597,3 @@ type Layout =
             },
             leftSidebarDefaultOpen = true
         )
-

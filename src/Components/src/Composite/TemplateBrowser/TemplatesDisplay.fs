@@ -109,7 +109,7 @@ type TemplatesDisplay =
                             ]
                         ]
                         Html.td [
-                                    Buttons.Buttons.CollapseButton(
+                            Buttons.Buttons.CollapseButton(
                                 showDetails,
                                 setShowDetails,
                                 classes = "swt:btn-sm",
@@ -192,10 +192,7 @@ type TemplatesDisplay =
                                 Html.th [
                                     Html.div [
                                         prop.className "swt:flex swt:items-center"
-                                        prop.children [
-                                            Icons.Filter("swt:size-3")
-                                            Html.span templates.Length
-                                        ]
+                                        prop.children [ Icons.Filter("swt:size-3"); Html.span templates.Length ]
                                     ]
                                 ]
                                 Html.th "Template Name"
@@ -252,4 +249,3 @@ type TemplatesDisplay =
                 ]
             ]
         ]
-

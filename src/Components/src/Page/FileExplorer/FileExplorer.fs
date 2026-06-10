@@ -48,10 +48,7 @@ module private FileExplorerHelper =
 
         [
             if not item.IsDirectory then
-                ContextMenuItem.create
-                    "Open"
-                    "swt:fluent--open-24-regular"
-                    (fun () -> selectItem item)
+                ContextMenuItem.create "Open" "swt:fluent--open-24-regular" (fun () -> selectItem item)
 
             match item.Path with
             | Some _ ->
@@ -150,6 +147,7 @@ type FileExplorer =
 
         let model, dispatch = React.useReducer (reducer, initialModel)
         let containerRef = React.useElementRef ()
+
         let onDirectoryExpansionChange =
             onDirectoryExpansionChange
             |> Option.orElse onExpansionChange
@@ -187,9 +185,11 @@ type FileExplorer =
             ev.preventDefault ()
             ev.stopPropagation ()
 
-            if directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
-               && canExpand
-               && not (model.ExpandedIds.Contains item.Id) then
+            if
+                directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
+                && canExpand
+                && not (model.ExpandedIds.Contains item.Id)
+            then
                 setExpanded item true
 
             selectItem item
@@ -199,6 +199,7 @@ type FileExplorer =
                 (fun data ->
                     let item = data |> unbox<FileItem>
                     let isExpanded = model.ExpandedIds.Contains item.Id
+
                     FileExplorerHelper.getContextMenuItems
                         item
                         isExpanded
@@ -242,10 +243,7 @@ type FileExplorer =
                     )
             )
 
-        let selectedPathIds =
-            model.SelectedPath
-            |> List.map _.Id
-            |> Set.ofList
+        let selectedPathIds = model.SelectedPath |> List.map _.Id |> Set.ofList
 
         let rec renderItem item =
             let isSelected = model.SelectedId = Some item.Id

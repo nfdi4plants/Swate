@@ -10,10 +10,7 @@ module internal GitTextComparisonCore =
         | Added
         | Removed
 
-    type InlineSegment = {
-        Text: string
-        Kind: LineChangeKind
-    }
+    type InlineSegment = { Text: string; Kind: LineChangeKind }
 
     type SideLine = {
         Number: int option
@@ -22,10 +19,7 @@ module internal GitTextComparisonCore =
         Kind: LineChangeKind
     }
 
-    type DiffRow = {
-        Left: SideLine
-        Right: SideLine
-    }
+    type DiffRow = { Left: SideLine; Right: SideLine }
 
     type DiffMetadata = {
         PreviousPath: string option
@@ -81,7 +75,11 @@ module internal GitTextComparisonCore =
         let private unquotePathToken (pathText: string) =
             let trimmed = pathText.Trim()
 
-            if trimmed.Length >= 2 && trimmed.StartsWith("\"", StringComparison.Ordinal) && trimmed.EndsWith("\"", StringComparison.Ordinal) then
+            if
+                trimmed.Length >= 2
+                && trimmed.StartsWith("\"", StringComparison.Ordinal)
+                && trimmed.EndsWith("\"", StringComparison.Ordinal)
+            then
                 let quotedValue = trimmed.Substring(1, trimmed.Length - 2)
 
                 try
@@ -92,11 +90,14 @@ module internal GitTextComparisonCore =
                 trimmed.Trim('"')
 
         let private normalizeDiffPath (pathText: string) =
-            let trimmed = pathText |> unquotePathToken |> fun value -> value.Trim()
+            let trimmed = pathText |> unquotePathToken |> (fun value -> value.Trim())
 
             if String.IsNullOrWhiteSpace trimmed || trimmed = "/dev/null" then
                 None
-            elif trimmed.StartsWith("a/", StringComparison.Ordinal) || trimmed.StartsWith("b/", StringComparison.Ordinal) then
+            elif
+                trimmed.StartsWith("a/", StringComparison.Ordinal)
+                || trimmed.StartsWith("b/", StringComparison.Ordinal)
+            then
                 Some(trimmed.Substring(2))
             else
                 Some trimmed
@@ -129,17 +130,16 @@ module internal GitTextComparisonCore =
                 None
 
         let extractDiffMetadata (diffText: string) =
-            let lines =
-                diffText
-                |> Text.normalizeLineEndings
-                |> Text.splitContentToLines
+            let lines = diffText |> Text.normalizeLineEndings |> Text.splitContentToLines
 
-            match lines |> Array.tryFind (fun line -> line.StartsWith("diff --git ", StringComparison.Ordinal)) with
+            match
+                lines
+                |> Array.tryFind (fun line -> line.StartsWith("diff --git ", StringComparison.Ordinal))
+            with
             | Some diffLine ->
                 extractFromDiffLine diffLine
                 |> Option.defaultValue (extractFromPatchHeaders lines)
-            | None ->
-                extractFromPatchHeaders lines
+            | None -> extractFromPatchHeaders lines
 
         let resolveHeaderLabel (fallbackLabel: string) (explicitLabel: string option) (pathLabel: string option) =
             explicitLabel
@@ -205,8 +205,7 @@ module internal GitTextComparisonCore =
                     flushBuffer ()
                     buffer.Append(character) |> ignore
                     currentIsWhitespace <- Some isWhitespace
-                | Some _ ->
-                    buffer.Append(character) |> ignore
+                | Some _ -> buffer.Append(character) |> ignore
                 | None ->
                     buffer.Append(character) |> ignore
                     currentIsWhitespace <- Some isWhitespace
@@ -219,71 +218,67 @@ module internal GitTextComparisonCore =
                 match segments.Count with
                 | count when count > 0 && segments.[count - 1].Kind = kind ->
                     let previous = segments.[count - 1]
-                    segments.[count - 1] <- { previous with Text = previous.Text + text }
-                | _ ->
-                    segments.Add({ Text = text; Kind = kind })
+
+                    segments.[count - 1] <- {
+                        previous with
+                            Text = previous.Text + text
+                    }
+                | _ -> segments.Add({ Text = text; Kind = kind })
 
         let buildInlineSegments (leftText: string) (rightText: string) =
             let leftSegments = ResizeArray<InlineSegment>()
             let rightSegments = ResizeArray<InlineSegment>()
 
             buildTokenDiffOperations (tokenize leftText) (tokenize rightText)
-            |> List.iter (function
+            |> List.iter (
+                function
                 | Keep text ->
                     appendSegment LineChangeKind.Neutral text leftSegments
                     appendSegment LineChangeKind.Neutral text rightSegments
-                | Delete text ->
-                    appendSegment LineChangeKind.Removed text leftSegments
-                | Insert text ->
-                    appendSegment LineChangeKind.Added text rightSegments
+                | Delete text -> appendSegment LineChangeKind.Removed text leftSegments
+                | Insert text -> appendSegment LineChangeKind.Added text rightSegments
             )
 
             leftSegments |> Seq.toList, rightSegments |> Seq.toList
 
     module Rows =
 
-        let private createSideLine (number: int option) (text: string) (kind: LineChangeKind) (segments: InlineSegment list) = {
-            Number = number
-            Text = text
-            Segments = segments
-            Kind = kind
-        }
+        let private createSideLine
+            (number: int option)
+            (text: string)
+            (kind: LineChangeKind)
+            (segments: InlineSegment list)
+            =
+            {
+                Number = number
+                Text = text
+                Segments = segments
+                Kind = kind
+            }
 
         let private createNeutralLine number text =
-            createSideLine
-                (Some number)
-                text
-                LineChangeKind.Neutral
-                [
-                    {
-                        Text = text
-                        Kind = LineChangeKind.Neutral
-                    }
-                ]
+            createSideLine (Some number) text LineChangeKind.Neutral [
+                {
+                    Text = text
+                    Kind = LineChangeKind.Neutral
+                }
+            ]
 
         let private createRemovedLine number text =
-            createSideLine
-                (Some number)
-                text
-                LineChangeKind.Removed
-                [
-                    {
-                        Text = text
-                        Kind = LineChangeKind.Removed
-                    }
-                ]
+            createSideLine (Some number) text LineChangeKind.Removed [
+                {
+                    Text = text
+                    Kind = LineChangeKind.Removed
+                }
+            ]
 
         let private createAddedLine number text =
-            createSideLine
-                (Some number)
-                text
-                LineChangeKind.Added
-                [
-                    {
-                        Text = text
-                        Kind = LineChangeKind.Added
-                    }
-                ]
+            createSideLine (Some number) text LineChangeKind.Added [
+                {
+                    Text = text
+                    Kind = LineChangeKind.Added
+                }
+            ]
 
         let emptyRow () = {
             Left = createSideLine None "" LineChangeKind.Neutral []
@@ -314,11 +309,10 @@ module internal GitTextComparisonCore =
 
                     yield
                         match leftLine, rightLine with
-                        | Some leftText, Some rightText when leftText = rightText ->
-                            {
-                                Left = createNeutralLine (leftLineNumberStart + rowIndex) leftText
-                                Right = createNeutralLine (rightLineNumberStart + rowIndex) rightText
-                            }
+                        | Some leftText, Some rightText when leftText = rightText -> {
+                            Left = createNeutralLine (leftLineNumberStart + rowIndex) leftText
+                            Right = createNeutralLine (rightLineNumberStart + rowIndex) rightText
+                          }
                         | Some leftText, Some rightText ->
                             let leftSegments, rightSegments = InlineDiff.buildInlineSegments leftText rightText
 
@@ -336,18 +330,15 @@ module internal GitTextComparisonCore =
                                         LineChangeKind.Added
                                         rightSegments
                             }
-                        | Some leftText, None ->
-                            {
-                                Left = createRemovedLine (leftLineNumberStart + rowIndex) leftText
-                                Right = (emptyRow ()).Right
-                            }
-                        | None, Some rightText ->
-                            {
-                                Left = (emptyRow ()).Left
-                                Right = createAddedLine (rightLineNumberStart + rowIndex) rightText
-                            }
-                        | None, None ->
-                            emptyRow ()
+                        | Some leftText, None -> {
+                            Left = createRemovedLine (leftLineNumberStart + rowIndex) leftText
+                            Right = (emptyRow ()).Right
+                          }
+                        | None, Some rightText -> {
+                            Left = (emptyRow ()).Left
+                            Right = createAddedLine (rightLineNumberStart + rowIndex) rightText
+                          }
+                        | None, None -> emptyRow ()
             ]
 
         let buildRows (leftContent: string) (rightContent: string) =
@@ -386,13 +377,23 @@ module internal GitTextComparisonCore =
                             Left = {
                                 Number = Some(leftLineNumberStart + rowIndex)
                                 Text = leftSlice.[rowIndex]
-                                Segments = [ { Text = leftSlice.[rowIndex]; Kind = LineChangeKind.Neutral } ]
+                                Segments = [
+                                    {
+                                        Text = leftSlice.[rowIndex]
+                                        Kind = LineChangeKind.Neutral
+                                    }
+                                ]
                                 Kind = LineChangeKind.Neutral
                             }
                             Right = {
                                 Number = Some(rightLineNumberStart + rowIndex)
                                 Text = rightSlice.[rowIndex]
-                                Segments = [ { Text = rightSlice.[rowIndex]; Kind = LineChangeKind.Neutral } ]
+                                Segments = [
+                                    {
+                                        Text = rightSlice.[rowIndex]
+                                        Kind = LineChangeKind.Neutral
+                                    }
+                                ]
                                 Kind = LineChangeKind.Neutral
                             }
                         }
@@ -419,10 +420,7 @@ module internal GitTextComparisonCore =
                     let parseCount (groupName: string) =
                         let group = matched.Groups.[groupName]
 
-                        if group.Success then
-                            Int32.Parse group.Value
-                        else
-                            1
+                        if group.Success then Int32.Parse group.Value else 1
 
                     Some {
                         OldStart = Int32.Parse matched.Groups.["oldStart"].Value
@@ -518,7 +516,10 @@ module internal GitTextComparisonCore =
 
             let sliceToText startIndex endIndexInclusive =
                 let startOffset = lineStartIndices.[startIndex]
-                let endExclusive = lineStartIndices.[endIndexInclusive] + lines.[endIndexInclusive].Length
+
+                let endExclusive =
+                    lineStartIndices.[endIndexInclusive] + lines.[endIndexInclusive].Length
+
                 normalized.Substring(startOffset, endExclusive - startOffset)
 
             let sliceToTextToEnd startIndex =
@@ -548,15 +549,13 @@ module internal GitTextComparisonCore =
                     match lines.[index] with
                     | line when isMarker ">>>>>>>" line ->
                         Ok(List.rev currentRev, normalizeConflictLabel line, List.rev incomingRev, index + 1, index)
-                    | line ->
-                        collectIncoming currentRev (line :: incomingRev) (index + 1)
+                    | line -> collectIncoming currentRev (line :: incomingRev) (index + 1)
 
             let tryParseConflict conflictId startIndex =
                 let currentLabel = normalizeConflictLabel lines.[startIndex]
 
                 match collectCurrent [] (startIndex + 1) with
-                | Error() ->
-                    None
+                | Error() -> None
                 | Ok(currentLines, incomingLabel, incomingLines, nextIndex, endIndex) ->
                     Some(
                         {
@@ -584,12 +583,16 @@ module internal GitTextComparisonCore =
                         | None ->
                             let fragmentsRev = flushPlainFragment plainRev fragmentsRev
                             List.rev (PlainText(sliceToTextToEnd index) :: fragmentsRev)
-                    | line ->
-                        loop (line :: plainRev) fragmentsRev nextConflictId (index + 1)
+                    | line -> loop (line :: plainRev) fragmentsRev nextConflictId (index + 1)
 
             loop [] [] 1 0
 
-        let tryReplaceExactTextAt (startIndex: int) (expectedText: string) (replacementText: string) (sourceText: string) =
+        let tryReplaceExactTextAt
+            (startIndex: int)
+            (expectedText: string)
+            (replacementText: string)
+            (sourceText: string)
+            =
             if String.IsNullOrEmpty expectedText then
                 Some sourceText
             elif startIndex < 0 || startIndex + expectedText.Length > sourceText.Length then
@@ -598,6 +601,10 @@ module internal GitTextComparisonCore =
                 let actualText = sourceText.Substring(startIndex, expectedText.Length)
 
                 if actualText = expectedText then
-                    Some(sourceText.Substring(0, startIndex) + replacementText + sourceText.Substring(startIndex + expectedText.Length))
+                    Some(
+                        sourceText.Substring(0, startIndex)
+                        + replacementText
+                        + sourceText.Substring(startIndex + expectedText.Length)
+                    )
                 else
                     None

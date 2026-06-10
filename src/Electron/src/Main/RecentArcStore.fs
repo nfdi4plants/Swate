@@ -92,8 +92,7 @@ type RecentARCStore() =
         if String.IsNullOrWhiteSpace path then
             this.RecentArcsState
         else
-            let arc =
-                Helpers.toPointer (PathHelpers.getFileName path) path true
+            let arc = Helpers.toPointer (PathHelpers.getFileName path) path true
 
             let remainingArcs =
                 this.RecentArcsState |> Array.filter (fun arc -> not (pathsEqual arc.path path))
