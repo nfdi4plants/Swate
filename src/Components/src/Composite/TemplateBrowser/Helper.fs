@@ -17,28 +17,49 @@ let private tryTrimmed (value: string) =
     else
         Some(value.Trim())
 
+let private isNullCell (cell: CompositeCell) = obj.ReferenceEquals(cell, null)
+
+let private normalizeNullCells (table: ArcTable) =
+    let normalizedTable = ArcTable.init table.Name
+
+    for column in table.Columns do
+        let firstNonNullCell = column.Cells |> Seq.tryFind (isNullCell >> not)
+        let emptyCell = ArcTableAux.getEmptyCellForHeader column.Header firstNonNullCell
+
+        let normalizedCells =
+            column.Cells
+            |> Seq.map (fun cell -> if isNullCell cell then emptyCell else cell)
+            |> ResizeArray
+
+        normalizedTable.AddColumn(column.Header, normalizedCells)
+
+    normalizedTable
+
 let compositeCellPreviewValues (cell: CompositeCell) =
-    match cell with
-    | CompositeCell.FreeText text -> [| text |]
-    | CompositeCell.Term ontologyAnnotation -> [|
-        ontologyAnnotation.NameText
-        defaultArg ontologyAnnotation.TermSourceREF ""
-        defaultArg ontologyAnnotation.TermAccessionNumber ""
-      |]
-    | CompositeCell.Unitized(value, ontologyAnnotation) -> [|
-        value
-        ontologyAnnotation.NameText
-        defaultArg ontologyAnnotation.TermSourceREF ""
-        defaultArg ontologyAnnotation.TermAccessionNumber ""
-      |]
-    | CompositeCell.Data data -> [|
-        defaultArg data.FilePath ""
-        data.NameText
-        defaultArg data.Selector ""
-        defaultArg data.Format ""
-        defaultArg data.SelectorFormat ""
-      |]
-    |> Array.choose tryTrimmed
+    if isNullCell cell then
+        [||]
+    else
+        match cell with
+        | CompositeCell.FreeText text -> [| text |]
+        | CompositeCell.Term ontologyAnnotation -> [|
+            ontologyAnnotation.NameText
+            defaultArg ontologyAnnotation.TermSourceREF ""
+            defaultArg ontologyAnnotation.TermAccessionNumber ""
+          |]
+        | CompositeCell.Unitized(value, ontologyAnnotation) -> [|
+            value
+            ontologyAnnotation.NameText
+            defaultArg ontologyAnnotation.TermSourceREF ""
+            defaultArg ontologyAnnotation.TermAccessionNumber ""
+          |]
+        | CompositeCell.Data data -> [|
+            defaultArg data.FilePath ""
+            data.NameText
+            defaultArg data.Selector ""
+            defaultArg data.Format ""
+            defaultArg data.SelectorFormat ""
+          |]
+        |> Array.choose tryTrimmed
 
 let templateColumnValuePreview (table: ArcTable) (columnIndex: int) =
     seq {
@@ -87,7 +108,7 @@ let createUpdatedTables
                 let deselectedColumnIndices =
                     getDeselectedTableColumnIndices deselectedColumns importTable.Index
 
-                let sourceTable = arcTables.[importTable.Index]
+                let sourceTable = arcTables.[importTable.Index] |> normalizeNullCells
                 let appliedTable = ArcTable.init sourceTable.Name
 
                 let finalTable =
