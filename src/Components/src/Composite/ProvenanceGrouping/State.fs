@@ -18,6 +18,154 @@ module Keys =
 
     let selectedGroup pairId groupId = pairId, groupId
 
+/// Stores and clamps the three-panel editor layout ratios.
+module PanelLayout =
+
+    let minimumSide = 15
+    let minimumMiddle = 30
+
+    let defaultRatios =
+        {
+            Left = 20
+            Middle = 60
+            Right = 20
+        }
+
+    let private clamp left right =
+        let left =
+            left
+            |> max minimumSide
+            |> min (100 - minimumMiddle - minimumSide)
+
+        let right =
+            right
+            |> max minimumSide
+            |> min (100 - minimumMiddle - left)
+
+        {
+            Left = left
+            Middle = 100 - left - right
+            Right = right
+        }
+
+    let get pairId state =
+        state.PanelRatios
+        |> Map.tryFind pairId
+        |> Option.defaultValue defaultRatios
+
+    let set pairId ratios state =
+        { state with PanelRatios = state.PanelRatios |> Map.add pairId (clamp ratios.Left ratios.Right) }
+
+    let setLeft pairId left state =
+        let current = get pairId state
+        set pairId { current with Left = left } state
+
+    let setRight pairId right state =
+        let current = get pairId state
+        set pairId { current with Right = right } state
+
+/// Tracks the transient connector shown while dragging from an edge handle.
+module LiveConnection =
+
+    let start source point state =
+        {
+            state with
+                ActiveConnectionHandle = Some source
+                LiveConnectionDrag =
+                    Some
+                        {
+                            Source = source
+                            Start = point
+                            Current = point
+                        }
+        }
+
+    let moveTo point state =
+        {
+            state with
+                LiveConnectionDrag =
+                    state.LiveConnectionDrag
+                    |> Option.map (fun current -> { current with Current = point })
+        }
+
+    let clear state =
+        {
+            state with
+                ActiveConnectionHandle = None
+                LiveConnectionDrag = None
+        }
+
+/// Tracks the in-app prompt and expansion state for mismatched group connections.
+module MemberResolution =
+
+    let request (pending: PendingMemberResolution) state =
+        { state with PendingMemberResolution = Some pending; Error = None }
+
+    let clearPending state =
+        { state with PendingMemberResolution = None }
+
+    let chooseManual (pending: PendingMemberResolution) state =
+        let pair: ManualResolutionPair =
+            {
+                PairId = pending.PairId
+                InputGroupId = pending.InputGroupId
+                OutputGroupId = pending.OutputGroupId
+            }
+
+        let pairs =
+            if state.ManualResolutionPairs |> List.exists ((=) pair) then
+                state.ManualResolutionPairs
+            else
+                state.ManualResolutionPairs @ [ pair ]
+
+        {
+            state with
+                PendingMemberResolution = None
+                ManualResolutionPairs = pairs
+                Detail = Some(ProvenanceDetail.Group(ProvenanceSide.Input, pending.InputGroupId))
+        }
+
+    let isManualPair pairId inputGroupId outputGroupId state =
+        state.ManualResolutionPairs
+        |> List.exists (fun (pair: ManualResolutionPair) ->
+            pair.PairId = pairId
+            && pair.InputGroupId = inputGroupId
+            && pair.OutputGroupId = outputGroupId)
+
+/// Stores explicit member-level links created from member handles.
+module ManualConnections =
+
+    let add (connection: ManualMemberConnection) state =
+        let exists = state.ManualMemberConnections |> List.exists ((=) connection)
+
+        if exists then
+            state
+        else
+            { state with ManualMemberConnections = state.ManualMemberConnections @ [ connection ] }
+
+    let forPair pairId state =
+        state.ManualMemberConnections
+        |> List.filter (fun connection -> connection.PairId = pairId)
+
+    let forGroupPair pairId inputGroupId outputGroupId state =
+        forPair pairId state
+        |> List.filter (fun (connection: ManualMemberConnection) -> connection.InputGroupId = inputGroupId && connection.OutputGroupId = outputGroupId)
+
+/// Stores header-level visual links that are editor UI state only.
+module VisualConnections =
+
+    let add (connection: VisualConnection) state =
+        let exists = state.VisualConnections |> List.exists ((=) connection)
+
+        if exists then
+            state
+        else
+            { state with VisualConnections = state.VisualConnections @ [ connection ] }
+
+    let forPair pairId state =
+        state.VisualConnections
+        |> List.filter (fun connection -> connection.PairId = pairId)
+
 /// Creates, finds, and synchronizes layer-local state with the current session.
 module Layers =
 
@@ -54,12 +202,27 @@ module Layers =
                 PropertyRailPlacements =
                     state.PropertyRailPlacements
                     |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
+                PanelRatios =
+                    state.PanelRatios
+                    |> Map.filter (fun pairId _ -> currentPairIds.Contains pairId)
                 ExpandedProperties =
                     state.ExpandedProperties
                     |> Set.filter (fun (pairId, _, _) -> currentPairIds.Contains pairId)
                 PaletteValues =
                     state.PaletteValues
                     |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
+                PendingMemberResolution =
+                    state.PendingMemberResolution
+                    |> Option.filter (fun pending -> currentPairIds.Contains pending.PairId)
+                ManualResolutionPairs =
+                    state.ManualResolutionPairs
+                    |> List.filter (fun pair -> currentPairIds.Contains pair.PairId)
+                ManualMemberConnections =
+                    state.ManualMemberConnections
+                    |> List.filter (fun connection -> currentPairIds.Contains connection.PairId)
+                VisualConnections =
+                    state.VisualConnections
+                    |> List.filter (fun connection -> currentPairIds.Contains connection.PairId)
         }
 
     let update layerId updateLayer state =
@@ -283,6 +446,13 @@ let init (session: ProvenanceSession) =
         ExpandedProperties = Set.empty
         PaletteValues = Map.empty
         PendingOverwrite = None
+        PanelRatios = Map.empty
+        ActiveConnectionHandle = None
+        LiveConnectionDrag = None
+        PendingMemberResolution = None
+        ManualResolutionPairs = []
+        ManualMemberConnections = []
+        VisualConnections = []
         SelectedInputs = Set.empty
         SelectedOutputs = Set.empty
         Detail = None

@@ -49,6 +49,73 @@ type ValueAssignmentError =
     | MixedPropertyValueCounts of ProvenancePropertyHeader
     | MultiplePropertyValues of ProvenancePropertyHeader * ProvenanceSetId list
 
+type PanelRatios =
+    {
+        Left: int
+        Middle: int
+        Right: int
+    }
+
+[<RequireQualifiedAccess>]
+type ConnectionHandleKind =
+    | GroupCard
+    | GroupMember
+    | PropertyHeader
+    | PropertyValue
+
+type ConnectionHandleRef =
+    {
+        Kind: ConnectionHandleKind
+        Side: ProvenanceSide
+        Id: string
+        ParentGroupId: string option
+    }
+
+type ConnectionPoint =
+    {
+        X: float
+        Y: float
+    }
+
+type LiveConnectionDrag =
+    {
+        Source: ConnectionHandleRef
+        Start: ConnectionPoint
+        Current: ConnectionPoint
+    }
+
+type ManualMemberConnection =
+    {
+        PairId: ProvenancePairId
+        InputGroupId: string
+        OutputGroupId: string
+        InputSetId: ProvenanceSetId
+        OutputSetId: ProvenanceSetId
+    }
+
+type PendingMemberResolution =
+    {
+        PairId: ProvenancePairId
+        InputGroupId: string
+        OutputGroupId: string
+        InputMemberCount: int
+        OutputMemberCount: int
+    }
+
+type ManualResolutionPair =
+    {
+        PairId: ProvenancePairId
+        InputGroupId: string
+        OutputGroupId: string
+    }
+
+type VisualConnection =
+    {
+        PairId: ProvenancePairId
+        Source: ConnectionHandleRef
+        Target: ConnectionHandleRef
+    }
+
 type UiState =
     {
         LayerStates: Map<ProvenanceLayerId, LayerViewState>
@@ -56,6 +123,13 @@ type UiState =
         ExpandedProperties: Set<ProvenancePairId * ProvenanceSide * GroupingKey>
         PaletteValues: Map<ProvenancePairId * ProvenanceSide, ProvenancePropertyValue list>
         PendingOverwrite: ValueAssignmentWarning option
+        PanelRatios: Map<ProvenancePairId, PanelRatios>
+        ActiveConnectionHandle: ConnectionHandleRef option
+        LiveConnectionDrag: LiveConnectionDrag option
+        PendingMemberResolution: PendingMemberResolution option
+        ManualResolutionPairs: ManualResolutionPair list
+        ManualMemberConnections: ManualMemberConnection list
+        VisualConnections: VisualConnection list
         SelectedInputs: Set<ProvenancePairId * string>
         SelectedOutputs: Set<ProvenancePairId * string>
         Detail: ProvenanceDetail option

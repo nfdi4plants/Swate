@@ -45,9 +45,17 @@ module DndKit =
         abstract member transform: obj
         abstract member isDragging: bool
 
+    type ICoordinates =
+        abstract member x: float
+        abstract member y: float
+
     type IDndKitEvent =
         abstract member active: HTMLElement
         abstract member over: HTMLElement
+
+    type IDndKitMoveEvent =
+        inherit IDndKitEvent
+        abstract member delta: ICoordinates
 
     [<Import("closestCenter", "@dnd-kit/core")>]
     let closestCenter: obj = jsNative
@@ -98,7 +106,7 @@ type DndKit =
 
     [<ReactComponent("DndContext", "@dnd-kit/core")>]
     static member DndContext
-        (?onDragStart, ?onDragCancel, ?onDragEnd, ?sensors, ?collisionDetection, ?children: ReactElement, ?key)
+        (?onDragStart, ?onDragMove, ?onDragCancel, ?onDragEnd, ?sensors, ?collisionDetection, ?children: ReactElement, ?key)
         =
         React.Imported()
 

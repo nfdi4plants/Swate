@@ -49,6 +49,7 @@ module Styles =
 module DragDrop =
 
     open Swate.Components.Shared.ProvenanceGrouping.Types
+    open Swate.Components.Composite.ProvenanceGrouping.Types
 
     let private encode (value: string) = System.Uri.EscapeDataString value
     let private decode (value: string) = System.Uri.UnescapeDataString value
@@ -81,10 +82,59 @@ module DragDrop =
     let groupDropId side groupId = $"provenance-drop|{side}|{encode groupId}"
     let groupNodeId side groupId = $"provenance-node::{side}::{encode groupId}"
 
+    let private handleKindText kind =
+        match kind with
+        | ConnectionHandleKind.GroupCard -> "GroupCard"
+        | ConnectionHandleKind.GroupMember -> "GroupMember"
+        | ConnectionHandleKind.PropertyHeader -> "PropertyHeader"
+        | ConnectionHandleKind.PropertyValue -> "PropertyValue"
+
+    let private tryHandleKind value =
+        match value with
+        | "GroupCard" -> Some ConnectionHandleKind.GroupCard
+        | "GroupMember" -> Some ConnectionHandleKind.GroupMember
+        | "PropertyHeader" -> Some ConnectionHandleKind.PropertyHeader
+        | "PropertyValue" -> Some ConnectionHandleKind.PropertyValue
+        | _ -> None
+
+    let connectionHandleIdentity (handle: ConnectionHandleRef) =
+        let parent = handle.ParentGroupId |> Option.defaultValue ""
+        $"{handleKindText handle.Kind}|{handle.Side}|{encode handle.Id}|{encode parent}"
+
+    let connectionHandleDragId handle =
+        $"provenance-connection-drag|{connectionHandleIdentity handle}"
+
+    let connectionHandleDropId handle =
+        $"provenance-connection-drop|{connectionHandleIdentity handle}"
+
+    let connectionHandleNodeId handle =
+        $"provenance-connection-node::{connectionHandleIdentity handle}"
+
     type Payload =
         | PropertyValue of ProvenancePropertyValueId
         | PropertyHeader of ProvenanceSide * string
         | Group of ProvenanceSide * string
+        | ConnectionHandle of ConnectionHandleRef
+
+    let private tryParseHandleParts kind side sourceId parent =
+        match tryHandleKind kind, side with
+        | Some kind, "Input" ->
+            Some
+                {
+                    Kind = kind
+                    Side = ProvenanceSide.Input
+                    Id = decode sourceId
+                    ParentGroupId = if parent = "" then None else Some(decode parent)
+                }
+        | Some kind, "Output" ->
+            Some
+                {
+                    Kind = kind
+                    Side = ProvenanceSide.Output
+                    Id = decode sourceId
+                    ParentGroupId = if parent = "" then None else Some(decode parent)
+                }
+        | _ -> None
 
     let tryDragId (id: string) =
         match id.Split('|') with
@@ -93,6 +143,9 @@ module DragDrop =
         | [| "provenance-property"; "Output"; headerId |] -> Some(Payload.PropertyHeader(ProvenanceSide.Output, decode headerId))
         | [| "provenance-group"; "Input"; groupId |] -> Some(Payload.Group(ProvenanceSide.Input, decode groupId))
         | [| "provenance-group"; "Output"; groupId |] -> Some(Payload.Group(ProvenanceSide.Output, decode groupId))
+        | [| "provenance-connection-drag"; kind; side; sourceId; parent |] ->
+            tryParseHandleParts kind side sourceId parent
+            |> Option.map Payload.ConnectionHandle
         | _ -> None
 
     let tryDropId (id: string) =
@@ -106,6 +159,77 @@ module DragDrop =
         | [| "provenance-property-drop"; "Input" |] -> Some ProvenanceSide.Input
         | [| "provenance-property-drop"; "Output" |] -> Some ProvenanceSide.Output
         | _ -> None
+
+    let tryConnectionDropId (id: string) =
+        match id.Split('|') with
+        | [| "provenance-connection-drop"; kind; side; sourceId; parent |] ->
+            tryParseHandleParts kind side sourceId parent
+        | _ -> None
+
+/// Validates edge-handle drag/drop pairs and returns the editor action they imply.
+module ConnectionRouting =
+
+    open Swate.Components.Shared.ProvenanceGrouping.Types
+    open Swate.Components.Composite.ProvenanceGrouping.Types
+
+    type ConnectionAction =
+        | ConnectGroups of inputGroupId: string * outputGroupId: string
+        | ConnectMembers of inputGroupId: string * outputGroupId: string * inputSetId: ProvenanceSetId * outputSetId: ProvenanceSetId
+        | ConnectMemberToGroup of inputGroupId: string * outputGroupId: string * memberSetId: ProvenanceSetId * memberSide: ProvenanceSide
+        | ConnectPropertyHeaderToGroup of source: ConnectionHandleRef * target: ConnectionHandleRef
+        | ConnectPropertyValueToGroup of source: ConnectionHandleRef * target: ConnectionHandleRef
+
+    let private oppositeSides left right = left.Side <> right.Side
+
+    let private sameSide left right = left.Side = right.Side
+
+    let private orderedGroups left right =
+        match left.Side, right.Side with
+        | ProvenanceSide.Input, ProvenanceSide.Output -> left.Id, right.Id
+        | ProvenanceSide.Output, ProvenanceSide.Input -> right.Id, left.Id
+        | _ -> left.Id, right.Id
+
+    let private orderedMembers left right =
+        match left.Side, right.Side, left.ParentGroupId, right.ParentGroupId with
+        | ProvenanceSide.Input, ProvenanceSide.Output, Some inputGroupId, Some outputGroupId ->
+            Some(inputGroupId, outputGroupId, left.Id, right.Id)
+        | ProvenanceSide.Output, ProvenanceSide.Input, Some outputGroupId, Some inputGroupId ->
+            Some(inputGroupId, outputGroupId, right.Id, left.Id)
+        | _ -> None
+
+    let action source target =
+        match source.Kind, target.Kind with
+        | ConnectionHandleKind.GroupCard, ConnectionHandleKind.GroupCard when oppositeSides source target ->
+            let inputGroupId, outputGroupId = orderedGroups source target
+            Some(ConnectionAction.ConnectGroups(inputGroupId, outputGroupId))
+        | ConnectionHandleKind.GroupMember, ConnectionHandleKind.GroupMember when oppositeSides source target ->
+            orderedMembers source target |> Option.map ConnectionAction.ConnectMembers
+        | ConnectionHandleKind.GroupMember, ConnectionHandleKind.GroupCard when oppositeSides source target ->
+            source.ParentGroupId
+            |> Option.map (fun sourceParent ->
+                let inputGroupId, outputGroupId =
+                    if source.Side = ProvenanceSide.Input then
+                        sourceParent, target.Id
+                    else
+                        target.Id, sourceParent
+
+                ConnectionAction.ConnectMemberToGroup(inputGroupId, outputGroupId, source.Id, source.Side))
+        | ConnectionHandleKind.GroupCard, ConnectionHandleKind.GroupMember when oppositeSides source target ->
+            target.ParentGroupId
+            |> Option.map (fun targetParent ->
+                let inputGroupId, outputGroupId =
+                    if target.Side = ProvenanceSide.Input then
+                        targetParent, source.Id
+                    else
+                        source.Id, targetParent
+
+                ConnectionAction.ConnectMemberToGroup(inputGroupId, outputGroupId, target.Id, target.Side))
+        | ConnectionHandleKind.PropertyHeader, ConnectionHandleKind.GroupCard when sameSide source target ->
+            Some(ConnectionAction.ConnectPropertyHeaderToGroup(source, target))
+        | ConnectionHandleKind.PropertyValue, ConnectionHandleKind.GroupCard when sameSide source target ->
+            Some(ConnectionAction.ConnectPropertyValueToGroup(source, target))
+        | _ ->
+            None
 
 /// Builds property rail headers and values from the persistent model plus UI-only palette state.
 module PropertyRails =

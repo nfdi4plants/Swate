@@ -15,6 +15,8 @@ open Swate.Components.Shared.ProvenanceGrouping.Session
 module ProvenanceGroupingState = Swate.Components.Composite.ProvenanceGrouping.State
 module ProvenanceGroupingValueAssignment = Swate.Components.Composite.ProvenanceGrouping.ValueAssignment
 module ProvenanceGroupingTypes = Swate.Components.Composite.ProvenanceGrouping.Types
+module DragDrop = Swate.Components.Composite.ProvenanceGrouping.DragDrop
+module ConnectionRouting = Swate.Components.Composite.ProvenanceGrouping.ConnectionRouting
 
 let typeTests =
     testList "Types" [
@@ -1308,6 +1310,110 @@ let uiStateTests =
                 (ProvenanceGroupingState.Layers.get pair.RightLayerId next).GroupingAssignments
                 []
                 "Only the both-side assignment should be removed from the opposite layer."
+
+        testCase "panel layout clamps side panels and preserves a middle panel" <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let state = ProvenanceGroupingState.init session
+
+            let tooSmallLeft =
+                ProvenanceGroupingState.PanelLayout.setLeft pair.Id 2 state
+                |> ProvenanceGroupingState.PanelLayout.get pair.Id
+
+            Expect.equal tooSmallLeft.Left 15 "Left panel should not shrink below the minimum."
+            Expect.equal tooSmallLeft.Middle 65 "Middle panel should keep the remaining usable width."
+            Expect.equal tooSmallLeft.Right 20 "Unchanged right panel should stay at the default width."
+
+            let tooLargeRight =
+                state
+                |> ProvenanceGroupingState.PanelLayout.setLeft pair.Id 45
+                |> ProvenanceGroupingState.PanelLayout.setRight pair.Id 80
+                |> ProvenanceGroupingState.PanelLayout.get pair.Id
+
+            Expect.equal tooLargeRight.Left 45 "Left panel should retain the committed user ratio."
+            Expect.equal tooLargeRight.Right 25 "Right panel should be clamped so the middle panel keeps its minimum."
+            Expect.equal tooLargeRight.Middle 30 "Middle panel must not shrink below its minimum."
+
+        testCase "connection handle identities round-trip through drag and drop ids" <| fun _ ->
+            let handle : ProvenanceGroupingTypes.ConnectionHandleRef =
+                {
+                    Kind = ProvenanceGroupingTypes.ConnectionHandleKind.GroupMember
+                    Side = ProvenanceSide.Input
+                    Id = "input-a"
+                    ParentGroupId = Some "input:Species=Arabidopsis"
+                }
+
+            Expect.equal
+                (DragDrop.connectionHandleDragId handle |> DragDrop.tryDragId)
+                (Some(DragDrop.Payload.ConnectionHandle handle))
+                "Connection drag id should parse back to the same handle reference."
+
+            Expect.equal
+                (DragDrop.connectionHandleDropId handle |> DragDrop.tryConnectionDropId)
+                (Some handle)
+                "Connection drop id should parse back to the same handle reference."
+
+        testCase "connection routing accepts compatible group and member targets only" <| fun _ ->
+            let group side id : ProvenanceGroupingTypes.ConnectionHandleRef =
+                {
+                    Kind = ProvenanceGroupingTypes.ConnectionHandleKind.GroupCard
+                    Side = side
+                    Id = id
+                    ParentGroupId = None
+                }
+
+            let memberHandle side parent id : ProvenanceGroupingTypes.ConnectionHandleRef =
+                {
+                    Kind = ProvenanceGroupingTypes.ConnectionHandleKind.GroupMember
+                    Side = side
+                    Id = id
+                    ParentGroupId = Some parent
+                }
+
+            Expect.equal
+                (ConnectionRouting.action (group ProvenanceSide.Input "input:input-a") (group ProvenanceSide.Output "output:output-z"))
+                (Some(ConnectionRouting.ConnectionAction.ConnectGroups("input:input-a", "output:output-z")))
+                "Input group handles should connect to output group handles."
+
+            Expect.equal
+                (ConnectionRouting.action (group ProvenanceSide.Input "input:input-a") (group ProvenanceSide.Input "input:input-b"))
+                None
+                "Same-side group handles should be rejected."
+
+            Expect.equal
+                (ConnectionRouting.action (memberHandle ProvenanceSide.Input "input:g" "input-a") (memberHandle ProvenanceSide.Output "output:g" "output-a"))
+                (Some(ConnectionRouting.ConnectionAction.ConnectMembers("input:g", "output:g", "input-a", "output-a")))
+                "Opposite-side member handles should create a manual member connection action."
+
+        testCase "member resolution prompt can be converted into a manual resolution pair" <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let pending : ProvenanceGroupingTypes.PendingMemberResolution =
+                {
+                    PairId = pair.Id
+                    InputGroupId = "input:Species=Arabidopsis"
+                    OutputGroupId = "output:Analysis=Mass Spectrometry"
+                    InputMemberCount = 3
+                    OutputMemberCount = 1
+                }
+
+            let requested =
+                ProvenanceGroupingState.init session
+                |> ProvenanceGroupingState.MemberResolution.request pending
+
+            Expect.equal requested.PendingMemberResolution (Some pending) "Mismatched group drops should store a pending user choice."
+
+            let manual =
+                requested |> ProvenanceGroupingState.MemberResolution.chooseManual pending
+
+            Expect.equal manual.PendingMemberResolution None "Choosing manual should close the prompt."
+            Expect.isTrue
+                (ProvenanceGroupingState.MemberResolution.isManualPair pair.Id pending.InputGroupId pending.OutputGroupId manual)
+                "Choosing manual should keep the pair expanded for member-level resolution."
+            Expect.equal
+                manual.Detail
+                (Some(ProvenanceGroupingTypes.ProvenanceDetail.Group(ProvenanceSide.Input, pending.InputGroupId)))
+                "Choosing manual should expand the input group and allow the output pair to auto-expand from manual state."
 
         testCase "property value drop plan adds only when every group member has no value for the property" <| fun _ ->
             let species = propertyHeader FixtureKinds.characteristicProperty "Species"
