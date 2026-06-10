@@ -89,7 +89,7 @@ jobs:
 
       # Install npm dependencies
       - name: Install root dependencies
-        run: npm ci
+        run: npm i
 
       # publish swate-app
       - name: Publish swate-app
