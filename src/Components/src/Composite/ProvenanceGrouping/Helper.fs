@@ -29,11 +29,11 @@ module Styles =
             yield! draggableButtonClasses isDragging
         ]
 
+    /// Value chips start at half the property-header cap and grow with their content up
+    /// to the header cap; both bounds yield to the panel width when the rail gets narrow.
     let propertyValueButtonClasses isDragging =
         [
-            // Full width keeps every chip the same size regardless of text length, so the
-            // connection handles line up at the rail edge on both sides.
-            "swt:btn swt:btn-sm swt:btn-primary swt:w-full swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
+            "swt:btn swt:btn-sm swt:btn-primary swt:w-fit swt:min-w-[min(9rem,100%)] swt:max-w-[min(18rem,100%)] swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
             yield! draggableButtonClasses isDragging
         ]
 

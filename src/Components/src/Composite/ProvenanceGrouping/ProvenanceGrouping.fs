@@ -41,9 +41,9 @@ module private Splitter =
         let left = ratios.Left.ToString(CultureInfo.InvariantCulture)
         let middle = ratios.Middle.ToString(CultureInfo.InvariantCulture)
         let right = ratios.Right.ToString(CultureInfo.InvariantCulture)
-        // The splitter tracks double as connector gutters, keeping a minimum distance
-        // between the rails and the cards their connectors attach to.
-        $"minmax(10rem, {left}fr) 2.5rem minmax(28rem, {middle}fr) 2.5rem minmax(10rem, {right}fr)"
+        // The splitter tracks double as connector gutters; their generous fixed width
+        // keeps readable space between the rails and the cards their connectors attach to.
+        $"minmax(10rem, {left}fr) 4rem minmax(28rem, {middle}fr) 4rem minmax(10rem, {right}fr)"
 
     let testId side =
         match side with
@@ -566,7 +566,14 @@ module private EditorSurface =
             | ProvenanceSide.Output -> "Output"
 
         Html.div [
-            prop.className "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-3"
+            prop.className [
+                "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-3"
+                // Fit-content cards hug the column edge facing their property rail, so
+                // the space between the two card columns stays free for group connectors.
+                match side with
+                | ProvenanceSide.Input -> "swt:items-start"
+                | ProvenanceSide.Output -> "swt:items-end"
+            ]
             prop.children [
                 for group in groups do
                     GroupCard.Main(
@@ -842,7 +849,7 @@ type ProvenanceGrouping =
                             Html.div [
                                 // The wide column gap is the gutter the group-to-group
                                 // connectors are drawn in.
-                                prop.className "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-12"
+                                prop.className "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-16"
                                 prop.children [
                                     EditorSurface.groupColumn
                                         ProvenanceSide.Input

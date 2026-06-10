@@ -228,7 +228,7 @@ export const PropertyRailExpandsValuesAndAddControls: Story = {
     expect(arabidopsis).toBeInTheDocument();
     expect(arabidopsis).toHaveClass('swt:btn');
     expect(arabidopsis).toHaveClass('swt:btn-primary');
-    expect(arabidopsis).toHaveClass('swt:w-full');
+    expect(arabidopsis).toHaveClass('swt:w-fit');
     expect(arabidopsis).toHaveClass('swt:cursor-grab');
     expect(arabidopsis.querySelector('[class*="re-order-dots"]')).not.toBeInTheDocument();
     expect(panel.getByText('Chlamydomonas')).toBeInTheDocument();

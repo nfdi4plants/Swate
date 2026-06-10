@@ -367,9 +367,12 @@ type ConnectorOverlay =
                     Browser.Dom.window.addEventListener ("resize", onLayout)
                     let observer = ConnectorObserver.create measure
                     ConnectorObserver.observeNode observer container
+                    // Resize nodes are the content-sized boxes (property headers, value
+                    // chips); their handles move when the box grows, without the handle
+                    // itself changing size, so the boxes must be observed directly.
                     ConnectorObserver.observeMatching
                         container
-                        "[data-provenance-group-node],[data-provenance-connection-node]"
+                        "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
                         observer
 
                     FsReact.createDisposable (fun () ->

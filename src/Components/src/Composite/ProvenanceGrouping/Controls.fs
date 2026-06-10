@@ -290,7 +290,8 @@ type Controls =
 
         // Property headers are never draggable connection sources; the overlay derives
         // their connectors from model data and only needs this anchor to measure the
-        // group-facing edge of the header row.
+        // group-facing edge of the header button. The anchor lives inside the button so
+        // it follows the button edge as the button resizes with its content.
         let propertyAnchor =
             Controls.ConnectionAnchor(
                 {
@@ -313,7 +314,9 @@ type Controls =
                     yield! prop.spread (!!draggable.attributes)
                     yield! prop.spread (!!draggable.listeners)
                 prop.className [
-                    "swt:btn swt:btn-sm swt:h-auto swt:min-h-8 swt:py-1 swt:grow swt:min-w-0 swt:justify-start"
+                    // swt:shrink overrides the btn class's flex-shrink:0 so the button can
+                    // give way (and truncate) when the rail row runs out of space.
+                    "swt:btn swt:btn-sm swt:h-auto swt:min-h-8 swt:py-1 swt:relative swt:shrink swt:min-w-0 swt:max-w-[18rem] swt:justify-start"
                     "swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
                     if sideSelected then
                         "swt:btn-primary"
@@ -322,12 +325,14 @@ type Controls =
                     if canSwitch then
                         yield! Styles.draggableButtonClasses draggable.isDragging
                 ]
+                prop.custom ("data-provenance-resize-node", "true")
                 if defaultArg debug false then
                     prop.testId $"provenance-property-{side}-{header.Category.Name}"
                 prop.onClick (fun _ -> onToggleSide header)
                 prop.children [
+                    propertyAnchor
                     Html.span [
-                        prop.className "swt:grow swt:min-w-0 swt:break-words swt:line-clamp-2 swt:text-left"
+                        prop.className "swt:min-w-0 swt:truncate swt:text-left"
                         prop.text header.Category.Name
                     ]
                 ]
@@ -405,11 +410,17 @@ type Controls =
             prop.className "swt:flex swt:flex-col swt:gap-1"
             prop.children [
                 Html.div [
-                    prop.className "swt:relative swt:flex swt:items-center swt:gap-1"
+                    prop.className [
+                        "swt:flex swt:items-center swt:gap-1"
+                        // The whole row hugs the rail-facing side, so the group-facing
+                        // button edge (with its connector anchor) moves with the button's
+                        // content size and frees the rest of the rail for connectors.
+                        if side = ProvenanceSide.Output then
+                            "swt:justify-end"
+                    ]
                     prop.children [
-                        propertyAnchor
-                        // The property text button hugs the group-facing edge so connectors
-                        // attach directly to it; the controls sit on the rail-facing side.
+                        // The controls sit on the rail-facing side; the property text
+                        // button faces the group cards so connectors attach directly to it.
                         match side with
                         | ProvenanceSide.Input ->
                             swapButton
@@ -425,7 +436,12 @@ type Controls =
                 ]
                 if expanded then
                     Html.div [
-                        prop.className "swt:flex swt:flex-col swt:gap-1 swt:pl-2"
+                        prop.className [
+                            "swt:flex swt:flex-col swt:gap-1"
+                            match side with
+                            | ProvenanceSide.Input -> "swt:items-start swt:pl-2"
+                            | ProvenanceSide.Output -> "swt:items-end swt:pr-2"
+                        ]
                         if defaultArg debug false then
                             prop.testId $"provenance-property-values-{side}-{header.Category.Name}"
                         prop.children [
@@ -506,7 +522,16 @@ type Controls =
                         debug = defaultArg debug false,
                         key = DragDrop.propertyHeaderIdentity header
                     )
-                Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                Html.div [
+                    prop.className [
+                        "swt:w-fit"
+                        if side = ProvenanceSide.Output then
+                            "swt:self-end"
+                    ]
+                    prop.children [
+                        Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                    ]
+                ]
             ]
         ]
 
@@ -800,6 +825,7 @@ type Controls =
                 if not canDrag then
                     "swt:cursor-default"
             ]
+            prop.custom ("data-provenance-resize-node", "true")
             if defaultArg debug false then
                 prop.testId $"provenance-value-{propertyValue.Id}"
             prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"

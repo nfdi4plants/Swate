@@ -111,7 +111,10 @@ type GroupCard =
             prop.custom ("data-provenance-group-node", DragDrop.groupNodeId side group.Id)
             prop.custom ("data-provenance-group-drop-id", DragDrop.groupDropId side group.Id)
             prop.className [
-                "swt:relative swt:flex swt:flex-col swt:gap-2 swt:rounded-box swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm"
+                // Cards size to their content (the column aligns them toward their rail),
+                // so the gap between the two card columns grows for group connectors. The
+                // edge handles are positioned on the card border and move with its width.
+                "swt:relative swt:flex swt:w-fit swt:max-w-full swt:flex-col swt:gap-2 swt:rounded-box swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm"
                 if selected then
                     "swt:border-primary swt:bg-primary/5"
                 else
@@ -134,7 +137,7 @@ type GroupCard =
                     prop.children [
                         Html.h3 [
                             prop.className
-                                "swt:grow swt:min-w-0 swt:break-words swt:line-clamp-2 swt:font-semibold swt:@max-xs/provenancePanel:text-sm"
+                                "swt:grow swt:min-w-0 swt:truncate swt:font-semibold swt:@max-xs/provenancePanel:text-sm"
                             prop.title title
                             prop.text title
                         ]
