@@ -318,8 +318,11 @@ let createWindow () = promise {
     printfn "[Swate] Creating new window"
     let screenSize = screen.getPrimaryDisplay().workAreaSize
 
+    let windowIconPath = Helper.Assets.getIcon ()
+
     let mainWindowOptions =
         BrowserWindowConstructorOptions(
+            icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
             webPreferences = WebPreferences(preload = path.join (__dirname, "preload.fs.js"))

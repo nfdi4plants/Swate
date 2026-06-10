@@ -1,16 +1,29 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
 
+const platformIcon =
+  process.platform === 'win32'
+    ? 'assets/icons/win/icon'
+    : process.platform === 'darwin'
+      ? 'assets/icons/mac/icon'
+      : 'assets/icons/png/1024x1024';
+
 module.exports = {
   packagerConfig: {
     asar: true,
     executableName: 'swate',
+    icon: platformIcon,
+    extraResource: [
+        "./assets"
+    ]
   },
   rebuildConfig: {},
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        setupIcon: 'assets/icons/win/icon.ico',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
