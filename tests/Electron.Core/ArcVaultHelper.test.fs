@@ -24,6 +24,9 @@ let private writeFileAsync (filePath: string) (content: string) = promise {
     return ()
 }
 
+let private readFileAsync (filePath: string) =
+    fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
+
 let private addDataMapToAllEntityTypes (arc: ARC) =
     let study = ArcStudy("Study With DataMap")
     study.DataMap <- Some(DataMap.init ())
@@ -51,6 +54,52 @@ Vitest.describe (
                 Vitest.expect(shouldUsePollingByDefault "WIN32").toBe (true)
                 Vitest.expect(shouldUsePollingByDefault "linux").toBe (false)
                 Vitest.expect(shouldUsePollingByDefault "darwin").toBe (false)
+        )
+
+        Vitest.test (
+            "Git metadata path detection excludes only exact .git path segments",
+            fun () ->
+                Vitest.expect(isGitMetadataPath ".git").toBe (true)
+                Vitest.expect(isGitMetadataPath ".git/objects/ab/object").toBe (true)
+                Vitest.expect(isGitMetadataPath "notes\\.GIT\\config").toBe (true)
+                Vitest.expect(isGitMetadataPath ".gitignore").toBe (false)
+                Vitest.expect(isGitMetadataPath ".gitattributes").toBe (false)
+                Vitest.expect(isGitMetadataPath "notes/my.git/file.txt").toBe (false)
+        )
+
+        Vitest.test (
+            "ARC loading and writing ignore Git metadata and preserve payload",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-load-arc-ignore-git-"
+                    "IgnoreGitArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let gitObjectFolder = join [| arcPath; ".git"; "objects"; "ab" |]
+                        let nestedGitFolder = join [| arcPath; "notes"; ".git" |]
+                        let payloadPath = join [| arcPath; "payload.txt" |]
+                        let gitObjectPath = join [| gitObjectFolder; "object" |]
+                        do! mkdirRecursiveAsync gitObjectFolder
+                        do! mkdirRecursiveAsync nestedGitFolder
+                        do! writeFileAsync gitObjectPath "git-object"
+                        do! writeFileAsync (join [| nestedGitFolder; "config" |]) "nested-git-config"
+                        do! writeFileAsync payloadPath "payload"
+
+                        let! loadResult = tryLoadArcIgnoringGitMetadataAsync arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+                        let paths = loadedArc.FileSystem.Tree.ToFilePaths()
+
+                        Vitest.expect(paths |> Array.exists isGitMetadataPath).toBe (false)
+
+                        loadedArc.SetFilePaths(Array.append paths [| ".git/objects/ab/object" |])
+                        loadedArc.StaticHash <- 0
+                        do! updateArcPreservingExistingPayloadFiles arcPath loadedArc
+
+                        let! payload = readFileAsync payloadPath
+                        let! gitObject = readFileAsync gitObjectPath
+                        Vitest.expect(payload).toBe ("payload")
+                        Vitest.expect(gitObject).toBe ("git-object")
+                    })
         )
 
         Vitest.test (

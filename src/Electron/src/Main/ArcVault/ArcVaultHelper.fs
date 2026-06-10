@@ -13,9 +13,83 @@ open Fable.Core.JsInterop
 open Main
 open Main.ArcMerge
 open Main.Bindings
+open Main.Bindings.Filesystem
 open Node.Api
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
+
+/// Returns true when a path addresses Git's private repository metadata.
+/// `.gitignore`, `.gitattributes`, and similarly named files remain ordinary ARC payload.
+let isGitMetadataPath (pathValue: string) =
+    pathValue
+    |> getNonEmptyPathParts
+    |> Array.exists (fun segment -> String.Equals(segment, ".git", StringComparison.OrdinalIgnoreCase))
+
+let private getAllArcFilePathsIgnoringGitMetadataAsync (arcPath: string) =
+    let rec collectFiles (absoluteDirectoryPath: string) (relativeDirectoryPath: string) = promise {
+        let! entries = readdirWithTypesAsync absoluteDirectoryPath (ReaddirOptions(withFileTypes = true))
+
+        let files = ResizeArray<string>()
+
+        for entry in entries do
+            let name = entry.name
+
+            let relativePath =
+                if relativeDirectoryPath = "" then
+                    name
+                else
+                    $"{relativeDirectoryPath}/{name}"
+
+            if not (isGitMetadataPath relativePath) then
+                if entry.isDirectory () then
+                    let absolutePath = path.join (absoluteDirectoryPath, name)
+                    let! nestedFiles = collectFiles absolutePath relativePath
+                    files.AddRange nestedFiles
+                elif entry.isFile () then
+                    files.Add relativePath
+
+        return files.ToArray()
+    }
+
+    collectFiles arcPath ""
+
+let private isGitMetadataContract (contract: Contract) =
+    isGitMetadataPath contract.Path
+    ||
+    match contract.Operation, contract.DTO with
+    | Operation.RENAME, Some(DTO.Text targetPath) -> isGitMetadataPath targetPath
+    | _ -> false
+
+/// Loads an ARC while enforcing that Git metadata never enters its filesystem model.
+let tryLoadArcIgnoringGitMetadataAsync (arcPath: string) = promise {
+    let! paths = getAllArcFilePathsIgnoringGitMetadataAsync arcPath
+    let arc = ARC.fromFilePaths paths
+
+    match! fullFillContractBatchAsync arcPath (arc.GetReadContracts()) with
+    | Error errors -> return Error errors
+    | Ok contracts ->
+        arc.SetISAFromContracts contracts
+        return Ok arc
+}
+
+/// Writes ARC updates without touching Git metadata or replacing existing payload with empty scaffold contracts.
+let updateArcPreservingExistingPayloadFiles (arcPath: string) (arc: ARC) = promise {
+    let contractsToWrite = ResizeArray<Contract>()
+
+    for contract in arc.GetUpdateContracts() |> Array.filter (isGitMetadataContract >> not) do
+        match contract.Operation, contract.DTO with
+        | Operation.CREATE, None ->
+            let absolutePath = path.join (arcPath, contract.Path)
+            let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
+
+            if not fileExists then
+                contractsToWrite.Add contract
+        | _ -> contractsToWrite.Add contract
+
+    match! fullFillContractBatchAsync arcPath (contractsToWrite.ToArray()) with
+    | Ok _ -> ()
+    | Error errors -> return failwith (PathHelpers.formatContractErrors errors)
+}
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
@@ -292,7 +366,7 @@ let private repairZeroByteCanonicalArcFiles (windowId: int) (arcPath: string) = 
 
 /// Loads an ARC, repairing empty canonical workbooks that can be left behind by interrupted creates.
 let tryLoadArcWithZeroByteRepair (windowId: int) (arcPath: string) = promise {
-    let! loadResult = ARC.tryLoadAsync arcPath
+    let! loadResult = tryLoadArcIgnoringGitMetadataAsync arcPath
 
     match loadResult with
     | Ok arc ->
@@ -302,7 +376,7 @@ let tryLoadArcWithZeroByteRepair (windowId: int) (arcPath: string) = promise {
         let! repairedAny = repairZeroByteCanonicalArcFiles windowId arcPath
 
         if repairedAny then
-            let! retryLoadResult = ARC.tryLoadAsync arcPath
+            let! retryLoadResult = tryLoadArcIgnoringGitMetadataAsync arcPath
 
             match retryLoadResult with
             | Ok arc ->
@@ -363,21 +437,11 @@ let createFileWatcher (path: string) (usePolling: bool option) =
 
     let ignoreFn =
         fun (path: string) ->
-            let normalizedPath = path.Replace("\\", "/")
-
-            let segments =
-                normalizedPath.Trim('/').Split('/', System.StringSplitOptions.RemoveEmptyEntries)
-
+            let normalizedPath = PathHelpers.normalizeSeparators path
             let tempXlsxPattern = """\.~\$.*\.xlsx$"""
 
-            // skip temporary Excel files (created when editing an xlsx file)
-            if System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern) then
-                true
-            // skip git folder itself (and its contents) to avoid expensive scans
-            elif segments |> Array.exists (fun segment -> segment = ".git") then
-                true
-            else
-                false
+            System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+            || isGitMetadataPath normalizedPath
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
     let usePolling =

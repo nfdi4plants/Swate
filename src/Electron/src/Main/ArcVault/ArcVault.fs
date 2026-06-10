@@ -97,7 +97,7 @@ module ArcVaultExtensions =
         member private this.ApplyWatcherArcMerge(events: FileEvent list) = promise {
             match this.path, this.arc with
             | Some arcPath, Some arcLocal ->
-                match! ARC.tryLoadAsync arcPath with
+                match! tryLoadArcIgnoringGitMetadataAsync arcPath with
                 | Error loadError ->
                     swatelogfn
                         this.window.id
@@ -239,7 +239,7 @@ module ArcVaultExtensions =
 
                 try
                     try
-                        do! arc.UpdateAsync(arcPath)
+                        do! updateArcPreservingExistingPayloadFiles arcPath arc
                         this.RefreshHasUnsavedArcChangesFlag()
                         return Ok()
                     with e ->
@@ -267,7 +267,7 @@ module ArcVaultExtensions =
                         match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
                         | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
                         | Ok _ ->
-                            match! ARC.tryLoadAsync arcPath with
+                            match! tryLoadArcIgnoringGitMetadataAsync arcPath with
                             | Ok persistedArc ->
                                 baselineArcStaticHashes persistedArc
                                 syncAddedArcFileFromPersisted persistedArc arcLocal arcFile

@@ -61,7 +61,7 @@ module ArcRenameHelper =
         (arcLocal: ARC)
         =
         promise {
-            match! ARC.tryLoadAsync arcPath with
+            match! tryLoadArcIgnoringGitMetadataAsync arcPath with
             | Error errors ->
                 return
                     Error(
@@ -101,7 +101,7 @@ module ArcRenameHelper =
                                     $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
                             )
                     else
-                        match! ARC.tryLoadAsync arcPath with
+                        match! tryLoadArcIgnoringGitMetadataAsync arcPath with
                         | Error errors ->
                             return
                                 Error(

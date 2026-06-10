@@ -237,6 +237,7 @@ type Navbar =
     static member private SaveArcButton() =
 
         let errorCtx = useErrorModalCtx ()
+        let isSaving, setIsSaving = React.useState false
 
         let hasUnsavedChanges =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -260,21 +261,27 @@ type Navbar =
                 dependencies = [||]
             }
 
-        let onSaveArc =
-            fun _ ->
-                promise {
-                    if not hasUnsavedChanges.state then
-                        return ()
+        let onSaveArc (event: Browser.Types.MouseEvent) =
+            if hasUnsavedChanges.state && not isSaving then
+                (event.currentTarget :?> Browser.Types.HTMLButtonElement).disabled <- true
+                setIsSaving true
 
+                promise {
                     match! Api.ipcArcVaultApi.saveArcFile () with
                     | Ok _ -> ()
                     | Error ex -> errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
+
+                    setIsSaving false
                 }
+                |> Promise.catch (fun ex ->
+                    setIsSaving false
+                    errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
+                )
                 |> Promise.start
 
         Html.button [
             prop.type'.button
-            prop.disabled (not hasUnsavedChanges.state)
+            prop.disabled (isSaving || not hasUnsavedChanges.state)
             prop.className "swt:btn swt:btn-square swt:btn-info swt:btn-sm"
             prop.onClick onSaveArc
             prop.title "Save ARC"

@@ -61,7 +61,7 @@ module ArcDeleteHelper =
         ArcEntityPathRules.buildCanonicalEntityPaths zone identifier |> List.head
 
     let private mergeDeletedEntityFromDisk arcPath canonicalFilePath (arcLocal: ARC) = promise {
-        match! ARC.tryLoadAsync arcPath with
+        match! tryLoadArcIgnoringGitMetadataAsync arcPath with
         | Error errors ->
             return
                 Error(
@@ -110,7 +110,7 @@ module ArcDeleteHelper =
         | Error validationError -> return Error validationError
         | Ok(fileType, identifier, normalizedRelativePath, canonicalFilePath) ->
             try
-                match! ARC.tryLoadAsync arcPath with
+                match! tryLoadArcIgnoringGitMetadataAsync arcPath with
                 | Error errors ->
                     return
                         Error(
