@@ -406,7 +406,7 @@ type DataHubBrowser =
                 prop.className "swt:flex swt:items-center swt:justify-center swt:gap-6"
                 prop.children [
                     Html.button [
-                        prop.testId "GitLabExplorePrevPageButton"
+                        prop.testId "GitLabExploreFirstPageButton"
                         prop.className "swt:btn swt:btn-xs"
                         prop.text "First"
                         prop.disabled (pageMeta.PrevPage.IsNone || pageMeta.Page = Some 1)
@@ -432,7 +432,7 @@ type DataHubBrowser =
                         prop.onClick (fun _ -> pageMeta.NextPage |> Option.iter onPageChange)
                     ]
                     Html.button [
-                        prop.testId "GitLabExploreNextPageButton"
+                        prop.testId "GitLabExploreLastPageButton"
                         prop.className "swt:btn swt:btn-xs"
                         prop.text (string pageMeta.TotalPages)
                         prop.disabled (pageMeta.TotalPages.IsNone || pageMeta.Page = pageMeta.TotalPages)

@@ -158,9 +158,11 @@ type Authentication =
 
     [<ReactComponent>]
     static member private NotAuthenticatedView
-        (dataHubUrl, setDataHubUrl, onSignIn: SignInInformation -> unit, setError: exn option -> unit)
+        (onSignIn: SignInInformation -> unit, setError: exn option -> unit, ?initialDataHubUrl)
         =
 
+        let initialDataHubUrl = defaultArg initialDataHubUrl Helper.Default_DataHub
+        let dataHubUrl, setDataHubUrl = React.useState initialDataHubUrl
         let pat, setPat = React.useState ""
 
         Html.div [
@@ -258,13 +260,16 @@ type Authentication =
         let error, setError = React.useState (None: exn option)
         let showAddAccount, setShowAddAccount = React.useState false
 
+        let initialDataHubUrl, setInitialDataHubUrl =
+            React.useState (None: DataHubInformation option)
+
         let activeUser = accounts.ActiveUser()
-        let dataHubUrl, setDataHubUrl = React.useState Helper.Default_DataHub
 
         let onSignIn =
             fun signInInfo ->
                 setError None
                 setIsOpen false
+                setInitialDataHubUrl None
                 setShowAddAccount false
                 onSignIn signInInfo
 
@@ -285,7 +290,7 @@ type Authentication =
         let onRegenerateToken (account: AccountSummary) =
             setShowAddAccount true
 
-            setDataHubUrl {
+            (Some >> setInitialDataHubUrl) {
                 Name = account.User.TargetDataHub
                 Url = account.User.TargetDataHub
                 Description =
@@ -308,7 +313,11 @@ type Authentication =
                                         prop.onClick (fun _ -> setShowAddAccount false)
                                         prop.text "\u2190 Back to account"
                                     ]
-                                    Authentication.NotAuthenticatedView(dataHubUrl, setDataHubUrl, onSignIn, setError)
+                                    Authentication.NotAuthenticatedView(
+                                        onSignIn,
+                                        setError,
+                                        ?initialDataHubUrl = initialDataHubUrl
+                                    )
                                 ]
                             ]
                         else
@@ -326,14 +335,14 @@ type Authentication =
                                     Authentication.AddAnotherAccountBtn(fun () -> setShowAddAccount true)
                                 ]
                             ]
-                    | None -> Authentication.NotAuthenticatedView(dataHubUrl, setDataHubUrl, onSignIn, setError)
+                    | None -> Authentication.NotAuthenticatedView(onSignIn, setError)
                 ),
                 [|
                     box activeUser
                     box error
                     box showAddAccount
                     box accounts
-                    box dataHubUrl
+                    box initialDataHubUrl
                 |]
             )
 
