@@ -1,13 +1,9 @@
 name: Release Swate Electron App
-# description: Build and release the Swate Electron app. Crossplatform build and release for Windows, macOS, and Linux. Will be uploaded to GitHub releases.
-
 on:
   workflow_dispatch:
-  # push:
-    # branches:
-    #   - main
-    #   - epic/SwateApp
-    
+  push:
+    branches:
+      - epic/SwateApp
 
 permissions:
   contents: write
