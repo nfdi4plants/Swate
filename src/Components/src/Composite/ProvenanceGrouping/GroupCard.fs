@@ -211,7 +211,9 @@ type GroupCard =
                                         if isHovered then
                                             Html.div [
                                                 prop.className [
-                                                    "swt:absolute swt:top-0 swt:z-30 swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg"
+                                                    // The viewport cap keeps the popover readable when the
+                                                    // editor itself is narrower than the preferred width.
+                                                    "swt:absolute swt:top-0 swt:z-30 swt:w-72 swt:max-w-[60vw] swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg"
                                                     memberDetailsPosition
                                                 ]
                                                 if defaultArg debug false then

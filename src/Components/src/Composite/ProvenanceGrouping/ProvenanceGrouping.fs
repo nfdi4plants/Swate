@@ -410,7 +410,7 @@ module private EditorPanels =
         let valueText = Formatting.formatValue warning.Value warning.Unit
 
         Html.div [
-            prop.className "swt:alert swt:alert-warning swt:items-start"
+            prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
             if debug then prop.testId "provenance-overwrite-warning"
             prop.children [
                 Html.i [ prop.className "swt:iconify swt:fluent--warning-20-regular swt:size-5" ]
@@ -462,7 +462,7 @@ module private EditorPanels =
         let outputMemberText = memberText pending.OutputMemberCount "output"
 
         Html.div [
-            prop.className "swt:alert swt:alert-warning swt:items-start"
+            prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
             if debug then prop.testId "provenance-member-resolution-prompt"
             prop.children [
                 Html.i [ prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5" ]
@@ -516,7 +516,7 @@ module private EditorPanels =
             match resolved with
             | Some conn ->
                 Html.div [
-                    prop.className "swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+                    prop.className "swt:mx-4 swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
                     if debug then prop.testId "provenance-connection-details"
                     prop.children [
                         Html.div [
@@ -815,38 +815,52 @@ type ProvenanceGrouping =
 
         let content =
             Html.div [
-                prop.className "swt:flex swt:flex-col swt:gap-4 swt:bg-base-200 swt:p-4 swt:overflow-auto"
-                prop.style [ style.height (defaultArg height 720) ]
+                prop.className [
+                    "swt:flex swt:flex-col swt:bg-base-200 swt:overflow-auto swt:pb-4"
+                    // Without an explicit height the editor fills its host instead of
+                    // forcing a fixed pixel height into responsive layouts.
+                    if height.IsNone then
+                        "swt:h-full swt:min-h-0"
+                ]
+                match height with
+                | Some height -> prop.style [ style.height height ]
+                | None -> ()
                 if debug then prop.testId "provenance-editor-root"
                 prop.children [
-                    Controls.LayerTabs(
-                        session,
-                        (fun pairId -> Session.selectPair pairId session |> publish),
-                        (fun () -> EditorActions.addLayer session pair.Id inputGroups outputGroups uiState publish),
-                        debug = debug)
-                    match uiState.Error with
-                    | Some error -> EditorPanels.errorAlert error
-                    | None -> Html.none
-                    match uiState.PendingOverwrite with
-                    | Some warning ->
-                        EditorPanels.overwriteWarning
-                            debug
-                            warning
-                            confirmPendingOverwrite
-                            (fun () -> State.Overwrite.clear uiState |> setUiState)
-                    | None -> Html.none
-                    match uiState.PendingMemberResolution with
-                    | Some pending ->
-                        EditorPanels.memberResolutionPrompt
-                            debug
-                            pending
-                            resolveAllToAll
-                            (fun pending -> applyUiState (State.MemberResolution.chooseManual pending))
-                            (fun () -> applyUiState State.MemberResolution.clearPending)
-                    | None -> Html.none
+                    // The toolbar and pending prompts stay pinned while the surface scrolls.
+                    Html.div [
+                        prop.className "swt:sticky swt:top-0 swt:z-20 swt:flex swt:flex-col swt:gap-4 swt:bg-base-200 swt:p-4"
+                        prop.children [
+                            Controls.LayerTabs(
+                                session,
+                                (fun pairId -> Session.selectPair pairId session |> publish),
+                                (fun () -> EditorActions.addLayer session pair.Id inputGroups outputGroups uiState publish),
+                                debug = debug)
+                            match uiState.Error with
+                            | Some error -> EditorPanels.errorAlert error
+                            | None -> Html.none
+                            match uiState.PendingOverwrite with
+                            | Some warning ->
+                                EditorPanels.overwriteWarning
+                                    debug
+                                    warning
+                                    confirmPendingOverwrite
+                                    (fun () -> State.Overwrite.clear uiState |> setUiState)
+                            | None -> Html.none
+                            match uiState.PendingMemberResolution with
+                            | Some pending ->
+                                EditorPanels.memberResolutionPrompt
+                                    debug
+                                    pending
+                                    resolveAllToAll
+                                    (fun pending -> applyUiState (State.MemberResolution.chooseManual pending))
+                                    (fun () -> applyUiState State.MemberResolution.clearPending)
+                            | None -> Html.none
+                        ]
+                    ]
                     Html.div [
                         prop.ref surfaceRef
-                        prop.className "swt:relative swt:grid swt:min-w-0 swt:items-start"
+                        prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start"
                         prop.style [
                             style.custom ("grid-template-columns", Splitter.template panelRatios)
                         ]
