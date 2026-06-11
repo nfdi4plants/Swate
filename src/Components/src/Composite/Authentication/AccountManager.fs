@@ -95,6 +95,10 @@ type AccountManager =
                                                         removeFn account.User.LocalSwateAccountId
                                                     )
                                                 )
+                                                prop.title
+                                                    "Regenerate token with correct scopes. You will have to add the account again after regenerating."
+                                                prop.ariaLabel
+                                                    "Regenerate token with correct scopes. You will have to add the account again after regenerating."
                                                 prop.target.blank
                                                 prop.rel "noopener noreferrer"
                                                 prop.text "Regenerate token"
@@ -113,6 +117,8 @@ type AccountManager =
                                             match onRotateToken with
                                             | Some rotateToken ->
                                                 Html.button [
+                                                    prop.title "Refresh token to extend expiration."
+                                                    prop.ariaLabel "Refresh token to extend expiration."
                                                     prop.testId $"RotateTokenButton-{account.User.LocalSwateAccountId}"
                                                     prop.className "swt:link swt:link-warning"
                                                     prop.onClick (fun e ->
