@@ -273,6 +273,8 @@ type Controls =
                 |}
             )
 
+        let density = React.useContext Density.context
+
         let sideScope =
             match side with
             | ProvenanceSide.Input -> GroupingScope.Input
@@ -316,8 +318,11 @@ type Controls =
                 prop.className [
                     // swt:shrink overrides the btn class's flex-shrink:0 so the button can
                     // give way (and truncate) when the rail row runs out of space.
-                    "swt:btn swt:btn-sm swt:h-auto swt:min-h-8 swt:py-1 swt:relative swt:shrink swt:min-w-0 swt:max-w-[18rem] swt:justify-start"
+                    "swt:btn swt:btn-sm swt:h-auto swt:relative swt:shrink swt:min-w-0 swt:max-w-[18rem] swt:justify-start"
                     "swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
+                    match density with
+                    | Density.EditorDensity.Compact -> "swt:min-h-6 swt:py-0.5 swt:text-[0.7rem]"
+                    | _ -> "swt:min-h-8 swt:py-1"
                     if sideSelected then
                         "swt:btn-primary"
                     else
@@ -840,6 +845,7 @@ type Controls =
         : ReactElement =
         let canDrag = defaultArg draggable true
         let showHeader = defaultArg showHeader true
+        let density = React.useContext Density.context
 
         let drag =
             DndKit.useDraggable (
@@ -881,7 +887,7 @@ type Controls =
                 yield! prop.spread (!!drag.attributes)
                 yield! prop.spread (!!drag.listeners)
             prop.className [
-                yield! Styles.propertyValueButtonClasses drag.isDragging
+                yield! Styles.propertyValueButtonClasses density drag.isDragging
                 if not canDrag then
                     "swt:cursor-default"
             ]

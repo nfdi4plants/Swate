@@ -11,24 +11,22 @@ open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Session
 open Swate.Components.Composite.ProvenanceGrouping.Types
 
-type private EditorLookups =
-    {
-        FindGroup: ProvenanceSide -> string -> DisplayGroup option
-        FindHeader: string -> ProvenancePropertyHeader option
-        FindPropertyValue: ProvenancePropertyValueId -> ProvenancePropertyValue option
-        SourceForValue: ProvenancePropertyValueId -> ProvenancePropertyValue -> ValueAssignmentSource
-    }
+type private EditorLookups = {
+    FindGroup: ProvenanceSide -> string -> DisplayGroup option
+    FindHeader: string -> ProvenancePropertyHeader option
+    FindPropertyValue: ProvenancePropertyValueId -> ProvenancePropertyValue option
+    SourceForValue: ProvenancePropertyValueId -> ProvenancePropertyValue -> ValueAssignmentSource
+}
 
-type private DragContext =
-    {
-        Session: ProvenanceSession
-        Pair: ProvenanceLayerPair
-        UiState: UiState
-        Publish: SessionResult -> unit
-        SetUiState: UiState -> unit
-        Lookups: EditorLookups
-        ConnectSetPairs: (ProvenanceSetId * ProvenanceSetId) list -> unit
-    }
+type private DragContext = {
+    Session: ProvenanceSession
+    Pair: ProvenanceLayerPair
+    UiState: UiState
+    Publish: SessionResult -> unit
+    SetUiState: UiState -> unit
+    Lookups: EditorLookups
+    ConnectSetPairs: (ProvenanceSetId * ProvenanceSetId) list -> unit
+}
 
 /// Resizable three-panel surface helpers.
 module private Splitter =
@@ -52,16 +50,19 @@ module private Splitter =
 
     let handle side onPointerDown debug =
         Html.div [
-            prop.className "swt:group swt:flex swt:min-h-full swt:cursor-col-resize swt:items-stretch swt:justify-center swt:rounded hover:swt:bg-base-300/60"
+            prop.className
+                "swt:group swt:flex swt:min-h-full swt:cursor-col-resize swt:items-stretch swt:justify-center swt:rounded hover:swt:bg-base-300/60"
             prop.onPointerDown onPointerDown
             prop.style [ style.custom ("touch-action", "none") ]
             prop.custom ("role", "separator")
             prop.custom ("aria-orientation", "vertical")
             prop.ariaLabel "Resize provenance panels"
-            if debug then prop.testId (testId side)
+            if debug then
+                prop.testId (testId side)
             prop.children [
                 Html.div [
-                    prop.className "swt:my-2 swt:w-1 swt:rounded-full swt:bg-base-content/15 swt:transition-colors group-hover:swt:bg-base-content/35"
+                    prop.className
+                        "swt:my-2 swt:w-1 swt:rounded-full swt:bg-base-content/15 swt:transition-colors group-hover:swt:bg-base-content/35"
                 ]
             ]
         ]
@@ -97,8 +98,12 @@ module private EditorLookups =
 
     let create pair uiState inputGroups outputGroups =
         let findGroup side groupId =
-            let groups : DisplayGroup list =
-                if side = ProvenanceSide.Input then inputGroups else outputGroups
+            let groups: DisplayGroup list =
+                if side = ProvenanceSide.Input then
+                    inputGroups
+                else
+                    outputGroups
+
             groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
 
         let findHeader headerId =
@@ -109,14 +114,16 @@ module private EditorLookups =
             pair.Model.PropertyValues.TryFind propertyValueId
             |> Option.orElseWith (fun () -> State.Palette.tryFindValue propertyValueId uiState)
 
-        let sourceForValue propertyValueId (propertyValue: ProvenancePropertyValue) : ValueAssignmentSource =
-            {
-                CopiedFrom =
-                    if pair.Model.PropertyValues.ContainsKey propertyValueId then Some propertyValueId else None
-                Header = propertyValue.Header
-                Value = propertyValue.Value
-                Unit = propertyValue.Unit
-            }
+        let sourceForValue propertyValueId (propertyValue: ProvenancePropertyValue) : ValueAssignmentSource = {
+            CopiedFrom =
+                if pair.Model.PropertyValues.ContainsKey propertyValueId then
+                    Some propertyValueId
+                else
+                    None
+            Header = propertyValue.Header
+            Value = propertyValue.Value
+            Unit = propertyValue.Unit
+        }
 
         {
             FindGroup = findGroup
@@ -146,8 +153,7 @@ module private EditorActions =
         |> publish
 
     let createSet session publish command =
-        Session.createLoadedSet command session
-        |> publish
+        Session.createLoadedSet command session |> publish
 
     let confirmPendingOverwrite session publish setUiState uiState warning =
         let rec apply current patches propertyValueIds =
@@ -160,9 +166,11 @@ module private EditorActions =
 
         match warning.ExistingValueIds with
         | [] ->
-            setUiState { uiState with Error = Some "Cannot overwrite because the target value context is no longer available." }
-        | propertyValueIds ->
-            apply session [] propertyValueIds |> publish
+            setUiState {
+                uiState with
+                    Error = Some "Cannot overwrite because the target value context is no longer available."
+            }
+        | propertyValueIds -> apply session [] propertyValueIds |> publish
 
     let connectSetPairs session publish pairs =
         pairs
@@ -172,7 +180,9 @@ module private EditorActions =
                 result
                 |> Result.bind (fun (current, patches) ->
                     Session.connectSets inputId outputId None current
-                    |> Result.map (fun (next, added) -> next, patches @ added)))
+                    |> Result.map (fun (next, added) -> next, patches @ added)
+                )
+            )
             (Ok(session, []))
         |> publish
 
@@ -184,12 +194,11 @@ module private EditorActions =
         else
             None
 
-    let allMemberPairs (inputGroup: DisplayGroup) (outputGroup: DisplayGroup) =
-        [
-            for input in inputGroup.Members do
-                for output in outputGroup.Members do
-                    input.SetId, output.SetId
-        ]
+    let allMemberPairs (inputGroup: DisplayGroup) (outputGroup: DisplayGroup) = [
+        for input in inputGroup.Members do
+            for output in outputGroup.Members do
+                input.SetId, output.SetId
+    ]
 
 /// Reads the current DOM position of a connection handle relative to the editor surface.
 module private HandleMeasure =
@@ -206,21 +215,22 @@ module private HandleMeasure =
             let origin = surface.getBoundingClientRect ()
             let rect = node.getBoundingClientRect ()
 
-            Some
-                {
-                    X = rect.left - origin.left + float surface.scrollLeft + rect.width / 2.
-                    Y = rect.top - origin.top + float surface.scrollTop + rect.height / 2.
-                }
+            Some {
+                X = rect.left - origin.left + float surface.scrollLeft + rect.width / 2.
+                Y = rect.top - origin.top + float surface.scrollTop + rect.height / 2.
+            }
         | None -> None
 
     let tryViewportCenter (handle: ConnectionHandleRef) =
         tryDocumentNode handle
         |> Option.map (fun node ->
             let rect = node.getBoundingClientRect ()
+
             {
                 X = rect.left + rect.width / 2.
                 Y = rect.top + rect.height / 2.
-            })
+            }
+        )
 
 /// Resolves destination handles from final pointer coordinates when DnD reports
 /// the active handle as its own drop target.
@@ -242,45 +252,46 @@ module private DropHitTesting =
 
     let private endpoint source (event: DndKit.IDndKitEvent) =
         HandleMeasure.tryViewportCenter source
-        |> Option.map (fun start ->
-            {
-                X = start.X + event.delta.x
-                Y = start.Y + event.delta.y
-            })
+        |> Option.map (fun start -> {
+            X = start.X + event.delta.x
+            Y = start.Y + event.delta.y
+        })
 
     let private targetHandleAt point source =
         elementsFromPoint point.X point.Y
         |> Array.tryPick (fun element ->
-            closestAttribute
-                "[data-provenance-connection-drop-id]"
-                "data-provenance-connection-drop-id"
-                element
+            closestAttribute "[data-provenance-connection-drop-id]" "data-provenance-connection-drop-id" element
             |> Option.bind DragDrop.tryConnectionDropId
-            |> Option.bind (fun target -> if target = source then None else Some target))
+            |> Option.bind (fun target -> if target = source then None else Some target)
+        )
 
     let private targetGroupAt point =
         elementsFromPoint point.X point.Y
         |> Array.tryPick (fun element ->
             closestAttribute "[data-provenance-group-drop-id]" "data-provenance-group-drop-id" element
             |> Option.bind DragDrop.tryDropId
-            |> Option.map (fun (side, groupId) ->
-                {
-                    Kind = ConnectionHandleKind.GroupCard
-                    Side = side
-                    Id = groupId
-                    ParentGroupId = None
-                }))
+            |> Option.map (fun (side, groupId) -> {
+                Kind = ConnectionHandleKind.GroupCard
+                Side = side
+                Id = groupId
+                ParentGroupId = None
+            })
+        )
 
     let connectionTarget source event =
         endpoint source event
-        |> Option.bind (fun point ->
-            targetHandleAt point source
-            |> Option.orElseWith (fun () -> targetGroupAt point))
+        |> Option.bind (fun point -> targetHandleAt point source |> Option.orElseWith (fun () -> targetGroupAt point))
 
 /// DnD event handlers that translate library events into session or UI state changes.
 module private DragHandlers =
 
-    let handleStart (surfaceRef: IRefValue<Browser.Types.HTMLElement option>) setActiveDrag setUiState uiState (event: DndKit.IDndKitEvent) =
+    let handleStart
+        (surfaceRef: IRefValue<Browser.Types.HTMLElement option>)
+        setActiveDrag
+        setUiState
+        uiState
+        (event: DndKit.IDndKitEvent)
+        =
         let payload = DragDrop.tryDragId (string event.active.id)
         setActiveDrag payload
 
@@ -310,21 +321,32 @@ module private DragHandlers =
     let private routePropertyValueDrop context side groupId propertyValueId =
         match context.Lookups.FindGroup side groupId, context.Lookups.FindPropertyValue propertyValueId with
         | Some group, Some propertyValue ->
-            match ValueAssignment.planPropertyValueDrop (context.Lookups.SourceForValue propertyValueId propertyValue) group context.Pair.Model with
+            match
+                ValueAssignment.planPropertyValueDrop
+                    (context.Lookups.SourceForValue propertyValueId propertyValue)
+                    group
+                    context.Pair.Model
+            with
             | Ok(ValueAssignmentPlan.AddCurrent command) ->
-                Session.createCurrentLoadedPropertyValue command context.Session |> context.Publish
+                Session.createCurrentLoadedPropertyValue command context.Session
+                |> context.Publish
             | Ok(ValueAssignmentPlan.ConfirmOverwrite warning) ->
                 State.Overwrite.set warning context.UiState |> context.SetUiState
             | Error error ->
-                context.SetUiState { context.UiState with Error = Some(AssignmentErrors.text error) }
+                context.SetUiState {
+                    context.UiState with
+                        Error = Some(AssignmentErrors.text error)
+                }
         | _ -> ()
 
     let private routeGroupConnection context inputGroupId outputGroupId =
-        match context.Lookups.FindGroup ProvenanceSide.Input inputGroupId, context.Lookups.FindGroup ProvenanceSide.Output outputGroupId with
+        match
+            context.Lookups.FindGroup ProvenanceSide.Input inputGroupId,
+            context.Lookups.FindGroup ProvenanceSide.Output outputGroupId
+        with
         | Some inputGroup, Some outputGroup ->
             match EditorActions.orderedMemberPairs inputGroup outputGroup with
-            | Some pairs ->
-                context.ConnectSetPairs pairs
+            | Some pairs -> context.ConnectSetPairs pairs
             | None ->
                 State.MemberResolution.request
                     {
@@ -339,16 +361,15 @@ module private DragHandlers =
         | _ -> ()
 
     let private routeMemberToGroupConnection context inputGroupId outputGroupId memberSetId memberSide =
-        match context.Lookups.FindGroup ProvenanceSide.Input inputGroupId, context.Lookups.FindGroup ProvenanceSide.Output outputGroupId with
+        match
+            context.Lookups.FindGroup ProvenanceSide.Input inputGroupId,
+            context.Lookups.FindGroup ProvenanceSide.Output outputGroupId
+        with
         | Some inputGroup, Some outputGroup ->
             let pairs =
                 match memberSide with
-                | ProvenanceSide.Input ->
-                    outputGroup.Members
-                    |> List.map (fun output -> memberSetId, output.SetId)
-                | ProvenanceSide.Output ->
-                    inputGroup.Members
-                    |> List.map (fun input -> input.SetId, memberSetId)
+                | ProvenanceSide.Input -> outputGroup.Members |> List.map (fun output -> memberSetId, output.SetId)
+                | ProvenanceSide.Output -> inputGroup.Members |> List.map (fun input -> input.SetId, memberSetId)
 
             context.ConnectSetPairs pairs
         | _ -> ()
@@ -359,7 +380,10 @@ module private DragHandlers =
             routeGroupConnection context inputGroupId outputGroupId
         | Some(ConnectionRouting.ConnectionAction.ConnectMembers(_, _, inputSetId, outputSetId)) ->
             context.ConnectSetPairs [ inputSetId, outputSetId ]
-        | Some(ConnectionRouting.ConnectionAction.ConnectMemberToGroup(inputGroupId, outputGroupId, memberSetId, memberSide)) ->
+        | Some(ConnectionRouting.ConnectionAction.ConnectMemberToGroup(inputGroupId,
+                                                                       outputGroupId,
+                                                                       memberSetId,
+                                                                       memberSide)) ->
             routeMemberToGroupConnection context inputGroupId outputGroupId memberSetId memberSide
         | Some(ConnectionRouting.ConnectionAction.ConnectPropertyValueToGroup(source, target)) ->
             routePropertyValueDrop context target.Side target.Id source.Id
@@ -385,6 +409,7 @@ module private DragHandlers =
 
     let handleEnd context (event: DndKit.IDndKitEvent) =
         let dragPayload = DragDrop.tryDragId (string event.active.id)
+
         let groupDrop, propertyDrop, connectionDrop =
             if isNull event.over then
                 None, None, None
@@ -401,26 +426,21 @@ module private DragHandlers =
                 else
                     Some target
 
-            resolvedTarget
-            |> Option.iter (routeConnectionHandle context source)
+            resolvedTarget |> Option.iter (routeConnectionHandle context source)
         | Some(DragDrop.Payload.ConnectionHandle source), None ->
             let resolvedTarget =
                 match groupDrop with
                 | Some(side, groupId) ->
-                    Some
-                        {
-                            Kind = ConnectionHandleKind.GroupCard
-                            Side = side
-                            Id = groupId
-                            ParentGroupId = None
-                        }
-                | None ->
-                    DropHitTesting.connectionTarget source event
+                    Some {
+                        Kind = ConnectionHandleKind.GroupCard
+                        Side = side
+                        Id = groupId
+                        ParentGroupId = None
+                    }
+                | None -> DropHitTesting.connectionTarget source event
 
-            resolvedTarget
-            |> Option.iter (routeConnectionHandle context source)
-        | _ ->
-            routeExistingValueAndPropertyDrags context dragPayload groupDrop propertyDrop
+            resolvedTarget |> Option.iter (routeConnectionHandle context source)
+        | _ -> routeExistingValueAndPropertyDrags context dragPayload groupDrop propertyDrop
 
 /// Alert and detail panels rendered around the main grouping surface.
 module private EditorPanels =
@@ -437,9 +457,12 @@ module private EditorPanels =
 
         Html.div [
             prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
-            if debug then prop.testId "provenance-overwrite-warning"
+            if debug then
+                prop.testId "provenance-overwrite-warning"
             prop.children [
-                Html.i [ prop.className "swt:iconify swt:fluent--warning-20-regular swt:size-5" ]
+                Html.i [
+                    prop.className "swt:iconify swt:fluent--warning-20-regular swt:size-5"
+                ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
                     prop.children [
@@ -448,11 +471,13 @@ module private EditorPanels =
                                 if count > 1 then
                                     $"Overwrite {count} {warning.Header.Category.Name} values?"
                                 else
-                                    $"Overwrite {warning.Header.Category.Name} value?")
+                                    $"Overwrite {warning.Header.Category.Name} value?"
+                            )
                         ]
                         Html.span [
                             prop.className "swt:text-sm"
-                            prop.text $"The selected targets already have {warning.Header.Category.Name}. Confirm to replace with {valueText} using the existing edit path."
+                            prop.text
+                                $"The selected targets already have {warning.Header.Category.Name}. Confirm to replace with {valueText} using the existing edit path."
                         ]
                     ]
                 ]
@@ -462,7 +487,8 @@ module private EditorPanels =
                         Html.button [
                             prop.type'.button
                             prop.className "swt:btn swt:btn-warning swt:btn-sm"
-                            if debug then prop.testId "provenance-confirm-overwrite"
+                            if debug then
+                                prop.testId "provenance-confirm-overwrite"
                             prop.onPointerUp (fun _ -> onConfirm warning)
                             prop.onClick (fun _ -> onConfirm warning)
                             prop.text "Overwrite"
@@ -484,14 +510,18 @@ module private EditorPanels =
                 $"{count} {side} member"
             else
                 $"{count} {side} members"
+
         let inputMemberText = memberText pending.InputMemberCount "input"
         let outputMemberText = memberText pending.OutputMemberCount "output"
 
         Html.div [
             prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
-            if debug then prop.testId "provenance-member-resolution-prompt"
+            if debug then
+                prop.testId "provenance-member-resolution-prompt"
             prop.children [
-                Html.i [ prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5" ]
+                Html.i [
+                    prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5"
+                ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
                     prop.children [
@@ -509,7 +539,8 @@ module private EditorPanels =
                             prop.type'.button
                             prop.className "swt:btn swt:btn-warning swt:btn-sm"
                             prop.ariaLabel "Create all-to-all connections"
-                            if debug then prop.testId "provenance-member-resolution-all-to-all"
+                            if debug then
+                                prop.testId "provenance-member-resolution-all-to-all"
                             prop.onClick (fun _ -> onAllToAll pending)
                             prop.text "All-to-all"
                         ]
@@ -517,7 +548,8 @@ module private EditorPanels =
                             prop.type'.button
                             prop.className "swt:btn swt:btn-outline swt:btn-sm"
                             prop.ariaLabel "Resolve manually"
-                            if debug then prop.testId "provenance-member-resolution-manual"
+                            if debug then
+                                prop.testId "provenance-member-resolution-manual"
                             prop.onPointerUp (fun _ -> onManual pending)
                             prop.onClick (fun _ -> onManual pending)
                             prop.text "Resolve manually"
@@ -526,7 +558,8 @@ module private EditorPanels =
                             prop.type'.button
                             prop.className "swt:btn swt:btn-ghost swt:btn-sm"
                             prop.ariaLabel "Cancel member resolution"
-                            if debug then prop.testId "provenance-member-resolution-cancel"
+                            if debug then
+                                prop.testId "provenance-member-resolution-cancel"
                             prop.onClick (fun _ -> onCancel ())
                             prop.text "Cancel"
                         ]
@@ -539,11 +572,14 @@ module private EditorPanels =
         match detail with
         | Some(ProvenanceDetail.Connection connectionId) ->
             let resolved = connections |> List.tryFind (fun c -> c.Id = connectionId)
+
             match resolved with
             | Some conn ->
                 Html.div [
-                    prop.className "swt:mx-4 swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
-                    if debug then prop.testId "provenance-connection-details"
+                    prop.className
+                        "swt:mx-4 swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+                    if debug then
+                        prop.testId "provenance-connection-details"
                     prop.children [
                         Html.div [
                             prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
@@ -556,7 +592,8 @@ module private EditorPanels =
                                     prop.type'.button
                                     prop.className "swt:btn swt:btn-outline swt:btn-error swt:btn-sm"
                                     prop.ariaLabel "Remove connection"
-                                    if debug then prop.testId "provenance-remove-connection"
+                                    if debug then
+                                        prop.testId "provenance-remove-connection"
                                     prop.onClick (fun _ -> onRemove conn)
                                     prop.children [
                                         Html.i [
@@ -576,6 +613,7 @@ module private EditorPanels =
                             prop.text $"Target: {conn.TargetGroupId}"
                         ]
                         let connectionIds = conn.ConnectionIds |> String.concat ", "
+
                         Html.p [
                             prop.className "swt:text-sm"
                             prop.text $"Connection IDs: {connectionIds}"
@@ -588,7 +626,19 @@ module private EditorPanels =
 /// Render helpers for side rails, group columns, and drag overlays.
 module private EditorSurface =
 
-    let propertyRail side (pair: ProvenanceLayerPair) (model: ProvenanceModel) uiState activeAssignments toggleSide toggleBoth move toggleExpanded addPaletteValue debug =
+    let propertyRail
+        side
+        (pair: ProvenanceLayerPair)
+        (model: ProvenanceModel)
+        uiState
+        activeAssignments
+        toggleSide
+        toggleBoth
+        move
+        toggleExpanded
+        addPaletteValue
+        debug
+        =
         Controls.PropertyRail(
             side,
             PropertyRails.propertyRailHeadersForSide pair.Id side model uiState,
@@ -601,7 +651,8 @@ module private EditorSurface =
             toggleExpanded,
             addPaletteValue,
             (fun header -> PropertyRails.canSwitchHeader header model),
-            debug = debug)
+            debug = debug
+        )
 
     let groupColumn
         side
@@ -643,18 +694,21 @@ module private EditorSurface =
                         (fun () -> toggleDetail side group.Id),
                         ?connectionCount = connectionCountFor group.Id,
                         debug = debug,
-                        key = $"{keyPrefix}:{group.Id}")
+                        key = $"{keyPrefix}:{group.Id}"
+                    )
                 if groups.IsEmpty then
                     Html.p [
                         prop.className "swt:text-sm swt:text-base-content/60"
                         prop.text "No entries in this layer"
                     ]
+
                     Controls.AddEndpointPopover(
                         side,
                         endpointKind,
                         createSet,
                         debug = debug,
-                        key = $"{pair.Id}:{keyPrefix}:{Endpoints.endpointKindIdentity endpointKind}")
+                        key = $"{pair.Id}:{keyPrefix}:{Endpoints.endpointKindIdentity endpointKind}"
+                    )
             ]
         ]
 
@@ -662,8 +716,7 @@ module private EditorSurface =
         match activeDrag with
         | Some(DragDrop.Payload.PropertyValue propertyValueId) ->
             match findPropertyValue propertyValueId with
-            | Some propertyValue ->
-                Controls.ValueDragPreview(propertyValue, showHeader = false, debug = debug)
+            | Some propertyValue -> Controls.ValueDragPreview(propertyValue, showHeader = false, debug = debug)
             | None -> Html.none
         | _ -> Html.none
 
@@ -671,7 +724,9 @@ module private EditorSurface =
 type ProvenanceGrouping =
 
     [<ReactComponent>]
-    static member Main(session: ProvenanceSession, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool) =
+    static member Main
+        (session: ProvenanceSession, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
+        =
         let debug = defaultArg debug false
         let rawUiState, setUiState = React.useState (State.init session)
         let activeDrag, setActiveDrag = React.useState<DragDrop.Payload option> None
@@ -680,6 +735,7 @@ type ProvenanceGrouping =
         let rootRef = React.useElementRef ()
         let tier, setTier = React.useState LayoutTier.Wide
         let openRail, setOpenRail = React.useState<ProvenanceSide option> None
+        let density, setDensity = React.useState Density.EditorDensity.Comfortable
 
         React.useEffectOnce (fun () ->
             let applyTier () =
@@ -694,17 +750,26 @@ type ProvenanceGrouping =
             | Some root -> TierObserver.observe observer root
             | None -> ()
 
-            FsReact.createDisposable (fun () -> TierObserver.disconnect observer))
+            FsReact.createDisposable (fun () -> TierObserver.disconnect observer)
+        )
 
         let uiState = State.Layers.ensure session rawUiState
-        let pair, inputGroups, outputGroups, connections = Display.displayPair session uiState
+
+        let pair, inputGroups, outputGroups, connections =
+            Display.displayPair session uiState
+
         let latestUiState = React.useRef uiState
         let activePairId = React.useRef pair.Id
         latestUiState.current <- uiState
         activePairId.current <- pair.Id
         let panelRatios = State.PanelLayout.get pair.Id uiState
-        let inputEndpointKind = Endpoints.defaultEndpointKind ProvenanceSide.Input pair.Model
-        let outputEndpointKind = Endpoints.defaultEndpointKind ProvenanceSide.Output pair.Model
+
+        let inputEndpointKind =
+            Endpoints.defaultEndpointKind ProvenanceSide.Input pair.Model
+
+        let outputEndpointKind =
+            Endpoints.defaultEndpointKind ProvenanceSide.Output pair.Model
+
         let lookups = EditorLookups.create pair uiState inputGroups outputGroups
 
         let applyUiState update =
@@ -717,20 +782,17 @@ type ProvenanceGrouping =
             | None -> ()
             | Some surface ->
                 let rect = surface.getBoundingClientRect ()
+
                 let rawPercent =
                     if rect.width <= 0. then
                         0.
                     else
                         ((clientX - rect.left) / rect.width) * 100.
 
-                let splitPercent =
-                    rawPercent
-                    |> max 0.
-                    |> min 100.
-                    |> round
-                    |> int
+                let splitPercent = rawPercent |> max 0. |> min 100. |> round |> int
 
                 let current = latestUiState.current
+
                 let next =
                     match side with
                     | Splitter.Left -> State.PanelLayout.setLeft activePairId.current splitPercent current
@@ -746,9 +808,7 @@ type ProvenanceGrouping =
                     | Some side -> commitPanelRatio side event.clientX
                     | None -> ()
 
-            let stopDragging =
-                fun (_: Browser.Types.PointerEvent) ->
-                    splitDrag.current <- None
+            let stopDragging = fun (_: Browser.Types.PointerEvent) -> splitDrag.current <- None
 
             Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
             Browser.Dom.document.addEventListener ("pointerup", unbox stopDragging)
@@ -773,45 +833,50 @@ type ProvenanceGrouping =
                     activationConstraint = {| distance = 6 |}
                 |}
             )
+
         let sensors = DndKit.useSensors [| pointerSensor |]
 
         let publish result =
             match result with
             | Ok(next, patches) ->
                 let nextUiState = State.Layers.ensure next uiState
-                setUiState { nextUiState with Error = None; PendingOverwrite = None; PendingMemberResolution = None }
+
+                setUiState {
+                    nextUiState with
+                        Error = None
+                        PendingOverwrite = None
+                        PendingMemberResolution = None
+                }
+
                 onChange { Session = next; Patches = patches }
             | Error error ->
-                setUiState { uiState with Error = Some(string error) }
+                setUiState {
+                    uiState with
+                        Error = Some(string error)
+                }
 
         let createSet command =
             EditorActions.createSet session publish command
 
         let addPaletteValue side header value unit =
-            State.Palette.addValue pair.Id side header value unit uiState
-            |> setUiState
+            State.Palette.addValue pair.Id side header value unit uiState |> setUiState
 
         let toggleSideGrouping layerId side header =
-            State.GroupingAssignments.toggleSide layerId side header uiState
-            |> setUiState
+            State.GroupingAssignments.toggleSide layerId side header uiState |> setUiState
 
         let togglePropertyExpanded side header =
-            State.PropertyExpansion.toggle pair.Id side header uiState
-            |> setUiState
+            State.PropertyExpansion.toggle pair.Id side header uiState |> setUiState
 
         let toggleSelection side groupId =
-            State.Selection.toggle pair.Id side groupId uiState
-            |> setUiState
+            State.Selection.toggle pair.Id side groupId uiState |> setUiState
 
         let toggleGroupDetail side groupId =
-            State.Detail.toggleGroup side groupId uiState
-            |> setUiState
+            State.Detail.toggleGroup side groupId uiState |> setUiState
 
         let confirmPendingOverwrite =
             EditorActions.confirmPendingOverwrite session publish setUiState uiState
 
-        let connectSetPairs =
-            EditorActions.connectSetPairs session publish
+        let connectSetPairs = EditorActions.connectSetPairs session publish
 
         let removeDisplayConnection (connection: DisplayConnection) =
             match Session.removeConnections connection.ConnectionIds session with
@@ -827,22 +892,28 @@ type ProvenanceGrouping =
                 }
 
                 onChange { Session = next; Patches = patches }
-            | Error error -> setUiState { uiState with Error = Some(string error) }
+            | Error error ->
+                setUiState {
+                    uiState with
+                        Error = Some(string error)
+                }
 
         let resolveAllToAll (pending: PendingMemberResolution) =
-            match lookups.FindGroup ProvenanceSide.Input pending.InputGroupId, lookups.FindGroup ProvenanceSide.Output pending.OutputGroupId with
+            match
+                lookups.FindGroup ProvenanceSide.Input pending.InputGroupId,
+                lookups.FindGroup ProvenanceSide.Output pending.OutputGroupId
+            with
             | Some inputGroup, Some outputGroup ->
-                EditorActions.allMemberPairs inputGroup outputGroup
-                |> connectSetPairs
-            | _ ->
-                State.MemberResolution.clearPending uiState |> setUiState
+                EditorActions.allMemberPairs inputGroup outputGroup |> connectSetPairs
+            | _ -> State.MemberResolution.clearPending uiState |> setUiState
 
         let isManuallyResolving side groupId =
             uiState.ManualResolutionPairs
             |> List.exists (fun resolution ->
                 resolution.PairId = pair.Id
                 && ((side = ProvenanceSide.Input && resolution.InputGroupId = groupId)
-                    || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId)))
+                    || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId))
+            )
 
         let isConnectedToExpanded side groupId =
             connections
@@ -853,23 +924,23 @@ type ProvenanceGrouping =
                     && State.Detail.isGroupExpanded ProvenanceSide.Output connection.TargetGroupId uiState
                 | ProvenanceSide.Output ->
                     connection.TargetGroupId = groupId
-                    && State.Detail.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId uiState)
+                    && State.Detail.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId uiState
+            )
 
         let isGroupExpanded side groupId =
             State.Detail.isGroupExpanded side groupId uiState
             || isManuallyResolving side groupId
             || isConnectedToExpanded side groupId
 
-        let dragContext =
-            {
-                Session = session
-                Pair = pair
-                UiState = uiState
-                Publish = publish
-                SetUiState = setUiState
-                Lookups = lookups
-                ConnectSetPairs = connectSetPairs
-            }
+        let dragContext = {
+            Session = session
+            Pair = pair
+            UiState = uiState
+            Publish = publish
+            SetUiState = setUiState
+            Lookups = lookups
+            ConnectSetPairs = connectSetPairs
+        }
 
         let railSideLabel side =
             match side with
@@ -894,10 +965,12 @@ type ProvenanceGrouping =
                 (fun header -> toggleSideGrouping layerId side header)
                 (fun header ->
                     State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState
-                    |> setUiState)
+                    |> setUiState
+                )
                 (fun header ->
                     State.GroupingAssignments.move pair.Id layerId oppositeLayerId targetSide header uiState
-                    |> setUiState)
+                    |> setUiState
+                )
                 (fun header -> togglePropertyExpanded side header)
                 (fun header value unit -> addPaletteValue side header value unit)
                 debug
@@ -914,7 +987,8 @@ type ProvenanceGrouping =
                 match side with
                 | ProvenanceSide.Input when connection.SourceGroupId = groupId -> connection.ConnectionIds.Length
                 | ProvenanceSide.Output when connection.TargetGroupId = groupId -> connection.ConnectionIds.Length
-                | _ -> 0)
+                | _ -> 0
+            )
 
         let groupColumnFor side withConnectionBadges =
             let groups, endpointKind =
@@ -946,7 +1020,8 @@ type ProvenanceGrouping =
         let mediumRailColumn side =
             if openRail = Some side then
                 Html.div [
-                    prop.className "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:overflow-hidden"
+                    prop.className
+                        "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:overflow-hidden"
                     prop.children [
                         Html.button [
                             prop.type'.button
@@ -977,7 +1052,8 @@ type ProvenanceGrouping =
             else
                 Html.button [
                     prop.type'.button
-                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-24 swt:w-fit swt:px-1 swt:py-2"
+                    prop.className
+                        "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-24 swt:w-fit swt:px-1 swt:py-2"
                     prop.ariaLabel $"Show {railSideLabel side} properties"
                     if debug then
                         prop.testId $"provenance-rail-toggle-{side}"
@@ -1040,7 +1116,8 @@ type ProvenanceGrouping =
                 uiState,
                 (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
                 onRemove = removeDisplayConnection,
-                debug = debug)
+                debug = debug
+            )
 
         let surface =
             match tier with
@@ -1051,7 +1128,8 @@ type ProvenanceGrouping =
                     prop.style [
                         style.custom ("grid-template-columns", Splitter.template panelRatios)
                     ]
-                    if debug then prop.testId "provenance-surface"
+                    if debug then
+                        prop.testId "provenance-surface"
                     prop.children [
                         connectorOverlay
                         railColumn ProvenanceSide.Input
@@ -1059,8 +1137,12 @@ type ProvenanceGrouping =
                         Html.div [
                             // The wide column gap is the gutter the group-to-group
                             // connectors are drawn in.
-                            prop.className
-                                "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-16"
+                            prop.className [
+                                "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start"
+                                match density with
+                                | Density.EditorDensity.Compact -> "swt:gap-12"
+                                | _ -> "swt:gap-16"
+                            ]
                             prop.children [
                                 groupColumnFor ProvenanceSide.Input false
                                 groupColumnFor ProvenanceSide.Output false
@@ -1072,7 +1154,10 @@ type ProvenanceGrouping =
                 ]
             | LayoutTier.Medium ->
                 let railTrack side =
-                    if openRail = Some side then "minmax(10rem, 16rem)" else "auto"
+                    if openRail = Some side then
+                        "minmax(10rem, 16rem)"
+                    else
+                        "auto"
 
                 Html.div [
                     prop.ref surfaceRef
@@ -1083,7 +1168,8 @@ type ProvenanceGrouping =
                             $"{railTrack ProvenanceSide.Input} minmax(0, 1fr) {railTrack ProvenanceSide.Output}"
                         )
                     ]
-                    if debug then prop.testId "provenance-surface"
+                    if debug then
+                        prop.testId "provenance-surface"
                     prop.children [
                         connectorOverlay
                         mediumRailColumn ProvenanceSide.Input
@@ -1104,7 +1190,8 @@ type ProvenanceGrouping =
                 Html.div [
                     prop.ref surfaceRef
                     prop.className "swt:relative swt:mx-4 swt:flex swt:min-w-0 swt:flex-col swt:gap-4"
-                    if debug then prop.testId "provenance-surface"
+                    if debug then
+                        prop.testId "provenance-surface"
                     prop.children [
                         narrowRailSection ProvenanceSide.Input
                         groupColumnFor ProvenanceSide.Input true
@@ -1126,17 +1213,56 @@ type ProvenanceGrouping =
                 match height with
                 | Some height -> prop.style [ style.height height ]
                 | None -> ()
-                if debug then prop.testId "provenance-editor-root"
+                if debug then
+                    prop.testId "provenance-editor-root"
                 prop.children [
                     // The toolbar and pending prompts stay pinned while the surface scrolls.
                     Html.div [
-                        prop.className "swt:sticky swt:top-0 swt:z-20 swt:flex swt:flex-col swt:gap-4 swt:bg-base-200 swt:p-4"
+                        prop.className
+                            "swt:sticky swt:top-0 swt:z-20 swt:flex swt:flex-col swt:gap-4 swt:bg-base-200 swt:p-4"
                         prop.children [
-                            Controls.LayerTabs(
-                                session,
-                                (fun pairId -> Session.selectPair pairId session |> publish),
-                                (fun () -> EditorActions.addLayer session pair.Id inputGroups outputGroups uiState publish),
-                                debug = debug)
+                            Html.div [
+                                prop.className "swt:flex swt:flex-wrap swt:items-center swt:justify-between swt:gap-2"
+                                prop.children [
+                                    Controls.LayerTabs(
+                                        session,
+                                        (fun pairId -> Session.selectPair pairId session |> publish),
+                                        (fun () ->
+                                            EditorActions.addLayer
+                                                session
+                                                pair.Id
+                                                inputGroups
+                                                outputGroups
+                                                uiState
+                                                publish
+                                        ),
+                                        debug = debug
+                                    )
+                                    Html.button [
+                                        prop.type'.button
+                                        prop.className [
+                                            "swt:btn swt:btn-xs"
+                                            if density = Density.EditorDensity.Compact then
+                                                "swt:btn-primary"
+                                            else
+                                                "swt:btn-ghost"
+                                        ]
+                                        prop.custom ("aria-pressed", (density = Density.EditorDensity.Compact))
+                                        prop.ariaLabel "Toggle compact density"
+                                        if debug then
+                                            prop.testId "provenance-density-toggle"
+                                        prop.onClick (fun _ ->
+                                            setDensity (
+                                                if density = Density.EditorDensity.Compact then
+                                                    Density.EditorDensity.Comfortable
+                                                else
+                                                    Density.EditorDensity.Compact
+                                            )
+                                        )
+                                        prop.text "Compact"
+                                    ]
+                                ]
+                            ]
                             match uiState.Error with
                             | Some error -> EditorPanels.errorAlert error
                             | None -> Html.none
@@ -1169,25 +1295,43 @@ type ProvenanceGrouping =
             collisionDetection = DndKit.pointerWithin,
             onDragStart = DragHandlers.handleStart surfaceRef setActiveDrag setUiState uiState,
             onDragMove = DragHandlers.handleMove setUiState uiState,
-            onDragCancel = (fun _ ->
-                setActiveDrag None
-                State.LiveConnection.clear uiState |> setUiState),
-            onDragEnd = (fun event ->
-                setActiveDrag None
-                let clearedUiState = State.LiveConnection.clear uiState
-                setUiState clearedUiState
-                DragHandlers.handleEnd { dragContext with UiState = clearedUiState } event),
+            onDragCancel =
+                (fun _ ->
+                    setActiveDrag None
+                    State.LiveConnection.clear uiState |> setUiState
+                ),
+            onDragEnd =
+                (fun event ->
+                    setActiveDrag None
+                    let clearedUiState = State.LiveConnection.clear uiState
+                    setUiState clearedUiState
+
+                    DragHandlers.handleEnd
+                        {
+                            dragContext with
+                                UiState = clearedUiState
+                        }
+                        event
+                ),
             children =
-                React.Fragment [
-                    content
-                    DndKit.DragOverlay(children = EditorSurface.dragOverlay lookups.FindPropertyValue debug activeDrag)
-                ]
+                Density.provider
+                    density
+                    (React.Fragment [
+                        content
+                        DndKit.DragOverlay(
+                            children = EditorSurface.dragOverlay lookups.FindPropertyValue debug activeDrag
+                        )
+                     ])
         )
 
     [<ReactComponent>]
-    static member Editor(initialModel: ProvenanceModel, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool) =
+    static member Editor
+        (initialModel: ProvenanceModel, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
+        =
         let session, setSession = React.useState (Session.init initialModel)
+
         let change (next: ProvenanceEditorChange) =
             setSession next.Session
             onChange next
+
         ProvenanceGrouping.Main(session, change, ?height = height, ?debug = debug)

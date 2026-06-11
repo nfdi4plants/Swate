@@ -60,6 +60,7 @@ type GroupCard =
             ?key: string
         ) =
         let hoveredMemberId, setHoveredMemberId = React.useState<ProvenanceSetId option> None
+        let density = React.useContext Density.context
 
         let droppable =
             DndKit.useDroppable (
@@ -115,7 +116,10 @@ type GroupCard =
                 // Cards size to their content (the column aligns them toward their rail),
                 // so the gap between the two card columns grows for group connectors. The
                 // edge handles are positioned on the card border and move with its width.
-                "swt:relative swt:flex swt:w-fit swt:max-w-full swt:flex-col swt:gap-1.5 swt:rounded-box swt:border swt:bg-base-100 swt:p-2.5 swt:shadow-sm"
+                "swt:relative swt:flex swt:w-fit swt:max-w-full swt:flex-col swt:rounded-box swt:border swt:bg-base-100 swt:shadow-sm"
+                match density with
+                | Density.EditorDensity.Compact -> "swt:gap-1 swt:p-1.5"
+                | _ -> "swt:gap-1.5 swt:p-2.5"
                 if selected then
                     "swt:border-primary swt:bg-primary/5"
                 else
@@ -174,7 +178,12 @@ type GroupCard =
                 ]
                 if expanded then
                     Html.ul [
-                        prop.className "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2 swt:text-sm"
+                        prop.className [
+                            "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2"
+                            match density with
+                            | Density.EditorDensity.Compact -> "swt:text-xs"
+                            | _ -> "swt:text-sm"
+                        ]
                         prop.children [
                             for member' in group.Members do
                                 let memberValues = GroupCardData.memberValues member' model
