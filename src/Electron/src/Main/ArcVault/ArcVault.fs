@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
+open Main.ARCtrlExtensions
 open Main.Bindings
 open Main.ArcMerge
 open Main.ArcVaultHelper
@@ -97,7 +98,7 @@ module ArcVaultExtensions =
         member private this.ApplyWatcherArcMerge(events: FileEvent list) = promise {
             match this.path, this.arc with
             | Some arcPath, Some arcLocal ->
-                match! ARC.tryLoadAsync arcPath with
+                match! ARC.LoadAsyncSwate arcPath with
                 | Error loadError ->
                     swatelogfn
                         this.window.id
@@ -267,7 +268,7 @@ module ArcVaultExtensions =
                         match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
                         | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
                         | Ok _ ->
-                            match! ARC.tryLoadAsync arcPath with
+                            match! ARC.LoadAsyncSwate arcPath with
                             | Ok persistedArc ->
                                 baselineArcStaticHashes persistedArc
                                 syncAddedArcFileFromPersisted persistedArc arcLocal arcFile
@@ -317,7 +318,7 @@ module ArcVaultExtensions =
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
-                match! tryLoadArcWithZeroByteRepair this.window.id this.path.Value with
+                match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
                 | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
                 | Ok arc ->
                     this.SetArc(arc)
@@ -398,7 +399,12 @@ module ArcVaultExtensions =
                 this.isBusyWriting <- true
 
                 try
-                    do! arc.WriteAsync(normalizedPath)
+                    match! arc.TryWriteAsyncSwate(normalizedPath) with
+                    | Ok _ -> ()
+                    | Error errors ->
+                        failwithf
+                            "Could not write ARC, failed with the following errors %s"
+                            (PathHelpers.formatContractErrors errors)
                 finally
                     this.isBusyWriting <- false
 
