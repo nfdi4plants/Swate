@@ -159,8 +159,14 @@ module private ConnectorPaths =
         || isManuallyResolving pairId side groupId uiState
         || isConnectedToExpanded connections side groupId uiState
 
-    let groupConnections container connections =
+    let groupConnections container pairId connections uiState =
         connections
+        // Expanded endpoints swap the aggregate group connector for the
+        // member-level connectors, so the group line disappears instead of
+        // doubling up underneath them.
+        |> List.filter (fun connection ->
+            not (isGroupExpanded pairId connections ProvenanceSide.Input connection.SourceGroupId uiState)
+            && not (isGroupExpanded pairId connections ProvenanceSide.Output connection.TargetGroupId uiState))
         |> List.choose (fun connection ->
             ConnectorMeasure.pathBetweenHandles
                 container
@@ -315,7 +321,7 @@ module private ConnectorPaths =
     let all container pairId model inputGroups outputGroups connections uiState =
         [
             yield! railConnections container pairId model inputGroups outputGroups uiState
-            yield! groupConnections container connections
+            yield! groupConnections container pairId connections uiState
             yield! memberConnections container pairId model connections uiState
             match liveConnection uiState with
             | Some path -> path
