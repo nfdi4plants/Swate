@@ -24,22 +24,26 @@ module private GroupCardData =
         |> List.distinct
         |> List.choose (fun id -> model.PropertyValues.TryFind id)
 
-    let title (group: DisplayGroup) =
-        match group.GroupingValues with
-        | [] -> group.Members.Head.Name
-        | values ->
-            values
-            |> List.groupBy (fun value -> value.Key)
-            |> List.sortBy (fun (key, _) -> $"{key.Header.Kind.Id}:{key.Header.Category.Name}")
-            |> List.map (fun (key, groupedValues) ->
-                let valuesText =
-                    groupedValues
-                    |> List.sortBy (fun value -> Formatting.formatValue value.Value value.Unit)
-                    |> List.map (fun value -> Formatting.formatValue value.Value value.Unit)
-                    |> String.concat " | "
+    /// One (category, joined values) pair per grouping category, rendered as chips.
+    let chips (group: DisplayGroup) =
+        group.GroupingValues
+        |> List.groupBy (fun value -> value.Key)
+        |> List.sortBy (fun (key, _) -> $"{key.Header.Kind.Id}:{key.Header.Category.Name}")
+        |> List.map (fun (key, groupedValues) ->
+            let valuesText =
+                groupedValues
+                |> List.sortBy (fun value -> Formatting.formatValue value.Value value.Unit)
+                |> List.map (fun value -> Formatting.formatValue value.Value value.Unit)
+                |> String.concat " | "
 
-                $"{key.Header.Category.Name}: {valuesText}"
-            )
+            key.Header.Category.Name, valuesText)
+
+    let title (group: DisplayGroup) =
+        match chips group with
+        | [] -> group.Members.Head.Name
+        | chips ->
+            chips
+            |> List.map (fun (category, valuesText) -> $"{category}: {valuesText}")
             |> String.concat ", "
 
 [<Erase; Mangle(false)>]
@@ -140,11 +144,32 @@ type GroupCard =
                 Html.div [
                     prop.className "swt:flex swt:items-start swt:gap-2"
                     prop.children [
-                        Html.h3 [
-                            prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-sm swt:font-semibold"
-                            prop.title title
-                            prop.text title
-                        ]
+                        match GroupCardData.chips group with
+                        | [] ->
+                            Html.h3 [
+                                prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-sm swt:font-semibold"
+                                prop.title title
+                                prop.text title
+                            ]
+                        | chips ->
+                            // Chips show only the grouping values; the category lives in
+                            // the tooltip and is already visible on the connected rail
+                            // property, so the card stays narrow without losing it.
+                            Html.div [
+                                prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-wrap swt:items-center swt:gap-1"
+                                prop.title title
+                                prop.ariaLabel title
+                                prop.children [
+                                    for category, valuesText in chips do
+                                        Html.span [
+                                            prop.key category
+                                            prop.className
+                                                "swt:badge swt:badge-outline swt:badge-sm swt:max-w-full swt:truncate swt:font-medium"
+                                            prop.title $"{category}: {valuesText}"
+                                            prop.text valuesText
+                                        ]
+                                ]
+                            ]
                         // Stacked layouts hide the connector overlay; this badge keeps
                         // the connection information visible on the card itself.
                         match connectionCount with

@@ -118,15 +118,13 @@ export const GroupsByPropertiesAndShowsMembers: Story = {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
-    await waitFor(() => {
-      expect(canvasElement).toHaveTextContent('Species: Arabidopsis');
-      expect(canvasElement).toHaveTextContent('Species: Chlamydomonas');
-    });
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    expect(canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas')).toBeInTheDocument();
 
-    const grouped = canvas
-      .getAllByText('Species: Arabidopsis')
-      .find((element) => element.tagName === 'H3')!
-      .closest('article')!;
+    // The grouping value shows as a chip; the category lives in its tooltip.
+    expect(grouped).toHaveTextContent('Arabidopsis');
+    expect(grouped).not.toHaveTextContent('Species:');
+
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
     await waitFor(() => expect(grouped).toHaveTextContent('Input A'));
   },
@@ -141,13 +139,7 @@ export const ExpandedGroupsShowMemberHoverValues: Story = {
       .not.toBeInTheDocument();
 
     await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
-    const grouped = await waitFor(() => {
-      const heading = canvas
-        .getAllByText('Species: Arabidopsis')
-        .find((element) => element.tagName === 'H3');
-      expect(heading).toBeDefined();
-      return heading!.closest('article')!;
-    });
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
 
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
     const member = within(grouped).getByTestId('provenance-group-member-Input-input-a');
@@ -356,13 +348,7 @@ export const RegroupedValuesAreReadOnlyOnCards: Story = {
 
     await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
     const grouped = await waitFor(
-      () => {
-        const heading = canvas
-          .getAllByText('Species: Chlamydomonas')
-          .find((element) => element.tagName === 'H3');
-        expect(heading).toBeDefined();
-        return heading!.closest('article')!;
-      },
+      () => canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas'),
       { timeout: 3000 },
     );
 
@@ -389,13 +375,7 @@ export const RemeasuresConnectionsAfterGroupExpansion: Story = {
     const canvas = within(canvasElement);
     fireEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
 
-    const grouped = await waitFor(() => {
-      const heading = canvas
-        .getAllByText('Species: Arabidopsis')
-        .find((element) => element.tagName === 'H3');
-      expect(heading).toBeDefined();
-      return heading!.closest('article')!;
-    });
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
 
     const before = await waitFor(() => {
       const paths = canvas.getAllByTestId('provenance-connection').map((connector) => connector.getAttribute('d'));
@@ -454,13 +434,7 @@ export const ExpandedGroupsRenderMemberLevelConnections: Story = {
     const canvas = within(canvasElement);
     fireEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
 
-    const grouped = await waitFor(() => {
-      const heading = canvas
-        .getAllByText('Species: Arabidopsis')
-        .find((element) => element.tagName === 'H3');
-      expect(heading).toBeDefined();
-      return heading!.closest('article')!;
-    });
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
 
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
 
@@ -644,10 +618,7 @@ export const WarnsBeforeOverwritingSingleValueFromRail: Story = {
     const canvas = within(canvasElement);
     const source = await railValue(canvas, 'Input', 'Species', 'Arabidopsis');
     await groupByProperty(canvas, 'Input', 'Species');
-    const target = canvas
-      .getAllByText('Species: Chlamydomonas')
-      .find((element) => element.tagName === 'H3')!
-      .closest('article')!;
+    const target = canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas');
 
     await dragByPointer(source, target);
 
@@ -667,10 +638,7 @@ export const RejectsOverwriteWhenTargetHasMultipleValues: Story = {
     const canvas = within(canvasElement);
     const source = await railValue(canvas, 'Output', 'Replicate', '1');
     await groupByProperty(canvas, 'Output', 'Replicate');
-    const target = canvas
-      .getAllByText('Replicate: 1 | 2')
-      .find((element) => element.tagName === 'H3')!
-      .closest('article')!;
+    const target = canvas.getByTestId('provenance-group-Output-output:Replicate=1 | 2');
 
     await dragByPointer(source, target);
 
@@ -786,10 +754,7 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
 
     const source = await addRailValue(canvas, 'Input', 'Analysis', 'Imaging');
     await groupByProperty(canvas, 'Input', 'Analysis');
-    const carried = canvas
-      .getAllByText('Analysis: Mass Spectrometry')
-      .find((element) => element.tagName === 'H3')!
-      .closest('article')!;
+    const carried = canvas.getByTestId('provenance-group-Input-input:Analysis=Mass Spectrometry');
     await dragByPointer(source, carried);
     await userEvent.click(canvas.getByTestId('provenance-confirm-overwrite'));
 
@@ -947,10 +912,12 @@ async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' 
   await userEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
   await waitFor(
     () => {
-      const groupedHeading = canvas
-        .getAllByText((content, element) => element?.tagName === 'H3' && content.startsWith(`${propertyName}:`))
-        .at(0);
-      expect(groupedHeading).toBeDefined();
+      // Grouped cards carry their grouping in the card test id, e.g.
+      // provenance-group-Input-input:Species=Arabidopsis.
+      const grouped = canvas.getAllByTestId(
+        new RegExp(`^provenance-group-${side}-${side.toLowerCase()}:.*${propertyName}=`),
+      );
+      expect(grouped.length).toBeGreaterThan(0);
     },
     { timeout: 3000 },
   );
@@ -1110,9 +1077,7 @@ export const MismatchedGroupConnectionPromptsForResolution: Story = {
     const canvas = within(canvasElement);
     fireEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
 
-    const inputGroup = await waitFor(
-      () => canvas.getAllByText('Species: Arabidopsis').find((element) => element.tagName === 'H3')!.closest('article')!,
-    );
+    const inputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
     const outputGroup = canvas.getByText('Output E').closest('article')!;
 
     await dragByPointer(
