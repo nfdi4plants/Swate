@@ -17,6 +17,8 @@ type private MeasuredConnector =
         ClassName: string
         StrokeWidth: float
         StrokeDasharray: string option
+        /// Filled triangle path marking the input-to-output direction at the target end.
+        ArrowHead: string option
         InteractiveConnection: DisplayConnection option
         AriaLabel: string option
     }
@@ -53,6 +55,25 @@ module private ConnectorMeasure =
         match tryHandle container source, tryHandle container target with
         | Some sourceNode, Some targetNode ->
             pathBetweenPoints (center container sourceNode) (center container targetNode)
+        | _ -> None
+
+    /// The connector curves always end horizontally (their control points share the
+    /// endpoint Y), so the arrow head is a horizontal triangle pulled back far enough
+    /// to clear the connection handle dot it points at.
+    let private arrowHeadAt start finish =
+        let direction = if finish.X - start.X >= 0. then 1. else -1.
+        let tipX = finish.X - direction * 7.
+        let baseX = tipX - direction * 6.
+        $"M {tipX} {finish.Y} L {baseX} {finish.Y - 3.5} L {baseX} {finish.Y + 3.5} Z"
+
+    let directedPathBetweenHandles container source target =
+        match tryHandle container source, tryHandle container target with
+        | Some sourceNode, Some targetNode ->
+            let start = center container sourceNode
+            let finish = center container targetNode
+
+            pathBetweenPoints start finish
+            |> Option.map (fun path -> path, arrowHeadAt start finish)
         | _ -> None
 
     /// Rail connectors shorter than this are skipped entirely so dense layouts do not
@@ -132,6 +153,7 @@ module private ConnectorPaths =
             ClassName = className
             StrokeWidth = strokeWidth
             StrokeDasharray = strokeDasharray
+            ArrowHead = None
             InteractiveConnection = interactiveConnection
             AriaLabel = ariaLabel
         }
@@ -162,20 +184,23 @@ module private ConnectorPaths =
     let groupConnections container connections =
         connections
         |> List.choose (fun connection ->
-            ConnectorMeasure.pathBetweenHandles
+            ConnectorMeasure.directedPathBetweenHandles
                 container
                 (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
                 (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
-            |> Option.map (
-                measured
-                    $"connection:{connection.Id}"
-                    "provenance-connection"
-                    "swt:text-primary"
-                    2.25
-                    None
-                    (Some connection)
-                    (Some $"Select connection {connection.Id}")
-            ))
+            |> Option.map (fun (path, arrowHead) ->
+                {
+                    measured
+                        $"connection:{connection.Id}"
+                        "provenance-connection"
+                        "swt:text-primary"
+                        2.25
+                        None
+                        (Some connection)
+                        (Some $"Select connection {connection.Id}")
+                        path with
+                        ArrowHead = Some arrowHead
+                }))
 
     let memberConnections container pairId (model: ProvenanceModel) connections uiState =
         connections
@@ -211,17 +236,20 @@ module private ConnectorPaths =
                             else
                                 ConnectorHandles.group ProvenanceSide.Output displayConnection.TargetGroupId
 
-                        ConnectorMeasure.pathBetweenHandles container source target
-                        |> Option.map (
-                            measured
-                                $"member:{displayConnection.Id}:{connectionId}"
-                                "provenance-member-connection"
-                                "swt:text-primary/70 swt:pointer-events-none"
-                                2.0
-                                None
-                                None
-                                None
-                        )))
+                        ConnectorMeasure.directedPathBetweenHandles container source target
+                        |> Option.map (fun (path, arrowHead) ->
+                            {
+                                measured
+                                    $"member:{displayConnection.Id}:{connectionId}"
+                                    "provenance-member-connection"
+                                    "swt:text-primary/70 swt:pointer-events-none"
+                                    2.0
+                                    None
+                                    None
+                                    None
+                                    path with
+                                    ArrowHead = Some arrowHead
+                            })))
         )
 
     let private expandedHeaders pairId side uiState =
@@ -474,6 +502,15 @@ type ConnectorOverlay =
                                 if measured.InteractiveConnection.IsNone then
                                     yield! debugAttributes
                             ]
+                            match measured.ArrowHead with
+                            | Some arrowHead ->
+                                Svg.path [
+                                    svg.d arrowHead
+                                    svg.fill "currentColor"
+                                    svg.custom ("fillOpacity", strokeOpacity)
+                                    svg.className measured.ClassName
+                                ]
+                            | None -> ()
                             // A wide transparent stroke is the actual click/keyboard target,
                             // so selecting a thin curve no longer needs pixel accuracy.
                             match measured.InteractiveConnection with
