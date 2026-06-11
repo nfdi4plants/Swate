@@ -453,3 +453,21 @@ module Session =
         |> mapEditError
         |> Result.bind (fun (model, patches) ->
             updatePairModel pair.Id model session |> Result.map (fun next -> next, patches))
+
+    let removeConnection connectionId session : SessionResult =
+        let pair = activePair session
+        Edit.removeConnection connectionId pair.Model
+        |> mapEditError
+        |> Result.bind (fun (model, patches) ->
+            updatePairModel pair.Id model session |> Result.map (fun next -> next, patches))
+
+    let removeConnections connectionIds session : SessionResult =
+        connectionIds
+        |> List.distinct
+        |> List.fold
+            (fun result connectionId ->
+                result
+                |> Result.bind (fun (current, patches) ->
+                    removeConnection connectionId current
+                    |> Result.map (fun (next, added) -> next, patches @ added)))
+            (Ok(session, []))

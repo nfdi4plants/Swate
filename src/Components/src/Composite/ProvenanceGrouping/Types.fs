@@ -177,7 +177,8 @@ module PatchPreview =
                 $"AddLoadedSet:{header.Kind.Id}:{ProvenanceKind.displayName header.Kind}"
             | ProvenanceTablePatch.AddLoadedPropertyValue(_, _, _, value, unit') ->
                 $"AddLoadedPropertyValue:{valueKind value}:{unitName unit'}{valueMetadata value}"
-            | ProvenanceTablePatch.AddLoadedConnection _ -> "AddLoadedConnection")
+            | ProvenanceTablePatch.AddLoadedConnection _ -> "AddLoadedConnection"
+            | ProvenanceTablePatch.RemoveLoadedConnection _ -> "RemoveLoadedConnection")
         |> ResizeArray
 
 [<Mangle(false)>]

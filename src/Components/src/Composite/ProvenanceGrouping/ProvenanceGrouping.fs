@@ -509,7 +509,7 @@ module private EditorPanels =
             ]
         ]
 
-    let connectionDetails debug (connections: DisplayConnection list) detail =
+    let connectionDetails debug (connections: DisplayConnection list) detail (onRemove: DisplayConnection -> unit) =
         match detail with
         | Some(ProvenanceDetail.Connection connectionId) ->
             let resolved = connections |> List.tryFind (fun c -> c.Id = connectionId)
@@ -519,9 +519,27 @@ module private EditorPanels =
                     prop.className "swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
                     if debug then prop.testId "provenance-connection-details"
                     prop.children [
-                        Html.h3 [
-                            prop.className "swt:font-semibold swt:text-primary"
-                            prop.text $"Connection: {connectionId}"
+                        Html.div [
+                            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                            prop.children [
+                                Html.h3 [
+                                    prop.className "swt:grow swt:font-semibold swt:text-primary"
+                                    prop.text $"Connection: {connectionId}"
+                                ]
+                                Html.button [
+                                    prop.type'.button
+                                    prop.className "swt:btn swt:btn-outline swt:btn-error swt:btn-sm"
+                                    prop.ariaLabel "Remove connection"
+                                    if debug then prop.testId "provenance-remove-connection"
+                                    prop.onClick (fun _ -> onRemove conn)
+                                    prop.children [
+                                        Html.i [
+                                            prop.className "swt:iconify swt:fluent--delete-20-regular swt:size-4"
+                                        ]
+                                        Html.span "Remove"
+                                    ]
+                                ]
+                            ]
                         ]
                         Html.p [
                             prop.className "swt:text-sm"
@@ -737,6 +755,22 @@ type ProvenanceGrouping =
         let connectSetPairs =
             EditorActions.connectSetPairs session publish
 
+        let removeDisplayConnection (connection: DisplayConnection) =
+            match Session.removeConnections connection.ConnectionIds session with
+            | Ok(next, patches) ->
+                let nextUiState = State.Layers.ensure next uiState
+
+                setUiState {
+                    nextUiState with
+                        Error = None
+                        PendingOverwrite = None
+                        PendingMemberResolution = None
+                        Detail = None
+                }
+
+                onChange { Session = next; Patches = patches }
+            | Error error -> setUiState { uiState with Error = Some(string error) }
+
         let resolveAllToAll (pending: PendingMemberResolution) =
             match lookups.FindGroup ProvenanceSide.Input pending.InputGroupId, lookups.FindGroup ProvenanceSide.Output pending.OutputGroupId with
             | Some inputGroup, Some outputGroup ->
@@ -827,6 +861,7 @@ type ProvenanceGrouping =
                                 connections,
                                 uiState,
                                 (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
+                                onRemove = removeDisplayConnection,
                                 debug = debug)
                             Html.div [
                                 prop.className "swt:@container/provenancePanel swt:min-w-0 swt:overflow-hidden"
@@ -897,7 +932,7 @@ type ProvenanceGrouping =
                             ]
                         ]
                     ]
-                    EditorPanels.connectionDetails debug connections uiState.Detail
+                    EditorPanels.connectionDetails debug connections uiState.Detail removeDisplayConnection
                 ]
             ]
 

@@ -43,6 +43,11 @@ type ProvenanceTablePatch =
         processName: ProvenanceProcessName option *
         inputSetId: ProvenanceSetId *
         outputSetId: ProvenanceSetId
+    | RemoveLoadedConnection of
+        tableName: ProvenanceTableName *
+        processName: ProvenanceProcessName option *
+        inputSetId: ProvenanceSetId *
+        outputSetId: ProvenanceSetId
 
 type CreateLoadedPropertyValueCommand =
     {
@@ -384,6 +389,25 @@ let copyPropertyValueToLoadedTarget propertyValueId target (model: ProvenanceMod
                 Unit = propertyValue.Unit
             }
             model
+
+let removeConnection (connectionId: ProvenanceConnectionId) (model: ProvenanceModel) : EditResult =
+    match chooseConnection model connectionId with
+    | Error error -> Error error
+    | Ok connection ->
+        let nextModel =
+            { model with Connections = model.Connections |> Map.remove connectionId }
+            |> ProvenanceModel.refreshInheritedOutputProperties
+
+        Ok(
+            nextModel,
+            [
+                ProvenanceTablePatch.RemoveLoadedConnection(
+                    connection.TableName,
+                    connection.ProcessName,
+                    connection.InputSetId,
+                    connection.OutputSetId
+                )
+            ])
 
 let connectSets inputSetId outputSetId processName (model: ProvenanceModel) : EditResult =
     match chooseInputSet model inputSetId, chooseOutputSet model outputSetId with

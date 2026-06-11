@@ -344,6 +344,7 @@ type ConnectorOverlay =
             connections: DisplayConnection list,
             uiState: UiState,
             onSelect: DisplayConnection -> unit,
+            ?onRemove: DisplayConnection -> unit,
             ?debug: bool
         ) =
         let paths, setPaths = React.useState ([]: MeasuredConnector list)
@@ -395,6 +396,13 @@ type ConnectorOverlay =
                         | Some connection, "Spacebar" ->
                             event.preventDefault ()
                             onSelect connection
+                        | Some connection, "Delete"
+                        | Some connection, "Backspace" ->
+                            match onRemove with
+                            | Some remove ->
+                                event.preventDefault ()
+                                remove connection
+                            | None -> ()
                         | _ -> ()
 
                     Svg.path [

@@ -599,6 +599,45 @@ export const SelectsConnectionWithKeyboard: Story = {
   },
 };
 
+export const RemovesConnectionFromDetailsPanel: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const initialCount = (await waitFor(() => {
+      const connectors = canvas.getAllByTestId('provenance-connection');
+      expect(connectors.length).toBeGreaterThan(0);
+      return connectors;
+    })).length;
+
+    await userEvent.click(canvas.getAllByTestId('provenance-connection')[0]);
+    const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
+    await userEvent.click(within(details).getByTestId('provenance-remove-connection'));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('RemoveLoadedConnection');
+      expect(canvas.queryAllByTestId('provenance-connection').length).toBeLessThan(initialCount);
+    });
+    expect(canvas.queryByTestId('provenance-connection-details')).not.toBeInTheDocument();
+  },
+};
+
+export const RemovesConnectionWithDeleteKey: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
+    const initialCount = canvas.getAllByTestId('provenance-connection').length;
+
+    connector.focus();
+    await userEvent.keyboard('{Delete}');
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('RemoveLoadedConnection');
+      expect(canvas.queryAllByTestId('provenance-connection').length).toBeLessThan(initialCount);
+    });
+  },
+};
+
 export const WarnsBeforeOverwritingSingleValueFromRail: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

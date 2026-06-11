@@ -785,6 +785,36 @@ let editTests =
             | other ->
                 failwithf "Expected one AddLoadedConnection patch, got %A" other
 
+        testCase "removeConnection removes the loaded connection and its inherited values" <| fun _ ->
+            let model = validModel ()
+
+            Expect.isTrue
+                (model.OutputSets.["output-b"].InheritedPropertyValueIds.ContainsKey "connection-c")
+                "Sanity: output-b should inherit values through connection-c before removal."
+
+            match removeConnection "connection-c" model with
+            | Ok(nextModel, [ ProvenanceTablePatch.RemoveLoadedConnection(tableName, processName, inputSetId, outputSetId) ]) ->
+                Expect.equal tableName "assay-table" "Patch should target the loaded table."
+                Expect.equal processName (Some "assay-process") "Patch should keep the process name for writeback."
+                Expect.equal inputSetId "input-b" "Patch should keep the input set."
+                Expect.equal outputSetId "output-b" "Patch should keep the output set."
+                Expect.isFalse (nextModel.Connections.ContainsKey "connection-c") "Model should no longer contain the removed connection."
+                Expect.isFalse
+                    (nextModel.OutputSets.["output-b"].InheritedPropertyValueIds.ContainsKey "connection-c")
+                    "Inherited values from the removed connection should be dropped."
+                Expect.isTrue
+                    (nextModel.OutputSets.["output-b"].InheritedPropertyValueIds.ContainsKey "connection-b")
+                    "Other connections keep their inherited values."
+            | other ->
+                failwithf "Expected one RemoveLoadedConnection patch, got %A" other
+
+        testCase "removeConnection rejects unknown connections" <| fun _ ->
+            match removeConnection "missing-connection" (validModel ()) with
+            | Error(EditError.ConnectionNotFound connectionId) ->
+                Expect.equal connectionId "missing-connection" "Error should carry the missing connection id."
+            | other ->
+                failwithf "Expected ConnectionNotFound, got %A" other
+
         testCase "updatePropertyValue finds anchor from loaded set membership when Source is None" <| fun _ ->
             let model = sourceFromLoadedMembershipModel ()
 
@@ -1076,6 +1106,26 @@ let sessionTests =
                 Expect.equal next.Pairs.["pair-2"].Model.Connections.Count 1 "Later transition gets its connection."
             | other ->
                 failwithf "Expected a later connection patch, got %A" other
+
+        testCase "removeConnections removes loaded connections from the active pair" <| fun _ ->
+            let session = sampleSession ()
+            let initialCount = (Session.activePair session).Model.Connections.Count
+
+            match Session.removeConnections [ "connection-a"; "connection-b"; "connection-a" ] session with
+            | Ok(next, patches) ->
+                Expect.equal patches.Length 2 "Duplicate ids should collapse to one patch per removed connection."
+
+                Expect.all
+                    patches
+                    (function ProvenanceTablePatch.RemoveLoadedConnection _ -> true | _ -> false)
+                    "All emitted patches should remove loaded connections."
+
+                Expect.equal
+                    (Session.activePair next).Model.Connections.Count
+                    (initialCount - 2)
+                    "Both connections should be removed from the active pair."
+            | Error error ->
+                failwithf "Unexpected removeConnections error: %A" error
 
         testCase "init and addLayer work for an output-only model" <| fun _ ->
             let initial = Session.init (outputOnlyModel ())
