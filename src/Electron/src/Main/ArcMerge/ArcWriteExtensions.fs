@@ -23,69 +23,88 @@ module ArcWriteExtensions =
 
     type ARC with
 
-        /// This function is a hotfix for ARCtrl bug #XXXX 
+        /// This function is a hotfix for ARCtrl bug #XXXX
         /// copy paste from ARCtrl, except for filesystem iteration
-        member this.GetWriteContractsSwate(?skipUpdateFS : bool) =
+        member this.GetWriteContractsSwate(?skipUpdateFS: bool) =
             if not (defaultArg skipUpdateFS false) then
                 this.UpdateFileSystem()
             //let datamapFile = defaultArg datamapFile false
             /// Map containing the fileName and the types for DTOTypes and objects.
-            let filemap = System.Collections.Generic.Dictionary<string, DTOType*DTO>()
-        
+            let filemap = System.Collections.Generic.Dictionary<string, DTOType * DTO>()
+
             let investigationConverter = ArcInvestigation.toFsWorkbook
-            filemap.Add (ARCtrl.ArcPathHelper.InvestigationFileName, (DTOType.ISA_Investigation, investigationConverter this |> box |> DTO.Spreadsheet))
+
+            filemap.Add(
+                ARCtrl.ArcPathHelper.InvestigationFileName,
+                (DTOType.ISA_Investigation, investigationConverter this |> box |> DTO.Spreadsheet)
+            )
+
             this.StaticHash <- this.GetLightHashCode()
+
             this.Studies
             |> Seq.iter (fun s ->
                 s.StaticHash <- s.GetLightHashCode()
-                filemap.Add (
+
+                filemap.Add(
                     Identifier.Study.fileNameFromIdentifier s.Identifier,
                     (DTOType.ISA_Study, ArcStudy.toFsWorkbook s |> box |> DTO.Spreadsheet)
                 )
-                if s.DataMap.IsSome (*&& datamapFile*) then 
+
+                if s.DataMap.IsSome (*&& datamapFile*) then
                     let dm = s.DataMap.Value
                     dm.StaticHash <- dm.GetHashCode()
-                    filemap.Add (
+
+                    filemap.Add(
                         Identifier.Study.datamapFileNameFromIdentifier s.Identifier,
                         (DTOType.ISA_Datamap, Spreadsheet.DataMap.toFsWorkbook dm |> box |> DTO.Spreadsheet)
                     )
-                
+
             )
+
             this.Assays
             |> Seq.iter (fun a ->
                 a.StaticHash <- a.GetLightHashCode()
-                filemap.Add (
+
+                filemap.Add(
                     Identifier.Assay.fileNameFromIdentifier a.Identifier,
-                    (DTOType.ISA_Assay, ArcAssay.toFsWorkbook a |> box |> DTO.Spreadsheet))     
-                if a.DataMap.IsSome (*&& datamapFile*) then 
+                    (DTOType.ISA_Assay, ArcAssay.toFsWorkbook a |> box |> DTO.Spreadsheet)
+                )
+
+                if a.DataMap.IsSome (*&& datamapFile*) then
                     let dm = a.DataMap.Value
                     dm.StaticHash <- dm.GetHashCode()
-                    filemap.Add (
+
+                    filemap.Add(
                         Identifier.Assay.datamapFileNameFromIdentifier a.Identifier,
                         (DTOType.ISA_Datamap, Spreadsheet.DataMap.toFsWorkbook dm |> box |> DTO.Spreadsheet)
                     )
             )
+
             this.Workflows
             |> Seq.iter (fun w ->
                 w.StaticHash <- w.GetLightHashCode()
-                filemap.Add (
+
+                filemap.Add(
                     Identifier.Workflow.fileNameFromIdentifier w.Identifier,
                     (DTOType.ISA_Workflow, ArcWorkflow.toFsWorkbook w |> box |> DTO.Spreadsheet)
                 )
                 //if w.CWLDescription.IsSome then
                 //    failwith "Not implemented yet: CWL description in ARC.GetWriteContracts"
-                if w.DataMap.IsSome (*&& datamapFile*) then 
+                if w.DataMap.IsSome (*&& datamapFile*) then
                     let dm = w.DataMap.Value
                     dm.StaticHash <- dm.GetHashCode()
-                    filemap.Add (
+
+                    filemap.Add(
                         Identifier.Workflow.datamapFileNameFromIdentifier w.Identifier,
                         (DTOType.ISA_Datamap, Spreadsheet.DataMap.toFsWorkbook dm |> box |> DTO.Spreadsheet)
                     )
             )
+
             this.Runs
             |> Seq.iter (fun r ->
                 r.StaticHash <- r.GetLightHashCode()
-                filemap.Add (
+
+                filemap.Add(
                     Identifier.Run.fileNameFromIdentifier r.Identifier,
                     (DTOType.ISA_Run, ArcRun.toFsWorkbook r |> box |> DTO.Spreadsheet)
                 )
@@ -93,10 +112,11 @@ module ArcWriteExtensions =
                 //    failwith "Not implemented yet: CWL description in ARC.GetWriteContracts"
                 //if r.CWLInput.Count > 0 then
                 //    failwith "Not implemented yet: CWL YAML input in ARC.GetWriteContracts"
-                if r.DataMap.IsSome (*&& datamapFile*) then 
+                if r.DataMap.IsSome (*&& datamapFile*) then
                     let dm = r.DataMap.Value
                     dm.StaticHash <- dm.GetHashCode()
-                    filemap.Add (
+
+                    filemap.Add(
                         Identifier.Run.datamapFileNameFromIdentifier r.Identifier,
                         (DTOType.ISA_Datamap, Spreadsheet.DataMap.toFsWorkbook dm |> box |> DTO.Spreadsheet)
                     )
@@ -107,9 +127,8 @@ module ArcWriteExtensions =
                 match l.Type with
                 | LicenseContentType.Fulltext ->
                     l.StaticHash <- l.GetHashCode()
-                    filemap.Add (l.Path, (DTOType.PlainText, DTO.Text l.Content))
-            | None ->
-                ()
+                    filemap.Add(l.Path, (DTOType.PlainText, DTO.Text l.Content))
+            | None -> ()
 
             [|
                 yield! collectionGitKeepContracts
