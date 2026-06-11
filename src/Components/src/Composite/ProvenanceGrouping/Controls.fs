@@ -274,6 +274,7 @@ type Controls =
             )
 
         let density = React.useContext Density.context
+        let controlsVisible, setControlsVisible = React.useState false
 
         let sideScope =
             match side with
@@ -408,11 +409,15 @@ type Controls =
                     ]
                 ]
 
-        // The secondary controls recede until their row is hovered or holds focus.
+        // The secondary controls leave the layout entirely until their row is
+        // hovered or holds focus, so idle rows are only as wide as their label.
         let rowControls =
             Html.span [
-                prop.className
-                    "swt:flex swt:items-center swt:gap-0.5 swt:opacity-60 swt:transition-opacity group-hover/railRow:swt:opacity-100 group-focus-within/railRow:swt:opacity-100"
+                prop.className [
+                    "swt:flex swt:items-center swt:gap-0.5"
+                    if not controlsVisible then
+                        "swt:hidden"
+                ]
                 prop.children [
                     match side with
                     | ProvenanceSide.Input ->
@@ -434,13 +439,25 @@ type Controls =
             prop.children [
                 Html.div [
                     prop.className [
-                        "swt:group/railRow swt:flex swt:items-center swt:gap-1"
+                        "swt:flex swt:items-center swt:gap-1"
                         // The whole row hugs the rail-facing side, so the group-facing
                         // button edge (with its connector anchor) moves with the button's
                         // content size and frees the rest of the rail for connectors.
                         if side = ProvenanceSide.Output then
                             "swt:justify-end"
                     ]
+                    prop.onMouseEnter (fun _ -> setControlsVisible true)
+                    prop.onMouseLeave (fun _ -> setControlsVisible false)
+                    // React maps onFocus/onBlur to focusin/focusout, so these bubble up
+                    // from the row's buttons; blur only hides the controls when focus
+                    // actually leaves the row.
+                    prop.onFocus (fun _ -> setControlsVisible true)
+                    prop.onBlur (fun event ->
+                        let row: Browser.Types.HTMLElement = unbox event.currentTarget
+                        let related: Browser.Types.HTMLElement = unbox event.relatedTarget
+
+                        if isNull (box related) || not (row.contains related) then
+                            setControlsVisible false)
                     prop.children [
                         // The controls sit on the rail-facing side; the property text
                         // button faces the group cards so connectors attach directly to it.

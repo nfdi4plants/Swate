@@ -162,6 +162,7 @@ export const GroupsBothSidesFromOutputProperty: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Replicate'));
     await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
 
     await waitFor(() => {
@@ -330,6 +331,7 @@ export const ClicksSwapHandleToSwitchGroupingSide: Story = {
     const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
+    await userEvent.hover(canvas.getByTestId('provenance-property-Input-Species'));
     await userEvent.click(canvas.getByTestId('provenance-property-drag-Input-Species'));
 
     await waitFor(() => {
@@ -896,6 +898,8 @@ async function startDragByPointer(source: Element) {
 async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
   const panelId = `provenance-property-values-${side}-${propertyName}`;
   const triggerId = `provenance-property-expand-${side}-${propertyName}`;
+  // The row controls only enter the layout while the row is hovered or focused.
+  await userEvent.hover(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
   for (let attempt = 0; attempt < 3 && !canvas.queryByTestId(panelId); attempt += 1) {
     await userEvent.click(canvas.getByTestId(triggerId));
     await waitFor(() => expect(canvas.getByTestId(panelId)).toBeInTheDocument(), { timeout: 1000 }).catch(() => {
