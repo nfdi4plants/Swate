@@ -76,6 +76,22 @@ module private ConnectorMeasure =
             |> Option.map (fun path -> path, arrowHeadAt start finish)
         | _ -> None
 
+    let tryHandleCenter container handle =
+        tryHandle container handle |> Option.map (center container)
+
+    let directedPathBetweenPoints start finish =
+        pathBetweenPoints start finish
+        |> Option.map (fun path -> path, arrowHeadAt start finish)
+
+    /// Half height of a group card, used to keep fanned attachment points on its edge.
+    let tryGroupHalfHeight (container: HTMLElement) nodeId =
+        let node: HTMLElement = !!container?querySelector($"[data-provenance-group-node='{nodeId}']")
+
+        if isNull node then
+            None
+        else
+            Some(node.getBoundingClientRect().height / 2.)
+
     /// Rail connectors shorter than this are skipped entirely so dense layouts do not
     /// fill the rail gutters with overlapping stubs.
     let minimumConnectorDistance = 24.
@@ -181,13 +197,73 @@ module private ConnectorPaths =
         || isManuallyResolving pairId side groupId uiState
         || isConnectedToExpanded connections side groupId uiState
 
+    let private fanSpacing = 14.
+
+    /// Vertical attachment offsets per connection for one card edge: connections
+    /// sharing a group fan out along the edge, ordered by their opposite endpoint,
+    /// instead of all knotting at the edge center.
+    let private fanOffsets keySelector sortSelector endpoints =
+        endpoints
+        |> List.groupBy keySelector
+        |> List.collect (fun (_, grouped) ->
+            let count = float grouped.Length
+
+            grouped
+            |> List.sortBy sortSelector
+            |> List.mapi (fun index (connection: DisplayConnection, _, _) ->
+                connection.Id, (float index - (count - 1.) / 2.) * fanSpacing))
+        |> Map.ofList
+
     let groupConnections container connections =
-        connections
-        |> List.choose (fun connection ->
-            ConnectorMeasure.directedPathBetweenHandles
-                container
-                (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
-                (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
+        let endpoints =
+            connections
+            |> List.choose (fun connection ->
+                let start =
+                    ConnectorMeasure.tryHandleCenter
+                        container
+                        (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
+
+                let finish =
+                    ConnectorMeasure.tryHandleCenter
+                        container
+                        (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
+
+                match start, finish with
+                | Some start, Some finish -> Some(connection, start, finish)
+                | _ -> None)
+
+        let sourceOffsets =
+            endpoints
+            |> fanOffsets
+                (fun (connection, _, _) -> connection.SourceGroupId)
+                (fun (connection, _, finish) -> finish.Y, connection.Id)
+
+        let targetOffsets =
+            endpoints
+            |> fanOffsets
+                (fun (connection, _, _) -> connection.TargetGroupId)
+                (fun (connection, start, _) -> start.Y, connection.Id)
+
+        let clampedOffset side groupId (offsets: Map<string, float>) connectionId =
+            let limit =
+                ConnectorMeasure.tryGroupHalfHeight container (DragDrop.groupNodeId side groupId)
+                |> Option.map (fun halfHeight -> max 0. (halfHeight - 10.))
+                |> Option.defaultValue 0.
+
+            offsets.TryFind connectionId
+            |> Option.defaultValue 0.
+            |> max -limit
+            |> min limit
+
+        endpoints
+        |> List.choose (fun (connection, start, finish) ->
+            let start =
+                { start with Y = start.Y + clampedOffset ProvenanceSide.Input connection.SourceGroupId sourceOffsets connection.Id }
+
+            let finish =
+                { finish with Y = finish.Y + clampedOffset ProvenanceSide.Output connection.TargetGroupId targetOffsets connection.Id }
+
+            ConnectorMeasure.directedPathBetweenPoints start finish
             |> Option.map (fun (path, arrowHead) ->
                 {
                     measured
