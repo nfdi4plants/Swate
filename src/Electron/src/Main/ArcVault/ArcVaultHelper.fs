@@ -167,6 +167,7 @@ let createWindow () = promise {
 
     let mainWindowOptions =
         BrowserWindowConstructorOptions(
+            title = "Swate",
             icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
@@ -195,8 +196,6 @@ let createWindow () = promise {
             event.preventDefault ()
             Fable.Electron.Main.shell.openExternal url |> Promise.start
     )
-
-    window.title <- "Swate"
 
     return window
 }
