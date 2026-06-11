@@ -236,7 +236,7 @@ type Controls =
 
         Html.button [
             prop.type'.button
-            prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square"
             prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
             if defaultArg debug false then
                 prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
@@ -341,7 +341,7 @@ type Controls =
         let expandButton =
             Html.button [
                 prop.type'.button
-                prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+                prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square"
                 if defaultArg debug false then
                     prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
                 prop.ariaLabel (
@@ -368,7 +368,7 @@ type Controls =
             Html.button [
                 prop.type'.button
                 prop.className [
-                    "swt:btn swt:btn-sm swt:btn-square"
+                    "swt:btn swt:btn-xs swt:btn-square"
                     if bothSelected then
                         "swt:btn-primary"
                     else
@@ -392,7 +392,7 @@ type Controls =
                 Html.button [
                     prop.type'.button
                     prop.disabled true
-                    prop.className "swt:btn swt:btn-sm swt:btn-ghost swt:btn-square"
+                    prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square"
                     prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
                     if defaultArg debug false then
                         prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
@@ -403,6 +403,24 @@ type Controls =
                     ]
                 ]
 
+        // The secondary controls recede until their row is hovered or holds focus.
+        let rowControls =
+            Html.span [
+                prop.className
+                    "swt:flex swt:items-center swt:gap-0.5 swt:opacity-60 swt:transition-opacity group-hover/railRow:swt:opacity-100 group-focus-within/railRow:swt:opacity-100"
+                prop.children [
+                    match side with
+                    | ProvenanceSide.Input ->
+                        swapButton
+                        bothButton
+                        expandButton
+                    | ProvenanceSide.Output ->
+                        expandButton
+                        bothButton
+                        swapButton
+                ]
+            ]
+
         Html.div [
             match key with
             | Some key -> prop.key key
@@ -411,7 +429,7 @@ type Controls =
             prop.children [
                 Html.div [
                     prop.className [
-                        "swt:flex swt:items-center swt:gap-1"
+                        "swt:group/railRow swt:flex swt:items-center swt:gap-1"
                         // The whole row hugs the rail-facing side, so the group-facing
                         // button edge (with its connector anchor) moves with the button's
                         // content size and frees the rest of the rail for connectors.
@@ -423,15 +441,11 @@ type Controls =
                         // button faces the group cards so connectors attach directly to it.
                         match side with
                         | ProvenanceSide.Input ->
-                            swapButton
-                            bothButton
-                            expandButton
+                            rowControls
                             propertyButton
                         | ProvenanceSide.Output ->
                             propertyButton
-                            expandButton
-                            bothButton
-                            swapButton
+                            rowControls
                     ]
                 ]
                 if expanded then
@@ -492,6 +506,34 @@ type Controls =
                 |}
             )
 
+        let showAllHeaders, setShowAllHeaders = React.useState false
+
+        // Long rails keep grouped/expanded properties visible and fold the rest
+        // behind a toggle, so dense models do not bury the active properties.
+        let collapseThreshold = 6
+
+        let isPinned header =
+            active
+            |> List.exists (fun assignment -> assignment.Key.Header = header)
+            || isExpanded header
+
+        let visibleHeaders =
+            if showAllHeaders || headers.Length <= collapseThreshold then
+                headers
+            else
+                let pinned = headers |> List.filter isPinned
+
+                let filler =
+                    headers
+                    |> List.filter (isPinned >> not)
+                    |> List.truncate (max 0 (collapseThreshold - pinned.Length))
+
+                headers
+                |> List.filter (fun header ->
+                    pinned |> List.contains header || filler |> List.contains header)
+
+        let hiddenHeaderCount = headers.Length - visibleHeaders.Length
+
         Html.aside [
             prop.ref droppable.setNodeRef
             prop.className [
@@ -506,7 +548,7 @@ type Controls =
                     prop.className "swt:text-sm swt:font-semibold swt:text-primary"
                     prop.text "Properties"
                 ]
-                for header in headers do
+                for header in visibleHeaders do
                     Controls.PropertyRailItem(
                         side,
                         header,
@@ -522,6 +564,24 @@ type Controls =
                         debug = defaultArg debug false,
                         key = DragDrop.propertyHeaderIdentity header
                     )
+                if hiddenHeaderCount > 0 || showAllHeaders && headers.Length > collapseThreshold then
+                    Html.button [
+                        prop.type'.button
+                        prop.className [
+                            "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
+                            if side = ProvenanceSide.Output then
+                                "swt:self-end"
+                        ]
+                        if defaultArg debug false then
+                            prop.testId $"provenance-property-overflow-{side}"
+                        prop.onClick (fun _ -> setShowAllHeaders (not showAllHeaders))
+                        prop.text (
+                            if showAllHeaders then
+                                "Show fewer"
+                            else
+                                $"+{hiddenHeaderCount} more"
+                        )
+                    ]
                 Html.div [
                     prop.className [
                         "swt:w-fit"
