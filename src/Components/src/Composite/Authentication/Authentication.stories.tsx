@@ -101,7 +101,7 @@ export const SwitchToSupportedDataHubFlow: Story = {
 
     await waitFor(async () => {
       const patLink = await canvas.findByTestId('GeneratePatLink');
-s    });
+    });
 
     const tokenInput = await canvas.findByTestId('PersonalAccessTokenInput');
     await userEvent.type(tokenInput, 'fake-test-token');
