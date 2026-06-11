@@ -135,12 +135,13 @@ type GroupCard =
                 prop.testId $"provenance-group-{side}-{group.Id}"
             prop.children [
                 Controls.ConnectionAnchor(propertyAnchor, propertyAnchorEdge, ?debug = debug)
-                Controls.ConnectionHandle(
-                    groupHandle,
-                    label = "Connect group",
-                    className = groupHandleEdge,
-                    ?debug = debug
-                )
+                if not expanded then
+                    Controls.ConnectionHandle(
+                        groupHandle,
+                        label = "Connect group",
+                        className = groupHandleEdge,
+                        ?debug = debug
+                    )
                 Html.div [
                     prop.className "swt:flex swt:items-start swt:gap-2"
                     prop.children [

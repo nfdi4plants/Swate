@@ -486,7 +486,6 @@ type Controls =
                                     propertyValue,
                                     draggable = true,
                                     showHeader = false,
-                                    side = side,
                                     ?debug = debug,
                                     key = DragDrop.propertyValueIdentity propertyValue
                                 )

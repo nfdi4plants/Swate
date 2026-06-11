@@ -7,6 +7,8 @@ open Browser.Types
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Shared.ProvenanceGrouping.Session
+open Swate.Components.Primitive.ContextMenu
+open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Composite.ProvenanceGrouping.Types
 
 type private MeasuredConnector =
@@ -93,14 +95,6 @@ module private ConnectorHandles =
             Side = side
             Id = setId
             ParentGroupId = Some groupId
-        }
-
-    let value side propertyValueId : ConnectionHandleRef =
-        {
-            Kind = ConnectionHandleKind.PropertyValue
-            Side = side
-            Id = propertyValueId
-            ParentGroupId = None
         }
 
     let propertyHeader side header : ConnectionHandleRef =
@@ -217,6 +211,12 @@ module private ConnectorPaths =
                             else
                                 ConnectorHandles.group ProvenanceSide.Output displayConnection.TargetGroupId
 
+                        let singleConnection =
+                            {
+                                displayConnection with
+                                    ConnectionIds = [ connectionId ]
+                            }
+
                         ConnectorMeasure.pathBetweenHandles container source target
                         |> Option.map (
                             measured
@@ -225,16 +225,10 @@ module private ConnectorPaths =
                                 "swt:text-primary/70 swt:pointer-events-none"
                                 2.0
                                 None
-                                None
-                                None
+                                (Some singleConnection)
+                                (Some $"Select connection {displayConnection.Id}")
                         )))
         )
-
-    let private expandedHeaders pairId side uiState =
-        uiState.ExpandedProperties
-        |> Set.toList
-        |> List.choose (fun (expandedPairId, expandedSide, key) ->
-            if expandedPairId = pairId && expandedSide = side then Some key.Header else None)
 
     let private memberHasMatchingValue (model: ProvenanceModel) predicate (member': DisplayMember) =
         member'.PropertyValueIds
@@ -246,56 +240,29 @@ module private ConnectorPaths =
         |> List.filter (fun (group: DisplayGroup) ->
             group.Members |> List.exists (memberHasMatchingValue model predicate))
 
-    /// Dashed rail connectors derived from model data only: a collapsed property draws one
-    /// line per same-side group containing any value for that property, and an expanded
-    /// property instead draws one line per value chip and group containing that exact value.
-    /// Rail chips deduplicate equal values, so chips match by value, not by occurrence ID.
+    /// Dashed rail connectors derived from model data only: a property draws one
+    /// line per same-side group containing any value for that property. Expanded
+    /// value chips are assignment drag sources only; they never create value-level
+    /// grouping connectors.
     let private railConnectionsForSide container pairId (model: ProvenanceModel) side groups uiState =
-        let expanded = expandedHeaders pairId side uiState
-
         PropertyRails.propertyRailHeadersForSide pairId side model uiState
         |> List.collect (fun header ->
-            if expanded |> List.contains header then
-                PropertyRails.propertyValuesForSideHeader pairId side header model uiState
-                |> List.collect (fun chip ->
-                    let matchesChip (propertyValue: ProvenancePropertyValue) =
-                        propertyValue.Header = chip.Header
-                        && propertyValue.Value = chip.Value
-                        && propertyValue.Unit = chip.Unit
-
-                    groupsMatching model matchesChip groups
-                    |> List.choose (fun group ->
-                        ConnectorMeasure.pathBetweenDistantHandles
-                            container
-                            (ConnectorHandles.value side chip.Id)
-                            (ConnectorHandles.propertyAnchor side group.Id)
-                        |> Option.map (
-                            measured
-                                $"value:{side}:{chip.Id}:{group.Id}"
-                                "provenance-value-connection"
-                                "swt:text-accent swt:pointer-events-none"
-                                1.75
-                                (Some "3 6")
-                                None
-                                None
-                        )))
-            else
-                groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
-                |> List.choose (fun group ->
-                    ConnectorMeasure.pathBetweenDistantHandles
-                        container
-                        (ConnectorHandles.propertyHeader side header)
-                        (ConnectorHandles.propertyAnchor side group.Id)
-                    |> Option.map (
-                        measured
-                            $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{group.Id}"
-                            "provenance-property-connection"
-                            "swt:text-secondary swt:pointer-events-none"
-                            1.75
-                            (Some "4 4")
-                            None
-                            None
-                    )))
+            groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
+            |> List.choose (fun group ->
+                ConnectorMeasure.pathBetweenDistantHandles
+                    container
+                    (ConnectorHandles.propertyHeader side header)
+                    (ConnectorHandles.propertyAnchor side group.Id)
+                |> Option.map (
+                    measured
+                        $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{group.Id}"
+                        "provenance-property-connection"
+                        "swt:text-secondary swt:pointer-events-none"
+                        1.75
+                        (Some "4 4")
+                        None
+                        None
+                )))
 
     let railConnections container pairId model inputGroups outputGroups uiState =
         [
@@ -326,6 +293,54 @@ module private ConnectorPaths =
             match liveConnection uiState with
             | Some path -> path
             | None -> ()
+        ]
+
+module private ConnectorContextMenu =
+
+    let connectionKeyAttribute = "data-provenance-interactive-connection-key"
+
+    let private tryTargetElement (event: Browser.Types.Event) : Browser.Types.Element option =
+        let targetObj: obj = box event.target
+
+        if isNullOrUndefined targetObj || isNullOrUndefined targetObj?closest then
+            None
+        else
+            Some(unbox<Browser.Types.Element> targetObj)
+
+    let private interactiveConnectionKey (event: Browser.Types.MouseEvent) =
+        event
+        |> tryTargetElement
+        |> Option.bind (fun target ->
+            let node: Browser.Types.Element = !!target?closest($"[{connectionKeyAttribute}]")
+            if isNull node then None else Some(node.getAttribute connectionKeyAttribute)
+        )
+        |> Option.bind (fun key -> if isNull key then None else Some key)
+
+    let spawnData paths event =
+        interactiveConnectionKey event
+        |> Option.bind (fun key ->
+            paths
+            |> List.tryFind (fun path -> path.Key = key)
+            |> Option.bind (fun path -> path.InteractiveConnection)
+        )
+        |> Option.map box
+
+    let items remove (data: obj) =
+        let connection = data |> unbox<DisplayConnection>
+
+        [
+            ContextMenuItem(
+                text = Html.span "Delete",
+                icon =
+                    Html.i [
+                        prop.className "swt:iconify swt:fluent--delete-20-regular swt:size-4"
+                    ],
+                onClick =
+                    (fun event ->
+                        event.buttonEvent.stopPropagation ()
+                        remove connection
+                    )
+            )
         ]
 
 /// Thin ResizeObserver bindings used to remeasure connector paths after layout changes.
@@ -404,109 +419,121 @@ type ConnectorOverlay =
             | Some(ProvenanceDetail.Connection connectionId) -> Some connectionId
             | _ -> None
 
-        Svg.svg [
-            svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
-            svg.children [
-                for measured in paths do
-                    let activateFromKeyboard (event: KeyboardEvent) =
-                        match measured.InteractiveConnection, event.key with
-                        | Some connection, "Enter"
-                        | Some connection, " "
-                        | Some connection, "Spacebar" ->
-                            event.preventDefault ()
-                            onSelect connection
-                        | Some connection, "Delete"
-                        | Some connection, "Backspace" ->
-                            match onRemove with
-                            | Some remove ->
+        React.Fragment [
+            Svg.svg [
+                svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
+                svg.children [
+                    for measured in paths do
+                        let activateFromKeyboard (event: KeyboardEvent) =
+                            match measured.InteractiveConnection, event.key with
+                            | Some connection, "Enter"
+                            | Some connection, " "
+                            | Some connection, "Spacebar" ->
                                 event.preventDefault ()
-                                remove connection
-                            | None -> ()
-                        | _ -> ()
-
-                    let isSelected =
-                        match measured.InteractiveConnection, selectedConnectionId with
-                        | Some connection, Some selectedId -> connection.Id = selectedId
-                        | _ -> false
-
-                    let isEmphasized = isSelected || hoveredKey = Some measured.Key
-
-                    let strokeWidth =
-                        if isEmphasized then
-                            measured.StrokeWidth + 1.25
-                        else
-                            measured.StrokeWidth
-
-                    // Selecting a connection keeps it bright and recedes its siblings.
-                    let strokeOpacity =
-                        match measured.InteractiveConnection with
-                        | Some _ when isEmphasized -> 1.0
-                        | Some _ when selectedConnectionId.IsSome -> 0.3
-                        | Some _ -> 0.85
-                        | None -> 1.0
-
-                    let debugAttributes = [
-                        if defaultArg debug false then
-                            svg.custom ("data-testid", measured.TestId)
-                            svg.custom ("data-provenance-connection-key", measured.Key)
-                    ]
-
-                    Svg.g [
-                        svg.key measured.Key
-                        svg.children [
-                            // A surface-colored halo keeps crossing connectors readable.
-                            Svg.path [
-                                svg.d measured.Path
-                                svg.fill "none"
-                                svg.stroke "currentColor"
-                                svg.strokeWidth (strokeWidth + 2.5)
-                                svg.strokeLineCap "round"
-                                svg.className "swt:text-base-200"
-                                match measured.StrokeDasharray with
-                                | Some dash -> svg.custom ("strokeDasharray", dash)
+                                onSelect connection
+                            | Some connection, "Delete"
+                            | Some connection, "Backspace" ->
+                                match onRemove with
+                                | Some remove ->
+                                    event.preventDefault ()
+                                    remove connection
                                 | None -> ()
-                            ]
-                            Svg.path [
-                                svg.d measured.Path
-                                svg.fill "none"
-                                svg.stroke "currentColor"
-                                svg.strokeWidth strokeWidth
-                                svg.strokeLineCap "round"
-                                svg.custom ("strokeOpacity", strokeOpacity)
-                                svg.className measured.ClassName
-                                match measured.StrokeDasharray with
-                                | Some dash -> svg.custom ("strokeDasharray", dash)
-                                | None -> ()
-                                if measured.InteractiveConnection.IsNone then
-                                    yield! debugAttributes
-                            ]
-                            // A wide transparent stroke is the actual click/keyboard target,
-                            // so selecting a thin curve no longer needs pixel accuracy.
+                            | _ -> ()
+
+                        let isSelected =
+                            match measured.InteractiveConnection, selectedConnectionId with
+                            | Some connection, Some selectedId -> connection.Id = selectedId
+                            | _ -> false
+
+                        let isEmphasized = isSelected || hoveredKey = Some measured.Key
+
+                        let strokeWidth =
+                            if isEmphasized then
+                                measured.StrokeWidth + 1.25
+                            else
+                                measured.StrokeWidth
+
+                        // Selecting a connection keeps it bright and recedes its siblings.
+                        let strokeOpacity =
                             match measured.InteractiveConnection with
-                            | Some connection ->
+                            | Some _ when isEmphasized -> 1.0
+                            | Some _ when selectedConnectionId.IsSome -> 0.3
+                            | Some _ -> 0.85
+                            | None -> 1.0
+
+                        let debugAttributes = [
+                            if defaultArg debug false then
+                                svg.custom ("data-testid", measured.TestId)
+                                svg.custom ("data-provenance-connection-key", measured.Key)
+                        ]
+
+                        Svg.g [
+                            svg.key measured.Key
+                            svg.children [
+                                // A surface-colored halo keeps crossing connectors readable.
                                 Svg.path [
                                     svg.d measured.Path
                                     svg.fill "none"
-                                    svg.stroke "transparent"
-                                    svg.strokeWidth 14
-                                    svg.className "swt:pointer-events-auto swt:cursor-pointer focus:swt:outline-none"
-                                    svg.custom ("tabIndex", "0")
-                                    svg.custom ("role", "button")
-                                    svg.custom (
-                                        "aria-label",
-                                        measured.AriaLabel
-                                        |> Option.defaultValue $"Select connection {connection.Id}"
-                                    )
-                                    yield! debugAttributes
-                                    svg.onClick (fun _ -> onSelect connection)
-                                    svg.onKeyDown activateFromKeyboard
-                                    svg.onMouseEnter (fun _ -> setHoveredKey (Some measured.Key))
-                                    svg.onMouseLeave (fun _ -> setHoveredKey None)
-                                    svg.onFocus (fun _ -> setHoveredKey (Some measured.Key))
-                                    svg.onBlur (fun _ -> setHoveredKey None)
+                                    svg.stroke "currentColor"
+                                    svg.strokeWidth (strokeWidth + 2.5)
+                                    svg.strokeLineCap "round"
+                                    svg.className "swt:text-base-200"
+                                    match measured.StrokeDasharray with
+                                    | Some dash -> svg.custom ("strokeDasharray", dash)
+                                    | None -> ()
                                 ]
-                            | None -> ()
+                                Svg.path [
+                                    svg.d measured.Path
+                                    svg.fill "none"
+                                    svg.stroke "currentColor"
+                                    svg.strokeWidth strokeWidth
+                                    svg.strokeLineCap "round"
+                                    svg.custom ("strokeOpacity", strokeOpacity)
+                                    svg.className measured.ClassName
+                                    match measured.StrokeDasharray with
+                                    | Some dash -> svg.custom ("strokeDasharray", dash)
+                                    | None -> ()
+                                    if measured.InteractiveConnection.IsNone then
+                                        yield! debugAttributes
+                                ]
+                                // A wide transparent stroke is the actual pointer/keyboard target,
+                                // so selecting a thin curve no longer needs pixel accuracy.
+                                match measured.InteractiveConnection with
+                                | Some connection ->
+                                    Svg.path [
+                                        svg.d measured.Path
+                                        svg.fill "none"
+                                        svg.stroke "transparent"
+                                        svg.strokeWidth 14
+                                        svg.className "swt:pointer-events-auto swt:cursor-pointer focus:swt:outline-none"
+                                        svg.custom ("tabIndex", "0")
+                                        svg.custom ("role", "button")
+                                        svg.custom (
+                                            "aria-label",
+                                            measured.AriaLabel
+                                            |> Option.defaultValue $"Select connection {connection.Id}"
+                                        )
+                                        svg.custom (ConnectorContextMenu.connectionKeyAttribute, measured.Key)
+                                        yield! debugAttributes
+                                        svg.onClick (fun _ -> onSelect connection)
+                                        svg.onKeyDown activateFromKeyboard
+                                        svg.onMouseEnter (fun _ -> setHoveredKey (Some measured.Key))
+                                        svg.onMouseLeave (fun _ -> setHoveredKey None)
+                                        svg.onFocus (fun _ -> setHoveredKey (Some measured.Key))
+                                        svg.onBlur (fun _ -> setHoveredKey None)
+                                    ]
+                                | None -> ()
+                            ]
                         ]
-                    ]
+                ]
             ]
+            match onRemove with
+            | Some remove ->
+                ContextMenu.ContextMenu(
+                    ConnectorContextMenu.items remove,
+                    ref = containerRef,
+                    onSpawn = ConnectorContextMenu.spawnData paths,
+                    debug = defaultArg debug false
+                )
+            | None -> Html.none
         ]

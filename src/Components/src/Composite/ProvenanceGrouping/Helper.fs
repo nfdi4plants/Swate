@@ -205,11 +205,8 @@ module ConnectionRouting =
         | ConnectGroups of inputGroupId: string * outputGroupId: string
         | ConnectMembers of inputGroupId: string * outputGroupId: string * inputSetId: ProvenanceSetId * outputSetId: ProvenanceSetId
         | ConnectMemberToGroup of inputGroupId: string * outputGroupId: string * memberSetId: ProvenanceSetId * memberSide: ProvenanceSide
-        | ConnectPropertyValueToGroup of source: ConnectionHandleRef * target: ConnectionHandleRef
 
     let private oppositeSides left right = left.Side <> right.Side
-
-    let private sameSide left right = left.Side = right.Side
 
     let private orderedGroups left right =
         match left.Side, right.Side with
@@ -252,8 +249,6 @@ module ConnectionRouting =
                         source.Id, targetParent
 
                 ConnectionAction.ConnectMemberToGroup(inputGroupId, outputGroupId, target.Id, target.Side))
-        | ConnectionHandleKind.PropertyValue, ConnectionHandleKind.GroupCard when sameSide source target ->
-            Some(ConnectionAction.ConnectPropertyValueToGroup(source, target))
         | _ ->
             None
 

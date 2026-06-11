@@ -265,22 +265,9 @@ module private DropHitTesting =
             |> Option.bind (fun target -> if target = source then None else Some target)
         )
 
-    let private targetGroupAt point =
-        elementsFromPoint point.X point.Y
-        |> Array.tryPick (fun element ->
-            closestAttribute "[data-provenance-group-drop-id]" "data-provenance-group-drop-id" element
-            |> Option.bind DragDrop.tryDropId
-            |> Option.map (fun (side, groupId) -> {
-                Kind = ConnectionHandleKind.GroupCard
-                Side = side
-                Id = groupId
-                ParentGroupId = None
-            })
-        )
-
     let connectionTarget source event =
         endpoint source event
-        |> Option.bind (fun point -> targetHandleAt point source |> Option.orElseWith (fun () -> targetGroupAt point))
+        |> Option.bind (fun point -> targetHandleAt point source)
 
 /// DnD event handlers that translate library events into session or UI state changes.
 module private DragHandlers =
@@ -385,8 +372,6 @@ module private DragHandlers =
                                                                        memberSetId,
                                                                        memberSide)) ->
             routeMemberToGroupConnection context inputGroupId outputGroupId memberSetId memberSide
-        | Some(ConnectionRouting.ConnectionAction.ConnectPropertyValueToGroup(source, target)) ->
-            routePropertyValueDrop context target.Side target.Id source.Id
         | None -> ()
 
     let private routeExistingValueAndPropertyDrags context dragPayload groupDrop propertyDrop =
@@ -428,18 +413,8 @@ module private DragHandlers =
 
             resolvedTarget |> Option.iter (routeConnectionHandle context source)
         | Some(DragDrop.Payload.ConnectionHandle source), None ->
-            let resolvedTarget =
-                match groupDrop with
-                | Some(side, groupId) ->
-                    Some {
-                        Kind = ConnectionHandleKind.GroupCard
-                        Side = side
-                        Id = groupId
-                        ParentGroupId = None
-                    }
-                | None -> DropHitTesting.connectionTarget source event
-
-            resolvedTarget |> Option.iter (routeConnectionHandle context source)
+            DropHitTesting.connectionTarget source event
+            |> Option.iter (routeConnectionHandle context source)
         | _ -> routeExistingValueAndPropertyDrags context dragPayload groupDrop propertyDrop
 
 /// Alert and detail panels rendered around the main grouping surface.
@@ -568,7 +543,7 @@ module private EditorPanels =
             ]
         ]
 
-    let connectionDetails debug (connections: DisplayConnection list) detail (onRemove: DisplayConnection -> unit) =
+    let connectionDetails debug (connections: DisplayConnection list) detail =
         match detail with
         | Some(ProvenanceDetail.Connection connectionId) ->
             let resolved = connections |> List.tryFind (fun c -> c.Id = connectionId)
@@ -587,20 +562,6 @@ module private EditorPanels =
                                 Html.h3 [
                                     prop.className "swt:grow swt:font-semibold swt:text-primary"
                                     prop.text $"Connection: {connectionId}"
-                                ]
-                                Html.button [
-                                    prop.type'.button
-                                    prop.className "swt:btn swt:btn-outline swt:btn-error swt:btn-sm"
-                                    prop.ariaLabel "Remove connection"
-                                    if debug then
-                                        prop.testId "provenance-remove-connection"
-                                    prop.onClick (fun _ -> onRemove conn)
-                                    prop.children [
-                                        Html.i [
-                                            prop.className "swt:iconify swt:fluent--delete-20-regular swt:size-4"
-                                        ]
-                                        Html.span "Remove"
-                                    ]
                                 ]
                             ]
                         ]
@@ -777,6 +738,10 @@ type ProvenanceGrouping =
             latestUiState.current <- next
             setUiState next
 
+        let commitUiState next =
+            latestUiState.current <- next
+            setUiState next
+
         let commitPanelRatio side clientX =
             match surfaceRef.current with
             | None -> ()
@@ -839,9 +804,12 @@ type ProvenanceGrouping =
         let publish result =
             match result with
             | Ok(next, patches) ->
-                let nextUiState = State.Layers.ensure next uiState
+                let nextUiState =
+                    latestUiState.current
+                    |> State.LiveConnection.clear
+                    |> State.Layers.ensure next
 
-                setUiState {
+                commitUiState {
                     nextUiState with
                         Error = None
                         PendingOverwrite = None
@@ -850,9 +818,10 @@ type ProvenanceGrouping =
 
                 onChange { Session = next; Patches = patches }
             | Error error ->
-                setUiState {
-                    uiState with
+                commitUiState {
+                    latestUiState.current with
                         Error = Some(string error)
+                        LiveConnectionDrag = None
                 }
 
         let createSet command =
@@ -881,9 +850,12 @@ type ProvenanceGrouping =
         let removeDisplayConnection (connection: DisplayConnection) =
             match Session.removeConnections connection.ConnectionIds session with
             | Ok(next, patches) ->
-                let nextUiState = State.Layers.ensure next uiState
+                let nextUiState =
+                    latestUiState.current
+                    |> State.LiveConnection.clear
+                    |> State.Layers.ensure next
 
-                setUiState {
+                commitUiState {
                     nextUiState with
                         Error = None
                         PendingOverwrite = None
@@ -893,9 +865,10 @@ type ProvenanceGrouping =
 
                 onChange { Session = next; Patches = patches }
             | Error error ->
-                setUiState {
-                    uiState with
+                commitUiState {
+                    latestUiState.current with
                         Error = Some(string error)
+                        LiveConnectionDrag = None
                 }
 
         let resolveAllToAll (pending: PendingMemberResolution) =
@@ -937,7 +910,7 @@ type ProvenanceGrouping =
             Pair = pair
             UiState = uiState
             Publish = publish
-            SetUiState = setUiState
+            SetUiState = commitUiState
             Lookups = lookups
             ConnectSetPairs = connectSetPairs
         }
@@ -1286,25 +1259,25 @@ type ProvenanceGrouping =
                         ]
                     ]
                     surface
-                    EditorPanels.connectionDetails debug connections uiState.Detail removeDisplayConnection
+                    EditorPanels.connectionDetails debug connections uiState.Detail
                 ]
             ]
 
         DndKit.DndContext(
             sensors = sensors,
             collisionDetection = DndKit.pointerWithin,
-            onDragStart = DragHandlers.handleStart surfaceRef setActiveDrag setUiState uiState,
-            onDragMove = DragHandlers.handleMove setUiState uiState,
+            onDragStart = DragHandlers.handleStart surfaceRef setActiveDrag commitUiState uiState,
+            onDragMove = DragHandlers.handleMove commitUiState uiState,
             onDragCancel =
                 (fun _ ->
                     setActiveDrag None
-                    State.LiveConnection.clear uiState |> setUiState
+                    State.LiveConnection.clear uiState |> commitUiState
                 ),
             onDragEnd =
                 (fun event ->
                     setActiveDrag None
                     let clearedUiState = State.LiveConnection.clear uiState
-                    setUiState clearedUiState
+                    commitUiState clearedUiState
 
                     DragHandlers.handleEnd
                         {

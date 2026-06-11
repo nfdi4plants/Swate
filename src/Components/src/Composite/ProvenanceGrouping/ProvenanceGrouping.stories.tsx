@@ -448,25 +448,45 @@ export const ExpandedGroupsRenderMemberLevelConnections: Story = {
   },
 };
 
-const connectionKeys = (paths: HTMLElement[]) =>
-  paths.map((path) => path.getAttribute('data-provenance-connection-key') ?? '');
-
-export const ExpandedPropertyValuesConnectToEveryMatchingGroup: Story = {
+export const ExpandedGroupsHideGroupConnectionAnchors: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await expandProperty(canvas, 'Input', 'Species');
+    await groupByProperty(canvas, 'Input', 'Species');
+
+    const groupId = 'input:Species=Arabidopsis';
+    const grouped = await waitFor(() => canvas.getByTestId(`provenance-group-Input-${groupId}`));
+    expect(within(grouped).getByTestId('provenance-connection-handle-Input-GroupCard')).toBeInTheDocument();
+    expect(connectionKeys(canvas.getAllByTestId('provenance-connection')).some((key) => key.includes(groupId))).toBe(true);
+
+    await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
 
     await waitFor(() => {
-      const paths = canvas.getAllByTestId('provenance-value-connection');
-      // Arabidopsis chip -> Input A/B/C, Chlamydomonas chip -> Input D.
-      expect(paths).toHaveLength(4);
-      expect(paths.every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
+      const expanded = canvas.getByTestId(`provenance-group-Input-${groupId}`);
+      expect(within(expanded).queryByTestId('provenance-connection-handle-Input-GroupCard')).not.toBeInTheDocument();
+      expect(within(expanded).getAllByTestId('provenance-connection-handle-Input-GroupMember').length).toBeGreaterThan(0);
+      expect(connectionKeys(canvas.queryAllByTestId('provenance-connection')).some((key) => key.includes(groupId))).toBe(false);
+      expect(connectionKeys(canvas.getAllByTestId('provenance-member-connection')).some((key) => key.includes(groupId))).toBe(true);
+    });
+  },
+};
+
+const connectionKeys = (paths: HTMLElement[]) =>
+  paths.map((path) => path.getAttribute('data-provenance-connection-key') ?? '');
+
+export const ExpandedPropertyValuesKeepHeaderGroupingOnly: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const panel = await expandProperty(canvas, 'Input', 'Species');
+
+    await waitFor(() => {
+      const headerKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'));
+      expect(headerKeys.some((key) => key.includes('Species'))).toBe(true);
     });
 
-    // Expanding Species swaps its header lines for the per-value lines above.
-    const headerKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'));
-    expect(headerKeys.some((key) => key.includes('Species'))).toBe(false);
+    expect(canvas.queryByTestId('provenance-value-connection')).not.toBeInTheDocument();
+    expect(panel.queryByTestId('provenance-connection-handle-Input-PropertyValue')).not.toBeInTheDocument();
   },
 };
 
@@ -491,29 +511,20 @@ export const CollapsedPropertiesConnectToMatchingGroupsAutomatically: Story = {
   },
 };
 
-export const AssignedValueConnectionsFollowModelData: Story = {
+export const RailValuesAssignByDragWithoutConnectionHandles: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const source = await railValue(canvas, 'Output', 'Analysis', 'Mass Spectrometry');
 
-    await waitFor(() => {
-      // Mass Spectrometry -> Output B at least; Output A may sit below the minimum
-      // connector distance. Output D has no Analysis value yet, so no line reaches it.
-      const keys = connectionKeys(canvas.getAllByTestId('provenance-value-connection'));
-      expect(keys.length).toBeGreaterThanOrEqual(2);
-      expect(keys.some((key) => key.includes('output-d'))).toBe(false);
-    });
+    expect(within(source as HTMLElement).queryByTestId('provenance-connection-handle-Output-PropertyValue')).not.toBeInTheDocument();
+    expect(canvas.queryByTestId('provenance-value-connection')).not.toBeInTheDocument();
 
-    const handle = within(source as HTMLElement).getByTestId('provenance-connection-handle-Output-PropertyValue');
     const target = canvas.getByText('Output D').closest('article')!;
-    await dragByPointer(handle, target);
+    await dragByPointer(source, target);
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
-      // The committed value immediately yields a Mass Spectrometry line to Output D.
-      const keys = connectionKeys(canvas.getAllByTestId('provenance-value-connection'));
-      expect(keys.some((key) => key.includes('output-d'))).toBe(true);
     });
   },
 };
@@ -547,6 +558,7 @@ export const ConnectionDetailsDoNotExposePropertyCreation: Story = {
     expect(details).toHaveTextContent('Connection IDs');
     expect(within(details).queryByText(/Add value/i)).not.toBeInTheDocument();
     expect(within(details).queryByText(/Add property/i)).not.toBeInTheDocument();
+    expect(within(details).queryByRole('button', { name: /remove connection/i })).not.toBeInTheDocument();
   },
 };
 
@@ -575,7 +587,7 @@ export const SelectsConnectionWithKeyboard: Story = {
   },
 };
 
-export const RemovesConnectionFromDetailsPanel: Story = {
+export const RemovesConnectionFromContextMenu: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -585,15 +597,46 @@ export const RemovesConnectionFromDetailsPanel: Story = {
       return connectors;
     })).length;
 
-    await userEvent.click(canvas.getAllByTestId('provenance-connection')[0]);
-    const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
-    await userEvent.click(within(details).getByTestId('provenance-remove-connection'));
+    const connector = canvas.getAllByTestId('provenance-connection')[0];
+    fireEvent.contextMenu(connector, { clientX: 320, clientY: 240, bubbles: true });
+    const menu = await screen.findByTestId('context_menu');
+    await userEvent.click(within(menu).getByRole('button', { name: /delete/i }));
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('RemoveLoadedConnection');
       expect(canvas.queryAllByTestId('provenance-connection').length).toBeLessThan(initialCount);
     });
     expect(canvas.queryByTestId('provenance-connection-details')).not.toBeInTheDocument();
+  },
+};
+
+export const RemovesExpandedMemberConnectionFromContextMenu: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await groupByProperty(canvas, 'Input', 'Species');
+
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
+
+    const connector = await waitFor(() => {
+      const memberConnector = canvas
+        .getAllByTestId('provenance-member-connection')
+        .find((path) => path.getAttribute('data-provenance-connection-key')?.includes('input:Species=Arabidopsis'));
+      expect(memberConnector).toBeTruthy();
+      expect(memberConnector).toHaveAttribute('role', 'button');
+      return memberConnector!;
+    });
+
+    const removedKey = connector.getAttribute('data-provenance-connection-key');
+    fireEvent.contextMenu(connector, { clientX: 360, clientY: 280, bubbles: true });
+    const menu = await screen.findByTestId('context_menu');
+    await userEvent.click(within(menu).getByRole('button', { name: /delete/i }));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('RemoveLoadedConnection');
+      expect(connectionKeys(canvas.queryAllByTestId('provenance-member-connection'))).not.toContain(removedKey);
+    });
   },
 };
 
@@ -1048,12 +1091,36 @@ export const ConnectsGroups: Story = {
 
     await dragByPointer(
       within(input).getByTestId('provenance-connection-handle-Input-GroupCard'),
-      output,
+      within(output).getByTestId('provenance-connection-handle-Output-GroupCard'),
     );
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedConnection');
     });
+    expect(canvas.queryByTestId('provenance-live-connection')).not.toBeInTheDocument();
+  },
+};
+
+export const IgnoresConnectionHandleDroppedOnCardBody: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByText('Input C').closest('article')!;
+    const output = canvas.getByText('Output E').closest('article')!;
+    const initialLineCount = await waitFor(() => {
+      const lines = canvas.queryAllByTestId('provenance-connection');
+      expect(lines.length).toBeGreaterThan(0);
+      return lines.length;
+    });
+
+    await dragByPointer(
+      within(input).getByTestId('provenance-connection-handle-Input-GroupCard'),
+      output,
+    );
+
+    await waitFor(() => expect(canvas.queryByTestId('provenance-live-connection')).not.toBeInTheDocument());
+    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
+    expect(canvas.queryAllByTestId('provenance-connection')).toHaveLength(initialLineCount);
   },
 };
 
