@@ -6,6 +6,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main.Auth
 open Main.Bindings.Path
+open Swate.Components.Composite.Authentication.Types
 open Vitest
 open ElectronCore.TestHelpers
 
@@ -122,7 +123,8 @@ Vitest.describe (
                             AvatarUrl = "https://example.org/avatar.png"
                             TargetDataHub = "https://datahub.example.org"
                             DateAdded = "2026-06-09T07:00:00.000Z"
-                            TokenInvalid = true
+                            TokenStatus = TokenStatus.Invalid
+                            TokenExpiresOn = Some "2026-06-30"
                         }
                         Token = "current-token"
                     }

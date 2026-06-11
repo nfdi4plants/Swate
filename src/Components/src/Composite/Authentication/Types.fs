@@ -77,11 +77,18 @@ type AuthUserDto = {
         TargetDataHub = targetDataHub
     }
 
+[<RequireQualifiedAccess>]
+type TokenStatus =
+    | Ok
+    | Expiring
+    | Invalid
+
 /// Platform-agnostic account summary for multi-account UI.
 type AccountSummary = {
     User: AuthUserDto
     DateAdded: string
-    TokenInvalid: bool
+    TokenStatus: TokenStatus
+    TokenExpiresOn: string option
 }
 
 /// Current auth state returned by getAuthState.
@@ -98,7 +105,8 @@ type AuthStateDto = {
     member this.ActiveUser() = this.ActiveAccount |> Option.map _.User
 
     member this.UsableActiveAccount() =
-        this.ActiveAccount |> Option.filter (fun account -> not account.TokenInvalid)
+        this.ActiveAccount
+        |> Option.filter (fun account -> account.TokenStatus <> TokenStatus.Invalid)
 
     member this.UsableActiveUser() =
         this.UsableActiveAccount() |> Option.map _.User

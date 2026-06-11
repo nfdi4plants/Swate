@@ -338,7 +338,8 @@ Vitest.describe (
                         TargetDataHub = "https://git.nfdi4plants.org/"
                     }
                     DateAdded = "2026-01-01T00:00:00.0000000Z"
-                    TokenInvalid = true
+                    TokenStatus = TokenStatus.Invalid
+                    TokenExpiresOn = Some "2026-01-15"
                 }
 
                 let authState: AuthStateDto = {
@@ -486,17 +487,27 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "nextTokenInvalidState marks unauthorized and forbidden failures as invalid",
+            "nextTokenStatusState marks unauthorized and forbidden failures as invalid",
             fun () ->
-                Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Unauthorized).toBe (true)
-                Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Forbidden).toBe (true)
+                Vitest
+                    .expect(AuthService.nextTokenStatusState TokenStatus.Ok AuthFailureKind.Unauthorized)
+                    .toEqual (TokenStatus.Invalid)
+
+                Vitest
+                    .expect(AuthService.nextTokenStatusState TokenStatus.Ok AuthFailureKind.Forbidden)
+                    .toEqual (TokenStatus.Invalid)
         )
 
         Vitest.test (
-            "nextTokenInvalidState preserves the existing invalid flag for non-auth failures",
+            "nextTokenStatusState preserves the existing status for non-auth failures",
             fun () ->
-                Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Network).toBe (false)
-                Vitest.expect(AuthService.nextTokenInvalidState true AuthFailureKind.Network).toBe (true)
+                Vitest
+                    .expect(AuthService.nextTokenStatusState TokenStatus.Expiring AuthFailureKind.Network)
+                    .toEqual (TokenStatus.Expiring)
+
+                Vitest
+                    .expect(AuthService.nextTokenStatusState TokenStatus.Invalid AuthFailureKind.Network)
+                    .toEqual (TokenStatus.Invalid)
         )
 )
 
