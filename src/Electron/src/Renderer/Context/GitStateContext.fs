@@ -28,6 +28,8 @@ type GitStateController = {
     discardSelection: string[] -> unit
     confirmPendingRemoteAction: unit -> unit
     cancelPendingRemoteAction: unit -> unit
+    submitPublishRename: string -> unit
+    cancelPublishRename: unit -> unit
     saveLfsAutoTrackThreshold: int -> unit
     saveDownloadLargeFiles: bool -> unit
     createBranch: GitSidebarCreateBranchRequest -> unit
@@ -66,8 +68,13 @@ module private Helper =
             fun requestedPath -> promise {
                 let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
                 return mapMergeConflictPageResult requestedPath result
-            }
+        }
         initGitRepository = Renderer.GitApiClient.gitInitRepository
+        renameOpenArcRoot =
+            fun newName -> promise {
+                let! result = Api.ipcArcVaultApi.renameOpenArcRoot newName
+                return result |> Result.mapError _.Message
+            }
         createDataHubProject =
             fun projectName -> promise {
                 let! result = Api.ipcGitLabApi.createProject projectName
@@ -112,6 +119,8 @@ let GitStateCtx =
             discardSelection = fun _ -> ()
             confirmPendingRemoteAction = fun () -> ()
             cancelPendingRemoteAction = fun () -> ()
+            submitPublishRename = fun _ -> ()
+            cancelPublishRename = fun () -> ()
             saveLfsAutoTrackThreshold = fun _ -> ()
             saveDownloadLargeFiles = fun _ -> ()
             createBranch = fun _ -> ()
@@ -171,6 +180,12 @@ let GitStateCtxProvider (children: ReactElement) =
     let cancelPendingRemoteAction () =
         dispatch CancelPendingRemoteActionRequested
 
+    let submitPublishRename newName =
+        dispatch (SubmitPublishRenameRequested newName)
+
+    let cancelPublishRename () =
+        dispatch CancelPublishRenameRequested
+
     let saveLfsAutoTrackThreshold (thresholdMb: int) =
         dispatch (SaveLfsAutoTrackThresholdRequested thresholdMb)
 
@@ -213,6 +228,8 @@ let GitStateCtxProvider (children: ReactElement) =
                 discardSelection = discardSelection
                 confirmPendingRemoteAction = confirmPendingRemoteAction
                 cancelPendingRemoteAction = cancelPendingRemoteAction
+                submitPublishRename = submitPublishRename
+                cancelPublishRename = cancelPublishRename
                 saveLfsAutoTrackThreshold = saveLfsAutoTrackThreshold
                 saveDownloadLargeFiles = saveDownloadLargeFiles
                 createBranch = createBranchFrom

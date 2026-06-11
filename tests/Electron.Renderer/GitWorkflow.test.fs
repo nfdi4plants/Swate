@@ -61,6 +61,15 @@ let private okOperationResult = {
     Path = None
 }
 
+let private duplicateRemoteProjectResult attemptedName = {
+    okOperationResult with
+        Success = false
+        Message =
+            Some
+                $"Could not publish local repository '{attemptedName}' to the active DataHub account: GitLab request failed with HTTP 400: name has already been taken."
+        FailureKind = Some GitFailureKind.RemoteProjectAlreadyExists
+}
+
 let private localBranch refName isCurrent isTracking = {
     RefName = refName
     DisplayLabel = refName
@@ -116,6 +125,13 @@ setter.call($0, $1);
 $0.dispatchEvent(new Event("input", { bubbles: true }));
 """)>]
 let private setTextAreaValue (element: HTMLTextAreaElement) (value: string) : unit = jsNative
+
+[<Emit("""
+const setter = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, "value").set;
+setter.call($0, $1);
+$0.dispatchEvent(new Event("input", { bubbles: true }));
+""")>]
+let private setInputValue (element: HTMLInputElement) (value: string) : unit = jsNative
 
 [<Emit("""
 globalThis.__swateOriginalFetch = globalThis.fetch;
@@ -251,6 +267,7 @@ let private defaultDependencies: GitDependencies = {
     loadDiffPage = fun path -> unexpectedPromise $"loadDiffPage:{path}"
     loadMergeConflictPage = fun path -> unexpectedPromise $"loadMergeConflictPage:{path}"
     initGitRepository = fun path -> unexpectedPromise $"initGitRepository:{path}"
+    renameOpenArcRoot = fun name -> unexpectedPromise $"renameOpenArcRoot:{name}"
     createDataHubProject = fun name -> unexpectedPromise $"createDataHubProject:{name}"
     installGitLfs = fun () -> unexpectedPromise "installGitLfs"
     previewGitPull = fun _ -> unexpectedPromise "previewGitPull"
@@ -1141,6 +1158,102 @@ Vitest.describe (
                 Vitest.expect(nextState.BranchOptions |> Array.map _.RefName).toEqual ([| "feature/pushed" |])
                 Vitest.expect(nextState.LfsAutoTrackThresholdMb).toBe (9)
                 Vitest.expect(nextState.DownloadLargeFiles).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "WriteCompleted opens a publish rename prompt when first push finds an existing DataHub project",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        gitPush = fun _ -> promise { return Ok(duplicateRemoteProjectResult "Existing ARC") }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/work/Existing ARC"
+                }
+
+                let stateAfterRequest, requestCmd =
+                    update deps ignore (WriteRequested Push) initialState
+
+                let! requestMessages = collectMessages requestCmd
+
+                let nextState, nextCmd =
+                    match requestMessages with
+                    | [| WriteCompleted(_, Push, Ok(RequiresRemoteProjectRename _)) |] ->
+                        update deps ignore requestMessages[0] stateAfterRequest
+                    | _ -> failwith "Expected duplicate project push to request ARC/project rename."
+
+                let! followUpMessages = collectMessages nextCmd
+
+                Vitest.expect(nextState.BusyOperation).toEqual (None)
+                Vitest.expect(nextState.ErrorNotice).toEqual (None)
+                Vitest.expect(nextState.PendingPublishRename |> Option.map _.CurrentName).toEqual (Some "Existing ARC")
+                Vitest.expect(followUpMessages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "SubmitPublishRenameRequested renames the active ARC root before retrying push",
+            fun () -> promise {
+                let renamedNames = ResizeArray<string>()
+
+                let deps = {
+                    defaultDependencies with
+                        renameOpenArcRoot =
+                            fun newName -> promise {
+                                renamedNames.Add newName
+                                return Ok "C:/work/Renamed ARC"
+                            }
+                        gitPush = fun _ -> promise { return Ok okOperationResult }
+                        getGitStatus = fun () -> promise { return Ok(statusForBranch "main") }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                }
+
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/work/Existing ARC"
+                        PendingPublishRename =
+                            Some {
+                                CurrentName = "Existing ARC"
+                                Message = "A DataHub repository named 'Existing ARC' already exists."
+                            }
+                }
+
+                let stateAfterSubmit, renameCmd =
+                    update deps ignore (SubmitPublishRenameRequested " Renamed ARC ") initialState
+
+                let! renameMessages = collectMessages renameCmd
+
+                let stateAfterRename, retryCmd =
+                    match renameMessages with
+                    | [| PublishRenameCompleted(_, Ok "C:/work/Renamed ARC") |] ->
+                        update deps ignore renameMessages[0] stateAfterSubmit
+                    | _ -> failwith "Expected rename completion to be dispatched."
+
+                let! retryMessages = collectMessages retryCmd
+
+                let stateAfterRetryRequest, pushCmd =
+                    match retryMessages with
+                    | [| WriteRequested Push |] -> update deps ignore retryMessages[0] stateAfterRename
+                    | _ -> failwith "Expected push to be retried after renaming the ARC root."
+
+                let! pushMessages = collectMessages pushCmd
+
+                let finalState, finishCmd =
+                    match pushMessages with
+                    | [| WriteCompleted(_, Push, Ok(Completed(UnitSuccess(_, _, _, _)))) |] ->
+                        update deps ignore pushMessages[0] stateAfterRetryRequest
+                    | _ -> failwith "Expected retried push to complete successfully."
+
+                let! _ = collectMessages finishCmd
+
+                Vitest.expect(renamedNames |> Seq.toArray).toEqual ([| "Renamed ARC" |])
+                Vitest.expect(stateAfterSubmit.BusyOperation).toEqual (Some GitBusyOperation.RenamingRepository)
+                Vitest.expect(stateAfterRename.PendingPublishRename).toEqual (None)
+                Vitest.expect(finalState.ErrorNotice).toEqual (None)
             }
         )
 
@@ -3050,6 +3163,58 @@ Vitest.describe (
 
                 Vitest.expect(container.textContent.Contains("Save Selected Changes")).toBe (true)
                 Vitest.expect(container.querySelector ("[data-testid='GitSidebarErrorNotice']")).not.toBeNull ()
+
+                cleanup ()
+            }
+        )
+
+        Vitest.test (
+            "GitSidebar publish rename prompt submits the edited repository name",
+            fun () -> promise {
+                let mutable submittedName: string option = None
+                let mutable cancelCalls = 0
+
+                let! container, cleanup =
+                    renderToBody (
+                        Swate.Components.Page.GitSidebar.Main(
+                            status = {
+                                CurrentBranch = Some "main"
+                                TrackingBranch = None
+                                Ahead = 1
+                                Behind = 0
+                                IsClean = true
+                                IsMergeInProgress = false
+                            },
+                            changedFiles = [||],
+                            branchOptions = [| sidebarLocalBranch "main" true false |],
+                            callbacks = noopCallbacks,
+                            downloadLargeFiles = true,
+                            lfsAutoTrackThresholdMb = 5,
+                            publishRenamePrompt = {
+                                CurrentName = "Existing ARC"
+                                Message = "A DataHub repository named 'Existing ARC' already exists."
+                            },
+                            onSubmitPublishRename = (fun name -> submittedName <- Some name),
+                            onCancelPublishRename = (fun () -> cancelCalls <- cancelCalls + 1)
+                        )
+                    )
+
+                let input =
+                    document.body.querySelector ("[data-testid='GitSidebarPublishRenameInput']") :?> HTMLInputElement
+
+                Vitest.expect(input.value).toBe ("Existing ARC")
+
+                setInputValue input "Renamed ARC"
+                do! Promise.sleep 0
+
+                let submitButton =
+                    document.body.querySelector ("[data-testid='GitSidebarPublishRenameSubmit']") :?> HTMLButtonElement
+
+                submitButton.click ()
+                do! Promise.sleep 0
+
+                Vitest.expect(submittedName).toEqual (Some "Renamed ARC")
+                Vitest.expect(cancelCalls).toBe (0)
 
                 cleanup ()
             }

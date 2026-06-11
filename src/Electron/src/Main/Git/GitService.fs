@@ -80,6 +80,15 @@ let classifyFailureKind (message: string) =
 
     if containsAny lfsInstallRequiredTokens then
         GitFailureKind.LfsInstallRequired
+    elif
+        containsAny [|
+            "has already been taken"
+            "name already exists"
+            "project already exists"
+            "repository already exists"
+        |]
+    then
+        GitFailureKind.RemoteProjectAlreadyExists
     elif containsAny [| "abort"; "cancelled"; "canceled"; "aborterror" |] then
         GitFailureKind.Canceled
     elif containsAny [| "timed out"; "timeout"; "time out" |] then

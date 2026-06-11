@@ -526,6 +526,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    renameOpenArcRoot =
+        fun (newName: string) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            let oldPath = vault.path
+                            let! renameResult = vault.RenameOpenArcRoot newName
+
+                            match renameResult with
+                            | Error renameError -> return Error renameError
+                            | Ok renamedPath ->
+                                oldPath |> Option.iter (fun path -> RECENT_ARCS.Remove(path) |> ignore)
+                                RECENT_ARCS.Add(renamedPath) |> ignore
+                                ARC_VAULTS.BroadcastRecentARCs()
+                                return Ok renamedPath
+                        })
+            with e ->
+                return Error e
+        }
     writeFile =
         fun (request: FileContentDTO) -> promise {
             try

@@ -422,6 +422,49 @@ module ArcVaultExtensions =
             | None -> ()
         }
 
+        member this.RenameOpenArcRoot(newName: string) : Fable.Core.JS.Promise<Result<string, exn>> = promise {
+            match this.path with
+            | None -> return Error(exn "ARC is not loaded.")
+            | Some currentPath ->
+                let hadWatcher = this.watcher.IsSome
+
+                if hadWatcher then
+                    do! this.StopFileWatcher()
+
+                let! renameResult = renameOpenArcRootDirectoryOnDisk currentPath newName
+
+                match renameResult with
+                | Error renameError ->
+                    if hadWatcher then
+                        this.StartFileWatcher()
+
+                    return Error renameError
+                | Ok renamedPath ->
+                    this.path <- Some renamedPath
+
+                    try
+                        if this.arc.IsNone then
+                            do! this.LoadArc()
+
+                        if hadWatcher then
+                            this.StartFileWatcher()
+
+                        do! this.RefreshFileTree()
+
+                        let sendMsg =
+                            Remoting.createIpc ()
+                            |> Remoting.withWindow this.window
+                            |> Remoting.buildProxySender<IPathChangeRendererApi>
+
+                        sendMsg.pathChange (Some renamedPath)
+                        return Ok renamedPath
+                    with reloadError ->
+                        if hadWatcher then
+                            this.StartFileWatcher()
+
+                        return Error(exn $"ARC folder was renamed to '{renamedPath}', but reload failed: {reloadError.Message}")
+        }
+
 
 /// Describes the outcome of an ARC lifecycle action performed by the controller.
 [<RequireQualifiedAccess>]

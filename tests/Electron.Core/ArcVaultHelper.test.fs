@@ -6,6 +6,7 @@ open Main.ArcVault
 open Main.ArcVaultHelper
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
+open Swate.Components.Shared
 open Vitest
 
 let private mkdirRecursiveAsync (directoryPath: string) = promise {
@@ -252,6 +253,64 @@ Vitest.describe (
                     do! TestHelpers.removeDirectoryAsync rootPath
                     return raise error
             }
+        )
+
+        Vitest.test (
+            "RenameOpenArcRoot moves the active ARC folder and updates the vault path",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-rename-arc-root-"
+                    "RenameRootArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let targetPath = join [| dirname arcPath; "renamed-arc" |] |> PathHelpers.normalizePath
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+
+                        do! vault.LoadArc()
+
+                        match! vault.RenameOpenArcRoot "renamed-arc" with
+                        | Error error -> failwith error.Message
+                        | Ok renamedPath ->
+                            Vitest.expect(renamedPath).toBe (targetPath)
+                            Vitest.expect(vault.path).toEqual (Some targetPath)
+
+                            let! oldPathExists = TestHelpers.pathExistsAsync arcPath
+                            let! newPathExists = TestHelpers.pathExistsAsync targetPath
+                            Vitest.expect(oldPathExists).toBe (false)
+                            Vitest.expect(newPathExists).toBe (true)
+
+                            let! reloadedArc = TestHelpers.loadArcAsync targetPath
+                            Vitest.expect(reloadedArc.Identifier).toBe ("RenameRootArc")
+                    })
+        )
+
+        Vitest.test (
+            "RenameOpenArcRoot rejects destination conflicts without moving the active ARC",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-rename-arc-root-conflict-"
+                    "RenameRootConflictArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let targetPath = join [| dirname arcPath; "existing-arc" |] |> PathHelpers.normalizePath
+                        do! mkdirRecursiveAsync targetPath
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadArc()
+
+                        match! vault.RenameOpenArcRoot "existing-arc" with
+                        | Ok _ -> failwith "Expected active ARC root rename to reject an existing destination."
+                        | Error error ->
+                            Vitest.expect(error.Message).toContain ("destination already exists")
+                            Vitest.expect(vault.path).toEqual (Some arcPath)
+
+                            let! oldPathExists = TestHelpers.pathExistsAsync arcPath
+                            let! targetPathExists = TestHelpers.pathExistsAsync targetPath
+                            Vitest.expect(oldPathExists).toBe (true)
+                            Vitest.expect(targetPathExists).toBe (true)
+                    })
         )
 
         Vitest.test (

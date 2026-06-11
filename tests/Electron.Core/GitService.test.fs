@@ -764,6 +764,7 @@ Vitest.describe (
                                         let! publishResult = GitService.push context.RepoPath None None None
                                         let failure = expectError publishResult
 
+                                        Vitest.expect(failure.Kind).toEqual (GitFailureKind.RemoteProjectAlreadyExists)
                                         Vitest.expect(failure.Message).toContain ("repo")
                                         Vitest.expect(failure.Message).toContain ("already been taken")
                                     }))
