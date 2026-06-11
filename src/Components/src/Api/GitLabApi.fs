@@ -270,6 +270,25 @@ module private Internals =
         | 404 -> GitLabError.NotFound
         | code -> GitLabError.HttpError code
 
+    let private compactResponseText (text: string) =
+        text
+        |> Option.ofObj
+        |> Option.map (fun value -> value.Replace("\r", " ").Replace("\n", " ").Trim())
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+    let mapHttpErrorWithBody status bodyText =
+        match mapHttpError status, compactResponseText bodyText with
+        | GitLabError.HttpError code, Some details -> GitLabError.InvalidRequest $"GitLab request failed with HTTP {code}: {details}"
+        | mappedError, _ -> mappedError
+
+    let readResponseText (response: Fetch.Types.Response) : JS.Promise<string> = promise {
+        try
+            let! text = response.text ()
+            return text
+        with _ ->
+            return ""
+    }
+
     let makeGetRequestOptions (pat: string option) (acceptJson: bool) =
         let headers = [
             match pat with
@@ -497,7 +516,8 @@ module private Internals =
                     let! response = fetchUnsafe url requestOptions
 
                     if not response.Ok then
-                        return Error(mapHttpError response.Status)
+                        let! errorText = readResponseText response
+                        return Error(mapHttpErrorWithBody response.Status errorText)
                     else
                         try
                             let! payload = response.json<'TResponse> ()

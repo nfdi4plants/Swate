@@ -155,6 +155,23 @@ globalThis.fetch = async (url, options) => {
 """)>]
 let private installGitLabCreateProjectFetchSpy () : unit = jsNative
 
+[<Emit("""
+globalThis.__swateOriginalFetch = globalThis.fetch;
+globalThis.__swateGitLabCreateProjectFetches = [];
+globalThis.fetch = async (url, options) => {
+  const body = options && options.body ? JSON.parse(options.body) : null;
+  globalThis.__swateGitLabCreateProjectFetches.push({ url, options, body });
+  return {
+    ok: false,
+    status: 400,
+    headers: { get: () => null },
+    text: async () => JSON.stringify({ message: { name: ["has already been taken"], path: ["has already been taken"] } }),
+    json: async () => ({ message: { name: ["has already been taken"], path: ["has already been taken"] } })
+  };
+};
+""")>]
+let private installGitLabCreateProjectFailureFetchSpy () : unit = jsNative
+
 [<Emit("globalThis.__swateGitLabCreateProjectFetches[globalThis.__swateGitLabCreateProjectFetches.length - 1].body")>]
 let private lastGitLabCreateProjectBody () : obj = jsNative
 
@@ -418,6 +435,26 @@ Vitest.describe (
                     Vitest.expect(getProperty<string> body "name").toBe ("My ARC Project")
                     Vitest.expect(getProperty<bool> body "initialize_with_readme").toBe (false)
                     Vitest.expect(hasOwnProperty body "path").toBe (false)
+                finally
+                    cleanupGitLabCreateProjectFetchSpy ()
+            }
+        )
+
+        Vitest.test (
+            "GitLabApi.CreateProject includes GitLab's duplicate-name response in the error",
+            fun () -> promise {
+                installGitLabCreateProjectFailureFetchSpy ()
+
+                try
+                    let! result = GitLabApi.CreateProject("https://gitlab.example/", "token-123", "Existing ARC")
+
+                    match result with
+                    | Ok _ -> failwith "Expected duplicate project creation to fail."
+                    | Error error ->
+                        let message = error.GitLabErrorToString
+
+                        Vitest.expect(message).toContain ("HTTP 400")
+                        Vitest.expect(message).toContain ("has already been taken")
                 finally
                     cleanupGitLabCreateProjectFetchSpy ()
             }

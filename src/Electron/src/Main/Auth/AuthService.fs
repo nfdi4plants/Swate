@@ -207,6 +207,26 @@ let private refreshTokenProvider () =
         TryGetAccessToken = fun host -> promise { return tryGetTokenForHost host }
     }
 
+    Main.Git.GitTokenProvider.RemoteProvisioning.setProvider {
+        CreateProject =
+            fun projectName -> promise {
+                match
+                    getActiveAccountState ()
+                    |> Option.filter canUseToken
+                    |> Option.map (fun accountState -> accountState.Summary.User, accountState.Token)
+                with
+                | None ->
+                    return Error "No usable DataHub account is signed in. Sign in before publishing this local repository."
+                | Some(user, token) when String.IsNullOrWhiteSpace user.TargetDataHub ->
+                    return Error "The active DataHub account has no DataHub endpoint configured."
+                | Some(user, token) ->
+                    let! projectResult =
+                        Swate.Components.Api.GitLabApi.GitLabApi.CreateProject(user.TargetDataHub, token, projectName)
+
+                    return projectResult |> Result.map _.http_url_to_repo |> Result.mapError _.GitLabErrorToString
+            }
+    }
+
 /// Get the current in-memory auth state for the active account.
 let getState () : AuthStateDto =
     reconcileActiveAccountInvariant ()
