@@ -6,6 +6,7 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 open Fable.Electron
+open Fable.Core
 open Fable.Core.JsInterop
 open Main
 open Main.ARCtrlExtensions
