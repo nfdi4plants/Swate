@@ -6,6 +6,7 @@ open Main.ArcVault
 open Main.ArcVaultHelper
 open Main.Bindings.Path
 open Main.IPC.Delete
+open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open ARCtrl
 open Vitest
@@ -205,6 +206,29 @@ Vitest.describe (
                             Vitest.expect(inMemoryArc.ContainsAssay("DeleteAssay")).toBe (false)
                             Vitest.expect(inMemoryArc.GetAssay("KeepAssay").Title).toEqual (Some "Unsaved local title")
                             Vitest.expect(vault.hasUnsavedArcChanges).toBe (true)
+                    })
+        )
+
+        Vitest.test (
+            "deleted generic file stays deleted after saving the ARC",
+            fun () ->
+                withTempArc
+                    (fun arc -> arc.AddAssay(ArcAssay("AssayA")))
+                    (fun arcPath -> promise {
+                        let relativePath = "assays/AssayA/protocol.md"
+                        let absolutePath = join [| arcPath; "assays"; "AssayA"; "protocol.md" |]
+                        do! ARCtrl.FileSystemHelper.writeFileTextAsync absolutePath "protocol"
+
+                        let! arc = loadArcAsync arcPath
+
+                        match! ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath relativePath with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ArcDeleteHelper.removeKnownPath relativePath arc
+
+                        do! arc.UpdateAsync arcPath
+
+                        let! exists = pathExistsAsync absolutePath
+                        Vitest.expect(exists).toBe (false)
                     })
         )
 )

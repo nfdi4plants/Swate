@@ -471,10 +471,16 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                                 "Deletion is only allowed for safe non-ARC filesystem items inside the ARC."
                                         )
                                 else
-                                    return!
+                                    match!
                                         ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk
                                             arcPath
                                             normalizedGenericPath
+                                    with
+                                    | Error deleteError -> return Error deleteError
+                                    | Ok() ->
+                                        ArcDeleteHelper.removeKnownPath normalizedGenericPath vault.arc.Value
+                                        do! vault.RefreshFileTree()
+                                        return Ok()
                             | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.InvestigationFile,
                                                                                               _) ->
                                 return Error(exn "Deleting the investigation file is not supported.")

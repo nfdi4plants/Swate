@@ -83,6 +83,25 @@ module ArcDeleteHelper =
             return Ok mergedArc
     }
 
+    let removeKnownPath relativePath (arc: ARC) =
+        arc.FileSystem.Tree.ToFilePaths()
+        |> Array.filter (fun path -> PathHelpers.isSameOrDescendantPath path relativePath |> not)
+        |> arc.SetFilePaths
+
+        match ArcEntityRef.fromPath relativePath with
+        | ArcEntityRef.AssayDataMap identifier ->
+            arc.TryGetAssay(identifier)
+            |> Option.iter (fun entity -> entity.DataMap <- None)
+        | ArcEntityRef.StudyDataMap identifier ->
+            arc.TryGetStudy(identifier)
+            |> Option.iter (fun entity -> entity.DataMap <- None)
+        | ArcEntityRef.WorkflowDataMap identifier ->
+            arc.TryGetWorkflow(identifier)
+            |> Option.iter (fun entity -> entity.DataMap <- None)
+        | ArcEntityRef.RunDataMap identifier ->
+            arc.TryGetRun(identifier) |> Option.iter (fun entity -> entity.DataMap <- None)
+        | _ -> ()
+
     let private tryGetEntityDeleteTarget relativePath =
         match ArcEntityPathRules.classifyDeleteTarget relativePath with
         | ArcEntityPathRules.DeletePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath) ->
