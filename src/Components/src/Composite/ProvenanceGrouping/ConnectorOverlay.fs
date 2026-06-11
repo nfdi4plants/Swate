@@ -15,6 +15,7 @@ type private MeasuredConnector =
         Path: string
         TestId: string
         ClassName: string
+        StrokeWidth: float
         StrokeDasharray: string option
         InteractiveConnection: DisplayConnection option
         AriaLabel: string option
@@ -123,12 +124,13 @@ module private ConnectorHandles =
 /// Projects model/UI state into concrete connector path definitions.
 module private ConnectorPaths =
 
-    let private measured key testId className strokeDasharray interactiveConnection ariaLabel path =
+    let private measured key testId className strokeWidth strokeDasharray interactiveConnection ariaLabel path =
         {
             Key = key
             Path = path
             TestId = testId
             ClassName = className
+            StrokeWidth = strokeWidth
             StrokeDasharray = strokeDasharray
             InteractiveConnection = interactiveConnection
             AriaLabel = ariaLabel
@@ -168,7 +170,8 @@ module private ConnectorPaths =
                 measured
                     $"connection:{connection.Id}"
                     "provenance-connection"
-                    "swt:text-primary swt:pointer-events-auto swt:cursor-pointer"
+                    "swt:text-primary"
+                    2.25
                     None
                     (Some connection)
                     (Some $"Select connection {connection.Id}")
@@ -214,6 +217,7 @@ module private ConnectorPaths =
                                 $"member:{displayConnection.Id}:{connectionId}"
                                 "provenance-member-connection"
                                 "swt:text-primary/70 swt:pointer-events-none"
+                                2.0
                                 None
                                 None
                                 None
@@ -264,6 +268,7 @@ module private ConnectorPaths =
                                 $"value:{side}:{chip.Id}:{group.Id}"
                                 "provenance-value-connection"
                                 "swt:text-accent swt:pointer-events-none"
+                                1.75
                                 (Some "3 6")
                                 None
                                 None
@@ -280,6 +285,7 @@ module private ConnectorPaths =
                             $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{group.Id}"
                             "provenance-property-connection"
                             "swt:text-secondary swt:pointer-events-none"
+                            1.75
                             (Some "4 4")
                             None
                             None
@@ -300,6 +306,7 @@ module private ConnectorPaths =
                     "live"
                     "provenance-live-connection"
                     "swt:text-primary swt:pointer-events-none swt:opacity-80"
+                    2.25
                     (Some "6 4")
                     None
                     None
@@ -348,6 +355,7 @@ type ConnectorOverlay =
             ?debug: bool
         ) =
         let paths, setPaths = React.useState ([]: MeasuredConnector list)
+        let hoveredKey, setHoveredKey = React.useState<string option> None
 
         let measure () =
             match containerRef.current with
@@ -385,6 +393,11 @@ type ConnectorOverlay =
             [| box pairId; box model; box inputGroups; box outputGroups; box connections; box uiState |]
         )
 
+        let selectedConnectionId =
+            match uiState.Detail with
+            | Some(ProvenanceDetail.Connection connectionId) -> Some connectionId
+            | _ -> None
+
         Svg.svg [
             svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
             svg.children [
@@ -405,29 +418,89 @@ type ConnectorOverlay =
                             | None -> ()
                         | _ -> ()
 
-                    Svg.path [
-                        svg.key measured.Key
-                        svg.d measured.Path
-                        svg.fill "none"
-                        svg.stroke "currentColor"
-                        svg.className measured.ClassName
-                        match measured.StrokeDasharray with
-                        | Some dash -> svg.custom ("strokeDasharray", dash)
-                        | None -> ()
+                    let isSelected =
+                        match measured.InteractiveConnection, selectedConnectionId with
+                        | Some connection, Some selectedId -> connection.Id = selectedId
+                        | _ -> false
+
+                    let isEmphasized = isSelected || hoveredKey = Some measured.Key
+
+                    let strokeWidth =
+                        if isEmphasized then
+                            measured.StrokeWidth + 1.25
+                        else
+                            measured.StrokeWidth
+
+                    // Selecting a connection keeps it bright and recedes its siblings.
+                    let strokeOpacity =
+                        match measured.InteractiveConnection with
+                        | Some _ when isEmphasized -> 1.0
+                        | Some _ when selectedConnectionId.IsSome -> 0.3
+                        | Some _ -> 0.85
+                        | None -> 1.0
+
+                    let debugAttributes = [
                         if defaultArg debug false then
                             svg.custom ("data-testid", measured.TestId)
                             svg.custom ("data-provenance-connection-key", measured.Key)
-                        match measured.InteractiveConnection with
-                        | Some connection ->
-                            svg.custom ("tabIndex", "0")
-                            svg.custom ("role", "button")
-                            svg.custom (
-                                "aria-label",
-                                measured.AriaLabel |> Option.defaultValue $"Select connection {connection.Id}"
-                            )
-                            svg.onClick (fun _ -> onSelect connection)
-                            svg.onKeyDown activateFromKeyboard
-                        | None -> ()
+                    ]
+
+                    Svg.g [
+                        svg.key measured.Key
+                        svg.children [
+                            // A surface-colored halo keeps crossing connectors readable.
+                            Svg.path [
+                                svg.d measured.Path
+                                svg.fill "none"
+                                svg.stroke "currentColor"
+                                svg.strokeWidth (strokeWidth + 2.5)
+                                svg.strokeLineCap "round"
+                                svg.className "swt:text-base-200"
+                                match measured.StrokeDasharray with
+                                | Some dash -> svg.custom ("strokeDasharray", dash)
+                                | None -> ()
+                            ]
+                            Svg.path [
+                                svg.d measured.Path
+                                svg.fill "none"
+                                svg.stroke "currentColor"
+                                svg.strokeWidth strokeWidth
+                                svg.strokeLineCap "round"
+                                svg.custom ("strokeOpacity", strokeOpacity)
+                                svg.className measured.ClassName
+                                match measured.StrokeDasharray with
+                                | Some dash -> svg.custom ("strokeDasharray", dash)
+                                | None -> ()
+                                if measured.InteractiveConnection.IsNone then
+                                    yield! debugAttributes
+                            ]
+                            // A wide transparent stroke is the actual click/keyboard target,
+                            // so selecting a thin curve no longer needs pixel accuracy.
+                            match measured.InteractiveConnection with
+                            | Some connection ->
+                                Svg.path [
+                                    svg.d measured.Path
+                                    svg.fill "none"
+                                    svg.stroke "transparent"
+                                    svg.strokeWidth 14
+                                    svg.className "swt:pointer-events-auto swt:cursor-pointer focus:swt:outline-none"
+                                    svg.custom ("tabIndex", "0")
+                                    svg.custom ("role", "button")
+                                    svg.custom (
+                                        "aria-label",
+                                        measured.AriaLabel
+                                        |> Option.defaultValue $"Select connection {connection.Id}"
+                                    )
+                                    yield! debugAttributes
+                                    svg.onClick (fun _ -> onSelect connection)
+                                    svg.onKeyDown activateFromKeyboard
+                                    svg.onMouseEnter (fun _ -> setHoveredKey (Some measured.Key))
+                                    svg.onMouseLeave (fun _ -> setHoveredKey None)
+                                    svg.onFocus (fun _ -> setHoveredKey (Some measured.Key))
+                                    svg.onBlur (fun _ -> setHoveredKey None)
+                                ]
+                            | None -> ()
+                        ]
                     ]
             ]
         ]
