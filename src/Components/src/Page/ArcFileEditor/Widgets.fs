@@ -17,14 +17,42 @@ module private WidgetsHelper =
         WidgetType.Template
         WidgetType.FilePicker
         WidgetType.DataAnnotator
+        WidgetType.JsonImport
+        WidgetType.JsonExport
     ]
 
     let widgetInfo (widgetType: WidgetType) =
         match widgetType with
-        | WidgetType.BuildingBlock -> "Add Building Block", Icons.BuildingBlock()
-        | WidgetType.Template -> "Add Template", Icons.Templates()
-        | WidgetType.FilePicker -> "File Picker", Icons.FilePicker()
-        | WidgetType.DataAnnotator -> "Data Annotator", Icons.DataAnnotator()
+        | WidgetType.BuildingBlock -> 
+            "Add Building Block", 
+            Html.i [
+                prop.className "swt:iconify swt:fluent--table-column-insert-24-filled swt:size-6"
+            ]
+        | WidgetType.Template -> 
+            "Add Template",
+            Html.i [
+                prop.className "swt:iconify swt:fluent--table-add-24-filled swt:size-6"
+            ]
+        | WidgetType.FilePicker -> 
+            "File Picker", 
+            Html.i [
+                prop.className "swt:iconify swt:fluent--document-text-link-20-filled swt:size-6"
+            ]
+        | WidgetType.DataAnnotator -> 
+            "Data Annotator", 
+            Html.i [
+                prop.className "swt:iconify swt:fluent--document-data-link-24-filled swt:size-6"
+            ]
+        | WidgetType.JsonImport ->
+            "Import JSON", 
+            Html.i [
+                prop.className "swt:iconify swt:fluent--arrow-import-20-filled swt:size-6"
+            ]
+        | WidgetType.JsonExport ->
+            "Export JSON", 
+            Html.i [
+                prop.className "swt:iconify swt:fluent--arrow-export-20-filled swt:size-6"
+            ]
         | WidgetType.Playground -> "Playground", Icons.Templates()
 
 open WidgetsHelper
@@ -68,7 +96,9 @@ type Main =
             buildingBlockWidget: ReactElement,
             templateWidget: ReactElement,
             filePickerWidget: ReactElement,
-            dataAnnotatorWidget: ReactElement
+            dataAnnotatorWidget: ReactElement,
+            jsonImportWidget: ReactElement,
+            jsonExportWidget: ReactElement
         ) =
         let widgets: Map<WidgetType, WidgetDefinition> =
             React.useMemo (
@@ -94,6 +124,16 @@ type Main =
                             prefix = "DATAANNOTATOR"
                             content = dataAnnotatorWidget
                         |}
+                        WidgetType.JsonImport,
+                        {|
+                            prefix = "JSONIMPORT"
+                            content = jsonImportWidget
+                        |}
+                        WidgetType.JsonExport,
+                        {|
+                            prefix = "JSONEXPORT"
+                            content = jsonExportWidget
+                        |}
                     ]
                     |> Map.ofList
                 ),
@@ -102,6 +142,8 @@ type Main =
                     box templateWidget
                     box filePickerWidget
                     box dataAnnotatorWidget
+                    box jsonImportWidget
+                    box jsonExportWidget
                 |]
             )
 

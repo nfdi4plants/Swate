@@ -62,6 +62,14 @@ type private LazyComponents =
         )
 
     [<ReactLazyComponent>]
+    static member LazyJsonImportWidget(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
+        Swate.Components.Composite.Widgets.JsonImport.JsonImport.JsonImport(arcFile, setArcFile)
+
+    [<ReactLazyComponent>]
+    static member LazyJsonExportWidget(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
+        Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile)
+
+    [<ReactLazyComponent>]
     static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
         Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotator.Main(destination, setAnnotationInput, onError)
 
@@ -69,16 +77,18 @@ type private LazyComponents =
     static member LazyArcFileMetadata(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
         Swate.Components.Page.Metadata.ArcFileMetadata.ArcFileMetadata(arcFile = arcFile, setArcFile = setArcFile)
 
+
 [<Erase; Mangle(false)>]
 type Main =
 
     [<ReactComponent>]
     static member private LazyFallback(text: string) =
         Html.div [
-            prop.className "swt:flex swt:items-center swt:justify-center swt:p-3 swt:text-sm swt:opacity-70"
-            prop.text text
+            prop.className "swt:flex swt:items-center swt:justify-center"
+            prop.children [ Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(text = text) ]
         ]
 
+    [<ReactComponent>]
     static member LazyLoaderWithMessage(lazyComponent: ReactElement, message: string) =
         React.Suspense([ lazyComponent ], fallback = Main.LazyFallback(message))
 
@@ -353,6 +363,16 @@ type Main =
                                 prop.className "swt:p-3 swt:text-sm swt:opacity-70"
                                 prop.text message
                             ]
+                    jsonImport =
+                        Main.LazyLoaderWithMessage(
+                            LazyComponents.LazyJsonImportWidget(arcFile, setArcFile),
+                            "Loading JSON Import Widget..."
+                        )
+                    jsonExport =
+                        Main.LazyLoaderWithMessage(
+                            LazyComponents.LazyJsonExportWidget(arcFile, setArcFile),
+                            "Loading JSON Export Widget..."
+                        )
                 |}),
                 [|
                     box arcFile
@@ -410,7 +430,9 @@ type Main =
                 widgetElements.buildingBlock,
                 widgetElements.template,
                 widgetElements.filePicker,
-                widgetElements.dataAnnotator
+                widgetElements.dataAnnotator,
+                widgetElements.jsonImport,
+                widgetElements.jsonExport
             )
         )
 
