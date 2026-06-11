@@ -17,8 +17,6 @@ type private MeasuredConnector =
         ClassName: string
         StrokeWidth: float
         StrokeDasharray: string option
-        /// Filled triangle path marking the input-to-output direction at the target end.
-        ArrowHead: string option
         InteractiveConnection: DisplayConnection option
         AriaLabel: string option
     }
@@ -56,41 +54,6 @@ module private ConnectorMeasure =
         | Some sourceNode, Some targetNode ->
             pathBetweenPoints (center container sourceNode) (center container targetNode)
         | _ -> None
-
-    /// The connector curves always end horizontally (their control points share the
-    /// endpoint Y), so the arrow head is a horizontal triangle pulled back far enough
-    /// to clear the connection handle dot it points at.
-    let private arrowHeadAt start finish =
-        let direction = if finish.X - start.X >= 0. then 1. else -1.
-        let tipX = finish.X - direction * 7.
-        let baseX = tipX - direction * 6.
-        $"M {tipX} {finish.Y} L {baseX} {finish.Y - 3.5} L {baseX} {finish.Y + 3.5} Z"
-
-    let directedPathBetweenHandles container source target =
-        match tryHandle container source, tryHandle container target with
-        | Some sourceNode, Some targetNode ->
-            let start = center container sourceNode
-            let finish = center container targetNode
-
-            pathBetweenPoints start finish
-            |> Option.map (fun path -> path, arrowHeadAt start finish)
-        | _ -> None
-
-    let tryHandleCenter container handle =
-        tryHandle container handle |> Option.map (center container)
-
-    let directedPathBetweenPoints start finish =
-        pathBetweenPoints start finish
-        |> Option.map (fun path -> path, arrowHeadAt start finish)
-
-    /// Half height of a group card, used to keep fanned attachment points on its edge.
-    let tryGroupHalfHeight (container: HTMLElement) nodeId =
-        let node: HTMLElement = !!container?querySelector($"[data-provenance-group-node='{nodeId}']")
-
-        if isNull node then
-            None
-        else
-            Some(node.getBoundingClientRect().height / 2.)
 
     /// Rail connectors shorter than this are skipped entirely so dense layouts do not
     /// fill the rail gutters with overlapping stubs.
@@ -169,7 +132,6 @@ module private ConnectorPaths =
             ClassName = className
             StrokeWidth = strokeWidth
             StrokeDasharray = strokeDasharray
-            ArrowHead = None
             InteractiveConnection = interactiveConnection
             AriaLabel = ariaLabel
         }
@@ -197,86 +159,23 @@ module private ConnectorPaths =
         || isManuallyResolving pairId side groupId uiState
         || isConnectedToExpanded connections side groupId uiState
 
-    let private fanSpacing = 14.
-
-    /// Vertical attachment offsets per connection for one card edge: connections
-    /// sharing a group fan out along the edge, ordered by their opposite endpoint,
-    /// instead of all knotting at the edge center.
-    let private fanOffsets keySelector sortSelector endpoints =
-        endpoints
-        |> List.groupBy keySelector
-        |> List.collect (fun (_, grouped) ->
-            let count = float grouped.Length
-
-            grouped
-            |> List.sortBy sortSelector
-            |> List.mapi (fun index (connection: DisplayConnection, _, _) ->
-                connection.Id, (float index - (count - 1.) / 2.) * fanSpacing))
-        |> Map.ofList
-
     let groupConnections container connections =
-        let endpoints =
-            connections
-            |> List.choose (fun connection ->
-                let start =
-                    ConnectorMeasure.tryHandleCenter
-                        container
-                        (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
-
-                let finish =
-                    ConnectorMeasure.tryHandleCenter
-                        container
-                        (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
-
-                match start, finish with
-                | Some start, Some finish -> Some(connection, start, finish)
-                | _ -> None)
-
-        let sourceOffsets =
-            endpoints
-            |> fanOffsets
-                (fun (connection, _, _) -> connection.SourceGroupId)
-                (fun (connection, _, finish) -> finish.Y, connection.Id)
-
-        let targetOffsets =
-            endpoints
-            |> fanOffsets
-                (fun (connection, _, _) -> connection.TargetGroupId)
-                (fun (connection, start, _) -> start.Y, connection.Id)
-
-        let clampedOffset side groupId (offsets: Map<string, float>) connectionId =
-            let limit =
-                ConnectorMeasure.tryGroupHalfHeight container (DragDrop.groupNodeId side groupId)
-                |> Option.map (fun halfHeight -> max 0. (halfHeight - 10.))
-                |> Option.defaultValue 0.
-
-            offsets.TryFind connectionId
-            |> Option.defaultValue 0.
-            |> max -limit
-            |> min limit
-
-        endpoints
-        |> List.choose (fun (connection, start, finish) ->
-            let start =
-                { start with Y = start.Y + clampedOffset ProvenanceSide.Input connection.SourceGroupId sourceOffsets connection.Id }
-
-            let finish =
-                { finish with Y = finish.Y + clampedOffset ProvenanceSide.Output connection.TargetGroupId targetOffsets connection.Id }
-
-            ConnectorMeasure.directedPathBetweenPoints start finish
-            |> Option.map (fun (path, arrowHead) ->
-                {
-                    measured
-                        $"connection:{connection.Id}"
-                        "provenance-connection"
-                        "swt:text-primary"
-                        2.25
-                        None
-                        (Some connection)
-                        (Some $"Select connection {connection.Id}")
-                        path with
-                        ArrowHead = Some arrowHead
-                }))
+        connections
+        |> List.choose (fun connection ->
+            ConnectorMeasure.pathBetweenHandles
+                container
+                (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
+                (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
+            |> Option.map (
+                measured
+                    $"connection:{connection.Id}"
+                    "provenance-connection"
+                    "swt:text-primary"
+                    2.25
+                    None
+                    (Some connection)
+                    (Some $"Select connection {connection.Id}")
+            ))
 
     let memberConnections container pairId (model: ProvenanceModel) connections uiState =
         connections
@@ -312,20 +211,17 @@ module private ConnectorPaths =
                             else
                                 ConnectorHandles.group ProvenanceSide.Output displayConnection.TargetGroupId
 
-                        ConnectorMeasure.directedPathBetweenHandles container source target
-                        |> Option.map (fun (path, arrowHead) ->
-                            {
-                                measured
-                                    $"member:{displayConnection.Id}:{connectionId}"
-                                    "provenance-member-connection"
-                                    "swt:text-primary/70 swt:pointer-events-none"
-                                    2.0
-                                    None
-                                    None
-                                    None
-                                    path with
-                                    ArrowHead = Some arrowHead
-                            })))
+                        ConnectorMeasure.pathBetweenHandles container source target
+                        |> Option.map (
+                            measured
+                                $"member:{displayConnection.Id}:{connectionId}"
+                                "provenance-member-connection"
+                                "swt:text-primary/70 swt:pointer-events-none"
+                                2.0
+                                None
+                                None
+                                None
+                        )))
         )
 
     let private expandedHeaders pairId side uiState =
@@ -578,15 +474,6 @@ type ConnectorOverlay =
                                 if measured.InteractiveConnection.IsNone then
                                     yield! debugAttributes
                             ]
-                            match measured.ArrowHead with
-                            | Some arrowHead ->
-                                Svg.path [
-                                    svg.d arrowHead
-                                    svg.fill "currentColor"
-                                    svg.custom ("fillOpacity", strokeOpacity)
-                                    svg.className measured.ClassName
-                                ]
-                            | None -> ()
                             // A wide transparent stroke is the actual click/keyboard target,
                             // so selecting a thin curve no longer needs pixel accuracy.
                             match measured.InteractiveConnection with
