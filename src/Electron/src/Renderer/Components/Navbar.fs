@@ -261,20 +261,20 @@ type Navbar =
                 dependencies = [||]
             }
 
-        let onSaveArc (event: Browser.Types.MouseEvent) =
+        let onSaveArc _ =
             if hasUnsavedChanges.state && not isSaving then
-                (event.currentTarget :?> Browser.Types.HTMLButtonElement).disabled <- true
                 setIsSaving true
 
                 promise {
-                    match! Api.ipcArcVaultApi.saveArcFile () with
-                    | Ok _ -> ()
-                    | Error ex -> errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
-
-                    setIsSaving false
+                    try
+                        match! Api.ipcArcVaultApi.saveArcFile () with
+                        | Ok _ -> ()
+                        | Error ex ->
+                            errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
+                    finally
+                        setIsSaving false
                 }
                 |> Promise.catch (fun ex ->
-                    setIsSaving false
                     errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
                 )
                 |> Promise.start

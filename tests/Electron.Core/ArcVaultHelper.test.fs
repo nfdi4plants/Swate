@@ -1,31 +1,20 @@
 module ElectronCore.ArcVaultHelperTests
 
 open ARCtrl
-open Fable.Core
-open Fable.Core.JsInterop
 open Main.ArcMerge
 open Main.ArcVault
 open Main.ArcVaultHelper
+open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Vitest
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-
 let private mkdirRecursiveAsync (directoryPath: string) = promise {
-    let! _ =
-        fsPromisesDynamic?mkdir (directoryPath, createObj [ "recursive" ==> true ])
-        |> unbox<JS.Promise<obj>>
-
+    let! _ = mkdirAsync directoryPath (MkdirOptions(recursive = true))
     return ()
 }
 
-let private writeFileAsync (filePath: string) (content: string) = promise {
-    let! _ = fsPromisesDynamic?writeFile (filePath, content) |> unbox<JS.Promise<obj>>
-    return ()
-}
-
-let private readFileAsync (filePath: string) =
-    fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
+let private writeTextFileAsync (filePath: string) (content: string) =
+    writeFileAsync filePath content TextEncoding.Utf8
 
 let private addDataMapToAllEntityTypes (arc: ARC) =
     let study = ArcStudy("Study With DataMap")
@@ -81,9 +70,9 @@ Vitest.describe (
                         let gitObjectPath = join [| gitObjectFolder; "object" |]
                         do! mkdirRecursiveAsync gitObjectFolder
                         do! mkdirRecursiveAsync nestedGitFolder
-                        do! writeFileAsync gitObjectPath "git-object"
-                        do! writeFileAsync (join [| nestedGitFolder; "config" |]) "nested-git-config"
-                        do! writeFileAsync payloadPath "payload"
+                        do! writeTextFileAsync gitObjectPath "git-object"
+                        do! writeTextFileAsync (join [| nestedGitFolder; "config" |]) "nested-git-config"
+                        do! writeTextFileAsync payloadPath "payload"
 
                         let! loadResult = tryLoadArcIgnoringGitMetadataAsync arcPath
                         let loadedArc = TestHelpers.expectLoadedArc loadResult
@@ -95,8 +84,8 @@ Vitest.describe (
                         loadedArc.StaticHash <- 0
                         do! updateArcPreservingExistingPayloadFiles arcPath loadedArc
 
-                        let! payload = readFileAsync payloadPath
-                        let! gitObject = readFileAsync gitObjectPath
+                        let! payload = readFileAsync payloadPath TextEncoding.Utf8
+                        let! gitObject = readFileAsync gitObjectPath TextEncoding.Utf8
                         Vitest.expect(payload).toBe ("payload")
                         Vitest.expect(gitObject).toBe ("git-object")
                     })
@@ -144,7 +133,7 @@ Vitest.describe (
                         let assayFile = join [| assayFolder; "isa.assay.xlsx" |]
 
                         do! mkdirRecursiveAsync assayFolder
-                        do! writeFileAsync assayFile ""
+                        do! writeTextFileAsync assayFile ""
 
                         let vault = ArcVault(TestHelpers.testWindow ())
                         vault.path <- Some arcPath

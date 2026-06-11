@@ -71,7 +71,8 @@ let tryLoadArcIgnoringGitMetadataAsync (arcPath: string) = promise {
         return Ok arc
 }
 
-/// Writes ARC updates without touching Git metadata or replacing existing payload with empty scaffold contracts.
+/// Replaces ARC.UpdateAsync for full ARC saves because its generated contracts may include Git metadata
+/// and empty scaffold contracts that would overwrite existing payload files.
 let updateArcPreservingExistingPayloadFiles (arcPath: string) (arc: ARC) = promise {
     let contractsToWrite = ResizeArray<Contract>()
 
