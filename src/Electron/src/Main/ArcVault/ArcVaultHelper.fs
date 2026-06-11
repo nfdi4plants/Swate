@@ -72,21 +72,18 @@ let tryLoadArcIgnoringGitMetadataAsync (arcPath: string) = promise {
 }
 
 /// Replaces ARC.UpdateAsync for full ARC saves because its generated contracts may include Git metadata
-/// and empty scaffold contracts that would overwrite existing payload files.
+/// and DTO-less write contracts that would overwrite or restore payload files.
 let updateArcPreservingExistingPayloadFiles (arcPath: string) (arc: ARC) = promise {
-    let contractsToWrite = ResizeArray<Contract>()
+    let contractsToWrite =
+        arc.GetUpdateContracts()
+        |> Array.filter (fun contract ->
+            not (isGitMetadataContract contract)
+            && match contract.Operation, contract.DTO with
+               | (Operation.CREATE | Operation.UPDATE), None -> false
+               | _ -> true
+        )
 
-    for contract in arc.GetUpdateContracts() |> Array.filter (isGitMetadataContract >> not) do
-        match contract.Operation, contract.DTO with
-        | Operation.CREATE, None ->
-            let absolutePath = path.join (arcPath, contract.Path)
-            let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
-
-            if not fileExists then
-                contractsToWrite.Add contract
-        | _ -> contractsToWrite.Add contract
-
-    match! fullFillContractBatchAsync arcPath (contractsToWrite.ToArray()) with
+    match! fullFillContractBatchAsync arcPath contractsToWrite with
     | Ok _ -> ()
     | Error errors -> return failwith (PathHelpers.formatContractErrors errors)
 }

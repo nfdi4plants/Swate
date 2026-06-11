@@ -24,6 +24,7 @@
     <Compile Include="FileTreeCreator.fs" />
     <Compile Include="ArcMerge\Types.fs" />
     <Compile Include="ArcMerge\Extensions.fs" />
+    <Compile Include="ArcMerge\ArcWriteExtensions.fs" />
     <Compile Include="ArcMerge\ArcEntityRefHelper.fs" />
     <Compile Include="ArcMerge\ArcMergeLibraryExtensions.fs" />
     <Compile Include="ArcMerge\ArcAddExtensions.fs" />

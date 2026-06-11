@@ -398,7 +398,12 @@ module ArcVaultExtensions =
                 this.isBusyWriting <- true
 
                 try
-                    do! arc.WriteAsync(normalizedPath)
+                    match! arc.TryWriteAsyncSwate(normalizedPath) with
+                    | Ok _ -> ()
+                    | Error errors ->
+                        failwithf
+                            "Could not write ARC, failed with the following errors %s"
+                            (PathHelpers.formatContractErrors errors)
                 finally
                     this.isBusyWriting <- false
 

@@ -3,15 +3,11 @@ namespace Update
 open Messages
 open Elmish
 open Spreadsheet
-open LocalHistory
 open Model
-open Swate.Components
 open Swate.Components.Shared
-open Fable.Remoting.Client
 open FsSpreadsheet.Js
 open ARCtrl
 open ARCtrl.Spreadsheet
-open ARCtrl.Json
 
 module Spreadsheet =
 

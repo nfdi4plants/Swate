@@ -57,6 +57,104 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "Swate write contracts contain only targeted ARC files",
+            fun () ->
+                let arc = ARC("TargetedWriteArc")
+                addDataMapToAllEntityTypes arc
+                arc.SetLicenseFulltext("license text")
+
+                arc.SetFilePaths(
+                    [|
+                        ".git/config"
+                        "payload.txt"
+                        "missing-payload.txt"
+                        "assays/Assay With DataMap/README.md"
+                    |]
+                )
+
+                let actualPaths = arc.GetWriteContractsSwate() |> Array.map _.Path |> Array.sort
+
+                let expectedPaths =
+                    [|
+                        "LICENSE"
+                        "assays/.gitkeep"
+                        "assays/Assay With DataMap/isa.assay.xlsx"
+                        "assays/Assay With DataMap/isa.datamap.xlsx"
+                        "isa.investigation.xlsx"
+                        "runs/.gitkeep"
+                        "runs/Run With DataMap/isa.datamap.xlsx"
+                        "runs/Run With DataMap/isa.run.xlsx"
+                        "studies/.gitkeep"
+                        "studies/Study With DataMap/isa.datamap.xlsx"
+                        "studies/Study With DataMap/isa.study.xlsx"
+                        "workflows/.gitkeep"
+                        "workflows/Workflow With DataMap/isa.datamap.xlsx"
+                        "workflows/Workflow With DataMap/isa.workflow.xlsx"
+                    |]
+                    |> Array.sort
+
+                Vitest.expect(actualPaths).toEqual (expectedPaths)
+        )
+
+        Vitest.test (
+            "TryWriteAsyncSwate preserves payload and does not create unmanaged file-tree entries",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-targeted-write-"
+                let arcPath = join [| rootPath; "arc" |]
+                let gitFolder = join [| arcPath; ".git" |]
+                let assayFolder = join [| arcPath; "assays"; "Assay 1" |]
+                let payloadPath = join [| arcPath; "payload.txt" |]
+                let gitConfigPath = join [| gitFolder; "config" |]
+                let readmePath = join [| assayFolder; "README.md" |]
+                let missingPayloadPath = join [| arcPath; "missing-payload.txt" |]
+
+                try
+                    do! mkdirRecursiveAsync gitFolder
+                    do! mkdirRecursiveAsync assayFolder
+                    do! writeTextFileAsync payloadPath "payload"
+                    do! writeTextFileAsync gitConfigPath "git-config"
+                    do! writeTextFileAsync readmePath "readme"
+
+                    let arc = ARC("TargetedWriteArc")
+                    arc.AddAssay(ArcAssay("Assay 1"))
+
+                    arc.SetFilePaths(
+                        [|
+                            ".git/config"
+                            "payload.txt"
+                            "missing-payload.txt"
+                            "assays/Assay 1/README.md"
+                        |]
+                    )
+
+                    match! arc.TryWriteAsyncSwate(arcPath) with
+                    | Error errors -> failwith (String.concat "\n" errors)
+                    | Ok _ -> ()
+
+                    let! payload = readFileAsync payloadPath TextEncoding.Utf8
+                    let! gitConfig = readFileAsync gitConfigPath TextEncoding.Utf8
+                    let! readme = readFileAsync readmePath TextEncoding.Utf8
+                    let! missingPayloadExists = TestHelpers.pathExistsAsync missingPayloadPath
+
+                    let! assayFileExists = TestHelpers.pathExistsAsync (join [| assayFolder; "isa.assay.xlsx" |])
+
+                    let! collectionGitKeepExists =
+                        TestHelpers.pathExistsAsync (join [| arcPath; "assays"; ".gitkeep" |])
+
+                    Vitest.expect(payload).toBe ("payload")
+                    Vitest.expect(gitConfig).toBe ("git-config")
+                    Vitest.expect(readme).toBe ("readme")
+                    Vitest.expect(missingPayloadExists).toBe (false)
+                    Vitest.expect(assayFileExists).toBe (true)
+                    Vitest.expect(collectionGitKeepExists).toBe (true)
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "ARC loading and writing ignore Git metadata and preserve payload",
             fun () ->
                 TestHelpers.withTempArcWith
@@ -88,6 +186,42 @@ Vitest.describe (
                         let! gitObject = readFileAsync gitObjectPath TextEncoding.Utf8
                         Vitest.expect(payload).toBe ("payload")
                         Vitest.expect(gitObject).toBe ("git-object")
+                    })
+        )
+
+        Vitest.test (
+            "normal ARC save does not restore deleted DTO-less files from a stale file tree",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-save-deleted-file-"
+                    "DeletedFileArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let payloadPath = join [| arcPath; "payload.txt" |]
+                        let collectionGitKeepPath = join [| arcPath; "assays"; ".gitkeep" |]
+                        do! writeTextFileAsync payloadPath "payload"
+
+                        let! loadResult = tryLoadArcIgnoringGitMetadataAsync arcPath
+                        let loadedArc = TestHelpers.expectLoadedArc loadResult
+                        let stalePaths = loadedArc.FileSystem.Tree.ToFilePaths()
+
+                        Vitest.expect(stalePaths |> Array.contains "payload.txt").toBe (true)
+                        Vitest.expect(stalePaths |> Array.contains "assays/.gitkeep").toBe (true)
+
+                        do! rmAsync payloadPath (RmOptions())
+                        do! rmAsync collectionGitKeepPath (RmOptions())
+
+                        loadedArc.Title <- Some "Saved title"
+                        loadedArc.StaticHash <- 0
+                        do! updateArcPreservingExistingPayloadFiles arcPath loadedArc
+
+                        let! payloadExists = TestHelpers.pathExistsAsync payloadPath
+                        let! collectionGitKeepExists = TestHelpers.pathExistsAsync collectionGitKeepPath
+                        Vitest.expect(payloadExists).toBe (false)
+                        Vitest.expect(collectionGitKeepExists).toBe (false)
+
+                        let! reloadedArc = TestHelpers.loadArcAsync arcPath
+                        Vitest.expect(reloadedArc.Title).toEqual (Some "Saved title")
                     })
         )
 
