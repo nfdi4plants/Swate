@@ -1,7 +1,7 @@
 module ElectronCore.ArcVaultHelperTests
 
 open ARCtrl
-open Main.ArcMerge
+open Main.ARCtrlExtensions
 open Main.ArcVault
 open Main.ArcVaultHelper
 open Main.Bindings.Filesystem
@@ -172,15 +172,15 @@ Vitest.describe (
                         do! writeTextFileAsync (join [| nestedGitFolder; "config" |]) "nested-git-config"
                         do! writeTextFileAsync payloadPath "payload"
 
-                        let! loadResult = tryLoadArcIgnoringGitMetadataAsync arcPath
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
                         let loadedArc = TestHelpers.expectLoadedArc loadResult
                         let paths = loadedArc.FileSystem.Tree.ToFilePaths()
 
                         Vitest.expect(paths |> Array.exists isGitMetadataPath).toBe (false)
 
                         loadedArc.SetFilePaths(Array.append paths [| ".git/objects/ab/object" |])
-                        loadedArc.StaticHash <- 0
-                        do! updateArcPreservingExistingPayloadFiles arcPath loadedArc
+                        loadedArc.Title <- Some "Saved title"
+                        do! loadedArc.UpdateAsync arcPath
 
                         let! payload = readFileAsync payloadPath TextEncoding.Utf8
                         let! gitObject = readFileAsync gitObjectPath TextEncoding.Utf8
@@ -201,7 +201,7 @@ Vitest.describe (
                         let collectionGitKeepPath = join [| arcPath; "assays"; ".gitkeep" |]
                         do! writeTextFileAsync payloadPath "payload"
 
-                        let! loadResult = tryLoadArcIgnoringGitMetadataAsync arcPath
+                        let! loadResult = ARC.LoadAsyncSwate arcPath
                         let loadedArc = TestHelpers.expectLoadedArc loadResult
                         let stalePaths = loadedArc.FileSystem.Tree.ToFilePaths()
 
@@ -212,8 +212,7 @@ Vitest.describe (
                         do! rmAsync collectionGitKeepPath (RmOptions())
 
                         loadedArc.Title <- Some "Saved title"
-                        loadedArc.StaticHash <- 0
-                        do! updateArcPreservingExistingPayloadFiles arcPath loadedArc
+                        do! loadedArc.UpdateAsync arcPath
 
                         let! payloadExists = TestHelpers.pathExistsAsync payloadPath
                         let! collectionGitKeepExists = TestHelpers.pathExistsAsync collectionGitKeepPath

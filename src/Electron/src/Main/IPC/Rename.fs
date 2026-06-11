@@ -3,6 +3,7 @@ module Main.IPC.Rename
 open System
 open Fable.Core
 open ARCtrl
+open Main.ARCtrlExtensions
 open Main.ArcMerge
 open Main.ArcVaultHelper
 open Main.IPC.Delete
@@ -61,7 +62,7 @@ module ArcRenameHelper =
         (arcLocal: ARC)
         =
         promise {
-            match! tryLoadArcIgnoringGitMetadataAsync arcPath with
+            match! ARC.LoadAsyncSwate arcPath with
             | Error errors ->
                 return
                     Error(
@@ -101,7 +102,7 @@ module ArcRenameHelper =
                                     $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
                             )
                     else
-                        match! tryLoadArcIgnoringGitMetadataAsync arcPath with
+                        match! ARC.LoadAsyncSwate arcPath with
                         | Error errors ->
                             return
                                 Error(

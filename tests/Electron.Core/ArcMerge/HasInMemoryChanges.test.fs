@@ -1,7 +1,7 @@
 module ElectronCore.ArcMerge.HasInMemoryChangesTests
 
 open ARCtrl
-open Main.ArcMerge
+open Main.ARCtrlExtensions
 open Vitest
 
 Vitest.describe (

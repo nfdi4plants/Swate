@@ -1,12 +1,9 @@
 module ElectronCore.ArcDeleteHelperTests
 
-open Fable.Core
-open Main.ArcMerge
+open Main.ARCtrlExtensions
 open Main.ArcVault
-open Main.ArcVaultHelper
 open Main.Bindings.Path
 open Main.IPC.Delete
-open Swate.Components.Shared
 open ARCtrl
 open Vitest
 

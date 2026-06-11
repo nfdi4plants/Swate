@@ -1,7 +1,7 @@
 namespace Main.ArcMerge
 
 open ARCtrl
-open Main.ArcMerge.ArcMergeExtensions
+open Main.ARCtrlExtensions
 
 module ArcMergeHelper =
 

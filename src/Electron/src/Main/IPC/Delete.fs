@@ -3,8 +3,8 @@ module Main.IPC.Delete
 open Fable.Core
 open ARCtrl
 open ARCtrl.Contract
+open Main.ARCtrlExtensions
 open Main.ArcMerge
-open Main.ArcVaultHelper
 open Swate.Components.Shared
 open ARC
 
@@ -61,7 +61,7 @@ module ArcDeleteHelper =
         ArcEntityPathRules.buildCanonicalEntityPaths zone identifier |> List.head
 
     let private mergeDeletedEntityFromDisk arcPath canonicalFilePath (arcLocal: ARC) = promise {
-        match! tryLoadArcIgnoringGitMetadataAsync arcPath with
+        match! ARC.LoadAsyncSwate arcPath with
         | Error errors ->
             return
                 Error(
@@ -110,7 +110,7 @@ module ArcDeleteHelper =
         | Error validationError -> return Error validationError
         | Ok(fileType, identifier, normalizedRelativePath, canonicalFilePath) ->
             try
-                match! tryLoadArcIgnoringGitMetadataAsync arcPath with
+                match! ARC.LoadAsyncSwate arcPath with
                 | Error errors ->
                     return
                         Error(

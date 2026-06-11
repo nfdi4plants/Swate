@@ -6,7 +6,7 @@ open Main.ArcVault
 open Main.ArcVaultTypes
 open Main.IPC.FileSystemIO
 open Main.IPC.Rename
-open Main.ArcMerge
+open Main.ARCtrlExtensions
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl

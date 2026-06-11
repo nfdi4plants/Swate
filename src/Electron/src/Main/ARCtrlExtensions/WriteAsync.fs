@@ -1,4 +1,4 @@
-namespace Main.ArcMerge
+namespace Main.ARCtrlExtensions
 
 open ARCtrl
 open ARCtrl.Contract
@@ -23,8 +23,9 @@ module ArcWriteExtensions =
 
     type ARC with
 
-        /// This function is a hotfix for ARCtrl bug #XXXX
-        /// copy paste from ARCtrl, except for filesystem iteration
+        /// Hotfix for #618, not fixed in the consumed ARCtrl 3.0.0-beta.12.
+        /// Mirrors ARCtrl.GetWriteContracts except that it emits only managed ARC payload contracts instead of
+        /// iterating the complete filesystem model, where stale or Git metadata paths could be recreated.
         member this.GetWriteContractsSwate(?skipUpdateFS: bool) =
             if not (defaultArg skipUpdateFS false) then
                 this.UpdateFileSystem()
@@ -138,6 +139,6 @@ module ArcWriteExtensions =
                     yield Contract.createCreate (entry.Key, dtoType, dto)
             |]
 
-        /// Hotfix for ARCtrl issue #618. Writes only contracts selected by GetWriteContractsSwate.
+        /// Hotfix for #618. Writes only contracts selected by GetWriteContractsSwate.
         member this.TryWriteAsyncSwate(arcPath: string) =
             this.GetWriteContractsSwate() |> fullFillContractBatchAsync arcPath
