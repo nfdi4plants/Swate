@@ -161,7 +161,6 @@ type Authentication =
         (dataHubUrl, setDataHubUrl, onSignIn: SignInInformation -> unit, setError: exn option -> unit)
         =
 
-
         let pat, setPat = React.useState ""
 
         Html.div [
@@ -334,6 +333,7 @@ type Authentication =
                     box error
                     box showAddAccount
                     box accounts
+                    box dataHubUrl
                 |]
             )
 
