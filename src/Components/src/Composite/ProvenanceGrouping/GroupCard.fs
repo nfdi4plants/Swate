@@ -114,7 +114,7 @@ type GroupCard =
                 // Cards size to their content (the column aligns them toward their rail),
                 // so the gap between the two card columns grows for group connectors. The
                 // edge handles are positioned on the card border and move with its width.
-                "swt:relative swt:flex swt:w-fit swt:max-w-full swt:flex-col swt:gap-2 swt:rounded-box swt:border swt:bg-base-100 swt:p-3 swt:shadow-sm"
+                "swt:relative swt:flex swt:w-fit swt:max-w-full swt:flex-col swt:gap-1.5 swt:rounded-box swt:border swt:bg-base-100 swt:p-2.5 swt:shadow-sm"
                 if selected then
                     "swt:border-primary swt:bg-primary/5"
                 else
@@ -136,8 +136,7 @@ type GroupCard =
                     prop.className "swt:flex swt:items-start swt:gap-2"
                     prop.children [
                         Html.h3 [
-                            prop.className
-                                "swt:grow swt:min-w-0 swt:truncate swt:font-semibold swt:@max-xs/provenancePanel:text-sm"
+                            prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-sm swt:font-semibold"
                             prop.title title
                             prop.text title
                         ]
@@ -149,9 +148,12 @@ type GroupCard =
                             (fun _ -> onSelect ())
                         )
                         if isGroup then
+                            // The member count doubles as the expand trigger, replacing a
+                            // generic info icon without taking extra header space.
                             Buttons.QuickAccessButton(
-                                Html.i [
-                                    prop.className "swt:iconify swt:fluent--info-20-regular swt:size-4"
+                                Html.span [
+                                    prop.className "swt:badge swt:badge-ghost swt:badge-sm swt:font-semibold"
+                                    prop.text $"×{group.Members.Length}"
                                 ],
                                 "Show members",
                                 (fun _ -> onExpand ())
