@@ -55,6 +55,7 @@ type GroupCard =
             expanded: bool,
             onSelect: unit -> unit,
             onExpand: unit -> unit,
+            ?connectionCount: int,
             ?debug: bool,
             ?key: string
         ) =
@@ -140,6 +141,17 @@ type GroupCard =
                             prop.title title
                             prop.text title
                         ]
+                        // Stacked layouts hide the connector overlay; this badge keeps
+                        // the connection information visible on the card itself.
+                        match connectionCount with
+                        | Some count when count > 0 ->
+                            Html.span [
+                                prop.className "swt:badge swt:badge-primary swt:badge-sm swt:shrink-0"
+                                prop.title $"{count} connections"
+                                prop.ariaLabel $"{count} connections"
+                                prop.text $"⇄ {count}"
+                            ]
+                        | _ -> Html.none
                         Buttons.QuickAccessButton(
                             Html.i [
                                 prop.className "swt:iconify swt:fluent--checkmark-circle-20-regular swt:size-4"

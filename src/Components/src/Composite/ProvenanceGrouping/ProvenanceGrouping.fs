@@ -66,6 +66,32 @@ module private Splitter =
             ]
         ]
 
+/// Width tiers of the editor root that drive the responsive layout variants.
+[<RequireQualifiedAccess>]
+type private LayoutTier =
+    | Wide
+    | Medium
+    | Narrow
+
+module private LayoutTier =
+
+    let forWidth (width: float) =
+        if width < 640. then LayoutTier.Narrow
+        elif width < 1024. then LayoutTier.Medium
+        else LayoutTier.Wide
+
+/// Thin ResizeObserver binding used to derive the layout tier from the editor width.
+module private TierObserver =
+
+    [<Emit("new ResizeObserver(() => $0())")>]
+    let create (callback: unit -> unit) : obj = jsNative
+
+    [<Emit("$0.observe($1)")>]
+    let observe (observer: obj) (target: Browser.Types.HTMLElement) : unit = jsNative
+
+    [<Emit("$0.disconnect()")>]
+    let disconnect (observer: obj) : unit = jsNative
+
 /// Resolves drag payload ids and display ids against the active pair and UI palette.
 module private EditorLookups =
 
@@ -577,7 +603,20 @@ module private EditorSurface =
             (fun header -> PropertyRails.canSwitchHeader header model),
             debug = debug)
 
-    let groupColumn side (pair: ProvenanceLayerPair) model (groups: DisplayGroup list) endpointKind createSet uiState isExpanded toggleSelection toggleDetail debug =
+    let groupColumn
+        side
+        (pair: ProvenanceLayerPair)
+        model
+        (groups: DisplayGroup list)
+        endpointKind
+        createSet
+        uiState
+        isExpanded
+        toggleSelection
+        toggleDetail
+        (connectionCountFor: string -> int option)
+        debug
+        =
         let keyPrefix =
             match side with
             | ProvenanceSide.Input -> "Input"
@@ -602,6 +641,7 @@ module private EditorSurface =
                         isExpanded side group.Id,
                         (fun () -> toggleSelection side group.Id),
                         (fun () -> toggleDetail side group.Id),
+                        ?connectionCount = connectionCountFor group.Id,
                         debug = debug,
                         key = $"{keyPrefix}:{group.Id}")
                 if groups.IsEmpty then
@@ -637,6 +677,24 @@ type ProvenanceGrouping =
         let activeDrag, setActiveDrag = React.useState<DragDrop.Payload option> None
         let surfaceRef = React.useElementRef ()
         let splitDrag = React.useRef (None: Splitter.SplitterSide option)
+        let rootRef = React.useElementRef ()
+        let tier, setTier = React.useState LayoutTier.Wide
+        let openRail, setOpenRail = React.useState<ProvenanceSide option> None
+
+        React.useEffectOnce (fun () ->
+            let applyTier () =
+                match rootRef.current with
+                | Some root -> setTier (LayoutTier.forWidth root.clientWidth)
+                | None -> ()
+
+            applyTier ()
+            let observer = TierObserver.create applyTier
+
+            match rootRef.current with
+            | Some root -> TierObserver.observe observer root
+            | None -> ()
+
+            FsReact.createDisposable (fun () -> TierObserver.disconnect observer))
 
         let uiState = State.Layers.ensure session rawUiState
         let pair, inputGroups, outputGroups, connections = Display.displayPair session uiState
@@ -813,8 +871,251 @@ type ProvenanceGrouping =
                 ConnectSetPairs = connectSetPairs
             }
 
+        let railSideLabel side =
+            match side with
+            | ProvenanceSide.Input -> "input"
+            | ProvenanceSide.Output -> "output"
+
+        let toggleRail side =
+            setOpenRail (if openRail = Some side then None else Some side)
+
+        let railPanel side =
+            let layerId, oppositeLayerId, targetSide =
+                match side with
+                | ProvenanceSide.Input -> pair.LeftLayerId, pair.RightLayerId, ProvenanceSide.Output
+                | ProvenanceSide.Output -> pair.RightLayerId, pair.LeftLayerId, ProvenanceSide.Input
+
+            EditorSurface.propertyRail
+                side
+                pair
+                pair.Model
+                uiState
+                (State.Layers.get layerId uiState).GroupingAssignments
+                (fun header -> toggleSideGrouping layerId side header)
+                (fun header ->
+                    State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState
+                    |> setUiState)
+                (fun header ->
+                    State.GroupingAssignments.move pair.Id layerId oppositeLayerId targetSide header uiState
+                    |> setUiState)
+                (fun header -> togglePropertyExpanded side header)
+                (fun header value unit -> addPaletteValue side header value unit)
+                debug
+
+        let railColumn side =
+            Html.div [
+                prop.className "swt:@container/provenancePanel swt:min-w-0 swt:overflow-hidden"
+                prop.children [ railPanel side ]
+            ]
+
+        let connectionCountFor side groupId =
+            connections
+            |> List.sumBy (fun connection ->
+                match side with
+                | ProvenanceSide.Input when connection.SourceGroupId = groupId -> connection.ConnectionIds.Length
+                | ProvenanceSide.Output when connection.TargetGroupId = groupId -> connection.ConnectionIds.Length
+                | _ -> 0)
+
+        let groupColumnFor side withConnectionBadges =
+            let groups, endpointKind =
+                match side with
+                | ProvenanceSide.Input -> inputGroups, inputEndpointKind
+                | ProvenanceSide.Output -> outputGroups, outputEndpointKind
+
+            let counts groupId =
+                if withConnectionBadges then
+                    Some(connectionCountFor side groupId)
+                else
+                    None
+
+            EditorSurface.groupColumn
+                side
+                pair
+                pair.Model
+                groups
+                endpointKind
+                createSet
+                uiState
+                isGroupExpanded
+                toggleSelection
+                toggleGroupDetail
+                counts
+                debug
+
+        // Medium tier: rails fold into slim vertical strips, one open at a time.
+        let mediumRailColumn side =
+            if openRail = Some side then
+                Html.div [
+                    prop.className "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:overflow-hidden"
+                    prop.children [
+                        Html.button [
+                            prop.type'.button
+                            prop.className [
+                                "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
+                                if side = ProvenanceSide.Output then
+                                    "swt:self-end"
+                            ]
+                            prop.ariaLabel $"Hide {railSideLabel side} properties"
+                            if debug then
+                                prop.testId $"provenance-rail-toggle-{side}"
+                            prop.onClick (fun _ -> toggleRail side)
+                            prop.children [
+                                Html.i [
+                                    prop.className [
+                                        "swt:iconify swt:size-4"
+                                        if side = ProvenanceSide.Input then
+                                            "swt:fluent--chevron-left-20-regular"
+                                        else
+                                            "swt:fluent--chevron-right-20-regular"
+                                    ]
+                                ]
+                            ]
+                        ]
+                        railPanel side
+                    ]
+                ]
+            else
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-24 swt:w-fit swt:px-1 swt:py-2"
+                    prop.ariaLabel $"Show {railSideLabel side} properties"
+                    if debug then
+                        prop.testId $"provenance-rail-toggle-{side}"
+                    prop.onClick (fun _ -> toggleRail side)
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:[writing-mode:vertical-rl] swt:text-xs"
+                            prop.text "Properties"
+                        ]
+                    ]
+                ]
+
+        // Narrow tier: everything stacks and the rails collapse behind toggles.
+        let narrowRailSection side =
+            Html.div [
+                prop.className "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
+                prop.children [
+                    Html.button [
+                        prop.type'.button
+                        prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
+                        prop.ariaLabel (
+                            if openRail = Some side then
+                                $"Hide {railSideLabel side} properties"
+                            else
+                                $"Show {railSideLabel side} properties"
+                        )
+                        if debug then
+                            prop.testId $"provenance-rail-toggle-{side}"
+                        prop.onClick (fun _ -> toggleRail side)
+                        prop.children [
+                            Html.i [
+                                prop.className [
+                                    "swt:iconify swt:size-4"
+                                    if openRail = Some side then
+                                        "swt:fluent--chevron-up-20-regular"
+                                    else
+                                        "swt:fluent--chevron-down-20-regular"
+                                ]
+                            ]
+                            Html.span (
+                                match side with
+                                | ProvenanceSide.Input -> "Input properties"
+                                | ProvenanceSide.Output -> "Output properties"
+                            )
+                        ]
+                    ]
+                    if openRail = Some side then
+                        railPanel side
+                ]
+            ]
+
+        let connectorOverlay =
+            ConnectorOverlay.Main(
+                surfaceRef,
+                pair.Id,
+                pair.Model,
+                inputGroups,
+                outputGroups,
+                connections,
+                uiState,
+                (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
+                onRemove = removeDisplayConnection,
+                debug = debug)
+
+        let surface =
+            match tier with
+            | LayoutTier.Wide ->
+                Html.div [
+                    prop.ref surfaceRef
+                    prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start"
+                    prop.style [
+                        style.custom ("grid-template-columns", Splitter.template panelRatios)
+                    ]
+                    if debug then prop.testId "provenance-surface"
+                    prop.children [
+                        connectorOverlay
+                        railColumn ProvenanceSide.Input
+                        Splitter.handle Splitter.Left (startPanelDrag Splitter.Left) debug
+                        Html.div [
+                            // The wide column gap is the gutter the group-to-group
+                            // connectors are drawn in.
+                            prop.className
+                                "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-16"
+                            prop.children [
+                                groupColumnFor ProvenanceSide.Input false
+                                groupColumnFor ProvenanceSide.Output false
+                            ]
+                        ]
+                        Splitter.handle Splitter.Right (startPanelDrag Splitter.Right) debug
+                        railColumn ProvenanceSide.Output
+                    ]
+                ]
+            | LayoutTier.Medium ->
+                let railTrack side =
+                    if openRail = Some side then "minmax(10rem, 16rem)" else "auto"
+
+                Html.div [
+                    prop.ref surfaceRef
+                    prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start swt:gap-x-8"
+                    prop.style [
+                        style.custom (
+                            "grid-template-columns",
+                            $"{railTrack ProvenanceSide.Input} minmax(0, 1fr) {railTrack ProvenanceSide.Output}"
+                        )
+                    ]
+                    if debug then prop.testId "provenance-surface"
+                    prop.children [
+                        connectorOverlay
+                        mediumRailColumn ProvenanceSide.Input
+                        Html.div [
+                            prop.className
+                                "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-8"
+                            prop.children [
+                                groupColumnFor ProvenanceSide.Input false
+                                groupColumnFor ProvenanceSide.Output false
+                            ]
+                        ]
+                        mediumRailColumn ProvenanceSide.Output
+                    ]
+                ]
+            | LayoutTier.Narrow ->
+                // Stacked cards cannot host readable connector curves; connection
+                // badges on the cards carry that information instead.
+                Html.div [
+                    prop.ref surfaceRef
+                    prop.className "swt:relative swt:mx-4 swt:flex swt:min-w-0 swt:flex-col swt:gap-4"
+                    if debug then prop.testId "provenance-surface"
+                    prop.children [
+                        narrowRailSection ProvenanceSide.Input
+                        groupColumnFor ProvenanceSide.Input true
+                        groupColumnFor ProvenanceSide.Output true
+                        narrowRailSection ProvenanceSide.Output
+                    ]
+                ]
+
         let content =
             Html.div [
+                prop.ref rootRef
                 prop.className [
                     "swt:flex swt:flex-col swt:bg-base-200 swt:overflow-auto swt:pb-4"
                     // Without an explicit height the editor fills its host instead of
@@ -858,94 +1159,7 @@ type ProvenanceGrouping =
                             | None -> Html.none
                         ]
                     ]
-                    Html.div [
-                        prop.ref surfaceRef
-                        prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start"
-                        prop.style [
-                            style.custom ("grid-template-columns", Splitter.template panelRatios)
-                        ]
-                        if debug then prop.testId "provenance-surface"
-                        prop.children [
-                            ConnectorOverlay.Main(
-                                surfaceRef,
-                                pair.Id,
-                                pair.Model,
-                                inputGroups,
-                                outputGroups,
-                                connections,
-                                uiState,
-                                (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
-                                onRemove = removeDisplayConnection,
-                                debug = debug)
-                            Html.div [
-                                prop.className "swt:@container/provenancePanel swt:min-w-0 swt:overflow-hidden"
-                                prop.children [
-                                    EditorSurface.propertyRail
-                                        ProvenanceSide.Input
-                                        pair
-                                        pair.Model
-                                        uiState
-                                        (State.Layers.get pair.LeftLayerId uiState).GroupingAssignments
-                                        (fun header -> toggleSideGrouping pair.LeftLayerId ProvenanceSide.Input header)
-                                        (fun header -> State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState |> setUiState)
-                                        (fun header -> State.GroupingAssignments.move pair.Id pair.LeftLayerId pair.RightLayerId ProvenanceSide.Output header uiState |> setUiState)
-                                        (fun header -> togglePropertyExpanded ProvenanceSide.Input header)
-                                        (fun header value unit -> addPaletteValue ProvenanceSide.Input header value unit)
-                                        debug
-                                ]
-                            ]
-                            Splitter.handle Splitter.Left (startPanelDrag Splitter.Left) debug
-                            Html.div [
-                                // The wide column gap is the gutter the group-to-group
-                                // connectors are drawn in.
-                                prop.className "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-16"
-                                prop.children [
-                                    EditorSurface.groupColumn
-                                        ProvenanceSide.Input
-                                        pair
-                                        pair.Model
-                                        inputGroups
-                                        inputEndpointKind
-                                        createSet
-                                        uiState
-                                        isGroupExpanded
-                                        toggleSelection
-                                        toggleGroupDetail
-                                        debug
-                                    EditorSurface.groupColumn
-                                        ProvenanceSide.Output
-                                        pair
-                                        pair.Model
-                                        outputGroups
-                                        outputEndpointKind
-                                        createSet
-                                        uiState
-                                        isGroupExpanded
-                                        toggleSelection
-                                        toggleGroupDetail
-                                        debug
-                                ]
-                            ]
-                            Splitter.handle Splitter.Right (startPanelDrag Splitter.Right) debug
-                            Html.div [
-                                prop.className "swt:@container/provenancePanel swt:min-w-0 swt:overflow-hidden"
-                                prop.children [
-                                    EditorSurface.propertyRail
-                                        ProvenanceSide.Output
-                                        pair
-                                        pair.Model
-                                        uiState
-                                        (State.Layers.get pair.RightLayerId uiState).GroupingAssignments
-                                        (fun header -> toggleSideGrouping pair.RightLayerId ProvenanceSide.Output header)
-                                        (fun header -> State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState |> setUiState)
-                                        (fun header -> State.GroupingAssignments.move pair.Id pair.RightLayerId pair.LeftLayerId ProvenanceSide.Input header uiState |> setUiState)
-                                        (fun header -> togglePropertyExpanded ProvenanceSide.Output header)
-                                        (fun header value unit -> addPaletteValue ProvenanceSide.Output header value unit)
-                                        debug
-                                ]
-                            ]
-                        ]
-                    ]
+                    surface
                     EditorPanels.connectionDetails debug connections uiState.Detail removeDisplayConnection
                 ]
             ]
