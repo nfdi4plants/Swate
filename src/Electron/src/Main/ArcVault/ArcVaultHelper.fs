@@ -1,7 +1,5 @@
 module Main.ArcVaultHelper
 
-
-open System
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -14,6 +12,7 @@ open Main
 open Main.ArcMerge
 open Main.Bindings
 open Node.Api
+
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 
