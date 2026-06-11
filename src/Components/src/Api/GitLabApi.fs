@@ -98,7 +98,35 @@ type CurrentUserDto = {
     id: int
     username: string
     name: string
+    email: string
     avatar_url: string option
+}
+
+type PersonalAccessTokenDto = {
+    id: int
+    name: string
+    revoked: bool
+    active: bool
+    created_at: string option
+    expires_at: string option
+    last_used_at: string option
+    scopes: string array
+    user_id: int
+    description: string option
+}
+
+type RotatedPersonalAccessTokenDto = {
+    id: int
+    name: string
+    revoked: bool
+    active: bool
+    created_at: string option
+    expires_at: string option
+    last_used_at: string option
+    scopes: string array
+    user_id: int
+    description: string option
+    token: string
 }
 
 type GroupDto = {
@@ -170,7 +198,35 @@ type private GitLabCurrentUserResponse = {
     id: int
     username: string
     name: string
+    email: string
     avatar_url: string option
+}
+
+type private GitLabPersonalAccessTokenResponse = {
+    id: int
+    name: string
+    revoked: bool
+    active: bool
+    created_at: string option
+    expires_at: string option
+    last_used_at: string option
+    scopes: string array option
+    user_id: int
+    description: string option
+}
+
+type private GitLabRotatedPersonalAccessTokenResponse = {
+    id: int
+    name: string
+    revoked: bool
+    active: bool
+    created_at: string option
+    expires_at: string option
+    last_used_at: string option
+    scopes: string array option
+    user_id: int
+    description: string option
+    token: string
 }
 
 type private GitLabGroupResponse = {
@@ -326,8 +382,39 @@ module private Internals =
         id = user.id
         username = user.username
         name = user.name
+        email = user.email
         avatar_url = user.avatar_url
     }
+
+    let toPersonalAccessTokenDto (token: GitLabPersonalAccessTokenResponse) : PersonalAccessTokenDto = {
+        id = token.id
+        name = token.name
+        revoked = token.revoked
+        active = token.active
+        created_at = token.created_at
+        expires_at = token.expires_at
+        last_used_at = token.last_used_at
+        scopes = token.scopes |> Option.defaultValue [||]
+        user_id = token.user_id
+        description = token.description
+    }
+
+    let toRotatedPersonalAccessTokenDto
+        (token: GitLabRotatedPersonalAccessTokenResponse)
+        : RotatedPersonalAccessTokenDto =
+        {
+            id = token.id
+            name = token.name
+            revoked = token.revoked
+            active = token.active
+            created_at = token.created_at
+            expires_at = token.expires_at
+            last_used_at = token.last_used_at
+            scopes = token.scopes |> Option.defaultValue [||]
+            user_id = token.user_id
+            description = token.description
+            token = token.token
+        }
 
     let sendGet<'T> (url: string) (pat: string option) : JS.Promise<Result<PagedResponse<'T>, GitLabError>> =
 
@@ -421,6 +508,33 @@ module private Internals =
                     return Error(GitLabError.NetworkError networkError)
         }
 
+    let sendPostNoBody<'TResponse> (url: string) (pat: string) : JS.Promise<Result<'TResponse, GitLabError>> = promise {
+        if String.IsNullOrWhiteSpace pat then
+            return Error(GitLabError.InvalidRequest "Personal Access Token is required.")
+        else
+            let requestOptions = [
+                RequestProperties.Method HttpMethod.POST
+                requestHeaders [
+                    HttpRequestHeaders.Custom("PRIVATE-TOKEN", pat)
+                    HttpRequestHeaders.Accept "application/json"
+                ]
+            ]
+
+            try
+                let! response = fetchUnsafe url requestOptions
+
+                if not response.Ok then
+                    return Error(mapHttpError response.Status)
+                else
+                    try
+                        let! payload = response.json<'TResponse> ()
+                        return Ok payload
+                    with decodeError ->
+                        return Error(GitLabError.DecodeError decodeError)
+            with networkError ->
+                return Error(GitLabError.NetworkError networkError)
+    }
+
 [<AttachMembers>]
 type GitLabApi =
 
@@ -430,6 +544,26 @@ type GitLabApi =
         let! response = Internals.sendGetSingle<GitLabCurrentUserResponse> url pat
         return response |> Result.map Internals.toCurrentUserDto
     }
+
+    /// GET /api/v4/personal_access_tokens/self
+    static member GetCurrentPersonalAccessToken
+        (baseUrl: string, pat: string)
+        : JS.Promise<Result<PersonalAccessTokenDto, GitLabError>> =
+        promise {
+            let url = $"{baseUrl.TrimEnd('/')}/api/v4/personal_access_tokens/self"
+            let! response = Internals.sendGetSingle<GitLabPersonalAccessTokenResponse> url pat
+            return response |> Result.map Internals.toPersonalAccessTokenDto
+        }
+
+    /// POST /api/v4/personal_access_tokens/self/rotate
+    static member RotateCurrentPersonalAccessToken
+        (baseUrl: string, pat: string)
+        : JS.Promise<Result<RotatedPersonalAccessTokenDto, GitLabError>> =
+        promise {
+            let url = $"{baseUrl.TrimEnd('/')}/api/v4/personal_access_tokens/self/rotate"
+            let! response = Internals.sendPostNoBody<GitLabRotatedPersonalAccessTokenResponse> url pat
+            return response |> Result.map Internals.toRotatedPersonalAccessTokenDto
+        }
 
     static member CreateProject
         (baseUrl: string, pat: string, projectName: string)

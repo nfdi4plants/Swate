@@ -115,6 +115,7 @@ type IAuthApi = {
     signOut: unit -> Fable.Core.JS.Promise<Result<unit, exn>>
     revalidate: unit -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
     listAccounts: unit -> Fable.Core.JS.Promise<Result<AccountSummary array, exn>>
+    rotatePersonalAccessToken: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
 }

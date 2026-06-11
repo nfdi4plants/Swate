@@ -688,7 +688,8 @@ type DataHubBrowser =
                 TargetDataHub = ""
             }
             DateAdded = "2026-01-01T00:00:00.0000000Z"
-            TokenInvalid = false
+            TokenStatus = TokenStatus.Ok
+            TokenExpiresOn = None
         }
 
         let login () =
@@ -1050,11 +1051,12 @@ type DataHubBrowser =
                             LocalSwateAccountId = string user.id
                             Name = user.name
                             AvatarUrl = user.avatar_url |> Option.defaultValue ""
-                            Email = ""
+                            Email = user.email
                             TargetDataHub = baseUrl
                         }
                         DateAdded = "2026-01-01T00:00:00.0000000Z"
-                        TokenInvalid = false
+                        TokenStatus = TokenStatus.Ok
+                        TokenExpiresOn = None
                     }
 
                     setAccounts {

@@ -29,6 +29,7 @@ module GitLabUrls =
             "read_repository"
             "read_api"
             "write_repository"
+            "self_rotate" // This is used to allow users to rotate their token from within Swate without having to log in to GitLab. It is a scope that only allows the token itself to be revoked, not any other tokens or account access.
         ]
 
         let scopeParam = scopes |> String.concat ","
@@ -42,7 +43,7 @@ module GitLabUrls =
             gitlabBaseUrl
             description
             scopeParam
-            
+
     let profileUrl (user: Types.AuthUserDto) =
         let normalizedBaseUrl = user.TargetDataHub.TrimEnd('/')
         $"{normalizedBaseUrl}/-/u/{user.Id}"

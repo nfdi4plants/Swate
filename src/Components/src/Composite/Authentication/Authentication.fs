@@ -250,6 +250,7 @@ type Authentication =
             onLogout: unit -> unit,
             ?isLoading: bool,
             ?dropdownClassName: string,
+            ?onRotateToken: string -> unit,
             ?onSwitchAccount: string -> unit,
             ?onRemoveAccount: string -> unit
         ) =
@@ -318,6 +319,7 @@ type Authentication =
                                     AccountManager.Main(
                                         accounts,
                                         onRegenerateToken = onRegenerateToken,
+                                        ?onRotateToken = onRotateToken,
                                         ?onSwitchAccount = onSwitchAccount,
                                         ?onRemoveAccount = onRemoveAccount
                                     )
@@ -349,23 +351,45 @@ type Authentication =
                 Html.div [
                     prop.className "swt:indicator swt:indicator-bottom"
                     prop.children [
-                        if
-                            activeUser.IsSome
-                            && accounts.ActiveAccount.IsSome
-                            && accounts.ActiveAccount.Value.TokenInvalid
-                        then
-                            Html.span [
-                                prop.testId "TokenInvalidIndicator"
-                                prop.className "swt:indicator-item"
-                                prop.ariaLabel "Your token is invalid. Please update your token or remove the account."
-                                prop.title "Your token is invalid. Please update your token or remove the account."
-                                prop.children [
-                                    Html.i [
-                                        prop.ariaHidden true
-                                        prop.className "swt:iconify swt:fluent--warning-12-filled swt:text-error"
+                        match activeUser, accounts.ActiveAccount with
+                        | Some _, Some activeAccount ->
+                            match activeAccount.TokenStatus with
+                            | TokenStatus.Invalid ->
+                                Html.span [
+                                    prop.testId "TokenInvalidIndicator"
+                                    prop.className "swt:indicator-item"
+                                    prop.ariaLabel
+                                        "Your token is invalid. Please update your token or remove the account."
+                                    prop.title "Your token is invalid. Please update your token or remove the account."
+                                    prop.children [
+                                        Html.i [
+                                            prop.ariaHidden true
+                                            prop.className "swt:iconify swt:fluent--warning-12-filled swt:text-error"
+                                        ]
                                     ]
                                 ]
-                            ]
+                            | TokenStatus.Expiring ->
+                                Html.span [
+                                    prop.testId "TokenExpiringIndicator"
+                                    prop.className "swt:indicator-item"
+                                    prop.ariaLabel "Your token is expiring soon. Rotate it to avoid interruption."
+                                    prop.title (
+                                        activeAccount.TokenExpiresOn
+                                        |> Option.map (fun expiresOn ->
+                                            $"Your token expires on {expiresOn}. Rotate it soon to avoid interruption."
+                                        )
+                                        |> Option.defaultValue
+                                            "Your token is expiring soon. Rotate it to avoid interruption."
+                                    )
+                                    prop.children [
+                                        Html.i [
+                                            prop.ariaHidden true
+                                            prop.className "swt:iconify swt:fluent--warning-12-filled swt:text-warning"
+                                        ]
+                                    ]
+                                ]
+                            | TokenStatus.Ok -> ()
+                        | _ -> ()
                         Html.button [
                             prop.testId "UserButtonToggle"
                             prop.onClick (fun _ -> setIsOpen (not isOpen))
@@ -397,13 +421,15 @@ type Authentication =
                 Some {
                     User = Authentication.ExmpUserInformation
                     DateAdded = "2026-01-01T00:00:00.0000000Z"
-                    TokenInvalid = false
+                    TokenStatus = TokenStatus.Ok
+                    TokenExpiresOn = Some "2026-02-01"
                 }
             StoredAccounts = [|
                 {
                     User = Authentication.ExmpUserInformation
                     DateAdded = "2026-01-01T00:00:00.0000000Z"
-                    TokenInvalid = false
+                    TokenStatus = TokenStatus.Ok
+                    TokenExpiresOn = Some "2026-02-01"
                 }
             |]
     }
@@ -439,7 +465,8 @@ type Authentication =
                                     TargetDataHub = activeUser.TargetDataHub
                                 }
                                 DateAdded = "2026-01-01T00:00:00.0000000Z"
-                                TokenInvalid = false
+                                TokenStatus = TokenStatus.Ok
+                                TokenExpiresOn = Some "2026-02-01"
                             }
                         StoredAccounts = [|
                             {
@@ -452,7 +479,8 @@ type Authentication =
                                     TargetDataHub = activeUser.TargetDataHub
                                 }
                                 DateAdded = "2026-01-01T00:00:00.0000000Z"
-                                TokenInvalid = false
+                                TokenStatus = TokenStatus.Ok
+                                TokenExpiresOn = Some "2026-02-01"
                             }
                             {
                                 User = {
@@ -465,7 +493,8 @@ type Authentication =
                                     TargetDataHub = "https://datahub.rz.rptu.de/"
                                 }
                                 DateAdded = "2026-01-02T00:00:00.0000000Z"
-                                TokenInvalid = false
+                                TokenStatus = TokenStatus.Expiring
+                                TokenExpiresOn = Some "2026-01-15"
                             }
                             {
                                 User = {
@@ -478,7 +507,8 @@ type Authentication =
                                     TargetDataHub = "https://git.nfdi4plants.org/"
                                 }
                                 DateAdded = "2022-01-02T00:00:00.0000000Z"
-                                TokenInvalid = true
+                                TokenStatus = TokenStatus.Invalid
+                                TokenExpiresOn = Some "2022-02-01"
                             }
                         |]
                     }
@@ -524,6 +554,35 @@ type Authentication =
 
             setAccounts next
 
+        let onRotateToken (localSwateAccountId: string) =
+            // For testing, we just set the token status to Ok and update the expiration date. In a real implementation, this should trigger the token rotation flow and update the account information accordingly.
+            let nextAccounts =
+                accounts.StoredAccounts
+                |> Array.map (fun account ->
+                    if account.User.LocalSwateAccountId = localSwateAccountId then
+                        {
+                            account with
+                                TokenStatus = TokenStatus.Ok
+                                TokenExpiresOn = Some "2026-03-01"
+                        }
+                    else
+                        account
+                )
+
+            let nextActive =
+                match accounts.ActiveAccount with
+                | Some activeAccount when activeAccount.User.LocalSwateAccountId = localSwateAccountId ->
+                    nextAccounts
+                    |> Array.tryFind (fun account ->
+                        account.User.LocalSwateAccountId = activeAccount.User.LocalSwateAccountId
+                    )
+                | other -> other
+
+            setAccounts {
+                ActiveAccount = nextActive
+                StoredAccounts = nextAccounts
+            }
+
         Html.div [
             prop.className "swt:flex swt:flex-col swt:m-10 swt:gap-2"
             prop.children [
@@ -541,7 +600,8 @@ type Authentication =
                     onLogout,
                     isLoading = isLoading,
                     onSwitchAccount = onSwitchAccount,
-                    onRemoveAccount = onRemoveAccount
+                    onRemoveAccount = onRemoveAccount,
+                    onRotateToken = onRotateToken
                 )
             ]
         ]

@@ -14,9 +14,13 @@ type AccountManager =
             account: AccountSummary,
             isActive: bool,
             onRegenerateToken: AccountSummary -> unit,
+            ?onRotateToken: string -> unit,
             ?onSwitch: string -> unit,
             ?onRemove: string -> unit
         ) =
+
+        let isInvalid = account.TokenStatus = TokenStatus.Invalid
+        let isExpiring = account.TokenStatus = TokenStatus.Expiring
 
         Html.div [
             prop.key account.User.LocalSwateAccountId
@@ -25,8 +29,10 @@ type AccountManager =
                 "swt:flex swt:items-center swt:justify-between swt:gap-2 swt:p-1.5 swt:rounded swt:text-sm"
                 if isActive then
                     "swt:bg-primary/10"
-                if account.TokenInvalid then
+                if isInvalid then
                     "swt:ring-1 swt:ring-error/40"
+                elif isExpiring then
+                    "swt:ring-1 swt:ring-warning/40"
             ]
             prop.children [
                 Html.div [
@@ -58,7 +64,15 @@ type AccountManager =
                                     prop.className "swt:truncate swt:text-xs swt:text-base-content/60"
                                     prop.text account.User.TargetDataHub
                                 ]
-                                if account.TokenInvalid then
+                                match account.TokenExpiresOn with
+                                | Some expiresOn ->
+                                    Html.span [
+                                        prop.className "swt:truncate swt:text-xs swt:text-base-content/70"
+                                        prop.text $"Token expires on {expiresOn}"
+                                    ]
+                                | None -> ()
+
+                                if isInvalid then
                                     Html.div [
                                         prop.className "swt:flex swt:items-center swt:gap-1 swt:text-xs swt:text-error"
                                         prop.children [
@@ -85,6 +99,29 @@ type AccountManager =
                                                 prop.rel "noopener noreferrer"
                                                 prop.text "Regenerate token"
                                             ]
+                                        ]
+                                    ]
+                                elif isExpiring then
+                                    Html.div [
+                                        prop.className
+                                            "swt:flex swt:items-center swt:gap-1 swt:text-xs swt:text-warning"
+                                        prop.children [
+                                            Html.span [
+                                                prop.className "swt:iconify swt:fluent--warning-24-regular swt:size-4"
+                                            ]
+                                            Html.span [ prop.text "Token expiring" ]
+                                            match onRotateToken with
+                                            | Some rotateToken ->
+                                                Html.button [
+                                                    prop.testId $"RotateTokenButton-{account.User.LocalSwateAccountId}"
+                                                    prop.className "swt:link swt:link-warning"
+                                                    prop.onClick (fun e ->
+                                                        e.stopPropagation ()
+                                                        rotateToken account.User.LocalSwateAccountId
+                                                    )
+                                                    prop.text "Refresh token"
+                                                ]
+                                            | None -> ()
                                         ]
                                     ]
                             ]
@@ -124,6 +161,7 @@ type AccountManager =
         (
             accounts: AuthStateDto,
             onRegenerateToken: AccountSummary -> unit,
+            ?onRotateToken: string -> unit,
             ?onSwitchAccount: string -> unit,
             ?onRemoveAccount: string -> unit
         ) =
@@ -147,6 +185,7 @@ type AccountManager =
                         acct,
                         isActive,
                         onRegenerateToken = onRegenerateToken,
+                        ?onRotateToken = onRotateToken,
                         ?onSwitch = onSwitchAccount,
                         ?onRemove = onRemoveAccount
                     )
