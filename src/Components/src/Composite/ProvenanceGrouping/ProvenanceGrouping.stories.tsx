@@ -474,19 +474,41 @@ export const ExpandedGroupsHideGroupConnectionAnchors: Story = {
 const connectionKeys = (paths: HTMLElement[]) =>
   paths.map((path) => path.getAttribute('data-provenance-connection-key') ?? '');
 
-export const ExpandedPropertyValuesKeepHeaderGroupingOnly: Story = {
+export const ExpandedPropertyValuesConnectValueChipsToMatchingGroups: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const panel = await expandProperty(canvas, 'Input', 'Species');
 
     await waitFor(() => {
       const headerKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'));
       expect(headerKeys.some((key) => key.includes('Species'))).toBe(true);
     });
 
-    expect(canvas.queryByTestId('provenance-value-connection')).not.toBeInTheDocument();
+    const panel = await expandProperty(canvas, 'Input', 'Species');
+
+    await waitFor(() => {
+      const headerKeys = connectionKeys(canvas.queryAllByTestId('provenance-property-connection'));
+      expect(headerKeys.some((key) => key.includes('Species'))).toBe(false);
+
+      const valueKeys = connectionKeys(canvas.getAllByTestId('provenance-value-connection'));
+      expect(valueKeys.some((key) => key.includes('Species') && key.includes('Arabidopsis'))).toBe(true);
+      expect(valueKeys.some((key) => key.includes('Species') && key.includes('Chlamydomonas'))).toBe(true);
+      expect(canvas.getAllByTestId('provenance-value-connection').every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
+    });
+
     expect(panel.queryByTestId('provenance-connection-handle-Input-PropertyValue')).not.toBeInTheDocument();
+
+    // Collapsing again must restore header connectors and drop value connectors,
+    // so the expanded-header filter cannot become a one-way switch.
+    await userEvent.hover(canvas.getByTestId('provenance-property-Input-Species'));
+    await userEvent.click(canvas.getByTestId('provenance-property-expand-Input-Species'));
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('provenance-property-values-Input-Species')).not.toBeInTheDocument();
+      const headerKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'));
+      expect(headerKeys.some((key) => key.includes('Species'))).toBe(true);
+      expect(canvas.queryByTestId('provenance-value-connection')).not.toBeInTheDocument();
+    });
   },
 };
 
