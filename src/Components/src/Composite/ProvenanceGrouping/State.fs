@@ -156,29 +156,51 @@ module Layers =
 
     let ensure session state =
         let currentPairIds = session.PairOrder |> Set.ofList
+        let layerStates = retainCurrentLayers session state
 
-        {
-            state with
-                LayerStates = retainCurrentLayers session state
-                PropertyRailPlacements =
-                    state.PropertyRailPlacements
-                    |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
-                PanelRatios =
-                    state.PanelRatios
-                    |> Map.filter (fun pairId _ -> currentPairIds.Contains pairId)
-                ExpandedProperties =
-                    state.ExpandedProperties
-                    |> Set.filter (fun (pairId, _, _) -> currentPairIds.Contains pairId)
-                PaletteValues =
-                    state.PaletteValues
-                    |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
-                PendingMemberResolution =
-                    state.PendingMemberResolution
-                    |> Option.filter (fun pending -> currentPairIds.Contains pending.PairId)
-                ManualResolutionPairs =
-                    state.ManualResolutionPairs
-                    |> List.filter (fun pair -> currentPairIds.Contains pair.PairId)
-        }
+        let propertyRailPlacements =
+            state.PropertyRailPlacements
+            |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
+
+        let panelRatios =
+            state.PanelRatios
+            |> Map.filter (fun pairId _ -> currentPairIds.Contains pairId)
+
+        let expandedProperties =
+            state.ExpandedProperties
+            |> Set.filter (fun (pairId, _, _) -> currentPairIds.Contains pairId)
+
+        let paletteValues =
+            state.PaletteValues
+            |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
+
+        let pendingMemberResolution =
+            state.PendingMemberResolution
+            |> Option.filter (fun pending -> currentPairIds.Contains pending.PairId)
+
+        let manualResolutionPairs =
+            state.ManualResolutionPairs
+            |> List.filter (fun pair -> currentPairIds.Contains pair.PairId)
+
+        if layerStates = state.LayerStates
+           && propertyRailPlacements = state.PropertyRailPlacements
+           && panelRatios = state.PanelRatios
+           && expandedProperties = state.ExpandedProperties
+           && paletteValues = state.PaletteValues
+           && pendingMemberResolution = state.PendingMemberResolution
+           && manualResolutionPairs = state.ManualResolutionPairs then
+            state
+        else
+            {
+                state with
+                    LayerStates = layerStates
+                    PropertyRailPlacements = propertyRailPlacements
+                    PanelRatios = panelRatios
+                    ExpandedProperties = expandedProperties
+                    PaletteValues = paletteValues
+                    PendingMemberResolution = pendingMemberResolution
+                    ManualResolutionPairs = manualResolutionPairs
+            }
 
     let update layerId updateLayer state =
         let current = get layerId state
