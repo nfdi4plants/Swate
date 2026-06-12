@@ -1435,7 +1435,7 @@ let uiStateTests =
                 (Some(ConnectionRouting.ConnectionAction.ConnectMembers("input:g", "output:g", "input-a", "output-a")))
                 "Opposite-side member handles should create a manual member connection action."
 
-        testCase "connection routing assigns dragged values but never property headers" <| fun _ ->
+        testCase "connection routing ignores property value and property header handles" <| fun _ ->
             let handle kind side id : ProvenanceGroupingTypes.ConnectionHandleRef =
                 {
                     Kind = kind
@@ -1451,8 +1451,8 @@ let uiStateTests =
 
             Expect.equal
                 (ConnectionRouting.action valueHandle sameSideGroup)
-                (Some(ConnectionRouting.ConnectionAction.ConnectPropertyValueToGroup(valueHandle, sameSideGroup)))
-                "Value chip handles should assign their value to a same-side group."
+                None
+                "Value chip assignment is handled by value drag/drop, not connector routing."
 
             Expect.equal
                 (ConnectionRouting.action valueHandle oppositeGroup)
