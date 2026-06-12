@@ -514,6 +514,7 @@ type Controls =
                                     propertyValue,
                                     draggable = true,
                                     showHeader = false,
+                                    anchorSide = side,
                                     ?debug = debug,
                                     key = DragDrop.propertyValueIdentity propertyValue
                                 )
@@ -872,7 +873,7 @@ type Controls =
             propertyValue: ProvenancePropertyValue,
             ?draggable: bool,
             ?showHeader: bool,
-            ?side: ProvenanceSide,
+            ?anchorSide: ProvenanceSide,
             ?debug: bool,
             ?key: string
         ) : ReactElement =
@@ -895,17 +896,19 @@ type Controls =
             else
                 text
 
-        let valueHandle =
-            side
+        let valueAnchor =
+            anchorSide
             |> Option.map (fun side ->
-                Controls.ConnectionHandle(
+                Controls.ConnectionAnchor(
                     {
                         Kind = ConnectionHandleKind.PropertyValue
                         Side = side
                         Id = propertyValue.Id
                         ParentGroupId = None
                     },
-                    label = $"Connect {propertyValue.Header.Category.Name} value",
+                    (match side with
+                     | ProvenanceSide.Input -> "swt:top-1/2 swt:right-0 swt:translate-x-1/2 swt:-translate-y-1/2"
+                     | ProvenanceSide.Output -> "swt:top-1/2 swt:left-0 swt:-translate-x-1/2 swt:-translate-y-1/2"),
                     ?debug = debug
                 )
             )
@@ -921,6 +924,7 @@ type Controls =
                 yield! prop.spread (!!drag.attributes)
                 yield! prop.spread (!!drag.listeners)
             prop.className [
+                "swt:relative"
                 yield! Styles.propertyValueButtonClasses density drag.isDragging
                 if not canDrag then
                     "swt:cursor-default"
@@ -930,16 +934,13 @@ type Controls =
                 prop.testId $"provenance-value-{propertyValue.Id}"
             prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"
             prop.children [
-                match side, valueHandle with
-                | Some ProvenanceSide.Output, Some handle -> handle
-                | _ -> Html.none
+                match valueAnchor with
+                | Some anchor -> anchor
+                | None -> Html.none
                 Html.span [
                     prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-left"
                     prop.text label
                 ]
-                match side, valueHandle with
-                | Some ProvenanceSide.Input, Some handle -> handle
-                | _ -> Html.none
             ]
         ]
 
