@@ -275,8 +275,7 @@ module private DragHandlers =
     let handleStart
         (surfaceRef: IRefValue<Browser.Types.HTMLElement option>)
         setActiveDrag
-        setUiState
-        uiState
+        (liveDragStore: LiveDrag.Store)
         (event: DndKit.IDndKitEvent)
         =
         let payload = DragDrop.tryDragId (string event.active.id)
@@ -285,19 +284,18 @@ module private DragHandlers =
         match payload, surfaceRef.current with
         | Some(DragDrop.Payload.ConnectionHandle handle), Some surface ->
             HandleMeasure.tryCenter surface handle
-            |> Option.iter (fun point -> State.LiveConnection.start handle point uiState |> setUiState)
+            |> Option.iter (fun point -> LiveDrag.start handle point liveDragStore)
         | _ -> ()
 
-    let handleMove setUiState uiState (event: DndKit.IDndKitMoveEvent) =
-        match uiState.LiveConnectionDrag with
+    let handleMove (liveDragStore: LiveDrag.Store) (event: DndKit.IDndKitMoveEvent) =
+        match liveDragStore.Current with
         | Some live ->
-            State.LiveConnection.moveTo
+            LiveDrag.moveTo
                 {
                     X = live.Start.X + event.delta.x
                     Y = live.Start.Y + event.delta.y
                 }
-                uiState
-            |> setUiState
+                liveDragStore
         | None -> ()
 
     let private layerIdForSide pair side =
@@ -695,6 +693,7 @@ type ProvenanceGrouping =
         let tier, setTier = React.useState LayoutTier.Wide
         let openRail, setOpenRail = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
+        let liveDragStore = React.useRef (LiveDrag.create ())
 
         React.useEffectOnce (fun () ->
             let applyTier () =
@@ -831,9 +830,10 @@ type ProvenanceGrouping =
         let publish result =
             match result with
             | Ok(next, patches) ->
+                LiveDrag.clear liveDragStore.current
+
                 let nextUiState =
                     latestUiState.current
-                    |> State.LiveConnection.clear
                     |> State.Layers.ensure next
 
                 commitUiState {
@@ -845,10 +845,11 @@ type ProvenanceGrouping =
 
                 onChange { Session = next; Patches = patches }
             | Error error ->
+                LiveDrag.clear liveDragStore.current
+
                 commitUiState {
                     latestUiState.current with
                         Error = Some(string error)
-                        LiveConnectionDrag = None
                 }
 
         let createSet command =
@@ -877,9 +878,10 @@ type ProvenanceGrouping =
         let removeDisplayConnection (connection: DisplayConnection) =
             match Session.removeConnections connection.ConnectionIds session with
             | Ok(next, patches) ->
+                LiveDrag.clear liveDragStore.current
+
                 let nextUiState =
                     latestUiState.current
-                    |> State.LiveConnection.clear
                     |> State.Layers.ensure next
 
                 commitUiState {
@@ -892,10 +894,11 @@ type ProvenanceGrouping =
 
                 onChange { Session = next; Patches = patches }
             | Error error ->
+                LiveDrag.clear liveDragStore.current
+
                 commitUiState {
                     latestUiState.current with
                         Error = Some(string error)
-                        LiveConnectionDrag = None
                 }
 
         let resolveAllToAll (pending: PendingMemberResolution) =
@@ -1125,7 +1128,7 @@ type ProvenanceGrouping =
                 inputRailProjection,
                 outputRailProjection,
                 ConnectorOverlayState.fromUiState uiState,
-                uiState.LiveConnectionDrag,
+                liveDragStore.current,
                 (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
                 onRemove = removeDisplayConnection,
                 debug = debug
@@ -1305,25 +1308,18 @@ type ProvenanceGrouping =
         DndKit.DndContext(
             sensors = sensors,
             collisionDetection = DndKit.pointerWithin,
-            onDragStart = DragHandlers.handleStart surfaceRef setActiveDrag commitUiState uiState,
-            onDragMove = DragHandlers.handleMove commitUiState uiState,
+            onDragStart = DragHandlers.handleStart surfaceRef setActiveDrag liveDragStore.current,
+            onDragMove = DragHandlers.handleMove liveDragStore.current,
             onDragCancel =
                 (fun _ ->
                     setActiveDrag None
-                    State.LiveConnection.clear uiState |> commitUiState
+                    LiveDrag.clear liveDragStore.current
                 ),
             onDragEnd =
                 (fun event ->
                     setActiveDrag None
-                    let clearedUiState = State.LiveConnection.clear uiState
-                    commitUiState clearedUiState
-
-                    DragHandlers.handleEnd
-                        {
-                            dragContext with
-                                UiState = clearedUiState
-                        }
-                        event
+                    LiveDrag.clear liveDragStore.current
+                    DragHandlers.handleEnd dragContext event
                 ),
             children =
                 Density.provider

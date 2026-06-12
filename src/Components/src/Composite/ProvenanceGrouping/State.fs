@@ -64,32 +64,6 @@ module PanelLayout =
         let current = get pairId state
         set pairId { current with Right = right } state
 
-/// Tracks the transient connector shown while dragging from an edge handle.
-module LiveConnection =
-
-    let start source point state =
-        {
-            state with
-                LiveConnectionDrag =
-                    Some
-                        {
-                            Source = source
-                            Start = point
-                            Current = point
-                        }
-        }
-
-    let moveTo point state =
-        {
-            state with
-                LiveConnectionDrag =
-                    state.LiveConnectionDrag
-                    |> Option.map (fun current -> { current with Current = point })
-        }
-
-    let clear state =
-        { state with LiveConnectionDrag = None }
-
 /// Tracks the in-app prompt and expansion state for mismatched group connections.
 module MemberResolution =
 
@@ -424,7 +398,6 @@ let init (session: ProvenanceSession) =
         PaletteValues = Map.empty
         PendingOverwrite = None
         PanelRatios = Map.empty
-        LiveConnectionDrag = None
         PendingMemberResolution = None
         ManualResolutionPairs = []
         SelectedInputs = Set.empty

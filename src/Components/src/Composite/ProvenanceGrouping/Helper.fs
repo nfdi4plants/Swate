@@ -195,6 +195,56 @@ module DragDrop =
             tryParseHandleParts kind side sourceId parent
         | _ -> None
 
+/// Keeps transient connector dragging outside editor state so pointer moves only
+/// repaint the overlay layer that needs the live path.
+module LiveDrag =
+
+    open Swate.Components.Composite.ProvenanceGrouping.Types
+
+    type Store =
+        {
+            mutable Current: LiveConnectionDrag option
+            mutable Listeners: (unit -> unit) list
+        }
+
+    let create () : Store =
+        {
+            Current = None
+            Listeners = []
+        }
+
+    let private notify store =
+        for listener in store.Listeners do
+            listener ()
+
+    let subscribe listener store =
+        store.Listeners <- listener :: store.Listeners
+
+        fun () ->
+            store.Listeners <-
+                store.Listeners
+                |> List.filter (fun current -> not (System.Object.ReferenceEquals(current, listener)))
+
+    let start source point store =
+        store.Current <-
+            Some
+                {
+                    Source = source
+                    Start = point
+                    Current = point
+                }
+
+        notify store
+
+    let moveTo point store =
+        store.Current <- store.Current |> Option.map (fun current -> { current with Current = point })
+        notify store
+
+    let clear store =
+        if store.Current.IsSome then
+            store.Current <- None
+            notify store
+
 /// Validates edge-handle drag/drop pairs and returns the editor action they imply.
 module ConnectionRouting =
 

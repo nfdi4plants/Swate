@@ -111,7 +111,6 @@ type UiState =
         PaletteValues: Map<ProvenancePairId * ProvenanceSide, ProvenancePropertyValue list>
         PendingOverwrite: ValueAssignmentWarning option
         PanelRatios: Map<ProvenancePairId, PanelRatios>
-        LiveConnectionDrag: LiveConnectionDrag option
         PendingMemberResolution: PendingMemberResolution option
         ManualResolutionPairs: ManualResolutionPair list
         SelectedInputs: Set<ProvenancePairId * string>

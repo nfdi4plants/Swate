@@ -404,6 +404,47 @@ module private ConnectorPaths =
             yield! memberConnections context pairId model connections overlayState
         ]
 
+module private ConnectorSvg =
+
+    let debugAttributes debug measured =
+        [
+            if debug then
+                svg.custom ("data-testid", measured.TestId)
+                svg.custom ("data-provenance-connection-key", measured.Key)
+        ]
+
+    let strokeElements measured strokeWidth strokeOpacity debug =
+        let debugAttributes = debugAttributes debug measured
+
+        [
+            // A surface-colored halo keeps crossing connectors readable.
+            Svg.path [
+                svg.d measured.Path
+                svg.fill "none"
+                svg.stroke "currentColor"
+                svg.strokeWidth (strokeWidth + 2.5)
+                svg.strokeLineCap "round"
+                svg.className "swt:text-base-200"
+                match measured.StrokeDasharray with
+                | Some dash -> svg.custom ("strokeDasharray", dash)
+                | None -> ()
+            ]
+            Svg.path [
+                svg.d measured.Path
+                svg.fill "none"
+                svg.stroke "currentColor"
+                svg.strokeWidth strokeWidth
+                svg.strokeLineCap "round"
+                svg.custom ("strokeOpacity", strokeOpacity)
+                svg.className measured.ClassName
+                match measured.StrokeDasharray with
+                | Some dash -> svg.custom ("strokeDasharray", dash)
+                | None -> ()
+                if measured.InteractiveConnection.IsNone then
+                    yield! debugAttributes
+            ]
+        ]
+
 module private ConnectorContextMenu =
 
     let connectionKeyAttribute = "data-provenance-interactive-connection-key"
@@ -479,6 +520,27 @@ module private AnimationFrame =
 type ConnectorOverlay =
 
     [<ReactComponent>]
+    static member private LiveConnectorLayer(store: LiveDrag.Store, ?debug: bool) =
+        let _, bump = React.useStateWithUpdater 0
+
+        React.useEffect (
+            (fun () ->
+                let unsubscribe = store |> LiveDrag.subscribe (fun () -> bump (fun version -> version + 1))
+                FsReact.createDisposable unsubscribe),
+            [| box store |]
+        )
+
+        match ConnectorPaths.liveConnection store.Current with
+        | Some measured ->
+            Svg.svg [
+                svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
+                svg.children [
+                    yield! ConnectorSvg.strokeElements measured measured.StrokeWidth 1.0 (defaultArg debug false)
+                ]
+            ]
+        | None -> Html.none
+
+    [<ReactComponent>]
     static member Main
         (
             containerRef: IRefValue<HTMLElement option>,
@@ -490,7 +552,7 @@ type ConnectorOverlay =
             inputRailProjection: PropertyRails.RailProjection,
             outputRailProjection: PropertyRails.RailProjection,
             overlayState: ConnectorOverlayState,
-            liveConnectionDrag: LiveConnectionDrag option,
+            liveDragStore: LiveDrag.Store,
             onSelect: DisplayConnection -> unit,
             ?onRemove: DisplayConnection -> unit,
             ?debug: bool
@@ -498,6 +560,7 @@ type ConnectorOverlay =
         let paths, setPaths = React.useStateWithUpdater ([]: MeasuredConnector list)
         let hoveredKey, setHoveredKey = React.useState<string option> None
         let pendingFrame = React.useRef (None: float option)
+        let debugEnabled = defaultArg debug false
 
         let setMeasuredPaths next =
             setPaths (fun current -> if current = next then current else next)
@@ -574,18 +637,12 @@ type ConnectorOverlay =
         )
 
         let selectedConnectionId = overlayState.SelectedConnectionId
-        let livePath = ConnectorPaths.liveConnection liveConnectionDrag
-
-        let renderedPaths =
-            match livePath with
-            | Some live -> paths @ [ live ]
-            | None -> paths
 
         React.Fragment [
             Svg.svg [
                 svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
                 svg.children [
-                    for measured in renderedPaths do
+                    for measured in paths do
                         let activateFromKeyboard (event: KeyboardEvent) =
                             match measured.InteractiveConnection, event.key with
                             | Some connection, "Enter"
@@ -623,41 +680,12 @@ type ConnectorOverlay =
                             | Some _ -> 0.85
                             | None -> 1.0
 
-                        let debugAttributes = [
-                            if defaultArg debug false then
-                                svg.custom ("data-testid", measured.TestId)
-                                svg.custom ("data-provenance-connection-key", measured.Key)
-                        ]
+                        let debugAttributes = ConnectorSvg.debugAttributes debugEnabled measured
 
                         Svg.g [
                             svg.key measured.Key
                             svg.children [
-                                // A surface-colored halo keeps crossing connectors readable.
-                                Svg.path [
-                                    svg.d measured.Path
-                                    svg.fill "none"
-                                    svg.stroke "currentColor"
-                                    svg.strokeWidth (strokeWidth + 2.5)
-                                    svg.strokeLineCap "round"
-                                    svg.className "swt:text-base-200"
-                                    match measured.StrokeDasharray with
-                                    | Some dash -> svg.custom ("strokeDasharray", dash)
-                                    | None -> ()
-                                ]
-                                Svg.path [
-                                    svg.d measured.Path
-                                    svg.fill "none"
-                                    svg.stroke "currentColor"
-                                    svg.strokeWidth strokeWidth
-                                    svg.strokeLineCap "round"
-                                    svg.custom ("strokeOpacity", strokeOpacity)
-                                    svg.className measured.ClassName
-                                    match measured.StrokeDasharray with
-                                    | Some dash -> svg.custom ("strokeDasharray", dash)
-                                    | None -> ()
-                                    if measured.InteractiveConnection.IsNone then
-                                        yield! debugAttributes
-                                ]
+                                yield! ConnectorSvg.strokeElements measured strokeWidth strokeOpacity debugEnabled
                                 // A wide transparent stroke is the actual pointer/keyboard target,
                                 // so selecting a thin curve no longer needs pixel accuracy.
                                 match measured.InteractiveConnection with
@@ -689,13 +717,14 @@ type ConnectorOverlay =
                         ]
                 ]
             ]
+            ConnectorOverlay.LiveConnectorLayer(liveDragStore, ?debug = debug)
             match onRemove with
             | Some remove ->
                 ContextMenu.ContextMenu(
                     ConnectorContextMenu.items remove,
                     ref = containerRef,
                     onSpawn = ConnectorContextMenu.spawnData paths,
-                    debug = defaultArg debug false
+                    debug = debugEnabled
                 )
             | None -> Html.none
         ]
