@@ -157,6 +157,38 @@ export const ExpandedGroupsShowMemberHoverValues: Story = {
   },
 };
 
+export const ShowsEntityTypesAndCollapsedSymbols: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+
+    // The collapsed card previews its member types as symbols instead of a bare "×3" count.
+    expect(within(grouped).getByTestId('provenance-group-symbols-Input-input:Species=Arabidopsis'))
+      .toBeInTheDocument();
+    expect(grouped).not.toHaveTextContent('×3');
+
+    // Expanding shows each member with its endpoint type ("Sample") above the name.
+    await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
+    const member = within(grouped).getByTestId('provenance-group-member-Input-input-a');
+    expect(member).toHaveTextContent('Sample');
+    expect(member).toHaveTextContent('Input A');
+  },
+};
+
+export const ShowsFileTypeForDataEndpoints: Story = {
+  render: () => <Harness fixture="dataOutputOnly" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // A Data endpoint surfaces as a "File" type line above the single-entity card name.
+    const card = await waitFor(() => canvas.getByText('Data Output A').closest('article')!);
+    expect(card).toHaveTextContent('File');
+  },
+};
+
 export const GroupsBothSidesFromOutputProperty: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

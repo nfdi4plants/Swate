@@ -10,8 +10,55 @@ open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Composite.ProvenanceGrouping.Types
 
+/// Maps loaded endpoint kinds (Source, Sample, Data, ...) to a display label and icon.
+/// The kind id carries an adapter prefix (`arc-isa:endpoint:sample`, `fixture:endpoint:data`, ...),
+/// so we classify on the role suffix to stay source-agnostic.
+module private EntityType =
+
+    type Descriptor = { Label: string; Icon: string }
+
+    let descriptor (kind: ProvenanceKind) : Descriptor =
+        let id = kind.Id.ToLowerInvariant()
+        let contains (token: string) = id.Contains token
+
+        if contains "endpoint:source" then
+            { Label = "Source"; Icon = "swt:fluent--branch-fork-20-regular" }
+        elif contains "endpoint:sample" then
+            { Label = "Sample"; Icon = "swt:fluent--beaker-20-regular" }
+        elif contains "endpoint:data" then
+            { Label = "File"; Icon = "swt:fluent--document-20-regular" }
+        elif contains "endpoint:material" then
+            { Label = "Material"; Icon = "swt:fluent--cube-20-regular" }
+        elif contains "endpoint:free-text" then
+            { Label = ProvenanceKind.displayName kind; Icon = "swt:fluent--text-field-20-regular" }
+        else
+            { Label = ProvenanceKind.displayName kind; Icon = "swt:fluent--tag-20-regular" }
+
+    /// Small type line shown above an entity name.
+    let line (descriptor: Descriptor) =
+        Html.span [
+            prop.className
+                "swt:inline-flex swt:items-center swt:gap-1 swt:text-xs swt:font-medium swt:uppercase swt:tracking-wide swt:text-base-content/60"
+            prop.children [
+                Html.i [
+                    prop.className $"swt:iconify {descriptor.Icon} swt:size-3 swt:shrink-0"
+                    prop.ariaHidden true
+                ]
+                Html.span [ prop.text descriptor.Label ]
+            ]
+        ]
+
 /// Derives display text and property chips for one provenance group card.
 module private GroupCardData =
+
+    /// Loaded endpoint kind for one member, resolved from the side-specific set map.
+    let endpointKind side (model: ProvenanceModel) (setId: ProvenanceSetId) =
+        let sets =
+            match side with
+            | ProvenanceSide.Input -> model.InputSets
+            | ProvenanceSide.Output -> model.OutputSets
+
+        sets.TryFind setId |> Option.map (fun set -> set.Header.Kind)
 
     let values (group: DisplayGroup) (model: ProvenanceModel) =
         group.Members
@@ -147,10 +194,20 @@ type GroupCard =
                     prop.children [
                         match GroupCardData.chips group with
                         | [] ->
-                            Html.h3 [
-                                prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-sm swt:font-semibold"
+                            // A chip-less card is always a single loaded endpoint, so the type
+                            // line sits above its name to mirror the expanded member rows.
+                            Html.div [
+                                prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5"
                                 prop.title title
-                                prop.text title
+                                prop.children [
+                                    match GroupCardData.endpointKind side model group.Members.Head.SetId with
+                                    | Some kind -> EntityType.line (EntityType.descriptor kind)
+                                    | None -> Html.none
+                                    Html.h3 [
+                                        prop.className "swt:min-w-0 swt:truncate swt:text-sm swt:font-semibold"
+                                        prop.text title
+                                    ]
+                                ]
                             ]
                         | chips ->
                             // Chips show only the grouping values; the category lives in
@@ -190,12 +247,64 @@ type GroupCard =
                             (fun _ -> onSelect ())
                         )
                         if isGroup then
-                            // The member count doubles as the expand trigger, replacing a
-                            // generic info icon without taking extra header space.
+                            // The collapsed group is drawn as a folder holding its members' type
+                            // symbols. When few enough to fit, every member contributes one symbol
+                            // side by side; otherwise it collapses to the dominant type symbol with a
+                            // count. The preview is aria-hidden; the button keeps its "Show members"
+                            // name and stays the expand trigger.
+                            let memberDescriptors =
+                                group.Members
+                                |> List.choose (fun member' ->
+                                    GroupCardData.endpointKind side model member'.SetId
+                                    |> Option.map EntityType.descriptor)
+
+                            let maxInlineSymbols = 4
+
+                            let symbolIcon (descriptor: EntityType.Descriptor) =
+                                Html.i [
+                                    prop.className $"swt:iconify {descriptor.Icon} swt:size-4 swt:shrink-0"
+                                ]
+
+                            let countLabel count =
+                                Html.span [
+                                    prop.className "swt:text-xs swt:font-semibold"
+                                    prop.text (string count)
+                                ]
+
                             Buttons.QuickAccessButton(
                                 Html.span [
-                                    prop.className "swt:badge swt:badge-ghost swt:badge-sm swt:font-semibold"
-                                    prop.text $"×{group.Members.Length}"
+                                    prop.ariaHidden true
+                                    prop.className "swt:inline-flex swt:items-center swt:gap-1"
+                                    if defaultArg debug false then
+                                        prop.testId $"provenance-group-symbols-{side}-{group.Id}"
+                                    prop.children [
+                                        Html.i [
+                                            prop.className "swt:iconify swt:fluent--folder-20-regular swt:size-4 swt:shrink-0 swt:text-base-content/70"
+                                        ]
+                                        Html.span [
+                                            prop.className "swt:inline-flex swt:items-center swt:gap-0.5 swt:text-base-content/70"
+                                            prop.children [
+                                                match memberDescriptors with
+                                                | [] -> countLabel group.Members.Length
+                                                | descriptors when descriptors.Length <= maxInlineSymbols ->
+                                                    for index, descriptor in List.indexed descriptors do
+                                                        Html.span [ prop.key (string index); prop.children [ symbolIcon descriptor ] ]
+                                                | descriptors ->
+                                                    let dominant =
+                                                        descriptors
+                                                        |> List.countBy (fun descriptor -> descriptor.Label)
+                                                        |> List.maxBy snd
+                                                        |> fst
+
+                                                    let icon =
+                                                        descriptors
+                                                        |> List.find (fun descriptor -> descriptor.Label = dominant)
+
+                                                    symbolIcon icon
+                                                    countLabel descriptors.Length
+                                            ]
+                                        ]
+                                    ]
                                 ],
                                 "Show members",
                                 (fun _ -> onExpand ())
@@ -237,14 +346,22 @@ type GroupCard =
                                                 Html.div [
                                                     prop.tabIndex 0
                                                     prop.ariaLabel $"Show values for {member'.Name}"
-                                                    prop.className "swt:min-w-0 swt:grow swt:truncate swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
+                                                    prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5 swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
                                                     if defaultArg debug false then
                                                         prop.testId $"provenance-group-member-{side}-{member'.SetId}"
                                                     prop.onMouseEnter (fun _ -> setHoveredMemberId (Some member'.SetId))
                                                     prop.onMouseLeave (fun _ -> setHoveredMemberId None)
                                                     prop.onFocus (fun _ -> setHoveredMemberId (Some member'.SetId))
                                                     prop.onBlur (fun _ -> setHoveredMemberId None)
-                                                    prop.text member'.Name
+                                                    prop.children [
+                                                        match GroupCardData.endpointKind side model member'.SetId with
+                                                        | Some kind -> EntityType.line (EntityType.descriptor kind)
+                                                        | None -> Html.none
+                                                        Html.span [
+                                                            prop.className "swt:min-w-0 swt:truncate"
+                                                            prop.text member'.Name
+                                                        ]
+                                                    ]
                                                 ]
                                                 if side = ProvenanceSide.Input then
                                                     Controls.ConnectionHandle(
