@@ -75,8 +75,7 @@ module private ValueDrafts =
             | _ -> None
         | DraftFloat ->
             match Double.TryParse text with
-            | true, value when not (Double.IsNaN value || Double.IsInfinity value) ->
-                Some(ProvenanceValue.Float value)
+            | true, value when not (Double.IsNaN value || Double.IsInfinity value) -> Some(ProvenanceValue.Float value)
             | _ -> None
         | DraftTerm -> term |> Option.map ProvenanceValue.Term
 
@@ -97,11 +96,9 @@ module private TermSearchMapping =
 /// Creates editor-owned generic provenance kinds for user-created values.
 module private KindNames =
 
-    let editorProperty =
-        ProvenanceKind.create "editor:property" "Property"
+    let editorProperty = ProvenanceKind.create "editor:property" "Property"
 
-    let private normalized (label: string) =
-        label.Trim()
+    let private normalized (label: string) = label.Trim()
 
     let endpointFromLabel (label: string) =
         let trimmed = normalized label
@@ -347,7 +344,7 @@ type Controls =
         let expandButton =
             Html.button [
                 prop.type'.button
-                prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square"
+                prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:z-10 swt:btn-outline"
                 if defaultArg debug false then
                     prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
                 prop.ariaLabel (
@@ -374,7 +371,7 @@ type Controls =
             Html.button [
                 prop.type'.button
                 prop.className [
-                    "swt:btn swt:btn-xs swt:btn-square"
+                    "swt:btn swt:btn-xs swt:btn-square swt:z-10"
                     if bothSelected then
                         "swt:btn-primary"
                     else
@@ -398,7 +395,8 @@ type Controls =
                 Html.button [
                     prop.type'.button
                     prop.disabled true
-                    prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square"
+                    prop.className
+                        "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:z-10 swt:btn-outline swt:border-white"
                     prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
                     if defaultArg debug false then
                         prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
@@ -457,17 +455,18 @@ type Controls =
                         let related: Browser.Types.HTMLElement = unbox event.relatedTarget
 
                         if isNull (box related) || not (row.contains related) then
-                            setControlsVisible false)
+                            setControlsVisible false
+                    )
                     prop.children [
                         // The controls sit on the rail-facing side; the property text
                         // button faces the group cards so connectors attach directly to it.
                         match side with
                         | ProvenanceSide.Input ->
-                            rowControls
                             propertyButton
+                            rowControls
                         | ProvenanceSide.Output ->
-                            propertyButton
                             rowControls
+                            propertyButton
                     ]
                 ]
                 if expanded then
@@ -534,8 +533,7 @@ type Controls =
         let collapseThreshold = 6
 
         let isPinned header =
-            active
-            |> List.exists (fun assignment -> assignment.Key.Header = header)
+            active |> List.exists (fun assignment -> assignment.Key.Header = header)
             || isExpanded header
 
         let visibleHeaders =
@@ -550,8 +548,7 @@ type Controls =
                     |> List.truncate (max 0 (collapseThreshold - pinned.Length))
 
                 headers
-                |> List.filter (fun header ->
-                    pinned |> List.contains header || filler |> List.contains header)
+                |> List.filter (fun header -> pinned |> List.contains header || filler |> List.contains header)
 
         let hiddenHeaderCount = headers.Length - visibleHeaders.Length
 
@@ -622,11 +619,9 @@ type Controls =
         let category = propertyValue.Header.Category.Name
         let kind = ValueDrafts.kindForValue propertyValue.Value
 
-        let value, setValue =
-            React.useState (ValueDrafts.textForValue propertyValue.Value)
+        let value, setValue = React.useState (ValueDrafts.textForValue propertyValue.Value)
 
-        let term, setTerm =
-            React.useState (ValueDrafts.termForValue propertyValue.Value)
+        let term, setTerm = React.useState (ValueDrafts.termForValue propertyValue.Value)
 
         let nextValue = ValueDrafts.tryValue kind value term
         let inputId = $"provenance-edit-{category}"
@@ -663,9 +658,7 @@ type Controls =
                         | DraftTerm ->
                             TermSearch.TermSearch(
                                 term |> Option.map TermSearchMapping.toTermSearchTerm,
-                                (fun next ->
-                                    setTerm (next |> Option.bind TermSearchMapping.fromTermSearchTerm)
-                                )
+                                (fun next -> setTerm (next |> Option.bind TermSearchMapping.fromTermSearchTerm))
                             )
                         | _ ->
                             Html.input [
@@ -767,11 +760,7 @@ type Controls =
 
                             TermSearch.TermSearch(
                                 categoryTerm |> Option.map TermSearchMapping.toTermSearchTerm,
-                                (fun next ->
-                                    setCategoryTerm (
-                                        next |> Option.bind TermSearchMapping.fromTermSearchTerm
-                                    )
-                                )
+                                (fun next -> setCategoryTerm (next |> Option.bind TermSearchMapping.fromTermSearchTerm))
                             )
                         Html.label [ prop.className "swt:label"; prop.text "Value type" ]
                         Html.select [
@@ -794,9 +783,7 @@ type Controls =
                         | DraftTerm ->
                             TermSearch.TermSearch(
                                 term |> Option.map TermSearchMapping.toTermSearchTerm,
-                                (fun next ->
-                                    setTerm (next |> Option.bind TermSearchMapping.fromTermSearchTerm)
-                                )
+                                (fun next -> setTerm (next |> Option.bind TermSearchMapping.fromTermSearchTerm))
                             )
                         | _ ->
                             Html.input [
@@ -808,9 +795,7 @@ type Controls =
                         Html.label [ prop.className "swt:label"; prop.text "Unit" ]
                         TermSearch.TermSearch(
                             unit' |> Option.map TermSearchMapping.toTermSearchTerm,
-                            (fun next ->
-                                setUnit (next |> Option.bind TermSearchMapping.fromTermSearchTerm)
-                            )
+                            (fun next -> setUnit (next |> Option.bind TermSearchMapping.fromTermSearchTerm))
                         )
                         if not canCreate then
                             Html.p [
@@ -857,8 +842,7 @@ type Controls =
             ?side: ProvenanceSide,
             ?debug: bool,
             ?key: string
-        )
-        : ReactElement =
+        ) : ReactElement =
         let canDrag = defaultArg draggable true
         let showHeader = defaultArg showHeader true
         let density = React.useContext Density.context
@@ -890,7 +874,8 @@ type Controls =
                     },
                     label = $"Connect {propertyValue.Header.Category.Name} value",
                     ?debug = debug
-                ))
+                )
+            )
 
         Html.div [
             match key with
@@ -961,7 +946,9 @@ type Controls =
         ) =
         let sideName = SideLabels.sideName side
         let name, setName = React.useState ""
-        let endpointLabel, setEndpointLabel = React.useState (ProvenanceKind.displayName defaultKind)
+
+        let endpointLabel, setEndpointLabel =
+            React.useState (ProvenanceKind.displayName defaultKind)
 
         Popover.Simple(
             trigger =
