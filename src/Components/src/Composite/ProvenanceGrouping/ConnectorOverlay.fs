@@ -467,6 +467,14 @@ module private ConnectorObserver =
     [<Emit("$0.disconnect()")>]
     let disconnect (observer: obj) : unit = jsNative
 
+module private AnimationFrame =
+
+    [<Emit("requestAnimationFrame($0)")>]
+    let request (_callback: unit -> unit) : float = jsNative
+
+    [<Emit("cancelAnimationFrame($0)")>]
+    let cancel (_handle: float) : unit = jsNative
+
 [<Erase; Mangle(false)>]
 type ConnectorOverlay =
 
@@ -489,11 +497,14 @@ type ConnectorOverlay =
         ) =
         let paths, setPaths = React.useStateWithUpdater ([]: MeasuredConnector list)
         let hoveredKey, setHoveredKey = React.useState<string option> None
+        let pendingFrame = React.useRef (None: float option)
 
         let setMeasuredPaths next =
             setPaths (fun current -> if current = next then current else next)
 
-        let measure () =
+        let measureNow () =
+            pendingFrame.current <- None
+
             match containerRef.current with
             | None -> setMeasuredPaths []
             | Some container ->
@@ -511,17 +522,29 @@ type ConnectorOverlay =
                     overlayState
                 |> setMeasuredPaths
 
+        let scheduleMeasure () =
+            match pendingFrame.current with
+            | Some _ -> ()
+            | None -> pendingFrame.current <- Some(AnimationFrame.request measureNow)
+
+        let cancelPendingFrame () =
+            match pendingFrame.current with
+            | Some handle ->
+                AnimationFrame.cancel handle
+                pendingFrame.current <- None
+            | None -> ()
+
         React.useEffect (
             (fun () ->
-                measure ()
+                measureNow ()
 
                 match containerRef.current with
-                | None -> FsReact.createDisposable (fun () -> ())
+                | None -> FsReact.createDisposable cancelPendingFrame
                 | Some container ->
-                    let onLayout = fun (_: Event) -> measure ()
+                    let onLayout = fun (_: Event) -> scheduleMeasure ()
                     container.addEventListener ("scroll", onLayout)
                     Browser.Dom.window.addEventListener ("resize", onLayout)
-                    let observer = ConnectorObserver.create measure
+                    let observer = ConnectorObserver.create scheduleMeasure
                     ConnectorObserver.observeNode observer container
                     // Resize nodes are the content-sized boxes (property headers, value
                     // chips); their handles move when the box grows, without the handle
@@ -535,6 +558,7 @@ type ConnectorOverlay =
                         container.removeEventListener ("scroll", onLayout)
                         Browser.Dom.window.removeEventListener ("resize", onLayout)
                         ConnectorObserver.disconnect observer
+                        cancelPendingFrame ()
                     )
             ),
             [| box pairId
@@ -544,7 +568,9 @@ type ConnectorOverlay =
                box connections
                box inputRailProjection
                box outputRailProjection
-               box overlayState |]
+               box overlayState.ExpandedGroup
+               box overlayState.ManualResolutionPairs
+               box overlayState.ExpandedProperties |]
         )
 
         let selectedConnectionId = overlayState.SelectedConnectionId
