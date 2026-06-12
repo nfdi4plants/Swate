@@ -145,6 +145,8 @@ type GitPathspecRequest = { Pathspecs: string[] }
 
 type GitLfsFreeLocalCopyRequest = { Path: string }
 
+type GitLfsDownloadFileRequest = { Path: string }
+
 type GitCommitRequest = { Message: string }
 
 type GitLfsSettingsDto = {

@@ -168,7 +168,7 @@ module ARCExplorer =
                 (services.runToggleLfsMark rootRepoPath)
 
         let contextMenuItems (item: FileItem) =
-            Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark None
+            Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark None None
 
         let openView item =
             promise { createOpenPreviewHandler setSelection services item |> Promise.start }

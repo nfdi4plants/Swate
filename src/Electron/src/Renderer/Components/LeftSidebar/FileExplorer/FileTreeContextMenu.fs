@@ -26,6 +26,7 @@ type ContextMenuConfig = {
     pathActionConfig: PathActionConfig
     enqueueError: ErrorModalRequest -> unit
     runToggleLfsMark: string -> bool -> JS.Promise<Result<unit, string>>
+    runDownloadLfsFile: string -> JS.Promise<Result<unit, string>>
     runFreeLocalLfsCopy: string -> JS.Promise<Result<unit, string>>
 }
 
@@ -190,12 +191,15 @@ let arcDeleteAndRenameContextMenuItems (config: ContextMenuConfig) (item: FileIt
     yield! deleteContextMenuItems config.requestDeleteItem item
 ]
 
-let createContextMenuItems (config: ContextMenuConfig) =
+let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
     let toggleLfsMark =
-        Renderer.Components.FileExplorerLfs.createToggleLfsMark config.enqueueError config.runToggleLfsMark
+        Renderer.Components.FileExplorerLfs.createToggleLfsMark config.enqueueError arcScopeId config.runToggleLfsMark
+
+    let downloadLfsFile =
+        Renderer.Components.FileExplorerLfs.createDownloadLfsFile config.enqueueError arcScopeId config.runDownloadLfsFile
 
     let freeLocalLfsCopy =
-        Renderer.Components.FileExplorerLfs.createFreeLocalLfsCopy config.enqueueError config.runFreeLocalLfsCopy
+        Renderer.Components.FileExplorerLfs.createFreeLocalLfsCopy config.enqueueError arcScopeId config.runFreeLocalLfsCopy
 
     fun item ->
         withDividers [
@@ -205,6 +209,7 @@ let createContextMenuItems (config: ContextMenuConfig) =
             Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems
                 item
                 toggleLfsMark
+                (Some downloadLfsFile)
                 (Some freeLocalLfsCopy)
             arcCreateContextMenuItems config.openCreateModal item
             arcDeleteAndRenameContextMenuItems config item

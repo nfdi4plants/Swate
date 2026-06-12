@@ -36,3 +36,16 @@ let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>
         | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS cleanup failed.")
         | Error message -> Error message
 }
+
+let runDownloadLfsFile (relativePath: string) = promise {
+
+    let request: GitLfsDownloadFileRequest = { Path = relativePath }
+
+    let! result = Renderer.GitApiClient.gitLfsDownloadFile request
+
+    return
+        match result with
+        | Ok operation when operation.Success -> Ok()
+        | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS download failed.")
+        | Error message -> Error message
+}

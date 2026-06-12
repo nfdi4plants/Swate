@@ -90,6 +90,7 @@ type IGitApi = {
     setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
     gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, exn>>
     gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, exn>>
+    gitLfsDownloadFile: GitLfsDownloadFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitLfsFreeLocalCopy: GitLfsFreeLocalCopyRequest -> JS.Promise<Result<GitOperationResult, exn>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
