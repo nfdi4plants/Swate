@@ -345,9 +345,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                             |]
 
-                            let filters = [|
-                                FileFilter("JSON files", [| "json" |])
-                            |]
+                            let filters = [| FileFilter("JSON files", [| "json" |]) |]
 
                             let window = dialogParentFromIpcEvent event
 
@@ -366,10 +364,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             elif result.filePaths.Length <> 1 then
                                 return Error(exn "Not exactly one path")
                             else
-                                let absolutePath =
-                                    result.filePaths
-                                    |> Array.exactlyOne
-                                    |> resolveAbsolutePath
+                                let absolutePath = result.filePaths |> Array.exactlyOne |> resolveAbsolutePath
 
                                 let! content = ARCtrl.FileSystemHelper.readFileTextAsync absolutePath
 
@@ -462,9 +457,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             let defaultPath =
                                 JsonExportFileSystemHelper.buildDefaultPath arcPath request.suggestedFileName
 
-                            let filters = [|
-                                FileFilter("JSON files", [| "json" |])
-                            |]
+                            let filters = [| FileFilter("JSON files", [| "json" |]) |]
 
                             let properties = [|
                                 Enums.Dialog.ShowSaveDialog.Options.Properties.CreateDirectory
@@ -484,8 +477,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             if result.canceled || String.IsNullOrWhiteSpace result.filePath then
                                 return Ok None
                             else
-                                let targetPath =
-                                    JsonExportFileSystemHelper.ensureJsonExtension result.filePath
+                                let targetPath = JsonExportFileSystemHelper.ensureJsonExtension result.filePath
 
                                 let directoryPath = path.dirname targetPath
                                 do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath

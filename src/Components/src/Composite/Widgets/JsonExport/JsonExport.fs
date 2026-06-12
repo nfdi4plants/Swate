@@ -17,14 +17,13 @@ module private JsonExportHelper =
         let jsonExport = Json.Export.parseToJsonString (arcfile, jef)
         Swate.Components.Util.Download.downloadFromString (jsonExport)
 
-    let defaultExportJson (arcfile: ArcFiles, jef: JsonExportFormat) =
-        promise {
-            try
-                downloadJson (arcfile, jef)
-                return Ok()
-            with exn ->
-                return Error exn
-        }
+    let defaultExportJson (arcfile: ArcFiles, jef: JsonExportFormat) = promise {
+        try
+            downloadJson (arcfile, jef)
+            return Ok()
+        with exn ->
+            return Error exn
+    }
 
 open JsonExportHelper
 
@@ -74,12 +73,7 @@ type JsonExport =
                 Html.button [
                     prop.className JsonWidgetLayout.actionClass
                     prop.disabled (isExporting || supportedFormats.IsEmpty)
-                    prop.text (
-                        if isExporting then
-                            "Exporting..."
-                        else
-                            "Download"
-                    )
+                    prop.text (if isExporting then "Exporting..." else "Download")
                     prop.onClick (fun _ ->
                         if not isExporting then
                             setIsExporting true

@@ -135,8 +135,7 @@ module JsonExportFileSystemHelper =
                     character
             )
 
-        let cleanedFileName =
-            String(cleanedChars).Trim().Trim([| '.'; ' ' |])
+        let cleanedFileName = String(cleanedChars).Trim().Trim([| '.'; ' ' |])
 
         let safeFileName =
             if String.IsNullOrWhiteSpace cleanedFileName then

@@ -94,8 +94,7 @@ type private LazyComponents =
                 onExportJson = exportJson,
                 onError = onError
             )
-        | None ->
-            Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile, onError = onError)
+        | None -> Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile, onError = onError)
 
     [<ReactLazyComponent>]
     static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
@@ -113,7 +112,9 @@ type Main =
     static member private LazyFallback(text: string) =
         Html.div [
             prop.className "swt:flex swt:items-center swt:justify-center"
-            prop.children [ Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(text = text) ]
+            prop.children [
+                Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(text = text)
+            ]
         ]
 
     [<ReactComponent>]

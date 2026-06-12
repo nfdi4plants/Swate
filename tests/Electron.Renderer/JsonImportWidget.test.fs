@@ -70,12 +70,7 @@ Vitest.describe (
             "shows only JSON formats supported by the active file type",
             fun () -> promise {
                 let! container, cleanup =
-                    jsonImportWidget
-                        (ArcFiles.DataMap(None, DataMap.init ()))
-                        ignore
-                        None
-                        None
-                        ignore
+                    jsonImportWidget (ArcFiles.DataMap(None, DataMap.init ())) ignore None None ignore
                     |> renderToBody
 
                 try
@@ -95,13 +90,7 @@ Vitest.describe (
                 let assay = ArcAssay.init "FallbackAssay"
 
                 let! container, cleanup =
-                    jsonImportWidget
-                        (ArcFiles.Assay assay)
-                        ignore
-                        None
-                        None
-                        ignore
-                    |> renderToBody
+                    jsonImportWidget (ArcFiles.Assay assay) ignore None None ignore |> renderToBody
 
                 try
                     let input =
@@ -136,12 +125,7 @@ Vitest.describe (
                 }
 
                 let! container, cleanup =
-                    jsonImportWidget
-                        (ArcFiles.Assay assay)
-                        ignore
-                        (Some pickJsonFile)
-                        (Some onImportJson)
-                        ignore
+                    jsonImportWidget (ArcFiles.Assay assay) ignore (Some pickJsonFile) (Some onImportJson) ignore
                     |> renderToBody
 
                 try
@@ -160,7 +144,8 @@ Vitest.describe (
                         | ArcFiles.Assay importedAssay ->
                             Vitest.expect(importedAssay.Identifier).toBe ("WidgetImportAssay")
                         | importedFile ->
-                            failwith $"Expected imported file to be an Assay, got {importedFile.RelatedArcFilesDiscriminate}."
+                            failwith
+                                $"Expected imported file to be an Assay, got {importedFile.RelatedArcFilesDiscriminate}."
                     | None -> failwith "Expected import callback to receive a parsed request."
                 finally
                     cleanup ()

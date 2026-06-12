@@ -282,12 +282,7 @@ module Json =
 
         let private supportedFormatsFromReadMap (fileType: ArcFilesDiscriminate) =
             readFromJsonMap.Keys
-            |> Seq.choose (fun (arcFileType, jsonFormat) ->
-                if arcFileType = fileType then
-                    Some jsonFormat
-                else
-                    None
-            )
+            |> Seq.choose (fun (arcFileType, jsonFormat) -> if arcFileType = fileType then Some jsonFormat else None)
             |> Seq.distinct
             |> Seq.sortBy (fun jsonFormat ->
                 formatOrder
@@ -304,11 +299,9 @@ module Json =
             else
                 formats |> List.tryHead
 
-        let supportedExportFormats (fileType: ArcFilesDiscriminate) =
-            supportedFormatsFromReadMap fileType
+        let supportedExportFormats (fileType: ArcFilesDiscriminate) = supportedFormatsFromReadMap fileType
 
-        let supportedImportFormats (fileType: ArcFilesDiscriminate) =
-            supportedFormatsFromReadMap fileType
+        let supportedImportFormats (fileType: ArcFilesDiscriminate) = supportedFormatsFromReadMap fileType
 
         let isExportFormatSupported (fileType: ArcFilesDiscriminate) (jsonFormat: JsonExportFormat) =
             supportedExportFormats fileType |> List.contains jsonFormat
@@ -359,11 +352,7 @@ module Json =
                     preferredName.Trim()
 
             let rec loop index =
-                let candidate =
-                    if index = 0 then
-                        baseName
-                    else
-                        $"{baseName} {index}"
+                let candidate = if index = 0 then baseName else $"{baseName} {index}"
 
                 if usedNames.Contains candidate then
                     loop (index + 1)
@@ -407,7 +396,9 @@ module Json =
                     let importedTables = importedArcFile.Tables()
 
                     if importedTables.Count = 0 then
-                        Error(exn $"Imported {arcFileTypeLabel importedFileType} JSON does not contain tables to append.")
+                        Error(
+                            exn $"Imported {arcFileTypeLabel importedFileType} JSON does not contain tables to append."
+                        )
                     else
                         let targetTables = currentArcFile.ArcTables()
                         let mutable usedNames = targetTables.TableNames |> Set.ofSeq
@@ -421,17 +412,10 @@ module Json =
                 | _ -> Ok importedArcFile
 
         let tryParseToArcFile
-            (
-                jsonString: string,
-                jsonType: JsonExportFormat,
-                filetype: ArcFilesDiscriminate
-            ) : Result<ArcFiles, exn> =
+            (jsonString: string, jsonType: JsonExportFormat, filetype: ArcFilesDiscriminate)
+            : Result<ArcFiles, exn> =
             match Generic.readFromJsonMap.TryFind(filetype, jsonType) with
-            | None ->
-                Error(
-                    exn
-                        $"JSON import format {jsonType.AsStringRdbl} is not supported for {filetype}."
-                )
+            | None -> Error(exn $"JSON import format {jsonType.AsStringRdbl} is not supported for {filetype}.")
             | Some arcFileFn ->
                 try
                     arcFileFn jsonString |> Ok

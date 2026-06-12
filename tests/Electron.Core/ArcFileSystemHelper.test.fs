@@ -84,8 +84,7 @@ Vitest.describe (
 
                 Vitest.expect(sanitized).toBe ("unsafe_export.json")
 
-                let emptyFallback =
-                    JsonExportFileSystemHelper.sanitizeSuggestedFileName "   "
+                let emptyFallback = JsonExportFileSystemHelper.sanitizeSuggestedFileName "   "
 
                 Vitest.expect(emptyFallback).toBe ("swate-export.json")
         )

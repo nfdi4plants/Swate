@@ -84,7 +84,10 @@ Vitest.describe (
             "rejects replacing an Assay editor with Study JSON",
             fun () -> promise {
                 let currentArcFile, _ = createAssayArcFile [||]
-                let importedStudy = ArcStudy.init "ImportedStudy" |> fun study -> ArcFiles.Study(study, [])
+
+                let importedStudy =
+                    ArcStudy.init "ImportedStudy" |> fun study -> ArcFiles.Study(study, [])
+
                 let mutable publishedArcFile: ArcFiles option = None
                 let mutable inMemoryUpdated = false
 

@@ -14,14 +14,13 @@ module private JsonImportWidgetHelper =
         Json.Generic.tryGetDefaultImportFormat arcFile.RelatedArcFilesDiscriminate
         |> Option.defaultValue JsonExportFormat.ARCtrl
 
-    let defaultImportJson (arcFile: ArcFiles) (setArcFile: ArcFiles -> unit) (request: JsonImportRequest) =
-        promise {
-            match Json.Import.applyToCurrentArcFile (arcFile, request.ImportedFile) with
-            | Ok nextArcFile ->
-                setArcFile nextArcFile
-                return Ok()
-            | Error exn -> return Error exn
-        }
+    let defaultImportJson (arcFile: ArcFiles) (setArcFile: ArcFiles -> unit) (request: JsonImportRequest) = promise {
+        match Json.Import.applyToCurrentArcFile (arcFile, request.ImportedFile) with
+        | Ok nextArcFile ->
+            setArcFile nextArcFile
+            return Ok()
+        | Error exn -> return Error exn
+    }
 
 open JsonImportWidgetHelper
 
@@ -57,11 +56,7 @@ type JsonImport =
                     |> Option.defaultValue JsonExportFormat.ARCtrl
                     |> setJsonFormat
             ),
-            [|
-                box fileType
-                box supportedFormats
-                box jsonFormat
-            |]
+            [| box fileType; box supportedFormats; box jsonFormat |]
         )
 
         let importFile (jsonFile: JsonImportFile) =
@@ -128,12 +123,7 @@ type JsonImport =
                             if not loading then
                                 pickAndImportFile ()
                         )
-                        prop.text (
-                            if loading then
-                                "Importing..."
-                            else
-                                "Import"
-                        )
+                        prop.text (if loading then "Importing..." else "Import")
                     ]
                 | None ->
                     Html.input [

@@ -8,7 +8,9 @@ module JsonWidgetLayout =
 
     let rootClass = "swt:join swt:w-fit swt:max-w-full"
     let actionClass = "swt:btn swt:btn-primary swt:join-item swt:w-32 swt:shrink-0"
-    let fileInputClass = "swt:file-input swt:file-input-primary swt:join-item swt:w-32 swt:shrink-0"
+
+    let fileInputClass =
+        "swt:file-input swt:file-input-primary swt:join-item swt:w-32 swt:shrink-0"
 
 [<Erase; Mangle(false)>]
 type JsonFormatSelect =

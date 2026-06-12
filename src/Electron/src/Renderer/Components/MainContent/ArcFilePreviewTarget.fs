@@ -64,8 +64,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
         pageStateCtx.setState (Some page)
 
-    let updateArcFileInMemory (nextArcFile: ArcFiles) =
-        Helper.setArcFileInMemory nextArcFile
+    let updateArcFileInMemory (nextArcFile: ArcFiles) = Helper.setArcFileInMemory nextArcFile
 
     let setArcFileInMemoryWithErrorModal (nextArcFile: ArcFiles) =
         promise {
@@ -129,12 +128,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
     let importJson =
         React.useCallback (
             (fun (request: JsonImportRequest) -> promise {
-                return!
-                    importJsonRequestIntoCurrentTarget
-                        arcFile
-                        request
-                        setArcFilePageState
-                        updateArcFileInMemory
+                return! importJsonRequestIntoCurrentTarget arcFile request setArcFilePageState updateArcFileInMemory
             }),
             [| box arcFile; box pageStateCtx |]
         )

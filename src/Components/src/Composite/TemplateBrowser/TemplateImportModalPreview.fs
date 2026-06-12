@@ -11,8 +11,11 @@ module TemplateTypes = Swate.Components.Composite.Template.Types
 type TemplateImportModalPreview =
 
     [<ReactComponent>]
-    static member ImportActionOption(id, action: TemplateTypes.TemplateImportAction, label: string, isActive: bool, setTemplateImportAction) =
+    static member ImportActionOption
+        (id, action: TemplateTypes.TemplateImportAction, label: string, isActive: bool, setTemplateImportAction)
+        =
         let radioGroupName = $"template-import-action-{id}"
+
         Html.label [
             prop.className "swt:inline-flex swt:items-center swt:gap-2 swt:cursor-pointer"
             prop.children [
@@ -21,9 +24,7 @@ type TemplateImportModalPreview =
                     prop.name radioGroupName
                     prop.className "swt:radio swt:radio-xs"
                     prop.isChecked isActive
-                    prop.onChange (fun (_: bool) ->
-                        setTemplateImportAction id action
-                    )
+                    prop.onChange (fun (_: bool) -> setTemplateImportAction id action)
                 ]
                 Html.span [ prop.className "swt:text-xs"; prop.text label ]
             ]

@@ -23,33 +23,33 @@ module private WidgetsHelper =
 
     let widgetInfo (widgetType: WidgetType) =
         match widgetType with
-        | WidgetType.BuildingBlock -> 
-            "Add Building Block", 
+        | WidgetType.BuildingBlock ->
+            "Add Building Block",
             Html.i [
                 prop.className "swt:iconify swt:fluent--table-column-insert-24-filled swt:size-6"
             ]
-        | WidgetType.Template -> 
+        | WidgetType.Template ->
             "Add Template",
             Html.i [
                 prop.className "swt:iconify swt:fluent--table-add-24-filled swt:size-6"
             ]
-        | WidgetType.FilePicker -> 
-            "File Picker", 
+        | WidgetType.FilePicker ->
+            "File Picker",
             Html.i [
                 prop.className "swt:iconify swt:fluent--document-text-link-20-filled swt:size-6"
             ]
-        | WidgetType.DataAnnotator -> 
-            "Data Annotator", 
+        | WidgetType.DataAnnotator ->
+            "Data Annotator",
             Html.i [
                 prop.className "swt:iconify swt:fluent--document-data-link-24-filled swt:size-6"
             ]
         | WidgetType.JsonImport ->
-            "Import JSON", 
+            "Import JSON",
             Html.i [
                 prop.className "swt:iconify swt:fluent--arrow-import-20-filled swt:size-6"
             ]
         | WidgetType.JsonExport ->
-            "Export JSON", 
+            "Export JSON",
             Html.i [
                 prop.className "swt:iconify swt:fluent--arrow-export-20-filled swt:size-6"
             ]
