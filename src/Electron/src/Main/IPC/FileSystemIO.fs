@@ -100,6 +100,55 @@ let tryGetNodeErrorCode (error: exn) : string option =
     with _ ->
         None
 
+[<RequireQualifiedAccess>]
+module JsonExportFileSystemHelper =
+
+    let private fallbackFileName = "swate-export.json"
+
+    let private invalidFileNameChars =
+        set [ '<'; '>'; ':'; '"'; '/'; '\\'; '|'; '?'; '*' ]
+
+    let ensureJsonExtension (fileName: string) =
+        if fileName.EndsWith(".json", StringComparison.OrdinalIgnoreCase) then
+            fileName
+        else
+            fileName + ".json"
+
+    let sanitizeSuggestedFileName (suggestedFileName: string) =
+        let rawFileName =
+            if String.IsNullOrWhiteSpace suggestedFileName then
+                fallbackFileName
+            else
+                suggestedFileName.Trim()
+
+        let fileNameOnly =
+            rawFileName.Replace('\\', '/').Split([| '/' |], StringSplitOptions.RemoveEmptyEntries)
+            |> Array.tryLast
+            |> Option.defaultValue fallbackFileName
+
+        let cleanedChars =
+            fileNameOnly.ToCharArray()
+            |> Array.map (fun character ->
+                if invalidFileNameChars |> Set.contains character || Char.IsControl character then
+                    '_'
+                else
+                    character
+            )
+
+        let cleanedFileName =
+            String(cleanedChars).Trim().Trim([| '.'; ' ' |])
+
+        let safeFileName =
+            if String.IsNullOrWhiteSpace cleanedFileName then
+                fallbackFileName
+            else
+                cleanedFileName
+
+        ensureJsonExtension safeFileName
+
+    let buildDefaultPath (arcPath: string) (suggestedFileName: string) =
+        Main.Bindings.Path.join [| arcPath; sanitizeSuggestedFileName suggestedFileName |]
+
 type private RenameRetryStrategy = {
     DelaysMs: int[]
     IsTransientErrorCode: string option -> bool

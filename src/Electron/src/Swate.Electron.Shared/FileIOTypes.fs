@@ -82,6 +82,11 @@ type FileContentDTO = {|
     path: string
 |}
 
+type JsonExportSaveRequest = {
+    suggestedFileName: string
+    content: string
+}
+
 type NoteTarget =
     | Root
     | Study of string

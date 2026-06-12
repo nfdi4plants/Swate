@@ -6,6 +6,7 @@
     <Compile Include="IpcReceiverDisposable.test.fs" />
     <Compile Include="MainSyncedState.test.fs" />
     <Compile Include="ArcFilePreviewTarget.test.fs" />
+    <Compile Include="JsonImportWidget.test.fs" />
     <Compile Include="FileStateContextReload.test.fs" />
     <Compile Include="FileTreeMaterialization.test.fs" />
     <Compile Include="FileTreeContextMenu.test.fs" />

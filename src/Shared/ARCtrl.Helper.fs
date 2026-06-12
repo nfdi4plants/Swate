@@ -268,10 +268,59 @@ module Json =
             ]
 
         let toFileName (id: string) (fileType: ArcFilesDiscriminate) (jsonType: JsonExportFormat) =
-            let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_hhmmss")
+            let n = System.DateTime.Now.ToUniversalTime().ToString("yyyyMMdd_HHmmss")
             let formatString = jsonType.ToString()
             let fileTypeString = fileType.ToString()
             n + "_" + fileTypeString + "_" + id + "_" + formatString + ".json"
+
+        let private formatOrder = [
+            JsonExportFormat.ARCtrl
+            JsonExportFormat.ARCtrlCompressed
+            JsonExportFormat.ISA
+            JsonExportFormat.ROCrate
+        ]
+
+        let private supportedFormatsFromReadMap (fileType: ArcFilesDiscriminate) =
+            readFromJsonMap.Keys
+            |> Seq.choose (fun (arcFileType, jsonFormat) ->
+                if arcFileType = fileType then
+                    Some jsonFormat
+                else
+                    None
+            )
+            |> Seq.distinct
+            |> Seq.sortBy (fun jsonFormat ->
+                formatOrder
+                |> List.tryFindIndex ((=) jsonFormat)
+                |> Option.defaultValue Int32.MaxValue
+            )
+            |> Seq.toList
+
+        let private preferredFormat (formats: JsonExportFormat list) =
+            if formats |> List.contains JsonExportFormat.ROCrate then
+                Some JsonExportFormat.ROCrate
+            elif formats |> List.contains JsonExportFormat.ARCtrl then
+                Some JsonExportFormat.ARCtrl
+            else
+                formats |> List.tryHead
+
+        let supportedExportFormats (fileType: ArcFilesDiscriminate) =
+            supportedFormatsFromReadMap fileType
+
+        let supportedImportFormats (fileType: ArcFilesDiscriminate) =
+            supportedFormatsFromReadMap fileType
+
+        let isExportFormatSupported (fileType: ArcFilesDiscriminate) (jsonFormat: JsonExportFormat) =
+            supportedExportFormats fileType |> List.contains jsonFormat
+
+        let isImportFormatSupported (fileType: ArcFilesDiscriminate) (jsonFormat: JsonExportFormat) =
+            supportedImportFormats fileType |> List.contains jsonFormat
+
+        let tryGetDefaultExportFormat (fileType: ArcFilesDiscriminate) =
+            supportedExportFormats fileType |> preferredFormat
+
+        let tryGetDefaultImportFormat (fileType: ArcFilesDiscriminate) =
+            supportedImportFormats fileType |> preferredFormat
 
         let tryParseJsonFileName (fileName: string) =
             if fileName.EndsWith(".json") then
@@ -291,6 +340,103 @@ module Json =
                 None
 
     module Import =
+
+        let private arcFileTypeLabel (fileType: ArcFilesDiscriminate) =
+            match fileType with
+            | ArcFilesDiscriminate.Investigation -> "Investigation"
+            | ArcFilesDiscriminate.Study -> "Study"
+            | ArcFilesDiscriminate.Assay -> "Assay"
+            | ArcFilesDiscriminate.Run -> "Run"
+            | ArcFilesDiscriminate.Workflow -> "Workflow"
+            | ArcFilesDiscriminate.DataMap -> "DataMap"
+            | ArcFilesDiscriminate.Template -> "Template"
+
+        let private uniqueTableName (usedNames: Set<string>) (preferredName: string) =
+            let baseName =
+                if String.IsNullOrWhiteSpace preferredName then
+                    "New Table"
+                else
+                    preferredName.Trim()
+
+            let rec loop index =
+                let candidate =
+                    if index = 0 then
+                        baseName
+                    else
+                        $"{baseName} {index}"
+
+                if usedNames.Contains candidate then
+                    loop (index + 1)
+                else
+                    candidate
+
+            loop 0
+
+        let private copyTableWithName (name: string) (table: ArcTable) =
+            let copiedTable = ArcTable.init name
+
+            let columns =
+                table.Columns
+                |> Seq.map (fun (column: CompositeColumn) ->
+                    CompositeColumn.create (
+                        column.Header.Copy(),
+                        column.Cells |> Seq.map (fun cell -> cell.Copy()) |> ResizeArray
+                    )
+                )
+                |> ResizeArray
+
+            if columns.Count > 0 then
+                copiedTable.AddColumns columns
+
+            copiedTable
+
+        let applyToCurrentArcFile (currentArcFile: ArcFiles, importedArcFile: ArcFiles) =
+            let currentFileType = currentArcFile.RelatedArcFilesDiscriminate
+            let importedFileType = importedArcFile.RelatedArcFilesDiscriminate
+
+            if currentFileType <> importedFileType then
+                Error(
+                    exn
+                        $"Cannot import {arcFileTypeLabel importedFileType} JSON into the current {arcFileTypeLabel currentFileType} editor."
+                )
+            else
+                match currentArcFile, importedArcFile with
+                | ArcFiles.DataMap(currentParentInfo, _), ArcFiles.DataMap(_, importedDataMap) ->
+                    Ok(ArcFiles.DataMap(currentParentInfo, importedDataMap))
+                | _ when currentArcFile.CanCreateTables() ->
+                    let importedTables = importedArcFile.Tables()
+
+                    if importedTables.Count = 0 then
+                        Error(exn $"Imported {arcFileTypeLabel importedFileType} JSON does not contain tables to append.")
+                    else
+                        let targetTables = currentArcFile.ArcTables()
+                        let mutable usedNames = targetTables.TableNames |> Set.ofSeq
+
+                        for sourceTable in importedTables do
+                            let nextName = uniqueTableName usedNames sourceTable.Name
+                            targetTables.AddTable(copyTableWithName nextName sourceTable)
+                            usedNames <- usedNames.Add nextName
+
+                        Ok(ArcFiles.refreshRef currentArcFile)
+                | _ -> Ok importedArcFile
+
+        let tryParseToArcFile
+            (
+                jsonString: string,
+                jsonType: JsonExportFormat,
+                filetype: ArcFilesDiscriminate
+            ) : Result<ArcFiles, exn> =
+            match Generic.readFromJsonMap.TryFind(filetype, jsonType) with
+            | None ->
+                Error(
+                    exn
+                        $"JSON import format {jsonType.AsStringRdbl} is not supported for {filetype}."
+                )
+            | Some arcFileFn ->
+                try
+                    arcFileFn jsonString |> Ok
+                with exn ->
+                    Error exn
 
         let tryParseFromJsonString
             (
@@ -314,8 +460,9 @@ module Json =
 
             match assumedJsonType with
             | Some(jsonFormat, arcfileType) ->
-                let arcfile = Generic.readFromJsonMap.[(arcfileType, jsonFormat)] jsonString
-                Some arcfile
+                match tryParseToArcFile (jsonString, jsonFormat, arcfileType) with
+                | Ok arcfile -> Some arcfile
+                | Error _ -> None
             | None -> None
 
         let parseFromJsonString
@@ -384,3 +531,15 @@ module Json =
                     failwithf "Error. It is not intended to parse Datamap to %s format." (string anyElse)
 
             name, jsonString
+
+        let tryParseToJsonString (arcfile: ArcFiles, jef: JsonExportFormat) =
+            if Generic.isExportFormatSupported arcfile.RelatedArcFilesDiscriminate jef then
+                try
+                    parseToJsonString (arcfile, jef) |> Ok
+                with exn ->
+                    Error exn
+            else
+                Error(
+                    exn
+                        $"JSON export format {jef.AsStringRdbl} is not supported for {arcfile.RelatedArcFilesDiscriminate}."
+                )

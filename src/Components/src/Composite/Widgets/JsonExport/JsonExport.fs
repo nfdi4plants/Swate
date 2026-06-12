@@ -1,62 +1,99 @@
 namespace Swate.Components.Composite.Widgets.JsonExport
 
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
+open Swate.Components.Composite.Widgets
 open Swate.Components.Shared
 
 
 module private JsonExportHelper =
 
-    type JsonExportState = {
-        ExportFormat: JsonExportFormat
-    } with
-
-        static member init() = {
-            ExportFormat = JsonExportFormat.ROCrate
-        }
+    let defaultFormat (arcFile: ArcFiles) =
+        Json.Generic.tryGetDefaultExportFormat arcFile.RelatedArcFilesDiscriminate
+        |> Option.defaultValue JsonExportFormat.ARCtrl
 
     let downloadJson (arcfile: ArcFiles, jef: JsonExportFormat) =
         let jsonExport = Json.Export.parseToJsonString (arcfile, jef)
         Swate.Components.Util.Download.downloadFromString (jsonExport)
+
+    let defaultExportJson (arcfile: ArcFiles, jef: JsonExportFormat) =
+        promise {
+            try
+                downloadJson (arcfile, jef)
+                return Ok()
+            with exn ->
+                return Error exn
+        }
 
 open JsonExportHelper
 
 [<Erase; Mangle(false)>]
 type JsonExport =
 
-    [<ReactComponent>]
-    static member private FileFormat(efm: JsonExportFormat, state: JsonExportState, setState) =
-        Html.option [ prop.text (efm.AsStringRdbl) ]
-
     [<ReactComponent(true)>]
-    static member JsonExport(arcFile: ArcFiles) =
-        let state, setState = React.useState JsonExportState.init
+    static member JsonExport
+        (
+            arcFile: ArcFiles,
+            ?onExportJson: ArcFiles * JsonExportFormat -> JS.Promise<Result<unit, exn>>,
+            ?onError: exn -> unit
+        ) =
+        let exportFormat, setExportFormat = React.useState (fun () -> defaultFormat arcFile)
+        let isExporting, setIsExporting = React.useState false
 
-        let keys = Json.Generic.readFromJsonMap |> Map.keys |> Seq.toList
+        let onError = defaultArg onError (fun exn -> Browser.Dom.console.error exn)
+
+        let exportJson =
+            defaultArg onExportJson (fun (arcFile, jsonFormat) -> defaultExportJson (arcFile, jsonFormat))
+
+        let supportedFormats =
+            React.useMemo (
+                (fun () -> Json.Generic.supportedExportFormats arcFile.RelatedArcFilesDiscriminate),
+                [| box arcFile.RelatedArcFilesDiscriminate |]
+            )
+
+        React.useEffect (
+            (fun () ->
+                if not (supportedFormats |> List.contains exportFormat) then
+                    Json.Generic.tryGetDefaultExportFormat arcFile.RelatedArcFilesDiscriminate
+                    |> Option.defaultValue JsonExportFormat.ARCtrl
+                    |> setExportFormat
+            ),
+            [| box supportedFormats; box exportFormat |]
+        )
 
         Html.div [
-            prop.className "swt:join"
+            prop.className JsonWidgetLayout.rootClass
             prop.children [
-                Html.select [
-                    prop.className "swt:select swt:join-item swt:min-w-fit"
-                    prop.onChange (fun (e: Browser.Types.Event) ->
-                        let jef: JsonExportFormat = JsonExportFormat.fromString (e.target?value)
-                        { state with ExportFormat = jef } |> setState
-                    )
-                    prop.defaultValue (string state.ExportFormat)
-                    prop.children [
-                        for af, jf in keys do
-                            if af = arcFile.RelatedArcFilesDiscriminate then
-                                JsonExport.FileFormat(jf, state, setState)
-                    ]
-                ]
+                JsonFormatSelect.JsonFormatSelect(
+                    supportedFormats,
+                    exportFormat,
+                    setExportFormat,
+                    disabled = isExporting
+                )
                 Html.button [
-                    prop.className "swt:btn swt:btn-primary swt:grow swt:join-item"
-                    prop.text "Download"
+                    prop.className JsonWidgetLayout.actionClass
+                    prop.disabled (isExporting || supportedFormats.IsEmpty)
+                    prop.text (
+                        if isExporting then
+                            "Exporting..."
+                        else
+                            "Download"
+                    )
                     prop.onClick (fun _ ->
-                        downloadJson (arcFile, state.ExportFormat)
+                        if not isExporting then
+                            setIsExporting true
+
+                            exportJson (arcFile, exportFormat)
+                            |> Promise.catch (fun exn -> Error exn)
+                            |> Promise.map (fun result ->
+                                setIsExporting false
+
+                                match result with
+                                | Ok() -> ()
+                                | Error exn -> onError exn
+                            )
+                            |> Promise.start
                     )
                 ]
             ]

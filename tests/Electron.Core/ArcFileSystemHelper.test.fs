@@ -74,6 +74,30 @@ Vitest.describe (
     fun () ->
 
         Vitest.test (
+            "sanitizes JSON export default file names without preserving path segments",
+            fun () ->
+                let sanitized =
+                    JsonExportFileSystemHelper.sanitizeSuggestedFileName "../unsafe:export"
+
+                Vitest.expect(sanitized).toBe ("unsafe_export.json")
+
+                let emptyFallback =
+                    JsonExportFileSystemHelper.sanitizeSuggestedFileName "   "
+
+                Vitest.expect(emptyFallback).toBe ("swate-export.json")
+        )
+
+        Vitest.test (
+            "builds JSON export default path under the active ARC folder",
+            fun () ->
+                let defaultPath =
+                    JsonExportFileSystemHelper.buildDefaultPath "C:/arc/root" "nested/export.json"
+                    |> PathHelpers.normalizePath
+
+                Vitest.expect(defaultPath).toBe ("C:/arc/root/export.json")
+        )
+
+        Vitest.test (
             "creates generic folders through the ARCtrl-backed create path",
             fun () ->
                 withAssayArc (fun arcPath -> promise {

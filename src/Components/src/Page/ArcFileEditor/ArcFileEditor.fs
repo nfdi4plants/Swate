@@ -9,6 +9,7 @@ open Swate.Components.Primitive
 open Swate.Components.Primitive.Navbar
 open Swate.Components.Composite.Widgets.Context
 open Swate.Components.Composite.DataMapTable
+open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components.Shared
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
@@ -61,13 +62,40 @@ type private LazyComponents =
             onPickPaths = onPickPaths
         )
 
-    [<ReactLazyComponent>]
-    static member LazyJsonImportWidget(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
-        Swate.Components.Composite.Widgets.JsonImport.JsonImport.JsonImport(arcFile, setArcFile)
+    [<ReactComponent>]
+    static member LazyJsonImportWidget
+        (
+            arcFile: ArcFiles,
+            setArcFile: ArcFiles -> unit,
+            pickJsonFile: (unit -> JS.Promise<Result<JsonImportFile option, exn>>) option,
+            onImportJson: (JsonImportRequest -> JS.Promise<Result<unit, exn>>) option,
+            onError: exn -> unit
+        ) =
+        Swate.Components.Composite.Widgets.JsonImport.JsonImport.JsonImport(
+            arcFile,
+            setArcFile,
+            ?pickJsonFile = pickJsonFile,
+            ?onImportJson = onImportJson,
+            onError = onError
+        )
 
-    [<ReactLazyComponent>]
-    static member LazyJsonExportWidget(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
-        Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile)
+
+    [<ReactComponent>]
+    static member LazyJsonExportWidget
+        (
+            arcFile: ArcFiles,
+            onExportJson: (ArcFiles * JsonExportFormat -> JS.Promise<Result<unit, exn>>) option,
+            onError: exn -> unit
+        ) =
+        match onExportJson with
+        | Some exportJson ->
+            Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(
+                arcFile,
+                onExportJson = exportJson,
+                onError = onError
+            )
+        | None ->
+            Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile, onError = onError)
 
     [<ReactLazyComponent>]
     static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
@@ -269,6 +297,9 @@ type Main =
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
+            ?pickJsonFile: unit -> JS.Promise<Result<JsonImportFile option, exn>>,
+            ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
+            ?onExportJson: ArcFiles * JsonExportFormat -> JS.Promise<Result<unit, exn>>,
             ?onError: string -> unit
         ) =
 
@@ -365,12 +396,22 @@ type Main =
                             ]
                     jsonImport =
                         Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyJsonImportWidget(arcFile, setArcFile),
+                            LazyComponents.LazyJsonImportWidget(
+                                arcFile,
+                                setArcFile,
+                                pickJsonFile,
+                                onImportJson,
+                                (fun exn -> onError exn.Message)
+                            ),
                             "Loading JSON Import Widget..."
                         )
                     jsonExport =
                         Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyJsonExportWidget(arcFile, setArcFile),
+                            LazyComponents.LazyJsonExportWidget(
+                                arcFile,
+                                onExportJson,
+                                (fun exn -> onError exn.Message)
+                            ),
                             "Loading JSON Export Widget..."
                         )
                 |}),
@@ -379,6 +420,9 @@ type Main =
                     box activeView
                     box activeTableIndex
                     box setArcFile
+                    box pickJsonFile
+                    box onImportJson
+                    box onExportJson
                     pickPaths
                 |]
             )

@@ -4,6 +4,7 @@ module Swate.Electron.Shared.IPCTypes
 open Fable.Core
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Composite.Authentication.Types
+open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.DTOs.NoteSearchDto
@@ -40,6 +41,7 @@ type IArcVaultsApi = {
     pickDirectory: unit -> JS.Promise<Result<string, exn>>
     pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
+    pickJsonImportFile: unit -> JS.Promise<Result<JsonImportFile option, exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
     openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>
@@ -50,6 +52,8 @@ type IArcVaultsApi = {
     saveArcFile: unit -> JS.Promise<Result<unit, exn>>
     /// Applies ARC file changes to the active vault's in-memory ARC without writing to disk.
     setArcFileInMemory: FileContentDTO -> JS.Promise<Result<unit, exn>>
+    /// Saves a user-facing JSON export through Electron's save dialog without mutating the active ARC.
+    saveJsonExport: JsonExportSaveRequest -> JS.Promise<Result<string option, exn>>
     /// Adds a new ARC entity from the file tree. The file watcher performs the follow-up merge and file-tree update.
     addArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     /// Creates a generic file or folder inside a safe ARC directory.
