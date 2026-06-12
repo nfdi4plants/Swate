@@ -26,7 +26,7 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) : JS.Promise<Resul
 }
 
 let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
-    let request: GitLfsFreeLocalCopyRequest = { Path = relativePath }
+    let request: GitLfsFileRequest = { Path = relativePath }
 
     let! result = Renderer.GitApiClient.gitLfsFreeLocalCopy request
 
@@ -39,7 +39,7 @@ let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>
 
 let runDownloadLfsFile (relativePath: string) = promise {
 
-    let request: GitLfsDownloadFileRequest = { Path = relativePath }
+    let request: GitLfsFileRequest = { Path = relativePath }
 
     let! result = Renderer.GitApiClient.gitLfsDownloadFile request
 

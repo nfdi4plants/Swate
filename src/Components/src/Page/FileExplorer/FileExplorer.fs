@@ -121,8 +121,8 @@ type FileExplorer =
             ?onExpansionChange: FileItem -> bool -> unit,
             ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
-            ?useDirectoryChevronToggle: bool,
-            ?useParentHorizontalScroll: bool,
+            ?directoryChevronToggleOnly: bool,
+            ?delegateHorizontalScrollToParent: bool,
             ?getItemIconClass: FileItem -> string option,
             ?getCopyPath: FileItem -> string option,
             ?getCopyRelativePath: FileItem -> string option,
@@ -135,8 +135,11 @@ type FileExplorer =
         let directoryInteractionMode =
             defaultArg directoryInteractionMode DirectoryInteractionMode.SingleClickToggle
 
-        let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
-        let useParentHorizontalScroll = defaultArg useParentHorizontalScroll false
+        let directoryChevronToggleOnly = defaultArg directoryChevronToggleOnly false
+
+        let delegateHorizontalScrollToParent =
+            defaultArg delegateHorizontalScrollToParent false
+
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let getCopyPath = defaultArg getCopyPath (fun item -> item.Path)
         let getCopyRelativePath = defaultArg getCopyRelativePath (fun _ -> None)
@@ -158,7 +161,7 @@ type FileExplorer =
             |> Option.orElse onDirectoryArrowToggle
 
         let scrollContainerClassName =
-            if useParentHorizontalScroll then
+            if delegateHorizontalScrollToParent then
                 "swt:w-max swt:min-w-full"
             else
                 "swt:w-full swt:overflow-x-auto"
@@ -302,7 +305,7 @@ type FileExplorer =
                     rowHighlightClass,
                     selectedNameClass,
                     isExpanded,
-                    useDirectoryChevronToggle,
+                    directoryChevronToggleOnly,
                     canExpand,
                     getItemIconClass,
                     handleDirectorySelection item canExpand,

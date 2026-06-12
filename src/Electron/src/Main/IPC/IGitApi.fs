@@ -403,7 +403,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                         })
         }
     gitLfsDownloadFile =
-        fun (request: GitLfsDownloadFileRequest) -> promise {
+        fun (request: GitLfsFileRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
@@ -444,7 +444,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                         })
         }
     gitLfsFreeLocalCopy =
-        fun (request: GitLfsFreeLocalCopyRequest) -> promise {
+        fun (request: GitLfsFileRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->

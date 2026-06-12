@@ -190,6 +190,14 @@ Vitest.describe (
                 Vitest
                     .expect(
                         FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                            Some(PageState.fromGitLfsPointer ("data/pointer.bin", Some "42 MB"))
+                        )
+                    )
+                    .toBe (true)
+
+                Vitest
+                    .expect(
+                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
                             Some PageState.NotesDraftPage
                         )
                     )

@@ -139,11 +139,11 @@ type FileExplorerItem =
             | Some action -> $"{action.Label} {item.Name}. {statusAccessibilityText}"
             | None -> statusAccessibilityText
 
-        let statusClassName =
+        let statusClassNames =
             if isDownloaded then
-                "swt:badge-success"
+                [ "swt:badge-success" ]
             else
-                "swt:bg-info swt:text-info-content"
+                [ "swt:bg-info"; "swt:text-info-content" ]
 
         let statusIconClassName =
             if isDownloaded then
@@ -151,11 +151,11 @@ type FileExplorerItem =
             else
                 "swt:fluent--cloud-arrow-down-24-regular"
 
-        let statusShapeClass =
+        let statusShapeClasses =
             if item.SizeFormatted.IsSome then
-                "swt:rounded-none swt:border-0"
+                [ "swt:rounded-none"; "swt:border-0" ]
             else
-                "swt:rounded-full"
+                [ "swt:rounded-full" ]
 
         let segmentCursorClass =
             match statusAction, isActionDisabled with
@@ -165,8 +165,14 @@ type FileExplorerItem =
 
         let statusBadge =
             Html.span [
-                prop.className
-                    $"swt:badge swt:badge-sm swt:gap-0.5 {segmentCursorClass} {statusClassName} {statusShapeClass}"
+                prop.className [
+                    "swt:badge"
+                    "swt:badge-sm"
+                    "swt:gap-0.5"
+                    segmentCursorClass
+                    yield! statusClassNames
+                    yield! statusShapeClasses
+                ]
                 prop.custom (
                     "data-lfs-download-status",
                     if isDownloaded then "downloaded"
@@ -187,8 +193,15 @@ type FileExplorerItem =
             match item.SizeFormatted with
             | Some size ->
                 Html.span [
-                    prop.className
-                        $"swt:badge swt:badge-sm swt:rounded-none swt:border-0 {segmentCursorClass} swt:bg-base-200 swt:text-base-content"
+                    prop.className [
+                        "swt:badge"
+                        "swt:badge-sm"
+                        "swt:rounded-none"
+                        "swt:border-0"
+                        segmentCursorClass
+                        "swt:bg-base-200"
+                        "swt:text-base-content"
+                    ]
                     prop.text size
                 ]
             | None -> ()
@@ -251,7 +264,7 @@ type FileExplorerItem =
             rowHighlightClass: string,
             selectedNameClass: string,
             isExpanded: bool,
-            useDirectoryChevronToggle: bool,
+            directoryChevronToggleOnly: bool,
             canExpandDirectory: bool,
             getItemIconClass: FileItem -> string option,
             onDirectorySelect: Browser.Types.MouseEvent -> unit,
@@ -287,7 +300,7 @@ type FileExplorerItem =
                 ]
                 prop.style [ style.display.flex; style.width (length.percent 100) ]
 
-                if not useDirectoryChevronToggle then
+                if not directoryChevronToggleOnly then
                     prop.onClick onDirectorySelect
 
                 prop.children [

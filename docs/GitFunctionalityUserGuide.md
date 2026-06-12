@@ -47,8 +47,8 @@ setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, st
 confirmGitMergeResolution: GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, string>>
 gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, string>>
 gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, string>>
-gitLfsDownloadFile: GitLfsDownloadFileRequest -> JS.Promise<Result<GitOperationResult, string>>
-gitLfsFreeLocalCopy: GitLfsFreeLocalCopyRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitLfsDownloadFile: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, string>>
+gitLfsFreeLocalCopy: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, string>>
 ```
 
 Most app code should access these through `GitWorkflow.GitDependencies`, which is populated in `GitStateContext.fs`. That dependency layer maps diff and merge page-load DTOs to `PageState`.
@@ -296,7 +296,7 @@ Additional LFS file/storage actions:
 
 - "Clean LFS Cache" requires a clean working tree, rejects repositories with custom `lfs.storage`, and runs `git lfs prune --verify-remote --verify-unreachable --when-unverified=halt` through the active ARC. This removes hidden local LFS cache objects only after Git LFS can verify the configured origin remote.
 - "Reduce LFS Storage" requires a clean working tree and runs `git lfs dedup`. It may fail on file systems without copy-on-write support or when Git LFS extensions are configured; this is expected and should be shown to users.
-- "Download LFS file" is available from LFS-tracked pointer files via the file context menu, the LFS size/status pill, and pointer-file preview clicks. It verifies the file is clean and listed by the same `git lfs ls-files` index used by the file tree, runs `git lfs pull --include=<path>`, runs `git lfs checkout <path>`, and verifies the file is hydrated without changing Git status.
+- "Download LFS file" is available from LFS-tracked pointer files via the file context menu, the LFS size/status pill, and the Git LFS pointer preview page. It verifies the file is clean and listed by the same `git lfs ls-files` index used by the file tree, runs `git lfs pull --include=<path>`, runs `git lfs checkout <path>`, and verifies the file is hydrated without changing Git status.
 - "Free local LFS copy" is available from downloaded LFS-tracked files via the file context menu and the LFS size/status pill. It verifies the file is clean, confirms Git LFS can fetch it from the remote, then replaces the visible full file with the small LFS pointer.
 
 ## 9. Branches and Pull Workflow

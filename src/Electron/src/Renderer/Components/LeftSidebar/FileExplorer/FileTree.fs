@@ -1,7 +1,6 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
-open Renderer.Components.Helper.GitLfsHelper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
@@ -55,7 +54,6 @@ type FileTree =
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
         let errorModal = useErrorModalCtx ()
-        let skipNextFileTreeReloadPathRef = React.useRef<string option> None
 
         let arcScopeId =
             appStateCtx
@@ -69,6 +67,7 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
+        // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
         React.useEffect (
@@ -159,21 +158,9 @@ type FileTree =
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                     if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
-                        skipNextFileTreeReloadPathRef.current <- Some selectedPath
-                        console.log ($"[Renderer] Downloading Git LFS content for '{selectedPath}' before preview.")
-
-                        let! downloadResult = Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile selectedPath
-
-                        match downloadResult with
-                        | Error errorMessage ->
-                            skipNextFileTreeReloadPathRef.current <- None
-
-                            let fullErrorMessage =
-                                $"Could not download Git LFS content for '{item.Name}': {errorMessage}"
-
-                            console.log ($"[Renderer] Error: {fullErrorMessage}")
-                            pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
-                        | Ok() -> do! openSelectedPreview item.Name selectedPath
+                        pageStateCtx.setState (
+                            Some(Renderer.Types.PageState.fromGitLfsPointer (selectedPath, item.SizeFormatted))
+                        )
                     else
                         do! openSelectedPreview item.Name selectedPath
             }
@@ -214,13 +201,7 @@ type FileTree =
         React.useEffect (
             (fun () ->
                 if hasObservedFileTreeUpdateRef.current then
-                    match skipNextFileTreeReloadPathRef.current, fileStateCtx.state.Selection.TreePath with
-                    | Some pendingPath, Some selectedPath when PathHelpers.pathsEqual pendingPath selectedPath ->
-                        skipNextFileTreeReloadPathRef.current <- None
-                    | Some _, _ ->
-                        skipNextFileTreeReloadPathRef.current <- None
-                        reloadSelectedPreviewAfterFileTreeUpdate ()
-                    | None, _ -> reloadSelectedPreviewAfterFileTreeUpdate ()
+                    reloadSelectedPreviewAfterFileTreeUpdate ()
                 else
                     hasObservedFileTreeUpdateRef.current <- true
             ),
@@ -508,7 +489,7 @@ type FileTree =
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             includeDefaultContextMenuItems = false,
-                            useParentHorizontalScroll = true
+                            delegateHorizontalScrollToParent = true
                         )
                     ]
                 ]
