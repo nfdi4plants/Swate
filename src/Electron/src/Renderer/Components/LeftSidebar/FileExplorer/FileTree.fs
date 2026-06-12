@@ -1,7 +1,6 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
-open Renderer.Components.Helper.GitLfsHelper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
@@ -68,6 +67,7 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
+        // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
         React.useEffect (
@@ -129,6 +129,19 @@ type FileTree =
                 FileTreeMaterialization.toMaterializedFileItemTree Helper.createItem reconciledMaterializedState.Paths
             )
 
+        let openSelectedPreview (itemName: string) (selectedPath: string) = promise {
+            let! result = openView selectedPath
+
+            match result with
+            | Ok pageState ->
+                console.log ("[Renderer] Received data, processing...")
+                pageStateCtx.setState (Some pageState)
+            | Error errorMessage ->
+                let fullErrorMessage = $"Could not open preview for '{itemName}': {errorMessage}"
+                console.log ($"[Renderer] Error: {fullErrorMessage}")
+                pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
+        }
+
         let openPreview (item: FileItem) =
             promise {
                 match item.Path with
@@ -143,16 +156,13 @@ type FileTree =
                 | Some path ->
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-                    let! result = openView selectedPath
 
-                    match result with
-                    | Ok pageState ->
-                        console.log ("[Renderer] Received data, processing...")
-                        pageStateCtx.setState (Some pageState)
-                    | Error errorMessage ->
-                        let fullErrorMessage = $"Could not open preview for '{item.Name}': {errorMessage}"
-                        console.log ($"[Renderer] Error: {fullErrorMessage}")
-                        pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
+                    if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
+                        pageStateCtx.setState (
+                            Some(Renderer.Types.PageState.fromGitLfsPointer (selectedPath, item.SizeFormatted))
+                        )
+                    else
+                        do! openSelectedPreview item.Name selectedPath
             }
             |> Promise.start
 
@@ -364,11 +374,12 @@ type FileTree =
             }
             enqueueError = errorModal.enqueue
             runToggleLfsMark = Renderer.Components.Helper.GitLfsHelper.runToggleLfsMark
+            runDownloadLfsFile = Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
             runFreeLocalLfsCopy = Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
         }
 
         let createContextMenuItems =
-            FileTreeContextMenu.createContextMenuItems contextMenuConfig
+            FileTreeContextMenu.createContextMenuItems contextMenuConfig arcScopeId
 
         let rootContextMenu rootItem =
             let rootMenuItem = {
@@ -385,6 +396,13 @@ type FileTree =
                 ref = rootContextMenuRef,
                 onSpawn = (fun _ -> Some(box ()))
             )
+
+        let getItemStatusAction =
+            Renderer.Components.FileExplorerLfs.createLfsPillAction
+                errorModal.enqueue
+                arcScopeId
+                Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile
+                Renderer.Components.Helper.GitLfsHelper.runFreeLocalLfsCopy
 
         let confirmRenameItem (newName: string) =
             if not isDialogBusy then
@@ -466,10 +484,12 @@ type FileTree =
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
                             getItemActions = renameContextMenuItems,
+                            getItemStatusAction = getItemStatusAction,
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
-                            includeDefaultContextMenuItems = false
+                            includeDefaultContextMenuItems = false,
+                            delegateHorizontalScrollToParent = true
                         )
                     ]
                 ]

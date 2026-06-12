@@ -185,7 +185,7 @@ type ARCObjectExplorer =
                 initialItems = filteredItems,
                 ?selectedItemId = Some visibleSelectedId,
                 onItemClick = (fun item -> setSelectedId item.Id),
-                useDirectoryChevronToggle = true
+                directoryChevronToggleOnly = true
             )
 
         let explorerPane =

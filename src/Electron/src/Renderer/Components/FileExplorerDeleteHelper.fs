@@ -1,8 +1,8 @@
 module Renderer.Components.FileExplorerDeleteHelper
 
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Renderer.Types
 
 [<RequireQualifiedAccess>]
 module FileExplorerDeleteHelper =
@@ -18,31 +18,35 @@ module FileExplorerDeleteHelper =
         |> Option.map PathHelpers.normalizePath
         |> Option.exists (fun selectedPath -> containsPath paths selectedPath |> not)
 
-    let shouldResetPageStateAfterSelectionRemoval (pageState: Renderer.Types.PageState option) =
-        match pageState with
-        | Some(Renderer.Types.PageState.ArcFilePage _)
-        | Some(Renderer.Types.PageState.MarkdownPage _)
-        | Some(Renderer.Types.PageState.TextPage _)
-        | Some Renderer.Types.PageState.UnknownPage
-        | Some(Renderer.Types.PageState.ErrorPage _) -> true
+    let private resetsWhenSelectionIsRemoved =
+        function
+        | PageState.ArcFilePage _
+        | PageState.MarkdownPage _
+        | PageState.TextPage _
+        | PageState.UnknownPage
+        | PageState.ErrorPage _
+        | PageState.GitLfsPointerPage _ -> true
         | _ -> false
 
-    let private shouldReloadPageStateAfterSelectedFileUpdate (pageState: Renderer.Types.PageState option) =
-        match pageState with
-        | Some(Renderer.Types.PageState.MarkdownPage _)
-        | Some(Renderer.Types.PageState.TextPage _)
-        | Some Renderer.Types.PageState.UnknownPage
-        | Some(Renderer.Types.PageState.ErrorPage _) -> true
+    let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
+        pageState |> Option.exists resetsWhenSelectionIsRemoved
+
+    let private reloadsWhenSelectedFileChanges =
+        function
+        | PageState.MarkdownPage _
+        | PageState.TextPage _
+        | PageState.UnknownPage
+        | PageState.ErrorPage _ -> true
         | _ -> false
 
     let tryGetReloadableSelectedFilePath
         (fileTree: FileEntry[])
         (selectionPath: string option)
-        (pageState: Renderer.Types.PageState option)
+        (pageState: PageState option)
         =
-        if shouldReloadPageStateAfterSelectedFileUpdate pageState |> not then
-            None
-        else
+        pageState
+        |> Option.filter reloadsWhenSelectedFileChanges
+        |> Option.bind (fun _ ->
             selectionPath
             |> Option.map PathHelpers.normalizePath
             |> Option.bind (fun selectedPath ->
@@ -53,3 +57,4 @@ module FileExplorerDeleteHelper =
                 )
                 |> Option.map (fun entry -> PathHelpers.normalizePath entry.path)
             )
+        )

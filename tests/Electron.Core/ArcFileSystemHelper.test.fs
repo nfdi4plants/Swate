@@ -12,6 +12,9 @@ open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 
+[<Emit("Object.assign(new Error($0), { code: $1 })")>]
+let private nodeError (message: string) (code: string) : exn = jsNative
+
 let private withAssayArc =
     TestHelpers.withTempArcWith
         "swate-generic-fs-"
@@ -177,5 +180,27 @@ Vitest.describe (
                     let! reloadedArc = TestHelpers.loadArcAsync arcPath
                     Vitest.expect(reloadedArc.ContainsAssay("AssayA")).toBe (true)
                 })
+        )
+
+        Vitest.test (
+            "retries transient recursive remove errors",
+            fun () -> promise {
+                let mutable attempts = 0
+                let targetPath = "/tmp/swate-retry-target"
+
+                let removePathAsync path = promise {
+                    attempts <- attempts + 1
+                    Vitest.expect(path).toBe (targetPath)
+
+                    if attempts < 3 then
+                        return raise (nodeError "directory is still changing" "ENOTEMPTY")
+                }
+
+                match! removePathWithRetriesAsync removePathAsync targetPath with
+                | Error error -> return failwith error.Message
+                | Ok() ->
+                    Vitest.expect(attempts).toBe (3)
+                    return ()
+            }
         )
 )

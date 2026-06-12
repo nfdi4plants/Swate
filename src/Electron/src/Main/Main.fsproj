@@ -32,6 +32,9 @@
     <Compile Include="ArcMerge\ArcAddExtensions.fs" />
     <Compile Include="Git\GitTokenProvider.fs" />
     <Compile Include="Git\GitInternals.fs" />
+    <Compile Include="Git\GitService\FailureClassification.fs" />
+    <Compile Include="Git\GitService\Validation.fs" />
+    <Compile Include="Git\GitService\Core.fs" />
     <Compile Include="Git\GitService.fs" />
     <Compile Include="Git\GitProvisioningService.fs" />
     <Compile Include="Auth\SecureAuthStore.fs" />

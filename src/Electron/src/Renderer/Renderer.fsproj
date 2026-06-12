@@ -55,6 +55,7 @@
     <Compile Include="Components\MainContent\GitDiffTarget.fs" />
     <Compile Include="Components\MainContent\GitMergeConflictTarget.fs" />
     <Compile Include="Components\MainContent\GitUnsupportedTarget.fs" />
+    <Compile Include="Components\MainContent\GitLfsPointerTarget.fs" />
     <Compile Include="Components\MainContent\EmptySelectionTarget.fs" />
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
