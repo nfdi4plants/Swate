@@ -2451,13 +2451,13 @@ Vitest.describe (
                                 let filePath = join [| context.RepoPath; "data.bin" |]
                                 let! _ = setupCommittedPushedLfsFile context "data.bin" content
 
-                                let! _ = context.Git.raw [| "rm"; ".gitattributes" |]
-                                let! _ = context.Git.raw [| "commit"; "-m"; "test: remove lfs attributes" |]
-
                                 let! cleanupResult = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
 
                                 expectOk "free local lfs copy without current attributes" cleanupResult
                                 |> ignore
+
+                                let! _ = context.Git.raw [| "rm"; ".gitattributes" |]
+                                let! _ = context.Git.raw [| "commit"; "-m"; "test: remove lfs attributes" |]
 
                                 let! listingBeforeDownload =
                                     context.Git.raw [|
