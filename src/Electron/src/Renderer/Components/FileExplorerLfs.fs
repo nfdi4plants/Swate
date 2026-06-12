@@ -1,9 +1,10 @@
 module Renderer.Components.FileExplorerLfs
 
-open Fable.Core
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
+
+module FileExplorerGitLfsHelper = Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper
 
 type FileTreeNodeLfsState = {
     IsLFS: bool option
@@ -40,24 +41,46 @@ let withFileTreeNodeLfsState (node: FileTreeNode) (item: FileItem) : FileItem =
             SizeFormatted = lfsState.SizeFormatted
     }
 
-let createToggleLfsMark
+let private createErrorReporter
     (enqueueErrorModal: ErrorModalRequest -> unit)
-    (runToggle: string -> bool -> JS.Promise<Result<unit, string>>)
-    : (FileItem -> bool -> unit) =
-    let setError (errorMsg: string option) =
-        match errorMsg with
-        | Some msg -> enqueueErrorModal (ErrorModalRequest.create (msg, title = "Git LFS update failed"))
-        | None -> ()
+    (arcScopeId: string option)
+    (title: string)
+    =
+    function
+    | Some msg -> enqueueErrorModal (ErrorModalRequest.create (msg, title = title, ?scopeId = arcScopeId))
+    | None -> ()
 
-    Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark setError runToggle
+let private createLfsAction title action enqueueErrorModal arcScopeId runAction =
+    action (createErrorReporter enqueueErrorModal arcScopeId title) runAction
 
-let createFreeLocalLfsCopy
-    (enqueueErrorModal: ErrorModalRequest -> unit)
-    (runCleanup: string -> JS.Promise<Result<unit, string>>)
-    : (FileItem -> unit) =
-    let setError (errorMsg: string option) =
-        match errorMsg with
-        | Some msg -> enqueueErrorModal (ErrorModalRequest.create (msg, title = "Git LFS cleanup failed"))
-        | None -> ()
+let createToggleLfsMark enqueueErrorModal arcScopeId runToggle =
+    createLfsAction
+        "Git LFS update failed"
+        FileExplorerGitLfsHelper.toggleLfsMark
+        enqueueErrorModal
+        arcScopeId
+        runToggle
 
-    Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy setError runCleanup
+let createFreeLocalLfsCopy enqueueErrorModal arcScopeId runCleanup =
+    createLfsAction
+        "Git LFS cleanup failed"
+        FileExplorerGitLfsHelper.freeLocalLfsCopy
+        enqueueErrorModal
+        arcScopeId
+        runCleanup
+
+let createDownloadLfsFile enqueueErrorModal arcScopeId runDownload =
+    createLfsAction
+        "Git LFS download failed"
+        FileExplorerGitLfsHelper.downloadLfsFile
+        enqueueErrorModal
+        arcScopeId
+        runDownload
+
+let createLfsPillAction enqueueErrorModal arcScopeId runDownload runCleanup =
+    let downloadLfsFile = createDownloadLfsFile enqueueErrorModal arcScopeId runDownload
+
+    let freeLocalLfsCopy =
+        createFreeLocalLfsCopy enqueueErrorModal arcScopeId runCleanup
+
+    fun item -> FileExplorerGitLfsHelper.lfsPillAction item (Some downloadLfsFile) (Some freeLocalLfsCopy)

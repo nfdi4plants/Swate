@@ -5,7 +5,9 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.Bindings.SimpleGit
+open Main.IPC.FileSystemIO
 open Main.Git.GitLfsService
+open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 open Vitest
 
@@ -144,6 +146,31 @@ Vitest.describe (
                 Vitest.expect(nullFiles.Length).toBe (0)
                 Vitest.expect(missingFiles.Length).toBe (0)
         )
+
+        Vitest.test (
+            "tryFindLsFileInfoByRelativePath matches the file tree path case-insensitively",
+            fun () ->
+                let filesByRelativePath =
+                    System.Collections.Generic.Dictionary<string, GitLfsLsFileInfo>()
+
+                filesByRelativePath.["Assays/GCqTOF_targets/dataset/150112_03.D/GC.ini"] <- {
+                    name = "Assays/GCqTOF_targets/dataset/150112_03.D/GC.ini"
+                    size = 42.0
+                    checkout = false
+                    downloaded = true
+                    ``oid_type`` = "sha256"
+                    oid = "0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef"
+                    version = "https://git-lfs.github.com/spec/v1"
+                }
+
+                let result =
+                    GitLfsService.tryFindLsFileInfoByRelativePath
+                        filesByRelativePath
+                        "assays/gcqtof_targets/dataset/150112_03.d/gc.ini"
+
+                Vitest.expect(result.IsSome).toBe (true)
+                Vitest.expect((result |> Option.get).name).toBe ("Assays/GCqTOF_targets/dataset/150112_03.D/GC.ini")
+        )
 )
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -170,12 +197,18 @@ let private createTempDirectoryAsync () : JS.Promise<string> =
 
     fsPromisesDynamic?mkdtemp (prefix) |> unbox<JS.Promise<string>>
 
-let private removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
+let private removeDirectoryOnceAsync path = promise {
     let! _ =
         fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
         |> unbox<JS.Promise<obj>>
 
     return ()
+}
+
+let private removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
+    match! removePathWithRetriesAsync removeDirectoryOnceAsync path with
+    | Ok() -> return ()
+    | Error removeError -> return raise removeError
 }
 
 let private configureRepositoryAsync (git: ISimpleGit) : JS.Promise<unit> = promise {
@@ -590,6 +623,48 @@ Vitest.describe (
                         Vitest.expect(status.IsClean).toBe (false)
                         Vitest.expect(fileStatus.WorkingDir).toBe ("M")
                         Vitest.expect(fileStatus.Index = "M").toBe (false)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "stage and unstage tolerate many long selected paths before a local commit",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let directoryPath = join [| context.RepoPath; "many" |]
+                        do! ensureDirectoryAsync directoryPath
+
+                        let repeatedNamePart = String.replicate 2 "abcdefghijklmnopqrstuvwxyz"
+
+                        let pathSpecs = [|
+                            for index in 0..399 ->
+                                let indexText = index.ToString("0000")
+                                $"many/file-{indexText}-{repeatedNamePart}.txt"
+                        |]
+
+                        for pathSpec in pathSpecs do
+                            let filePath = join [| context.RepoPath; pathSpec |]
+                            do! writeUtf8FileAsync filePath $"content for {pathSpec}\n"
+
+                        let! stageResult = GitService.stagePaths context.RepoPath pathSpecs
+                        expectOk "stage many long paths" stageResult |> ignore
+
+                        let! unstageResult = GitService.unstagePaths context.RepoPath pathSpecs
+                        expectOk "unstage many long paths" unstageResult |> ignore
+
+                        let! restageResult = GitService.stagePaths context.RepoPath pathSpecs
+                        expectOk "restage many long paths" restageResult |> ignore
+
+                        let! commitResult = GitService.commit context.RepoPath "test: commit many selected files"
+                        Vitest.expect((expectOk "commit many selected files" commitResult).Length).toBeGreaterThan (6)
+
+                        let! status =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status after many-path commit")
+
+                        Vitest.expect(status.IsClean).toBe (true)
                     })
             }
         )
@@ -2267,7 +2342,233 @@ Vitest.describe (
 
                                 let! result = GitService.freeLocalLfsCopy context.RepoPath "plain.txt"
                                 let failure = expectError result
-                                Vitest.expect(failure.Message.Contains("not tracked")).toBe (true)
+                                Vitest.expect(failure.Message.Contains("not listed by Git LFS")).toBe (true)
+                            })
+                    }
+                )
+        )
+
+        Vitest.describe (
+            "GitService.downloadLfsFile",
+            fun () ->
+                Vitest.test (
+                    "downloadLfsFile rehydrates a pointer and leaves git status clean",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let content = String.replicate 4096 "x"
+                                let filePath = join [| context.RepoPath; "data.bin" |]
+                                let! _ = setupCommittedPushedLfsFile context "data.bin" content
+
+                                let! cleanupResult = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                                expectOk "free local lfs copy" cleanupResult |> ignore
+
+                                let! downloadResult = GitService.downloadLfsFile context.RepoPath "data.bin"
+                                expectOk "download lfs file" downloadResult |> ignore
+
+                                let! contentAfter =
+                                    fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
+
+                                Vitest.expect(contentAfter).toBe (content)
+
+                                let! statusAfterDownload =
+                                    unwrapResultAsync
+                                        (GitService.getStatus context.RepoPath)
+                                        (expectOk "git status after lfs download")
+
+                                Vitest.expect(statusAfterDownload.Files.Length).toBe (0)
+
+                                let! listing =
+                                    context.Git.raw [|
+                                        "lfs"
+                                        "ls-files"
+                                        "-l"
+                                        "--size"
+                                        "--json"
+                                        "--include=data.bin"
+                                    |]
+
+                                Vitest.expect(listing.Contains("\"checkout\": true")).toBe (true)
+                            })
+                    }
+                )
+
+                Vitest.test (
+                    "downloadLfsFile uses the shared LFS index when include filtering misses the path",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let content = String.replicate 4096 "x"
+                                let relativePath = "data/a,b.bin"
+                                let directoryPath = join [| context.RepoPath; "data" |]
+                                let filePath = join [| context.RepoPath; relativePath |]
+
+                                do! ensureDirectoryAsync directoryPath
+                                let! _ = setupCommittedPushedLfsFile context relativePath content
+
+                                let! filteredListing =
+                                    context.Git.raw [|
+                                        "lfs"
+                                        "ls-files"
+                                        "-l"
+                                        "--size"
+                                        "--json"
+                                        $"--include={relativePath}"
+                                    |]
+
+                                Vitest.expect(filteredListing.Contains("\"files\": null")).toBe (true)
+
+                                let! cleanupResult = GitService.freeLocalLfsCopy context.RepoPath relativePath
+                                expectOk "free local lfs copy for comma path" cleanupResult |> ignore
+
+                                let! downloadResult = GitService.downloadLfsFile context.RepoPath relativePath
+                                expectOk "download lfs file for comma path" downloadResult |> ignore
+
+                                let! contentAfter =
+                                    fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
+
+                                Vitest.expect(contentAfter).toBe (content)
+
+                                let! statusAfterDownload =
+                                    unwrapResultAsync
+                                        (GitService.getStatus context.RepoPath)
+                                        (expectOk "git status after comma-path lfs download")
+
+                                Vitest.expect(statusAfterDownload.Files.Length).toBe (0)
+                            })
+                    }
+                )
+
+                Vitest.test (
+                    "downloadLfsFile reports listed LFS pointers whose current attributes no longer track the path",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let content = String.replicate 4096 "x"
+                                let filePath = join [| context.RepoPath; "data.bin" |]
+                                let! _ = setupCommittedPushedLfsFile context "data.bin" content
+
+                                let! cleanupResult = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+
+                                expectOk "free local lfs copy without current attributes" cleanupResult
+                                |> ignore
+
+                                let! _ = context.Git.raw [| "rm"; ".gitattributes" |]
+                                let! _ = context.Git.raw [| "commit"; "-m"; "test: remove lfs attributes" |]
+
+                                let! listingBeforeDownload =
+                                    context.Git.raw [|
+                                        "lfs"
+                                        "ls-files"
+                                        "-l"
+                                        "--size"
+                                        "--json"
+                                        "--include=data.bin"
+                                    |]
+
+                                Vitest.expect(listingBeforeDownload.Contains("\"checkout\": false")).toBe (true)
+
+                                let! downloadResult = GitService.downloadLfsFile context.RepoPath "data.bin"
+                                let failure = expectError downloadResult
+                                Vitest.expect(failure.Message.Contains("listed by Git LFS")).toBe (true)
+                                Vitest.expect(failure.Message.Contains(".gitattributes")).toBe (true)
+                                Vitest.expect(failure.Message.Contains("not tracked")).toBe (false)
+
+                                let! contentAfterFailure =
+                                    fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
+
+                                Vitest
+                                    .expect(
+                                        contentAfterFailure.StartsWith("version https://git-lfs.github.com/spec/v1")
+                                    )
+                                    .toBe (true)
+                            })
+                    }
+                )
+
+                Vitest.test (
+                    "downloadLfsFile rejects dirty files and keeps local content",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let filePath = join [| context.RepoPath; "data.bin" |]
+                                let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
+
+                                let! cleanupResult = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                                expectOk "free local lfs copy" cleanupResult |> ignore
+
+                                do! writeUtf8FileAsync filePath "changed locally\n"
+
+                                let! result = GitService.downloadLfsFile context.RepoPath "data.bin"
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("local changes")).toBe (true)
+
+                                let! contentAfter =
+                                    fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
+
+                                Vitest.expect(contentAfter).toBe ("changed locally\n")
+                            })
+                    }
+                )
+
+                Vitest.test (
+                    "downloadLfsFile rejects staged changes and keeps staged file content",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let filePath = join [| context.RepoPath; "data.bin" |]
+                                let! _ = setupCommittedPushedLfsFile context "data.bin" (String.replicate 4096 "x")
+
+                                let! cleanupResult = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
+                                expectOk "free local lfs copy" cleanupResult |> ignore
+
+                                do! writeUtf8FileAsync filePath "staged change\n"
+                                let! _ = context.Git.raw [| "add"; "data.bin" |]
+
+                                let! result = GitService.downloadLfsFile context.RepoPath "data.bin"
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("local changes")).toBe (true)
+
+                                let! contentAfter =
+                                    fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
+
+                                Vitest.expect(contentAfter).toBe ("staged change\n")
+                            })
+                    }
+                )
+
+                Vitest.test (
+                    "downloadLfsFile rejects an invalid path traversal request",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let! result = GitService.downloadLfsFile context.RepoPath "../outside.bin"
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("traversal")).toBe (true)
+                            })
+                    }
+                )
+
+                Vitest.test (
+                    "downloadLfsFile rejects a file that is not tracked by LFS",
+                    gitLfsIntegrationTestOptions,
+                    fun () -> promise {
+                        do!
+                            withTempRepository (fun context -> promise {
+                                let plainPath = join [| context.RepoPath; "plain.txt" |]
+                                do! writeUtf8FileAsync plainPath "plain text\n"
+                                let! _ = context.Git.raw [| "add"; "plain.txt" |]
+                                let! _ = context.Git.raw [| "commit"; "-m"; "test: add plain file" |]
+
+                                let! result = GitService.downloadLfsFile context.RepoPath "plain.txt"
+                                let failure = expectError result
+                                Vitest.expect(failure.Message.Contains("not listed by Git LFS")).toBe (true)
                             })
                     }
                 )
