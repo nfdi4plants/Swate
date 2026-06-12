@@ -233,7 +233,7 @@ type Controls =
 
         Html.button [
             prop.type'.button
-            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square"
+            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:btn-outline swt:z-10"
             prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
             if defaultArg debug false then
                 prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
@@ -316,17 +316,22 @@ type Controls =
                 prop.className [
                     // swt:shrink overrides the btn class's flex-shrink:0 so the button can
                     // give way (and truncate) when the rail row runs out of space.
-                    "swt:btn swt:btn-sm swt:h-auto swt:relative swt:shrink swt:min-w-0 swt:max-w-[18rem] swt:justify-start"
+                    "swt:btn swt:btn-sm swt:h-auto swt:relative swt:shrink swt:min-w-0 swt:max-w-[18rem] swt:justify-start "
                     "swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
                     match density with
                     | Density.EditorDensity.Compact -> "swt:min-h-6 swt:py-0.5 swt:text-[0.7rem]"
                     | _ -> "swt:min-h-8 swt:py-1"
+
+                    match side with
+                    | ProvenanceSide.Input -> "swt:rounded-l-none"
+                    | ProvenanceSide.Output -> "swt:rounded-r-none"
                     if sideSelected then
                         "swt:btn-primary"
                     else
                         "swt:btn-outline"
                     if canSwitch then
                         yield! Styles.draggableButtonClasses draggable.isDragging
+                        
                 ]
                 prop.custom ("data-provenance-resize-node", "true")
                 if defaultArg debug false then
@@ -344,7 +349,18 @@ type Controls =
         let expandButton =
             Html.button [
                 prop.type'.button
-                prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:z-10 swt:btn-outline"
+                prop.className [
+                    "swt:btn swt:btn-xs swt:btn-square swt:z-10 swt:btn-outline"
+
+                    match side with 
+                    | ProvenanceSide.Input -> " swt:rounded-r-none swt:border-r-0"
+                    | ProvenanceSide.Output -> "swt:rounded-l-none swt:border-l-0"
+                    match density with
+                    | Density.EditorDensity.Compact ->
+                        "swt:min-h-6 swt:py-0.5"
+                    | _ ->
+                        "swt:min-h-8 swt:py-1"
+                ]
                 if defaultArg debug false then
                     prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
                 prop.ariaLabel (
@@ -364,6 +380,20 @@ type Controls =
                                 "swt:fluent--chevron-down-20-regular"
                         ]
                     ]
+                ]
+            ]
+
+        let propertyButtonWithExpand =
+            Html.div [
+                prop.className "swt:flex swt:min-w-0"
+                prop.children [
+                    match side with
+                    | ProvenanceSide.Input ->
+                        expandButton
+                        propertyButton
+                    | ProvenanceSide.Output ->
+                        propertyButton
+                        expandButton
                 ]
             ]
 
@@ -421,9 +451,8 @@ type Controls =
                     | ProvenanceSide.Input ->
                         swapButton
                         bothButton
-                        expandButton
+                        
                     | ProvenanceSide.Output ->
-                        expandButton
                         bothButton
                         swapButton
                 ]
@@ -462,17 +491,17 @@ type Controls =
                         // button faces the group cards so connectors attach directly to it.
                         match side with
                         | ProvenanceSide.Input ->
-                            propertyButton
+                            propertyButtonWithExpand
                             rowControls
                         | ProvenanceSide.Output ->
                             rowControls
-                            propertyButton
+                            propertyButtonWithExpand
                     ]
                 ]
                 if expanded then
                     Html.div [
                         prop.className [
-                            "swt:flex swt:flex-col swt:gap-1"
+                            "swt:flex swt:flex-col swt:gap-1 swt:z-20"
                             match side with
                             | ProvenanceSide.Input -> "swt:items-start swt:pl-2"
                             | ProvenanceSide.Output -> "swt:items-end swt:pr-2"
@@ -563,7 +592,11 @@ type Controls =
                 prop.testId $"provenance-property-rail-{side}"
             prop.children [
                 Html.h3 [
-                    prop.className "swt:text-sm swt:font-semibold swt:text-primary"
+                    prop.className [
+                        "swt:text-sm swt:font-semibold swt:text-primary"
+                        if side = ProvenanceSide.Output then
+                            "swt:self-end"
+                    ]
                     prop.text "Properties"
                 ]
                 for header in visibleHeaders do
