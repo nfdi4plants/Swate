@@ -121,9 +121,9 @@ export const GroupsByPropertiesAndShowsMembers: Story = {
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
     expect(canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas')).toBeInTheDocument();
 
-    // The grouping value shows as a chip; the category lives in its tooltip.
-    expect(grouped).toHaveTextContent('Arabidopsis');
-    expect(grouped).not.toHaveTextContent('Species:');
+    // The grouping shows as an organizer tab "Category: Value" on top of the member folder.
+    const tab = within(grouped).getByTestId('provenance-group-tab-Input-input:Species=Arabidopsis-0');
+    expect(tab).toHaveTextContent('Species: Arabidopsis');
 
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
     await waitFor(() => expect(grouped).toHaveTextContent('Input A'));
@@ -175,6 +175,28 @@ export const ShowsEntityTypesAndCollapsedSymbols: Story = {
     const member = within(grouped).getByTestId('provenance-group-member-Input-input-a');
     expect(member).toHaveTextContent('Sample');
     expect(member).toHaveTextContent('Input A');
+  },
+};
+
+export const HoveringGroupTabHighlightsItAndKeepsFolderPreview: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    const tab = within(grouped).getByTestId('provenance-group-tab-Input-input:Species=Arabidopsis-0');
+
+    expect(tab).toHaveAttribute('data-hovered', 'false');
+
+    // Hovering the tab highlights it and the folder previews that tab's members.
+    await userEvent.hover(tab);
+    await waitFor(() => expect(tab).toHaveAttribute('data-hovered', 'true'));
+    expect(within(grouped).getByTestId('provenance-group-symbols-Input-input:Species=Arabidopsis'))
+      .toBeInTheDocument();
+
+    await userEvent.unhover(tab);
+    await waitFor(() => expect(tab).toHaveAttribute('data-hovered', 'false'));
   },
 };
 
