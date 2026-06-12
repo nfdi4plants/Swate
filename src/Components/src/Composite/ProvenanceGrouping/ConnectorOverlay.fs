@@ -367,8 +367,8 @@ module private ConnectorPaths =
                         measured
                             $"value:{side}:{DragDrop.propertyHeaderIdentity header}:{Formatting.formatValue propertyValue.Value propertyValue.Unit}:{group.Id}"
                             "provenance-value-connection"
-                            "swt:text-secondary swt:pointer-events-none"
-                            1.75
+                            "swt:text-accent swt:pointer-events-none"
+                            2.0
                             (Some "4 4")
                             None
                             None
