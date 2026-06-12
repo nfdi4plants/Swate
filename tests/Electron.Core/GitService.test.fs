@@ -630,10 +630,11 @@ Vitest.describe (
 
                         let repeatedNamePart = String.replicate 2 "abcdefghijklmnopqrstuvwxyz"
 
-                        let pathSpecs =
-                            [| for index in 0..399 ->
+                        let pathSpecs = [|
+                            for index in 0..399 ->
                                 let indexText = index.ToString("0000")
-                                $"many/file-{indexText}-{repeatedNamePart}.txt" |]
+                                $"many/file-{indexText}-{repeatedNamePart}.txt"
+                        |]
 
                         for pathSpec in pathSpecs do
                             let filePath = join [| context.RepoPath; pathSpec |]
@@ -2447,7 +2448,9 @@ Vitest.describe (
                                 let! _ = context.Git.raw [| "commit"; "-m"; "test: remove lfs attributes" |]
 
                                 let! cleanupResult = GitService.freeLocalLfsCopy context.RepoPath "data.bin"
-                                expectOk "free local lfs copy without current attributes" cleanupResult |> ignore
+
+                                expectOk "free local lfs copy without current attributes" cleanupResult
+                                |> ignore
 
                                 let! listingBeforeDownload =
                                     context.Git.raw [|
@@ -2471,8 +2474,10 @@ Vitest.describe (
                                     fsPromisesDynamic?readFile (filePath, "utf8") |> unbox<JS.Promise<string>>
 
                                 Vitest
-                                    .expect(contentAfterFailure.StartsWith("version https://git-lfs.github.com/spec/v1"))
-                                    .toBe(true)
+                                    .expect(
+                                        contentAfterFailure.StartsWith("version https://git-lfs.github.com/spec/v1")
+                                    )
+                                    .toBe (true)
                             })
                     }
                 )

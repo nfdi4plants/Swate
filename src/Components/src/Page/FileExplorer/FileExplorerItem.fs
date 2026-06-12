@@ -58,7 +58,7 @@ type FileExplorerItem =
         )
 
     [<ReactComponent>]
-    static member private StatusActionButton (item: FileItem, action: ContextMenuItem) =
+    static member private StatusActionButton(item: FileItem, action: ContextMenuItem) =
         let label = $"{action.Label} {item.Name}"
 
         Html.button [
@@ -79,7 +79,7 @@ type FileExplorerItem =
                 ev.stopPropagation ()
 
                 if action.Disabled <> Some true then
-                    action.OnClick ()
+                    action.OnClick()
             )
             prop.children [
                 Html.i [ prop.className $"swt:iconify {action.Icon} swt:size-3" ]
@@ -115,22 +115,20 @@ type FileExplorerItem =
             Html.none
 
     [<ReactComponent>]
-    static member private LFSStatusPill (item: FileItem, ?statusAction: ContextMenuItem) =
+    static member private LFSStatusPill(item: FileItem, ?statusAction: ContextMenuItem) =
         let isPointer = item.IsLFSPointer = Some true
         let isDownloaded = Helper.hasLocalLfsCopy item
 
         let statusText =
-            if isDownloaded then
-                "LFS Downloaded"
-            elif isPointer then
-                "LFS Pointer"
-            else
-                "LFS Not Downloaded"
+            if isDownloaded then "LFS Downloaded"
+            elif isPointer then "LFS Pointer"
+            else "LFS Not Downloaded"
 
         let statusAccessibilityText =
             item.SizeFormatted
             |> Option.map (fun size -> $"{statusText} - {size}")
             |> Option.defaultValue statusText
+
         let isActionDisabled =
             statusAction
             |> Option.bind (fun action -> action.Disabled)
@@ -171,44 +169,38 @@ type FileExplorerItem =
                     $"swt:badge swt:badge-sm swt:gap-0.5 {segmentCursorClass} {statusClassName} {statusShapeClass}"
                 prop.custom (
                     "data-lfs-download-status",
-                    if isDownloaded then
-                        "downloaded"
-                    elif isPointer then
-                        "pointer"
-                    else
-                        "not-downloaded"
+                    if isDownloaded then "downloaded"
+                    elif isPointer then "pointer"
+                    else "not-downloaded"
                 )
                 prop.children [
                     Html.i [
                         prop.className $"swt:iconify {statusIconClassName} swt:size-3"
                     ]
-                    Html.span [
-                        prop.text "LFS"
-                    ]
+                    Html.span [ prop.text "LFS" ]
                 ]
             ]
 
-        let badgeSegments =
-            [
-                statusBadge
+        let badgeSegments = [
+            statusBadge
 
-                match item.SizeFormatted with
-                | Some size ->
-                    Html.span [
-                        prop.className
-                            $"swt:badge swt:badge-sm swt:rounded-none swt:border-0 {segmentCursorClass} swt:bg-base-200 swt:text-base-content"
-                        prop.text size
-                    ]
-                | None -> ()
-            ]
+            match item.SizeFormatted with
+            | Some size ->
+                Html.span [
+                    prop.className
+                        $"swt:badge swt:badge-sm swt:rounded-none swt:border-0 {segmentCursorClass} swt:bg-base-200 swt:text-base-content"
+                    prop.text size
+                ]
+            | None -> ()
+        ]
 
-        let commonProps (className: string list) =
-            [
-                prop.className className
-                prop.ariaLabel pillAccessibilityText
-                prop.title pillAccessibilityText
-                prop.children badgeSegments
-            ]
+        let commonProps (className: string list) = [
+            prop.className className
+            prop.ariaLabel pillAccessibilityText
+            prop.title pillAccessibilityText
+            prop.children badgeSegments
+        ]
+
         let stopPillClick (e: Browser.Types.MouseEvent) =
             e.preventDefault ()
             e.stopPropagation ()
@@ -231,14 +223,15 @@ type FileExplorerItem =
                     stopPillClick e
 
                     if not isActionDisabled then
-                        action.OnClick ()
+                        action.OnClick()
                 )
             ]
         | None ->
             Html.span [
                 yield!
-                    commonProps
-                        [ "swt:inline-flex swt:overflow-hidden swt:rounded-full swt:border swt:border-base-300" ]
+                    commonProps [
+                        "swt:inline-flex swt:overflow-hidden swt:rounded-full swt:border swt:border-base-300"
+                    ]
                 prop.onClick stopPillClick
             ]
 

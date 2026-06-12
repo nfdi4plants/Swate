@@ -51,10 +51,7 @@ let private indexUsingRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<stri
 
     filesByRelativePath
 
-let tryFindLsFileInfoByRelativePath
-    (filesByRelativePath: Dictionary<string, GitLfsLsFileInfo>)
-    (relativePath: string)
-    =
+let tryFindLsFileInfoByRelativePath (filesByRelativePath: Dictionary<string, GitLfsLsFileInfo>) (relativePath: string) =
     let normalizedPath = PathHelpers.normalizeSeparators relativePath
 
     match filesByRelativePath.TryGetValue normalizedPath with
@@ -67,6 +64,8 @@ let tryFindLsFileInfoByRelativePath
             else
                 None
         )
+
+let buildLsFilesJsonArgs () = [| "lfs"; "ls-files"; "-j" |]
 
 /// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
@@ -189,7 +188,7 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
         let! commandResult =
             runGitCaptured {
                 WorkingDirectory = Some normalizedRepoRoot
-                Arguments = [| "lfs"; "ls-files"; "-j" |]
+                Arguments = buildLsFilesJsonArgs ()
                 Environment = None
                 StandardInput = None
                 TimeoutMs = Some lfsLsFilesTimeoutMs
@@ -222,6 +221,18 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
         return Dictionary<string, GitLfsLsFileInfo>()
 }
 
+let tryFindListingForPath (repoRoot: string) (relativePath: string) : JS.Promise<Result<GitLfsLsFileInfo, string>> = promise {
+    try
+        let! filesByRelativePath = tryGetLsFilesByRelativePath repoRoot
+
+        return
+            match tryFindLsFileInfoByRelativePath filesByRelativePath relativePath with
+            | Some listing -> Ok listing
+            | None -> Error "The file is not listed by Git LFS in the current checkout."
+    with error ->
+        return Error $"Could not read Git LFS file metadata: {error.Message}"
+}
+
 let storagePruneArgs = [|
     "lfs"
     "prune"
@@ -241,17 +252,9 @@ let buildFetchRefetchArgs (relativePath: string) = [|
     "HEAD"
 |]
 
-let buildPullIncludeArgs (relativePath: string) = [|
-    "lfs"
-    "pull"
-    $"--include={relativePath}"
-|]
+let buildPullIncludeArgs (relativePath: string) = [| "lfs"; "pull"; $"--include={relativePath}" |]
 
-let buildCheckoutArgs (relativePath: string) = [|
-    "lfs"
-    "checkout"
-    relativePath
-|]
+let buildCheckoutArgs (relativePath: string) = [| "lfs"; "checkout"; relativePath |]
 
 let private formatDiagnosticsSection (title: string) (content: string option) =
     match content |> Option.map _.Trim() with

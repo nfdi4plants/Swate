@@ -47,27 +47,40 @@ let private createErrorReporter
     (title: string)
     =
     function
-    | Some msg -> enqueueErrorModal (ErrorModalRequest.create(msg, title = title, ?scopeId = arcScopeId))
+    | Some msg -> enqueueErrorModal (ErrorModalRequest.create (msg, title = title, ?scopeId = arcScopeId))
     | None -> ()
 
 let private createLfsAction title action enqueueErrorModal arcScopeId runAction =
     action (createErrorReporter enqueueErrorModal arcScopeId title) runAction
 
 let createToggleLfsMark enqueueErrorModal arcScopeId runToggle =
-    createLfsAction "Git LFS update failed" FileExplorerGitLfsHelper.toggleLfsMark enqueueErrorModal arcScopeId runToggle
+    createLfsAction
+        "Git LFS update failed"
+        FileExplorerGitLfsHelper.toggleLfsMark
+        enqueueErrorModal
+        arcScopeId
+        runToggle
 
 let createFreeLocalLfsCopy enqueueErrorModal arcScopeId runCleanup =
-    createLfsAction "Git LFS cleanup failed" FileExplorerGitLfsHelper.freeLocalLfsCopy enqueueErrorModal arcScopeId runCleanup
+    createLfsAction
+        "Git LFS cleanup failed"
+        FileExplorerGitLfsHelper.freeLocalLfsCopy
+        enqueueErrorModal
+        arcScopeId
+        runCleanup
 
 let createDownloadLfsFile enqueueErrorModal arcScopeId runDownload =
-    createLfsAction "Git LFS download failed" FileExplorerGitLfsHelper.downloadLfsFile enqueueErrorModal arcScopeId runDownload
+    createLfsAction
+        "Git LFS download failed"
+        FileExplorerGitLfsHelper.downloadLfsFile
+        enqueueErrorModal
+        arcScopeId
+        runDownload
 
 let createLfsPillAction enqueueErrorModal arcScopeId runDownload runCleanup =
-    let downloadLfsFile =
-        createDownloadLfsFile enqueueErrorModal arcScopeId runDownload
+    let downloadLfsFile = createDownloadLfsFile enqueueErrorModal arcScopeId runDownload
 
     let freeLocalLfsCopy =
         createFreeLocalLfsCopy enqueueErrorModal arcScopeId runCleanup
 
-    fun item ->
-        FileExplorerGitLfsHelper.lfsPillAction item (Some downloadLfsFile) (Some freeLocalLfsCopy)
+    fun item -> FileExplorerGitLfsHelper.lfsPillAction item (Some downloadLfsFile) (Some freeLocalLfsCopy)

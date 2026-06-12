@@ -26,8 +26,7 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
 }
 
-let private createComposedContextMenuItems config item =
-    createContextMenuItems config None item
+let private createComposedContextMenuItems config item = createContextMenuItems config None item
 
 let private createFileItem (name: string) (path: string option) = {
     FileTree.createFile name path FileItemIcon.Document with
@@ -270,12 +269,13 @@ Vitest.describe (
 
                 let menuItems = createComposedContextMenuItems config item
 
-                Vitest
-                    .expect(groupedLabels menuItems)
-                    .toContain ("Download LFS file")
+                Vitest.expect(groupedLabels menuItems).toContain ("Download LFS file")
 
-                let downloadItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Download LFS file")
-                let freeItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Free local LFS copy")
+                let downloadItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Download LFS file")
+
+                let freeItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Free local LFS copy")
 
                 Vitest.expect(downloadItem.Disabled).toEqual (None)
                 Vitest.expect(freeItem.Disabled).toEqual (Some true)
@@ -303,8 +303,12 @@ Vitest.describe (
                 }
 
                 let menuItems = createComposedContextMenuItems config item
-                let downloadItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Download LFS file")
-                let freeItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Free local LFS copy")
+
+                let downloadItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Download LFS file")
+
+                let freeItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Free local LFS copy")
 
                 Vitest.expect(downloadItem.Disabled).toEqual (Some true)
                 Vitest.expect(freeItem.Disabled).toEqual (None)

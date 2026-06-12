@@ -116,14 +116,25 @@ let contextMenuItems
         [
             ContextMenuItem.create
                 (if isMarked then "Unmark Git LFS" else "Mark Git LFS")
-                (if isMarked then "swt:fluent--document-dismiss-24-regular" else "swt:fluent--document-add-24-regular")
+                (if isMarked then
+                     "swt:fluent--document-dismiss-24-regular"
+                 else
+                     "swt:fluent--document-add-24-regular")
                 (fun () -> onToggleLfsMark item (not isMarked))
 
             if isMarked then
-                yield! lfsAction downloadLabel downloadIcon item needsDownload onDownloadLfsFile |> Option.toList
-                yield! lfsAction freeCopyLabel freeCopyIcon item hasLocalCopy onFreeLocalLfsCopy |> Option.toList
+                yield!
+                    lfsAction downloadLabel downloadIcon item needsDownload onDownloadLfsFile
+                    |> Option.toList
+
+                yield!
+                    lfsAction freeCopyLabel freeCopyIcon item hasLocalCopy onFreeLocalLfsCopy
+                    |> Option.toList
 
             ContextMenuItem.disabled
-                (if isMarked then "Git LFS: marked" else "Git LFS: not marked")
+                (if isMarked then
+                     "Git LFS: marked"
+                 else
+                     "Git LFS: not marked")
                 "swt:fluent--tag-24-regular"
         ]

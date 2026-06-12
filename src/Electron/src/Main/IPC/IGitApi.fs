@@ -412,9 +412,16 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                         vault
                         (fun () -> promise {
                             let! result = GitService.downloadLfsFile arcPath request.Path
+
                             if Result.isOk result then
                                 do! vault.RefreshFileTree()
-                            return toGitOperationResult (fun () -> Some $"Downloaded LFS file '{request.Path}'.") None None result
+
+                            return
+                                toGitOperationResult
+                                    (fun () -> Some $"Downloaded LFS file '{request.Path}'.")
+                                    None
+                                    None
+                                    result
                         })
         }
     gitLfsDedup =

@@ -196,10 +196,16 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
         Renderer.Components.FileExplorerLfs.createToggleLfsMark config.enqueueError arcScopeId config.runToggleLfsMark
 
     let downloadLfsFile =
-        Renderer.Components.FileExplorerLfs.createDownloadLfsFile config.enqueueError arcScopeId config.runDownloadLfsFile
+        Renderer.Components.FileExplorerLfs.createDownloadLfsFile
+            config.enqueueError
+            arcScopeId
+            config.runDownloadLfsFile
 
     let freeLocalLfsCopy =
-        Renderer.Components.FileExplorerLfs.createFreeLocalLfsCopy config.enqueueError arcScopeId config.runFreeLocalLfsCopy
+        Renderer.Components.FileExplorerLfs.createFreeLocalLfsCopy
+            config.enqueueError
+            arcScopeId
+            config.runFreeLocalLfsCopy
 
     fun item ->
         withDividers [

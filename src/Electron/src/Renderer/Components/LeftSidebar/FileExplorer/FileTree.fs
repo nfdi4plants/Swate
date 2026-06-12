@@ -130,19 +130,18 @@ type FileTree =
                 FileTreeMaterialization.toMaterializedFileItemTree Helper.createItem reconciledMaterializedState.Paths
             )
 
-        let openSelectedPreview (itemName: string) (selectedPath: string) =
-            promise {
-                let! result = openView selectedPath
+        let openSelectedPreview (itemName: string) (selectedPath: string) = promise {
+            let! result = openView selectedPath
 
-                match result with
-                | Ok pageState ->
-                    console.log ("[Renderer] Received data, processing...")
-                    pageStateCtx.setState (Some pageState)
-                | Error errorMessage ->
-                    let fullErrorMessage = $"Could not open preview for '{itemName}': {errorMessage}"
-                    console.log ($"[Renderer] Error: {fullErrorMessage}")
-                    pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
-            }
+            match result with
+            | Ok pageState ->
+                console.log ("[Renderer] Received data, processing...")
+                pageStateCtx.setState (Some pageState)
+            | Error errorMessage ->
+                let fullErrorMessage = $"Could not open preview for '{itemName}': {errorMessage}"
+                console.log ($"[Renderer] Error: {fullErrorMessage}")
+                pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
+        }
 
         let openPreview (item: FileItem) =
             promise {
@@ -168,12 +167,13 @@ type FileTree =
                         match downloadResult with
                         | Error errorMessage ->
                             skipNextFileTreeReloadPathRef.current <- None
+
                             let fullErrorMessage =
                                 $"Could not download Git LFS content for '{item.Name}': {errorMessage}"
 
                             console.log ($"[Renderer] Error: {fullErrorMessage}")
                             pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
-                        | Ok () -> do! openSelectedPreview item.Name selectedPath
+                        | Ok() -> do! openSelectedPreview item.Name selectedPath
                     else
                         do! openSelectedPreview item.Name selectedPath
             }

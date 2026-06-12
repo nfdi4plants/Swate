@@ -328,32 +328,28 @@ let private isPathCleanInStatus (status: StatusResult) (relativePath: string) =
     )
     |> not
 
-let private ensureBackupMatchesLfsOid
-    (backupPath: string)
-    (listing: GitLfsLsFileInfo)
-    =
-    promise {
-        let! pointerTextResult =
-            runGitCaptured {
-                WorkingDirectory = None
-                Arguments = [| "lfs"; "pointer"; "--file"; backupPath |]
-                Environment = None
-                StandardInput = None
-                TimeoutMs = Some 30000
-            }
+let private ensureBackupMatchesLfsOid (backupPath: string) (listing: GitLfsLsFileInfo) = promise {
+    let! pointerTextResult =
+        runGitCaptured {
+            WorkingDirectory = None
+            Arguments = [| "lfs"; "pointer"; "--file"; backupPath |]
+            Environment = None
+            StandardInput = None
+            TimeoutMs = Some 30000
+        }
 
-        let generatedPointer =
-            $"{pointerTextResult.StdoutText}\n{pointerTextResult.StderrText}"
+    let generatedPointer =
+        $"{pointerTextResult.StdoutText}\n{pointerTextResult.StderrText}"
 
-        return
-            if
-                pointerTextResult.ExitCode = 0
-                && generatedPointer.Contains($"oid sha256:{listing.oid}")
-            then
-                Ok()
-            else
-                Error(exn "The temporary LFS backup did not match the expected object. The original file was restored.")
-    }
+    return
+        if
+            pointerTextResult.ExitCode = 0
+            && generatedPointer.Contains($"oid sha256:{listing.oid}")
+        then
+            Ok()
+        else
+            Error(exn "The temporary LFS backup did not match the expected object. The original file was restored.")
+}
 
 let private isMergeInProgress (arcPath: string) =
     let mergeHeadPath = resolve [| arcPath; ".git"; "MERGE_HEAD" |]
@@ -1653,18 +1649,11 @@ let private discardPathspecsWithOriginals (arcPath: string) (status: StatusResul
 
     Array.append safePathSpecs originalPaths |> Array.distinct
 
-let private tryGetLfsListingFromFileTreeIndex (arcPath: string) (safePath: string) = promise {
-    let! filesByRelativePath = GitLfsService.tryGetLsFilesByRelativePath arcPath
-
-    return GitLfsService.tryFindLsFileInfoByRelativePath filesByRelativePath safePath
+let private requireLfsListingForPath (arcPath: string) (safePath: string) : JS.Promise<GitLfsLsFileInfo> = promise {
+    match! GitLfsService.tryFindListingForPath arcPath safePath with
+    | Ok listing -> return listing
+    | Error message -> return abortGitPromise $"'{safePath}' {message}"
 }
-
-let private requireLfsListingForPath (arcPath: string) (safePath: string) : JS.Promise<GitLfsLsFileInfo> =
-    promise {
-        match! tryGetLfsListingFromFileTreeIndex arcPath safePath with
-        | Some listing -> return listing
-        | None -> return abortGitPromise $"'{safePath}' The file is not listed by Git LFS in the current checkout."
-    }
 
 let private runLfsRaw (args: string[]) git =
     runSimpleGit (fun currentGit -> currentGit.raw args) git
@@ -1772,8 +1761,7 @@ let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitR
             withOriginLfsGitResult
                 arcPath
                 (fun git -> promise {
-                    let! fetchResult =
-                        runLfsRaw (GitLfsService.buildFetchRefetchArgs safePath) git
+                    let! fetchResult = runLfsRaw (GitLfsService.buildFetchRefetchArgs safePath) git
 
                     match fetchResult with
                     | Error failure -> return Error failure
@@ -1793,9 +1781,7 @@ let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitR
 
                                 let! checkoutResult =
                                     runSimpleGit
-                                        (fun currentGit ->
-                                            currentGit.raw [| "checkout"; "HEAD"; "--"; safePath |]
-                                        )
+                                        (fun currentGit -> currentGit.raw [| "checkout"; "HEAD"; "--"; safePath |])
                                         pointerGit
 
                                 match checkoutResult with
@@ -1804,8 +1790,7 @@ let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitR
 
                                     return Error failure
                                 | Ok _ ->
-                                    let! finalStatusResult =
-                                        runSimpleGit (fun currentGit -> currentGit.status ()) git
+                                    let! finalStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
                                     match finalStatusResult with
                                     | Error failure ->
@@ -2164,21 +2149,17 @@ let checkoutBranch (arcPath: string) (request: GitCheckoutBranchRequest) : JS.Pr
                     })
 }
 
-let downloadLfsFile
-    (arcPath: string)
-    (requestedPath: string)
-    : JS.Promise<GitResult<unit>> =
-    promise {
-        let! lfsFileResult =
-            getCleanLfsFileForAction
-                arcPath
-                requestedPath
-                (fun safePath ->
-                    $"'{safePath}' has local changes. Save, discard, or commit them before downloading the Git LFS file."
-                )
+let downloadLfsFile (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<unit>> = promise {
+    let! lfsFileResult =
+        getCleanLfsFileForAction
+            arcPath
+            requestedPath
+            (fun safePath ->
+                $"'{safePath}' has local changes. Save, discard, or commit them before downloading the Git LFS file."
+            )
 
-        match lfsFileResult with
-        | Error failure -> return Error failure
-        | Ok(_, _, listing) when listing.checkout -> return Ok()
-        | Ok(safePath, absolutePath, listing) -> return! downloadMissingLfsFile arcPath safePath absolutePath listing
-    }
+    match lfsFileResult with
+    | Error failure -> return Error failure
+    | Ok(_, _, listing) when listing.checkout -> return Ok()
+    | Ok(safePath, absolutePath, listing) -> return! downloadMissingLfsFile arcPath safePath absolutePath listing
+}

@@ -13,7 +13,10 @@ let ensureValidPathspec = GitServiceValidation.ensureValidPathspec
 let validatePathspecs = GitServiceValidation.validatePathspecs
 let validateRemoteName = GitServiceValidation.validateRemoteName
 let ensureAllowedRemoteUrl = GitServiceValidation.ensureAllowedRemoteUrl
-let tryGetRepositoryWebUrlFromRemoteUrl = GitServiceValidation.tryGetRepositoryWebUrlFromRemoteUrl
+
+let tryGetRepositoryWebUrlFromRemoteUrl =
+    GitServiceValidation.tryGetRepositoryWebUrlFromRemoteUrl
+
 let tryGetUnsupportedGitContent = GitServiceCore.tryGetUnsupportedGitContent
 let resolvePushTarget = GitServiceCore.resolvePushTarget
 let getStatus = GitServiceCore.getStatus
