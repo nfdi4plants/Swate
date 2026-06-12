@@ -1443,6 +1443,19 @@ let update
                     (fun err -> PublishRenameCompleted(model.ArcSessionId, Error(string err)))
 
             nextModel, cmd
+    | PublishRenameCompleted(sessionId, Ok renamedPath) when
+        sessionId <> model.ArcSessionId
+        && model.CurrentArcPath = Some renamedPath
+        ->
+        {
+            model with
+                PendingPublishRename = None
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+        },
+        Cmd.ofMsg (WriteRequested Push)
     | PublishRenameCompleted(sessionId, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
     | PublishRenameCompleted(_, Error message) ->
         {

@@ -13,6 +13,7 @@ open Main
 open Main.ARCtrlExtensions
 open Main.Bindings
 open Node.Api
+open Swate.Electron.Shared.RenamePathRules
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"
@@ -169,15 +170,6 @@ type OpenArcRootRenamePlan = {
     NewName: string
 }
 
-let private normalizeArcRootFolderName (newName: string) =
-    newName
-    |> Option.ofObj
-    |> Option.map _.Trim()
-    |> Option.defaultValue String.Empty
-
-let private containsPathSeparator (value: string) =
-    value.IndexOf("/", StringComparison.Ordinal) >= 0 || value.IndexOf("\\", StringComparison.Ordinal) >= 0
-
 let private resolveAbsolutePath (pathValue: string) =
     pathDynamic?resolve (pathValue) |> unbox<string> |> PathHelpers.normalizePath
 
@@ -245,41 +237,39 @@ let private mapArcRootRenameDiskError (sourcePath: string) (targetPath: string) 
     | _ -> renameError
 
 let tryBuildOpenArcRootRenamePlan arcPath newName : Result<OpenArcRootRenamePlan, exn> =
-    let normalizedName = normalizeArcRootFolderName newName
+    let candidateName = newName |> Option.ofObj |> Option.defaultValue String.Empty
 
-    if String.IsNullOrWhiteSpace normalizedName then
-        Error(exn "ARC folder name must not be empty.")
-    elif
-        normalizedName = "."
-        || normalizedName = ".."
-        || containsPathSeparator normalizedName
-        || (pathDynamic?isAbsolute (normalizedName) |> unbox<bool>)
-        || PathHelpers.containsPathTraversalSegments normalizedName
-    then
-        Error(exn "ARC folder name must be a single folder name without path separators or traversal segments.")
-    else
-        let sourcePath = resolveAbsolutePath arcPath
-        let parentPath = pathDynamic?dirname (sourcePath) |> unbox<string>
-
-        let targetPath =
-            pathDynamic?resolve (parentPath, normalizedName)
-            |> unbox<string>
-            |> PathHelpers.normalizePath
-
+    match validateRenameName candidateName with
+    | Error validationError -> Error(exn validationError)
+    | Ok normalizedName ->
         if
-            String.Equals(
-                normalizePathForComparison sourcePath,
-                normalizePathForComparison targetPath,
-                StringComparison.Ordinal
-            )
+            (pathDynamic?isAbsolute (normalizedName) |> unbox<bool>)
+            || PathHelpers.containsPathTraversalSegments normalizedName
         then
-            Error(exn "New ARC folder name must be different from the current folder name.")
+            Error(exn "ARC folder name must be a single folder name without path separators or traversal segments.")
         else
-            Ok {
-                SourcePath = sourcePath
-                TargetPath = targetPath
-                NewName = normalizedName
-            }
+            let sourcePath = resolveAbsolutePath arcPath
+            let parentPath = pathDynamic?dirname (sourcePath) |> unbox<string>
+
+            let targetPath =
+                pathDynamic?resolve (parentPath, normalizedName)
+                |> unbox<string>
+                |> PathHelpers.normalizePath
+
+            if
+                String.Equals(
+                    normalizePathForComparison sourcePath,
+                    normalizePathForComparison targetPath,
+                    StringComparison.Ordinal
+                )
+            then
+                Error(exn "New ARC folder name must be different from the current folder name.")
+            else
+                Ok {
+                    SourcePath = sourcePath
+                    TargetPath = targetPath
+                    NewName = normalizedName
+                }
 
 let renameOpenArcRootDirectoryOnDisk arcPath newName : JS.Promise<Result<string, exn>> = promise {
     match tryBuildOpenArcRootRenamePlan arcPath newName with

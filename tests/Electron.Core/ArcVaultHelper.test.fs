@@ -286,6 +286,46 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "RenameOpenArcRoot clears pending watcher state before moving the active ARC",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-rename-arc-root-watcher-"
+                    "RenameRootWatcherArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadArc()
+
+                        let timeoutId = Fable.Core.JS.setTimeout (fun () -> ()) 60000
+
+                        vault.fileWatcherReloadArcTimeout <- Some timeoutId
+
+                        vault.fileWatcherPendingEvents.Add {
+                            EventName = "change"
+                            RelativePath = "isa.investigation.xlsx"
+                            AbsolutePath = join [| arcPath; "isa.investigation.xlsx" |]
+                        }
+
+                        vault.fileWatcherPendingArcMergeEvents.Add {
+                            EventName = "change"
+                            RelativePath = "isa.investigation.xlsx"
+                            AbsolutePath = join [| arcPath; "isa.investigation.xlsx" |]
+                        }
+
+                        try
+                            match! vault.RenameOpenArcRoot "renamed-arc-watcher" with
+                            | Error error -> failwith error.Message
+                            | Ok _ ->
+                                Vitest.expect(vault.fileWatcherReloadArcTimeout).toEqual (None)
+                                Vitest.expect(vault.fileWatcherPendingEvents.Count).toBe (0)
+                                Vitest.expect(vault.fileWatcherPendingArcMergeEvents.Count).toBe (0)
+                        finally
+                            vault.fileWatcherReloadArcTimeout |> Option.iter Fable.Core.JS.clearTimeout
+                    })
+        )
+
+        Vitest.test (
             "RenameOpenArcRoot rejects destination conflicts without moving the active ARC",
             fun () ->
                 TestHelpers.withTempArcWith
@@ -311,6 +351,14 @@ Vitest.describe (
                             Vitest.expect(oldPathExists).toBe (true)
                             Vitest.expect(targetPathExists).toBe (true)
                     })
+        )
+
+        Vitest.test (
+            "tryBuildOpenArcRootRenamePlan applies the shared rename-name validation rules",
+            fun () ->
+                match tryBuildOpenArcRootRenamePlan "C:/work/current-arc" "bad\u0000name" with
+                | Ok _ -> failwith "Expected ARC root rename to reject null characters."
+                | Error error -> Vitest.expect(error.Message).toContain ("null")
         )
 
         Vitest.test (

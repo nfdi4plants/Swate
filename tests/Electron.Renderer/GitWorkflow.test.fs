@@ -1258,6 +1258,51 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "PublishRenameCompleted still retries push when path-change update arrives first",
+            fun () -> promise {
+                let deps = {
+                    defaultDependencies with
+                        gitPush = fun _ -> promise { return Ok okOperationResult }
+                        getGitStatus = fun () -> promise { return Ok(statusForBranch "main") }
+                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
+                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 5 true) }
+                }
+
+                let renamingState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/work/Existing ARC"
+                        ArcSessionId = 7
+                        BusyOperation = Some GitBusyOperation.RenamingRepository
+                        BusyNotice = Some "Renaming ARC"
+                        PendingPublishRename =
+                            Some {
+                                CurrentName = "Existing ARC"
+                                Message = "A DataHub repository named 'Existing ARC' already exists."
+                            }
+                }
+
+                let stateAfterPathChange, pathChangeCmd =
+                    update deps ignore (ArcPathChanged(Some "C:/work/Renamed ARC")) renamingState
+
+                let! _ = collectMessages pathChangeCmd
+
+                let stateAfterRenameCompletion, retryCmd =
+                    update
+                        deps
+                        ignore
+                        (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC"))
+                        stateAfterPathChange
+
+                let! retryMessages = collectMessages retryCmd
+
+                Vitest.expect(stateAfterPathChange.ArcSessionId).not.toBe (7)
+                Vitest.expect(stateAfterRenameCompletion.CurrentArcPath).toEqual (Some "C:/work/Renamed ARC")
+                Vitest.expect(stateAfterRenameCompletion.ErrorNotice).toEqual (None)
+                Vitest.expect(retryMessages).toEqual ([| WriteRequested Push |])
+            }
+        )
+
+        Vitest.test (
             "WriteRequested discards selected paths, refreshes status, and clears the open diff",
             fun () -> promise {
                 let discardedPathspecs = ResizeArray<string[]>()
