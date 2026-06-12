@@ -715,7 +715,10 @@ type ProvenanceGrouping =
         let uiState = State.Layers.ensure session rawUiState
 
         let pair, inputGroups, outputGroups, connections =
-            Display.displayPair session uiState
+            React.useMemo(
+                (fun () -> Display.displayPair session uiState),
+                [| box session; box uiState.LayerStates |]
+            )
 
         let latestUiState = React.useRef uiState
         let activePairId = React.useRef pair.Id
@@ -724,10 +727,16 @@ type ProvenanceGrouping =
         let panelRatios = State.PanelLayout.get pair.Id uiState
 
         let inputEndpointKind =
-            Endpoints.defaultEndpointKind ProvenanceSide.Input pair.Model
+            React.useMemo(
+                (fun () -> Endpoints.defaultEndpointKind ProvenanceSide.Input pair.Model),
+                [| box pair.Model.OutputSets |]
+            )
 
         let outputEndpointKind =
-            Endpoints.defaultEndpointKind ProvenanceSide.Output pair.Model
+            React.useMemo(
+                (fun () -> Endpoints.defaultEndpointKind ProvenanceSide.Output pair.Model),
+                [| box pair.Model.InputSets |]
+            )
 
         let lookups = EditorLookups.create pair uiState inputGroups outputGroups
 
@@ -972,14 +981,23 @@ type ProvenanceGrouping =
                 prop.children [ railPanel side ]
             ]
 
-        let connectionCountFor side groupId =
-            connections
-            |> List.sumBy (fun connection ->
-                match side with
-                | ProvenanceSide.Input when connection.SourceGroupId = groupId -> connection.ConnectionIds.Length
-                | ProvenanceSide.Output when connection.TargetGroupId = groupId -> connection.ConnectionIds.Length
-                | _ -> 0
+        let connectionCounts =
+            React.useMemo(
+                (fun () ->
+                    connections
+                    |> List.collect (fun connection ->
+                        [
+                            (ProvenanceSide.Input, connection.SourceGroupId), connection.ConnectionIds.Length
+                            (ProvenanceSide.Output, connection.TargetGroupId), connection.ConnectionIds.Length
+                        ])
+                    |> List.groupBy fst
+                    |> List.map (fun (key, grouped) -> key, grouped |> List.sumBy snd)
+                    |> Map.ofList),
+                [| box connections |]
             )
+
+        let connectionCountFor side groupId =
+            connectionCounts |> Map.tryFind (side, groupId) |> Option.defaultValue 0
 
         let groupColumnFor side withConnectionBadges =
             let groups, endpointKind =
