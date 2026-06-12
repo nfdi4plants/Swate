@@ -1104,7 +1104,10 @@ type ProvenanceGrouping =
                 inputGroups,
                 outputGroups,
                 connections,
-                uiState,
+                inputRailProjection,
+                outputRailProjection,
+                ConnectorOverlayState.fromUiState uiState,
+                uiState.LiveConnectionDrag,
                 (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
                 onRemove = removeDisplayConnection,
                 debug = debug
