@@ -57,22 +57,45 @@ module ConnectorOverlayState =
     let isPropertyExpanded pairId side header state =
         state.ExpandedProperties.Contains(pairId, side, { Header = header })
 
+type private ConnectorMeasureContext =
+    {
+        Container: HTMLElement
+        Origin: ClientRect
+        Nodes: Map<string, HTMLElement>
+    }
+
+module private ConnectorDom =
+
+    [<Emit("Array.from($0.querySelectorAll($1))")>]
+    let querySelectorAll (_container: HTMLElement) (_selector: string) : HTMLElement[] = jsNative
+
+    let connectionNodes (container: HTMLElement) =
+        querySelectorAll container "[data-provenance-connection-node]"
+        |> Array.choose (fun node ->
+            let id = node.getAttribute "data-provenance-connection-node"
+            if isNull id then None else Some(id, node))
+        |> Map.ofArray
+
 /// Measures connection handles and builds SVG connector paths between them.
 module private ConnectorMeasure =
 
-    let private tryHandle (container: HTMLElement) handle =
-        let node: HTMLElement =
-            !!container?querySelector($"[data-provenance-connection-node='{DragDrop.connectionHandleNodeId handle}']")
+    let createContext container =
+        {
+            Container = container
+            Origin = container.getBoundingClientRect ()
+            Nodes = ConnectorDom.connectionNodes container
+        }
 
-        if isNull node then None else Some node
+    let private tryHandle (context: ConnectorMeasureContext) handle =
+        context.Nodes |> Map.tryFind (DragDrop.connectionHandleNodeId handle)
 
-    let private center (container: HTMLElement) (node: HTMLElement) =
-        let origin = container.getBoundingClientRect ()
+    let private center (context: ConnectorMeasureContext) (node: HTMLElement) =
+        let origin = context.Origin
         let rect = node.getBoundingClientRect ()
 
         {
-            X = rect.left - origin.left + float container.scrollLeft + rect.width / 2.
-            Y = rect.top - origin.top + float container.scrollTop + rect.height / 2.
+            X = rect.left - origin.left + float context.Container.scrollLeft + rect.width / 2.
+            Y = rect.top - origin.top + float context.Container.scrollTop + rect.height / 2.
         }
 
     let pathBetweenPoints start finish =
@@ -85,10 +108,10 @@ module private ConnectorMeasure =
         let secondControlX = finish.X - direction * bend
         Some $"M {start.X} {start.Y} C {firstControlX} {start.Y}, {secondControlX} {finish.Y}, {finish.X} {finish.Y}"
 
-    let pathBetweenHandles container source target =
-        match tryHandle container source, tryHandle container target with
+    let pathBetweenHandles context source target =
+        match tryHandle context source, tryHandle context target with
         | Some sourceNode, Some targetNode ->
-            pathBetweenPoints (center container sourceNode) (center container targetNode)
+            pathBetweenPoints (center context sourceNode) (center context targetNode)
         | _ -> None
 
     /// Rail connectors shorter than this are skipped entirely so dense layouts do not
@@ -100,11 +123,11 @@ module private ConnectorMeasure =
         let deltaY = finish.Y - start.Y
         sqrt (deltaX * deltaX + deltaY * deltaY)
 
-    let pathBetweenDistantHandles container source target =
-        match tryHandle container source, tryHandle container target with
+    let pathBetweenDistantHandles context source target =
+        match tryHandle context source, tryHandle context target with
         | Some sourceNode, Some targetNode ->
-            let start = center container sourceNode
-            let finish = center container targetNode
+            let start = center context sourceNode
+            let finish = center context targetNode
 
             if distanceBetween start finish < minimumConnectorDistance then
                 None
@@ -195,7 +218,7 @@ module private ConnectorPaths =
         || isManuallyResolving pairId side groupId overlayState
         || isConnectedToExpanded connections side groupId overlayState
 
-    let groupConnections container pairId connections overlayState =
+    let groupConnections context pairId connections overlayState =
         connections
         // Expanded endpoints swap the aggregate group connector for the
         // member-level connectors, so the group line disappears instead of
@@ -205,7 +228,7 @@ module private ConnectorPaths =
             && not (isGroupExpanded pairId connections ProvenanceSide.Output connection.TargetGroupId overlayState))
         |> List.choose (fun connection ->
             ConnectorMeasure.pathBetweenHandles
-                container
+                context
                 (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
                 (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
             |> Option.map (
@@ -219,7 +242,7 @@ module private ConnectorPaths =
                     (Some $"Select connection {connection.Id}")
             ))
 
-    let memberConnections container pairId (model: ProvenanceModel) connections overlayState =
+    let memberConnections context pairId (model: ProvenanceModel) connections overlayState =
         connections
         |> List.collect (fun displayConnection ->
             let inputExpanded =
@@ -259,7 +282,7 @@ module private ConnectorPaths =
                                     ConnectionIds = [ connectionId ]
                             }
 
-                        ConnectorMeasure.pathBetweenHandles container source target
+                        ConnectorMeasure.pathBetweenHandles context source target
                         |> Option.map (
                             measured
                                 $"member:{displayConnection.Id}:{connectionId}"
@@ -285,7 +308,7 @@ module private ConnectorPaths =
     /// Dashed rail connectors derived from model data only: collapsed properties
     /// draw one line per same-side group containing any value for that property.
     let private railConnectionsForSide
-        container
+        context
         pairId
         (model: ProvenanceModel)
         side
@@ -299,7 +322,7 @@ module private ConnectorPaths =
             groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
             |> List.choose (fun group ->
                 ConnectorMeasure.pathBetweenDistantHandles
-                    container
+                    context
                     (ConnectorHandles.propertyHeader side header)
                     (ConnectorHandles.propertyAnchor side group.Id)
                 |> Option.map (
@@ -319,7 +342,7 @@ module private ConnectorPaths =
         && propertyValue.Unit = unit'
 
     let private valueRailConnectionsForSide
-        container
+        context
         pairId
         (model: ProvenanceModel)
         side
@@ -337,7 +360,7 @@ module private ConnectorPaths =
                 groupsMatching model (propertyValueMatches header propertyValue.Value propertyValue.Unit) groups
                 |> List.choose (fun group ->
                     ConnectorMeasure.pathBetweenDistantHandles
-                        container
+                        context
                         (ConnectorHandles.propertyValue side propertyValue.Id)
                         (ConnectorHandles.propertyAnchor side group.Id)
                     |> Option.map (
@@ -351,12 +374,12 @@ module private ConnectorPaths =
                             None
                     ))))
 
-    let railConnections container pairId model inputGroups outputGroups inputRailProjection outputRailProjection overlayState =
+    let railConnections context pairId model inputGroups outputGroups inputRailProjection outputRailProjection overlayState =
         [
-            yield! railConnectionsForSide container pairId model ProvenanceSide.Input inputGroups inputRailProjection overlayState
-            yield! railConnectionsForSide container pairId model ProvenanceSide.Output outputGroups outputRailProjection overlayState
-            yield! valueRailConnectionsForSide container pairId model ProvenanceSide.Input inputGroups inputRailProjection overlayState
-            yield! valueRailConnectionsForSide container pairId model ProvenanceSide.Output outputGroups outputRailProjection overlayState
+            yield! railConnectionsForSide context pairId model ProvenanceSide.Input inputGroups inputRailProjection overlayState
+            yield! railConnectionsForSide context pairId model ProvenanceSide.Output outputGroups outputRailProjection overlayState
+            yield! valueRailConnectionsForSide context pairId model ProvenanceSide.Input inputGroups inputRailProjection overlayState
+            yield! valueRailConnectionsForSide context pairId model ProvenanceSide.Output outputGroups outputRailProjection overlayState
         ]
 
     let liveConnection liveConnectionDrag =
@@ -374,11 +397,11 @@ module private ConnectorPaths =
                     None
             ))
 
-    let all container pairId model inputGroups outputGroups connections inputRailProjection outputRailProjection overlayState =
+    let all context pairId model inputGroups outputGroups connections inputRailProjection outputRailProjection overlayState =
         [
-            yield! railConnections container pairId model inputGroups outputGroups inputRailProjection outputRailProjection overlayState
-            yield! groupConnections container pairId connections overlayState
-            yield! memberConnections container pairId model connections overlayState
+            yield! railConnections context pairId model inputGroups outputGroups inputRailProjection outputRailProjection overlayState
+            yield! groupConnections context pairId connections overlayState
+            yield! memberConnections context pairId model connections overlayState
         ]
 
 module private ConnectorContextMenu =
@@ -464,15 +487,20 @@ type ConnectorOverlay =
             ?onRemove: DisplayConnection -> unit,
             ?debug: bool
         ) =
-        let paths, setPaths = React.useState ([]: MeasuredConnector list)
+        let paths, setPaths = React.useStateWithUpdater ([]: MeasuredConnector list)
         let hoveredKey, setHoveredKey = React.useState<string option> None
+
+        let setMeasuredPaths next =
+            setPaths (fun current -> if current = next then current else next)
 
         let measure () =
             match containerRef.current with
-            | None -> setPaths []
+            | None -> setMeasuredPaths []
             | Some container ->
+                let context = ConnectorMeasure.createContext container
+
                 ConnectorPaths.all
-                    container
+                    context
                     pairId
                     model
                     inputGroups
@@ -481,7 +509,7 @@ type ConnectorOverlay =
                     inputRailProjection
                     outputRailProjection
                     overlayState
-                |> setPaths
+                |> setMeasuredPaths
 
         React.useEffect (
             (fun () ->
