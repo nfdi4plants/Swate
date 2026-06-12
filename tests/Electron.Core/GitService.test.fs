@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.Bindings.SimpleGit
+open Main.IPC.FileSystemIO
 open Main.Git.GitLfsService
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
@@ -196,12 +197,18 @@ let private createTempDirectoryAsync () : JS.Promise<string> =
 
     fsPromisesDynamic?mkdtemp (prefix) |> unbox<JS.Promise<string>>
 
-let private removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
+let private removeDirectoryOnceAsync path = promise {
     let! _ =
         fsPromisesDynamic?rm (path, createObj [ "recursive" ==> true; "force" ==> true ])
         |> unbox<JS.Promise<obj>>
 
     return ()
+}
+
+let private removeDirectoryAsync (path: string) : JS.Promise<unit> = promise {
+    match! removePathWithRetriesAsync removeDirectoryOnceAsync path with
+    | Ok() -> return ()
+    | Error removeError -> return raise removeError
 }
 
 let private configureRepositoryAsync (git: ISimpleGit) : JS.Promise<unit> = promise {

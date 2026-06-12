@@ -100,7 +100,7 @@ let tryGetNodeErrorCode (error: exn) : string option =
     with _ ->
         None
 
-type private RenameRetryStrategy = {
+type private FileSystemRetryStrategy = {
     DelaysMs: int[]
     IsTransientErrorCode: string option -> bool
 }
@@ -110,6 +110,18 @@ let private renameRetryStrategy = {
     DelaysMs = [| 0; 75; 200; 500 |]
     IsTransientErrorCode =
         function
+        | Some "EPERM"
+        | Some "EACCES"
+        | Some "EBUSY" -> true
+        | _ -> false
+}
+
+// Recursive directory deletion can briefly report non-empty or locked paths while Git/file watchers finish writes.
+let private removeRetryStrategy = {
+    DelaysMs = [| 0; 75; 200; 500 |]
+    IsTransientErrorCode =
+        function
+        | Some "ENOTEMPTY"
         | Some "EPERM"
         | Some "EACCES"
         | Some "EBUSY" -> true
@@ -143,6 +155,39 @@ let private renameWithRetriesAsync
     }
 
     attempt 0
+
+let removePathWithRetriesAsync
+    (removePathAsync: string -> JS.Promise<unit>)
+    (absolutePath: string)
+    : JS.Promise<Result<unit, exn>> =
+    let rec attempt (attemptIndex: int) = promise {
+        if attemptIndex > 0 then
+            do! Promise.sleep removeRetryStrategy.DelaysMs.[attemptIndex]
+
+        try
+            do! removePathAsync absolutePath
+            return Ok()
+        with removeError ->
+            let errorCode = tryGetNodeErrorCode removeError
+
+            if
+                attemptIndex < removeRetryStrategy.DelaysMs.Length - 1
+                && removeRetryStrategy.IsTransientErrorCode errorCode
+            then
+                return! attempt (attemptIndex + 1)
+            else
+                return Error removeError
+    }
+
+    attempt 0
+
+let private removeGenericFileSystemItemAsync absolutePath = promise {
+    let! _ =
+        fsPromisesDynamic?rm (absolutePath, createObj [ "recursive" ==> true; "force" ==> false ])
+        |> unbox<JS.Promise<obj>>
+
+    return ()
+}
 
 let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
     match tryGetNodeErrorCode renameError with
@@ -312,13 +357,5 @@ module ArcFileSystemHelper =
         else
             match tryResolveArcRelativePath arcPath normalizedRelativePath with
             | Error pathError -> return Error pathError
-            | Ok absolutePath ->
-                try
-                    let! _ =
-                        fsPromisesDynamic?rm (absolutePath, createObj [ "recursive" ==> true; "force" ==> false ])
-                        |> unbox<JS.Promise<obj>>
-
-                    return Ok()
-                with deleteError ->
-                    return Error deleteError
+            | Ok absolutePath -> return! removePathWithRetriesAsync removeGenericFileSystemItemAsync absolutePath
     }
