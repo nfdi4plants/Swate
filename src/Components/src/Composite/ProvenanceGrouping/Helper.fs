@@ -259,6 +259,14 @@ module PropertyRails =
     open Swate.Components.Shared.ProvenanceGrouping.Grouping
     open Swate.Components.Composite.ProvenanceGrouping.Types
 
+    type RailProjection =
+        {
+            Headers: ProvenancePropertyHeader list
+            ValuesByHeader: Map<ProvenancePropertyHeader, ProvenancePropertyValue list>
+            ExpandedHeaders: Set<ProvenancePropertyHeader>
+            CanSwitchHeaders: Set<ProvenancePropertyHeader>
+        }
+
     let private setsForSide side (model: ProvenanceModel) =
         if side = ProvenanceSide.Input then model.InputSets else model.OutputSets
 
@@ -334,6 +342,31 @@ module PropertyRails =
         |> List.groupBy (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
         |> List.map (fun (_, values) -> values |> List.sortBy (fun value -> value.Id) |> List.head)
         |> List.sortBy (fun propertyValue -> Formatting.formatValue propertyValue.Value propertyValue.Unit)
+
+    let railProjection pairId side model uiState =
+        let headers = propertyRailHeadersForSide pairId side model uiState
+
+        let valuesByHeader =
+            headers
+            |> List.map (fun header -> header, propertyValuesForSideHeader pairId side header model uiState)
+            |> Map.ofList
+
+        let expandedHeaders =
+            headers
+            |> List.filter (fun header -> State.PropertyExpansion.isExpanded pairId side header uiState)
+            |> Set.ofList
+
+        let canSwitchHeaders =
+            headers
+            |> List.filter (fun header -> canSwitchHeader header model)
+            |> Set.ofList
+
+        {
+            Headers = headers
+            ValuesByHeader = valuesByHeader
+            ExpandedHeaders = expandedHeaders
+            CanSwitchHeaders = canSwitchHeaders
+        }
 
 /// Derives endpoint defaults, identities, and display headers for empty-side creation.
 module Endpoints =

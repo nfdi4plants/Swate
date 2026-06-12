@@ -589,9 +589,7 @@ module private EditorSurface =
 
     let propertyRail
         side
-        (pair: ProvenanceLayerPair)
-        (model: ProvenanceModel)
-        uiState
+        (projection: PropertyRails.RailProjection)
         activeAssignments
         toggleSide
         toggleBoth
@@ -602,16 +600,16 @@ module private EditorSurface =
         =
         Controls.PropertyRail(
             side,
-            PropertyRails.propertyRailHeadersForSide pair.Id side model uiState,
+            projection.Headers,
             activeAssignments,
-            (fun header -> PropertyRails.propertyValuesForSideHeader pair.Id side header model uiState),
-            (fun header -> State.PropertyExpansion.isExpanded pair.Id side header uiState),
+            (fun header -> projection.ValuesByHeader |> Map.tryFind header |> Option.defaultValue []),
+            (fun header -> projection.ExpandedHeaders.Contains header),
             toggleSide,
             toggleBoth,
             move,
             toggleExpanded,
             addPaletteValue,
-            (fun header -> PropertyRails.canSwitchHeader header model),
+            (fun header -> projection.CanSwitchHeaders.Contains header),
             debug = debug
         )
 
@@ -732,6 +730,26 @@ type ProvenanceGrouping =
             Endpoints.defaultEndpointKind ProvenanceSide.Output pair.Model
 
         let lookups = EditorLookups.create pair uiState inputGroups outputGroups
+
+        let inputRailProjection =
+            React.useMemo(
+                (fun () -> PropertyRails.railProjection pair.Id ProvenanceSide.Input pair.Model uiState),
+                [| box pair.Id
+                   box pair.Model
+                   box uiState.PropertyRailPlacements
+                   box uiState.ExpandedProperties
+                   box uiState.PaletteValues |]
+            )
+
+        let outputRailProjection =
+            React.useMemo(
+                (fun () -> PropertyRails.railProjection pair.Id ProvenanceSide.Output pair.Model uiState),
+                [| box pair.Id
+                   box pair.Model
+                   box uiState.PropertyRailPlacements
+                   box uiState.ExpandedProperties
+                   box uiState.PaletteValues |]
+            )
 
         let applyUiState update =
             let next = update latestUiState.current
@@ -931,9 +949,9 @@ type ProvenanceGrouping =
 
             EditorSurface.propertyRail
                 side
-                pair
-                pair.Model
-                uiState
+                (match side with
+                 | ProvenanceSide.Input -> inputRailProjection
+                 | ProvenanceSide.Output -> outputRailProjection)
                 (State.Layers.get layerId uiState).GroupingAssignments
                 (fun header -> toggleSideGrouping layerId side header)
                 (fun header ->
