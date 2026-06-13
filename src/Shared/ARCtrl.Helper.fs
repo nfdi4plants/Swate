@@ -354,12 +354,12 @@ module Json =
             loop 0
 
         let private copyTableWithName (name: string) (table: ArcTable) =
-            let copiedTable = table.Copy()
+            let next = table.Copy()
 
-            if copiedTable.Name <> name then
-                ArcTables(ResizeArray [ copiedTable ]).RenameTableAt(0, name)
-
-            copiedTable
+            if next.Name <> name then
+                ARCtrl.IdentifierSetters.setArcTableName name next
+            else
+                next
 
         let applyToCurrentArcFile (currentArcFile: ArcFiles, importedArcFile: ArcFiles) =
             let currentFileType = currentArcFile.RelatedArcFilesDiscriminate
