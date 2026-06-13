@@ -260,6 +260,7 @@ type Controls =
             onSwitch: ProvenancePropertyHeader -> unit,
             onToggleExpanded: ProvenancePropertyHeader -> unit,
             onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
+            setIsValueChipDragging: bool -> unit,
             ?debug: bool,
             ?key: string
         ) =
@@ -512,6 +513,7 @@ type Controls =
                             for propertyValue in propertyValues do
                                 Controls.ValueChip(
                                     propertyValue,
+                                    onDragChanged = setIsValueChipDragging,
                                     draggable = true,
                                     showHeader = false,
                                     anchorSide = side,
@@ -547,6 +549,7 @@ type Controls =
             onToggleExpanded: ProvenancePropertyHeader -> unit,
             onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             canSwitch: ProvenancePropertyHeader -> bool,
+            setIsValueChipDragging: bool -> unit,
             ?debug: bool
         ) =
         let droppable =
@@ -613,6 +616,7 @@ type Controls =
                         onSwitch,
                         onToggleExpanded,
                         onAddValue,
+                        setIsValueChipDragging,
                         debug = defaultArg debug false,
                         key = DragDrop.propertyHeaderIdentity header
                     )
@@ -871,6 +875,7 @@ type Controls =
     static member ValueChip
         (
             propertyValue: ProvenancePropertyValue,
+            onDragChanged: bool -> unit,
             ?draggable: bool,
             ?showHeader: bool,
             ?anchorSide: ProvenanceSide,
@@ -887,6 +892,20 @@ type Controls =
                     id = DragDrop.valueDragId propertyValue.Id
                 |}
             )
+
+        let wasDragging = React.useRef false
+
+        React.useEffect(
+            (fun () ->
+                if drag.isDragging <> wasDragging.current then
+                    wasDragging.current <- drag.isDragging
+                    onDragChanged (drag.isDragging)
+            ),
+            [| box drag.isDragging |]
+        )
+
+        // let isdragging = setIsValueChipDragging drag.isDragging
+
 
         let text = Formatting.formatValue propertyValue.Value propertyValue.Unit
 
