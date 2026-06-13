@@ -24,8 +24,7 @@ module FileExplorerDeleteHelper =
         | PageState.MarkdownPage _
         | PageState.TextPage _
         | PageState.UnknownPage
-        | PageState.ErrorPage _
-        | PageState.GitLfsPointerPage _ -> true
+        | PageState.ErrorPage _ -> true
         | _ -> false
 
     let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
@@ -39,22 +38,31 @@ module FileExplorerDeleteHelper =
         | PageState.ErrorPage _ -> true
         | _ -> false
 
+    let private isCheckedOutLfsFile (entry: FileEntry) =
+        entry.lfs |> Option.exists (fun lfsInfo -> lfsInfo.checkout)
+
+    let private shouldReloadSelectedFile pageState entry =
+        match pageState with
+        | Some state -> reloadsWhenSelectedFileChanges state
+        | None -> isCheckedOutLfsFile entry
+
     let tryGetReloadableSelectedFilePath
         (fileTree: FileEntry[])
         (selectionPath: string option)
         (pageState: PageState option)
         =
-        pageState
-        |> Option.filter reloadsWhenSelectedFileChanges
-        |> Option.bind (fun _ ->
-            selectionPath
-            |> Option.map PathHelpers.normalizePath
-            |> Option.bind (fun selectedPath ->
-                fileTree
-                |> Array.tryFind (fun entry ->
-                    not entry.isDirectory
-                    && PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) selectedPath
-                )
-                |> Option.map (fun entry -> PathHelpers.normalizePath entry.path)
+        selectionPath
+        |> Option.map PathHelpers.normalizePath
+        |> Option.bind (fun selectedPath ->
+            fileTree
+            |> Array.tryFind (fun entry ->
+                not entry.isDirectory
+                && PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) selectedPath
+            )
+            |> Option.bind (fun entry ->
+                if shouldReloadSelectedFile pageState entry then
+                    Some(PathHelpers.normalizePath entry.path)
+                else
+                    None
             )
         )

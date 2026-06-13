@@ -1861,10 +1861,13 @@ let private getCleanLfsFileForAction
             | Ok listing -> return Ok(safePath, absolutePath, listing)
     }
 
+let private createMissingLfsAttributesFailure safePath actionDescription =
+    exn
+        $"'{safePath}' is listed by Git LFS, but the current .gitattributes does not register it. Restore Git LFS tracking for this path before {actionDescription}."
+
 let private createLfsCheckoutFailure arcPath safePath =
     if not (isTrackedByAttributes arcPath safePath) then
-        exn
-            $"'{safePath}' is listed by Git LFS, but the current .gitattributes does not register it. Restore Git LFS tracking for this path before downloading it."
+        createMissingLfsAttributesFailure safePath "downloading it"
     else
         exn $"Could not download '{safePath}' into the working tree."
 
@@ -1918,6 +1921,8 @@ let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitR
     match lfsFileResult with
     | Error failure -> return Error failure
     | Ok(_, _, listing) when not listing.checkout -> return Ok()
+    | Ok(safePath, _, _) when not (isTrackedByAttributes arcPath safePath) ->
+        return errorResult (createMissingLfsAttributesFailure safePath "freeing the local LFS copy")
     | Ok(safePath, absolutePath, listing) ->
         return!
             withOriginLfsGitResult

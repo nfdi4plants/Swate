@@ -158,9 +158,7 @@ type FileTree =
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
                     if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
-                        pageStateCtx.setState (
-                            Some(Renderer.Types.PageState.fromGitLfsPointer (selectedPath, item.SizeFormatted))
-                        )
+                        pageStateCtx.setState None
                     else
                         do! openSelectedPreview item.Name selectedPath
             }

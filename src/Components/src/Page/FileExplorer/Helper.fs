@@ -5,10 +5,10 @@ open Swate.Components.Page.FileExplorer.Types
 let isLfs (item: FileItem) = item.IsLFS = Some true
 
 let needsLfsDownload (item: FileItem) =
-    isLfs item && (item.Downloaded <> Some true || item.IsLFSPointer = Some true)
+    isLfs item && (item.Downloaded = Some false || item.IsLFSPointer = Some true)
 
 let hasLocalLfsCopy (item: FileItem) =
-    isLfs item && item.Downloaded = Some true && item.IsLFSPointer <> Some true
+    isLfs item && item.Downloaded = Some true && item.IsLFSPointer = Some false
 
 let iconClassName (baseClasses: string list) (item: FileItem) (getItemIconClass: FileItem -> string option) = [
     yield! baseClasses
