@@ -6,6 +6,7 @@ open System.Text.RegularExpressions
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Components.Page.GitSidebarTypes
+open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.Node
 open Main.Bindings.Filesystem
@@ -451,6 +452,17 @@ let private tryResolveArcRelativePath (arcPath: string) (requestedPath: string) 
 let private createTemporaryLfsBackupPath (absolutePath: string) =
     $"{absolutePath}.swate-lfs-backup-{Guid.NewGuid():N}"
 
+let private restoreTemporaryLfsBackup backupPath absolutePath =
+    if existsSync backupPath then
+        if existsSync absolutePath then
+            unlinkSync absolutePath
+
+        renameSync backupPath absolutePath
+
+let private removeTemporaryLfsBackup backupPath =
+    if existsSync backupPath then
+        unlinkSync backupPath
+
 let private isPathCleanInStatus (status: StatusResult) (relativePath: string) =
     valueOrEmptyArray status.files
     |> Array.exists (fun fileStatus ->
@@ -460,10 +472,7 @@ let private isPathCleanInStatus (status: StatusResult) (relativePath: string) =
     )
     |> not
 
-let private ensureBackupMatchesLfsOid
-    (backupPath: string)
-    (listing: Swate.Electron.Shared.FileIOTypes.GitLfsLsFileInfo)
-    =
+let private ensureBackupMatchesLfsOid (backupPath: string) (listing: GitLfsLsFileInfo) =
     promise {
         let! pointerTextResult =
             runGitCaptured {
@@ -1802,105 +1811,186 @@ let private discardPathspecsWithOriginals (arcPath: string) (status: StatusResul
 
     Array.append safePathSpecs originalPaths |> Array.distinct
 
-let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<unit>> = promise {
-    match tryResolveArcRelativePath arcPath requestedPath with
-    | Error validationError -> return errorResult validationError
-    | Ok(safePath, absolutePath) ->
-        if not (isTrackedByAttributes arcPath safePath) then
-            return errorResult (exn $"'{safePath}' is not tracked by Git LFS.")
-        else
-            let! gitResult = createOriginLfsRemoteGit arcPath None
+let private requireLfsListingForPath (arcPath: string) (safePath: string) : JS.Promise<GitLfsLsFileInfo> = promise {
+    match! GitLfsService.tryFindListingForPath arcPath safePath with
+    | Ok listing -> return listing
+    | Error message -> return abortGitPromise $"'{safePath}' {message}"
+}
 
-            match gitResult with
+let private runLfsRaw (args: string[]) git =
+    runSimpleGit (fun currentGit -> currentGit.raw args) git
+
+let private withOriginLfsGitResult arcPath (operation: ISimpleGit -> JS.Promise<GitResult<'T>>) = promise {
+    let! gitResult = createOriginLfsRemoteGit arcPath None
+
+    match gitResult with
+    | Error failure -> return Error failure
+    | Ok git -> return! operation git
+}
+
+let private withOriginLfsGit arcPath operation =
+    withOriginLfsGitResult arcPath (runSimpleGit operation)
+
+let private getCleanLfsListingForPath
+    (arcPath: string)
+    (safePath: string)
+    (dirtyMessage: string)
+    : JS.Promise<GitResult<GitLfsLsFileInfo>> =
+    withLocalGit
+        arcPath
+        (fun git -> promise {
+            let! status = git.status ()
+
+            if not (isPathCleanInStatus status safePath) then
+                return abortGitPromise dirtyMessage
+            else
+                return! requireLfsListingForPath arcPath safePath
+        })
+
+let private getCleanLfsFileForAction
+    (arcPath: string)
+    (requestedPath: string)
+    (dirtyMessageForSafePath: string -> string)
+    : JS.Promise<GitResult<string * string * GitLfsLsFileInfo>> =
+    promise {
+        match tryResolveArcRelativePath arcPath requestedPath with
+        | Error validationError -> return errorResult validationError
+        | Ok(safePath, absolutePath) ->
+            match! getCleanLfsListingForPath arcPath safePath (dirtyMessageForSafePath safePath) with
             | Error failure -> return Error failure
-            | Ok git ->
-                let! statusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
+            | Ok listing -> return Ok(safePath, absolutePath, listing)
+    }
 
-                match statusResult with
-                | Error failure -> return Error failure
-                | Ok status when not (isPathCleanInStatus status safePath) ->
-                    return
-                        errorResult (
-                            exn
-                                $"'{safePath}' has local changes. Save, discard, or commit them before freeing the local LFS copy."
-                        )
-                | Ok _ ->
-                    let! listingResult =
-                        runSimpleGit
-                            (fun currentGit -> currentGit.raw (GitLfsService.buildLsFilesJsonArgs safePath))
-                            git
+let private createLfsCheckoutFailure arcPath safePath =
+    if not (isTrackedByAttributes arcPath safePath) then
+        exn
+            $"'{safePath}' is listed by Git LFS, but the current .gitattributes does not register it. Restore Git LFS tracking for this path before downloading it."
+    else
+        exn $"Could not download '{safePath}' into the working tree."
 
-                    match listingResult with
+let private requireDownloadedLfsFile
+    arcPath
+    safePath
+    absolutePath
+    (expectedListing: GitLfsLsFileInfo)
+    (git: ISimpleGit)
+    =
+    promise {
+        let! finalListing = requireLfsListingForPath arcPath safePath
+
+        if not finalListing.checkout then
+            return abortGitPromiseWith (createLfsCheckoutFailure arcPath safePath)
+        else
+            let! finalStats = statAsync absolutePath
+            let expectedSize = int64 expectedListing.size
+            let actualSize = int64 finalStats.size
+
+            if actualSize <> expectedSize then
+                return abortGitPromiseWith (createLfsCheckoutFailure arcPath safePath)
+            else
+                let! finalStatus = git.status ()
+
+                if not (isPathCleanInStatus finalStatus safePath) then
+                    return abortGitPromiseWith (createLfsCheckoutFailure arcPath safePath)
+                else
+                    return ()
+    }
+
+let private downloadMissingLfsFile arcPath safePath absolutePath listing : JS.Promise<GitResult<unit>> =
+    withOriginLfsGit
+        arcPath
+        (fun git -> promise {
+            let! _ = git.raw (GitLfsService.buildPullIncludeArgs safePath)
+            let! _ = git.raw (GitLfsService.buildCheckoutArgs safePath)
+            do! requireDownloadedLfsFile arcPath safePath absolutePath listing git
+            return ()
+        })
+
+let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<unit>> = promise {
+    let! lfsFileResult =
+        getCleanLfsFileForAction
+            arcPath
+            requestedPath
+            (fun safePath ->
+                $"'{safePath}' has local changes. Save, discard, or commit them before freeing the local LFS copy."
+            )
+
+    match lfsFileResult with
+    | Error failure -> return Error failure
+    | Ok(_, _, listing) when not listing.checkout -> return Ok()
+    | Ok(safePath, absolutePath, listing) ->
+        return!
+            withOriginLfsGitResult
+                arcPath
+                (fun git -> promise {
+                    let! fetchResult = runLfsRaw (GitLfsService.buildFetchRefetchArgs safePath) git
+
+                    match fetchResult with
                     | Error failure -> return Error failure
-                    | Ok listingJson ->
-                        match GitLfsService.tryFindListingForPath safePath listingJson with
-                        | Error message -> return errorResult (exn $"'{safePath}' {message}")
-                        | Ok listing when not listing.checkout -> return Ok()
-                        | Ok listing ->
-                            let! fetchResult =
-                                runSimpleGit
-                                    (fun currentGit -> currentGit.raw (GitLfsService.buildFetchRefetchArgs safePath))
-                                    git
+                    | Ok _ ->
+                        let backupPath = createTemporaryLfsBackupPath absolutePath
 
-                            match fetchResult with
-                            | Error failure -> return Error failure
-                            | Ok _ ->
-                                let backupPath = createTemporaryLfsBackupPath absolutePath
+                        try
+                            renameSync absolutePath backupPath
 
-                                try
-                                    renameSync absolutePath backupPath
+                            match! ensureBackupMatchesLfsOid backupPath listing with
+                            | Error validationError ->
+                                restoreTemporaryLfsBackup backupPath absolutePath
 
-                                    match! ensureBackupMatchesLfsOid backupPath listing with
-                                    | Error validationError ->
-                                        if existsSync backupPath then
-                                            renameSync backupPath absolutePath
+                                return errorResult validationError
+                            | Ok() ->
+                                let pointerGit = git.env (GitLfsSkipSmudgeEnvKey, "1")
 
-                                        return errorResult validationError
-                                    | Ok() ->
-                                        let pointerGit = git.env (GitLfsSkipSmudgeEnvKey, "1")
+                                let! checkoutResult =
+                                    runSimpleGit
+                                        (fun currentGit -> currentGit.raw [| "checkout"; "HEAD"; "--"; safePath |])
+                                        pointerGit
 
-                                        let! checkoutResult =
-                                            runSimpleGit
-                                                (fun currentGit ->
-                                                    currentGit.raw [| "checkout"; "HEAD"; "--"; safePath |]
-                                                )
-                                                pointerGit
+                                match checkoutResult with
+                                | Error failure ->
+                                    restoreTemporaryLfsBackup backupPath absolutePath
 
-                                        match checkoutResult with
-                                        | Error failure ->
-                                            if existsSync backupPath then
-                                                renameSync backupPath absolutePath
+                                    return Error failure
+                                | Ok _ ->
+                                    let! finalStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
-                                            return Error failure
-                                        | Ok _ ->
-                                            let! finalStatusResult =
-                                                runSimpleGit (fun currentGit -> currentGit.status ()) git
+                                    match finalStatusResult with
+                                    | Error failure ->
+                                        restoreTemporaryLfsBackup backupPath absolutePath
 
-                                            match finalStatusResult with
-                                            | Error failure ->
-                                                if existsSync backupPath then
-                                                    renameSync backupPath absolutePath
+                                        return Error failure
+                                    | Ok finalStatus when not (isPathCleanInStatus finalStatus safePath) ->
+                                        restoreTemporaryLfsBackup backupPath absolutePath
 
-                                                return Error failure
-                                            | Ok finalStatus when not (isPathCleanInStatus finalStatus safePath) ->
-                                                if existsSync backupPath then
-                                                    renameSync backupPath absolutePath
+                                        return
+                                            errorResult (
+                                                exn
+                                                    $"Could not replace '{safePath}' with an LFS pointer without changing Git status."
+                                            )
+                                    | Ok _ ->
+                                        removeTemporaryLfsBackup backupPath
 
-                                                return
-                                                    errorResult (
-                                                        exn
-                                                            $"Could not replace '{safePath}' with an LFS pointer without changing Git status."
-                                                    )
-                                            | Ok _ ->
-                                                if existsSync backupPath then
-                                                    unlinkSync backupPath
+                                        return Ok()
+                        with ex ->
+                            restoreTemporaryLfsBackup backupPath absolutePath
 
-                                                return Ok()
-                                with ex ->
-                                    if existsSync backupPath then
-                                        renameSync backupPath absolutePath
+                            return errorResult ex
+                })
+}
 
-                                    return errorResult ex
+let downloadLfsFile (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<unit>> = promise {
+    let! lfsFileResult =
+        getCleanLfsFileForAction
+            arcPath
+            requestedPath
+            (fun safePath ->
+                $"'{safePath}' has local changes. Save, discard, or commit them before downloading the Git LFS file."
+            )
+
+    match lfsFileResult with
+    | Error failure -> return Error failure
+    | Ok(_, _, listing) when listing.checkout -> return Ok()
+    | Ok(safePath, absolutePath, listing) -> return! downloadMissingLfsFile arcPath safePath absolutePath listing
 }
 
 /// Discards validated pathspecs by restoring tracked paths from HEAD and cleaning selected untracked files.

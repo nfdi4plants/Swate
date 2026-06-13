@@ -33,9 +33,9 @@ let private withFileEntryLfsMetadata
         | Some relativePath ->
             let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
 
-            match lfsFilesByRelativePath.TryGetValue(normalizedRelativePath) with
-            | true, lfsInfo -> { entry with lfs = Some lfsInfo }
-            | _ -> { entry with lfs = None }
+            match tryFindLsFileInfoByRelativePath lfsFilesByRelativePath normalizedRelativePath with
+            | Some lfsInfo -> { entry with lfs = Some lfsInfo }
+            | None -> { entry with lfs = None }
         | None -> { entry with lfs = None }
 
 /// Enriches file entries with Git LFS metadata from `git lfs ls-files -j`.

@@ -13,6 +13,11 @@ type LeftSidebarPage =
 
 type GitUnsupportedPageData = GitUnsupportedContentDto
 
+type GitLfsPointerPageData = {
+    Path: string
+    SizeFormatted: string option
+}
+
 [<RequireQualifiedAccess>]
 type PageState =
     | ArcFilePage of ArcFiles
@@ -25,6 +30,7 @@ type PageState =
     | GitDiffPage of GitDiffViewDataDto
     | GitMergeConflictPage of GitMergeConflictViewDataDto
     | GitUnsupportedPage of GitUnsupportedPageData
+    | GitLfsPointerPage of GitLfsPointerPageData
     | ErrorPage of string
     | DataHubBrowser
     | SettingsPage
@@ -42,5 +48,11 @@ type PageState =
                 PageState.ErrorPage
                     $"Failed to parse ARC file: {dto.path} - {dto.fileType} - unsupported format or corrupted content."
         | _ -> PageState.UnknownPage
+
+    static member fromGitLfsPointer(path: string, sizeFormatted: string option) : PageState =
+        PageState.GitLfsPointerPage {
+            Path = PathHelpers.normalizePath path
+            SizeFormatted = sizeFormatted
+        }
 
 let pageStateOfFileContentDTO (dto: FileContentDTO) : PageState = PageState.fromFileContentDTO dto

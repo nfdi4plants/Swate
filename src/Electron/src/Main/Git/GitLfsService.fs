@@ -51,6 +51,21 @@ let private indexUsingRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<stri
 
     filesByRelativePath
 
+let tryFindLsFileInfoByRelativePath (filesByRelativePath: Dictionary<string, GitLfsLsFileInfo>) (relativePath: string) =
+    let normalizedPath = PathHelpers.normalizeSeparators relativePath
+
+    match filesByRelativePath.TryGetValue normalizedPath with
+    | true, info -> Some info
+    | false, _ ->
+        filesByRelativePath
+        |> Seq.tryPick (fun entry ->
+            if PathHelpers.pathsEqual entry.Key normalizedPath then
+                Some entry.Value
+            else
+                None
+        )
+
+let buildLsFilesJsonArgs () = [| "lfs"; "ls-files"; "-j" |]
 
 /// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
@@ -173,7 +188,7 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
         let! commandResult =
             runGitCaptured {
                 WorkingDirectory = Some normalizedRepoRoot
-                Arguments = [| "lfs"; "ls-files"; "-j" |]
+                Arguments = buildLsFilesJsonArgs ()
                 Environment = None
                 StandardInput = None
                 TimeoutMs = Some lfsLsFilesTimeoutMs
@@ -206,6 +221,18 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
         return Dictionary<string, GitLfsLsFileInfo>()
 }
 
+let tryFindListingForPath (repoRoot: string) (relativePath: string) : JS.Promise<Result<GitLfsLsFileInfo, string>> = promise {
+    try
+        let! filesByRelativePath = tryGetLsFilesByRelativePath repoRoot
+
+        return
+            match tryFindLsFileInfoByRelativePath filesByRelativePath relativePath with
+            | Some listing -> Ok listing
+            | None -> Error "The file is not listed by Git LFS in the current checkout."
+    with error ->
+        return Error $"Could not read Git LFS file metadata: {error.Message}"
+}
+
 let storagePruneArgs = [|
     "lfs"
     "prune"
@@ -225,34 +252,9 @@ let buildFetchRefetchArgs (relativePath: string) = [|
     "HEAD"
 |]
 
-let buildLsFilesJsonArgs (relativePath: string) = [|
-    "lfs"
-    "ls-files"
-    "-l"
-    "--size"
-    "--json"
-    $"--include={relativePath}"
-|]
+let buildPullIncludeArgs (relativePath: string) = [| "lfs"; "pull"; $"--include={relativePath}" |]
 
-let tryFindListingForPath (relativePath: string) (listingJson: string) : Result<GitLfsLsFileInfo, string> =
-    try
-        let normalizedPath = PathHelpers.normalizeSeparators relativePath
-
-        match
-            listingJson
-            |> parseLsFiles
-            |> Array.tryFind (fun file ->
-                String.Equals(PathHelpers.normalizeSeparators file.name, normalizedPath, StringComparison.Ordinal)
-            )
-        with
-        | None -> Error "The file is not listed by Git LFS in the current checkout."
-        | Some file ->
-            Ok {
-                file with
-                    name = PathHelpers.normalizeSeparators file.name
-            }
-    with error ->
-        Error $"Could not read Git LFS file metadata: {error.Message}"
+let buildCheckoutArgs (relativePath: string) = [| "lfs"; "checkout"; relativePath |]
 
 let private formatDiagnosticsSection (title: string) (content: string option) =
     match content |> Option.map _.Trim() with

@@ -5,9 +5,7 @@ open System.Text.RegularExpressions
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.GitTypes
-open Fable.Core
 open Fable.Electron
-open Fable.Electron.Main
 open Fable.Electron.Remoting.Main
 open Main
 open Main.Git
@@ -404,6 +402,28 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                                 toGitOperationResult (fun _ -> Some "Hidden Git LFS cache cleaned.") None None result
                         })
         }
+    gitLfsDownloadFile =
+        fun (request: GitLfsFileRequest) -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(vault, arcPath) ->
+                return!
+                    withBusyWriting
+                        vault
+                        (fun () -> promise {
+                            let! result = GitService.downloadLfsFile arcPath request.Path
+
+                            if Result.isOk result then
+                                do! vault.RefreshFileTree()
+
+                            return
+                                toGitOperationResult
+                                    (fun () -> Some $"Downloaded LFS file '{request.Path}'.")
+                                    None
+                                    None
+                                    result
+                        })
+        }
     gitLfsDedup =
         fun () -> promise {
             match tryGetVaultAndArcPath event with
@@ -424,7 +444,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                         })
         }
     gitLfsFreeLocalCopy =
-        fun (request: GitLfsFreeLocalCopyRequest) -> promise {
+        fun (request: GitLfsFileRequest) -> promise {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
