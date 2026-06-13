@@ -334,15 +334,7 @@ module Json =
 
     module Import =
 
-        let private arcFileTypeLabel (fileType: ArcFilesDiscriminate) =
-            match fileType with
-            | ArcFilesDiscriminate.Investigation -> "Investigation"
-            | ArcFilesDiscriminate.Study -> "Study"
-            | ArcFilesDiscriminate.Assay -> "Assay"
-            | ArcFilesDiscriminate.Run -> "Run"
-            | ArcFilesDiscriminate.Workflow -> "Workflow"
-            | ArcFilesDiscriminate.DataMap -> "DataMap"
-            | ArcFilesDiscriminate.Template -> "Template"
+        let private arcFileTypeLabel (fileType: ArcFilesDiscriminate) = fileType |> unbox<string>
 
         let private uniqueTableName (usedNames: Set<string>) (preferredName: string) =
             let baseName =
@@ -362,20 +354,11 @@ module Json =
             loop 0
 
         let private copyTableWithName (name: string) (table: ArcTable) =
+            let tableCopy = table.Copy()
             let copiedTable = ArcTable.init name
 
-            let columns =
-                table.Columns
-                |> Seq.map (fun (column: CompositeColumn) ->
-                    CompositeColumn.create (
-                        column.Header.Copy(),
-                        column.Cells |> Seq.map (fun cell -> cell.Copy()) |> ResizeArray
-                    )
-                )
-                |> ResizeArray
-
-            if columns.Count > 0 then
-                copiedTable.AddColumns columns
+            for column in tableCopy.Columns do
+                copiedTable.AddColumn(column.Header, column.Cells)
 
             copiedTable
 
@@ -411,17 +394,6 @@ module Json =
                         Ok(ArcFiles.refreshRef currentArcFile)
                 | _ -> Ok importedArcFile
 
-        let tryParseToArcFile
-            (jsonString: string, jsonType: JsonExportFormat, filetype: ArcFilesDiscriminate)
-            : Result<ArcFiles, exn> =
-            match Generic.readFromJsonMap.TryFind(filetype, jsonType) with
-            | None -> Error(exn $"JSON import format {jsonType.AsStringRdbl} is not supported for {filetype}.")
-            | Some arcFileFn ->
-                try
-                    arcFileFn jsonString |> Ok
-                with exn ->
-                    Error exn
-
         let tryParseFromJsonString
             (
                 jsonString: string,
@@ -444,9 +416,13 @@ module Json =
 
             match assumedJsonType with
             | Some(jsonFormat, arcfileType) ->
-                match tryParseToArcFile (jsonString, jsonFormat, arcfileType) with
-                | Ok arcfile -> Some arcfile
-                | Error _ -> None
+                match Generic.readFromJsonMap.TryFind(arcfileType, jsonFormat) with
+                | Some arcFileFn ->
+                    try
+                        arcFileFn jsonString |> Some
+                    with _ ->
+                        None
+                | None -> None
             | None -> None
 
         let parseFromJsonString

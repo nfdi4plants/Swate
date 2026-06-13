@@ -4,22 +4,18 @@ open Fable.Core
 open Feliz
 open Swate.Components.Shared
 
-module JsonWidgetLayout =
+module private JsonFormatSelectHelper =
 
-    let rootClass = "swt:join swt:w-fit swt:max-w-full"
-    let actionClass = "swt:btn swt:btn-primary swt:join-item swt:w-32 swt:shrink-0"
-
-    let fileInputClass =
-        "swt:file-input swt:file-input-primary swt:join-item swt:w-32 swt:shrink-0"
-
-[<Erase; Mangle(false)>]
-type JsonFormatSelect =
-
-    static member private Width(formats: JsonExportFormat list, selectedFormat: JsonExportFormat) =
+    let width (formats: JsonExportFormat list) (selectedFormat: JsonExportFormat) =
         selectedFormat :: formats
         |> List.map (fun format -> format.AsStringRdbl.Length)
         |> List.max
         |> fun characters -> $"calc({characters}ch + 4rem)"
+
+open JsonFormatSelectHelper
+
+[<Erase; Mangle(false)>]
+type JsonFormatSelect =
 
     [<ReactComponent>]
     static member JsonFormatSelect
@@ -31,7 +27,7 @@ type JsonFormatSelect =
             ?testId: string
         ) =
         let disabled = defaultArg disabled false
-        let selectWidth = JsonFormatSelect.Width(formats, selectedFormat)
+        let selectWidth = width formats selectedFormat
 
         Html.select [
             if testId.IsSome then

@@ -103,7 +103,7 @@ Vitest.describe (
 
                 match result with
                 | Ok() -> failwith "Expected mismatched JSON import to fail."
-                | Error exn -> Vitest.expect(exn.Message).toContain ("Cannot import Study JSON")
+                | Error exn -> Vitest.expect(exn.Message).toContain ("Cannot import study JSON")
 
                 Vitest.expect(publishedArcFile.IsNone).toBe (true)
                 Vitest.expect(inMemoryUpdated).toBe (false)

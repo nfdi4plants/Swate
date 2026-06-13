@@ -10,7 +10,6 @@ open Swate.Components
 open Swate.Components.Shared
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Electron.Shared.FileIOTypes
 
 [<ReactComponent>]
 let private TableNavbarActions (props: ArcFileEditorHeaderProps, setArcFile: ArcFiles -> unit) =
@@ -104,27 +103,6 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
 
         )
 
-    let exportJson =
-        React.useCallback (
-            (fun (arcFile: ArcFiles, jsonFormat: JsonExportFormat) -> promise {
-                match Json.Export.tryParseToJsonString (arcFile, jsonFormat) with
-                | Error exn -> return Error exn
-                | Ok(fileName, content) ->
-                    let request: JsonExportSaveRequest = {
-                        suggestedFileName = fileName
-                        content = content
-                    }
-
-                    match! Api.ipcArcVaultApi.saveJsonExport request with
-                    | Ok _ -> return Ok()
-                    | Error exn -> return Error exn
-            }),
-            [||]
-        )
-
-    let pickJsonFile =
-        React.useCallback ((fun () -> Api.ipcArcVaultApi.pickJsonImportFile ()), [||])
-
     let importJson =
         React.useCallback (
             (fun (request: JsonImportRequest) -> promise {
@@ -141,9 +119,7 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
         setArcFile,
         pickFilePaths,
         trailingNavbarElements = trailingNavbarElements,
-        pickJsonFile = pickJsonFile,
         onImportJson = importJson,
-        onExportJson = exportJson,
         onError =
             (fun message ->
                 errorModal.enqueue (ErrorModalRequest.create (message, title = "Could not update ARC file editor"))

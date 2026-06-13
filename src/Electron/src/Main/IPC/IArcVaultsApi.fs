@@ -4,7 +4,6 @@ open System
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
@@ -334,51 +333,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error(exn $"Could not import external text files: {e.Message}")
         }
-    pickJsonImportFile =
-        fun _ -> promise {
-            try
-                return!
-                    withLoadedArcVault
-                        event
-                        (fun vault -> promise {
-                            let properties = [|
-                                Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                            |]
-
-                            let filters = [| FileFilter("JSON files", [| "json" |]) |]
-
-                            let window = dialogParentFromIpcEvent event
-
-                            let! result =
-                                dialog.showOpenDialog (
-                                    ?window = window,
-                                    title = "Import JSON",
-                                    defaultPath = vault.path.Value,
-                                    buttonLabel = "Import",
-                                    properties = properties,
-                                    filters = filters
-                                )
-
-                            if result.canceled then
-                                return Ok None
-                            elif result.filePaths.Length <> 1 then
-                                return Error(exn "Not exactly one path")
-                            else
-                                let absolutePath = result.filePaths |> Array.exactlyOne |> resolveAbsolutePath
-
-                                let! content = ARCtrl.FileSystemHelper.readFileTextAsync absolutePath
-
-                                return
-                                    Ok(
-                                        Some {
-                                            FileName = Some(path.basename absolutePath)
-                                            Content = content
-                                        }
-                                    )
-                        })
-            with e ->
-                return Error(exn $"Could not import JSON file: {e.Message}")
-        }
     getFileTree =
         fun () -> promise {
             try
@@ -440,49 +394,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                             match vault.UpdateArcByFileContentDTO request with
                             | Error saveError -> return Error saveError
                             | Ok() -> return Ok()
-                        })
-            with e ->
-                return Error e
-        }
-    saveJsonExport =
-        fun (request: JsonExportSaveRequest) -> promise {
-            try
-                return!
-                    withLoadedArcVault
-                        event
-                        (fun vault -> promise {
-                            let arcPath = vault.path.Value
-                            let window = dialogParentFromIpcEvent event
-
-                            let defaultPath =
-                                JsonExportFileSystemHelper.buildDefaultPath arcPath request.suggestedFileName
-
-                            let filters = [| FileFilter("JSON files", [| "json" |]) |]
-
-                            let properties = [|
-                                Enums.Dialog.ShowSaveDialog.Options.Properties.CreateDirectory
-                                Enums.Dialog.ShowSaveDialog.Options.Properties.ShowOverwriteConfirmation
-                            |]
-
-                            let! result =
-                                dialog.showSaveDialog (
-                                    ?window = window,
-                                    title = "Export JSON",
-                                    defaultPath = defaultPath,
-                                    buttonLabel = "Export",
-                                    filters = filters,
-                                    properties = properties
-                                )
-
-                            if result.canceled || String.IsNullOrWhiteSpace result.filePath then
-                                return Ok None
-                            else
-                                let targetPath = JsonExportFileSystemHelper.ensureJsonExtension result.filePath
-
-                                let directoryPath = path.dirname targetPath
-                                do! ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
-                                do! ARCtrl.FileSystemHelper.writeFileTextAsync targetPath request.content
-                                return Ok(Some targetPath)
                         })
             with e ->
                 return Error e

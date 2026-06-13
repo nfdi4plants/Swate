@@ -10,9 +10,22 @@ open Swate.Components.Shared
 
 module private JsonImportWidgetHelper =
 
+    let rootClass = "swt:join swt:w-fit swt:max-w-full"
+
+    let actionClass = "swt:btn swt:btn-primary swt:join-item swt:w-32 swt:shrink-0"
+
+    let fileInputClass =
+        "swt:file-input swt:file-input-primary swt:join-item swt:w-32 swt:shrink-0"
+
     let defaultFormat (arcFile: ArcFiles) =
         Json.Generic.tryGetDefaultImportFormat arcFile.RelatedArcFilesDiscriminate
         |> Option.defaultValue JsonExportFormat.ARCtrl
+
+    let selectedOrDefaultFormat (supportedFormats: JsonExportFormat list) (arcFile: ArcFiles) selectedFormat =
+        if supportedFormats |> List.contains selectedFormat then
+            selectedFormat
+        else
+            defaultFormat arcFile
 
     let defaultImportJson (arcFile: ArcFiles) (setArcFile: ArcFiles -> unit) (request: JsonImportRequest) = promise {
         match Json.Import.applyToCurrentArcFile (arcFile, request.ImportedFile) with
@@ -36,7 +49,9 @@ type JsonImport =
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
             ?onError: exn -> unit
         ) =
-        let jsonFormat, setJsonFormat = React.useState (fun () -> defaultFormat arcFile)
+        let selectedJsonFormat, setSelectedJsonFormat =
+            React.useState (fun () -> defaultFormat arcFile)
+
         let loading, setLoading = React.useState false
 
         let onError = defaultArg onError (fun exn -> Browser.Dom.console.error exn)
@@ -49,23 +64,27 @@ type JsonImport =
         let supportedFormats =
             React.useMemo ((fun () -> Json.Generic.supportedImportFormats fileType), [| box fileType |])
 
-        React.useEffect (
-            (fun () ->
-                if not (supportedFormats |> List.contains jsonFormat) then
-                    Json.Generic.tryGetDefaultImportFormat fileType
-                    |> Option.defaultValue JsonExportFormat.ARCtrl
-                    |> setJsonFormat
-            ),
-            [| box fileType; box supportedFormats; box jsonFormat |]
-        )
+        let jsonFormat = selectedOrDefaultFormat supportedFormats arcFile selectedJsonFormat
+
+        let setJsonFormat format =
+            if supportedFormats |> List.contains format then
+                setSelectedJsonFormat format
 
         let importFile (jsonFile: JsonImportFile) =
             setLoading true
 
             promise {
-                match Json.Import.tryParseToArcFile (jsonFile.Content, jsonFormat, fileType) with
-                | Error exn -> return Error exn
-                | Ok importedFile ->
+                match
+                    Json.Import.tryParseFromJsonString (
+                        jsonFile.Content,
+                        Some jsonFormat,
+                        Some fileType,
+                        jsonFile.FileName
+                    )
+                with
+                | None ->
+                    return Error(exn $"Could not parse {jsonFormat.AsStringRdbl} JSON for {fileType |> unbox<string>}.")
+                | Some importedFile ->
                     return!
                         importJson {
                             ImportedFile = importedFile
@@ -102,7 +121,7 @@ type JsonImport =
                 |> Promise.start
 
         Html.div [
-            prop.className JsonWidgetLayout.rootClass
+            prop.className rootClass
             prop.children [
                 JsonFormatSelect.JsonFormatSelect(
                     supportedFormats,
@@ -117,7 +136,7 @@ type JsonImport =
                     Html.button [
                         prop.testId "json-import-picker-button"
                         prop.type'.button
-                        prop.className JsonWidgetLayout.actionClass
+                        prop.className actionClass
                         prop.disabled (loading || supportedFormats.IsEmpty)
                         prop.onClick (fun _ ->
                             if not loading then
@@ -130,7 +149,7 @@ type JsonImport =
                         prop.testId "json-import-file-input"
                         prop.type'.file
                         prop.accept ".json,application/json"
-                        prop.className JsonWidgetLayout.fileInputClass
+                        prop.className fileInputClass
                         prop.disabled (loading || supportedFormats.IsEmpty)
                         prop.onChange (fun (file: File) ->
                             let reader = Browser.Dom.FileReader.Create()

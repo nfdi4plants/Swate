@@ -62,39 +62,25 @@ type private LazyComponents =
             onPickPaths = onPickPaths
         )
 
-    [<ReactComponent>]
+    [<ReactLazyComponent>]
     static member LazyJsonImportWidget
         (
             arcFile: ArcFiles,
             setArcFile: ArcFiles -> unit,
-            pickJsonFile: (unit -> JS.Promise<Result<JsonImportFile option, exn>>) option,
             onImportJson: (JsonImportRequest -> JS.Promise<Result<unit, exn>>) option,
             onError: exn -> unit
         ) =
         Swate.Components.Composite.Widgets.JsonImport.JsonImport.JsonImport(
-            arcFile,
-            setArcFile,
-            ?pickJsonFile = pickJsonFile,
+            arcFile = arcFile,
+            setArcFile = setArcFile,
             ?onImportJson = onImportJson,
             onError = onError
         )
 
 
-    [<ReactComponent>]
-    static member LazyJsonExportWidget
-        (
-            arcFile: ArcFiles,
-            onExportJson: (ArcFiles * JsonExportFormat -> JS.Promise<Result<unit, exn>>) option,
-            onError: exn -> unit
-        ) =
-        match onExportJson with
-        | Some exportJson ->
-            Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(
-                arcFile,
-                onExportJson = exportJson,
-                onError = onError
-            )
-        | None -> Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile, onError = onError)
+    [<ReactLazyComponent>]
+    static member LazyJsonExportWidget(arcFile: ArcFiles, onError: exn -> unit) =
+        Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile = arcFile, onError = onError)
 
     [<ReactLazyComponent>]
     static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
@@ -298,9 +284,7 @@ type Main =
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
-            ?pickJsonFile: unit -> JS.Promise<Result<JsonImportFile option, exn>>,
             ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
-            ?onExportJson: ArcFiles * JsonExportFormat -> JS.Promise<Result<unit, exn>>,
             ?onError: string -> unit
         ) =
 
@@ -400,7 +384,6 @@ type Main =
                             LazyComponents.LazyJsonImportWidget(
                                 arcFile,
                                 setArcFile,
-                                pickJsonFile,
                                 onImportJson,
                                 (fun exn -> onError exn.Message)
                             ),
@@ -408,11 +391,7 @@ type Main =
                         )
                     jsonExport =
                         Main.LazyLoaderWithMessage(
-                            LazyComponents.LazyJsonExportWidget(
-                                arcFile,
-                                onExportJson,
-                                (fun exn -> onError exn.Message)
-                            ),
+                            LazyComponents.LazyJsonExportWidget(arcFile, (fun exn -> onError exn.Message)),
                             "Loading JSON Export Widget..."
                         )
                 |}),
@@ -421,9 +400,7 @@ type Main =
                     box activeView
                     box activeTableIndex
                     box setArcFile
-                    box pickJsonFile
                     box onImportJson
-                    box onExportJson
                     pickPaths
                 |]
             )

@@ -9,9 +9,19 @@ open Swate.Components.Shared
 
 module private JsonExportHelper =
 
+    let rootClass = "swt:join swt:w-fit swt:max-w-full"
+
+    let actionClass = "swt:btn swt:btn-primary swt:join-item swt:w-32 swt:shrink-0"
+
     let defaultFormat (arcFile: ArcFiles) =
         Json.Generic.tryGetDefaultExportFormat arcFile.RelatedArcFilesDiscriminate
         |> Option.defaultValue JsonExportFormat.ARCtrl
+
+    let selectedOrDefaultFormat (supportedFormats: JsonExportFormat list) (arcFile: ArcFiles) selectedFormat =
+        if supportedFormats |> List.contains selectedFormat then
+            selectedFormat
+        else
+            defaultFormat arcFile
 
     let downloadJson (arcfile: ArcFiles, jef: JsonExportFormat) =
         let jsonExport = Json.Export.parseToJsonString (arcfile, jef)
@@ -37,7 +47,9 @@ type JsonExport =
             ?onExportJson: ArcFiles * JsonExportFormat -> JS.Promise<Result<unit, exn>>,
             ?onError: exn -> unit
         ) =
-        let exportFormat, setExportFormat = React.useState (fun () -> defaultFormat arcFile)
+        let selectedExportFormat, setSelectedExportFormat =
+            React.useState (fun () -> defaultFormat arcFile)
+
         let isExporting, setIsExporting = React.useState false
 
         let onError = defaultArg onError (fun exn -> Browser.Dom.console.error exn)
@@ -51,18 +63,15 @@ type JsonExport =
                 [| box arcFile.RelatedArcFilesDiscriminate |]
             )
 
-        React.useEffect (
-            (fun () ->
-                if not (supportedFormats |> List.contains exportFormat) then
-                    Json.Generic.tryGetDefaultExportFormat arcFile.RelatedArcFilesDiscriminate
-                    |> Option.defaultValue JsonExportFormat.ARCtrl
-                    |> setExportFormat
-            ),
-            [| box supportedFormats; box exportFormat |]
-        )
+        let exportFormat =
+            selectedOrDefaultFormat supportedFormats arcFile selectedExportFormat
+
+        let setExportFormat format =
+            if supportedFormats |> List.contains format then
+                setSelectedExportFormat format
 
         Html.div [
-            prop.className JsonWidgetLayout.rootClass
+            prop.className rootClass
             prop.children [
                 JsonFormatSelect.JsonFormatSelect(
                     supportedFormats,
@@ -71,7 +80,7 @@ type JsonExport =
                     disabled = isExporting
                 )
                 Html.button [
-                    prop.className JsonWidgetLayout.actionClass
+                    prop.className actionClass
                     prop.disabled (isExporting || supportedFormats.IsEmpty)
                     prop.text (if isExporting then "Exporting..." else "Download")
                     prop.onClick (fun _ ->
