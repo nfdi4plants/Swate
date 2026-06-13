@@ -585,7 +585,6 @@ module private EditorPanels =
 /// Render helpers for side rails, group columns, and drag overlays.
 module private EditorSurface =
 
-    let isValueChipDragging, setIsValueChipDragging = React.useState false
     let propertyRail
         side
         (projection: PropertyRails.RailProjection)
@@ -596,6 +595,8 @@ module private EditorSurface =
         toggleExpanded
         addPaletteValue
         debug
+        setIsValueChipDragging
+        
         =
         Controls.PropertyRail(
             side,
@@ -626,6 +627,7 @@ module private EditorSurface =
         toggleDetail
         (connectionCountFor: string -> int option)
         debug
+        isValueChipDragging
         =
         let keyPrefix =
             match side with
@@ -698,6 +700,7 @@ type ProvenanceGrouping =
         let openRail, setOpenRail = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
         let liveDragStore = React.useRef (LiveDrag.create ())
+        let isValueChipDragging, setIsValueChipDragging = React.useState false
 
         React.useEffectOnce (fun () ->
             let applyTier () =
@@ -981,6 +984,7 @@ type ProvenanceGrouping =
                 (fun header -> togglePropertyExpanded side header)
                 (fun header value unit -> addPaletteValue side header value unit)
                 debug
+                setIsValueChipDragging
 
         let railColumn side =
             Html.div [
@@ -1031,6 +1035,7 @@ type ProvenanceGrouping =
                 toggleGroupDetail
                 counts
                 debug
+                isValueChipDragging
 
         // Medium tier: rails fold into slim vertical strips, one open at a time.
         let mediumRailColumn side =
