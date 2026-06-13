@@ -173,9 +173,6 @@ type OpenArcRootRenamePlan = {
 let private resolveAbsolutePath (pathValue: string) =
     pathDynamic?resolve (pathValue) |> unbox<string> |> PathHelpers.normalizePath
 
-let private normalizePathForComparison (pathValue: string) =
-    PathHelpers.normalizePathForFsComparison pathValue
-
 let private tryGetNodeErrorCode (error: exn) : string option =
     try
         error?code |> unbox<string> |> Option.ofObj
@@ -258,8 +255,8 @@ let tryBuildOpenArcRootRenamePlan arcPath newName : Result<OpenArcRootRenamePlan
 
             if
                 String.Equals(
-                    normalizePathForComparison sourcePath,
-                    normalizePathForComparison targetPath,
+                    PathHelpers.normalizePathForFsComparison sourcePath,
+                    PathHelpers.normalizePathForFsComparison targetPath,
                     StringComparison.Ordinal
                 )
             then
@@ -293,7 +290,8 @@ let renameOpenArcRootDirectoryOnDisk arcPath newName : JS.Promise<Result<string,
 
                 match renameResult with
                 | Ok() -> return Ok plan.TargetPath
-                | Error renameError -> return Error(mapArcRootRenameDiskError plan.SourcePath plan.TargetPath renameError)
+                | Error renameError ->
+                    return Error(mapArcRootRenameDiskError plan.SourcePath plan.TargetPath renameError)
 }
 
 let createWindow () = promise {
