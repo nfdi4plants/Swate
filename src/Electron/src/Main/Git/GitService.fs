@@ -472,29 +472,28 @@ let private isPathCleanInStatus (status: StatusResult) (relativePath: string) =
     )
     |> not
 
-let private ensureBackupMatchesLfsOid (backupPath: string) (listing: GitLfsLsFileInfo) =
-    promise {
-        let! pointerTextResult =
-            runGitCaptured {
-                WorkingDirectory = None
-                Arguments = [| "lfs"; "pointer"; "--file"; backupPath |]
-                Environment = None
-                StandardInput = None
-                TimeoutMs = Some 30000
-            }
+let private ensureBackupMatchesLfsOid (backupPath: string) (listing: GitLfsLsFileInfo) = promise {
+    let! pointerTextResult =
+        runGitCaptured {
+            WorkingDirectory = None
+            Arguments = [| "lfs"; "pointer"; "--file"; backupPath |]
+            Environment = None
+            StandardInput = None
+            TimeoutMs = Some 30000
+        }
 
-        let generatedPointer =
-            $"{pointerTextResult.StdoutText}\n{pointerTextResult.StderrText}"
+    let generatedPointer =
+        $"{pointerTextResult.StdoutText}\n{pointerTextResult.StderrText}"
 
-        return
-            if
-                pointerTextResult.ExitCode = 0
-                && generatedPointer.Contains($"oid sha256:{listing.oid}")
-            then
-                Ok()
-            else
-                Error(exn "The temporary LFS backup did not match the expected object. The original file was restored.")
-    }
+    return
+        if
+            pointerTextResult.ExitCode = 0
+            && generatedPointer.Contains($"oid sha256:{listing.oid}")
+        then
+            Ok()
+        else
+            Error(exn "The temporary LFS backup did not match the expected object. The original file was restored.")
+}
 
 let private isMergeInProgress (arcPath: string) =
     let mergeHeadPath = resolve [| arcPath; ".git"; "MERGE_HEAD" |]
