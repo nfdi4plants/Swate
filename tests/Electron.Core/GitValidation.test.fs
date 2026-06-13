@@ -69,6 +69,9 @@ Vitest.describe (
             "maps network message", "could not resolve host github.com", GitFailureKind.Network
             "maps timeout message", "operation timed out", GitFailureKind.Timeout
             "maps canceled message", "AbortError: signal aborted", GitFailureKind.Canceled
+            "maps duplicate DataHub project message",
+            "GitLab request failed with HTTP 400: {\"message\":{\"name\":[\"has already been taken\"],\"path\":[\"has already been taken\"]}}",
+            GitFailureKind.RemoteProjectAlreadyExists
             "falls back to unknown message", "something unexpected", GitFailureKind.Unknown
             "keeps unauthorized priority over network indicators",
             "connection refused, could not read username",

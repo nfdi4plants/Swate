@@ -1,6 +1,7 @@
 module Main.ArcVaultHelper
 
 
+open System
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -12,6 +13,10 @@ open Main
 open Main.ARCtrlExtensions
 open Main.Bindings
 open Node.Api
+open Swate.Electron.Shared.RenamePathRules
+
+let private fsPromisesDynamic: obj = importAll "fs/promises"
+let private pathDynamic: obj = importAll "path"
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
@@ -158,6 +163,136 @@ let swatelogfn id fmt =
 
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
+
+type OpenArcRootRenamePlan = {
+    SourcePath: string
+    TargetPath: string
+    NewName: string
+}
+
+let private resolveAbsolutePath (pathValue: string) =
+    pathDynamic?resolve (pathValue) |> unbox<string> |> PathHelpers.normalizePath
+
+let private tryGetNodeErrorCode (error: exn) : string option =
+    try
+        error?code |> unbox<string> |> Option.ofObj
+    with _ ->
+        None
+
+let private pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
+    let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
+
+    if fileExists then
+        return true
+    else
+        return! ARCtrl.FileSystemHelper.directoryExistsAsync absolutePath
+}
+
+let private renameWithRetriesAsync
+    (sourceAbsolutePath: string)
+    (targetAbsolutePath: string)
+    : JS.Promise<Result<unit, exn>> =
+    let retryDelaysMs = [| 0; 75; 200; 500 |]
+
+    let isTransientRenameError =
+        function
+        | Some "EPERM"
+        | Some "EACCES"
+        | Some "EBUSY" -> true
+        | _ -> false
+
+    let rec attempt (attemptIndex: int) = promise {
+        if attemptIndex > 0 then
+            do! Promise.sleep retryDelaysMs.[attemptIndex]
+
+        try
+            let! _ =
+                fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath)
+                |> unbox<JS.Promise<obj>>
+
+            return Ok()
+        with renameError ->
+            let errorCode = tryGetNodeErrorCode renameError
+
+            if attemptIndex < retryDelaysMs.Length - 1 && isTransientRenameError errorCode then
+                return! attempt (attemptIndex + 1)
+            else
+                return Error renameError
+    }
+
+    attempt 0
+
+let private mapArcRootRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
+    match tryGetNodeErrorCode renameError with
+    | Some "EPERM"
+    | Some "EACCES" ->
+        exn
+            $"Cannot rename '{sourcePath}' to '{targetPath}'. Windows reported a permission or file-lock conflict. If the destination already exists, choose a different name and close apps that may be using these paths."
+    | Some "ENOTEMPTY"
+    | Some "EEXIST" -> exn $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
+    | Some "ENOENT" -> exn $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
+    | _ -> renameError
+
+let tryBuildOpenArcRootRenamePlan arcPath newName : Result<OpenArcRootRenamePlan, exn> =
+    let candidateName = newName |> Option.ofObj |> Option.defaultValue String.Empty
+
+    match validateRenameName candidateName with
+    | Error validationError -> Error(exn validationError)
+    | Ok normalizedName ->
+        if
+            (pathDynamic?isAbsolute (normalizedName) |> unbox<bool>)
+            || PathHelpers.containsPathTraversalSegments normalizedName
+        then
+            Error(exn "ARC folder name must be a single folder name without path separators or traversal segments.")
+        else
+            let sourcePath = resolveAbsolutePath arcPath
+            let parentPath = pathDynamic?dirname (sourcePath) |> unbox<string>
+
+            let targetPath =
+                pathDynamic?resolve (parentPath, normalizedName)
+                |> unbox<string>
+                |> PathHelpers.normalizePath
+
+            if
+                String.Equals(
+                    PathHelpers.normalizePathForFsComparison sourcePath,
+                    PathHelpers.normalizePathForFsComparison targetPath,
+                    StringComparison.Ordinal
+                )
+            then
+                Error(exn "New ARC folder name must be different from the current folder name.")
+            else
+                Ok {
+                    SourcePath = sourcePath
+                    TargetPath = targetPath
+                    NewName = normalizedName
+                }
+
+let renameOpenArcRootDirectoryOnDisk arcPath newName : JS.Promise<Result<string, exn>> = promise {
+    match tryBuildOpenArcRootRenamePlan arcPath newName with
+    | Error validationError -> return Error validationError
+    | Ok plan ->
+        let! sourceExists = ARCtrl.FileSystemHelper.directoryExistsAsync plan.SourcePath
+
+        if not sourceExists then
+            return Error(exn $"Cannot rename '{plan.SourcePath}' because the source path no longer exists on disk.")
+        else
+            let! targetExists = pathExistsAsync plan.TargetPath
+
+            if targetExists then
+                return
+                    Error(
+                        exn
+                            $"Cannot rename '{plan.SourcePath}' to '{plan.TargetPath}' because the destination already exists."
+                    )
+            else
+                let! renameResult = renameWithRetriesAsync plan.SourcePath plan.TargetPath
+
+                match renameResult with
+                | Ok() -> return Ok plan.TargetPath
+                | Error renameError ->
+                    return Error(mapArcRootRenameDiskError plan.SourcePath plan.TargetPath renameError)
+}
 
 let createWindow () = promise {
     printfn "[Swate] Creating new window"

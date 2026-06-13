@@ -140,6 +140,12 @@ let Main () =
             ?errorNotice = gitStateCtx.state.ErrorNotice,
             ?warningNotice = gitStateCtx.state.WarningNotice,
             ?pendingConfirmation = gitStateCtx.state.PendingConfirmation,
+            ?publishRenamePrompt =
+                (gitStateCtx.state.PendingPublishRename
+                 |> Option.map (fun prompt -> {
+                     CurrentName = prompt.CurrentName
+                     Message = prompt.Message
+                 })),
             callbacks = {
                 OnRefresh = gitStateCtx.refresh
                 OnFetch = gitStateCtx.fetch
@@ -165,6 +171,8 @@ let Main () =
             lfsAutoTrackThresholdMb = gitStateCtx.state.LfsAutoTrackThresholdMb,
             remoteActionsEnabled = remoteActionsEnabled,
             canOpenRemoteRepository = gitStateCtx.state.OriginRemoteRepositoryWebUrl.IsSome,
+            onSubmitPublishRename = gitStateCtx.submitPublishRename,
+            onCancelPublishRename = gitStateCtx.cancelPublishRename,
             onOpenRemoteRepository =
                 (fun () ->
                     match gitStateCtx.state.OriginRemoteRepositoryWebUrl with
