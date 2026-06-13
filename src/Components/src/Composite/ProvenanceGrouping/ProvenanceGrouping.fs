@@ -493,7 +493,7 @@ module private EditorPanels =
                 prop.testId "provenance-member-resolution-prompt"
             prop.children [
                 Html.i [
-                    prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5"
+                    prop.className "swt:iconify swt:cil--graph-24-regular swt:size-5"
                 ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
@@ -585,6 +585,7 @@ module private EditorPanels =
 /// Render helpers for side rails, group columns, and drag overlays.
 module private EditorSurface =
 
+    let isValueChipDragging, setIsValueChipDragging = React.useState false
     let propertyRail
         side
         (projection: PropertyRails.RailProjection)
@@ -608,6 +609,7 @@ module private EditorSurface =
             toggleExpanded,
             addPaletteValue,
             (fun header -> projection.CanSwitchHeaders.Contains header),
+            setIsValueChipDragging,
             debug = debug
         )
 
@@ -630,6 +632,7 @@ module private EditorSurface =
             | ProvenanceSide.Input -> "Input"
             | ProvenanceSide.Output -> "Output"
 
+
         Html.div [
             prop.className [
                 "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-3"
@@ -649,6 +652,7 @@ module private EditorSurface =
                         isExpanded side group.Id,
                         (fun () -> toggleSelection side group.Id),
                         (fun () -> toggleDetail side group.Id),
+                        isValueChipDragging,
                         ?connectionCount = connectionCountFor group.Id,
                         debug = debug,
                         key = $"{keyPrefix}:{group.Id}"
