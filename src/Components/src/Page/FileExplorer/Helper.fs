@@ -2,14 +2,6 @@ module Swate.Components.Page.FileExplorer.Helper
 
 open Swate.Components.Page.FileExplorer.Types
 
-let isLfs (item: FileItem) = item.IsLFS = Some true
-
-let needsLfsDownload (item: FileItem) =
-    isLfs item && (item.Downloaded <> Some true || item.IsLFSPointer = Some true)
-
-let hasLocalLfsCopy (item: FileItem) =
-    isLfs item && item.Downloaded = Some true && item.IsLFSPointer <> Some true
-
 let iconClassName (baseClasses: string list) (item: FileItem) (getItemIconClass: FileItem -> string option) = [
     yield! baseClasses
     yield item.Icon |> FileItemIcon.className

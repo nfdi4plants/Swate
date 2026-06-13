@@ -58,6 +58,7 @@ type IArcVaultsApi = {
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
+    renameOpenArcRoot: string -> JS.Promise<Result<string, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: string -> JS.Promise<Result<string, exn>>
@@ -90,8 +91,7 @@ type IGitApi = {
     setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
     gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, exn>>
     gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsDownloadFile: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsFreeLocalCopy: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitLfsFreeLocalCopy: GitLfsFreeLocalCopyRequest -> JS.Promise<Result<GitOperationResult, exn>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     confirmGitMergeResolution:

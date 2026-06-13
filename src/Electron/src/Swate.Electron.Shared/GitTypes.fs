@@ -38,6 +38,7 @@ type GitFailureKind =
     | Timeout
     | Canceled
     | LfsInstallRequired
+    | RemoteProjectAlreadyExists
     | Unknown
 
 [<StringEnum(CaseRules.None)>]
@@ -143,7 +144,7 @@ type GitCloneRepositoryRequest = {
 
 type GitPathspecRequest = { Pathspecs: string[] }
 
-type GitLfsFileRequest = { Path: string }
+type GitLfsFreeLocalCopyRequest = { Path: string }
 
 type GitCommitRequest = { Message: string }
 

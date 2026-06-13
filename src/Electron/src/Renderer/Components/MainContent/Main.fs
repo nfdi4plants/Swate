@@ -10,7 +10,6 @@ open Renderer.Components.MainContent.ErrorViewTarget
 open Renderer.Components.MainContent.GitDiffTarget
 open Renderer.Components.MainContent.GitMergeConflictTarget
 open Renderer.Components.MainContent.GitUnsupportedTarget
-open Renderer.Components.MainContent.GitLfsPointerTarget
 open Renderer.Components.MainContent.LandingDraftTarget
 open Renderer.Components.MainContent.NotesDraftTarget
 open Renderer.Components.MainContent.NotesSearchTarget
@@ -100,7 +99,6 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
                     | Some _, Some(PageState.GitUnsupportedPage unsupportedPage) ->
                         GitUnsupportedTarget.Main unsupportedPage
-                    | Some _, Some(PageState.GitLfsPointerPage pointerPage) -> GitLfsPointerTarget.Main pointerPage
                     | Some _, None -> EmptySelectionTarget()
                 ]
             ]

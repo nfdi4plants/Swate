@@ -207,7 +207,7 @@ type GraphObjectExplorer =
                         if item.Selectable then
                             setExplorerSelection item.Id item.Path
                     ),
-                directoryChevronToggleOnly = true
+                useDirectoryChevronToggle = true
             )
 
         let explorerPane =

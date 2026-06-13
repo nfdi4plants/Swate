@@ -26,7 +26,7 @@ let runToggleLfsMark (relativePath: string) (markAsLfs: bool) : JS.Promise<Resul
 }
 
 let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
-    let request: GitLfsFileRequest = { Path = relativePath }
+    let request: GitLfsFreeLocalCopyRequest = { Path = relativePath }
 
     let! result = Renderer.GitApiClient.gitLfsFreeLocalCopy request
 
@@ -34,18 +34,5 @@ let runFreeLocalLfsCopy (relativePath: string) : JS.Promise<Result<unit, string>
         match result with
         | Ok operation when operation.Success -> Ok()
         | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS cleanup failed.")
-        | Error message -> Error message
-}
-
-let runDownloadLfsFile (relativePath: string) = promise {
-
-    let request: GitLfsFileRequest = { Path = relativePath }
-
-    let! result = Renderer.GitApiClient.gitLfsDownloadFile request
-
-    return
-        match result with
-        | Ok operation when operation.Success -> Ok()
-        | Ok operation -> Error(operation.Message |> Option.defaultValue "Git LFS download failed.")
         | Error message -> Error message
 }
