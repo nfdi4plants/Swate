@@ -493,7 +493,7 @@ module private EditorPanels =
                 prop.testId "provenance-member-resolution-prompt"
             prop.children [
                 Html.i [
-                    prop.className "swt:iconify swt:cil--graph-24-regular swt:size-5"
+                    prop.className "swt:iconify swt:fluent--diagram-24-regular swt:size-5"
                 ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
