@@ -167,7 +167,7 @@ let ProvenanceGroupingTarget () =
                     Html.div [
                         prop.className "swt:flex swt:items-center swt:gap-2 swt:pb-3"
                         prop.children [
-                            Html.i [ prop.className "swt:iconify swt:fluent--diagram-24-regular swt:size-5 swt:text-primary" ]
+                            Html.i [ prop.className "swt:iconify swt:fluent--text-paragraph-24-regular swt:size-5 swt:text-primary" ]
                             Html.h2 [ prop.className "swt:text-sm swt:font-semibold"; prop.text "Provenance" ]
                         ]
                     ]

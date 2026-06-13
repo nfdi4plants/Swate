@@ -163,7 +163,7 @@ type Main =
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
                                     )
                                     ButtonInfo.create (
-                                        "swt:fluent--diagram-24-regular swt:size-5",
+                                        "swt:fluent--text-paragraph-24-regular swt:size-5",
                                         "Provenance Grouping",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.ProvenanceGroupingPage)
                                     )
