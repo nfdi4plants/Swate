@@ -354,11 +354,10 @@ module Json =
             loop 0
 
         let private copyTableWithName (name: string) (table: ArcTable) =
-            let tableCopy = table.Copy()
-            let copiedTable = ArcTable.init name
+            let copiedTable = table.Copy()
 
-            for column in tableCopy.Columns do
-                copiedTable.AddColumn(column.Header, column.Cells)
+            if copiedTable.Name <> name then
+                ArcTables(ResizeArray [ copiedTable ]).RenameTableAt(0, name)
 
             copiedTable
 
