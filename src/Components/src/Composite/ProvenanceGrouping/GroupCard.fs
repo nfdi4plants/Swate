@@ -208,6 +208,7 @@ type GroupCard =
             expanded: bool,
             onSelect: unit -> unit,
             onExpand: unit -> unit,
+            isValueChipDragging: bool,
             ?connectionCount: int,
             ?debug: bool,
             ?key: string
@@ -237,6 +238,24 @@ type GroupCard =
                 | [] -> group.Members
                 | members -> members
             | None -> group.Members
+
+        // let dnd = DndKit.use()
+
+        // let isValueChipDragging =
+        //     match dnd.active with
+        //     | Some active ->
+        //         active.data.current?type = DragDrop.PropertyValue
+        //     | None ->
+        //         false
+
+        // let dnd = DndKit.use()
+
+        // let isValueChipDragging =
+        //     match dnd.active with
+        //     | Some active ->
+        //         active.data.current?type = DragDrop.PropertyValue
+        //     | None ->
+        //         false
 
         // Two anchors at opposite card edges: the group-facing edge carries the draggable
         // group connection handle, the property-facing edge is measurement-only and is
@@ -290,7 +309,7 @@ type GroupCard =
                     "swt:border-primary swt:bg-primary/5"
                 else
                     "swt:border-base-300"
-                if droppable.isOver then
+                if droppable.isOver && isValueChipDragging then
                     "swt:ring-2 swt:ring-primary"
             ]
             if defaultArg debug false then

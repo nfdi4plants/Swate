@@ -493,7 +493,7 @@ module private EditorPanels =
                 prop.testId "provenance-member-resolution-prompt"
             prop.children [
                 Html.i [
-                    prop.className "swt:iconify swt:fluent--branch-fork-24-regular swt:size-5"
+                    prop.className "swt:iconify swt:fluent--text-paragraph-24-regular swt:size-5"
                 ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
@@ -595,6 +595,8 @@ module private EditorSurface =
         toggleExpanded
         addPaletteValue
         debug
+        setIsValueChipDragging
+        
         =
         Controls.PropertyRail(
             side,
@@ -608,6 +610,7 @@ module private EditorSurface =
             toggleExpanded,
             addPaletteValue,
             (fun header -> projection.CanSwitchHeaders.Contains header),
+            setIsValueChipDragging,
             debug = debug
         )
 
@@ -624,11 +627,13 @@ module private EditorSurface =
         toggleDetail
         (connectionCountFor: string -> int option)
         debug
+        isValueChipDragging
         =
         let keyPrefix =
             match side with
             | ProvenanceSide.Input -> "Input"
             | ProvenanceSide.Output -> "Output"
+
 
         Html.div [
             prop.className [
@@ -649,6 +654,7 @@ module private EditorSurface =
                         isExpanded side group.Id,
                         (fun () -> toggleSelection side group.Id),
                         (fun () -> toggleDetail side group.Id),
+                        isValueChipDragging,
                         ?connectionCount = connectionCountFor group.Id,
                         debug = debug,
                         key = $"{keyPrefix}:{group.Id}"
@@ -694,6 +700,7 @@ type ProvenanceGrouping =
         let openRail, setOpenRail = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
         let liveDragStore = React.useRef (LiveDrag.create ())
+        let isValueChipDragging, setIsValueChipDragging = React.useState false
 
         React.useEffectOnce (fun () ->
             let applyTier () =
@@ -977,6 +984,7 @@ type ProvenanceGrouping =
                 (fun header -> togglePropertyExpanded side header)
                 (fun header value unit -> addPaletteValue side header value unit)
                 debug
+                setIsValueChipDragging
 
         let railColumn side =
             Html.div [
@@ -1027,6 +1035,7 @@ type ProvenanceGrouping =
                 toggleGroupDetail
                 counts
                 debug
+                isValueChipDragging
 
         // Medium tier: rails fold into slim vertical strips, one open at a time.
         let mediumRailColumn side =
