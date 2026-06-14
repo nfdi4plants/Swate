@@ -1,6 +1,5 @@
 module ElectronRenderer.FileTreeContextMenuTests
 
-open Fable.Core
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
@@ -210,7 +209,9 @@ Vitest.describe (
                 }
 
                 let menuItems = createComposedContextMenuItems config item
-                let addNoteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Add Note")
+
+                let addNoteItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Add Note")
 
                 addNoteItem.OnClick()
 
