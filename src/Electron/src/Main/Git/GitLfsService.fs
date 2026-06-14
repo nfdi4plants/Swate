@@ -298,7 +298,16 @@ let buildFetchRefetchArgs (relativePath: string) = [|
     "HEAD"
 |]
 
-let buildPullIncludeArgs (relativePath: string) = [| "lfs"; "pull"; $"--include={relativePath}" |]
+let private buildSmudgePointerArgs (relativePath: string) = [|
+    "-c"
+    "lfs.fetchinclude="
+    "-c"
+    "lfs.fetchexclude="
+    "lfs"
+    "smudge"
+    "--"
+    relativePath
+|]
 
 let buildCheckoutArgs (relativePath: string) = [| "lfs"; "checkout"; "--"; relativePath |]
 
@@ -616,6 +625,39 @@ let private extractSpawnFailureMessage (result: GitSpawnResult) =
         "Git command failed."
 
 let private spawnFailure (result: GitSpawnResult) = exn (extractSpawnFailureMessage result)
+
+let private buildPointerInput (listing: GitLfsLsFileInfo) =
+    let sizeText = listing.size |> int64 |> string
+
+    $"version {listing.version}\noid {listing.``oid_type``}:{listing.oid}\nsize {sizeText}\n"
+
+/// Downloads the exact LFS object described by `listing` without path include filtering.
+/// `git lfs smudge` reads the pointer OID from stdin and stores the object locally; stdout is discarded.
+let downloadObjectFromListing
+    (repoPath: string)
+    (commandAuth: GitCommandAuthentication)
+    (relativePath: string)
+    (listing: GitLfsLsFileInfo)
+    : JS.Promise<Result<unit, exn>> =
+    promise {
+        let! result =
+            runGitDiscardingStdout {
+                WorkingDirectory = Some repoPath
+                Arguments = [|
+                    yield! commandAuth.ConfigArgs
+                    yield! buildSmudgePointerArgs relativePath
+                |]
+                Environment = Some commandAuth.Environment
+                StandardInput = Some(buildPointerInput listing)
+                TimeoutMs = Some DefaultTimeoutMs
+            }
+
+        return
+            if result.ExitCode = 0 && not result.TimedOut then
+                Ok()
+            else
+                Error(exn (extractSpawnFailureMessage result))
+    }
 
 let private isUnsupportedOptionFailure (result: GitSpawnResult) =
     let diagnosticText = $"{result.StdoutText}\n{result.StderrText}".ToLowerInvariant()

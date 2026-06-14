@@ -230,7 +230,7 @@ promise {
 
 - System install/probe: `installSystem`, `isSystemInstalled`
 - Tracking: `track`, `isTrackedByAttributes`
-- Storage helpers: `storagePruneArgs`, `storageDedupArgs`, `buildFetchRefetchArgs`, `buildPullIncludeArgs`, `buildCheckoutArgs`, `buildLsFilesJsonArgs`, `tryFindListingForPath`
+- Storage helpers: `storagePruneArgs`, `storageDedupArgs`, `buildFetchRefetchArgs`, `buildCheckoutArgs`, `buildLsFilesJsonArgs`, `tryFindListingForPath`, `downloadObjectFromListing`
 - Push support: `planOutboundPush`, `uploadObjects`, `collectPushDiagnostics`
 
 `GitAuthAdapter.fs` builds scoped auth config and redacts secrets. `GitTokenProvider.fs` is the process-wide token lookup hook installed by `AuthService`.

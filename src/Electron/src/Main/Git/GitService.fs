@@ -975,6 +975,17 @@ type private AuthenticatedGitSession = {
     CommandAuth: GitAuthAdapter.GitCommandAuthentication
 }
 
+let private createLocalGitSession arcPath progressCallback =
+    let options = createOptions arcPath syncTimeout progressCallback
+
+    {
+        Git = createGit options
+        CommandAuth = {
+            ConfigArgs = [||]
+            Environment = createNonInteractiveEnv ()
+        }
+    }
+
 let private createAuthenticatedGitSession
     (arcPath: string)
     (remoteName: string)
@@ -1031,10 +1042,10 @@ let private createAuthenticatedGitSession
                             }
     }
 
-let private createOriginLfsRemoteGit
+let private createOriginLfsRemoteSession
     (arcPath: string)
     (progressCallback: GitProgressCallback option)
-    : JS.Promise<GitResult<ISimpleGit>> =
+    : JS.Promise<GitResult<AuthenticatedGitSession>> =
     promise {
         let remoteName = "origin"
         let probeOptions = createOptions arcPath standardTimeout None
@@ -1054,14 +1065,22 @@ let private createOriginLfsRemoteGit
             match ensureAllowedRemoteUrl remoteUrl with
             | Ok _ ->
                 let! sessionResult = createAuthenticatedGitSession arcPath remoteName progressCallback
-                return sessionResult |> Result.map _.Git
+                return sessionResult
             | Error _ when
                 remoteUrl.StartsWith("file://", StringComparison.OrdinalIgnoreCase)
                 || isAbsolute remoteUrl
                 ->
-                let options = createOptions arcPath syncTimeout progressCallback
-                return Ok(createGit options)
+                return Ok(createLocalGitSession arcPath progressCallback)
             | Error validationError -> return errorResult validationError
+    }
+
+let private createOriginLfsRemoteGit
+    (arcPath: string)
+    (progressCallback: GitProgressCallback option)
+    : JS.Promise<GitResult<ISimpleGit>> =
+    promise {
+        let! sessionResult = createOriginLfsRemoteSession arcPath progressCallback
+        return sessionResult |> Result.map _.Git
     }
 
 let private ensureRepo (git: ISimpleGit) = promise {
@@ -1974,9 +1993,6 @@ let private withOriginLfsGitResult arcPath (operation: ISimpleGit -> JS.Promise<
     | Ok git -> return! operation git
 }
 
-let private withOriginLfsGit arcPath operation =
-    withOriginLfsGitResult arcPath (runSimpleGit operation)
-
 let private getCleanLfsListingForPath
     (arcPath: string)
     (safePath: string)
@@ -2045,15 +2061,23 @@ let private requireDownloadedLfsFile
                     return ()
     }
 
-let private downloadMissingLfsFile arcPath safePath absolutePath listing : JS.Promise<GitResult<unit>> =
-    withOriginLfsGit
-        arcPath
-        (fun git -> promise {
-            let! _ = git.raw (GitLfsService.buildPullIncludeArgs safePath)
-            let! _ = git.raw (GitLfsService.buildCheckoutArgs safePath)
-            do! requireDownloadedLfsFile arcPath safePath absolutePath listing git
-            return ()
-        })
+let private downloadMissingLfsFile arcPath safePath absolutePath listing : JS.Promise<GitResult<unit>> = promise {
+    match! createOriginLfsRemoteSession arcPath None with
+    | Error failure -> return Error failure
+    | Ok session ->
+        match! GitLfsService.downloadObjectFromListing arcPath session.CommandAuth safePath listing with
+        | Error error -> return errorResult error
+        | Ok() ->
+            let! checkoutResult = runLfsRaw (GitLfsService.buildCheckoutArgs safePath) session.Git
+
+            match checkoutResult with
+            | Error failure -> return Error failure
+            | Ok _ ->
+                return!
+                    runSimpleGit
+                        (fun currentGit -> requireDownloadedLfsFile arcPath safePath absolutePath listing currentGit)
+                        session.Git
+}
 
 let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitResult<unit>> = promise {
     let! lfsFileResult =

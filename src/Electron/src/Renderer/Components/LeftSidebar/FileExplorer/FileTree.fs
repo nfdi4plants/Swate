@@ -165,36 +165,44 @@ type FileTree =
             |> Promise.start
 
         let reloadSelectedPreviewAfterFileTreeUpdate () =
-            match
-                FileExplorerDeleteHelper.tryGetReloadableSelectedFilePath
+            if
+                FileExplorerDeleteHelper.shouldClearPageStateForLfsPointerSelection
                     fileStateCtx.state.FileTree
                     fileStateCtx.state.Selection.TreePath
                     pageStateCtx.state
-            with
-            | None -> ()
-            | Some selectedPath ->
-                promise {
-                    let! result = openView selectedPath
+            then
+                pageStateCtx.setState None
+            else
+                match
+                    FileExplorerDeleteHelper.tryGetReloadableSelectedFilePath
+                        fileStateCtx.state.FileTree
+                        fileStateCtx.state.Selection.TreePath
+                        pageStateCtx.state
+                with
+                | None -> ()
+                | Some selectedPath ->
+                    promise {
+                        let! result = openView selectedPath
 
-                    match result with
-                    | Ok pageState -> pageStateCtx.setState (Some pageState)
-                    | Error errorMessage ->
+                        match result with
+                        | Ok pageState -> pageStateCtx.setState (Some pageState)
+                        | Error errorMessage ->
+                            pageStateCtx.setState (
+                                Some(
+                                    Renderer.Types.PageState.ErrorPage
+                                        $"Could not reload preview for '{selectedPath}': {errorMessage}"
+                                )
+                            )
+                    }
+                    |> Promise.catch (fun exn ->
                         pageStateCtx.setState (
                             Some(
                                 Renderer.Types.PageState.ErrorPage
-                                    $"Could not reload preview for '{selectedPath}': {errorMessage}"
+                                    $"Could not reload preview for '{selectedPath}': {exn.Message}"
                             )
                         )
-                }
-                |> Promise.catch (fun exn ->
-                    pageStateCtx.setState (
-                        Some(
-                            Renderer.Types.PageState.ErrorPage
-                                $"Could not reload preview for '{selectedPath}': {exn.Message}"
-                        )
                     )
-                )
-                |> Promise.start
+                    |> Promise.start
 
         React.useEffect (
             (fun () ->
