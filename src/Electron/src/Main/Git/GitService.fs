@@ -81,6 +81,15 @@ let classifyFailureKind (message: string) =
 
     if containsAny lfsInstallRequiredTokens then
         GitFailureKind.LfsInstallRequired
+    elif
+        containsAny [|
+            "has already been taken"
+            "name already exists"
+            "project already exists"
+            "repository already exists"
+        |]
+    then
+        GitFailureKind.RemoteProjectAlreadyExists
     elif containsAny [| "abort"; "cancelled"; "canceled"; "aborterror" |] then
         GitFailureKind.Canceled
     elif containsAny [| "timed out"; "timeout"; "time out" |] then
@@ -1075,6 +1084,136 @@ let private withLocalGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<
     | Ok() -> return! runSimpleGit operation git
 }
 
+type private RemoteUrlState =
+    | RemoteMissing
+    | RemoteConfiguredWithoutUrl
+    | RemoteConfigured of string
+
+let private tryGetNonEmptyRemoteUrl (remote: RemoteWithRefs) =
+    [|
+        remote.refs.push
+        remote.refs.fetch
+    |]
+    |> Array.tryPick (fun url ->
+        url
+        |> Option.ofObj
+        |> Option.map _.Trim()
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+    )
+
+let private getRemoteUrlState (remoteName: string) (git: ISimpleGit) : JS.Promise<RemoteUrlState> = promise {
+    let! remoteList = git.getRemotes true
+
+    let remoteUrl =
+        match remoteList with
+        | U2.Case1 remotes ->
+            remotes
+            |> Array.tryFind (fun remote -> String.Equals(remote.name, remoteName, StringComparison.Ordinal))
+            |> Option.map (fun _ -> RemoteConfiguredWithoutUrl)
+        | U2.Case2 remotes ->
+            remotes
+            |> Array.tryFind (fun remote -> String.Equals(remote.name, remoteName, StringComparison.Ordinal))
+            |> Option.map (fun remote ->
+                match tryGetNonEmptyRemoteUrl remote with
+                | Some url -> RemoteConfigured url
+                | None -> RemoteConfiguredWithoutUrl
+            )
+
+    return remoteUrl |> Option.defaultValue RemoteMissing
+}
+
+let private tryGetPublishRepositoryName (arcPath: string) =
+    let projectName =
+        arcPath
+        |> Option.ofObj
+        |> Option.map basename
+        |> Option.map _.Trim()
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+    match projectName with
+    | Some name -> Ok name
+    | None -> Error(exn "Cannot derive a DataHub repository name from the ARC path.")
+
+let private createPublishFailure (projectName: string) (message: string) =
+    let details =
+        message
+        |> Option.ofObj
+        |> Option.map _.Trim()
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        |> Option.defaultValue "DataHub project creation failed without details."
+
+    {
+        Kind = classifyFailureKind details
+        Message = $"Could not publish local repository '{projectName}' to the active DataHub account: {details}"
+    }
+
+let private configurePublishedOriginRemote
+    (arcPath: string)
+    (remoteState: RemoteUrlState)
+    (remoteUrl: string)
+    : JS.Promise<GitResult<unit>> =
+    withLocalGit
+        arcPath
+        (fun git -> promise {
+            match remoteState with
+            | RemoteMissing ->
+                let! _ = git.addRemote ("origin", remoteUrl)
+                return ()
+            | RemoteConfiguredWithoutUrl ->
+                let! _ = git.raw [| "remote"; "set-url"; "origin"; remoteUrl |]
+                return ()
+            | RemoteConfigured _ -> return ()
+        })
+
+let private publishOriginRemoteIfMissing
+    (arcPath: string)
+    (remoteName: string)
+    (remoteState: RemoteUrlState)
+    : JS.Promise<GitResult<unit>> =
+    promise {
+        if not (String.Equals(remoteName, "origin", StringComparison.Ordinal)) then
+            return
+                Error {
+                    Kind = GitFailureKind.Unknown
+                    Message = $"Remote '{remoteName}' is not configured. Configure the remote before pushing."
+                }
+        else
+            match tryGetPublishRepositoryName arcPath with
+            | Error nameError -> return errorResult nameError
+            | Ok projectName ->
+                let! projectResult = RemoteProvisioning.createProject projectName
+
+                match projectResult with
+                | Error message -> return Error(createPublishFailure projectName message)
+                | Ok remoteUrl ->
+                    match ensureAllowedRemoteUrl remoteUrl with
+                    | Error remoteUrlError ->
+                        return
+                            errorResult (
+                                exn
+                                    $"DataHub created repository '{projectName}', but returned an unusable Git remote URL: {remoteUrlError.Message}"
+                            )
+                    | Ok safeRemoteUrl ->
+                        return! configurePublishedOriginRemote arcPath remoteState safeRemoteUrl
+    }
+
+let private ensurePushRemoteConfigured (arcPath: string) (remoteName: string) : JS.Promise<GitResult<unit>> = promise {
+    let! remoteStateResult = withLocalGit arcPath (getRemoteUrlState remoteName)
+
+    match remoteStateResult with
+    | Error failure -> return Error failure
+    | Ok(RemoteConfigured remoteUrl) ->
+        match ensureAllowedRemoteUrl remoteUrl with
+        | Ok _ -> return Ok()
+        | Error validationError ->
+            return
+                errorResult (
+                    exn $"Remote '{remoteName}' is configured but cannot be used for authenticated push: {validationError.Message}"
+                )
+    | Ok((RemoteMissing | RemoteConfiguredWithoutUrl) as remoteState) ->
+        return! publishOriginRemoteIfMissing arcPath remoteName remoteState
+}
+
 let private withAuthenticatedGit
     (arcPath: string)
     (remoteName: string)
@@ -1600,79 +1739,84 @@ let push
             match validateOptionalBranchName branchName with
             | Error branchError -> return errorResult branchError
             | Ok safeBranchName ->
-                let! gitResult = createAuthenticatedGitSession arcPath safeRemoteName progressCallback
+                let! remoteConfigResult = ensurePushRemoteConfigured arcPath safeRemoteName
 
-                match gitResult with
+                match remoteConfigResult with
                 | Error failure -> return Error failure
-                | Ok session ->
-                    let git = session.Git
-                    let! pushStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
+                | Ok() ->
+                    let! gitResult = createAuthenticatedGitSession arcPath safeRemoteName progressCallback
 
-                    match pushStatusResult with
+                    match gitResult with
                     | Error failure -> return Error failure
-                    | Ok pushStatus ->
-                        let pushTarget =
-                            resolvePushTarget safeBranchName pushStatus.current pushStatus.tracking pushStatus.detached
+                    | Ok session ->
+                        let git = session.Git
+                        let! pushStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
-                        return!
-                            executePushWorkflow
-                                pushTarget
-                                (fun () ->
-                                    planOutboundPush
-                                        runSimpleGit
-                                        runGitCaptured
-                                        toFailure
-                                        (fun currentGit ->
-                                            runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit
-                                        )
-                                        arcPath
-                                        safeRemoteName
-                                        (Some pushTarget.RefSpec)
-                                        git
-                                )
-                                (fun objectIds -> promise {
-                                    let! uploadResult =
-                                        GitLfsService.uploadObjects
+                        match pushStatusResult with
+                        | Error failure -> return Error failure
+                        | Ok pushStatus ->
+                            let pushTarget =
+                                resolvePushTarget safeBranchName pushStatus.current pushStatus.tracking pushStatus.detached
+
+                            return!
+                                executePushWorkflow
+                                    pushTarget
+                                    (fun () ->
+                                        planOutboundPush
+                                            runSimpleGit
                                             runGitCaptured
-                                            session.CommandAuth
+                                            toFailure
+                                            (fun currentGit ->
+                                                runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit
+                                            )
                                             arcPath
                                             safeRemoteName
-                                            pushTarget.RefSpec
-                                            objectIds
+                                            (Some pushTarget.RefSpec)
+                                            git
+                                    )
+                                    (fun objectIds -> promise {
+                                        let! uploadResult =
+                                            GitLfsService.uploadObjects
+                                                runGitCaptured
+                                                session.CommandAuth
+                                                arcPath
+                                                safeRemoteName
+                                                pushTarget.RefSpec
+                                                objectIds
 
-                                    return uploadResult |> Result.mapError toFailure
-                                })
-                                (fun skipLfsHook currentPushTarget ->
-                                    runSimpleGit
-                                        (fun currentGit -> promise {
-                                            let pushGit =
-                                                if skipLfsHook then
-                                                    currentGit.env ("GIT_LFS_SKIP_PUSH", "1")
-                                                else
-                                                    currentGit
-
-                                            if currentPushTarget.SetUpstream then
-                                                let! _ =
-                                                    pushGit.push (
-                                                        safeRemoteName,
-                                                        currentPushTarget.PushBranch,
-                                                        !^[| "--set-upstream" |]
-                                                    )
-
-                                                return ()
-                                            else
-                                                let! _ = pushGit.push (safeRemoteName, currentPushTarget.PushBranch)
-                                                return ()
-                                        })
-                                        git
-                                )
-                                (fun _failure ->
-                                    collectPushDiagnostics
+                                        return uploadResult |> Result.mapError toFailure
+                                    })
+                                    (fun skipLfsHook currentPushTarget ->
                                         runSimpleGit
-                                        (fun currentFailure -> Some currentFailure.Message)
-                                        safeRemoteName
-                                        git
-                                )
+                                            (fun currentGit -> promise {
+                                                let pushGit =
+                                                    if skipLfsHook then
+                                                        currentGit.env ("GIT_LFS_SKIP_PUSH", "1")
+                                                    else
+                                                        currentGit
+
+                                                if currentPushTarget.SetUpstream then
+                                                    let! _ =
+                                                        pushGit.push (
+                                                            safeRemoteName,
+                                                            currentPushTarget.PushBranch,
+                                                            !^[| "--set-upstream" |]
+                                                        )
+
+                                                    return ()
+                                                else
+                                                    let! _ = pushGit.push (safeRemoteName, currentPushTarget.PushBranch)
+                                                    return ()
+                                            })
+                                            git
+                                    )
+                                    (fun _failure ->
+                                        collectPushDiagnostics
+                                            runSimpleGit
+                                            (fun currentFailure -> Some currentFailure.Message)
+                                            safeRemoteName
+                                            git
+                                    )
     }
 
 /// Persists Git workflow LFS settings in local repository config.

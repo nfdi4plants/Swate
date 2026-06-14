@@ -58,6 +58,7 @@ type IArcVaultsApi = {
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
+    renameOpenArcRoot: string -> JS.Promise<Result<string, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: string -> JS.Promise<Result<string, exn>>

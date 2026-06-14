@@ -38,6 +38,7 @@ type GitFailureKind =
     | Timeout
     | Canceled
     | LfsInstallRequired
+    | RemoteProjectAlreadyExists
     | Unknown
 
 [<StringEnum(CaseRules.None)>]

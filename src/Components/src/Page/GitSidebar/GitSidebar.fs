@@ -224,6 +224,16 @@ type private ModalsProps = {
 }
 
 [<NoEquality; NoComparison>]
+type private PublishRenameDialogProps = {
+    Prompt: GitSidebarPublishRenamePrompt option
+    InputValue: string
+    SetInputValue: string -> unit
+    IsBusy: bool
+    Submit: unit -> unit
+    Cancel: unit -> unit
+}
+
+[<NoEquality; NoComparison>]
 type private PendingRemoteActionDialogProps = {
     PendingConfirmation: GitSidebarConfirmationDialog option
     ConfirmPendingRemoteAction: unit -> unit
@@ -1455,6 +1465,66 @@ type GitSidebar =
         )
 
     [<ReactComponent>]
+    static member private PublishRenameDialog(props: PublishRenameDialogProps) =
+        let prompt = props.Prompt
+        let normalizedInput = props.InputValue.Trim()
+
+        BaseModal.Modal(
+            isOpen = prompt.IsSome,
+            setIsOpen =
+                (fun isOpen ->
+                    if not isOpen then
+                        props.Cancel()
+                ),
+            header = Html.text "Rename Repository",
+            description =
+                Html.text (
+                    prompt
+                    |> Option.map _.Message
+                    |> Option.defaultValue "Choose a different repository name."
+                ),
+            children =
+                Html.div [
+                    prop.className "swt:flex swt:flex-col swt:gap-2"
+                    prop.children [
+                        Html.label [
+                            prop.className "swt:flex swt:flex-col swt:gap-2"
+                            prop.children [
+                                Html.span [
+                                    prop.className "swt:text-sm swt:font-medium"
+                                    prop.text "Repository name"
+                                ]
+                                Html.input [
+                                    prop.testId "GitSidebarPublishRenameInput"
+                                    prop.className "swt:input swt:input-bordered swt:w-full"
+                                    prop.disabled props.IsBusy
+                                    prop.value props.InputValue
+                                    prop.onChange props.SetInputValue
+                                ]
+                            ]
+                        ]
+                    ]
+                ],
+            footer =
+                React.Fragment [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-ghost"
+                        prop.disabled props.IsBusy
+                        prop.text "Cancel"
+                        prop.onClick (fun _ -> props.Cancel())
+                    ]
+                    Html.button [
+                        prop.testId "GitSidebarPublishRenameSubmit"
+                        prop.className "swt:btn swt:btn-primary swt:ml-auto"
+                        prop.disabled (props.IsBusy || String.IsNullOrWhiteSpace normalizedInput)
+                        prop.text "Rename and Upload"
+                        prop.onClick (fun _ -> props.Submit())
+                    ]
+                ],
+            debug = "GitSidebarPublishRename"
+        )
+
+    [<ReactComponent>]
     static member Main
         (
             status: GitSidebarStatus,
@@ -1468,20 +1538,26 @@ type GitSidebar =
             ?errorNotice: string,
             ?warningNotice: string,
             ?pendingConfirmation: GitSidebarConfirmationDialog,
+            ?publishRenamePrompt: GitSidebarPublishRenamePrompt,
             ?remoteActionsEnabled: bool,
             ?remoteActionsWarning: string,
             ?canOpenRemoteRepository: bool,
-            ?onOpenRemoteRepository: unit -> unit
+            ?onOpenRemoteRepository: unit -> unit,
+            ?onSubmitPublishRename: string -> unit,
+            ?onCancelPublishRename: unit -> unit
         ) =
 
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
         let errorNotice = errorNotice
         let warningNotice = warningNotice
         let pendingConfirmation = pendingConfirmation
+        let publishRenamePrompt = publishRenamePrompt
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
         let canOpenRemoteRepository = defaultArg canOpenRemoteRepository false
         let onOpenRemoteRepository = defaultArg onOpenRemoteRepository (fun () -> ())
+        let onSubmitPublishRename = defaultArg onSubmitPublishRename (fun _ -> ())
+        let onCancelPublishRename = defaultArg onCancelPublishRename (fun () -> ())
         let _selectedFileForCompatibility = selectedFile
         let onRefresh = callbacks.OnRefresh
         let onFetch = callbacks.OnFetch
@@ -1506,6 +1582,8 @@ type GitSidebar =
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
         let isMissingMessageModalOpen, setMissingMessageModalOpen = React.useState false
+        let publishRenameInput, setPublishRenameInput =
+            React.useState (publishRenamePrompt |> Option.map _.CurrentName |> Option.defaultValue "")
 
         let downloadLargeFilesInput, setDownloadLargeFilesInput =
             React.useState downloadLargeFiles
@@ -1575,6 +1653,13 @@ type GitSidebar =
         React.useEffect (
             (fun () -> setLfsThresholdInput (GitSidebarInternal.formatThresholdInput lfsAutoTrackThresholdMb)),
             [| box lfsAutoTrackThresholdMb |]
+        )
+
+        React.useEffect (
+            (fun () ->
+                setPublishRenameInput (publishRenamePrompt |> Option.map _.CurrentName |> Option.defaultValue "")
+            ),
+            [| box publishRenamePrompt |]
         )
 
         let branchOptionsWithHead =
@@ -1768,6 +1853,15 @@ type GitSidebar =
                 onSwitchBranch branchName
                 setActiveDialog ActiveDialog.None
 
+        let submitPublishRename () =
+            let normalizedName = publishRenameInput.Trim()
+
+            if String.IsNullOrWhiteSpace normalizedName then
+                setLocalError (Some "Repository name must not be empty.")
+            else
+                setLocalError None
+                onSubmitPublishRename normalizedName
+
         let submitPruneLfsCache () =
             setLocalError None
             callbacks.OnPruneLfsCache()
@@ -1946,6 +2040,17 @@ type GitSidebar =
                         PendingConfirmation = pendingConfirmation
                         ConfirmPendingRemoteAction = onConfirmPendingRemoteAction
                         CancelPendingRemoteAction = onCancelPendingRemoteAction
+                    }
+                )
+
+                GitSidebar.PublishRenameDialog(
+                    {
+                        Prompt = publishRenamePrompt
+                        InputValue = publishRenameInput
+                        SetInputValue = setPublishRenameInput
+                        IsBusy = isBusy
+                        Submit = submitPublishRename
+                        Cancel = onCancelPublishRename
                     }
                 )
             ]

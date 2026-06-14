@@ -344,16 +344,23 @@ module ArcVaultExtensions =
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
 
+        member this.ClearPendingFileWatcherState() =
+            this.fileWatcherReloadArcTimeout |> Option.iter Fable.Core.JS.clearTimeout
+            this.fileWatcherReloadArcTimeout <- None
+            this.fileWatcherPendingEvents.Clear()
+            this.fileWatcherPendingArcMergeEvents.Clear()
+
         member this.StopFileWatcher() = promise {
             match this.watcher with
-            | None -> return ()
+            | None -> ()
             | Some watcher ->
                 try
                     do! watcher.close ()
                 with _ ->
                     ()
 
-                this.watcher <- None
+            this.watcher <- None
+            this.ClearPendingFileWatcherState()
         }
 
         /// This functions should be called once, when an vault is first started with a path
@@ -420,6 +427,70 @@ module ArcVaultExtensions =
                 let fileTree = createFileEntryTree fileEntries
                 this.SetFileTree(fileTree)
             | None -> ()
+        }
+
+        member this.RenameOpenArcRoot(newName: string) : Fable.Core.JS.Promise<Result<string, exn>> = promise {
+            match this.path with
+            | None -> return Error(exn "ARC is not loaded.")
+            | Some currentPath ->
+                let hadWatcher = this.watcher.IsSome
+
+                if hadWatcher then
+                    do! this.StopFileWatcher()
+                else
+                    this.ClearPendingFileWatcherState()
+
+                let! renameResult = renameOpenArcRootDirectoryOnDisk currentPath newName
+
+                match renameResult with
+                | Error renameError ->
+                    if hadWatcher then
+                        this.StartFileWatcher()
+
+                    return Error renameError
+                | Ok renamedPath ->
+                    this.path <- Some renamedPath
+
+                    if this.arc.IsNone then
+                        try
+                            do! this.LoadArc()
+                        with loadError ->
+                            swatelogfn this.window.id "ARC folder was renamed to '%s', but reload failed: %s" renamedPath loadError.Message
+
+                    if hadWatcher then
+                        try
+                            this.StartFileWatcher()
+                        with watcherError ->
+                            swatelogfn
+                                this.window.id
+                                "ARC folder was renamed to '%s', but file watcher restart failed: %s"
+                                renamedPath
+                                watcherError.Message
+
+                    try
+                        do! this.RefreshFileTree()
+                    with refreshError ->
+                        swatelogfn
+                            this.window.id
+                            "ARC folder was renamed to '%s', but file tree refresh failed: %s"
+                            renamedPath
+                            refreshError.Message
+
+                    try
+                        let sendMsg =
+                            Remoting.createIpc ()
+                            |> Remoting.withWindow this.window
+                            |> Remoting.buildProxySender<IPathChangeRendererApi>
+
+                        sendMsg.pathChange (Some renamedPath)
+                    with notifyError ->
+                        swatelogfn
+                            this.window.id
+                            "ARC folder was renamed to '%s', but renderer path notification failed: %s"
+                            renamedPath
+                            notifyError.Message
+
+                    return Ok renamedPath
         }
 
 

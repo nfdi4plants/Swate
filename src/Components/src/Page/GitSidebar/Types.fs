@@ -59,6 +59,11 @@ type GitSidebarConfirmationDialog = {
     CancelLabel: string
 }
 
+type GitSidebarPublishRenamePrompt = {
+    CurrentName: string
+    Message: string
+}
+
 type GitSidebarCallbacks = {
     OnRefresh: unit -> unit
     OnFetch: unit -> unit

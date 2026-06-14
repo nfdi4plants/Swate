@@ -16,6 +16,7 @@ module GitProvisioningService = Main.Git.GitProvisioningService
 module GitAuthAdapter = Main.Git.GitAuthAdapter
 module GitLfsAdapter = Main.Git.GitLfsAdapter
 module GitLfsService = Main.Git.GitLfsService
+module GitRemoteProvisioningProvider = Main.Git.GitTokenProvider.RemoteProvisioning
 module GitTokenProvider = Main.Git.GitTokenProvider
 module JsonDecoder = Main.Git.JsonDecoder
 
@@ -269,6 +270,9 @@ let private expectErrorResult<'T> (result: Result<'T, exn>) =
 
 let private gitServiceIntegrationTimeoutMs = 120000
 
+let private gitServiceIntegrationTestOptions =
+    TestOptions(timeout = gitServiceIntegrationTimeoutMs)
+
 let private gitLfsIntegrationTestOptions =
     TestOptions(timeout = gitServiceIntegrationTimeoutMs)
 
@@ -371,6 +375,17 @@ let private withTestTokenProvider (body: unit -> JS.Promise<'T>) = promise {
         return! body ()
     finally
         GitTokenProvider.setTokenProvider GitTokenProvider.defaultTokenProvider
+}
+
+let private withTestRemoteProvisioningProvider createProject (body: unit -> JS.Promise<'T>) = promise {
+    GitRemoteProvisioningProvider.setProvider {
+        CreateProject = createProject
+    }
+
+    try
+        return! body ()
+    finally
+        GitRemoteProvisioningProvider.setProvider GitRemoteProvisioningProvider.defaultProvider
 }
 
 let private withTempRepository (testBody: TempRepositoryContext -> JS.Promise<unit>) : JS.Promise<unit> = promise {
@@ -733,6 +748,110 @@ Vitest.describe (
 
                         let! configuredRemoteUrl = context.Git.raw [| "remote"; "get-url"; "origin" |]
                         Vitest.expect(configuredRemoteUrl.Trim()).toBe (remoteUrl)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "push publishes a local repository by creating origin from the active DataHub account",
+            gitServiceIntegrationTestOptions,
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let remotePath = join [| context.RootPath; "published.git" |]
+                        let filePath = join [| context.RepoPath; "published.txt" |]
+                        let mutable createdProjectName = None
+
+                        let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                        do! configureLocalRemoteRewrite context.Git remotePath
+
+                        do! writeUtf8FileAsync filePath "published\n"
+
+                        let! stageResult = GitService.stagePaths context.RepoPath [| "published.txt" |]
+                        expectOk "stage publish file" stageResult |> ignore
+
+                        let! commitResult = GitService.commit context.RepoPath "test: publish local repository"
+                        expectOk "commit publish file" commitResult |> ignore
+
+                        let! currentBranch =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status before publish")
+
+                        let branchName =
+                            currentBranch.Current
+                            |> Option.defaultWith (fun () -> failwith "Expected a current branch before publish.")
+
+                        do!
+                            withTestTokenProvider (fun () ->
+                                withTestRemoteProvisioningProvider
+                                    (fun projectName -> promise {
+                                        createdProjectName <- Some projectName
+                                        return Ok testRemoteUrl
+                                    })
+                                    (fun () -> promise {
+                                        let! publishResult = GitService.push context.RepoPath None None None
+                                        expectOk "publish local repository" publishResult |> ignore
+                                    }))
+
+                        Vitest.expect(createdProjectName).toEqual (Some "repo")
+
+                        let! configuredRemoteUrl = context.Git.raw [| "config"; "--get"; "remote.origin.url" |]
+                        Vitest.expect(configuredRemoteUrl.Trim()).toBe (testRemoteUrl)
+
+                        let! publishedStatus =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status after publish")
+
+                        Vitest.expect(publishedStatus.Tracking).toEqual (Some $"origin/{branchName}")
+
+                        let! remoteBranch =
+                            context.Git.raw [| "ls-remote"; remotePath; $"refs/heads/{branchName}" |]
+
+                        Vitest.expect(remoteBranch.Contains($"refs/heads/{branchName}")).toBe (true)
+                    })
+            }
+        )
+
+        Vitest.test (
+            "push reports the DataHub project creation error when the publish target already exists",
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let filePath = join [| context.RepoPath; "duplicate.txt" |]
+
+                        do! writeUtf8FileAsync filePath "duplicate\n"
+
+                        let! stageResult = GitService.stagePaths context.RepoPath [| "duplicate.txt" |]
+                        expectOk "stage duplicate file" stageResult |> ignore
+
+                        let! commitResult = GitService.commit context.RepoPath "test: duplicate publish target"
+                        expectOk "commit duplicate file" commitResult |> ignore
+
+                        do!
+                            withTestTokenProvider (fun () ->
+                                withTestRemoteProvisioningProvider
+                                    (fun _ -> promise {
+                                        return Error "GitLab rejected project creation (HTTP 400): name has already been taken."
+                                    })
+                                    (fun () -> promise {
+                                        let! publishResult = GitService.push context.RepoPath None None None
+                                        let failure = expectError publishResult
+
+                                        Vitest.expect(failure.Kind).toEqual (GitFailureKind.RemoteProjectAlreadyExists)
+                                        Vitest.expect(failure.Message).toContain ("repo")
+                                        Vitest.expect(failure.Message).toContain ("already been taken")
+                                    }))
+
+                        let! originLookup =
+                            runSimpleGitResult
+                                (fun git -> git.raw [| "remote"; "get-url"; "origin" |])
+                                context.Git
+
+                        match originLookup with
+                        | Ok _ -> failwith "Expected origin to remain unconfigured after project creation fails."
+                        | Error _ -> ()
                     })
             }
         )
