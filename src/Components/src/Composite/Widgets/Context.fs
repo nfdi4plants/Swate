@@ -10,6 +10,8 @@ type WidgetType =
     | Template
     | FilePicker
     | DataAnnotator
+    | JsonImport
+    | JsonExport
     | Playground
 
 type WidgetDefinition = {|

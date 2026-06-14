@@ -11,6 +11,26 @@ module TemplateTypes = Swate.Components.Composite.Template.Types
 type TemplateImportModalPreview =
 
     [<ReactComponent>]
+    static member ImportActionOption
+        (id, action: TemplateTypes.TemplateImportAction, label: string, isActive: bool, setTemplateImportAction)
+        =
+        let radioGroupName = $"template-import-action-{id}"
+
+        Html.label [
+            prop.className "swt:inline-flex swt:items-center swt:gap-2 swt:cursor-pointer"
+            prop.children [
+                Html.input [
+                    prop.type'.radio
+                    prop.name radioGroupName
+                    prop.className "swt:radio swt:radio-xs"
+                    prop.isChecked isActive
+                    prop.onChange (fun (_: bool) -> setTemplateImportAction id action)
+                ]
+                Html.span [ prop.className "swt:text-xs"; prop.text label ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member TemplateImportModalPreview(templates: Template[], callbacks: TemplateTypes.TemplatePreviewCallbacks) =
         if templates.Length = 0 then
             Html.div [
@@ -22,7 +42,6 @@ type TemplateImportModalPreview =
                 prop.className "swt:flex swt:flex-col swt:gap-2"
                 prop.children [
                     for template in templates do
-                        let radioGroupName = $"template-import-action-{template.Id}"
                         let importAction = callbacks.GetTemplateImportAction template.Id
                         let columns = template.Table.Columns |> Array.ofSeq
 
@@ -38,23 +57,6 @@ type TemplateImportModalPreview =
 
                         let canEditColumns = importAction <> TemplateTypes.TemplateImportAction.NoImport
 
-                        let renderImportActionOption (action: TemplateTypes.TemplateImportAction) (label: string) =
-                            Html.label [
-                                prop.className "swt:inline-flex swt:items-center swt:gap-2 swt:cursor-pointer"
-                                prop.children [
-                                    Html.input [
-                                        prop.type'.radio
-                                        prop.name radioGroupName
-                                        prop.className "swt:radio swt:radio-xs"
-                                        prop.isChecked (importAction.Equals action)
-                                        prop.onChange (fun (_: bool) ->
-                                            callbacks.SetTemplateImportAction template.Id action
-                                        )
-                                    ]
-                                    Html.span [ prop.className "swt:text-xs"; prop.text label ]
-                                ]
-                            ]
-
                         Html.div [
                             prop.key (string template.Id)
                             prop.className
@@ -68,13 +70,27 @@ type TemplateImportModalPreview =
                                 Html.div [
                                     prop.className "swt:flex swt:flex-col swt:gap-1"
                                     prop.children [
-                                        renderImportActionOption
-                                            TemplateTypes.TemplateImportAction.ImportAsNewTable
-                                            "Import (new table)"
-                                        renderImportActionOption
-                                            TemplateTypes.TemplateImportAction.AppendToActiveTable
-                                            "Append to active table"
-                                        renderImportActionOption TemplateTypes.TemplateImportAction.NoImport "No import"
+                                        TemplateImportModalPreview.ImportActionOption(
+                                            template.Id,
+                                            TemplateTypes.TemplateImportAction.ImportAsNewTable,
+                                            "Import (new table)",
+                                            (importAction = TemplateTypes.TemplateImportAction.ImportAsNewTable),
+                                            setTemplateImportAction = callbacks.SetTemplateImportAction
+                                        )
+                                        TemplateImportModalPreview.ImportActionOption(
+                                            template.Id,
+                                            TemplateTypes.TemplateImportAction.AppendToActiveTable,
+                                            "Append to active table",
+                                            (importAction = TemplateTypes.TemplateImportAction.AppendToActiveTable),
+                                            setTemplateImportAction = callbacks.SetTemplateImportAction
+                                        )
+                                        TemplateImportModalPreview.ImportActionOption(
+                                            template.Id,
+                                            TemplateTypes.TemplateImportAction.NoImport,
+                                            "No import",
+                                            (importAction = TemplateTypes.TemplateImportAction.NoImport),
+                                            setTemplateImportAction = callbacks.SetTemplateImportAction
+                                        )
                                     ]
                                 ]
                                 Html.details [
