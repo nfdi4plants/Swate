@@ -378,9 +378,7 @@ let private withTestTokenProvider (body: unit -> JS.Promise<'T>) = promise {
 }
 
 let private withTestRemoteProvisioningProvider createProject (body: unit -> JS.Promise<'T>) = promise {
-    GitRemoteProvisioningProvider.setProvider {
-        CreateProject = createProject
-    }
+    GitRemoteProvisioningProvider.setProvider { CreateProject = createProject }
 
     try
         return! body ()
@@ -792,7 +790,8 @@ Vitest.describe (
                                     (fun () -> promise {
                                         let! publishResult = GitService.push context.RepoPath None None None
                                         expectOk "publish local repository" publishResult |> ignore
-                                    }))
+                                    })
+                            )
 
                         Vitest.expect(createdProjectName).toEqual (Some "repo")
 
@@ -806,8 +805,7 @@ Vitest.describe (
 
                         Vitest.expect(publishedStatus.Tracking).toEqual (Some $"origin/{branchName}")
 
-                        let! remoteBranch =
-                            context.Git.raw [| "ls-remote"; remotePath; $"refs/heads/{branchName}" |]
+                        let! remoteBranch = context.Git.raw [| "ls-remote"; remotePath; $"refs/heads/{branchName}" |]
 
                         Vitest.expect(remoteBranch.Contains($"refs/heads/{branchName}")).toBe (true)
                     })
@@ -833,21 +831,25 @@ Vitest.describe (
                             withTestTokenProvider (fun () ->
                                 withTestRemoteProvisioningProvider
                                     (fun _ -> promise {
-                                        return Error "GitLab rejected project creation (HTTP 400): name has already been taken."
+                                        return
+                                            Error
+                                                "GitLab rejected project creation (HTTP 400): name has already been taken."
                                     })
                                     (fun () -> promise {
                                         let! publishResult = GitService.push context.RepoPath None None None
                                         let failure = expectError publishResult
 
-                                        Vitest.expect(failure.Kind).toEqual (GitFailureKind.RemoteProjectAlreadyExists)
+                                        Vitest
+                                            .expect(failure.Kind)
+                                            .toEqual (GitFailureKind.RemoteProjectAlreadyExists)
+
                                         Vitest.expect(failure.Message).toContain ("repo")
                                         Vitest.expect(failure.Message).toContain ("already been taken")
-                                    }))
+                                    })
+                            )
 
                         let! originLookup =
-                            runSimpleGitResult
-                                (fun git -> git.raw [| "remote"; "get-url"; "origin" |])
-                                context.Git
+                            runSimpleGitResult (fun git -> git.raw [| "remote"; "get-url"; "origin" |]) context.Git
 
                         match originLookup with
                         | Ok _ -> failwith "Expected origin to remain unconfigured after project creation fails."

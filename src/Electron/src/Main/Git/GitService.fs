@@ -1090,10 +1090,7 @@ type private RemoteUrlState =
     | RemoteConfigured of string
 
 let private tryGetNonEmptyRemoteUrl (remote: RemoteWithRefs) =
-    [|
-        remote.refs.push
-        remote.refs.fetch
-    |]
+    [| remote.refs.push; remote.refs.fetch |]
     |> Array.tryPick (fun url ->
         url
         |> Option.ofObj
@@ -1193,8 +1190,7 @@ let private publishOriginRemoteIfMissing
                                 exn
                                     $"DataHub created repository '{projectName}', but returned an unusable Git remote URL: {remoteUrlError.Message}"
                             )
-                    | Ok safeRemoteUrl ->
-                        return! configurePublishedOriginRemote arcPath remoteState safeRemoteUrl
+                    | Ok safeRemoteUrl -> return! configurePublishedOriginRemote arcPath remoteState safeRemoteUrl
     }
 
 let private ensurePushRemoteConfigured (arcPath: string) (remoteName: string) : JS.Promise<GitResult<unit>> = promise {
@@ -1208,7 +1204,8 @@ let private ensurePushRemoteConfigured (arcPath: string) (remoteName: string) : 
         | Error validationError ->
             return
                 errorResult (
-                    exn $"Remote '{remoteName}' is configured but cannot be used for authenticated push: {validationError.Message}"
+                    exn
+                        $"Remote '{remoteName}' is configured but cannot be used for authenticated push: {validationError.Message}"
                 )
     | Ok((RemoteMissing | RemoteConfiguredWithoutUrl) as remoteState) ->
         return! publishOriginRemoteIfMissing arcPath remoteName remoteState
@@ -1756,7 +1753,11 @@ let push
                         | Error failure -> return Error failure
                         | Ok pushStatus ->
                             let pushTarget =
-                                resolvePushTarget safeBranchName pushStatus.current pushStatus.tracking pushStatus.detached
+                                resolvePushTarget
+                                    safeBranchName
+                                    pushStatus.current
+                                    pushStatus.tracking
+                                    pushStatus.detached
 
                             return!
                                 executePushWorkflow
@@ -1805,7 +1806,9 @@ let push
 
                                                     return ()
                                                 else
-                                                    let! _ = pushGit.push (safeRemoteName, currentPushTarget.PushBranch)
+                                                    let! _ =
+                                                        pushGit.push (safeRemoteName, currentPushTarget.PushBranch)
+
                                                     return ()
                                             })
                                             git

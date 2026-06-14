@@ -1582,6 +1582,7 @@ type GitSidebar =
         let branchName, setBranchName = React.useState ""
         let commitMessage, setCommitMessage = React.useState ""
         let isMissingMessageModalOpen, setMissingMessageModalOpen = React.useState false
+
         let publishRenameInput, setPublishRenameInput =
             React.useState (publishRenamePrompt |> Option.map _.CurrentName |> Option.defaultValue "")
 

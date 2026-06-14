@@ -263,7 +263,9 @@ Vitest.describe (
                     "RenameRootArc"
                     ignore
                     (fun arcPath -> promise {
-                        let targetPath = join [| dirname arcPath; "renamed-arc" |] |> PathHelpers.normalizePath
+                        let targetPath =
+                            join [| dirname arcPath; "renamed-arc" |] |> PathHelpers.normalizePath
+
                         let vault = ArcVault(TestHelpers.testWindow ())
                         vault.path <- Some arcPath
 
@@ -333,7 +335,9 @@ Vitest.describe (
                     "RenameRootConflictArc"
                     ignore
                     (fun arcPath -> promise {
-                        let targetPath = join [| dirname arcPath; "existing-arc" |] |> PathHelpers.normalizePath
+                        let targetPath =
+                            join [| dirname arcPath; "existing-arc" |] |> PathHelpers.normalizePath
+
                         do! mkdirRecursiveAsync targetPath
 
                         let vault = ArcVault(TestHelpers.testWindow ())

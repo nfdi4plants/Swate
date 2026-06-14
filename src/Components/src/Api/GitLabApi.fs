@@ -278,7 +278,8 @@ module private Internals =
 
     let mapHttpErrorWithBody status bodyText =
         match mapHttpError status, compactResponseText bodyText with
-        | GitLabError.HttpError code, Some details -> GitLabError.InvalidRequest $"GitLab request failed with HTTP {code}: {details}"
+        | GitLabError.HttpError code, Some details ->
+            GitLabError.InvalidRequest $"GitLab request failed with HTTP {code}: {details}"
         | mappedError, _ -> mappedError
 
     let readResponseText (response: Fetch.Types.Response) : JS.Promise<string> = promise {

@@ -60,10 +60,7 @@ type GitPendingRemoteAction =
     | UpdateFromOnline
     | CompletePrimarySavePush
 
-type GitPublishRenamePrompt = {
-    CurrentName: string
-    Message: string
-}
+type GitPublishRenamePrompt = { CurrentName: string; Message: string }
 
 type GitPullWorkflowResult = {
     Status: GitStatusDto option
@@ -374,9 +371,7 @@ let private tryGetPathLeaf (pathValue: string) =
 
 let private publishRenamePrompt message model =
     let currentName =
-        model.CurrentArcPath
-        |> Option.bind tryGetPathLeaf
-        |> Option.defaultValue "ARC"
+        model.CurrentArcPath |> Option.bind tryGetPathLeaf |> Option.defaultValue "ARC"
 
     {
         CurrentName = currentName
@@ -723,8 +718,7 @@ let private runSimpleWriteAttemptAsync
         match classifyWriteResult busyOperation result with
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
-        | Ok(WriteOperationRemoteProjectAlreadyExists message) ->
-            return Ok(RequiresRemoteProjectRename message)
+        | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Ok(RequiresRemoteProjectRename message)
         | Ok(WriteOperationReady operationResult) ->
             return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
     }
@@ -1444,8 +1438,7 @@ let update
 
             nextModel, cmd
     | PublishRenameCompleted(sessionId, Ok renamedPath) when
-        sessionId <> model.ArcSessionId
-        && model.CurrentArcPath = Some renamedPath
+        sessionId <> model.ArcSessionId && model.CurrentArcPath = Some renamedPath
         ->
         {
             model with

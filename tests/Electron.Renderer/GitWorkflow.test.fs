@@ -1287,11 +1287,7 @@ Vitest.describe (
                 let! _ = collectMessages pathChangeCmd
 
                 let stateAfterRenameCompletion, retryCmd =
-                    update
-                        deps
-                        ignore
-                        (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC"))
-                        stateAfterPathChange
+                    update deps ignore (PublishRenameCompleted(7, Ok "C:/work/Renamed ARC")) stateAfterPathChange
 
                 let! retryMessages = collectMessages retryCmd
 
