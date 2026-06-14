@@ -100,7 +100,7 @@ let tryGetNodeErrorCode (error: exn) : string option =
     with _ ->
         None
 
-type private RenameRetryStrategy = {
+type private FileSystemRetryStrategy = {
     DelaysMs: int[]
     IsTransientErrorCode: string option -> bool
 }

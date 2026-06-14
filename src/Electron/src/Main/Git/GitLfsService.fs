@@ -51,6 +51,21 @@ let private indexUsingRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<stri
 
     filesByRelativePath
 
+let tryFindLsFileInfoByRelativePath (filesByRelativePath: Dictionary<string, GitLfsLsFileInfo>) (relativePath: string) =
+    let normalizedPath = PathHelpers.normalizeSeparators relativePath
+
+    match filesByRelativePath.TryGetValue normalizedPath with
+    | true, info -> Some info
+    | false, _ ->
+        filesByRelativePath
+        |> Seq.tryPick (fun entry ->
+            if PathHelpers.pathsEqual entry.Key normalizedPath then
+                Some entry.Value
+            else
+                None
+        )
+
+let buildLsFilesJsonArgs () = [| "lfs"; "ls-files"; "-j" |]
 
 /// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
@@ -164,46 +179,104 @@ let isSystemInstalled () : JS.Promise<bool> = promise {
 let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
     gitLfs.IsTrackedByAttributes repoRoot relativePath
 
+let private extractLsFilesFailureMessage (result: GitSpawnResult) =
+    let stderrText =
+        result.StderrText
+        |> Option.ofObj
+        |> Option.defaultValue String.Empty
+        |> _.Trim()
+
+    let stdoutText =
+        result.StdoutText
+        |> Option.ofObj
+        |> Option.defaultValue String.Empty
+        |> _.Trim()
+
+    let message =
+        if result.TimedOut then
+            if not (String.IsNullOrWhiteSpace stderrText) then
+                stderrText
+            else
+                "Git LFS metadata command timed out."
+        elif not (String.IsNullOrWhiteSpace stderrText) then
+            stderrText
+        elif not (String.IsNullOrWhiteSpace stdoutText) then
+            stdoutText
+        else
+            "Git LFS metadata command failed."
+
+    redactToken message
+
+let private readLsFilesByRelativePath
+    (repoRoot: string)
+    : JS.Promise<Result<Dictionary<string, GitLfsLsFileInfo>, string>> =
+    promise {
+        let normalizedRepoRoot = PathHelpers.normalizePath repoRoot
+
+        try
+            let! commandResult =
+                runGitCaptured {
+                    WorkingDirectory = Some normalizedRepoRoot
+                    Arguments = buildLsFilesJsonArgs ()
+                    Environment = None
+                    StandardInput = None
+                    TimeoutMs = Some lfsLsFilesTimeoutMs
+                }
+
+            if commandResult.ExitCode <> 0 || commandResult.TimedOut then
+                return Error(extractLsFilesFailureMessage commandResult)
+            else
+                let stdoutText =
+                    commandResult.StdoutText
+                    |> Option.ofObj
+                    |> Option.defaultValue String.Empty
+                    |> _.Trim()
+
+                if String.IsNullOrWhiteSpace stdoutText then
+                    return Ok(Dictionary<string, GitLfsLsFileInfo>())
+                else
+                    try
+                        return stdoutText |> parseLsFiles |> indexUsingRelativePath |> Ok
+                    with parseError ->
+                        let reason =
+                            if String.IsNullOrWhiteSpace parseError.Message then
+                                "Unknown decoding error."
+                            else
+                                parseError.Message
+
+                        Browser.Dom.console.warn $"Git LFS ls-files parse warning: {reason}"
+                        return Error reason
+        with error ->
+            let message =
+                if String.IsNullOrWhiteSpace error.Message then
+                    "Unknown Git LFS metadata error."
+                else
+                    error.Message
+
+            return Error(redactToken message)
+    }
+
 /// Tries to read `git lfs ls-files -j` metadata keyed by repository-relative path.
 /// Fail-open behavior: command or parse failures yield an empty dictionary.
 let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<string, GitLfsLsFileInfo>> = promise {
-    let normalizedRepoRoot = PathHelpers.normalizePath repoRoot
-
-    try
-        let! commandResult =
-            runGitCaptured {
-                WorkingDirectory = Some normalizedRepoRoot
-                Arguments = [| "lfs"; "ls-files"; "-j" |]
-                Environment = None
-                StandardInput = None
-                TimeoutMs = Some lfsLsFilesTimeoutMs
-            }
-
-        if commandResult.ExitCode <> 0 || commandResult.TimedOut then
-            return Dictionary<string, GitLfsLsFileInfo>()
-        else
-            let stdoutText =
-                commandResult.StdoutText
-                |> Option.ofObj
-                |> Option.defaultValue String.Empty
-                |> _.Trim()
-
-            if String.IsNullOrWhiteSpace stdoutText then
-                return Dictionary<string, GitLfsLsFileInfo>()
-            else
-                try
-                    return stdoutText |> parseLsFiles |> indexUsingRelativePath
-                with parseError ->
-                    let reason =
-                        if String.IsNullOrWhiteSpace parseError.Message then
-                            "Unknown decoding error."
-                        else
-                            parseError.Message
-
-                    Browser.Dom.console.warn $"Git LFS ls-files parse warning: {reason}"
-                    return Dictionary<string, GitLfsLsFileInfo>()
-    with _ ->
+    match! readLsFilesByRelativePath repoRoot with
+    | Ok filesByRelativePath -> return filesByRelativePath
+    | Error message ->
+        Browser.Dom.console.warn $"Git LFS ls-files warning: {message}"
         return Dictionary<string, GitLfsLsFileInfo>()
+}
+
+let tryFindListingForPath (repoRoot: string) (relativePath: string) : JS.Promise<Result<GitLfsLsFileInfo, string>> = promise {
+    try
+        match! readLsFilesByRelativePath repoRoot with
+        | Error message -> return Error $"Could not read Git LFS file metadata: {message}"
+        | Ok filesByRelativePath ->
+            return
+                match tryFindLsFileInfoByRelativePath filesByRelativePath relativePath with
+                | Some listing -> Ok listing
+                | None -> Error "The file is not listed by Git LFS in the current checkout."
+    with error ->
+        return Error $"Could not read Git LFS file metadata: {error.Message}"
 }
 
 let storagePruneArgs = [|
@@ -225,34 +298,18 @@ let buildFetchRefetchArgs (relativePath: string) = [|
     "HEAD"
 |]
 
-let buildLsFilesJsonArgs (relativePath: string) = [|
+let private buildSmudgePointerArgs (relativePath: string) = [|
+    "-c"
+    "lfs.fetchinclude="
+    "-c"
+    "lfs.fetchexclude="
     "lfs"
-    "ls-files"
-    "-l"
-    "--size"
-    "--json"
-    $"--include={relativePath}"
+    "smudge"
+    "--"
+    relativePath
 |]
 
-let tryFindListingForPath (relativePath: string) (listingJson: string) : Result<GitLfsLsFileInfo, string> =
-    try
-        let normalizedPath = PathHelpers.normalizeSeparators relativePath
-
-        match
-            listingJson
-            |> parseLsFiles
-            |> Array.tryFind (fun file ->
-                String.Equals(PathHelpers.normalizeSeparators file.name, normalizedPath, StringComparison.Ordinal)
-            )
-        with
-        | None -> Error "The file is not listed by Git LFS in the current checkout."
-        | Some file ->
-            Ok {
-                file with
-                    name = PathHelpers.normalizeSeparators file.name
-            }
-    with error ->
-        Error $"Could not read Git LFS file metadata: {error.Message}"
+let buildCheckoutArgs (relativePath: string) = [| "lfs"; "checkout"; "--"; relativePath |]
 
 let private formatDiagnosticsSection (title: string) (content: string option) =
     match content |> Option.map _.Trim() with
@@ -568,6 +625,39 @@ let private extractSpawnFailureMessage (result: GitSpawnResult) =
         "Git command failed."
 
 let private spawnFailure (result: GitSpawnResult) = exn (extractSpawnFailureMessage result)
+
+let private buildPointerInput (listing: GitLfsLsFileInfo) =
+    let sizeText = listing.size |> int64 |> string
+
+    $"version {listing.version}\noid {listing.``oid_type``}:{listing.oid}\nsize {sizeText}\n"
+
+/// Downloads the exact LFS object described by `listing` without path include filtering.
+/// `git lfs smudge` reads the pointer OID from stdin and stores the object locally; stdout is discarded.
+let downloadObjectFromListing
+    (repoPath: string)
+    (commandAuth: GitCommandAuthentication)
+    (relativePath: string)
+    (listing: GitLfsLsFileInfo)
+    : JS.Promise<Result<unit, exn>> =
+    promise {
+        let! result =
+            runGitDiscardingStdout {
+                WorkingDirectory = Some repoPath
+                Arguments = [|
+                    yield! commandAuth.ConfigArgs
+                    yield! buildSmudgePointerArgs relativePath
+                |]
+                Environment = Some commandAuth.Environment
+                StandardInput = Some(buildPointerInput listing)
+                TimeoutMs = Some DefaultTimeoutMs
+            }
+
+        return
+            if result.ExitCode = 0 && not result.TimedOut then
+                Ok()
+            else
+                Error(exn (extractSpawnFailureMessage result))
+    }
 
 let private isUnsupportedOptionFailure (result: GitSpawnResult) =
     let diagnosticText = $"{result.StdoutText}\n{result.StderrText}".ToLowerInvariant()

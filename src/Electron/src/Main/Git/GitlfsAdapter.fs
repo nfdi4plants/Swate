@@ -27,8 +27,7 @@ type GitSpawnResult = {
     TimedOut: bool
 }
 
-/// Runs `git` without a shell and captures stdout/stderr for callers that need exact output or stdin support.
-let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promise {
+let private runGitProcess (captureStdout: bool) (request: GitSpawnRequest) : Promise<GitSpawnResult> = promise {
     let! result =
         Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
             let spawnOptions =
@@ -55,7 +54,11 @@ let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promis
                 if not finished then
                     finished <- true
 
-                    let stdoutBuffer = bufferConcat (stdoutChunks.ToArray())
+                    let stdoutBuffer =
+                        if captureStdout then
+                            bufferConcat (stdoutChunks.ToArray())
+                        else
+                            bufferConcat [||]
 
                     resolve {
                         ExitCode = exitCode
@@ -65,7 +68,13 @@ let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promis
                         TimedOut = timedOut
                     }
 
-            proc?stdout?on ("data", fun d -> stdoutChunks.Add d) |> ignore
+            proc?stdout?on (
+                "data",
+                fun d ->
+                    if captureStdout then
+                        stdoutChunks.Add d
+            )
+            |> ignore
 
             proc?stderr?on ("data", fun d -> stderrChunks.Add(d?toString ("utf8") |> unbox<string>))
             |> ignore
@@ -116,6 +125,13 @@ let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promis
 
     return result
 }
+
+/// Runs `git` without a shell and captures stdout/stderr for callers that need exact output or stdin support.
+let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = runGitProcess true request
+
+/// Runs `git` while draining and discarding stdout.
+/// This is used for commands such as `git lfs smudge`, whose stdout may contain a large file.
+let runGitDiscardingStdout (request: GitSpawnRequest) : Promise<GitSpawnResult> = runGitProcess false request
 
 /// Runs a small git command and returns stdout text, or None on command failure.
 /// Used for feature probes where failure should not surface as a user-facing Git error.

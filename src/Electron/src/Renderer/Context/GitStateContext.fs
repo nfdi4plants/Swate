@@ -68,7 +68,7 @@ module private Helper =
             fun requestedPath -> promise {
                 let! result = Renderer.GitApiClient.getGitMergeConflictViewData requestedPath
                 return mapMergeConflictPageResult requestedPath result
-        }
+            }
         initGitRepository = Renderer.GitApiClient.gitInitRepository
         renameOpenArcRoot =
             fun newName -> promise {
@@ -183,8 +183,7 @@ let GitStateCtxProvider (children: ReactElement) =
     let submitPublishRename newName =
         dispatch (SubmitPublishRenameRequested newName)
 
-    let cancelPublishRename () =
-        dispatch CancelPublishRenameRequested
+    let cancelPublishRename () = dispatch CancelPublishRenameRequested
 
     let saveLfsAutoTrackThreshold (thresholdMb: int) =
         dispatch (SaveLfsAutoTrackThresholdRequested thresholdMb)
