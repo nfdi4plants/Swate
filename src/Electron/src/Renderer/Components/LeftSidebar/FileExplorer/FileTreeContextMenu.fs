@@ -134,14 +134,22 @@ let copyPathContextMenuItems (arcRootPath: string option) (item: FileItem) = [
 
 let arcCreateContextMenuItems (openCreateModal: ArcExplorerNodeKind -> unit) (item: FileItem) =
     if item.IsDirectory then
-        arcCreateKinds
-        |> List.sortBy arcCreateKindSortOrder
-        |> List.map (fun kind ->
+        [
+            yield!
+                arcCreateKinds
+                |> List.sortBy arcCreateKindSortOrder
+                |> List.map (fun kind ->
+                    ContextMenuItem.create
+                        $"Add {ArcExplorerNodeKind.label kind}"
+                        (arcCreateKindIcon kind)
+                        (fun () -> openCreateModal kind)
+                )
+
             ContextMenuItem.create
-                $"Add {ArcExplorerNodeKind.label kind}"
-                (arcCreateKindIcon kind)
-                (fun () -> openCreateModal kind)
-        )
+                "Add Note"
+                "swt:fluent--note-add-24-regular"
+                (fun () -> openCreateModal ArcExplorerNodeKind.Note)
+        ]
     else
         []
 
