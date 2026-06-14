@@ -38,8 +38,7 @@ module RemoteProvisioning =
 
     let mutable private activeProvider = defaultProvider
 
-    let setProvider (provider: Provider) =
-        activeProvider <- provider
+    let setProvider (provider: Provider) = activeProvider <- provider
 
     let createProject (projectName: string) =
         activeProvider.CreateProject projectName

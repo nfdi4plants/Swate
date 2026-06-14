@@ -22,12 +22,23 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     pathActionConfig = createConfig ()
     enqueueError = ignore
     runToggleLfsMark = fun _ _ -> promise { return Ok() }
+    runDownloadLfsFile = fun _ -> promise { return Ok() }
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
 }
+
+let private createComposedContextMenuItems config item = createContextMenuItems config None item
 
 let private createFileItem (name: string) (path: string option) = {
     FileTree.createFile name path FileItemIcon.Document with
         Id = defaultArg path name
+}
+
+let private createLfsFileItem (name: string) (path: string) (downloaded: bool) (isPointer: bool) = {
+    createFileItem name (Some path) with
+        IsLFS = Some true
+        Downloaded = Some downloaded
+        IsLFSPointer = Some isPointer
+        SizeFormatted = Some "42 MB"
 }
 
 let private createFolderItem (name: string) (path: string option) = {
@@ -115,7 +126,7 @@ Vitest.describe (
             "composed folder context menu is grouped with dividers",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
-                let menuItems = createContextMenuItems (createContextMenuConfig ()) item
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
 
                 Vitest
                     .expect(groupedLabels menuItems)
@@ -219,7 +230,7 @@ Vitest.describe (
             "composed file context menu is grouped with open, copy, git, and ARC actions",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
-                let menuItems = createContextMenuItems (createContextMenuConfig ()) item
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
 
                 Vitest
                     .expect(groupedLabels menuItems)
@@ -242,10 +253,78 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "composed LFS pointer menu enables download and disables freeing the local copy",
+            fun () -> promise {
+                let item = createLfsFileItem "pointer.bin" "data/pointer.bin" false true
+                let mutable downloadedPath = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        runDownloadLfsFile =
+                            fun path -> promise {
+                                downloadedPath <- Some path
+                                return Ok()
+                            }
+                }
+
+                let menuItems = createComposedContextMenuItems config item
+
+                Vitest.expect(groupedLabels menuItems).toContain ("Download LFS file")
+
+                let downloadItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Download LFS file")
+
+                let freeItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Free local LFS copy")
+
+                Vitest.expect(downloadItem.Disabled).toEqual (None)
+                Vitest.expect(freeItem.Disabled).toEqual (Some true)
+
+                downloadItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(downloadedPath).toEqual (Some "data/pointer.bin")
+            }
+        )
+
+        Vitest.test (
+            "composed downloaded LFS menu disables download and enables freeing the local copy",
+            fun () -> promise {
+                let item = createLfsFileItem "downloaded.bin" "data/downloaded.bin" true false
+                let mutable freedPath = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        runFreeLocalLfsCopy =
+                            fun path -> promise {
+                                freedPath <- Some path
+                                return Ok()
+                            }
+                }
+
+                let menuItems = createComposedContextMenuItems config item
+
+                let downloadItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Download LFS file")
+
+                let freeItem =
+                    menuItems |> List.find (fun menuItem -> menuItem.Label = "Free local LFS copy")
+
+                Vitest.expect(downloadItem.Disabled).toEqual (Some true)
+                Vitest.expect(freeItem.Disabled).toEqual (None)
+
+                freeItem.OnClick()
+                do! Promise.sleep 0
+
+                Vitest.expect(freedPath).toEqual (Some "data/downloaded.bin")
+            }
+        )
+
+        Vitest.test (
             "delete action is styled as destructive ARC action",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
-                let menuItems = createContextMenuItems (createContextMenuConfig ()) item
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
                 let deleteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Delete")
 
                 Vitest.expect(deleteItem.ClassName).toEqual (Some "swt:text-error")

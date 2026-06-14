@@ -455,7 +455,11 @@ module ArcVaultExtensions =
                         try
                             do! this.LoadArc()
                         with loadError ->
-                            swatelogfn this.window.id "ARC folder was renamed to '%s', but reload failed: %s" renamedPath loadError.Message
+                            swatelogfn
+                                this.window.id
+                                "ARC folder was renamed to '%s', but reload failed: %s"
+                                renamedPath
+                                loadError.Message
 
                     if hadWatcher then
                         try

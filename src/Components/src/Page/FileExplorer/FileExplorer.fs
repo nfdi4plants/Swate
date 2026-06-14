@@ -113,6 +113,7 @@ type FileExplorer =
             ?canCreateItem: FileItem -> bool,
             ?onCreateItem: FileItem -> unit,
             ?getItemActions: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem list,
+            ?getItemStatusAction: FileItem -> Swate.Components.Page.FileExplorer.Types.ContextMenuItem option,
             ?canDeleteItem: FileItem -> bool,
             ?onDeleteItem: FileItem -> unit,
             ?selectedItemId: string option,
@@ -120,7 +121,8 @@ type FileExplorer =
             ?onExpansionChange: FileItem -> bool -> unit,
             ?onDirectoryArrowToggle: FileItem -> bool -> unit,
             ?directoryInteractionMode: DirectoryInteractionMode,
-            ?useDirectoryChevronToggle: bool,
+            ?directoryChevronToggleOnly: bool,
+            ?delegateHorizontalScrollToParent: bool,
             ?getItemIconClass: FileItem -> string option,
             ?getCopyPath: FileItem -> string option,
             ?getCopyRelativePath: FileItem -> string option,
@@ -133,13 +135,18 @@ type FileExplorer =
         let directoryInteractionMode =
             defaultArg directoryInteractionMode DirectoryInteractionMode.SingleClickToggle
 
-        let useDirectoryChevronToggle = defaultArg useDirectoryChevronToggle false
+        let directoryChevronToggleOnly = defaultArg directoryChevronToggleOnly false
+
+        let delegateHorizontalScrollToParent =
+            defaultArg delegateHorizontalScrollToParent false
+
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let getCopyPath = defaultArg getCopyPath (fun item -> item.Path)
         let getCopyRelativePath = defaultArg getCopyRelativePath (fun _ -> None)
         let includeDefaultContextMenuItems = defaultArg includeDefaultContextMenuItems true
         let canCreateItem = defaultArg canCreateItem (fun (_: FileItem) -> false)
         let getItemActions = defaultArg getItemActions (fun (_: FileItem) -> [])
+        let getItemStatusAction = defaultArg getItemStatusAction (fun (_: FileItem) -> None)
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
 
         let includeSelectedDirectoryInVisiblePath =
@@ -152,6 +159,12 @@ type FileExplorer =
             onDirectoryExpansionChange
             |> Option.orElse onExpansionChange
             |> Option.orElse onDirectoryArrowToggle
+
+        let scrollContainerClassName =
+            if delegateHorizontalScrollToParent then
+                "swt:w-max swt:min-w-full"
+            else
+                "swt:w-full swt:overflow-x-auto"
 
         React.useEffect (
             (fun () ->
@@ -270,6 +283,7 @@ type FileExplorer =
                 | None -> true
 
             let itemActions = getItemActions item
+            let statusAction = getItemStatusAction item
 
             if item.IsDirectory then
                 let childrenTree =
@@ -291,7 +305,7 @@ type FileExplorer =
                     rowHighlightClass,
                     selectedNameClass,
                     isExpanded,
-                    useDirectoryChevronToggle,
+                    directoryChevronToggleOnly,
                     canExpand,
                     getItemIconClass,
                     handleDirectorySelection item canExpand,
@@ -305,6 +319,7 @@ type FileExplorer =
                     itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
                     canDeleteItem = canDeleteItem,
+                    ?statusAction = statusAction,
                     ?children = childrenTree
                 )
             else
@@ -316,7 +331,8 @@ type FileExplorer =
                     (fun () -> selectItem item),
                     itemActions = itemActions,
                     ?onDeleteItem = onDeleteItem,
-                    canDeleteItem = canDeleteItem
+                    canDeleteItem = canDeleteItem,
+                    ?statusAction = statusAction
                 )
 
         Html.div [
@@ -325,7 +341,7 @@ type FileExplorer =
             prop.children [
                 Html.div [
                     prop.testId "file-explorer-scroll-container"
-                    prop.className "swt:w-full swt:overflow-x-auto"
+                    prop.className scrollContainerClassName
                     prop.children [
                         Html.ul [
                             prop.testId "file-explorer-container"
