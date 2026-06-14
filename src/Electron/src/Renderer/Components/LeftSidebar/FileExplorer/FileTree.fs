@@ -228,7 +228,10 @@ type FileTree =
             setIsDialogBusy false
             setActiveDialog None
 
-        let openCreateModal kind = openDialog (CreateDialog kind)
+        let openCreateModal kind =
+            match kind with
+            | ArcExplorerNodeKind.Note -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesDraftPage)
+            | _ -> openDialog (CreateDialog kind)
 
         let openFileSystemCreateModal kind item =
             if canCreateFileSystemItemIn item then

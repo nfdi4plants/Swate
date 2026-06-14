@@ -3,6 +3,7 @@ module ElectronRenderer.FileTreeContextMenuTests
 open Fable.Core
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
@@ -145,6 +146,7 @@ Vitest.describe (
                             "Add Assay"
                             "Add Workflow"
                             "Add Run"
+                            "Add Note"
                             "<divider>"
                             "Rename"
                             "Delete"
@@ -191,8 +193,28 @@ Vitest.describe (
                             "Add Assay"
                             "Add Workflow"
                             "Add Run"
+                            "Add Note"
                         |]
                     )
+        )
+
+        Vitest.test (
+            "add note action requests note creation",
+            fun () ->
+                let item = createFolderItem "AssayA" (Some "assays/AssayA")
+                let mutable requestedCreateKind = None
+
+                let config = {
+                    createContextMenuConfig () with
+                        openCreateModal = fun kind -> requestedCreateKind <- Some kind
+                }
+
+                let menuItems = createComposedContextMenuItems config item
+                let addNoteItem = menuItems |> List.find (fun menuItem -> menuItem.Label = "Add Note")
+
+                addNoteItem.OnClick()
+
+                Vitest.expect(requestedCreateKind).toEqual (Some ArcExplorerNodeKind.Note)
         )
 
         Vitest.test (
