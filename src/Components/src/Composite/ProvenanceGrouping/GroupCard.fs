@@ -99,6 +99,25 @@ module private TabObserver =
     [<Emit("$0.disconnect()")>]
     let disconnect (observer: obj) : unit = jsNative
 
+module private TabText =
+
+    let fullLabel category valueText = $"{category}: {valueText}"
+
+    let splitInitial (text: string) =
+        let trimmed = text.Trim()
+
+        if trimmed.Length = 0 then
+            "", ""
+        elif trimmed.Length = 1 then
+            trimmed, ""
+        else
+            trimmed.Substring(0, 1), trimmed.Substring(1)
+
+type private OrganizerTabMode =
+    | Responsive
+    | Focused
+    | Collapsed
+
 [<Erase; Mangle(false)>]
 type GroupCard =
 
@@ -113,12 +132,18 @@ type GroupCard =
             paletteClasses: string,
             isHighlighted: bool,
             setHighlighted: bool -> unit,
+            mode: OrganizerTabMode,
+            onToggleFocus: unit -> unit,
             ?testId: string,
             ?key: string
         ) =
         let tabRef = React.useRef<Browser.Types.HTMLElement option> None
         let fullLabelRef = React.useRef<Browser.Types.HTMLElement option> None
         let showHeader, setShowHeader = React.useState true
+        let label = TabText.fullLabel category valueText
+        let collapsedInitial, collapsedRemainder = TabText.splitInitial label
+        let isFocused = mode = Focused
+        let isCollapsed = mode = Collapsed
 
         let measure () =
             match fullLabelRef.current with
@@ -139,12 +164,20 @@ type GroupCard =
         Html.span [
             prop.ref (fun element ->
                 tabRef.current <- (if isNull element then None else Some(unbox element)))
+            prop.role.button
             prop.tabIndex 0
-            prop.title $"{category}: {valueText}"
+            prop.title label
+            prop.ariaLabel label
+            prop.custom ("aria-pressed", isFocused)
             prop.custom ("data-hovered", isHighlighted)
             match testId with
             | Some testId -> prop.testId testId
             | None -> ()
+            prop.onClick (fun _ -> onToggleFocus ())
+            prop.onKeyDown (fun (event: Browser.Types.KeyboardEvent) ->
+                if event.key = "Enter" || event.key = " " then
+                    event.preventDefault ()
+                    onToggleFocus ())
             prop.onMouseEnter (fun _ -> setHighlighted true)
             prop.onMouseLeave (fun _ -> setHighlighted false)
             prop.onFocus (fun _ -> setHighlighted true)
@@ -152,6 +185,10 @@ type GroupCard =
             prop.className [
                 "swt:relative swt:flex swt:min-w-0 swt:cursor-default swt:overflow-hidden swt:whitespace-nowrap swt:rounded-t-md swt:text-xs swt:outline-none swt:transition-all"
                 paletteClasses
+                if isFocused then
+                    "swt:flex-[999_1_0%]"
+                elif isCollapsed then
+                    "swt:min-w-7 swt:flex-1 swt:basis-0"
                 if isHighlighted then
                     "swt:opacity-100 swt:shadow-md"
                 else
@@ -162,7 +199,7 @@ type GroupCard =
                 Html.span [
                     prop.ariaHidden true
                     prop.className "swt:invisible swt:px-3 swt:py-1"
-                    prop.text $"{category}: {valueText}"
+                    prop.text label
                 ]
                 // Measurement overlay: checks whether the full untruncated label
                 // fits in the actual visible tab width.
@@ -184,23 +221,40 @@ type GroupCard =
                 ]
                 // Visible overlay: drops the header entirely once the tab shrinks.
                 Html.span [
-                    prop.className "swt:absolute swt:inset-0 swt:flex swt:items-baseline swt:px-3 swt:py-1"
+                    prop.className [
+                        "swt:absolute swt:inset-0 swt:flex swt:items-baseline swt:py-1"
+                        if isCollapsed then
+                            "swt:px-2"
+                        else
+                            "swt:px-3"
+                    ]
                     prop.children [
-                        if showHeader then
+                        if isCollapsed then
                             Html.span [
-                                prop.className "swt:mr-1 swt:shrink-0"
-                                prop.text $"{category}:"
+                                prop.className "swt:shrink-0 swt:font-medium"
+                                prop.text collapsedInitial
                             ]
-                        Html.span [
-                            prop.className [
-                                "swt:font-medium"
-                                if showHeader then
-                                    "swt:shrink-0"
-                                else
-                                    "swt:min-w-0 swt:truncate"
+                            if collapsedRemainder.Length > 0 then
+                                Html.span [
+                                    prop.className "swt:min-w-0 swt:truncate swt:font-medium"
+                                    prop.text collapsedRemainder
+                                ]
+                        else
+                            if showHeader then
+                                Html.span [
+                                    prop.className "swt:mr-1 swt:shrink-0"
+                                    prop.text $"{category}:"
+                                ]
+                            Html.span [
+                                prop.className [
+                                    "swt:font-medium"
+                                    if showHeader then
+                                        "swt:shrink-0"
+                                    else
+                                        "swt:min-w-0 swt:truncate"
+                                ]
+                                prop.text valueText
                             ]
-                            prop.text valueText
-                        ]
                     ]
                 ]
             ]
@@ -223,6 +277,8 @@ type GroupCard =
         ) =
         let hoveredMemberId, setHoveredMemberId = React.useState<ProvenanceSetId option> None
         let hoveredTabIndex, setHoveredTabIndex = React.useState<int option> None
+        let focusedTabIndex, setFocusedTabIndex = React.useStateWithUpdater<int option> None
+        let articleRef = React.useElementRef ()
         let density = React.useContext Density.context
 
         let droppable =
@@ -234,6 +290,18 @@ type GroupCard =
 
         let title = GroupCardData.title group
         let tabs = GroupCardData.tabs group
+
+        React.useListener.onClickAway (articleRef, fun _ -> setFocusedTabIndex (fun _ -> None))
+
+        let toggleFocusedTab index =
+            setFocusedTabIndex (fun current ->
+                match current with
+                | Some focused when focused = index -> None
+                | _ -> Some index)
+
+        let setArticleRef element =
+            articleRef.current <- (if isNull element then None else Some(unbox element))
+            droppable.setNodeRef element
 
         // let dnd = DndKit.use()
 
@@ -290,7 +358,7 @@ type GroupCard =
             match key with
             | Some key -> prop.key key
             | None -> ()
-            prop.ref droppable.setNodeRef
+            prop.ref setArticleRef
             prop.custom ("data-provenance-group-node", DragDrop.groupNodeId side group.Id)
             prop.custom ("data-provenance-group-drop-id", DragDrop.groupDropId side group.Id)
             prop.className [
@@ -425,15 +493,23 @@ type GroupCard =
                                         let valueText =
                                             Formatting.formatValue groupingValue.Value groupingValue.Unit
 
+                                        let tabMode =
+                                            match focusedTabIndex with
+                                            | Some focused when focused = index -> Focused
+                                            | Some _ -> Collapsed
+                                            | None -> Responsive
+
                                         GroupCard.OrganizerTab(
                                             category,
                                             valueText,
                                             tabPalette.[index % tabPalette.Length],
-                                            (hoveredTabIndex = Some index),
+                                            (hoveredTabIndex = Some index || focusedTabIndex = Some index),
                                             (fun highlighted ->
                                                 setHoveredTabIndex (
                                                     if highlighted then Some index else None
                                                 )),
+                                            tabMode,
+                                            (fun () -> toggleFocusedTab index),
                                             ?testId =
                                                 (if defaultArg debug false then
                                                      Some $"provenance-group-tab-{side}-{group.Id}-{index}"
