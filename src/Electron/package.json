@@ -1,7 +1,7 @@
 {
   "name": "swate",
   "productName": "Swate",
-  "version": "2.0.0-alpha.2",
+  "version": "2.0.0-alpha.3",
   "description": "An open-source, cross-platform, and user-friendly software for managing and sharing scientific data.",
   "main": ".vite/build/main.fs.js",
   "config": {
