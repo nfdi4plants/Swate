@@ -508,6 +508,60 @@ module private ConnectorObserver =
     [<Emit("$0.disconnect()")>]
     let disconnect (observer: obj) : unit = jsNative
 
+module private ConnectorMutationObserver =
+
+    [<Emit("new MutationObserver(() => $0())")>]
+    let create (callback: unit -> unit) : obj = jsNative
+
+    [<Emit("$0.observe($1, { subtree: true, childList: true, attributes: true, attributeFilter: ['class', 'style', 'hidden', 'aria-expanded'] })")>]
+    let observe (observer: obj) (target: HTMLElement) : unit = jsNative
+
+    [<Emit("$0.disconnect()")>]
+    let disconnect (observer: obj) : unit = jsNative
+
+module private ConnectorTransition =
+
+    let private layoutProperties =
+        set [
+            "bottom"
+            "column-gap"
+            "flex"
+            "flex-basis"
+            "flex-grow"
+            "flex-shrink"
+            "gap"
+            "grid-template-columns"
+            "grid-template-rows"
+            "height"
+            "left"
+            "margin-bottom"
+            "margin-left"
+            "margin-right"
+            "margin-top"
+            "max-height"
+            "max-width"
+            "min-height"
+            "min-width"
+            "padding-bottom"
+            "padding-left"
+            "padding-right"
+            "padding-top"
+            "right"
+            "row-gap"
+            "scale"
+            "top"
+            "transform"
+            "translate"
+            "width"
+        ]
+
+    [<Emit("$0.propertyName || ''")>]
+    let private propertyName (_event: Event) : string = jsNative
+
+    let affectsLayout event =
+        let name = propertyName event
+        System.String.IsNullOrWhiteSpace name || layoutProperties.Contains name
+
 module private AnimationFrame =
 
     [<Emit("requestAnimationFrame($0)")>]
@@ -560,6 +614,8 @@ type ConnectorOverlay =
         let paths, setPaths = React.useStateWithUpdater ([]: MeasuredConnector list)
         let hoveredKey, setHoveredKey = React.useState<string option> None
         let pendingFrame = React.useRef (None: float option)
+        let transitionFrame = React.useRef (None: float option)
+        let activeLayoutTransitions = React.useRef 0
         let debugEnabled = defaultArg debug false
 
         let setMeasuredPaths next =
@@ -597,17 +653,65 @@ type ConnectorOverlay =
                 pendingFrame.current <- None
             | None -> ()
 
+        let rec measureDuringLayoutTransition () =
+            measureNow ()
+
+            if activeLayoutTransitions.current > 0 then
+                transitionFrame.current <- Some(AnimationFrame.request measureDuringLayoutTransition)
+            else
+                transitionFrame.current <- None
+
+        let startLayoutTransition () =
+            activeLayoutTransitions.current <- activeLayoutTransitions.current + 1
+            scheduleMeasure ()
+
+            match transitionFrame.current with
+            | Some _ -> ()
+            | None -> transitionFrame.current <- Some(AnimationFrame.request measureDuringLayoutTransition)
+
+        let finishLayoutTransition () =
+            activeLayoutTransitions.current <- max 0 (activeLayoutTransitions.current - 1)
+            scheduleMeasure ()
+
+        let cancelTransitionFrame () =
+            match transitionFrame.current with
+            | Some handle -> AnimationFrame.cancel handle
+            | None -> ()
+
+            transitionFrame.current <- None
+            activeLayoutTransitions.current <- 0
+
         React.useEffect (
             (fun () ->
                 measureNow ()
 
                 match containerRef.current with
-                | None -> FsReact.createDisposable cancelPendingFrame
+                | None ->
+                    FsReact.createDisposable (fun () ->
+                        cancelPendingFrame ()
+                        cancelTransitionFrame ()
+                    )
                 | Some container ->
                     let onLayout = fun (_: Event) -> scheduleMeasure ()
+                    let onLayoutMutation = fun () -> scheduleMeasure ()
+
+                    let onTransitionRun =
+                        fun (event: Event) ->
+                            if ConnectorTransition.affectsLayout event then
+                                startLayoutTransition ()
+
+                    let onTransitionFinish =
+                        fun (event: Event) ->
+                            if ConnectorTransition.affectsLayout event then
+                                finishLayoutTransition ()
+
                     container.addEventListener ("scroll", onLayout)
+                    container.addEventListener ("transitionrun", onTransitionRun)
+                    container.addEventListener ("transitionend", onTransitionFinish)
+                    container.addEventListener ("transitioncancel", onTransitionFinish)
                     Browser.Dom.window.addEventListener ("resize", onLayout)
                     let observer = ConnectorObserver.create scheduleMeasure
+                    let mutationObserver = ConnectorMutationObserver.create onLayoutMutation
                     ConnectorObserver.observeNode observer container
                     // Resize nodes are the content-sized boxes (property headers, value
                     // chips); their handles move when the box grows, without the handle
@@ -617,11 +721,18 @@ type ConnectorOverlay =
                         "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
                         observer
 
+                    ConnectorMutationObserver.observe mutationObserver container
+
                     FsReact.createDisposable (fun () ->
                         container.removeEventListener ("scroll", onLayout)
+                        container.removeEventListener ("transitionrun", onTransitionRun)
+                        container.removeEventListener ("transitionend", onTransitionFinish)
+                        container.removeEventListener ("transitioncancel", onTransitionFinish)
                         Browser.Dom.window.removeEventListener ("resize", onLayout)
                         ConnectorObserver.disconnect observer
+                        ConnectorMutationObserver.disconnect mutationObserver
                         cancelPendingFrame ()
+                        cancelTransitionFrame ()
                     )
             ),
             [| box pairId
