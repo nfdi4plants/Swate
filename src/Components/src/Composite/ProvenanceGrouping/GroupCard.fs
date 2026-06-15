@@ -130,16 +130,14 @@ type GroupCard =
             ?key: string
         ) =
         let tabRef = React.useRef<Browser.Types.HTMLElement option> None
+        let fullLabelRef = React.useRef<Browser.Types.HTMLElement option> None
         let showHeader, setShowHeader = React.useState true
 
         let measure () =
-            match tabRef.current with
-            | Some element ->
-                // The invisible in-flow copy below keeps the full text as the
-                // tab's natural width, so this comparison is stable no matter
-                // whether the header is currently shown.
-                setShowHeader (element.scrollWidth <= element.clientWidth + 1.0)
-            | None -> ()
+            match fullLabelRef.current with
+            | Some fullLabel ->
+                setShowHeader (fullLabel.scrollWidth <= fullLabel.clientWidth + 1.0)
+            | _ -> ()
 
         React.useEffectOnce (fun () ->
             measure ()
@@ -173,12 +171,29 @@ type GroupCard =
                     "swt:opacity-75"
             ]
             prop.children [
-                // Invisible in-flow copy: gives the tab its natural full width so
-                // flexbox allocation, not the toggled header, drives the overflow.
+                // Invisible in-flow copy: gives the tab its natural full width.
                 Html.span [
                     prop.ariaHidden true
                     prop.className "swt:invisible swt:px-3 swt:py-1"
                     prop.text $"{category}: {valueText}"
+                ]
+                // Measurement overlay: checks whether the full untruncated label
+                // fits in the actual visible tab width.
+                Html.span [
+                    prop.ref (fun element ->
+                        fullLabelRef.current <- (if isNull element then None else Some(unbox element)))
+                    prop.ariaHidden true
+                    prop.className "swt:pointer-events-none swt:absolute swt:inset-0 swt:invisible swt:flex swt:items-baseline swt:overflow-visible swt:px-3 swt:py-1"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:mr-1 swt:shrink-0"
+                            prop.text $"{category}:"
+                        ]
+                        Html.span [
+                            prop.className "swt:shrink-0 swt:font-medium"
+                            prop.text valueText
+                        ]
+                    ]
                 ]
                 // Visible overlay: drops the header entirely once the tab shrinks.
                 Html.span [
@@ -190,7 +205,13 @@ type GroupCard =
                                 prop.text $"{category}:"
                             ]
                         Html.span [
-                            prop.className "swt:min-w-0 swt:truncate swt:font-medium"
+                            prop.className [
+                                "swt:font-medium"
+                                if showHeader then
+                                    "swt:shrink-0"
+                                else
+                                    "swt:min-w-0 swt:truncate"
+                            ]
                             prop.text valueText
                         ]
                     ]
