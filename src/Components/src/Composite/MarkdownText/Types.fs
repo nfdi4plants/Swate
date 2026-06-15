@@ -7,7 +7,8 @@ type PreviewMode =
     | Preview
 
 type MarkdownOptions = {
-    Height: int
+    MinHeight: int
+    MaxHeight: int
     Mode: PreviewMode
     PreviewClassName: string option
 }
@@ -16,7 +17,8 @@ type MarkdownOptions = {
 module MarkdownOptions =
 
     let defaults = {
-        Height = 360
+        MinHeight = 240
+        MaxHeight = 360
         Mode = PreviewMode.Live
         PreviewClassName = None
     }
