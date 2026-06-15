@@ -526,7 +526,10 @@ type TextInputWithMarkdown =
                                                     if activeMode = PreviewMode.Live then
                                                         "swt:border-b swt:border-base-300 swt:lg:border-b-0 swt:lg:border-r"
                                                 ]
-                                                prop.style [ style.maxHeight options.MaxHeight; style.minHeight options.MinHeight ]
+                                                prop.style [
+                                                    style.maxHeight options.MaxHeight
+                                                    style.minHeight options.MinHeight
+                                                ]
                                                 prop.children [
                                                     Html.textarea [
                                                         prop.ref textareaRef
@@ -546,7 +549,10 @@ type TextInputWithMarkdown =
                                         if activeMode <> PreviewMode.Edit then
                                             Html.div [
                                                 prop.className "swt:min-w-0 swt:overflow-auto swt:bg-base-100"
-                                                prop.style [ style.maxHeight options.MaxHeight; style.minHeight options.MinHeight ]
+                                                prop.style [
+                                                    style.maxHeight options.MaxHeight
+                                                    style.minHeight options.MinHeight
+                                                ]
                                                 prop.children [
                                                     ReactMDEditor.MarkdownPreview(
                                                         tempValue,
