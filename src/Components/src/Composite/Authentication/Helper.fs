@@ -28,6 +28,7 @@ module GitLabUrls =
             "read_user"
             "read_repository"
             "read_api"
+            "write_api"
             "write_repository"
             "self_rotate" // This is used to allow users to rotate their token from within Swate without having to log in to GitLab. It is a scope that only allows the token itself to be revoked, not any other tokens or account access.
         ]
