@@ -806,7 +806,7 @@ type ConnectorOverlay =
                                         svg.fill "none"
                                         svg.stroke "transparent"
                                         svg.strokeWidth 14
-                                        svg.className "swt:pointer-events-auto swt:cursor-pointer focus:swt:outline-none"
+                                        svg.className "swt:pointer-events-auto swt:cursor-pointer swt:outline-none swt:shadow-none"
                                         svg.custom ("tabIndex", "0")
                                         svg.custom ("role", "button")
                                         svg.custom (
