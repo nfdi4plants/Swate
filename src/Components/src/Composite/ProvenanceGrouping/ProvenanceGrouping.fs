@@ -53,7 +53,7 @@ module private Splitter =
             prop.className
                 "swt:group swt:flex swt:min-h-full swt:cursor-col-resize swt:items-stretch swt:justify-center swt:rounded hover:swt:bg-base-300/60"
             prop.onPointerDown onPointerDown
-            prop.style [ style.custom ("touch-action", "none") ]
+            prop.style [ style.custom ("touchAction", "none") ]
             prop.custom ("role", "separator")
             prop.custom ("aria-orientation", "vertical")
             prop.ariaLabel "Resize provenance panels"
@@ -1150,7 +1150,7 @@ type ProvenanceGrouping =
                     prop.ref surfaceRef
                     prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start"
                     prop.style [
-                        style.custom ("grid-template-columns", Splitter.template panelRatios)
+                        style.custom ("gridTemplateColumns", Splitter.template panelRatios)
                     ]
                     if debug then
                         prop.testId "provenance-surface"
@@ -1188,7 +1188,7 @@ type ProvenanceGrouping =
                     prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start swt:gap-x-8"
                     prop.style [
                         style.custom (
-                            "grid-template-columns",
+                            "gridTemplateColumns",
                             $"{railTrack ProvenanceSide.Input} minmax(0, 1fr) {railTrack ProvenanceSide.Output}"
                         )
                     ]
