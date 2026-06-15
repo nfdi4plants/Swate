@@ -19,6 +19,7 @@ open Vitest
 module GitService = Main.Git.GitService
 module GitProvisioningService = Main.Git.GitProvisioningService
 module GitAuthAdapter = Main.Git.GitAuthAdapter
+module GitCommandResolver = Main.Git.GitCommandResolver
 module GitTokenProvider = Main.Git.GitTokenProvider
 module AuthService = Main.Auth.AuthService
 
@@ -322,6 +323,50 @@ Vitest.describe (
             fun () ->
                 let redacted = GitAuthAdapter.redactToken "Authorization: Bearer abc123"
                 Vitest.expect(redacted).toBe ("Authorization: [REDACTED]")
+        )
+)
+
+Vitest.describe (
+    "GitCommandResolver.resolveGitToolPath",
+    fun () ->
+        Vitest.test (
+            "keeps the inherited PATH when Git LFS resolves normally",
+            fun () ->
+                let path =
+                    GitCommandResolver.resolveGitToolPath (fun _ -> true) "darwin" "/usr/bin:/bin"
+
+                Vitest.expect(path).toBe ("/usr/bin:/bin")
+        )
+
+        Vitest.test (
+            "prepends common macOS Git tool directories when automatic resolution fails",
+            fun () ->
+                let path =
+                    GitCommandResolver.resolveGitToolPath (fun _ -> false) "darwin" "/usr/bin:/bin:/custom/bin"
+
+                Vitest
+                    .expect(path)
+                    .toBe ("/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:/usr/bin:/bin:/custom/bin")
+        )
+
+        Vitest.test (
+            "prepends common Linux Git tool directories when automatic resolution fails",
+            fun () ->
+                let path =
+                    GitCommandResolver.resolveGitToolPath (fun _ -> false) "linux" "/usr/bin:/bin:/custom/bin"
+
+                Vitest
+                    .expect(path)
+                    .toBe ("/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin:/custom/bin")
+        )
+
+        Vitest.test (
+            "does not alter unsupported platforms",
+            fun () ->
+                let path =
+                    GitCommandResolver.resolveGitToolPath (fun _ -> false) "win32" "C:\\Git\\cmd;C:\\Windows"
+
+                Vitest.expect(path).toBe ("C:\\Git\\cmd;C:\\Windows")
         )
 )
 
