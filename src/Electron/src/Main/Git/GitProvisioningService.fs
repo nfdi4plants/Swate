@@ -283,7 +283,7 @@ let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string
                 let! initResult =
                     runSimpleGit
                         (fun git -> promise {
-                            let! _ = git.init ()
+                            let! _ = git.init (U2.Case1 [| "--initial-branch=main" |])
                             return normalizedTargetPath
                         })
                         initGit
