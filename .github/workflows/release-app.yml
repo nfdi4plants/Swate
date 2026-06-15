@@ -63,7 +63,10 @@ jobs:
           #   arch: arm64
 
           - os: macos-latest
-            arch: universal
+            arch: x64
+
+          - os: macos-latest
+            arch: arm64
 
           - os: ubuntu-latest
             arch: x64
