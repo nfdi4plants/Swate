@@ -1,5 +1,11 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const { execFile } = require('node:child_process');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { promisify } = require('node:util');
+
+const execFileAsync = promisify(execFile);
 
 const platformIcon =
   process.platform === 'win32'
@@ -7,6 +13,32 @@ const platformIcon =
     : process.platform === 'darwin'
       ? 'assets/icons/mac/icon'
       : 'assets/icons/png/1024x1024';
+
+const adHocSignDarwinArm64App = async (_forgeConfig, packageResult) => {
+  if (packageResult.platform !== 'darwin' || packageResult.arch !== 'arm64') {
+    return;
+  }
+
+  let signedAppCount = 0;
+
+  for (const outputPath of packageResult.outputPaths) {
+    const entries = await fs.readdir(outputPath, { withFileTypes: true });
+    const appEntry = entries.find((entry) => entry.isDirectory() && entry.name.endsWith('.app'));
+
+    if (!appEntry) {
+      continue;
+    }
+
+    const appPath = path.join(outputPath, appEntry.name);
+    await execFileAsync('codesign', ['--force', '--deep', '--sign', '-', appPath]);
+    await execFileAsync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath]);
+    signedAppCount++;
+  }
+
+  if (signedAppCount === 0) {
+    throw new Error(`No .app bundle found to ad-hoc sign in: ${packageResult.outputPaths.join(', ')}`);
+  }
+};
 
 module.exports = {
   packagerConfig: {
@@ -18,6 +50,9 @@ module.exports = {
     ]
   },
   rebuildConfig: {},
+  hooks: {
+    postPackage: adHocSignDarwinArm64App,
+  },
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
