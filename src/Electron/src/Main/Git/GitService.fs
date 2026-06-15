@@ -49,7 +49,7 @@ let private gitLfsThresholdConfigKey = "swate.lfs.autotrackthresholdmb"
 let private gitLfsDownloadLargeFilesConfigKey = "swate.lfs.downloadlargefiles"
 let private gitLfsDefaultThresholdMb = 1
 let private gitLfsMaximumThresholdMb = 100
-let private gitLfsDefaultDownloadLargeFiles = true
+let private gitLfsDefaultDownloadLargeFiles = false
 
 let private normalizeOptionalGitRef (value: string option) =
     value
