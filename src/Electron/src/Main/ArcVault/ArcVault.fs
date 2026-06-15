@@ -387,7 +387,7 @@ module ArcVaultExtensions =
                 sendMsg.pathChange (Some normalizedPath)
         }
 
-        member this.CreateARC(path: string, identifier: string) = promise {
+        member this.CreateARC(path: string, identifier: string, initGit: bool) = promise {
             match this.path, this.arc with
             | Some _, _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to path."
             | _, Some _ -> swatefailfn this.window.id "Unable to create ARC in vault bound to ARC."
@@ -414,6 +414,12 @@ module ArcVaultExtensions =
                             (PathHelpers.formatContractErrors errors)
                 finally
                     this.isBusyWriting <- false
+
+                if initGit then
+                    match! Git.GitProvisioningService.initRepository normalizedPath with
+                    | Error failure ->
+                        swatelogfn this.window.id $"Git init failed for '{normalizedPath}': {failure}"
+                    | Ok _ -> ()
 
                 do! this.Startup()
                 sendMsg.pathChange (Some normalizedPath)
@@ -646,13 +652,13 @@ type ArcVaults() =
         return id
     }
 
-    member this.RegisterVaultWithNewArc(path: string, newIdentifier: string) : Fable.Core.JS.Promise<int> = promise {
+    member this.RegisterVaultWithNewArc(path: string, newIdentifier: string, initGit: bool) : Fable.Core.JS.Promise<int> = promise {
         let! window = createWindow ()
         let id = window.id
         let vault = ArcVault(window)
         this.Vaults.Add(id, vault)
 
-        do! vault.CreateARC(path, newIdentifier)
+        do! vault.CreateARC(path, newIdentifier, initGit)
 
         this.OnCloseWindow(window, vault, id)
 
@@ -670,10 +676,10 @@ type ArcVaults() =
         return ()
     }
 
-    member this.CreateARCInVault(windowId: int, path: string, identifier: string) = promise {
+    member this.CreateARCInVault(windowId: int, path: string, identifier: string, initGit: bool) = promise {
         match this.Vaults.TryGetValue windowId with
         | false, _ -> failwith $"Vault with window-id '{windowId}' not found."
-        | true, vault -> do! vault.CreateARC(path, identifier)
+        | true, vault -> do! vault.CreateARC(path, identifier, initGit)
 
         return ()
     }
@@ -721,7 +727,7 @@ type ArcVaults() =
 
     /// Create a new ARC at the given path with the given identifier.
     /// Decision: path already open → focus, calling window empty → create there, else → new window.
-    member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string) = promise {
+    member this.CreateOrFocusArc(callingWindowId: int, arcPath: string, identifier: string, initGit: bool) = promise {
         let normalizedArcPath = PathHelpers.normalizePath arcPath
 
         match this.TryGetVaultByPath normalizedArcPath with
@@ -732,12 +738,12 @@ type ArcVaults() =
         | None ->
             match this.TryGetVault callingWindowId with
             | Some vault when vault.path.IsNone ->
-                do! vault.CreateARC(normalizedArcPath, identifier)
+                do! vault.CreateARC(normalizedArcPath, identifier, initGit)
                 do! vault.RefreshFileTree()
                 this.TrackRecentAndBroadcast(normalizedArcPath)
                 return ArcOpenDisposition.CreatedInCurrent normalizedArcPath
             | _ ->
-                let! newWindowId = this.RegisterVaultWithNewArc(normalizedArcPath, identifier)
+                let! newWindowId = this.RegisterVaultWithNewArc(normalizedArcPath, identifier, initGit)
 
                 match this.TryGetVault newWindowId with
                 | Some newVault -> do! newVault.RefreshFileTree()

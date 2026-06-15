@@ -126,7 +126,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     createARC =
-        fun (identifier: string) -> promise {
+        fun (request: CreateArcRequest) -> promise {
             let window = dialogParentFromIpcEvent event
 
             let! r =
@@ -145,11 +145,11 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let arcContainerPath = r.filePaths |> Array.exactlyOne
 
                 let arcPath =
-                    ARCtrl.ArcPathHelper.combine arcContainerPath identifier
+                    ARCtrl.ArcPathHelper.combine arcContainerPath request.identifier
                     |> PathHelpers.normalizePath
 
                 let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
+                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier, request.initGit)
                 return Ok(ArcOpenDisposition.path disposition)
         }
     ensureNotesFolder =
