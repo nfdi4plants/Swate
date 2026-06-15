@@ -28,6 +28,7 @@ body:
         - Standalone
         - ARCitect
         - Excel
+        - Electron Swate App
       default: 0
   - type: textarea
     id: swate-host-details
