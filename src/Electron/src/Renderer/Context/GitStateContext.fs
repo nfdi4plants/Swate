@@ -15,7 +15,7 @@ open Renderer.Context.GitWorkflow
 type GitStateController = {
     state: GitState
     refresh: unit -> unit
-    initRepository: string option -> unit
+    initRepository: unit -> unit
     fetch: unit -> unit
     pull: unit -> unit
     push: unit -> unit
@@ -75,17 +75,11 @@ module private Helper =
                 let! result = Api.ipcArcVaultApi.renameOpenArcRoot newName
                 return result |> Result.mapError _.Message
             }
-        createDataHubProject =
-            fun projectName -> promise {
-                let! result = Api.ipcGitLabApi.createProject projectName
-                return result |> Result.mapError _.GitLabErrorToString
-            }
         installGitLfs = Renderer.GitApiClient.installGitLfs
         previewGitPull = Renderer.GitApiClient.previewGitPull
         gitFetch = Renderer.GitApiClient.gitFetch
         gitPull = Renderer.GitApiClient.gitPull
         gitPush = Renderer.GitApiClient.gitPush
-        gitAddRemote = Renderer.GitApiClient.gitAddRemote
         gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
         createBranch = Renderer.GitApiClient.createBranch
         checkoutBranch = Renderer.GitApiClient.checkoutBranch
@@ -106,7 +100,7 @@ let GitStateCtx =
         {
             state = GitState.Empty
             refresh = fun () -> ()
-            initRepository = fun _ -> ()
+            initRepository = fun () -> ()
             fetch = fun () -> ()
             pull = fun () -> ()
             push = fun () -> ()
@@ -146,8 +140,7 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let refresh () = dispatch RefreshRequested
 
-    let initRepository remoteProjectName =
-        dispatch (InitRepositoryRequested remoteProjectName)
+    let initRepository () = dispatch InitRepositoryRequested
 
     let fetch () = dispatch FetchRequested
 
