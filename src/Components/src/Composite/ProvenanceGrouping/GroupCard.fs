@@ -78,19 +78,6 @@ module private GroupCardData =
             $"{value.Key.Header.Kind.Id}:{value.Key.Header.Category.Name}",
             Formatting.formatValue value.Value value.Unit)
 
-    /// Members whose own property values carry the given grouping value.
-    let membersWithValue (model: ProvenanceModel) (groupingValue: DisplayGroupingValue) (members: DisplayMember list) =
-        members
-        |> List.filter (fun member' ->
-            member'.PropertyValueIds
-            |> List.exists (fun id ->
-                match model.PropertyValues.TryFind id with
-                | Some value ->
-                    value.Header = groupingValue.Key.Header
-                    && value.Value = groupingValue.Value
-                    && value.Unit = groupingValue.Unit
-                | None -> false))
-
     let title (group: DisplayGroup) =
         match tabs group with
         | [] -> group.Members.Head.Name
@@ -248,18 +235,6 @@ type GroupCard =
         let title = GroupCardData.title group
         let tabs = GroupCardData.tabs group
 
-        // The folder previews all members by default; while a grouping tab is
-        // hovered/focused it narrows to the members carrying that tab's value.
-        // Inherited grouping values do not live on the members themselves, so an
-        // empty match falls back to the full member list.
-        let visibleMembers =
-            match hoveredTabIndex |> Option.bind (fun index -> tabs |> List.tryItem index) with
-            | Some groupingValue ->
-                match GroupCardData.membersWithValue model groupingValue group.Members with
-                | [] -> group.Members
-                | members -> members
-            | None -> group.Members
-
         // let dnd = DndKit.use()
 
         // let isValueChipDragging =
@@ -393,8 +368,7 @@ type GroupCard =
                 | tabs ->
                     // A grouped card is drawn as a file organizer: one tab per grouping
                     // value sits on top of a folder body that holds the members' type
-                    // symbols. Hovering a tab opens it into the folder and narrows the
-                    // preview to that tab's members.
+                    // symbols. Hovering or focusing a tab highlights that grouping value.
                     let symbolIcon (descriptor: EntityType.Descriptor) =
                         Html.i [
                             prop.className $"swt:iconify {descriptor.Icon} swt:size-4 swt:shrink-0"
@@ -406,11 +380,11 @@ type GroupCard =
                             prop.text (string count)
                         ]
 
-                    // When few enough to fit, every visible member contributes one symbol
+                    // When few enough to fit, every member contributes one symbol
                     // side by side; otherwise the preview collapses to the dominant type
                     // symbol with a count.
                     let memberDescriptors =
-                        visibleMembers
+                        group.Members
                         |> List.choose (fun member' ->
                             GroupCardData.endpointKind side model member'.SetId
                             |> Option.map EntityType.descriptor)
@@ -495,7 +469,7 @@ type GroupCard =
                                                     prop.testId $"provenance-group-symbols-{side}-{group.Id}"
                                                 prop.children [
                                                     match memberDescriptors with
-                                                    | [] -> countLabel visibleMembers.Length
+                                                    | [] -> countLabel group.Members.Length
                                                     | descriptors when descriptors.Length <= maxInlineSymbols ->
                                                         for index, descriptor in List.indexed descriptors do
                                                             Html.span [
