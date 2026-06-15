@@ -912,8 +912,7 @@ Vitest.describe (
                         RepositoryAvailability = GitRepositoryAvailability.MissingRepository
                 }
 
-                let requestedState, requestCmd =
-                    update deps ignore InitRepositoryRequested state
+                let requestedState, requestCmd = update deps ignore InitRepositoryRequested state
 
                 let! requestMessages = collectMessages requestCmd
 
