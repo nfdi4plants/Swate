@@ -344,9 +344,7 @@ Vitest.describe (
                 let path =
                     GitCommandResolver.resolveGitToolPath (fun _ -> false) "darwin" "/usr/bin:/bin:/custom/bin"
 
-                Vitest
-                    .expect(path)
-                    .toBe ("/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:/usr/bin:/bin:/custom/bin")
+                Vitest.expect(path).toBe ("/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:/usr/bin:/bin:/custom/bin")
         )
 
         Vitest.test (

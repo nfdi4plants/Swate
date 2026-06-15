@@ -43,10 +43,7 @@ let private distinctPathEntries (separator: char) (fallbackEntries: string[]) (c
 
     let addEntry (entry: string) =
         let normalizedEntry =
-            entry
-            |> Option.ofObj
-            |> Option.defaultValue String.Empty
-            |> _.Trim()
+            entry |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
 
         if not (String.IsNullOrWhiteSpace normalizedEntry) && seen.Add normalizedEntry then
             entries.Add normalizedEntry
@@ -69,8 +66,7 @@ let resolveGitToolPath (canResolveGitLfs: string -> bool) (platform: string) (cu
         |> _.Trim()
         |> _.ToLowerInvariant()
 
-    let existingPath =
-        currentPath |> Option.ofObj |> Option.defaultValue String.Empty
+    let existingPath = currentPath |> Option.ofObj |> Option.defaultValue String.Empty
 
     if supportsFallback normalizedPlatform && not (canResolveGitLfs existingPath) then
         distinctPathEntries (pathSeparator normalizedPlatform) (fallbackDirectories normalizedPlatform) existingPath
