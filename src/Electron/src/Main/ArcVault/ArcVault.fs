@@ -417,8 +417,7 @@ module ArcVaultExtensions =
 
                 if initGit then
                     match! Git.GitProvisioningService.initRepository normalizedPath with
-                    | Error failure ->
-                        swatelogfn this.window.id $"Git init failed for '{normalizedPath}': {failure}"
+                    | Error failure -> swatelogfn this.window.id $"Git init failed for '{normalizedPath}': {failure}"
                     | Ok _ -> ()
 
                 do! this.Startup()
@@ -652,21 +651,24 @@ type ArcVaults() =
         return id
     }
 
-    member this.RegisterVaultWithNewArc(path: string, newIdentifier: string, initGit: bool) : Fable.Core.JS.Promise<int> = promise {
-        let! window = createWindow ()
-        let id = window.id
-        let vault = ArcVault(window)
-        this.Vaults.Add(id, vault)
+    member this.RegisterVaultWithNewArc
+        (path: string, newIdentifier: string, initGit: bool)
+        : Fable.Core.JS.Promise<int> =
+        promise {
+            let! window = createWindow ()
+            let id = window.id
+            let vault = ArcVault(window)
+            this.Vaults.Add(id, vault)
 
-        do! vault.CreateARC(path, newIdentifier, initGit)
+            do! vault.CreateARC(path, newIdentifier, initGit)
 
-        this.OnCloseWindow(window, vault, id)
+            this.OnCloseWindow(window, vault, id)
 
-        window.focus ()
-        swatelogfn id "Register window"
+            window.focus ()
+            swatelogfn id "Register window"
 
-        return id
-    }
+            return id
+        }
 
     member this.OpenARCInVault(windowId: int, path: string) = promise {
         match this.Vaults.TryGetValue windowId with

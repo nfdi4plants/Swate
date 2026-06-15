@@ -21,10 +21,7 @@ module IPCTypesHelper =
 
 open IPCTypesHelper
 
-type CreateArcRequest = {
-    identifier: string
-    initGit: bool
-}
+type CreateArcRequest = { identifier: string; initGit: bool }
 
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {

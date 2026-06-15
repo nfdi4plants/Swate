@@ -64,7 +64,11 @@ let openArcByPath (onError: string -> unit) (arcPath: string) : JS.Promise<bool>
 }
 
 let createArc (onError: string -> unit) (identifier: string) (initGit: bool) : JS.Promise<string option> = promise {
-    let request = { identifier = identifier; initGit = initGit }
+    let request = {
+        identifier = identifier
+        initGit = initGit
+    }
+
     match! Api.ipcArcVaultApi.createARC request with
     | Error exn ->
         onError exn.Message

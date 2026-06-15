@@ -30,9 +30,7 @@ let CreateNewArcModalContent (close: unit -> unit) =
                     let! _ = createArc onCreateArcError temp initGit
                     ()
                 }
-                |> Promise.catch (fun ex ->
-                    console.warn ($"Error during ARC creation: {ex.Message}")
-                )
+                |> Promise.catch (fun ex -> console.warn ($"Error during ARC creation: {ex.Message}"))
                 |> Promise.start
 
             close ()
