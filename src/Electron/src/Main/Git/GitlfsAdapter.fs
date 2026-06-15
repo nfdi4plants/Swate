@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Fable.Core.JS
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.Node
+open Main.Git.GitAuthAdapter
 
 [<Literal>]
 let private repoValidationTimeoutMs = 5000
@@ -27,6 +28,11 @@ type GitSpawnResult = {
     TimedOut: bool
 }
 
+let private resolveGitEnvironment (environment: obj option) =
+    environment
+    |> Option.defaultWith createNonInteractiveEnv
+    |> GitCommandResolver.ensureGitToolPath
+
 let private runGitProcess (captureStdout: bool) (request: GitSpawnRequest) : Promise<GitSpawnResult> = promise {
     let! result =
         Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
@@ -34,13 +40,10 @@ let private runGitProcess (captureStdout: bool) (request: GitSpawnRequest) : Pro
                 createObj [
                     "shell" ==> false
                     "windowsHide" ==> true
+                    "env" ==> resolveGitEnvironment request.Environment
 
                     match request.WorkingDirectory with
                     | Some value -> "cwd" ==> value
-                    | None -> ()
-
-                    match request.Environment with
-                    | Some value -> "env" ==> value
                     | None -> ()
                 ]
 
@@ -144,6 +147,7 @@ let tryExecGitText (workingDirectory: string option) (timeoutMs: int) (args: str
                     "stdio" ==> "pipe"
                     "shell" ==> false
                     "timeout" ==> timeoutMs
+                    "env" ==> createNonInteractiveEnv ()
 
                     match workingDirectory with
                     | Some value -> "cwd" ==> value
@@ -220,6 +224,7 @@ type NodeGitLfsAdapter() =
                         "encoding" ==> "utf8"
                         "stdio" ==> "pipe"
                         "shell" ==> false
+                        "env" ==> createNonInteractiveEnv ()
                     ]
                 )
                 |> unbox<string>
@@ -253,6 +258,7 @@ type NodeGitLfsAdapter() =
                             let spawnOptions =
                                 createObj [
                                     "shell" ==> false
+                                    "env" ==> createNonInteractiveEnv ()
 
                                     match workingDirectory with
                                     | Some value -> "cwd" ==> value
@@ -407,6 +413,7 @@ type NodeGitLfsAdapter() =
                             "encoding" ==> "utf8"
                             "stdio" ==> "pipe"
                             "shell" ==> false
+                            "env" ==> createNonInteractiveEnv ()
                         ]
                     )
                     |> unbox<string>
