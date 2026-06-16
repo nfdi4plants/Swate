@@ -32,7 +32,7 @@ let private tryResolveTargetPath (markdown: string) (targetRef: ExistingTargetRe
         match Validation.sanitizeProtocolName frontmatter.Title with
         | None -> Error "Title is invalid for protocol naming. Choose a different title."
         | Some protocolName ->
-            match NoteConversion.mkExistingTargetRelativePath targetRef frontmatter.Date.Date protocolName with
+            match NoteConversion.mkExistingTargetRelativePath targetRef protocolName with
             | None -> Error "Could not resolve a safe target path."
             | Some targetPath -> Ok targetPath
 

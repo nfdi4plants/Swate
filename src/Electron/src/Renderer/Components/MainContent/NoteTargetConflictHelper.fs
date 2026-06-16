@@ -12,7 +12,7 @@ let targetExistsOnDisk (targetPath: string) = promise {
     | Error _ -> return false
 }
 
-let showOverwriteConflictModal (errorModalCtx: ErrorModalActionsContext) (targetPath: string) (overwrite: unit -> unit) =
+let showOverwriteConflictModal (errorModalCtx: ErrorModalActionsContext) (targetPath: string) overwrite =
     let modalId = Guid.NewGuid().ToString()
 
     errorModalCtx.enqueue (

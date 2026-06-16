@@ -58,7 +58,7 @@ type Notes =
                         match NoteConversion.resolveProtocolName draft with
                         | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
                         | Some protocolName ->
-                            match NoteConversion.mkExistingTargetRelativePath targetRef dateCreated protocolName with
+                            match NoteConversion.mkExistingTargetRelativePath targetRef protocolName with
                             | None -> setError (Some "Could not resolve a safe target path.")
                             | Some relativePath -> createPayload (NotesTarget.ExistingTarget targetRef) relativePath
 

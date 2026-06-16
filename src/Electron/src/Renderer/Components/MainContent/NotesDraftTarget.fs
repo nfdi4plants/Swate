@@ -31,7 +31,7 @@ let NotesDraftTarget () =
                 Error = error
         }
 
-    let submitRequest (payload: NotesSubmitPayload) (requestFileType: FileContentType) (request: FileContentDTO) =
+    let submitRequest (request: FileContentDTO) =
         promise {
             setSubmitState true None
 
@@ -53,9 +53,7 @@ let NotesDraftTarget () =
                     let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
                     pageStateCtx.setState (Some pageState)
                 | Result.Error _ ->
-                    let fallbackData = FileContentDTO.create requestFileType payload.Intent.Content request.path
-
-                    let pageState = Renderer.Types.PageState.fromFileContentDTO fallbackData
+                    let pageState = Renderer.Types.PageState.fromFileContentDTO request
                     pageStateCtx.setState (Some pageState)
         }
         |> Promise.catch (fun exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}"))
@@ -65,30 +63,23 @@ let NotesDraftTarget () =
         fun (payload: NotesSubmitPayload) ->
             let targetPath = PathHelpers.normalizePath payload.Intent.RelativePath
 
-            let requestFileType = FileContentDTO.inferTextFileTypeFromPath targetPath
-
             let request: FileContentDTO =
-                FileContentDTO.create requestFileType payload.Intent.Content targetPath
+                FileContentDTO.create (FileContentDTO.inferTextFileTypeFromPath targetPath) payload.Intent.Content targetPath
 
-            let submit () = submitRequest payload requestFileType request
+            let submit () = submitRequest request
+            let showConflict () =
+                setSubmitState false None
+                showOverwriteConflictModal errorModalCtx targetPath submit
 
             promise {
                 setSubmitState true None
 
-                let targetExistsInSnapshot =
-                    PathHelpers.pathExistsInSnapshot (fileStateCtx.state.FileTree |> Array.map _.path) targetPath
-
-                if targetExistsInSnapshot then
-                    setSubmitState false None
-                    showOverwriteConflictModal errorModalCtx targetPath submit
+                if PathHelpers.pathExistsInSnapshot (fileStateCtx.state.FileTree |> Array.map _.path) targetPath then
+                    showConflict ()
                 else
                     let! targetExists = targetExistsOnDisk targetPath
 
-                    if targetExists then
-                        setSubmitState false None
-                        showOverwriteConflictModal errorModalCtx targetPath submit
-                    else
-                        submit ()
+                    if targetExists then showConflict () else submit ()
             }
             |> Promise.catch (fun exn -> setSubmitState false (Some $"Failed to check target note: {exn.Message}"))
             |> Promise.start

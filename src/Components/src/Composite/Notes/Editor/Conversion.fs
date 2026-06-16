@@ -124,7 +124,7 @@ module NoteConversion =
     let resolveProtocolName (draft: NotesDraft) =
         Validation.sanitizeProtocolName draft.Title
 
-    let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (_dateCreated: DateTime) (protocolName: string) =
+    let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (protocolName: string) =
         let folder =
             match targetRef.Kind with
             | NotesTargetKind.Study -> "studies"
