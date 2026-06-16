@@ -8,6 +8,7 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Renderer.Components.Helper.NoteFileSystemHelper
 open Renderer.Components.MainContent.NoteMoveHelper
 open Renderer.Components.MainContent.NoteTargetConflictHelper
 
@@ -47,6 +48,10 @@ let MarkdownEditorTarget (content: string) =
         [| box content |]
     )
 
+    let writeMarkdown path =
+        FileContentDTO.create FileContentType.Markdown markdown path
+        |> Api.ipcArcVaultApi.writeFile
+
     let saveMarkdown () =
         match selectedPath with
         | None -> setSaveError (Some "No markdown file is selected.")
@@ -56,10 +61,7 @@ let MarkdownEditorTarget (content: string) =
                 setSaveError None
                 setMoveError None
 
-                let request: FileContentDTO =
-                    FileContentDTO.create FileContentType.Markdown markdown relativePath
-
-                let! writeResult = Api.ipcArcVaultApi.writeFile request
+                let! writeResult = writeMarkdown relativePath
 
                 match writeResult with
                 | Ok() -> setLastSavedContent markdown
@@ -69,37 +71,84 @@ let MarkdownEditorTarget (content: string) =
             }
             |> Promise.start
 
-    let executeMovePlan (plan: ExistingTargetNoteMovePlan) =
+    let completeMovePlan (plan: ExistingTargetNoteMovePlan) = promise {
+        fileStateCtx.setSelection (ArcSelection.forTreePath (Some plan.TargetPath))
+        setLastSavedContent markdown
+        setSelectedExistingTarget None
+
+        match! ensureAssetsFolder plan.TargetPath with
+        | Error exn ->
+            setMoveError (
+                Some $"Moved note to '{plan.TargetPath}', but failed to create the assets folder: {exn.Message}"
+            )
+        | Ok() -> ()
+
+        let! previewResult = Api.ipcArcVaultApi.openFile plan.TargetPath
+
+        match previewResult with
+        | Ok previewData ->
+            let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
+            pageStateCtx.setState (Some pageState)
+        | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.MarkdownPage markdown))
+    }
+
+    let executeFileMovePlan (plan: ExistingTargetNoteMovePlan) = promise {
+        match! writeMarkdown plan.TargetPath with
+        | Error exn -> return Error $"Failed to move note: {exn.Message}"
+        | Ok() ->
+            match! Api.ipcArcVaultApi.deletePath plan.SourcePath with
+            | Error exn ->
+                return
+                    Error
+                        $"Moved note to '{plan.TargetPath}', but failed to delete the original note: {exn.Message}"
+            | Ok() -> return Ok()
+    }
+
+    let renameSourceMarkdownForFolderMove (plan: ExistingTargetNoteMovePlan) = promise {
+        let targetFileName = PathHelpers.getFileName plan.TargetPath
+
+        if PathHelpers.pathsEqual (PathHelpers.getFileName plan.SourcePath) targetFileName then
+            return Ok()
+        else
+            return!
+                Api.ipcArcVaultApi.renamePath {
+                    relativePath = plan.SourcePath
+                    newName = targetFileName
+                }
+    }
+
+    let executeFolderMovePlan (plan: ExistingTargetNoteMovePlan) folderMove overwrite = promise {
+        match! writeMarkdown plan.SourcePath with
+        | Error exn -> return Error $"Failed to save note before moving it: {exn.Message}"
+        | Ok() ->
+            match! renameSourceMarkdownForFolderMove plan with
+            | Error exn -> return Error $"Failed to rename note file before moving it: {exn.Message}"
+            | Ok() ->
+                match!
+                    Api.ipcArcVaultApi.movePath {
+                        sourceRelativePath = folderMove.SourceFolderPath
+                        targetRelativePath = folderMove.TargetFolderPath
+                        overwrite = overwrite
+                    }
+                with
+                | Error exn -> return Error $"Failed to move note folder: {exn.Message}"
+                | Ok() -> return Ok()
+    }
+
+    let runMovePlan plan overwrite =
+        match plan.FolderMove with
+        | Some folderMove -> executeFolderMovePlan plan folderMove overwrite
+        | None -> executeFileMovePlan plan
+
+    let executeMovePlan (plan: ExistingTargetNoteMovePlan) overwrite =
         promise {
             setIsMovingToExistingTarget true
             setSaveError None
             setMoveError None
 
-            let! writeResult = Api.ipcArcVaultApi.writeFile plan.Request
-
-            match writeResult with
-            | Error exn -> setMoveError (Some $"Failed to move note: {exn.Message}")
-            | Ok() ->
-                let! deleteResult = Api.ipcArcVaultApi.deletePath plan.SourcePath
-
-                match deleteResult with
-                | Error exn ->
-                    setMoveError (
-                        Some
-                            $"Moved note to '{plan.TargetPath}', but failed to delete the original note: {exn.Message}"
-                    )
-                | Ok() ->
-                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some plan.TargetPath))
-                    setLastSavedContent markdown
-                    setSelectedExistingTarget None
-
-                    let! previewResult = Api.ipcArcVaultApi.openFile plan.TargetPath
-
-                    match previewResult with
-                    | Ok previewData ->
-                        let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
-                        pageStateCtx.setState (Some pageState)
-                    | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.MarkdownPage markdown))
+            match! runMovePlan plan overwrite with
+            | Error errorMessage -> setMoveError (Some errorMessage)
+            | Ok() -> do! completeMovePlan plan
 
             setIsMovingToExistingTarget false
         }
@@ -111,7 +160,7 @@ let MarkdownEditorTarget (content: string) =
 
     let showMoveConflict (plan: ExistingTargetNoteMovePlan) =
         setMoveError None
-        showOverwriteConflictModal errorModalCtx plan.TargetPath (fun () -> executeMovePlan plan)
+        showOverwriteConflictModal errorModalCtx (movePlanConflictPath plan) (fun () -> executeMovePlan plan true)
 
     let blockOrExecuteMovePlan (plan: ExistingTargetNoteMovePlan) =
         promise {
@@ -119,13 +168,13 @@ let MarkdownEditorTarget (content: string) =
             setSaveError None
             setMoveError None
 
-            let! targetExists = targetExistsOnDisk plan.TargetPath
+            let! targetExists = targetExistsOnDisk (movePlanConflictPath plan)
 
             if targetExists then
                 setIsMovingToExistingTarget false
                 showMoveConflict plan
             else
-                executeMovePlan plan
+                executeMovePlan plan false
         }
         |> Promise.catch (fun exn ->
             setMoveError (Some $"Failed to check target note: {exn.Message}")

@@ -62,7 +62,7 @@ Vitest.describe (
                     fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-notes-"))
                     |> unbox<JS.Promise<string>>
 
-                let notesDir = pathDynamic?join (repoRoot, "notes", "27_04_2026") |> unbox<string>
+                let notesDir = pathDynamic?join (repoRoot, "notes", "2026-04-27", "my_note") |> unbox<string>
                 let notePath = pathDynamic?join (notesDir, "my_note.md") |> unbox<string>
 
                 let! _ =
@@ -77,7 +77,7 @@ Vitest.describe (
 
                 Vitest.expect(notes.Length).toBe (1)
                 let note = notes.[0]
-                Vitest.expect(note.RelativePath).toBe ("notes/27_04_2026/my_note.md")
+                Vitest.expect(note.RelativePath).toBe ("notes/2026-04-27/my_note/my_note.md")
                 Vitest.expect(note.Title).toBe ("My note")
                 Vitest.expect(note.Date.Year).toBe (2026)
                 Vitest.expect(note.Date.Month).toBe (4)
@@ -103,7 +103,7 @@ Vitest.describe (
                     fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-notes-"))
                     |> unbox<JS.Promise<string>>
 
-                let notesDir = pathDynamic?join (repoRoot, "notes", "27_04_2026") |> unbox<string>
+                let notesDir = pathDynamic?join (repoRoot, "notes", "2026-04-27", "plain_note") |> unbox<string>
                 let notePath = pathDynamic?join (notesDir, "plain_note.md") |> unbox<string>
 
                 let! _ =
@@ -129,7 +129,7 @@ Vitest.describe (
                     fsPromisesDynamic?mkdtemp (pathDynamic?join (tmpDir, "swate-notes-"))
                     |> unbox<JS.Promise<string>>
 
-                let notesDir = pathDynamic?join (repoRoot, "notes", "27_04_2026") |> unbox<string>
+                let notesDir = pathDynamic?join (repoRoot, "notes", "2026-04-27", "untagged_note") |> unbox<string>
                 let notePath = pathDynamic?join (notesDir, "untagged_note.md") |> unbox<string>
 
                 let! _ =

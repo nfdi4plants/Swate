@@ -239,7 +239,7 @@ Vitest.describe (
         Vitest.test (
             "root notes action is hidden for nested notes folders",
             fun () ->
-                let item = createFolderItem "15_06_2026" (Some "notes/15_06_2026")
+                let item = createFolderItem "2026-06-15" (Some "notes/2026-06-15")
                 let menuItems = rootNoteActionContextMenuItems ignore item
 
                 Vitest.expect(menuItems.Length).toBe (0)
@@ -260,7 +260,7 @@ Vitest.describe (
                 let request = createUntitledRootNoteRequest (DateTime(2026, 6, 15)) []
 
                 Vitest.expect(request.fileType).toEqual (FileContentType.Markdown)
-                Vitest.expect(request.path).toBe ("notes/15_06_2026/untitled-note.md")
+                Vitest.expect(request.path).toBe ("notes/2026-06-15/untitled-note/untitled-note.md")
 
                 match NoteConversion.tryDecodeMarkdownFrontmatter request.content with
                 | None -> failwith "Expected generated markdown to contain note frontmatter."
@@ -278,11 +278,11 @@ Vitest.describe (
                     createUntitledRootNoteRequest
                         (DateTime(2026, 6, 15))
                         [
-                            "notes/15_06_2026/untitled-note.md"
-                            "notes\\15_06_2026\\untitled-note-2.md"
+                            "notes/2026-06-15/untitled-note"
+                            "notes\\2026-06-15\\untitled-note-2\\untitled-note-2.md"
                         ]
 
-                Vitest.expect(request.path).toBe ("notes/15_06_2026/untitled-note-3.md")
+                Vitest.expect(request.path).toBe ("notes/2026-06-15/untitled-note-3/untitled-note-3.md")
         )
 
         Vitest.test (

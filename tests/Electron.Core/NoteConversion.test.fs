@@ -104,7 +104,7 @@ Body
         )
 
         Vitest.test (
-            "mkExistingTargetRelativePath targets the selected entity protocols folder",
+            "note path helpers use dated note folders and protocol folders",
             fun () ->
                 let studyTarget: ExistingTargetRef = {
                     Kind = NotesTargetKind.Study
@@ -120,18 +120,20 @@ Body
                     .expect(
                         NoteConversion.mkExistingTargetRelativePath
                             studyTarget
-                            (DateTime(2026, 6, 15))
                             "Sampling_protocol"
                     )
-                    .toEqual (Some "studies/StudyA/protocols/Sampling_protocol.md")
+                    .toEqual (Some "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
 
                 Vitest
                     .expect(
                         NoteConversion.mkExistingTargetRelativePath
                             assayTarget
-                            (DateTime(2026, 6, 15))
                             "Extraction_protocol"
                     )
-                    .toEqual (Some "assays/AssayA/protocols/Extraction_protocol.md")
+                    .toEqual (Some "assays/AssayA/protocols/Extraction_protocol/Extraction_protocol.md")
+
+                Vitest
+                    .expect(NoteConversion.mkNewRootNoteRelativePath (DateTime(2026, 6, 15)) "Sampling_protocol")
+                    .toEqual (Some "notes/2026-06-15/Sampling_protocol/Sampling_protocol.md")
         )
 )

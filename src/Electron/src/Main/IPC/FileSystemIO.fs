@@ -214,6 +214,12 @@ module ArcFileSystemHelper =
         TargetPath: string
     }
 
+    type GenericMovePlan = {
+        SourcePath: string
+        TargetPath: string
+        Overwrite: bool
+    }
+
     let private resolveArcRelativePathPair arcPath firstRelativePath secondRelativePath =
         match
             tryResolveArcRelativePath arcPath firstRelativePath, tryResolveArcRelativePath arcPath secondRelativePath
@@ -250,6 +256,12 @@ module ArcFileSystemHelper =
         match kind with
         | FileSystemItemKind.File -> ARCtrl.FileSystemHelper.writeFileTextAsync targetAbsolutePath ""
         | FileSystemItemKind.Folder -> mkdirAsync targetAbsolutePath
+
+    let private renameResolvedPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
+        match! renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath with
+        | Ok() -> return Ok()
+        | Error renameError -> return Error(mapRenameDiskError sourcePath targetPath renameError)
+    }
 
     let tryBuildCreateFileSystemItemPlan
         (request: CreateFileSystemItemRequest)
@@ -325,18 +337,80 @@ module ArcFileSystemHelper =
                     match targetCheck with
                     | Error conflictError -> return Error conflictError
                     | Ok() ->
-                        let! renameResult = renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
+                        return!
+                            renameResolvedPathOnDisk
+                                genericRenamePlan.SourcePath
+                                genericRenamePlan.TargetPath
+                                sourceAbsolutePath
+                                targetAbsolutePath
+        }
 
-                        match renameResult with
-                        | Ok() -> return Ok()
-                        | Error renameError ->
+    let tryBuildGenericMovePlan (request: MovePathRequest) : Result<GenericMovePlan, exn> =
+        let sourcePath =
+            request.sourceRelativePath |> PathHelpers.normalizeCanonicalRelativePath
+
+        let targetPath =
+            request.targetRelativePath |> PathHelpers.normalizeCanonicalRelativePath
+
+        if ArcEntityPathRules.isGenericFileSystemTargetAllowed sourcePath |> not then
+            Error(exn "Generic filesystem move is only supported for safe non-entity source paths.")
+        elif ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath |> not then
+            Error(exn "Generic filesystem move targets must stay inside safe non-entity ARC paths.")
+        elif PathHelpers.pathsEqual sourcePath targetPath then
+            Error(exn "Move target is identical to the current path.")
+        elif PathHelpers.isSameOrDescendantPath targetPath sourcePath then
+            Error(exn "Move target must not be inside the source path.")
+        else
+            Ok {
+                SourcePath = sourcePath
+                TargetPath = targetPath
+                Overwrite = request.overwrite
+            }
+
+    let moveGenericFileSystemItemOnDisk
+        (arcPath: string)
+        (request: MovePathRequest)
+        : JS.Promise<Result<unit, exn>> =
+        promise {
+            match tryBuildGenericMovePlan request with
+            | Error validationError -> return Error validationError
+            | Ok genericMovePlan ->
+                match resolveArcRelativePathPair arcPath genericMovePlan.SourcePath genericMovePlan.TargetPath with
+                | Error pathError -> return Error pathError
+                | Ok(sourceAbsolutePath, targetAbsolutePath) ->
+                    let moveToTargetAsync () = promise {
+                        let targetParentAbsolutePath =
+                            pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+
+                        do! mkdirAsync targetParentAbsolutePath
+
+                        return!
+                            renameResolvedPathOnDisk
+                                genericMovePlan.SourcePath
+                                genericMovePlan.TargetPath
+                                sourceAbsolutePath
+                                targetAbsolutePath
+                    }
+
+                    let! sourceExists = pathExistsAsync sourceAbsolutePath
+
+                    if sourceExists |> not then
+                        return Error(exn $"Cannot move '{genericMovePlan.SourcePath}' because it does not exist.")
+                    else
+                        let! targetExists = pathExistsAsync targetAbsolutePath
+
+                        match targetExists, genericMovePlan.Overwrite with
+                        | true, false ->
                             return
                                 Error(
-                                    mapRenameDiskError
-                                        genericRenamePlan.SourcePath
-                                        genericRenamePlan.TargetPath
-                                        renameError
+                                    exn
+                                        $"Cannot move '{genericMovePlan.SourcePath}' to '{genericMovePlan.TargetPath}' because the destination already exists."
                                 )
+                        | true, true ->
+                            match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
+                            | Error removeError -> return Error removeError
+                            | Ok() -> return! moveToTargetAsync ()
+                        | false, _ -> return! moveToTargetAsync ()
         }
 
     let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {

@@ -1,6 +1,7 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
+open Renderer.Components.Helper.NoteFileSystemHelper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
@@ -335,7 +336,7 @@ type FileTree =
                 let selectedPath = PathHelpers.normalizePath request.path
 
                 promise {
-                    let! writeResult = Api.ipcArcVaultApi.writeFile request
+                    let! writeResult = writeNoteWithAssets request
 
                     match writeResult with
                     | Error exn -> applyAddNoteError exn.Message

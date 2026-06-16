@@ -209,7 +209,7 @@ let tests =
                 "Safe generic descendants should be renameable."
 
             Expect.isTrue
-                (ArcEntityPathRules.isRenamePathAllowed "notes/15_06_2026/foo.md")
+                (ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md")
                 "Nested note files should remain renameable."
 
             Expect.isTrue

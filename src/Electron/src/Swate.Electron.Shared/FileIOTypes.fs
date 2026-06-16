@@ -94,6 +94,12 @@ type RenamePathRequest = {
     newName: string
 }
 
+type MovePathRequest = {
+    sourceRelativePath: string
+    targetRelativePath: string
+    overwrite: bool
+}
+
 [<RequireQualifiedAccess>]
 type FileSystemItemKind =
     | File

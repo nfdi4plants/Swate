@@ -26,6 +26,12 @@ let private renameRequest relativePath newName = {
     newName = newName
 }
 
+let private moveRequest sourcePath targetPath overwrite = {
+    sourceRelativePath = sourcePath
+    targetRelativePath = targetPath
+    overwrite = overwrite
+}
+
 let private createItemRequest parentPath name kind = {
     parentPath = parentPath
     name = name
@@ -51,6 +57,12 @@ let private createItemOrFail arcPath request = promise {
     | Ok createdPath -> return createdPath
 }
 
+let private moveItemOrFail arcPath request = promise {
+    match! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk arcPath request with
+    | Error error -> return failwith error.Message
+    | Ok() -> return ()
+}
+
 let private deleteItemOrFail arcPath relativePath = promise {
     match! ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath relativePath with
     | Error error -> return failwith error.Message
@@ -67,6 +79,16 @@ let private writeRelativeFileAsync arcPath relativePath content = promise {
 
     let! _ =
         fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
+        |> unbox<JS.Promise<obj>>
+
+    return ()
+}
+
+let private createRelativeDirectoryAsync arcPath relativePath = promise {
+    let absolutePath = absoluteArcPath arcPath relativePath
+
+    let! _ =
+        fsPromisesDynamic?mkdir (absolutePath, createObj [ "recursive" ==> true ])
         |> unbox<JS.Promise<obj>>
 
     return ()
@@ -155,6 +177,41 @@ Vitest.describe (
 
                     let! reloadedArc = TestHelpers.loadArcAsync arcPath
                     Vitest.expect(reloadedArc.ContainsAssay("AssayA")).toBe (true)
+                })
+        )
+
+        Vitest.test (
+            "moves generic note folders with nested assets and requires overwrite for conflicts",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceFolder = "notes/2026-06-15/untitled-note"
+                    let targetFolder = "assays/AssayA/protocols/Sampling_protocol"
+
+                    do! createRelativeDirectoryAsync arcPath $"{sourceFolder}/assets"
+                    do! writeRelativeFileAsync arcPath $"{sourceFolder}/untitled-note.md" "source"
+                    do! writeRelativeFileAsync arcPath $"{sourceFolder}/assets/image.txt" "asset"
+
+                    do! moveItemOrFail arcPath (moveRequest sourceFolder targetFolder false)
+
+                    do! expectRelativePathExists arcPath sourceFolder false
+                    do! expectRelativePathExists arcPath $"{targetFolder}/untitled-note.md" true
+                    do! expectRelativePathExists arcPath $"{targetFolder}/assets/image.txt" true
+
+                    let secondSourceFolder = "notes/2026-06-16/untitled-note"
+                    do! createRelativeDirectoryAsync arcPath secondSourceFolder
+                    do! writeRelativeFileAsync arcPath $"{secondSourceFolder}/untitled-note.md" "replacement"
+
+                    match!
+                        ArcFileSystemHelper.moveGenericFileSystemItemOnDisk
+                            arcPath
+                            (moveRequest secondSourceFolder targetFolder false)
+                    with
+                    | Ok() -> failwith "Expected move without overwrite to reject an existing target."
+                    | Error error -> Vitest.expect(error.Message).toContain ("destination already exists")
+
+                    do! moveItemOrFail arcPath (moveRequest secondSourceFolder targetFolder true)
+                    do! expectRelativePathExists arcPath secondSourceFolder false
+                    do! expectRelativePathExists arcPath $"{targetFolder}/untitled-note.md" true
                 })
         )
 

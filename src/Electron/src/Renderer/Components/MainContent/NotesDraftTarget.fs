@@ -6,6 +6,7 @@ open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+open Renderer.Components.Helper.NoteFileSystemHelper
 open Renderer.Components.MainContent.NoteTargetConflictHelper
 
 
@@ -35,7 +36,7 @@ let NotesDraftTarget () =
         promise {
             setSubmitState true None
 
-            let! writeResult = Api.ipcArcVaultApi.writeFile request
+            let! writeResult = writeNoteWithAssets request
 
             match writeResult with
             | Result.Error exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}")

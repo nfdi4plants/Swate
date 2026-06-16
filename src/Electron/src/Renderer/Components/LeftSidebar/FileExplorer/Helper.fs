@@ -139,15 +139,23 @@ let isRootNotesFolder (item: FileItem) =
         |> Option.exists (fun path -> PathHelpers.pathsEqual path "notes"))
 
 let createUntitledRootNotePath (dateCreated: DateTime) (existingPaths: string seq) =
-    let dateFolder = NoteConversion.formatDateFolder dateCreated.Date
-
     let rec loop index =
         let suffix = if index = 1 then "" else $"-{index}"
-        let candidate = $"notes/{dateFolder}/untitled-note{suffix}.md"
+        let protocolName = $"untitled-note{suffix}"
+
+        let candidate =
+            NoteConversion.mkNewRootNoteRelativePath dateCreated.Date protocolName
+            |> Option.defaultWith (fun () -> failwith "Could not create a safe untitled note path.")
+
+        let candidateFolder =
+            NoteConversion.tryGetNoteFolderRelativePath candidate
 
         let alreadyExists =
             existingPaths
-            |> Seq.exists (fun path -> PathHelpers.pathsEqual path candidate)
+            |> Seq.exists (fun path ->
+                PathHelpers.pathsEqual path candidate
+                || (candidateFolder |> Option.exists (PathHelpers.pathsEqual path))
+            )
 
         if alreadyExists then loop (index + 1) else candidate
 

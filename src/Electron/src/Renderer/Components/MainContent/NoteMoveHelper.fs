@@ -3,13 +3,17 @@ module Renderer.Components.MainContent.NoteMoveHelper
 open System
 open Swate.Components.Shared
 open Swate.Components.Composite.Notes.Editor
-open Swate.Electron.Shared.FileIOTypes
-open Swate.Electron.Shared.FileIOHelper
+
+
+type ExistingTargetNoteFolderMove = {
+    SourceFolderPath: string
+    TargetFolderPath: string
+}
 
 type ExistingTargetNoteMovePlan = {
     SourcePath: string
     TargetPath: string
-    Request: FileContentDTO
+    FolderMove: ExistingTargetNoteFolderMove option
 }
 
 [<RequireQualifiedAccess>]
@@ -36,6 +40,33 @@ let private tryResolveTargetPath (markdown: string) (targetRef: ExistingTargetRe
             | None -> Error "Could not resolve a safe target path."
             | Some targetPath -> Ok targetPath
 
+let private tryBuildFolderMove sourcePath targetPath =
+    let expectedMarkdownFileName folderPath =
+        $"{PathHelpers.getFileName folderPath}.md"
+
+    match
+        NoteConversion.tryGetNoteFolderRelativePath sourcePath,
+        NoteConversion.tryGetNoteFolderRelativePath targetPath
+    with
+    | Some sourceFolderPath, Some targetFolderPath
+        when PathHelpers.pathsEqual (PathHelpers.getFileName sourcePath) (expectedMarkdownFileName sourceFolderPath)
+             && PathHelpers.pathsEqual (PathHelpers.getFileName targetPath) (expectedMarkdownFileName targetFolderPath)
+        ->
+        Some {
+            SourceFolderPath = sourceFolderPath
+            TargetFolderPath = targetFolderPath
+        }
+    | _ -> None
+
+let movePlanConflictPath plan =
+    plan.FolderMove
+    |> Option.map _.TargetFolderPath
+    |> Option.defaultValue plan.TargetPath
+
+let private planTargetExistsInSnapshot existingPaths plan =
+    PathHelpers.pathExistsInSnapshot existingPaths plan.TargetPath
+    || PathHelpers.pathExistsInSnapshot existingPaths (movePlanConflictPath plan)
+
 let tryBuildMoveToExistingTargetPlan
     (selectedPath: string option)
     (markdown: string)
@@ -55,10 +86,10 @@ let tryBuildMoveToExistingTargetPlan
             let plan = {
                 SourcePath = sourcePath
                 TargetPath = preferredTargetPath
-                Request = FileContentDTO.create FileContentType.Markdown markdown preferredTargetPath
+                FolderMove = tryBuildFolderMove sourcePath preferredTargetPath
             }
 
-            if PathHelpers.pathExistsInSnapshot existingPaths preferredTargetPath then
+            if planTargetExistsInSnapshot existingPaths plan then
                 Ok(ExistingTargetNoteMovePlanResult.TargetConflict plan)
             else
                 Ok(ExistingTargetNoteMovePlanResult.Ready plan)

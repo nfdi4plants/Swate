@@ -526,6 +526,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    movePath =
+        fun (request: MovePathRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
+                        })
+            with e ->
+                return Error e
+        }
     renameOpenArcRoot =
         fun (newName: string) -> promise {
             try

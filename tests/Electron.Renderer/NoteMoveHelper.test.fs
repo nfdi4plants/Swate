@@ -4,7 +4,6 @@ open System
 open Renderer.Components.MainContent.NoteMoveHelper
 open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 let private target kind name : ExistingTargetRef = { Kind = kind; Name = name }
@@ -43,17 +42,21 @@ Vitest.describe (
 
                 let plan =
                     tryBuildMoveToExistingTargetPlan
-                        (Some "notes/15_06_2026/untitled-note.md")
+                        (Some "notes/2026-06-15/untitled-note/untitled-note.md")
                         content
                         (target NotesTargetKind.Study "StudyA")
                         []
                     |> expectReadyPlan
 
-                Vitest.expect(plan.SourcePath).toBe ("notes/15_06_2026/untitled-note.md")
-                Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol.md")
-                Vitest.expect(plan.Request.fileType).toEqual (FileContentType.Markdown)
-                Vitest.expect(plan.Request.path).toBe (plan.TargetPath)
-                Vitest.expect(plan.Request.content).toBe (content)
+                Vitest.expect(plan.SourcePath).toBe ("notes/2026-06-15/untitled-note/untitled-note.md")
+                Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
+                Vitest.expect(movePlanConflictPath plan).toBe ("studies/StudyA/protocols/Sampling_protocol")
+
+                match plan.FolderMove with
+                | None -> failwith "Expected new note folder structure to move as a folder."
+                | Some folderMove ->
+                    Vitest.expect(folderMove.SourceFolderPath).toBe ("notes/2026-06-15/untitled-note")
+                    Vitest.expect(folderMove.TargetFolderPath).toBe ("studies/StudyA/protocols/Sampling_protocol")
         )
 
         Vitest.test (
@@ -63,13 +66,13 @@ Vitest.describe (
 
                 let plan =
                     tryBuildMoveToExistingTargetPlan
-                        (Some "notes/15_06_2026/untitled-note.md")
+                        (Some "notes/2026-06-15/untitled-note/untitled-note.md")
                         content
                         (target NotesTargetKind.Assay "AssayA")
                         []
                     |> expectReadyPlan
 
-                Vitest.expect(plan.TargetPath).toBe ("assays/AssayA/protocols/Extraction_protocol.md")
+                Vitest.expect(plan.TargetPath).toBe ("assays/AssayA/protocols/Extraction_protocol/Extraction_protocol.md")
         )
 
         Vitest.test (
@@ -79,16 +82,33 @@ Vitest.describe (
 
                 let plan =
                     tryBuildMoveToExistingTargetPlan
-                        (Some "notes/15_06_2026/untitled-note.md")
+                        (Some "notes/2026-06-15/untitled-note/untitled-note.md")
                         content
                         (target NotesTargetKind.Study "StudyA")
                         [
-                            "studies/StudyA/protocols/Sampling_protocol.md"
+                            "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md"
                         ]
                     |> expectConflictPlan
 
-                Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol.md")
-                Vitest.expect(plan.Request.path).toBe (plan.TargetPath)
+                Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
+        )
+
+        Vitest.test (
+            "reports a conflict when the target note folder already exists",
+            fun () ->
+                let content = markdown "Sampling protocol" (DateTime(2026, 6, 15))
+
+                let plan =
+                    tryBuildMoveToExistingTargetPlan
+                        (Some "notes/2026-06-15/untitled-note/untitled-note.md")
+                        content
+                        (target NotesTargetKind.Study "StudyA")
+                        [
+                            "studies/StudyA/protocols/Sampling_protocol"
+                        ]
+                    |> expectConflictPlan
+
+                Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
         )
 
         Vitest.test (
@@ -97,9 +117,9 @@ Vitest.describe (
                 let exists =
                     PathHelpers.pathExistsInSnapshot
                         [
-                            "studies\\StudyA\\protocols\\Sampling_protocol.md"
+                            "studies\\StudyA\\protocols\\Sampling_protocol\\Sampling_protocol.md"
                         ]
-                        "studies/studya/protocols/sampling_protocol.md"
+                        "studies/studya/protocols/sampling_protocol/sampling_protocol.md"
 
                 Vitest.expect(exists).toBe (true)
         )
@@ -111,7 +131,7 @@ Vitest.describe (
 
                 let result =
                     tryBuildMoveToExistingTargetPlan
-                        (Some "studies/StudyA/protocols/Sampling_protocol.md")
+                        (Some "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
                         content
                         (target NotesTargetKind.Study "StudyA")
                         []
@@ -126,7 +146,7 @@ Vitest.describe (
             fun () ->
                 let result =
                     tryBuildMoveToExistingTargetPlan
-                        (Some "notes/15_06_2026/plain.md")
+                        (Some "notes/2026-06-15/plain/plain.md")
                         "# Plain markdown"
                         (target NotesTargetKind.Assay "AssayA")
                         []
