@@ -28,6 +28,8 @@
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeMaterialization.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeFileTargetWorkflow.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\RootNoteHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRenameHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeContextMenu.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Modals\CreateArcFileModal.fs" />

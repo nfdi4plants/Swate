@@ -19,6 +19,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Types
 open Helper
 open FileTreeMaterialization
+open RootNoteHelper
 
 module private FileTreeHelper =
 
@@ -369,27 +370,25 @@ type FileTree =
             )
             |> Promise.start
 
-        let addRootNote (_item: FileItem) =
-            if not isDialogBusy then
-                let request = createUntitledRootNoteRequest System.DateTime.Today
-
-                promise {
-                    setIsDialogBusy true
-
-                    let! targetAvailabilityResult = checkTargetAvailability Api.ipcArcVaultApi.pathExists request.path
-
-                    match targetAvailabilityResult with
-                    | Error exn ->
-                        applyAddNoteError $"Failed to check note target: {exn.Message}"
-                        setIsDialogBusy false
-                    | Ok TargetAvailability.Exists -> openDialog (NoteOverwriteDialog request)
-                    | Ok TargetAvailability.Empty -> do! writeRootNoteRequest request false
+        let addFileTarget (request: FileContentDTO) =
+            FileTreeFileTargetWorkflow.addFileTarget
+                {
+                    IsBusy = isDialogBusy
+                    PathExists = Api.ipcArcVaultApi.pathExists
+                    WriteTarget = fun request -> writeRootNoteRequest request false
+                    RequestOverwrite = NoteOverwriteDialog >> openDialog
+                    SetBusy = setIsDialogBusy
                 }
-                |> Promise.catch (fun exn ->
-                    applyAddNoteError exn.Message
-                    setIsDialogBusy false
-                )
-                |> Promise.start
+                request
+            |> Promise.map (function
+                | Error exn -> applyAddNoteError $"Failed to check target: {exn.Message}"
+                | Ok() -> ()
+            )
+            |> Promise.catch (fun exn ->
+                applyAddNoteError exn.Message
+                setIsDialogBusy false
+            )
+            |> Promise.start
 
         let confirmOverwriteRootNote () =
             if not isDialogBusy then
@@ -445,7 +444,11 @@ type FileTree =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
         let itemActions item = [
-            yield! rootNoteActionContextMenuItems System.DateTime.Today addRootNote item
+            yield!
+                rootNoteActionContextMenuItems
+                    System.DateTime.Today
+                    (fun _ -> createUntitledRootNoteRequest System.DateTime.Today |> addFileTarget)
+                    item
             yield! renameContextMenuItems item
         ]
 

@@ -2,6 +2,7 @@ module ElectronRenderer.FileTreeContextMenuTests
 
 open System
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
+open Renderer.Components.LeftSidebar.FileExplorer.RootNoteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Page.FileExplorer.Types
