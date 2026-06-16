@@ -111,6 +111,11 @@ module private GitSidebarInternal =
         |> List.choose id
         |> String.concat " | "
 
+    let progressOutput (progress: GitSidebarProgress) =
+        progress.Output
+        |> Option.bind Option.ofObj
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
     let formatThresholdInput (thresholdMb: int) = string thresholdMb
 
     let tryRangeBetween (orderedPaths: string[]) (anchorPath: string) (clickedPath: string) =
@@ -265,6 +270,7 @@ type GitSidebar =
             match runStatus with
             | GitSidebarRunStatus.Progress progress ->
                 let progressValue = GitSidebarInternal.progressPercentValue progress
+                let progressOutput = GitSidebarInternal.progressOutput progress
 
                 Html.div [
                     prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
@@ -307,6 +313,26 @@ type GitSidebar =
                                                                 "var(--color-base-content)"
                                                             )
                                                         ]
+                                                    ]
+                                                ]
+                                            ]
+                                        | None -> Html.none
+
+                                        match progressOutput with
+                                        | Some output ->
+                                            Html.details [
+                                                prop.testId "GitSidebarProgressOutput"
+                                                prop.className "swt:min-w-0"
+                                                prop.children [
+                                                    Html.summary [
+                                                        prop.className
+                                                            "swt:cursor-pointer swt:select-none swt:text-xs swt:font-medium"
+                                                        prop.text "Git output"
+                                                    ]
+                                                    Html.pre [
+                                                        prop.className
+                                                            "swt:mt-2 swt:max-h-36 swt:overflow-auto swt:whitespace-pre-wrap swt:break-words swt:rounded swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:font-mono swt:text-xs"
+                                                        prop.text output
                                                     ]
                                                 ]
                                             ]

@@ -389,11 +389,13 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+
                 return!
                     withBusyWriting
                         vault
                         (fun () -> promise {
-                            let! result = GitService.pruneLfsCache arcPath
+                            let! result = GitService.pruneLfsCacheWithProgress arcPath (Some progressReporter)
 
                             return
                                 toGitOperationResult (fun _ -> Some "Hidden Git LFS cache cleaned.") None None result
@@ -426,11 +428,13 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+
                 return!
                     withBusyWriting
                         vault
                         (fun () -> promise {
-                            let! result = GitService.dedupLfsStorage arcPath
+                            let! result = GitService.dedupLfsStorageWithProgress arcPath (Some progressReporter)
 
                             return
                                 toGitOperationResult

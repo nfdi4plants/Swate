@@ -2,18 +2,20 @@ module Main.Git.GitInternals
 
 open System
 open Fable.Core
+open Fable.Core.JsInterop
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.SimpleGit
 open Main.Git.GitAuthAdapter
 
 type GitProgressCallback = GitProgressDto -> unit
 
-let internal createProgressDto methodName stage progress processed total : GitProgressDto = {
+let internal createProgressDto methodName stage progress processed total output : GitProgressDto = {
     Method = methodName
     Stage = stage
     Progress = progress
     Processed = processed
     Total = total
+    Output = output
 }
 
 let internal progressFromSimpleGit (progressEvent: SimpleGitProgressEvent) =
@@ -23,10 +25,44 @@ let internal progressFromSimpleGit (progressEvent: SimpleGitProgressEvent) =
         (Some progressEvent.progress)
         (Some progressEvent.processed)
         (Some progressEvent.total)
+        None
 
 let internal reportPhase (progressCallback: GitProgressCallback option) methodName stage =
     progressCallback
-    |> Option.iter (fun report -> createProgressDto (Some methodName) (Some stage) None None None |> report)
+    |> Option.iter (fun report -> createProgressDto (Some methodName) (Some stage) None None None None |> report)
+
+let internal reportOutputText (progressCallback: GitProgressCallback option) (text: string) =
+    progressCallback
+    |> Option.iter (fun report ->
+        let output = text |> Option.ofObj |> Option.defaultValue String.Empty |> redactToken
+
+        if not (String.IsNullOrEmpty output) then
+            createProgressDto None None None None None (Some output) |> report
+    )
+
+[<Emit("$0 != null && typeof $0.on === 'function'")>]
+let private hasStreamListener (_stream: obj) : bool = jsNative
+
+[<Emit("$0.outputHandler(function(command, stdout, stderr, args) { $1(command, stdout, stderr, args); })")>]
+let private attachOutputHandler (_git: ISimpleGit) (_handler: string -> obj -> obj -> string[] -> unit) : ISimpleGit =
+    jsNative
+
+let internal withGitOutputProgress (progressCallback: GitProgressCallback option) (git: ISimpleGit) =
+    match progressCallback with
+    | None -> git
+    | Some _ ->
+        attachOutputHandler
+            git
+            (fun (_command: string) (stdout: obj) (stderr: obj) (_args: string[]) ->
+                let handleChunk chunk =
+                    reportOutputText progressCallback (string chunk)
+
+                if hasStreamListener stdout then
+                    stdout?on ("data", handleChunk) |> ignore
+
+                if hasStreamListener stderr then
+                    stderr?on ("data", handleChunk) |> ignore
+            )
 
 // `internal` stays inside the Main assembly boundary (not accessible from shared/renderer projects).
 let internal unsafeOptions =

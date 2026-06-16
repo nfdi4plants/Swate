@@ -345,7 +345,32 @@ let mapProgress (progress: GitProgressDto) : GitSidebarProgress = {
     Method = progress.Method
     Stage = progress.Stage
     ProgressPercent = progress.Progress
+    Output = progress.Output
 }
+
+let private appendProgressOutput current incoming =
+    match current, incoming with
+    | None, None -> None
+    | Some output, None -> Some output
+    | None, Some output -> Some output
+    | Some currentOutput, Some incomingOutput -> Some(currentOutput + incomingOutput)
+
+let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress) =
+    let current =
+        model.CurrentProgress
+        |> Option.defaultValue {
+            Method = None
+            Stage = model.BusyNotice
+            ProgressPercent = None
+            Output = None
+        }
+
+    {
+        Method = incoming.Method |> Option.orElse current.Method
+        Stage = incoming.Stage |> Option.orElse current.Stage
+        ProgressPercent = incoming.ProgressPercent |> Option.orElse current.ProgressPercent
+        Output = appendProgressOutput current.Output incoming.Output
+    }
 
 let private hasMatchingOriginBranch (branchName: string) (model: GitState) =
     model.BranchOptions
@@ -1003,7 +1028,7 @@ let update
     | SetCurrentProgress(Some progress) when model.BusyOperation.IsSome ->
         {
             model with
-                CurrentProgress = Some progress
+                CurrentProgress = Some(mergeProgressUpdate model progress)
         },
         Cmd.none
     | SetCurrentProgress _ -> { model with CurrentProgress = None }, Cmd.none

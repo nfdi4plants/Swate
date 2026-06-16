@@ -410,14 +410,21 @@ let cloneRepository
                                                                 | Some token ->
                                                                     Ok(
                                                                         applyAuth
-                                                                            createGit
+                                                                            (fun options ->
+                                                                                createGit options
+                                                                                |> withGitOutputProgress progress
+                                                                            )
                                                                             repoOptions
                                                                             host
                                                                             token
                                                                             (Some "origin")
                                                                             (Some safeRemoteUrl)
                                                                     )
-                                                                | None -> Ok(createGit repoOptions)
+                                                                | None ->
+                                                                    Ok(
+                                                                        createGit repoOptions
+                                                                        |> withGitOutputProgress progress
+                                                                    )
                                                             with authError ->
                                                                 Error authError
 
@@ -450,7 +457,10 @@ let cloneRepository
                                                         try
                                                             Ok(
                                                                 applyAuth
-                                                                    createGit
+                                                                    (fun options ->
+                                                                        createGit options
+                                                                        |> withGitOutputProgress progress
+                                                                    )
                                                                     cloneOptions
                                                                     host
                                                                     token
@@ -479,7 +489,9 @@ let cloneRepository
                                                                 hydrateIfRequested (Some token) authenticatedCloneResult
                                                 | None ->
                                                     let unauthenticatedGit =
-                                                        createGit cloneOptions |> applyCloneSkipSmudge
+                                                        createGit cloneOptions
+                                                        |> withGitOutputProgress progress
+                                                        |> applyCloneSkipSmudge
 
                                                     GitInternals.reportPhase progress "clone" "Cloning repository"
 

@@ -726,6 +726,16 @@ let private reconcileTrackingBranchForCheckout
 let private runSimpleGit (operation: ISimpleGit -> JS.Promise<'T>) (git: ISimpleGit) : JS.Promise<GitResult<'T>> =
     GitInternals.runSimpleGit toFailure operation git
 
+let private reportGitSpawnOutput progressCallback (result: GitSpawnResult) =
+    GitInternals.reportOutputText progressCallback result.StdoutText
+    GitInternals.reportOutputText progressCallback result.StderrText
+    result
+
+let private runGitCapturedWithOutput progressCallback request = promise {
+    let! result = runGitCaptured request
+    return reportGitSpawnOutput progressCallback result
+}
+
 // GitService reads the threshold because stage/commit need the value while deciding whether to enforce LFS automatically.
 let private getConfiguredLfsThresholdMb (git: ISimpleGit) : JS.Promise<int> = promise {
     try
@@ -985,7 +995,7 @@ let private createLocalGitSession arcPath progressCallback =
     let options = createOptions arcPath syncTimeout progressCallback
 
     {
-        Git = createGit options
+        Git = createGit options |> withGitOutputProgress progressCallback
         CommandAuth = {
             ConfigArgs = [||]
             Environment = createNonInteractiveEnv ()
@@ -1027,7 +1037,7 @@ let private createAuthenticatedGitSession
 
                             let git =
                                 applyAuth
-                                    createGit
+                                    (fun options -> createGit options |> withGitOutputProgress progressCallback)
                                     operationOptions
                                     host
                                     token
@@ -1098,16 +1108,24 @@ let private ensureRepo (git: ISimpleGit) = promise {
         return Error(exn "The selected ARC path is not a git repository.")
 }
 
-let private withLocalGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<'T>) : JS.Promise<GitResult<'T>> = promise {
-    let options = createOptions arcPath standardTimeout None
-    let git = createGit options
+let private withLocalGitAndProgress
+    (arcPath: string)
+    (progressCallback: GitProgressCallback option)
+    (operation: ISimpleGit -> JS.Promise<'T>)
+    : JS.Promise<GitResult<'T>> =
+    promise {
+        let options = createOptions arcPath standardTimeout None
+        let git = createGit options |> withGitOutputProgress progressCallback
 
-    let! repoCheckResult = ensureRepo git
+        let! repoCheckResult = ensureRepo git
 
-    match repoCheckResult with
-    | Error repoError -> return errorResult repoError
-    | Ok() -> return! runSimpleGit operation git
-}
+        match repoCheckResult with
+        | Error repoError -> return errorResult repoError
+        | Ok() -> return! runSimpleGit operation git
+    }
+
+let private withLocalGit (arcPath: string) (operation: ISimpleGit -> JS.Promise<'T>) : JS.Promise<GitResult<'T>> =
+    withLocalGitAndProgress arcPath None operation
 
 type private RemoteUrlState =
     | RemoteMissing
@@ -1622,7 +1640,7 @@ let previewPull
                                             ()
 
                                         let! mergeTreeResult =
-                                            runGitCaptured {
+                                            runGitCapturedWithOutput progressCallback {
                                                 WorkingDirectory = Some arcPath
                                                 Arguments = [|
                                                     "merge-tree"
@@ -1772,6 +1790,7 @@ let push
                     | Error failure -> return Error failure
                     | Ok session ->
                         let git = session.Git
+                        let runGitCapturedForProgress = runGitCapturedWithOutput progressCallback
                         let! pushStatusResult = runSimpleGit (fun currentGit -> currentGit.status ()) git
 
                         match pushStatusResult with
@@ -1792,7 +1811,7 @@ let push
 
                                         planOutboundPush
                                             runSimpleGit
-                                            runGitCaptured
+                                            runGitCapturedForProgress
                                             toFailure
                                             (fun currentGit ->
                                                 runSimpleGit (fun gitInstance -> gitInstance.status ()) currentGit
@@ -1807,7 +1826,7 @@ let push
 
                                         let! uploadResult =
                                             GitLfsService.uploadObjects
-                                                runGitCaptured
+                                                runGitCapturedForProgress
                                                 session.CommandAuth
                                                 arcPath
                                                 safeRemoteName
@@ -1880,34 +1899,45 @@ let setLfsSettings (arcPath: string) (settings: GitLfsSettingsDto) : JS.Promise<
                 })
 }
 
-let pruneLfsCache (arcPath: string) : JS.Promise<GitResult<string>> = promise {
-    let! localValidationResult =
-        withLocalGit
-            arcPath
-            (fun git -> promise {
-                match! requireCleanWorkingTreeForLfsStorageAction "Cleaning the Git LFS cache" git with
-                | Error validationError -> return abortGitPromiseWith validationError
-                | Ok() ->
-                    match! rejectCustomLfsStorageForPrune git with
+let pruneLfsCacheWithProgress
+    (arcPath: string)
+    (progressCallback: GitProgressCallback option)
+    : JS.Promise<GitResult<string>> =
+    promise {
+        let! localValidationResult =
+            withLocalGitAndProgress
+                arcPath
+                progressCallback
+                (fun git -> promise {
+                    match! requireCleanWorkingTreeForLfsStorageAction "Cleaning the Git LFS cache" git with
                     | Error validationError -> return abortGitPromiseWith validationError
-                    | Ok() -> return ()
-            })
+                    | Ok() ->
+                        match! rejectCustomLfsStorageForPrune git with
+                        | Error validationError -> return abortGitPromiseWith validationError
+                        | Ok() -> return ()
+                })
 
-    match localValidationResult with
-    | Error failure -> return Error failure
-    | Ok() ->
-        let! gitResult = createOriginLfsRemoteGit arcPath None
-
-        match gitResult with
+        match localValidationResult with
         | Error failure -> return Error failure
-        | Ok git ->
-            let! result = runSimpleGit (fun currentGit -> currentGit.raw GitLfsService.storagePruneArgs) git
-            return result
-}
+        | Ok() ->
+            let! gitResult = createOriginLfsRemoteGit arcPath progressCallback
 
-let dedupLfsStorage (arcPath: string) : JS.Promise<GitResult<string>> =
-    withLocalGit
+            match gitResult with
+            | Error failure -> return Error failure
+            | Ok git ->
+                let! result = runSimpleGit (fun currentGit -> currentGit.raw GitLfsService.storagePruneArgs) git
+                return result
+    }
+
+let pruneLfsCache (arcPath: string) : JS.Promise<GitResult<string>> = pruneLfsCacheWithProgress arcPath None
+
+let dedupLfsStorageWithProgress
+    (arcPath: string)
+    (progressCallback: GitProgressCallback option)
+    : JS.Promise<GitResult<string>> =
+    withLocalGitAndProgress
         arcPath
+        progressCallback
         (fun git -> promise {
             match! requireCleanWorkingTreeForLfsStorageAction "Reducing Git LFS duplicate storage" git with
             | Error validationError -> return abortGitPromiseWith validationError
@@ -1915,6 +1945,9 @@ let dedupLfsStorage (arcPath: string) : JS.Promise<GitResult<string>> =
                 let! output = git.raw GitLfsService.storageDedupArgs
                 return output
         })
+
+let dedupLfsStorage (arcPath: string) : JS.Promise<GitResult<string>> =
+    dedupLfsStorageWithProgress arcPath None
 
 /// Stages validated pathspecs and auto-tracks oversized selected files in Git LFS before restaging.
 let stagePaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<unit>> = promise {

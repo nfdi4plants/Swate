@@ -57,6 +57,7 @@ const buildProgressRunStatus = (progress: {
   Method?: string;
   Stage?: string;
   ProgressPercent?: number;
+  Output?: string;
 }) => ({
   // Fable DU: GitSidebarRunStatus.Progress
   tag: 2,
@@ -566,6 +567,7 @@ export const BusyProgressState: Story = {
       Method: "pull",
       Stage: "Receiving objects",
       ProgressPercent: 54,
+      Output: "remote: Enumerating objects: 18, done.\nremote: Counting objects: 100% (18/18), done.\n",
     }),
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
@@ -578,7 +580,13 @@ export const BusyProgressState: Story = {
     );
     await expect(canvas.getByTestId("GitSidebarProgressBar")).toBeInTheDocument();
     const fillBar = canvas.getByTestId("GitSidebarProgressBar").firstElementChild;
-    await expect(fillBar).toHaveStyle({ width: "54%" });
+    await expect(fillBar).toHaveAttribute("style", expect.stringContaining("width: 54%"));
+    const outputDetails = canvas.getByTestId("GitSidebarProgressOutput");
+    await expect(outputDetails).not.toHaveAttribute("open");
+    await expect(outputDetails).toHaveTextContent("Git output");
+    await expect(outputDetails).toHaveTextContent(
+      "remote: Enumerating objects: 18, done.",
+    );
   },
 };
 
