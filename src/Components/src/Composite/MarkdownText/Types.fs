@@ -7,20 +7,22 @@ type PreviewMode =
     | Preview
 
 type MarkdownOptions = {
-    Height: int
-    MinHeight: int
-    MaxHeight: int
+    CreatedHeight: int
+    EditorHeight: int
     Mode: PreviewMode
     PreviewClassName: string option
 }
 
 [<RequireQualifiedAccess>]
-module MarkdownOptions =
+type MarkdownParent =
+    | Editor
+    | Created
 
+[<RequireQualifiedAccess>]
+module MarkdownOptions =
     let defaults = {
-        Height = 360
-        MinHeight = 240
-        MaxHeight = 360
+        CreatedHeight = 560
+        EditorHeight = 360
         Mode = PreviewMode.Live
         PreviewClassName = None
     }

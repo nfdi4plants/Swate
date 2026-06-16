@@ -64,6 +64,7 @@ type TextInputWithMarkdown =
         (
             value: string,
             setValue: string -> unit,
+            ?parent: MarkdownParent,
             ?label: string,
             ?placeholder: string,
             ?disabled: bool,
@@ -82,8 +83,8 @@ type TextInputWithMarkdown =
 
         let options = {
             MarkdownOptions.defaults with
-                MinHeight = defaultArg height MarkdownOptions.defaults.MinHeight
-                MaxHeight = defaultArg height MarkdownOptions.defaults.MaxHeight
+                CreatedHeight = defaultArg height MarkdownOptions.defaults.CreatedHeight
+                EditorHeight = defaultArg height MarkdownOptions.defaults.EditorHeight
                 Mode = defaultArg mode MarkdownOptions.defaults.Mode
                 PreviewClassName =
                     match previewClassName with
@@ -422,10 +423,17 @@ type TextInputWithMarkdown =
                 prop.onClick (fun _ -> setActiveMode targetMode)
             ]
 
+        let specificHeight =
+            match parent with
+            | Some MarkdownParent.Editor -> options.EditorHeight
+            | Some MarkdownParent.Created -> options.CreatedHeight
+            | None -> options.CreatedHeight
+
         let previewClassName =
             match options.PreviewClassName with
-            | Some className -> $"swt:p-4 swt:h-[360px]{className}"
-            | None -> "swt:p-4 swt:h-[360px]"
+            | Some className -> $"swt:p-4 swt:h-[{specificHeight}px {className}]"
+            | None -> $"swt:p-4 swt:h-[{specificHeight}px]"
+
 
         let editorWrapperClasses = [
             "wmde-markdown-var swt:w-full swt:max-w-none swt:p-0 swt:overflow-hidden swt:min-h-0 swt:rounded-field swt:border swt:border-base-300 swt:bg-base-100"
@@ -526,7 +534,7 @@ type TextInputWithMarkdown =
                                                     if activeMode = PreviewMode.Live then
                                                         "swt:border-b swt:border-base-300 swt:lg:border-b-0 swt:lg:border-r"
                                                 ]
-                                                prop.style [ style.height options.Height ]
+                                                prop.style [ style.height specificHeight ]
                                                 prop.children [
                                                     Html.textarea [
                                                         prop.ref textareaRef
@@ -546,10 +554,7 @@ type TextInputWithMarkdown =
                                         if activeMode <> PreviewMode.Edit then
                                             Html.div [
                                                 prop.className "swt:min-w-0 swt:overflow-auto swt:bg-base-100"
-                                                prop.style [
-                                                    style.height options.MaxHeight
-                                                    style.minHeight options.MinHeight
-                                                ]
+                                                prop.style [ style.height specificHeight ]
                                                 prop.children [
                                                     ReactMDEditor.MarkdownPreview(
                                                         tempValue,
@@ -622,4 +627,4 @@ flowchart TD
 
         let value, setValue = React.useState entryInitialValue
 
-        TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...", height = 440)
+        TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...")

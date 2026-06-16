@@ -10,6 +10,7 @@ open Swate.Components.Composite.MarkdownText
 open Swate.Components.Composite.TermSearch
 open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Primitive.LayoutComponents
+open Swate.Components.Composite.MarkdownText.Types
 
 [<RequireQualifiedAccess>]
 module NoteFormFields =
@@ -185,9 +186,9 @@ module NoteFormFields =
                     TextInputWithMarkdown.TextInputWithMarkdown(
                         draft.MainText,
                         (fun value -> setDraft { draft with MainText = value }),
+                        parent = MarkdownParent.Editor,
                         label = "Main Text",
-                        placeholder = "Write note markdown...",
-                        height = 360
+                        placeholder = "Write note markdown..."
                     )
                 ]
             ]
