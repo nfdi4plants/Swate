@@ -64,6 +64,7 @@ type TextInputWithMarkdown =
         (
             value: string,
             setValue: string -> unit,
+            height: int,
             ?label: string,
             ?placeholder: string,
             ?disabled: bool,
@@ -71,7 +72,6 @@ type TextInputWithMarkdown =
             ?isJoin: bool,
             ?rmv: MouseEvent -> unit,
             ?validator: string -> Result<unit, string>,
-            ?height: int,
             ?mode: PreviewMode,
             ?previewClassName: string,
             ?plugins: MarkdownToolbarPlugin list,
@@ -79,20 +79,12 @@ type TextInputWithMarkdown =
         ) =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
-
-        let options = {
-            MarkdownOptions.defaults with
-                Height = defaultArg height MarkdownOptions.defaults.Height
-                Mode = defaultArg mode MarkdownOptions.defaults.Mode
-                PreviewClassName =
-                    match previewClassName with
-                    | Some value -> Some value
-                    | None -> MarkdownOptions.defaults.PreviewClassName
-        }
+        let previewClassName = defaultArg previewClassName "swt:p-4 swt:h-full"
+        let defaultMode = defaultArg mode MarkdownOptions.defaults.Mode
 
         let startedChange = React.useRef false
         let tempValue, setTempValue = React.useState value
-        let activeMode, setActiveMode = React.useState options.Mode
+        let activeMode, setActiveMode = React.useState defaultMode
         let debouncedValue = React.useDebounce (tempValue, 300)
         let validationError, setValidationError = React.useState (None: string option)
 
@@ -421,10 +413,7 @@ type TextInputWithMarkdown =
                 prop.onClick (fun _ -> setActiveMode targetMode)
             ]
 
-        let previewClassName =
-            match options.PreviewClassName with
-            | Some className -> $"swt:p-4 {className}"
-            | None -> "swt:p-4"
+
 
         let editorWrapperClasses = [
             "wmde-markdown-var swt:w-full swt:max-w-none swt:p-0 swt:overflow-hidden swt:min-h-0 swt:rounded-field swt:border swt:border-base-300 swt:bg-base-100"
@@ -524,13 +513,22 @@ type TextInputWithMarkdown =
                                                     "swt:min-w-0"
                                                     if activeMode = PreviewMode.Live then
                                                         "swt:border-b swt:border-base-300 swt:lg:border-b-0 swt:lg:border-r"
+                                                    if height = 560 then
+                                                        "swt:h-full"
+
                                                 ]
-                                                prop.style [ style.height options.Height ]
                                                 prop.children [
                                                     Html.textarea [
                                                         prop.ref textareaRef
-                                                        prop.className
-                                                            "swt:w-full swt:h-full swt:border-0 swt:bg-transparent swt:resize-none swt:px-3 swt:py-2 swt:focus:outline-hidden"
+                                                        prop.className [
+                                                            "swt:w-full swt:border-0 swt:swt:bg-transparent swt:resize-none swt:px-3 swt:py-2 swt:focus:outline-hidden"
+                                                            if height = 560 then
+                                                                "swt:h-full"
+                                                        ]
+                                                        // if (defaultMode = PreviewMode.Edit) then
+                                                        //     prop.style [ style.height height ]
+                                                    
+                                                        prop.style [ style.height height ]
                                                         prop.disabled disabled
                                                         prop.readOnly disabled
                                                         prop.value tempValue
@@ -544,8 +542,8 @@ type TextInputWithMarkdown =
 
                                         if activeMode <> PreviewMode.Edit then
                                             Html.div [
-                                                prop.className "swt:min-w-0 swt:overflow-auto swt:bg-base-100"
-                                                prop.style [ style.height options.Height ]
+                                                prop.className
+                                                    "swt:min-w-0 swt:h-full swt:overflow-auto swt:bg-base-100"
                                                 prop.children [
                                                     ReactMDEditor.MarkdownPreview(
                                                         tempValue,
@@ -618,4 +616,4 @@ flowchart TD
 
         let value, setValue = React.useState entryInitialValue
 
-        TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...", height = 440)
+        TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...", height = 360)

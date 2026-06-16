@@ -82,7 +82,7 @@ let MarkdownEditorTarget (content: string) =
                 ]
             ]
             Html.div [
-                prop.className "swt:min-h-0 swt:flex-1"
+                prop.className "swt:flex-1"
                 prop.children [
                     TextInputWithMarkdown.TextInputWithMarkdown(
                         markdown,
