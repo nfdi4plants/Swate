@@ -11,19 +11,15 @@ type TargetAvailability =
 let private isAlreadyExistsError (error: exn) =
     error.Message.ToLowerInvariant().Contains("already exists")
 
-let checkTargetAvailability
-    (pathExists: string -> JS.Promise<Result<bool, exn>>)
-    (targetPath: string)
-    =
-    promise {
-        let normalizedTargetPath = PathHelpers.normalizePath targetPath
-        let! existsResult = pathExists normalizedTargetPath
+let checkTargetAvailability (pathExists: string -> JS.Promise<Result<bool, exn>>) (targetPath: string) = promise {
+    let normalizedTargetPath = PathHelpers.normalizePath targetPath
+    let! existsResult = pathExists normalizedTargetPath
 
-        match existsResult with
-        | Ok true -> return Ok TargetAvailability.Exists
-        | Ok false -> return Ok TargetAvailability.Empty
-        | Error error -> return Error error
-    }
+    match existsResult with
+    | Ok true -> return Ok TargetAvailability.Exists
+    | Ok false -> return Ok TargetAvailability.Empty
+    | Error error -> return Error error
+}
 
 let ensureChildFolder
     (createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>)

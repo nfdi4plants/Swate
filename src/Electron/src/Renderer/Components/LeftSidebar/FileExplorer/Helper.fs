@@ -150,11 +150,13 @@ let createUntitledRootNoteRequest (dateCreated: DateTime) =
     FileContentDTO.create FileContentType.Markdown (NoteConversion.formatMarkdown draft) path
 
 let rootNoteActionContextMenuItems (dateCreated: DateTime) (onAddNote: FileItem -> unit) (item: FileItem) =
-    let createTargetPath date = NoteConversion.mkNewRootNoteRelativePath date "untitled-note"
+    let createTargetPath date =
+        NoteConversion.mkNewRootNoteRelativePath date "untitled-note"
 
     let isRootFolderForNewRootNote (item: FileItem) =
         item.IsDirectory
-        && (tryGetItemRelativePath item |> Option.exists (isRootFolderForDatedTargetPath createTargetPath dateCreated))
+        && (tryGetItemRelativePath item
+            |> Option.exists (isRootFolderForDatedTargetPath createTargetPath dateCreated))
 
     ContextMenuItem.whenItem
         isRootFolderForNewRootNote

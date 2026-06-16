@@ -22,7 +22,11 @@ let isRootFolderForDatedTargetPath
     (dateCreated: DateTime)
     (candidateRelativePath: string)
     =
-    match createTargetPath dateCreated.Date |> Option.bind (getNonEmptyPathParts >> Array.tryHead), getNonEmptyPathParts candidateRelativePath with
+    match
+        createTargetPath dateCreated.Date
+        |> Option.bind (getNonEmptyPathParts >> Array.tryHead),
+        getNonEmptyPathParts candidateRelativePath
+    with
     | Some targetRoot, [| candidateRoot |] -> pathsEqual targetRoot candidateRoot
     | _ -> false
 

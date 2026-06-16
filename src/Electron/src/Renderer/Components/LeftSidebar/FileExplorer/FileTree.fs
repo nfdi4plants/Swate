@@ -279,7 +279,11 @@ type FileTree =
             | Error errorMessage -> return Error errorMessage
         }
 
-        let activeCreateKind, activeFileSystemCreateDraft, activeRenameDraft, activeDeleteItem, activeNoteOverwriteRequest =
+        let (activeCreateKind,
+             activeFileSystemCreateDraft,
+             activeRenameDraft,
+             activeDeleteItem,
+             activeNoteOverwriteRequest) =
             match activeDialog with
             | Some(CreateDialog kind) -> Some kind, None, None, None, None
             | Some(FileSystemCreateDialog draft) -> None, Some draft, None, None, None
@@ -329,34 +333,33 @@ type FileTree =
                     )
                     |> Promise.start
 
-        let writeRootNoteRequest (request: FileContentDTO) closeOnSuccess =
-            promise {
-                let selectedPath = PathHelpers.normalizePath request.path
+        let writeRootNoteRequest (request: FileContentDTO) closeOnSuccess = promise {
+            let selectedPath = PathHelpers.normalizePath request.path
 
-                setIsDialogBusy true
+            setIsDialogBusy true
 
-                let! writeResult =
-                    writeFileWithEnsuredChildFolder
-                        Api.ipcArcVaultApi.writeFile
-                        Api.ipcArcVaultApi.createFileSystemItem
-                        NoteConversion.tryGetNoteFolderRelativePath
-                        NoteConversion.noteAssetsFolderName
-                        request
+            let! writeResult =
+                writeFileWithEnsuredChildFolder
+                    Api.ipcArcVaultApi.writeFile
+                    Api.ipcArcVaultApi.createFileSystemItem
+                    NoteConversion.tryGetNoteFolderRelativePath
+                    NoteConversion.noteAssetsFolderName
+                    request
 
-                match writeResult with
-                | Error exn -> applyAddNoteError exn.Message
-                | Ok() ->
-                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+            match writeResult with
+            | Error exn -> applyAddNoteError exn.Message
+            | Ok() ->
+                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    match! reloadPreviewByPath selectedPath with
-                    | Ok() -> ()
-                    | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
+                match! reloadPreviewByPath selectedPath with
+                | Ok() -> ()
+                | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
 
-                    if closeOnSuccess then
-                        closeDialog ()
+                if closeOnSuccess then
+                    closeDialog ()
 
-                setIsDialogBusy false
-            }
+            setIsDialogBusy false
+        }
 
         let startWriteRootNoteRequest request closeOnSuccess =
             writeRootNoteRequest request closeOnSuccess
@@ -373,8 +376,7 @@ type FileTree =
                 promise {
                     setIsDialogBusy true
 
-                    let! targetAvailabilityResult =
-                        checkTargetAvailability Api.ipcArcVaultApi.pathExists request.path
+                    let! targetAvailabilityResult = checkTargetAvailability Api.ipcArcVaultApi.pathExists request.path
 
                     match targetAvailabilityResult with
                     | Error exn ->

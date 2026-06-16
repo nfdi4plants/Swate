@@ -9,13 +9,8 @@ type FileTargetConflictModal =
 
     [<ReactComponent>]
     static member Main
-        (
-            isOpen: bool,
-            targetPath: string option,
-            close: unit -> unit,
-            overwrite: unit -> unit,
-            ?isBusy: bool
-        ) =
+        (isOpen: bool, targetPath: string option, close: unit -> unit, overwrite: unit -> unit, ?isBusy: bool)
+        =
 
         let isBusy = defaultArg isBusy false
         let displayPath = targetPath |> Option.defaultValue "the selected target"
@@ -47,7 +42,8 @@ type FileTargetConflictModal =
             isOpen = isOpen,
             setIsOpen = setIsOpen,
             header = Html.text "Target Already Exists",
-            description = Html.text $"A file already exists at '{displayPath}'. Rename the note or overwrite the existing file.",
+            description =
+                Html.text $"A file already exists at '{displayPath}'. Rename the note or overwrite the existing file.",
             children = Html.none,
             footer = footer,
             debug = "file-target-conflict"

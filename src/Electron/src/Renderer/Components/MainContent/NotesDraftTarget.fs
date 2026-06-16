@@ -14,7 +14,10 @@ let NotesDraftTarget () =
 
     let notesDraft, setNotesDraft = React.useState NotesDraft.init
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
-    let pendingOverwriteRequest, setPendingOverwriteRequest = React.useState<FileContentDTO option> None
+
+    let pendingOverwriteRequest, setPendingOverwriteRequest =
+        React.useState<FileContentDTO option> None
+
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
 
@@ -31,37 +34,36 @@ let NotesDraftTarget () =
                 Error = error
         }
 
-    let writeRequest (request: FileContentDTO) =
-        promise {
-            let! writeResult =
-                writeFileWithEnsuredChildFolder
-                    Api.ipcArcVaultApi.writeFile
-                    Api.ipcArcVaultApi.createFileSystemItem
-                    NoteConversion.tryGetNoteFolderRelativePath
-                    NoteConversion.noteAssetsFolderName
-                    request
+    let writeRequest (request: FileContentDTO) = promise {
+        let! writeResult =
+            writeFileWithEnsuredChildFolder
+                Api.ipcArcVaultApi.writeFile
+                Api.ipcArcVaultApi.createFileSystemItem
+                NoteConversion.tryGetNoteFolderRelativePath
+                NoteConversion.noteAssetsFolderName
+                request
 
-            match writeResult with
-            | Result.Error exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}")
-            | Ok() ->
-                setPendingOverwriteRequest None
+        match writeResult with
+        | Result.Error exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}")
+        | Ok() ->
+            setPendingOverwriteRequest None
 
-                let selectedPath = PathHelpers.normalizePath request.path
+            let selectedPath = PathHelpers.normalizePath request.path
 
-                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-                setNotesDraft NotesDraft.init
-                setNotesUiState NotesUiState.init
+            fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+            setNotesDraft NotesDraft.init
+            setNotesUiState NotesUiState.init
 
-                let! previewResult = Api.ipcArcVaultApi.openFile request.path
+            let! previewResult = Api.ipcArcVaultApi.openFile request.path
 
-                match previewResult with
-                | Ok previewData ->
-                    let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
-                    pageStateCtx.setState (Some pageState)
-                | Result.Error _ ->
-                    let pageState = Renderer.Types.PageState.fromFileContentDTO request
-                    pageStateCtx.setState (Some pageState)
-        }
+            match previewResult with
+            | Ok previewData ->
+                let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
+                pageStateCtx.setState (Some pageState)
+            | Result.Error _ ->
+                let pageState = Renderer.Types.PageState.fromFileContentDTO request
+                pageStateCtx.setState (Some pageState)
+    }
 
     let submitRequest (overwrite: bool) (request: FileContentDTO) =
         promise {
@@ -70,8 +72,7 @@ let NotesDraftTarget () =
             if overwrite then
                 do! writeRequest request
             else
-                let! targetAvailabilityResult =
-                    checkTargetAvailability Api.ipcArcVaultApi.pathExists request.path
+                let! targetAvailabilityResult = checkTargetAvailability Api.ipcArcVaultApi.pathExists request.path
 
                 match targetAvailabilityResult with
                 | Error exn -> setSubmitState false (Some $"Failed to check note target: {exn.Message}")
@@ -100,9 +101,11 @@ let NotesDraftTarget () =
         FileTargetConflictModal.Main(
             isOpen = pendingOverwriteRequest.IsSome,
             targetPath = (pendingOverwriteRequest |> Option.map _.path),
-            close = (fun () ->
-                setPendingOverwriteRequest None
-                setSubmitState false None),
+            close =
+                (fun () ->
+                    setPendingOverwriteRequest None
+                    setSubmitState false None
+                ),
             overwrite = (fun () -> pendingOverwriteRequest |> Option.iter (submitRequest true)),
             isBusy = notesUiState.IsSubmitting
         )

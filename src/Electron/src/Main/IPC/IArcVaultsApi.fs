@@ -386,13 +386,15 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
         }
     pathExists =
         fun (relativePath: string) ->
-            runLoadedArcPathAction event (fun arcPath -> promise {
-                match tryResolveArcRelativePath arcPath relativePath with
-                | Error pathError -> return Error pathError
-                | Ok absolutePath ->
-                    let! exists = pathExistsAsync absolutePath
-                    return Ok exists
-            })
+            runLoadedArcPathAction
+                event
+                (fun arcPath -> promise {
+                    match tryResolveArcRelativePath arcPath relativePath with
+                    | Error pathError -> return Error pathError
+                    | Ok absolutePath ->
+                        let! exists = pathExistsAsync absolutePath
+                        return Ok exists
+                })
     readNotes =
         fun () -> promise {
             try
