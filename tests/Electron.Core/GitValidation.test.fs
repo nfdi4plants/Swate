@@ -655,22 +655,6 @@ Vitest.describe (
                         Vitest.expect(progressEvents[0].Progress).toEqual (None)
                     }
                 )
-
-                Vitest.test (
-                    "parses Git LFS download progress into the shared Git progress shape",
-                    fun () ->
-                        match
-                            GitProvisioningService.tryParseGitLfsProgressMessage
-                                "Downloading LFS objects: 42% (5/12), 128 MB | 2.0 MB/s"
-                        with
-                        | None -> failwith "Expected Git LFS progress to be parsed."
-                        | Some progress ->
-                            Vitest.expect(progress.Method).toEqual (Some "lfs")
-                            Vitest.expect(progress.Stage).toEqual (Some "Downloading LFS objects")
-                            Vitest.expect(progress.Progress).toEqual (Some 42.0)
-                            Vitest.expect(progress.Processed).toEqual (Some 5.0)
-                            Vitest.expect(progress.Total).toEqual (Some 12.0)
-                )
         )
 )
 

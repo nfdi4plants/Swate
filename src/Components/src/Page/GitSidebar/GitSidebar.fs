@@ -303,7 +303,7 @@ type GitSidebar =
                                                         prop.style [
                                                             style.width (length.percent value)
                                                             style.custom (
-                                                                "background-color",
+                                                                "backgroundColor",
                                                                 "var(--color-base-content)"
                                                             )
                                                         ]

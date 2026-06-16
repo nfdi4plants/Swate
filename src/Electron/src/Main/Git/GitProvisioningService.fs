@@ -137,8 +137,6 @@ let private runSimpleGit
     : JS.Promise<GitService.GitResult<'T>> =
     GitInternals.runSimpleGit toFailure operation git
 
-let tryParseGitLfsProgressMessage = GitInternals.tryParseGitLfsProgressMessage
-
 let private resolveAbsolutePath (pathValue: string) = resolve [| pathValue |]
 
 let private dirname (pathValue: string) = Main.Bindings.Path.dirname pathValue
@@ -431,10 +429,7 @@ let cloneRepository
                                                                 "lfs"
                                                                 "Downloading Git LFS files"
 
-                                                            let! hydrateResult =
-                                                                hydrateGit
-                                                                |> GitInternals.withGitLfsOutputProgress progress
-                                                                |> hydrateClonedLfsContent
+                                                            let! hydrateResult = hydrateClonedLfsContent hydrateGit
 
                                                             match hydrateResult with
                                                             | Ok() -> return cloneResult

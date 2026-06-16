@@ -966,7 +966,7 @@ let private hydratePulledLfsContent
                     let! _ = currentGit.raw [| "lfs"; "pull" |]
                     return ()
                 })
-                (withGitLfsOutputProgress progressCallback git)
+                git
 
         return result
     }
