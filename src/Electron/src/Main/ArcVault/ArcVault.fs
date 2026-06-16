@@ -232,7 +232,7 @@ module ArcVaultExtensions =
                     this.RefreshHasUnsavedArcChangesFlag()
                     Ok()
 
-        /// Writes the active in-memory ARC scaffold to disk using ARCtrl UpdateAsync.
+        /// Writes the active in-memory ARC scaffold to disk without touching unmanaged files such as notes.
         member this.WriteArc() : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
             | Some arcPath, Some arc ->
@@ -240,9 +240,11 @@ module ArcVaultExtensions =
 
                 try
                     try
-                        do! arc.UpdateAsync(arcPath)
-                        this.RefreshHasUnsavedArcChangesFlag()
-                        return Ok()
+                        match! arc.TryUpdateAsyncSwate(arcPath) with
+                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
+                        | Ok _ ->
+                            this.RefreshHasUnsavedArcChangesFlag()
+                            return Ok()
                     with e ->
                         return Error(exn $"Failed to persist ARC to disk: {e.Message}")
                 finally

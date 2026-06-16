@@ -124,20 +124,17 @@ module NoteConversion =
     let resolveProtocolName (draft: NotesDraft) =
         Validation.sanitizeProtocolName draft.Title
 
-    let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (dateCreated: DateTime) (protocolName: string) =
+    let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (_dateCreated: DateTime) (protocolName: string) =
         let folder =
             match targetRef.Kind with
             | NotesTargetKind.Study -> "studies"
             | NotesTargetKind.Assay -> "assays"
 
-        let dateFolder = formatDateFolder dateCreated
-
         if
-            PathHelpers.isSafePathSegment dateFolder
-            && PathHelpers.isSafePathSegment targetRef.Name
+            PathHelpers.isSafePathSegment targetRef.Name
             && PathHelpers.isSafePathSegment protocolName
         then
-            Some $"{notesRootFolder}/{folder}/{targetRef.Name}/{dateFolder}/{protocolName}.md"
+            Some $"{folder}/{targetRef.Name}/protocols/{protocolName}.md"
         else
             None
 

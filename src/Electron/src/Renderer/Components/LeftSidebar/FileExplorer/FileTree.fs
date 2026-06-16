@@ -259,6 +259,9 @@ type FileTree =
         let applyCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
 
+        let applyAddNoteError errorMessage =
+            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not add note"))
+
         let applyFileSystemCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create file or folder"))
 
@@ -321,6 +324,32 @@ type FileTree =
                     )
                     |> Promise.start
 
+        let addRootNote (_item: FileItem) =
+            if not isDialogBusy then
+                setIsDialogBusy true
+
+                let existingPaths =
+                    fileStateCtx.state.FileTree |> Array.map _.path
+
+                let request = createUntitledRootNoteRequest System.DateTime.Today existingPaths
+                let selectedPath = PathHelpers.normalizePath request.path
+
+                promise {
+                    let! writeResult = Api.ipcArcVaultApi.writeFile request
+
+                    match writeResult with
+                    | Error exn -> applyAddNoteError exn.Message
+                    | Ok() ->
+                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                        match! reloadPreviewByPath selectedPath with
+                        | Ok() -> ()
+                        | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
+                }
+                |> Promise.catch (fun exn -> applyAddNoteError exn.Message)
+                |> Promise.map (fun _ -> setIsDialogBusy false)
+                |> Promise.start
+
         let createFileSystemItem (name: string) =
             if not isDialogBusy then
                 match activeFileSystemCreateDraft with
@@ -368,6 +397,11 @@ type FileTree =
 
         let renameContextMenuItems =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
+
+        let itemActions item = [
+            yield! rootNoteActionContextMenuItems addRootNote item
+            yield! renameContextMenuItems item
+        ]
 
         let contextMenuConfig: FileTreeContextMenu.ContextMenuConfig = {
             openItem = openPreview
@@ -492,7 +526,7 @@ type FileTree =
                             getItemIconClass = getItemIconClass,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
-                            getItemActions = renameContextMenuItems,
+                            getItemActions = itemActions,
                             getItemStatusAction = getItemStatusAction,
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,

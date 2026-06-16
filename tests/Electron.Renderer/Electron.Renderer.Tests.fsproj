@@ -11,6 +11,7 @@
     <Compile Include="FileTreeMaterialization.test.fs" />
     <Compile Include="FileTreeContextMenu.test.fs" />
     <Compile Include="FileTreeRenameWorkflow.test.fs" />
+    <Compile Include="NoteMoveHelper.test.fs" />
     <Compile Include="GitWorkflow.test.fs" />
     <Compile Include="NoteSearchInterop.test.fs" />
   </ItemGroup>

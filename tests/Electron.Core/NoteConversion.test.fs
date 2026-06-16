@@ -3,6 +3,7 @@ module ElectronCore.NoteConversionTests
 open System
 open ARCtrl
 open Swate.Components.Composite.Notes.Editor
+open Swate.Components.Shared
 open Vitest
 
 let private mkTag name source accession =
@@ -100,5 +101,37 @@ Body
                     |> expectSome "Expected YAML frontmatter to decode."
 
                 Vitest.expect(frontmatter.Tags.IsNone).toBe (true)
+        )
+
+        Vitest.test (
+            "mkExistingTargetRelativePath targets the selected entity protocols folder",
+            fun () ->
+                let studyTarget: ExistingTargetRef = {
+                    Kind = NotesTargetKind.Study
+                    Name = "StudyA"
+                }
+
+                let assayTarget: ExistingTargetRef = {
+                    Kind = NotesTargetKind.Assay
+                    Name = "AssayA"
+                }
+
+                Vitest
+                    .expect(
+                        NoteConversion.mkExistingTargetRelativePath
+                            studyTarget
+                            (DateTime(2026, 6, 15))
+                            "Sampling_protocol"
+                    )
+                    .toEqual (Some "studies/StudyA/protocols/Sampling_protocol.md")
+
+                Vitest
+                    .expect(
+                        NoteConversion.mkExistingTargetRelativePath
+                            assayTarget
+                            (DateTime(2026, 6, 15))
+                            "Extraction_protocol"
+                    )
+                    .toEqual (Some "assays/AssayA/protocols/Extraction_protocol.md")
         )
 )

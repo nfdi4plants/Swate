@@ -1,6 +1,9 @@
 module ElectronRenderer.FileTreeContextMenuTests
 
+open System
+open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
+open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -216,6 +219,70 @@ Vitest.describe (
                 addNoteItem.OnClick()
 
                 Vitest.expect(requestedCreateKind).toEqual (Some ArcExplorerNodeKind.Note)
+        )
+
+        Vitest.test (
+            "root notes folder row exposes add note action",
+            fun () ->
+                let item = createFolderItem "notes" (Some "notes")
+                let mutable requestedItem: FileItem option = None
+                let menuItems = rootNoteActionContextMenuItems (fun item -> requestedItem <- Some item) item
+
+                Vitest.expect(labels menuItems).toEqual ([| "Create new item in" |])
+                Vitest.expect(menuItems.Head.Icon).toBe ("swt:fluent--note-add-24-regular")
+
+                menuItems.Head.OnClick()
+
+                Vitest.expect(requestedItem |> Option.map _.Path).toEqual (Some(Some "notes"))
+        )
+
+        Vitest.test (
+            "root notes action is hidden for nested notes folders",
+            fun () ->
+                let item = createFolderItem "15_06_2026" (Some "notes/15_06_2026")
+                let menuItems = rootNoteActionContextMenuItems ignore item
+
+                Vitest.expect(menuItems.Length).toBe (0)
+        )
+
+        Vitest.test (
+            "root notes folder context menu does not expose rename",
+            fun () ->
+                let item = createFolderItem "notes" (Some "notes")
+                let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
+
+                Vitest.expect(groupedLabels menuItems).not.toContain ("Rename")
+        )
+
+        Vitest.test (
+            "untitled root note request uses dated notes path and frontmatter",
+            fun () ->
+                let request = createUntitledRootNoteRequest (DateTime(2026, 6, 15)) []
+
+                Vitest.expect(request.fileType).toEqual (FileContentType.Markdown)
+                Vitest.expect(request.path).toBe ("notes/15_06_2026/untitled-note.md")
+
+                match NoteConversion.tryDecodeMarkdownFrontmatter request.content with
+                | None -> failwith "Expected generated markdown to contain note frontmatter."
+                | Some(frontmatter, body) ->
+                    Vitest.expect(frontmatter.Title).toBe ("Untitled Note")
+                    Vitest.expect(frontmatter.Date).toEqual (DateTime(2026, 6, 15))
+                    Vitest.expect(frontmatter.Tags.IsNone).toBe (true)
+                    Vitest.expect(body).toBe ("")
+        )
+
+        Vitest.test (
+            "untitled root note request increments filename when target exists",
+            fun () ->
+                let request =
+                    createUntitledRootNoteRequest
+                        (DateTime(2026, 6, 15))
+                        [
+                            "notes/15_06_2026/untitled-note.md"
+                            "notes\\15_06_2026\\untitled-note-2.md"
+                        ]
+
+                Vitest.expect(request.path).toBe ("notes/15_06_2026/untitled-note-3.md")
         )
 
         Vitest.test (

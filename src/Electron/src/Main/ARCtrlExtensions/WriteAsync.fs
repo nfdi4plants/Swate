@@ -21,6 +21,11 @@ module ArcWriteExtensions =
             Contract.createCreate (path, DTOType.PlainText)
         )
 
+    let private isUnmanagedPlainTextCreateContract (contract: Contract) =
+        contract.Operation = Operation.CREATE
+        && contract.DTOType = Some DTOType.PlainText
+        && contract.DTO.IsNone
+
     type ARC with
 
         /// Hotfix for #618, not fixed in the consumed ARCtrl 3.0.0-beta.12.
@@ -142,3 +147,12 @@ module ArcWriteExtensions =
         /// Hotfix for #618. Writes only contracts selected by GetWriteContractsSwate.
         member this.TryWriteAsyncSwate(arcPath: string) =
             this.GetWriteContractsSwate() |> fullFillContractBatchAsync arcPath
+
+        /// Writes only managed update contracts. This prevents ARC save from overwriting unmanaged text files
+        /// such as notes with empty content when ARCtrl falls back to full write contracts.
+        member this.GetUpdateContractsSwate(?skipUpdateFS: bool) =
+            this.GetUpdateContracts(?skipUpdateFS = skipUpdateFS)
+            |> Array.filter (isUnmanagedPlainTextCreateContract >> not)
+
+        member this.TryUpdateAsyncSwate(arcPath: string) =
+            this.GetUpdateContractsSwate() |> fullFillContractBatchAsync arcPath

@@ -2,6 +2,7 @@ module Renderer.Components.LeftSidebar.FileExplorer.Helper
 
 open System
 open Swate.Components.Page.FileExplorer.Types
+open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
@@ -131,6 +132,46 @@ let canCreateFileSystemItemIn (item: FileItem) =
             String.IsNullOrWhiteSpace path
             || ArcEntityPathRules.isGenericFileSystemParentAllowed path
         ))
+
+let isRootNotesFolder (item: FileItem) =
+    item.IsDirectory
+    && (tryGetItemRelativePath item
+        |> Option.exists (fun path -> PathHelpers.pathsEqual path "notes"))
+
+let createUntitledRootNotePath (dateCreated: DateTime) (existingPaths: string seq) =
+    let dateFolder = NoteConversion.formatDateFolder dateCreated.Date
+
+    let rec loop index =
+        let suffix = if index = 1 then "" else $"-{index}"
+        let candidate = $"notes/{dateFolder}/untitled-note{suffix}.md"
+
+        let alreadyExists =
+            existingPaths
+            |> Seq.exists (fun path -> PathHelpers.pathsEqual path candidate)
+
+        if alreadyExists then loop (index + 1) else candidate
+
+    loop 1
+
+let createUntitledRootNoteRequest (dateCreated: DateTime) (existingPaths: string seq) =
+    let dateCreated = dateCreated.Date
+    let path = createUntitledRootNotePath dateCreated existingPaths
+
+    let draft: NotesDraft = {
+        NotesDraft.init with
+            Title = "Untitled Note"
+            DateCreated = Some dateCreated
+    }
+
+    FileContentDTO.create FileContentType.Markdown (NoteConversion.formatMarkdown draft) path
+
+let rootNoteActionContextMenuItems (onAddNote: FileItem -> unit) (item: FileItem) =
+    ContextMenuItem.whenItem
+        isRootNotesFolder
+        "Create new item in"
+        "swt:fluent--note-add-24-regular"
+        onAddNote
+        item
 
 let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
 

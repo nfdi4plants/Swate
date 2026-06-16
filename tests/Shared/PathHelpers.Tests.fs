@@ -194,6 +194,8 @@ let tests =
 
             Expect.isFalse (ArcEntityPathRules.isRenamePathAllowed "studies") "Add-zone roots must stay protected."
 
+            Expect.isFalse (ArcEntityPathRules.isRenamePathAllowed "notes") "Root notes folder must stay protected."
+
             Expect.isFalse
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/isa.study.xlsx")
                 "Canonical ARC files should not be renameable."
@@ -205,6 +207,10 @@ let tests =
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
                 "Safe generic descendants should be renameable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "notes/15_06_2026/foo.md")
+                "Nested note files should remain renameable."
 
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "test.fsx")
