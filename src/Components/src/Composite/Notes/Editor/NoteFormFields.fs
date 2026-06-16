@@ -186,7 +186,7 @@ module NoteFormFields =
                     TextInputWithMarkdown.TextInputWithMarkdown(
                         draft.MainText,
                         (fun value -> setDraft { draft with MainText = value }),
-                        parent = MarkdownParent.Editor,
+                        height = 360,
                         label = "Main Text",
                         placeholder = "Write note markdown..."
                     )

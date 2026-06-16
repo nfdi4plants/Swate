@@ -87,7 +87,6 @@ let MarkdownEditorTarget (content: string) =
                     TextInputWithMarkdown.TextInputWithMarkdown(
                         markdown,
                         (fun value -> setMarkdown value),
-                        parent = MarkdownParent.Created,
                         placeholder = "Write markdown...",
                         mode = PreviewMode.Live,
                         height = 560

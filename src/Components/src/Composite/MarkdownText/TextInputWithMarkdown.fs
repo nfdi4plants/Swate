@@ -64,7 +64,7 @@ type TextInputWithMarkdown =
         (
             value: string,
             setValue: string -> unit,
-            ?parent: MarkdownParent,
+            height: int,
             ?label: string,
             ?placeholder: string,
             ?disabled: bool,
@@ -72,7 +72,6 @@ type TextInputWithMarkdown =
             ?isJoin: bool,
             ?rmv: MouseEvent -> unit,
             ?validator: string -> Result<unit, string>,
-            ?height: int,
             ?mode: PreviewMode,
             ?previewClassName: string,
             ?plugins: MarkdownToolbarPlugin list,
@@ -80,21 +79,12 @@ type TextInputWithMarkdown =
         ) =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
-
-        let options = {
-            MarkdownOptions.defaults with
-                CreatedHeight = defaultArg height MarkdownOptions.defaults.CreatedHeight
-                EditorHeight = defaultArg height MarkdownOptions.defaults.EditorHeight
-                Mode = defaultArg mode MarkdownOptions.defaults.Mode
-                PreviewClassName =
-                    match previewClassName with
-                    | Some value -> Some value
-                    | None -> MarkdownOptions.defaults.PreviewClassName
-        }
+        let previewClassName = defaultArg previewClassName "swt:p-4 swt:h-full"
+        let defaultMode = defaultArg mode MarkdownOptions.defaults.Mode
 
         let startedChange = React.useRef false
         let tempValue, setTempValue = React.useState value
-        let activeMode, setActiveMode = React.useState options.Mode
+        let activeMode, setActiveMode = React.useState defaultMode
         let debouncedValue = React.useDebounce (tempValue, 300)
         let validationError, setValidationError = React.useState (None: string option)
 
@@ -423,16 +413,6 @@ type TextInputWithMarkdown =
                 prop.onClick (fun _ -> setActiveMode targetMode)
             ]
 
-        let specificHeight =
-            match parent with
-            | Some MarkdownParent.Editor -> options.EditorHeight
-            | Some MarkdownParent.Created -> options.CreatedHeight
-            | None -> options.CreatedHeight
-
-        let previewClassName =
-            match options.PreviewClassName with
-            | Some className -> $"swt:p-4 swt:h-[{specificHeight}px {className}]"
-            | None -> $"swt:p-4 swt:h-[{specificHeight}px]"
 
 
         let editorWrapperClasses = [
@@ -534,12 +514,12 @@ type TextInputWithMarkdown =
                                                     if activeMode = PreviewMode.Live then
                                                         "swt:border-b swt:border-base-300 swt:lg:border-b-0 swt:lg:border-r"
                                                 ]
-                                                prop.style [ style.height specificHeight ]
                                                 prop.children [
                                                     Html.textarea [
                                                         prop.ref textareaRef
                                                         prop.className
-                                                            "swt:w-full swt:h-full swt:border-0 swt:bg-transparent swt:resize-none swt:px-3 swt:py-2 swt:focus:outline-hidden"
+                                                            "swt:w-full swt:border-0 swt:swt:bg-transparent swt:resize-none swt:px-3 swt:py-2 swt:focus:outline-hidden"
+                                                        prop.style [ style.height height ]
                                                         prop.disabled disabled
                                                         prop.readOnly disabled
                                                         prop.value tempValue
@@ -553,8 +533,8 @@ type TextInputWithMarkdown =
 
                                         if activeMode <> PreviewMode.Edit then
                                             Html.div [
-                                                prop.className "swt:min-w-0 swt:overflow-auto swt:bg-base-100"
-                                                prop.style [ style.height specificHeight ]
+                                                prop.className
+                                                    "swt:min-w-0 swt:h-full swt:overflow-auto swt:bg-base-100"
                                                 prop.children [
                                                     ReactMDEditor.MarkdownPreview(
                                                         tempValue,
@@ -627,4 +607,4 @@ flowchart TD
 
         let value, setValue = React.useState entryInitialValue
 
-        TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...")
+        TextInputWithMarkdown.TextInputWithMarkdown(value, setValue, placeholder = "Write markdown...", height = 360)
