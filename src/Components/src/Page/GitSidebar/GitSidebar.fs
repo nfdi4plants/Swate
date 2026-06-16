@@ -293,12 +293,22 @@ type GitSidebar =
 
                                         match progressValue with
                                         | Some value ->
-                                            Html.progress [
+                                            Html.div [
                                                 prop.testId "GitSidebarProgressBar"
-                                                prop.className "swt:progress swt:progress-info swt:h-1.5 swt:w-full"
-                                                prop.value value
-                                                prop.max 100
-                                                prop.ariaLabel "Git operation progress"
+                                                prop.className "swt:h-1.5 swt:w-full swt:rounded-full swt:bg-base-300"
+                                                prop.children [
+                                                    Html.div [
+                                                        prop.className
+                                                            "swt:h-full swt:rounded-full swt:transition-all swt:duration-300"
+                                                        prop.style [
+                                                            style.width (length.percent value)
+                                                            style.custom (
+                                                                "background-color",
+                                                                "var(--color-base-content)"
+                                                            )
+                                                        ]
+                                                    ]
+                                                ]
                                             ]
                                         | None -> Html.none
                                     ]

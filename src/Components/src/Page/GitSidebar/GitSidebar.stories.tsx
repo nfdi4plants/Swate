@@ -576,8 +576,9 @@ export const BusyProgressState: Story = {
     await expect(canvas.getByTestId("GitSidebarProgressNotice")).toHaveTextContent(
       "pull | Receiving objects | 54%",
     );
-    await expect(canvas.getByTestId("GitSidebarProgressBar")).toHaveAttribute("value", "54");
-    await expect(canvas.getByTestId("GitSidebarProgressBar")).toHaveAttribute("max", "100");
+    await expect(canvas.getByTestId("GitSidebarProgressBar")).toBeInTheDocument();
+    const fillBar = canvas.getByTestId("GitSidebarProgressBar").firstElementChild;
+    await expect(fillBar).toHaveStyle({ width: "54%" });
   },
 };
 
