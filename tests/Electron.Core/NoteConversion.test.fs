@@ -117,19 +117,11 @@ Body
                 }
 
                 Vitest
-                    .expect(
-                        NoteConversion.mkExistingTargetRelativePath
-                            studyTarget
-                            "Sampling_protocol"
-                    )
+                    .expect(NoteConversion.mkExistingTargetRelativePath studyTarget "Sampling_protocol")
                     .toEqual (Some "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
 
                 Vitest
-                    .expect(
-                        NoteConversion.mkExistingTargetRelativePath
-                            assayTarget
-                            "Extraction_protocol"
-                    )
+                    .expect(NoteConversion.mkExistingTargetRelativePath assayTarget "Extraction_protocol")
                     .toEqual (Some "assays/AssayA/protocols/Extraction_protocol/Extraction_protocol.md")
 
                 Vitest

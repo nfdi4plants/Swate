@@ -72,7 +72,9 @@ Vitest.describe (
                         []
                     |> expectReadyPlan
 
-                Vitest.expect(plan.TargetPath).toBe ("assays/AssayA/protocols/Extraction_protocol/Extraction_protocol.md")
+                Vitest
+                    .expect(plan.TargetPath)
+                    .toBe ("assays/AssayA/protocols/Extraction_protocol/Extraction_protocol.md")
         )
 
         Vitest.test (
@@ -103,9 +105,7 @@ Vitest.describe (
                         (Some "notes/2026-06-15/untitled-note/untitled-note.md")
                         content
                         (target NotesTargetKind.Study "StudyA")
-                        [
-                            "studies/StudyA/protocols/Sampling_protocol"
-                        ]
+                        [ "studies/StudyA/protocols/Sampling_protocol" ]
                     |> expectConflictPlan
 
                 Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")

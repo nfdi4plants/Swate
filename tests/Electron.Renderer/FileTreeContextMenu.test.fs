@@ -226,7 +226,9 @@ Vitest.describe (
             fun () ->
                 let item = createFolderItem "notes" (Some "notes")
                 let mutable requestedItem: FileItem option = None
-                let menuItems = rootNoteActionContextMenuItems (fun item -> requestedItem <- Some item) item
+
+                let menuItems =
+                    rootNoteActionContextMenuItems (fun item -> requestedItem <- Some item) item
 
                 Vitest.expect(labels menuItems).toEqual ([| "Create new item in" |])
                 Vitest.expect(menuItems.Head.Icon).toBe ("swt:fluent--note-add-24-regular")
@@ -275,12 +277,10 @@ Vitest.describe (
             "untitled root note request increments filename when target exists",
             fun () ->
                 let request =
-                    createUntitledRootNoteRequest
-                        (DateTime(2026, 6, 15))
-                        [
-                            "notes/2026-06-15/untitled-note"
-                            "notes\\2026-06-15\\untitled-note-2\\untitled-note-2.md"
-                        ]
+                    createUntitledRootNoteRequest (DateTime(2026, 6, 15)) [
+                        "notes/2026-06-15/untitled-note"
+                        "notes\\2026-06-15\\untitled-note-2\\untitled-note-2.md"
+                    ]
 
                 Vitest.expect(request.path).toBe ("notes/2026-06-15/untitled-note-3/untitled-note-3.md")
         )
