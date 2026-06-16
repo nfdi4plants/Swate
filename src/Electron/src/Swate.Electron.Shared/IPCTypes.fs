@@ -145,6 +145,10 @@ module MainToRendererIpc =
         gitProgressUpdate: GitProgressDto -> unit
     }
 
+    type IGitRepositoryRendererApi = {
+        gitRepositoryInitialized: string -> unit
+    }
+
     type IGitLfsProgressRendererApi = {
         gitLfsProgressUpdate: GitLfsProgressDto -> unit
     }

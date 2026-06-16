@@ -189,6 +189,7 @@ type Msg =
     | ResetWorkflow
     | SetCurrentProgress of GitSidebarProgress option
     | ArcPathChanged of ArcRootPath
+    | GitRepositoryInitialized of arcPath: string
     | RefreshRequested
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
     | InitRepositoryRequested
@@ -996,6 +997,11 @@ let update
             | None -> applyPageChangeCmd setPageState GitPageChange.Clear
 
         nextModel, cmd
+    | GitRepositoryInitialized arcPath ->
+        match model.CurrentArcPath with
+        | Some currentArcPath when Swate.Components.Shared.PathHelpers.pathsEqual currentArcPath arcPath ->
+            model, Cmd.ofMsg RefreshRequested
+        | _ -> model, Cmd.none
     | RefreshRequested when model.CurrentArcPath.IsNone ->
         {
             GitState.Empty with
@@ -1686,6 +1692,16 @@ let subscribe (_model: GitState) : Sub<Msg> = [
         let dispose =
             Renderer.IpcReceiver.subscribeProxyReceiver<IGitProgressRendererApi> {
                 gitProgressUpdate = fun progress -> dispatch (SetCurrentProgress(Some(mapProgress progress)))
+            }
+
+        { new System.IDisposable with
+            member _.Dispose() = dispose ()
+        }
+    [ "gitRepositoryInitialized" ],
+    fun dispatch ->
+        let dispose =
+            Renderer.IpcReceiver.subscribeProxyReceiver<IGitRepositoryRendererApi> {
+                gitRepositoryInitialized = fun arcPath -> dispatch (GitRepositoryInitialized arcPath)
             }
 
         { new System.IDisposable with
