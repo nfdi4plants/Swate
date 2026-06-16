@@ -331,7 +331,7 @@ type GitSidebar =
                                                     ]
                                                     Html.pre [
                                                         prop.className
-                                                            "swt:mt-2 swt:max-h-36 swt:overflow-auto swt:whitespace-pre-wrap swt:break-words swt:rounded swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:font-mono swt:text-xs"
+                                                            "swt:mt-2 swt:max-h-36 swt:overflow-auto swt:whitespace-pre-wrap swt:break-words swt:rounded swt:border swt:border-base-content/30 swt:bg-base-content swt:p-2 swt:font-mono swt:text-xs swt:text-base-100"
                                                         prop.text output
                                                     ]
                                                 ]
@@ -609,6 +609,11 @@ type GitSidebar =
                     ]
                 ]
             ]
+        ]
+
+    [<ReactComponent>]
+    static member private BranchStatusDetails(props: BranchHeaderProps) =
+        React.Fragment [
             Html.div [
                 prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                 prop.children [
@@ -1949,24 +1954,34 @@ type GitSidebar =
                 )
             )
 
+        let branchHeaderProps = {
+            Status = status
+            HasConflicts = hasConflicts
+            IsBusy = isBusy
+            CanOpenRemoteRepository = canOpenRemoteRepository
+            OnOpenRemoteRepository = onOpenRemoteRepository
+            OnRefresh =
+                fun () ->
+                    setLocalError None
+                    onRefresh ()
+        }
+
         Html.div [
             prop.testId "GitSidebar"
             prop.className
                 "swt:@container/gitSidebar swt:flex swt:h-full swt:min-h-0 swt:min-w-0 swt:flex-col swt:overflow-x-hidden swt:bg-base-100"
             prop.children [
-                GitSidebar.BranchHeader(
-                    {
-                        Status = status
-                        HasConflicts = hasConflicts
-                        IsBusy = isBusy
-                        CanOpenRemoteRepository = canOpenRemoteRepository
-                        OnOpenRemoteRepository = onOpenRemoteRepository
-                        OnRefresh =
-                            fun () ->
-                                setLocalError None
-                                onRefresh ()
-                    }
+                GitSidebar.BranchHeader(branchHeaderProps)
+
+                GitSidebar.OperationStatusNotice(
+                    ?runStatus = Some runStatus,
+                    ?errorNotice = visibleError,
+                    ?warningNotice = warningNotice,
+                    busyTestId = "GitSidebarProgressNotice",
+                    errorTestId = "GitSidebarErrorNotice"
                 )
+
+                GitSidebar.BranchStatusDetails(branchHeaderProps)
 
                 GitSidebar.AdvancedActions(
                     {
@@ -2030,14 +2045,6 @@ type GitSidebar =
                         SubmitPrimarySave = submitPrimarySave
                         SubmitLocalCommit = submitLocalCommit
                     }
-                )
-
-                GitSidebar.OperationStatusNotice(
-                    ?runStatus = Some runStatus,
-                    ?errorNotice = visibleError,
-                    ?warningNotice = warningNotice,
-                    busyTestId = "GitSidebarProgressNotice",
-                    errorTestId = "GitSidebarErrorNotice"
                 )
 
                 if hasConflicts then

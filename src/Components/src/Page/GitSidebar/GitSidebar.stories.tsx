@@ -587,6 +587,20 @@ export const BusyProgressState: Story = {
     await expect(outputDetails).toHaveTextContent(
       "remote: Enumerating objects: 18, done.",
     );
+    const outputConsole = within(outputDetails).getByText(/remote: Enumerating objects/);
+    await expect(outputConsole).toHaveClass("swt:bg-base-content");
+    await expect(outputConsole).toHaveClass("swt:text-base-100");
+
+    const sourceControlTitle = canvas.getByText("Source Control");
+    const trackingInfo = canvas.getByText("Tracking origin/feature/git-sidebar");
+    expect(
+      sourceControlTitle.compareDocumentPosition(canvas.getByTestId("GitSidebarProgressNotice")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      canvas.getByTestId("GitSidebarProgressNotice").compareDocumentPosition(trackingInfo) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   },
 };
 
