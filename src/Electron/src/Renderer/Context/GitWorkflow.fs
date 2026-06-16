@@ -5,7 +5,6 @@ open Elmish
 open Fable.Core
 
 open Renderer.Types
-open Swate.Components.Api.GitLabApi
 open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.GitTypes
@@ -190,9 +189,10 @@ type Msg =
     | ResetWorkflow
     | SetCurrentProgress of GitSidebarProgress option
     | ArcPathChanged of ArcRootPath
+    | GitRepositoryInitialized of arcPath: string
     | RefreshRequested
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
-    | InitRepositoryRequested of remoteProjectName: string option
+    | InitRepositoryRequested
     | InitRepositoryCompleted of sessionId: int * result: Result<InitRepositoryOutcome, string>
     | SelectChangeRequested of GitSidebarChange * Reply<unit>
     | SelectChangeCompleted of
@@ -238,13 +238,11 @@ type GitDependencies = {
     loadMergeConflictPage: string -> JS.Promise<Result<PageState, string>>
     initGitRepository: string -> JS.Promise<Result<string, string>>
     renameOpenArcRoot: string -> JS.Promise<Result<string, string>>
-    createDataHubProject: string -> JS.Promise<Result<ExploreProjectDto, string>>
     installGitLfs: unit -> JS.Promise<Result<GitOperationResult, string>>
     previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, string>>
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
-    gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -537,39 +535,12 @@ let private refreshAllAsync (deps: GitDependencies) = promise {
     }
 }
 
-let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) (remoteProjectName: string option) = promise {
+let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) = promise {
     let! initResult = deps.initGitRepository arcPath
 
     match initResult with
     | Error message -> return Error message
-    | Ok _ ->
-        match
-            remoteProjectName
-            |> Option.map _.Trim()
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-        with
-        | None -> return Ok { WarningMessage = None }
-        | Some projectName ->
-            let! projectResult = deps.createDataHubProject projectName
-
-            match projectResult with
-            | Error message -> return Ok { WarningMessage = Some message }
-            | Ok project ->
-                let! addRemoteResult =
-                    deps.gitAddRemote {
-                        RemoteName = "origin"
-                        RemoteUrl = project.http_url_to_repo
-                    }
-
-                match addRemoteResult with
-                | Error message -> return Ok { WarningMessage = Some message }
-                | Ok operationResult when operationResult.Success -> return Ok { WarningMessage = None }
-                | Ok operationResult ->
-                    return
-                        Ok {
-                            WarningMessage =
-                                Some(operationResult.Message |> Option.defaultValue "Adding origin remote failed.")
-                        }
+    | Ok _ -> return Ok { WarningMessage = None }
 }
 
 let private loadPageAsync (deps: GitDependencies) (path: string) (isConflicted: bool) = promise {
@@ -1026,6 +997,11 @@ let update
             | None -> applyPageChangeCmd setPageState GitPageChange.Clear
 
         nextModel, cmd
+    | GitRepositoryInitialized arcPath ->
+        match model.CurrentArcPath with
+        | Some currentArcPath when Swate.Components.Shared.PathHelpers.pathsEqual currentArcPath arcPath ->
+            model, Cmd.ofMsg RefreshRequested
+        | _ -> model, Cmd.none
     | RefreshRequested when model.CurrentArcPath.IsNone ->
         {
             GitState.Empty with
@@ -1097,8 +1073,8 @@ let update
                 Cmd.none
 
         nextModel, cmd
-    | InitRepositoryRequested _ when model.CurrentArcPath.IsNone -> model, Cmd.none
-    | InitRepositoryRequested remoteProjectName ->
+    | InitRepositoryRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
+    | InitRepositoryRequested ->
         let nextModel =
             model
             |> withBusyOperation (Some GitBusyOperation.InitializingRepository)
@@ -1110,8 +1086,8 @@ let update
 
         let cmd =
             Cmd.OfPromise.either
-                (fun (deps, arcPath, remoteProjectName) -> runInitRepositoryAsync deps arcPath remoteProjectName)
-                (deps, Option.get model.CurrentArcPath, remoteProjectName)
+                (fun (deps, arcPath) -> runInitRepositoryAsync deps arcPath)
+                (deps, Option.get model.CurrentArcPath)
                 (fun result -> InitRepositoryCompleted(model.ArcSessionId, result))
                 (fun err -> InitRepositoryCompleted(model.ArcSessionId, Error(string err)))
 
@@ -1716,6 +1692,16 @@ let subscribe (_model: GitState) : Sub<Msg> = [
         let dispose =
             Renderer.IpcReceiver.subscribeProxyReceiver<IGitProgressRendererApi> {
                 gitProgressUpdate = fun progress -> dispatch (SetCurrentProgress(Some(mapProgress progress)))
+            }
+
+        { new System.IDisposable with
+            member _.Dispose() = dispose ()
+        }
+    [ "gitRepositoryInitialized" ],
+    fun dispatch ->
+        let dispose =
+            Renderer.IpcReceiver.subscribeProxyReceiver<IGitRepositoryRendererApi> {
+                gitRepositoryInitialized = fun arcPath -> dispatch (GitRepositoryInitialized arcPath)
             }
 
         { new System.IDisposable with
