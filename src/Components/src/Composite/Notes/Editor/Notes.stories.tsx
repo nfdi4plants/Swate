@@ -116,7 +116,7 @@ export const ExistingTargetSubmit: Story = {
     await userEvent.click(canvas.getByTestId('notes-add-existing-button'));
 
     const targetSelect = canvas.getByTestId('notes-existing-target-select') as HTMLSelectElement;
-    await userEvent.selectOptions(targetSelect, 'MyStudy');
+    await userEvent.selectOptions(targetSelect, 'study::MyStudy');
 
     await userEvent.click(canvas.getByTestId('notes-create-existing-button'));
 

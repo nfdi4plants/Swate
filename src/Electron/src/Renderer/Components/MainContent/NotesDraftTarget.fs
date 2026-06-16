@@ -3,9 +3,8 @@ module Renderer.Components.MainContent.NotesDraftTarget
 open Feliz
 open Swate.Components.Shared
 open Swate.Components.Composite.Notes.Editor
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 open Renderer.Components.Helper.NoteFileSystemHelper
 
 
@@ -16,7 +15,6 @@ let NotesDraftTarget () =
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let errorModalCtx = useErrorModalCtx ()
 
     let availableNotesTargets =
         React.useMemo (
@@ -69,20 +67,6 @@ let NotesDraftTarget () =
                     payload.Intent.Content
                     targetPath
 
-            let submit () = submitRequest request
-
-            promise {
-                setSubmitState true None
-
-                let! shouldSubmitResult =
-                    shouldRunOrShowOverwriteModal errorModalCtx targetPath submit
-
-                match shouldSubmitResult with
-                | Error exn -> setSubmitState false (Some $"Failed to check target note: {exn.Message}")
-                | Ok true -> submit ()
-                | Ok false -> setSubmitState false None
-            }
-            |> Promise.catch (fun exn -> setSubmitState false (Some $"Failed to check target note: {exn.Message}"))
-            |> Promise.start
+            submitRequest request
 
     Notes.Wizard(notesDraft, setNotesDraft, notesUiState, setNotesUiState, onSubmit, availableNotesTargets)

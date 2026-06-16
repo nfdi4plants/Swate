@@ -330,43 +330,21 @@ type FileTree =
                 let request = createUntitledRootNoteRequest System.DateTime.Today
                 let selectedPath = PathHelpers.normalizePath request.path
 
-                let writeNote () =
-                    promise {
-                        setIsDialogBusy true
-
-                        let! writeResult = writeNoteWithAssets request
-
-                        match writeResult with
-                        | Error exn -> applyAddNoteError exn.Message
-                        | Ok() ->
-                            fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                            match! reloadPreviewByPath selectedPath with
-                            | Ok() -> ()
-                            | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
-
-                        setIsDialogBusy false
-                    }
-                    |> Promise.catch (fun exn ->
-                        applyAddNoteError exn.Message
-                        setIsDialogBusy false
-                    )
-                    |> Promise.start
-
                 promise {
                     setIsDialogBusy true
 
-                    let! shouldWriteResult =
-                        shouldRunOrShowOverwriteModal errorModal selectedPath writeNote
+                    let! writeResult = writeNoteWithAssets request
 
-                    match shouldWriteResult with
-                    | Error exn ->
-                        applyAddNoteError exn.Message
-                        setIsDialogBusy false
-                    | Ok false -> setIsDialogBusy false
-                    | Ok true ->
-                        setIsDialogBusy false
-                        writeNote ()
+                    match writeResult with
+                    | Error exn -> applyAddNoteError exn.Message
+                    | Ok() ->
+                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                        match! reloadPreviewByPath selectedPath with
+                        | Ok() -> ()
+                        | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
+
+                    setIsDialogBusy false
                 }
                 |> Promise.catch (fun exn ->
                     applyAddNoteError exn.Message

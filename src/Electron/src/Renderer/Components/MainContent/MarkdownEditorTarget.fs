@@ -3,49 +3,28 @@ module Renderer.Components.MainContent.MarkdownEditorTargetView
 open Feliz
 open Swate.Components.Composite.MarkdownText
 open Swate.Components.Composite.MarkdownText.Types
-open Swate.Components.Composite.Notes.Editor
-open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
-open Renderer.Components.Helper.NoteFileSystemHelper
-open Renderer.Components.MainContent.NoteMoveHelper
 
 [<ReactComponent(true)>]
 let MarkdownEditorTarget (content: string) =
-    let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let errorModalCtx = useErrorModalCtx ()
     let markdown, setMarkdown = React.useState content
     let lastSavedContent, setLastSavedContent = React.useState content
     let isSaving, setIsSaving = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
 
-    let selectedExistingTarget, setSelectedExistingTarget =
-        React.useState (None: ExistingTargetRef option)
-
-    let isMovingToExistingTarget, setIsMovingToExistingTarget = React.useState false
-    let moveError, setMoveError = React.useState (None: string option)
-
     let selectedPath =
         fileStateCtx.state.Selection.TreePath |> Option.map PathHelpers.normalizePath
 
     let hasUnsavedChanges = markdown <> lastSavedContent
-    let isBusy = isSaving || isMovingToExistingTarget
-
-    let availableNotesTargets =
-        React.useMemo (
-            (fun _ -> createAvailableNotesTargets fileStateCtx.state.FileTree),
-            [| box fileStateCtx.state.FileTree |]
-        )
 
     React.useEffect (
         (fun () ->
             setMarkdown content
             setLastSavedContent content
             setSaveError None
-            setMoveError None
-            setSelectedExistingTarget None
         ),
         [| box content |]
     )
@@ -61,7 +40,6 @@ let MarkdownEditorTarget (content: string) =
             promise {
                 setIsSaving true
                 setSaveError None
-                setMoveError None
 
                 let! writeResult = writeMarkdown relativePath
 
@@ -73,132 +51,11 @@ let MarkdownEditorTarget (content: string) =
             }
             |> Promise.start
 
-    let completeMove targetPath = promise {
-        fileStateCtx.setSelection (ArcSelection.forTreePath (Some targetPath))
-        setLastSavedContent markdown
-        setSelectedExistingTarget None
-
-        match! ensureAssetsFolder targetPath with
-        | Error exn ->
-            setMoveError (
-                Some $"Moved note to '{targetPath}', but failed to create the assets folder: {exn.Message}"
-            )
-        | Ok() -> ()
-
-        let! previewResult = Api.ipcArcVaultApi.openFile targetPath
-
-        match previewResult with
-        | Ok previewData ->
-            let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
-            pageStateCtx.setState (Some pageState)
-        | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.MarkdownPage markdown))
-    }
-
-    let executeMove sourcePath targetPath overwrite =
-        promise {
-            setIsMovingToExistingTarget true
-            setSaveError None
-            setMoveError None
-
-            let moveLegacyFile () = promise {
-                match! writeMarkdown targetPath with
-                | Error exn -> return Error $"Failed to move note: {exn.Message}"
-                | Ok() ->
-                    match! Api.ipcArcVaultApi.deletePath sourcePath with
-                    | Error exn ->
-                        return
-                            Error
-                                $"Moved note to '{targetPath}', but failed to delete the original note: {exn.Message}"
-                    | Ok() -> return Ok()
-            }
-
-            let moveFolder sourceFolderPath targetFolderPath = promise {
-                match! writeMarkdown sourcePath with
-                | Error exn -> return Error $"Failed to save note before moving it: {exn.Message}"
-                | Ok() ->
-                    let targetFileName = PathHelpers.getFileName targetPath
-
-                    let! renameResult =
-                        if PathHelpers.pathsEqual (PathHelpers.getFileName sourcePath) targetFileName then
-                            promise { return Ok() }
-                        else
-                            Api.ipcArcVaultApi.renamePath {
-                                relativePath = sourcePath
-                                newName = targetFileName
-                            }
-
-                    match renameResult with
-                    | Error exn -> return Error $"Failed to rename note file before moving it: {exn.Message}"
-                    | Ok() ->
-                        match!
-                            Api.ipcArcVaultApi.movePath {
-                                sourceRelativePath = sourceFolderPath
-                                targetRelativePath = targetFolderPath
-                                overwrite = overwrite
-                            }
-                        with
-                        | Error exn -> return Error $"Failed to move note folder: {exn.Message}"
-                        | Ok() -> return Ok()
-            }
-
-            let! moveResult =
-                match tryGetStructuredNoteFolderMove sourcePath targetPath with
-                | Some(sourceFolderPath, targetFolderPath) -> moveFolder sourceFolderPath targetFolderPath
-                | None -> moveLegacyFile ()
-
-            match moveResult with
-            | Error errorMessage -> setMoveError (Some errorMessage)
-            | Ok() -> do! completeMove targetPath
-
-            setIsMovingToExistingTarget false
-        }
-        |> Promise.catch (fun exn ->
-            setMoveError (Some $"Failed to move note: {exn.Message}")
-            setIsMovingToExistingTarget false
-        )
-        |> Promise.start
-
-    let requestMoveToExistingTarget () =
-        match selectedExistingTarget with
-        | None -> setMoveError (Some "Select a Study or Assay target first.")
-        | Some targetRef ->
-            match
-                tryResolveMoveToExistingTargetPaths
-                    selectedPath
-                    markdown
-                    targetRef
-            with
-            | Error errorMessage -> setMoveError (Some errorMessage)
-            | Ok(sourcePath, targetPath) ->
-                promise {
-                    setIsMovingToExistingTarget true
-                    setSaveError None
-                    setMoveError None
-
-                    let! shouldMoveResult =
-                        shouldRunOrShowOverwriteModal errorModalCtx targetPath (fun () -> executeMove sourcePath targetPath true)
-
-                    match shouldMoveResult with
-                    | Error exn ->
-                        setMoveError (Some $"Failed to check target note: {exn.Message}")
-                        setIsMovingToExistingTarget false
-                    | Ok false -> setIsMovingToExistingTarget false
-                    | Ok true ->
-                        setIsMovingToExistingTarget false
-                        executeMove sourcePath targetPath false
-                }
-                |> Promise.catch (fun exn ->
-                    setMoveError (Some $"Failed to check target note: {exn.Message}")
-                    setIsMovingToExistingTarget false
-                )
-                |> Promise.start
-
     let saveStatusText =
-        match saveError, moveError with
-        | Some err, _ -> err
-        | None, Some err -> err
-        | None, None when hasUnsavedChanges -> "Unsaved changes"
-        | None, None -> "Saved"
+        match saveError with
+        | Some err -> err
+        | None when hasUnsavedChanges -> "Unsaved changes"
+        | None -> "Saved"
 
     Html.div [
         prop.className
@@ -209,7 +66,7 @@ let MarkdownEditorTarget (content: string) =
                 prop.children [
                     Html.span [
                         prop.className (
-                            if saveError.IsSome || moveError.IsSome then
+                            if saveError.IsSome then
                                 "swt:text-xs swt:text-error"
                             else
                                 "swt:text-xs swt:opacity-70"
@@ -219,36 +76,9 @@ let MarkdownEditorTarget (content: string) =
                     Html.button [
                         prop.type'.button
                         prop.className "swt:btn swt:btn-sm swt:btn-primary"
-                        prop.disabled (isBusy || selectedPath.IsNone || not hasUnsavedChanges)
+                        prop.disabled (isSaving || selectedPath.IsNone || not hasUnsavedChanges)
                         prop.text (if isSaving then "Saving..." else "Save")
                         prop.onClick (fun _ -> saveMarkdown ())
-                    ]
-                    Html.button [
-                        prop.type'.button
-                        prop.testId "markdown-add-existing-button"
-                        prop.className "swt:btn swt:btn-sm swt:btn-secondary"
-                        prop.disabled (isBusy || selectedPath.IsNone || selectedExistingTarget.IsNone)
-                        prop.text "Add to existing Assay/Study"
-                        prop.onClick (fun _ -> requestMoveToExistingTarget ())
-                    ]
-                ]
-            ]
-            Html.div [
-                prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
-                prop.children [
-                    Html.div [
-                        prop.className "swt:min-w-64 swt:max-w-md swt:flex-1"
-                        prop.children [
-                            TargetSelector.Main(
-                                selectedExistingTarget,
-                                (fun target ->
-                                    setSelectedExistingTarget target
-                                    setMoveError None
-                                ),
-                                availableNotesTargets,
-                                isBusy
-                            )
-                        ]
                     ]
                 ]
             ]
