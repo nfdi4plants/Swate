@@ -21,7 +21,10 @@ let MarkdownEditorTarget (content: string) =
     let lastSavedContent, setLastSavedContent = React.useState content
     let isSaving, setIsSaving = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
-    let selectedExistingTarget, setSelectedExistingTarget = React.useState (None: ExistingTargetRef option)
+
+    let selectedExistingTarget, setSelectedExistingTarget =
+        React.useState (None: ExistingTargetRef option)
+
     let isMovingToExistingTarget, setIsMovingToExistingTarget = React.useState false
     let moveError, setMoveError = React.useState (None: string option)
 
@@ -98,9 +101,7 @@ let MarkdownEditorTarget (content: string) =
         | Ok() ->
             match! Api.ipcArcVaultApi.deletePath plan.SourcePath with
             | Error exn ->
-                return
-                    Error
-                        $"Moved note to '{plan.TargetPath}', but failed to delete the original note: {exn.Message}"
+                return Error $"Moved note to '{plan.TargetPath}', but failed to delete the original note: {exn.Message}"
             | Ok() -> return Ok()
     }
 

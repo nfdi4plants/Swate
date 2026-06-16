@@ -25,7 +25,8 @@ let showOverwriteConflictModal (errorModalCtx: ErrorModalActionsContext) (target
                     "Overwrite target",
                     (fun () ->
                         errorModalCtx.dismissById modalId
-                        overwrite ()),
+                        overwrite ()
+                    ),
                     iconClassName = "swt:fluent--document-arrow-right-24-regular",
                     style = ErrorModalActionStyle.Error
                 )

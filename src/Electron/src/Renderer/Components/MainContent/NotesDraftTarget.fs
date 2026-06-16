@@ -65,9 +65,13 @@ let NotesDraftTarget () =
             let targetPath = PathHelpers.normalizePath payload.Intent.RelativePath
 
             let request: FileContentDTO =
-                FileContentDTO.create (FileContentDTO.inferTextFileTypeFromPath targetPath) payload.Intent.Content targetPath
+                FileContentDTO.create
+                    (FileContentDTO.inferTextFileTypeFromPath targetPath)
+                    payload.Intent.Content
+                    targetPath
 
             let submit () = submitRequest request
+
             let showConflict () =
                 setSubmitState false None
                 showOverwriteConflictModal errorModalCtx targetPath submit

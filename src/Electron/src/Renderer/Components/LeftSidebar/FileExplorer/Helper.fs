@@ -147,8 +147,7 @@ let createUntitledRootNotePath (dateCreated: DateTime) (existingPaths: string se
             NoteConversion.mkNewRootNoteRelativePath dateCreated.Date protocolName
             |> Option.defaultWith (fun () -> failwith "Could not create a safe untitled note path.")
 
-        let candidateFolder =
-            NoteConversion.tryGetNoteFolderRelativePath candidate
+        let candidateFolder = NoteConversion.tryGetNoteFolderRelativePath candidate
 
         let alreadyExists =
             existingPaths
@@ -174,12 +173,7 @@ let createUntitledRootNoteRequest (dateCreated: DateTime) (existingPaths: string
     FileContentDTO.create FileContentType.Markdown (NoteConversion.formatMarkdown draft) path
 
 let rootNoteActionContextMenuItems (onAddNote: FileItem -> unit) (item: FileItem) =
-    ContextMenuItem.whenItem
-        isRootNotesFolder
-        "Create new item in"
-        "swt:fluent--note-add-24-regular"
-        onAddNote
-        item
+    ContextMenuItem.whenItem isRootNotesFolder "Create new item in" "swt:fluent--note-add-24-regular" onAddNote item
 
 let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
 

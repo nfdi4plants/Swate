@@ -329,8 +329,7 @@ type FileTree =
             if not isDialogBusy then
                 setIsDialogBusy true
 
-                let existingPaths =
-                    fileStateCtx.state.FileTree |> Array.map _.path
+                let existingPaths = fileStateCtx.state.FileTree |> Array.map _.path
 
                 let request = createUntitledRootNoteRequest System.DateTime.Today existingPaths
                 let selectedPath = PathHelpers.normalizePath request.path

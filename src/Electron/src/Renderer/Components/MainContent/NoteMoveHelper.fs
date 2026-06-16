@@ -45,12 +45,11 @@ let private tryBuildFolderMove sourcePath targetPath =
         $"{PathHelpers.getFileName folderPath}.md"
 
     match
-        NoteConversion.tryGetNoteFolderRelativePath sourcePath,
-        NoteConversion.tryGetNoteFolderRelativePath targetPath
+        NoteConversion.tryGetNoteFolderRelativePath sourcePath, NoteConversion.tryGetNoteFolderRelativePath targetPath
     with
-    | Some sourceFolderPath, Some targetFolderPath
-        when PathHelpers.pathsEqual (PathHelpers.getFileName sourcePath) (expectedMarkdownFileName sourceFolderPath)
-             && PathHelpers.pathsEqual (PathHelpers.getFileName targetPath) (expectedMarkdownFileName targetFolderPath)
+    | Some sourceFolderPath, Some targetFolderPath when
+        PathHelpers.pathsEqual (PathHelpers.getFileName sourcePath) (expectedMarkdownFileName sourceFolderPath)
+        && PathHelpers.pathsEqual (PathHelpers.getFileName targetPath) (expectedMarkdownFileName targetFolderPath)
         ->
         Some {
             SourceFolderPath = sourceFolderPath
@@ -76,7 +75,8 @@ let tryBuildMoveToExistingTargetPlan
     match selectedPath |> Option.map PathHelpers.normalizePath with
     | None -> Error "No note file is selected."
     | Some sourcePath when not (isAssignableMarkdownPath sourcePath) ->
-        Error "Only markdown note or protocol files inside notes, studies, or assays can be added to an existing Study or Assay."
+        Error
+            "Only markdown note or protocol files inside notes, studies, or assays can be added to an existing Study or Assay."
     | Some sourcePath ->
         match tryResolveTargetPath markdown targetRef with
         | Error errorMessage -> Error errorMessage

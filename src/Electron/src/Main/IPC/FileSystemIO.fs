@@ -367,51 +367,47 @@ module ArcFileSystemHelper =
                 Overwrite = request.overwrite
             }
 
-    let moveGenericFileSystemItemOnDisk
-        (arcPath: string)
-        (request: MovePathRequest)
-        : JS.Promise<Result<unit, exn>> =
-        promise {
-            match tryBuildGenericMovePlan request with
-            | Error validationError -> return Error validationError
-            | Ok genericMovePlan ->
-                match resolveArcRelativePathPair arcPath genericMovePlan.SourcePath genericMovePlan.TargetPath with
-                | Error pathError -> return Error pathError
-                | Ok(sourceAbsolutePath, targetAbsolutePath) ->
-                    let moveToTargetAsync () = promise {
-                        let targetParentAbsolutePath =
-                            pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+    let moveGenericFileSystemItemOnDisk (arcPath: string) (request: MovePathRequest) : JS.Promise<Result<unit, exn>> = promise {
+        match tryBuildGenericMovePlan request with
+        | Error validationError -> return Error validationError
+        | Ok genericMovePlan ->
+            match resolveArcRelativePathPair arcPath genericMovePlan.SourcePath genericMovePlan.TargetPath with
+            | Error pathError -> return Error pathError
+            | Ok(sourceAbsolutePath, targetAbsolutePath) ->
+                let moveToTargetAsync () = promise {
+                    let targetParentAbsolutePath =
+                        pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
 
-                        do! mkdirAsync targetParentAbsolutePath
+                    do! mkdirAsync targetParentAbsolutePath
 
-                        return!
-                            renameResolvedPathOnDisk
-                                genericMovePlan.SourcePath
-                                genericMovePlan.TargetPath
-                                sourceAbsolutePath
-                                targetAbsolutePath
-                    }
+                    return!
+                        renameResolvedPathOnDisk
+                            genericMovePlan.SourcePath
+                            genericMovePlan.TargetPath
+                            sourceAbsolutePath
+                            targetAbsolutePath
+                }
 
-                    let! sourceExists = pathExistsAsync sourceAbsolutePath
+                let! sourceExists = pathExistsAsync sourceAbsolutePath
 
-                    if sourceExists |> not then
-                        return Error(exn $"Cannot move '{genericMovePlan.SourcePath}' because it does not exist.")
-                    else
-                        let! targetExists = pathExistsAsync targetAbsolutePath
+                if sourceExists |> not then
+                    return Error(exn $"Cannot move '{genericMovePlan.SourcePath}' because it does not exist.")
+                else
+                    let! targetExists = pathExistsAsync targetAbsolutePath
 
-                        match targetExists, genericMovePlan.Overwrite with
-                        | true, false ->
-                            return
-                                Error(
-                                    exn
-                                        $"Cannot move '{genericMovePlan.SourcePath}' to '{genericMovePlan.TargetPath}' because the destination already exists."
-                                )
-                        | true, true ->
-                            match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
-                            | Error removeError -> return Error removeError
-                            | Ok() -> return! moveToTargetAsync ()
-                        | false, _ -> return! moveToTargetAsync ()
-        }
+                    match targetExists, genericMovePlan.Overwrite with
+                    | true, false ->
+                        return
+                            Error(
+                                exn
+                                    $"Cannot move '{genericMovePlan.SourcePath}' to '{genericMovePlan.TargetPath}' because the destination already exists."
+                            )
+                    | true, true ->
+                        match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
+                        | Error removeError -> return Error removeError
+                        | Ok() -> return! moveToTargetAsync ()
+                    | false, _ -> return! moveToTargetAsync ()
+    }
 
     let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {
         let normalizedRelativePath =
