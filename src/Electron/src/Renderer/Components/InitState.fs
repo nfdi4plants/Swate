@@ -71,14 +71,15 @@ let CreateNewArcModalContent (close: unit -> unit) =
                 ]
             ]
         ]
-        Html.div [
-            prop.className "swt:form-control swt:mt-4"
+        Html.fieldSet [
+            prop.className "swt:fieldset swt:mt-4"
             prop.children [
                 Html.label [
                     prop.className "swt:label swt:cursor-pointer swt:justify-start swt:gap-2"
                     prop.children [
                         Html.input [
                             prop.type'.checkbox
+                            prop.className "swt:checkbox"
                             prop.isChecked initGit
                             prop.onCheckedChange setInitGit
                             prop.disabled isBusy
