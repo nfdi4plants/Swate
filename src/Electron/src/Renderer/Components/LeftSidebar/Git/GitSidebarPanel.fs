@@ -4,6 +4,7 @@ open Browser.Dom
 open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 
 let mutable private gitVersionCheckStarted = false
 
@@ -14,7 +15,6 @@ let Main () =
     let authState = Renderer.Context.AuthStateContext.useAuthStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let runStatus = Renderer.Context.GitWorkflow.currentRunStatus gitStateCtx.state
-    let remoteProjectName, setRemoteProjectName = React.useState ""
     let errorCtx = useErrorModalCtx ()
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
@@ -29,7 +29,8 @@ let Main () =
             |> Promise.map (
                 function
                 | Ok() -> ()
-                | Error message -> Browser.Dom.window.alert message
+                | Error message ->
+                    errorCtx.enqueue (ErrorModalRequest.create (message, title = "Could not verify Git installation"))
             )
             |> ignore
     )
@@ -41,12 +42,6 @@ let Main () =
             None
         else
             Some "Sign in to a DataHub account to use fetch, pull, push, update, and remote bootstrap."
-
-    let normalizedRemoteProjectName =
-        remoteProjectName.Trim()
-        |> function
-            | "" -> None
-            | value -> Some value
 
     let openArc =
         fun _ ->
@@ -90,45 +85,8 @@ let Main () =
                         "Initialize Repository"
                 IconClassName = "swt:fluent--branch-fork-24-regular"
                 Disabled = gitStateCtx.state.BusyOperation.IsSome
-                OnClick =
-                    (fun () ->
-                        gitStateCtx.initRepository (
-                            if remoteActionsEnabled then
-                                normalizedRemoteProjectName
-                            else
-                                None
-                        )
-                    )
-            },
-            extraContent =
-                Html.div [
-                    prop.className "swt:flex swt:flex-col swt:gap-2"
-                    prop.children [
-                        Html.label [
-                            prop.className "swt:flex swt:flex-col swt:gap-1"
-                            prop.children [
-                                Html.span [
-                                    prop.className "swt:text-xs swt:font-medium swt:text-base-content/70"
-                                    prop.text "DataHub repository name"
-                                ]
-                                Html.input [
-                                    prop.testId "GitSidebarRemoteProjectNameInput"
-                                    prop.className "swt:input swt:input-bordered swt:w-full"
-                                    prop.disabled (gitStateCtx.state.BusyOperation.IsSome || not remoteActionsEnabled)
-                                    prop.value remoteProjectName
-                                    prop.placeholder "my-arc"
-                                    prop.onChange setRemoteProjectName
-                                ]
-                            ]
-                        ]
-                        Html.p [
-                            prop.className "swt:text-xs swt:text-base-content/60"
-                            prop.text
-                                "If you provide a name, Swate creates a project on the active DataHub and adds it as origin right after git init."
-                        ]
-                    ]
-                ],
-            ?infoText = remoteActionsWarning
+                OnClick = fun () -> gitStateCtx.initRepository ()
+            }
         )
     | Some _ ->
         Swate.Components.Page.GitSidebar.Main(
