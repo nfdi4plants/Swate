@@ -634,6 +634,28 @@ Vitest.describe (
                         Vitest.expect(options).toEqual ([| "--branch"; "feature/clone-flow" |])
                 )
         )
+
+        Vitest.describe (
+            "clone progress events",
+            fun () ->
+                Vitest.test (
+                    "reports an initial clone phase before Git emits percentage progress",
+                    fun () -> promise {
+                        let progressEvents = ResizeArray<GitProgressDto>()
+
+                        let! result = GitProvisioningService.cloneRepository "" "" None false (Some progressEvents.Add)
+
+                        match result with
+                        | Ok _ -> failwith "Expected clone to fail for an invalid request."
+                        | Error _ -> ()
+
+                        Vitest.expect(progressEvents.Count).toBe (1)
+                        Vitest.expect(progressEvents[0].Method).toEqual (Some "clone")
+                        Vitest.expect(progressEvents[0].Stage).toEqual (Some "Preparing clone")
+                        Vitest.expect(progressEvents[0].Progress).toEqual (None)
+                    }
+                )
+        )
 )
 
 Vitest.describe (

@@ -345,7 +345,32 @@ let mapProgress (progress: GitProgressDto) : GitSidebarProgress = {
     Method = progress.Method
     Stage = progress.Stage
     ProgressPercent = progress.Progress
+    Output = progress.Output
 }
+
+let private appendProgressOutput current incoming =
+    match current, incoming with
+    | None, None -> None
+    | Some output, None -> Some output
+    | None, Some output -> Some output
+    | Some currentOutput, Some incomingOutput -> Some(currentOutput + incomingOutput)
+
+let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress) =
+    let current =
+        model.CurrentProgress
+        |> Option.defaultValue {
+            Method = None
+            Stage = model.BusyNotice
+            ProgressPercent = None
+            Output = None
+        }
+
+    {
+        Method = incoming.Method |> Option.orElse current.Method
+        Stage = incoming.Stage |> Option.orElse current.Stage
+        ProgressPercent = incoming.ProgressPercent |> Option.orElse current.ProgressPercent
+        Output = appendProgressOutput current.Output incoming.Output
+    }
 
 let private hasMatchingOriginBranch (branchName: string) (model: GitState) =
     model.BranchOptions
@@ -539,6 +564,7 @@ let private withBusyOperation busyOperation model = {
     model with
         BusyOperation = busyOperation
         BusyNotice = busyOperation |> Option.bind busyNoticeFromOperation
+        CurrentProgress = None
 }
 
 let private startRefreshRequest requestId model = {
@@ -999,12 +1025,13 @@ let update
     : GitState * Cmd<Msg> =
     match msg with
     | ResetWorkflow -> GitState.Empty, Cmd.none
-    | SetCurrentProgress currentProgress ->
+    | SetCurrentProgress(Some progress) when model.BusyOperation.IsSome ->
         {
             model with
-                CurrentProgress = currentProgress
+                CurrentProgress = Some(mergeProgressUpdate model progress)
         },
         Cmd.none
+    | SetCurrentProgress _ -> { model with CurrentProgress = None }, Cmd.none
     | ArcPathChanged arcPath when arcPath = model.CurrentArcPath -> model, Cmd.none
     | ArcPathChanged arcPath ->
         let nextModel = {
