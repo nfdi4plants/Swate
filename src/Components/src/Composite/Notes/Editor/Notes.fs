@@ -65,11 +65,7 @@ type Notes =
                 React.Fragment [
                     TargetSelector.Main(selectedTarget, setSelectedTarget, availableTargets, isSubmitting)
                     match error with
-                    | Some message ->
-                        Html.span [
-                            prop.className "swt:text-error"
-                            prop.text message
-                        ]
+                    | Some message -> Html.span [ prop.className "swt:text-error"; prop.text message ]
                     | None -> Html.none
                 ],
             footer = footer,
@@ -175,12 +171,7 @@ type Notes =
                             prop.text "Notes"
                         ]
                         NoteFormFields.Main(draft, setDraft)
-                        Actions.Main(
-                            uiState.IsSubmitting,
-                            openExistingTargetSelector,
-                            submitNewRootNote,
-                            uiState.Error
-                        )
+                        Actions.Main(uiState.IsSubmitting, openExistingTargetSelector, submitNewRootNote, uiState.Error)
                         Notes.ExistingTargetModal(
                             uiState.ShowExistingTargetSelector,
                             (fun () -> setExistingTargetSelector false),

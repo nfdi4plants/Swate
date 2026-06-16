@@ -7,12 +7,7 @@ module Actions =
 
     [<ReactComponent>]
     let Main
-        (
-            isSubmitting: bool,
-            onOpenExistingTargetSelector: unit -> unit,
-            onCreateNew: unit -> unit,
-            error: string option
-        ) =
+        (isSubmitting: bool, onOpenExistingTargetSelector: unit -> unit, onCreateNew: unit -> unit, error: string option) =
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [

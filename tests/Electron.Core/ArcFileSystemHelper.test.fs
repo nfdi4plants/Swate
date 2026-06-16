@@ -121,9 +121,7 @@ Vitest.describe (
         Vitest.test (
             "reports missing safe relative paths as absent",
             fun () ->
-                withAssayArc (fun arcPath -> promise {
-                    do! expectPathExistsRequest arcPath "notes/missing-note" false
-                })
+                withAssayArc (fun arcPath -> promise { do! expectPathExistsRequest arcPath "notes/missing-note" false })
         )
 
         Vitest.test (

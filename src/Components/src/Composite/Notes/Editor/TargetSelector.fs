@@ -75,10 +75,7 @@ module TargetSelector =
                     )
                     prop.children [
                         if not hasTargets then
-                            Html.option [
-                                prop.value ""
-                                prop.text "No targets available"
-                            ]
+                            Html.option [ prop.value ""; prop.text "No targets available" ]
                         if studyTargets.Length > 0 then
                             Html.optgroup [
                                 prop.label "Study"
