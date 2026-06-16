@@ -125,7 +125,7 @@ export const ExistingTargetSubmit: Story = {
     });
 
     const payload = args.onSubmit.mock.calls[0][0];
-    expect(payload.Intent.RelativePath).toBe('studies/MyStudy/protocols/Watering_plan.md');
+    expect(payload.Intent.RelativePath).toBe('studies/MyStudy/protocols/Watering_plan/Watering_plan.md');
   },
 };
 
@@ -143,7 +143,7 @@ export const NewRootNoteSubmit: Story = {
     });
 
     const payload = args.onSubmit.mock.calls[0][0];
-    expect(payload.Intent.RelativePath).toBe('notes/26_02_2026/Watering_plan.md');
+    expect(payload.Intent.RelativePath).toBe('notes/2026-02-26/Watering_plan/Watering_plan.md');
   },
 };
 
@@ -161,7 +161,7 @@ export const PreviewGeneratedMarkdownAndPath: Story = {
 
     await waitFor(() => {
       expect(canvas.getByTestId('notes-preview-relative-path')).toHaveTextContent(
-        'notes/26_02_2026/Preview_from_story.md'
+        'notes/2026-02-26/Preview_from_story/Preview_from_story.md'
       );
     });
 
