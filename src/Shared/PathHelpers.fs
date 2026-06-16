@@ -299,6 +299,14 @@ module ArcEntityPathRules =
             && (segments.Length <> 1 || (tryParseZone segments.[0]).IsNone)
             && (segments.Length <> 2 || (tryParseZone segments.[0]).IsNone)
 
+    let tryNormalizeGenericFileSystemTarget (errorMessage: string) (relativePath: string) : Result<string, string> =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+
+        if isGenericFileSystemTargetAllowed normalizedRelativePath then
+            Ok normalizedRelativePath
+        else
+            Error errorMessage
+
     let isDeletePathAllowed (relativePath: string) =
         match classifyDeleteTarget relativePath with
         | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, _)

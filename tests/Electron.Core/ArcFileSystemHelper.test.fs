@@ -4,7 +4,6 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Path
-open Main.IPC.ArcVaultsApi
 open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -76,9 +75,11 @@ let private expectRelativePathExists arcPath relativePath expected = promise {
 }
 
 let private expectPathExistsRequest arcPath relativePath expected = promise {
-    match! pathExistsAtArcRelativePath arcPath relativePath with
+    match tryResolveArcRelativePath arcPath relativePath with
     | Error error -> return failwith error.Message
-    | Ok exists -> Vitest.expect(exists).toBe (expected)
+    | Ok absolutePath ->
+        let! exists = pathExistsAsync absolutePath
+        Vitest.expect(exists).toBe (expected)
 }
 
 let private writeRelativeFileAsync arcPath relativePath content = promise {
@@ -129,11 +130,11 @@ Vitest.describe (
             "rejects unsafe path existence requests",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
-                    match! pathExistsAtArcRelativePath arcPath "../outside" with
+                    match tryResolveArcRelativePath arcPath "../outside" with
                     | Ok _ -> failwith "Expected traversal path to be rejected."
                     | Error error -> Vitest.expect(error.Message.Length > 0).toBe (true)
 
-                    match! pathExistsAtArcRelativePath arcPath arcPath with
+                    match tryResolveArcRelativePath arcPath arcPath with
                     | Ok _ -> failwith "Expected absolute path to be rejected."
                     | Error error -> Vitest.expect(error.Message.Length > 0).toBe (true)
                 })

@@ -17,6 +17,15 @@ let getPathDepth (path: string) =
 let pathsEqual (left: string) (right: string) =
     PathHelpers.normalizePath left = PathHelpers.normalizePath right
 
+let isRootFolderForDatedTargetPath
+    (createTargetPath: DateTime -> string option)
+    (dateCreated: DateTime)
+    (candidateRelativePath: string)
+    =
+    match createTargetPath dateCreated.Date |> Option.bind (getNonEmptyPathParts >> Array.tryHead), getNonEmptyPathParts candidateRelativePath with
+    | Some targetRoot, [| candidateRoot |] -> pathsEqual targetRoot candidateRoot
+    | _ -> false
+
 let private tryGetRepoRelativePathCore (repoRoot: string) (absolutePath: string) (allowRoot: bool) =
     let normalizedRoot = PathHelpers.normalizePath repoRoot
     let normalizedAbsolutePath = PathHelpers.normalizePath absolutePath

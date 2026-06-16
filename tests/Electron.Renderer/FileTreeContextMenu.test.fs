@@ -228,7 +228,10 @@ Vitest.describe (
                 let mutable requestedItem: FileItem option = None
 
                 let menuItems =
-                    rootNoteActionContextMenuItems (fun item -> requestedItem <- Some item) item
+                    rootNoteActionContextMenuItems
+                        (DateTime(2026, 6, 15))
+                        (fun item -> requestedItem <- Some item)
+                        item
 
                 Vitest.expect(labels menuItems).toEqual ([| "Create new item in" |])
                 Vitest.expect(menuItems.Head.Icon).toBe ("swt:fluent--note-add-24-regular")
@@ -242,7 +245,7 @@ Vitest.describe (
             "root notes action is hidden for nested notes folders",
             fun () ->
                 let item = createFolderItem "2026-06-15" (Some "notes/2026-06-15")
-                let menuItems = rootNoteActionContextMenuItems ignore item
+                let menuItems = rootNoteActionContextMenuItems (DateTime(2026, 6, 15)) ignore item
 
                 Vitest.expect(menuItems.Length).toBe (0)
         )

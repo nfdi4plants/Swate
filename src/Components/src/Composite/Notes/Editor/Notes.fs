@@ -4,10 +4,77 @@ open Fable.Core
 open Feliz
 open Browser.Dom
 open Swate.Components.Shared
+open Swate.Components.Primitive.BaseModal
 
 
 [<Erase; Mangle(false)>]
 type Notes =
+
+    [<ReactComponent>]
+    static member private ExistingTargetModal
+        (
+            isOpen: bool,
+            close: unit -> unit,
+            selectedTarget: ExistingTargetRef option,
+            setSelectedTarget: ExistingTargetRef option -> unit,
+            availableTargets: ResizeArray<ExistingTargetRef>,
+            isSubmitting: bool,
+            error: string option,
+            submit: unit -> unit
+        ) =
+
+        let createInExistingText =
+            match selectedTarget |> Option.map _.Kind with
+            | Some NotesTargetKind.Study -> "Create in Study"
+            | Some NotesTargetKind.Assay -> "Create in Assay"
+            | None -> "Create in Existing Target"
+
+        let setIsOpen isOpen =
+            if not isOpen then
+                close ()
+
+        let footer =
+            Html.div [
+                prop.className "swt:flex swt:gap-2 swt:justify-end swt:w-full"
+                prop.children [
+                    Html.button [
+                        prop.className "swt:btn swt:btn-ghost"
+                        prop.disabled isSubmitting
+                        prop.onClick (fun _ -> close ())
+                        prop.text "Cancel"
+                    ]
+                    Html.button [
+                        prop.testId "notes-create-existing-button"
+                        prop.className [
+                            "swt:btn swt:btn-primary"
+                            if isSubmitting || selectedTarget.IsNone then
+                                "swt:btn-disabled"
+                        ]
+                        prop.disabled (isSubmitting || selectedTarget.IsNone)
+                        prop.onClick (fun _ -> submit ())
+                        prop.text createInExistingText
+                    ]
+                ]
+            ]
+
+        BaseModal.Modal(
+            isOpen = isOpen,
+            setIsOpen = setIsOpen,
+            header = Html.text "Existing Target",
+            children =
+                React.Fragment [
+                    TargetSelector.Main(selectedTarget, setSelectedTarget, availableTargets, isSubmitting)
+                    match error with
+                    | Some message ->
+                        Html.span [
+                            prop.className "swt:text-error"
+                            prop.text message
+                        ]
+                    | None -> Html.none
+                ],
+            footer = footer,
+            debug = "notes-existing-target"
+        )
 
     [<ReactComponent>]
     static member Wizard
@@ -42,8 +109,26 @@ type Notes =
 
                 onSubmit payload
 
-        let toggleExistingTargetSelector () =
-            uiState |> State.toggleExistingTargetSelector |> setUiState
+        let setExistingTargetSelector isOpen =
+            setUiState {
+                uiState with
+                    ShowExistingTargetSelector = isOpen
+                    Error = None
+            }
+
+        let openExistingTargetSelector () =
+            let selectedTarget =
+                draft.SelectedExistingTarget
+                |> Option.bind (fun targetRef -> availableExistingTargets |> Seq.tryFind ((=) targetRef))
+                |> Option.orElseWith (fun () -> availableExistingTargets |> Seq.tryHead)
+
+            if draft.SelectedExistingTarget <> selectedTarget then
+                setDraft {
+                    draft with
+                        SelectedExistingTarget = selectedTarget
+                }
+
+            setExistingTargetSelector true
 
         let submitToExisting () =
             if Validation.isRequiredDataValid draft |> not then
@@ -60,7 +145,9 @@ type Notes =
                         | Some protocolName ->
                             match NoteConversion.mkExistingTargetRelativePath targetRef protocolName with
                             | None -> setError (Some "Could not resolve a safe target path.")
-                            | Some relativePath -> createPayload (NotesTarget.ExistingTarget targetRef) relativePath
+                            | Some relativePath ->
+                                setExistingTargetSelector false
+                                createPayload (NotesTarget.ExistingTarget targetRef) relativePath
 
         let submitNewRootNote () =
             if Validation.isRequiredDataValid draft |> not then
@@ -90,50 +177,25 @@ type Notes =
                         NoteFormFields.Main(draft, setDraft)
                         Actions.Main(
                             uiState.IsSubmitting,
-                            uiState.ShowExistingTargetSelector,
-                            toggleExistingTargetSelector,
+                            openExistingTargetSelector,
                             submitNewRootNote,
                             uiState.Error
                         )
-                        if uiState.ShowExistingTargetSelector then
-                            let createInExistingText =
-                                match draft.SelectedExistingTarget |> Option.map _.Kind with
-                                | Some NotesTargetKind.Study -> "Create in Study"
-                                | Some NotesTargetKind.Assay -> "Create in Assay"
-                                | None -> "Create in Existing Target"
-
-                            Html.div [
-                                prop.className
-                                    "swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4 swt:space-y-3"
-                                prop.children [
-                                    Html.h3 [
-                                        prop.className "swt:text-lg swt:font-semibold"
-                                        prop.text "Existing Target"
-                                    ]
-                                    TargetSelector.Main(
-                                        draft.SelectedExistingTarget,
-                                        (fun target ->
-                                            setDraft {
-                                                draft with
-                                                    SelectedExistingTarget = target
-                                            }
-                                        ),
-                                        availableExistingTargets,
-                                        uiState.IsSubmitting
-                                    )
-                                    Html.button [
-                                        prop.testId "notes-create-existing-button"
-                                        prop.className [
-                                            "swt:btn swt:btn-primary"
-                                            if uiState.IsSubmitting || draft.SelectedExistingTarget.IsNone then
-                                                "swt:btn-disabled"
-                                        ]
-                                        prop.disabled (uiState.IsSubmitting || draft.SelectedExistingTarget.IsNone)
-                                        prop.onClick (fun _ -> submitToExisting ())
-                                        prop.text createInExistingText
-                                    ]
-                                ]
-                            ]
+                        Notes.ExistingTargetModal(
+                            uiState.ShowExistingTargetSelector,
+                            (fun () -> setExistingTargetSelector false),
+                            draft.SelectedExistingTarget,
+                            (fun target ->
+                                setDraft {
+                                    draft with
+                                        SelectedExistingTarget = target
+                                }
+                            ),
+                            availableExistingTargets,
+                            uiState.IsSubmitting,
+                            uiState.Error,
+                            submitToExisting
+                        )
                     ]
                 ]
             ]

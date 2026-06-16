@@ -443,7 +443,7 @@ type FileTree =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
         let itemActions item = [
-            yield! rootNoteActionContextMenuItems addRootNote item
+            yield! rootNoteActionContextMenuItems System.DateTime.Today addRootNote item
             yield! renameContextMenuItems item
         ]
 

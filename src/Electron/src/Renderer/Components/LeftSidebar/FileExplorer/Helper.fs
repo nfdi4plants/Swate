@@ -133,11 +133,6 @@ let canCreateFileSystemItemIn (item: FileItem) =
             || ArcEntityPathRules.isGenericFileSystemParentAllowed path
         ))
 
-let isRootNotesFolder (item: FileItem) =
-    item.IsDirectory
-    && (tryGetItemRelativePath item
-        |> Option.exists (fun path -> PathHelpers.pathsEqual path "notes"))
-
 let createUntitledRootNotePath (dateCreated: DateTime) =
     NoteConversion.mkNewRootNoteRelativePath dateCreated.Date "untitled-note"
     |> Option.defaultWith (fun () -> failwith "Could not create a safe untitled note path.")
@@ -154,8 +149,19 @@ let createUntitledRootNoteRequest (dateCreated: DateTime) =
 
     FileContentDTO.create FileContentType.Markdown (NoteConversion.formatMarkdown draft) path
 
-let rootNoteActionContextMenuItems (onAddNote: FileItem -> unit) (item: FileItem) =
-    ContextMenuItem.whenItem isRootNotesFolder "Create new item in" "swt:fluent--note-add-24-regular" onAddNote item
+let rootNoteActionContextMenuItems (dateCreated: DateTime) (onAddNote: FileItem -> unit) (item: FileItem) =
+    let createTargetPath date = NoteConversion.mkNewRootNoteRelativePath date "untitled-note"
+
+    let isRootFolderForNewRootNote (item: FileItem) =
+        item.IsDirectory
+        && (tryGetItemRelativePath item |> Option.exists (isRootFolderForDatedTargetPath createTargetPath dateCreated))
+
+    ContextMenuItem.whenItem
+        isRootFolderForNewRootNote
+        "Create new item in"
+        "swt:fluent--note-add-24-regular"
+        onAddNote
+        item
 
 let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
 

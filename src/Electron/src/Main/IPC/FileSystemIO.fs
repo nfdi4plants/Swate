@@ -347,20 +347,23 @@ module ArcFileSystemHelper =
 
     let tryBuildGenericMovePlan (request: MovePathRequest) : Result<GenericMovePlan, exn> =
         let sourcePath =
-            request.sourceRelativePath |> PathHelpers.normalizeCanonicalRelativePath
+            ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
+                "Generic filesystem move is only supported for safe non-entity source paths."
+                request.sourceRelativePath
 
         let targetPath =
-            request.targetRelativePath |> PathHelpers.normalizeCanonicalRelativePath
+            ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
+                "Generic filesystem move targets must stay inside safe non-entity ARC paths."
+                request.targetRelativePath
 
-        if ArcEntityPathRules.isGenericFileSystemTargetAllowed sourcePath |> not then
-            Error(exn "Generic filesystem move is only supported for safe non-entity source paths.")
-        elif ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath |> not then
-            Error(exn "Generic filesystem move targets must stay inside safe non-entity ARC paths.")
-        elif PathHelpers.pathsEqual sourcePath targetPath then
+        match sourcePath, targetPath with
+        | Error validationError, _
+        | _, Error validationError -> Error(exn validationError)
+        | Ok sourcePath, Ok targetPath when PathHelpers.pathsEqual sourcePath targetPath ->
             Error(exn "Move target is identical to the current path.")
-        elif PathHelpers.isSameOrDescendantPath targetPath sourcePath then
+        | Ok sourcePath, Ok targetPath when PathHelpers.isSameOrDescendantPath targetPath sourcePath ->
             Error(exn "Move target must not be inside the source path.")
-        else
+        | Ok sourcePath, Ok targetPath ->
             Ok {
                 SourcePath = sourcePath
                 TargetPath = targetPath
