@@ -525,8 +525,10 @@ type TextInputWithMarkdown =
                                                             if height = 560 then
                                                                 "swt:h-full"
                                                         ]
-                                                        if height = 360 then
-                                                            prop.style [ style.height height ]
+                                                        // if (defaultMode = PreviewMode.Edit) then
+                                                        //     prop.style [ style.height height ]
+                                                    
+                                                        prop.style [ style.height height ]
                                                         prop.disabled disabled
                                                         prop.readOnly disabled
                                                         prop.value tempValue
