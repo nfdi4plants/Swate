@@ -1,6 +1,7 @@
 module ElectronRenderer.NoteMoveHelperTests
 
 open System
+open Renderer.Components.Helper.NotePathHelper
 open Renderer.Components.MainContent.NoteMoveHelper
 open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
@@ -18,110 +19,76 @@ let private markdown title date =
 
     NoteConversion.formatMarkdown draft
 
-let private expectReadyPlan result =
+let private expectResolvedPaths result =
     match result with
-    | Ok(ExistingTargetNoteMovePlanResult.Ready plan) -> plan
-    | Ok(ExistingTargetNoteMovePlanResult.TargetConflict plan) ->
-        failwith $"Expected a ready move plan, but got a target conflict for '{plan.TargetPath}'."
-    | Error errorMessage -> failwith errorMessage
-
-let private expectConflictPlan result =
-    match result with
-    | Ok(ExistingTargetNoteMovePlanResult.TargetConflict plan) -> plan
-    | Ok(ExistingTargetNoteMovePlanResult.Ready plan) ->
-        failwith $"Expected a target conflict, but got a ready move plan for '{plan.TargetPath}'."
+    | Ok paths -> paths
     | Error errorMessage -> failwith errorMessage
 
 Vitest.describe (
     "NoteMoveHelper",
     fun () ->
         Vitest.test (
-            "builds a move plan from a selected note to an existing study",
+            "resolves selected note paths for an existing study",
             fun () ->
                 let content = markdown "Sampling protocol" (DateTime(2026, 6, 15))
 
-                let plan =
-                    tryBuildMoveToExistingTargetPlan
+                let sourcePath, targetPath =
+                    tryResolveMoveToExistingTargetPaths
                         (Some "notes/2026-06-15/untitled-note/untitled-note.md")
                         content
                         (target NotesTargetKind.Study "StudyA")
-                        []
-                    |> expectReadyPlan
+                    |> expectResolvedPaths
 
-                Vitest.expect(plan.SourcePath).toBe ("notes/2026-06-15/untitled-note/untitled-note.md")
-                Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
-                Vitest.expect(movePlanConflictPath plan).toBe ("studies/StudyA/protocols/Sampling_protocol")
+                Vitest.expect(sourcePath).toBe ("notes/2026-06-15/untitled-note/untitled-note.md")
+                Vitest.expect(targetPath).toBe ("studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
 
-                match plan.FolderMove with
+                match tryGetStructuredNoteFolderMove sourcePath targetPath with
                 | None -> failwith "Expected new note folder structure to move as a folder."
-                | Some folderMove ->
-                    Vitest.expect(folderMove.SourceFolderPath).toBe ("notes/2026-06-15/untitled-note")
-                    Vitest.expect(folderMove.TargetFolderPath).toBe ("studies/StudyA/protocols/Sampling_protocol")
+                | Some(sourceFolderPath, targetFolderPath) ->
+                    Vitest.expect(sourceFolderPath).toBe ("notes/2026-06-15/untitled-note")
+                    Vitest.expect(targetFolderPath).toBe ("studies/StudyA/protocols/Sampling_protocol")
         )
 
         Vitest.test (
-            "builds a move plan from a selected note to an existing assay",
+            "resolves selected note paths for an existing assay",
             fun () ->
                 let content = markdown "Extraction protocol" (DateTime(2026, 6, 15))
 
-                let plan =
-                    tryBuildMoveToExistingTargetPlan
+                let _, targetPath =
+                    tryResolveMoveToExistingTargetPaths
                         (Some "notes/2026-06-15/untitled-note/untitled-note.md")
                         content
                         (target NotesTargetKind.Assay "AssayA")
-                        []
-                    |> expectReadyPlan
+                    |> expectResolvedPaths
 
                 Vitest
-                    .expect(plan.TargetPath)
+                    .expect(targetPath)
                     .toBe ("assays/AssayA/protocols/Extraction_protocol/Extraction_protocol.md")
         )
 
         Vitest.test (
-            "reports a conflict when the target note already exists",
+            "uses the structured note folder as conflict path",
             fun () ->
-                let content = markdown "Sampling protocol" (DateTime(2026, 6, 15))
+                let conflictPath =
+                    noteTargetConflictPath "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md"
 
-                let plan =
-                    tryBuildMoveToExistingTargetPlan
-                        (Some "notes/2026-06-15/untitled-note/untitled-note.md")
-                        content
-                        (target NotesTargetKind.Study "StudyA")
-                        [
-                            "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md"
-                        ]
-                    |> expectConflictPlan
-
-                Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
+                Vitest.expect(conflictPath).toBe ("studies/StudyA/protocols/Sampling_protocol")
         )
 
         Vitest.test (
-            "reports a conflict when the target note folder already exists",
+            "uses non-structured markdown path as conflict path",
             fun () ->
-                let content = markdown "Sampling protocol" (DateTime(2026, 6, 15))
+                let conflictPath = noteTargetConflictPath "notes/README.md"
 
-                let plan =
-                    tryBuildMoveToExistingTargetPlan
-                        (Some "notes/2026-06-15/untitled-note/untitled-note.md")
-                        content
-                        (target NotesTargetKind.Study "StudyA")
-                        [ "studies/StudyA/protocols/Sampling_protocol" ]
-                    |> expectConflictPlan
-
-                Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
+                Vitest.expect(conflictPath).toBe ("notes/README.md")
         )
 
         Vitest.test (
-            "finds target conflicts in snapshots with normalized paths",
+            "uses non-markdown path as conflict path",
             fun () ->
-                let exists =
-                    PathHelpers.pathExistsInSnapshot
-                        [
-                            "studies\\StudyA\\protocols\\Sampling_protocol\\Sampling_protocol.md"
-                        ]
-                        "studies/studya/protocols/sampling_protocol/sampling_protocol.md"
+                let conflictPath = noteTargetConflictPath "notes/2026-06-15/attachments"
 
-                Vitest.expect(exists).toBe (true)
+                Vitest.expect(conflictPath).toBe ("notes/2026-06-15/attachments")
         )
 
         Vitest.test (
@@ -130,14 +97,13 @@ Vitest.describe (
                 let content = markdown "Sampling protocol" (DateTime(2026, 6, 15))
 
                 let result =
-                    tryBuildMoveToExistingTargetPlan
+                    tryResolveMoveToExistingTargetPaths
                         (Some "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
                         content
                         (target NotesTargetKind.Study "StudyA")
-                        []
 
                 match result with
-                | Ok _ -> failwith "Expected move plan creation to fail for an unchanged target."
+                | Ok _ -> failwith "Expected path resolution to fail for an unchanged target."
                 | Error errorMessage -> Vitest.expect(errorMessage.Contains "already").toBe (true)
         )
 
@@ -145,14 +111,58 @@ Vitest.describe (
             "requires note frontmatter",
             fun () ->
                 let result =
-                    tryBuildMoveToExistingTargetPlan
+                    tryResolveMoveToExistingTargetPaths
                         (Some "notes/2026-06-15/plain/plain.md")
                         "# Plain markdown"
                         (target NotesTargetKind.Assay "AssayA")
-                        []
 
                 match result with
-                | Ok _ -> failwith "Expected move plan creation to fail without frontmatter."
+                | Ok _ -> failwith "Expected path resolution to fail without frontmatter."
                 | Error errorMessage -> Vitest.expect(errorMessage.Contains "frontmatter").toBe (true)
+        )
+
+        Vitest.test (
+            "rejects missing selection",
+            fun () ->
+                let content = markdown "Sampling protocol" (DateTime(2026, 6, 15))
+
+                let result =
+                    tryResolveMoveToExistingTargetPaths None content (target NotesTargetKind.Study "StudyA")
+
+                match result with
+                | Ok _ -> failwith "Expected path resolution to fail without a selected note."
+                | Error errorMessage -> Vitest.expect(errorMessage.Contains "selected").toBe (true)
+        )
+
+        Vitest.test (
+            "rejects invalid source paths",
+            fun () ->
+                let content = markdown "Sampling protocol" (DateTime(2026, 6, 15))
+
+                let result =
+                    tryResolveMoveToExistingTargetPaths
+                        (Some "attachments/protocol.md")
+                        content
+                        (target NotesTargetKind.Study "StudyA")
+
+                match result with
+                | Ok _ -> failwith "Expected path resolution to fail for a non-note source path."
+                | Error errorMessage -> Vitest.expect(errorMessage.Contains "Only markdown").toBe (true)
+        )
+
+        Vitest.test (
+            "rejects invalid protocol titles",
+            fun () ->
+                let content = markdown "///" (DateTime(2026, 6, 15))
+
+                let result =
+                    tryResolveMoveToExistingTargetPaths
+                        (Some "notes/2026-06-15/plain/plain.md")
+                        content
+                        (target NotesTargetKind.Assay "AssayA")
+
+                match result with
+                | Ok _ -> failwith "Expected path resolution to fail for an unsafe protocol title."
+                | Error errorMessage -> Vitest.expect(errorMessage.Contains "Title").toBe (true)
         )
 )

@@ -5,22 +5,6 @@ open Swate.Components.Shared
 open Swate.Components.Composite.Notes.Editor
 
 
-type ExistingTargetNoteFolderMove = {
-    SourceFolderPath: string
-    TargetFolderPath: string
-}
-
-type ExistingTargetNoteMovePlan = {
-    SourcePath: string
-    TargetPath: string
-    FolderMove: ExistingTargetNoteFolderMove option
-}
-
-[<RequireQualifiedAccess>]
-type ExistingTargetNoteMovePlanResult =
-    | Ready of ExistingTargetNoteMovePlan
-    | TargetConflict of ExistingTargetNoteMovePlan
-
 let private isAssignableMarkdownPath (path: string) =
     let normalizedPath = PathHelpers.normalizePath path
 
@@ -40,7 +24,7 @@ let private tryResolveTargetPath (markdown: string) (targetRef: ExistingTargetRe
             | None -> Error "Could not resolve a safe target path."
             | Some targetPath -> Ok targetPath
 
-let private tryBuildFolderMove sourcePath targetPath =
+let tryGetStructuredNoteFolderMove sourcePath targetPath =
     let expectedMarkdownFileName folderPath =
         $"{PathHelpers.getFileName folderPath}.md"
 
@@ -50,27 +34,13 @@ let private tryBuildFolderMove sourcePath targetPath =
     | Some sourceFolderPath, Some targetFolderPath when
         PathHelpers.pathsEqual (PathHelpers.getFileName sourcePath) (expectedMarkdownFileName sourceFolderPath)
         && PathHelpers.pathsEqual (PathHelpers.getFileName targetPath) (expectedMarkdownFileName targetFolderPath)
-        ->
-        Some {
-            SourceFolderPath = sourceFolderPath
-            TargetFolderPath = targetFolderPath
-        }
+        -> Some(sourceFolderPath, targetFolderPath)
     | _ -> None
 
-let movePlanConflictPath plan =
-    plan.FolderMove
-    |> Option.map _.TargetFolderPath
-    |> Option.defaultValue plan.TargetPath
-
-let private planTargetExistsInSnapshot existingPaths plan =
-    PathHelpers.pathExistsInSnapshot existingPaths plan.TargetPath
-    || PathHelpers.pathExistsInSnapshot existingPaths (movePlanConflictPath plan)
-
-let tryBuildMoveToExistingTargetPlan
+let tryResolveMoveToExistingTargetPaths
     (selectedPath: string option)
     (markdown: string)
     (targetRef: ExistingTargetRef)
-    (existingPaths: string seq)
     =
     match selectedPath |> Option.map PathHelpers.normalizePath with
     | None -> Error "No note file is selected."
@@ -82,14 +52,4 @@ let tryBuildMoveToExistingTargetPlan
         | Error errorMessage -> Error errorMessage
         | Ok preferredTargetPath when PathHelpers.pathsEqual sourcePath preferredTargetPath ->
             Error "The selected note is already in this Study or Assay."
-        | Ok preferredTargetPath ->
-            let plan = {
-                SourcePath = sourcePath
-                TargetPath = preferredTargetPath
-                FolderMove = tryBuildFolderMove sourcePath preferredTargetPath
-            }
-
-            if planTargetExistsInSnapshot existingPaths plan then
-                Ok(ExistingTargetNoteMovePlanResult.TargetConflict plan)
-            else
-                Ok(ExistingTargetNoteMovePlanResult.Ready plan)
+        | Ok preferredTargetPath -> Ok(sourcePath, preferredTargetPath)

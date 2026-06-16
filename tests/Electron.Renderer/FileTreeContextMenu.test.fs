@@ -259,7 +259,7 @@ Vitest.describe (
         Vitest.test (
             "untitled root note request uses dated notes path and frontmatter",
             fun () ->
-                let request = createUntitledRootNoteRequest (DateTime(2026, 6, 15)) []
+                let request = createUntitledRootNoteRequest (DateTime(2026, 6, 15))
 
                 Vitest.expect(request.fileType).toEqual (FileContentType.Markdown)
                 Vitest.expect(request.path).toBe ("notes/2026-06-15/untitled-note/untitled-note.md")
@@ -274,15 +274,11 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "untitled root note request increments filename when target exists",
+            "untitled root note request keeps the stable target path",
             fun () ->
-                let request =
-                    createUntitledRootNoteRequest (DateTime(2026, 6, 15)) [
-                        "notes/2026-06-15/untitled-note"
-                        "notes\\2026-06-15\\untitled-note-2\\untitled-note-2.md"
-                    ]
+                let request = createUntitledRootNoteRequest (DateTime(2026, 6, 15))
 
-                Vitest.expect(request.path).toBe ("notes/2026-06-15/untitled-note-3/untitled-note-3.md")
+                Vitest.expect(request.path).toBe ("notes/2026-06-15/untitled-note/untitled-note.md")
         )
 
         Vitest.test (

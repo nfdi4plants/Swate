@@ -327,27 +327,51 @@ type FileTree =
 
         let addRootNote (_item: FileItem) =
             if not isDialogBusy then
-                setIsDialogBusy true
-
-                let existingPaths = fileStateCtx.state.FileTree |> Array.map _.path
-
-                let request = createUntitledRootNoteRequest System.DateTime.Today existingPaths
+                let request = createUntitledRootNoteRequest System.DateTime.Today
                 let selectedPath = PathHelpers.normalizePath request.path
 
+                let writeNote () =
+                    promise {
+                        setIsDialogBusy true
+
+                        let! writeResult = writeNoteWithAssets request
+
+                        match writeResult with
+                        | Error exn -> applyAddNoteError exn.Message
+                        | Ok() ->
+                            fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+
+                            match! reloadPreviewByPath selectedPath with
+                            | Ok() -> ()
+                            | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
+
+                        setIsDialogBusy false
+                    }
+                    |> Promise.catch (fun exn ->
+                        applyAddNoteError exn.Message
+                        setIsDialogBusy false
+                    )
+                    |> Promise.start
+
                 promise {
-                    let! writeResult = writeNoteWithAssets request
+                    setIsDialogBusy true
 
-                    match writeResult with
-                    | Error exn -> applyAddNoteError exn.Message
-                    | Ok() ->
-                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                    let! shouldWriteResult =
+                        shouldRunOrShowOverwriteModal errorModal selectedPath writeNote
 
-                        match! reloadPreviewByPath selectedPath with
-                        | Ok() -> ()
-                        | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
+                    match shouldWriteResult with
+                    | Error exn ->
+                        applyAddNoteError exn.Message
+                        setIsDialogBusy false
+                    | Ok false -> setIsDialogBusy false
+                    | Ok true ->
+                        setIsDialogBusy false
+                        writeNote ()
                 }
-                |> Promise.catch (fun exn -> applyAddNoteError exn.Message)
-                |> Promise.map (fun _ -> setIsDialogBusy false)
+                |> Promise.catch (fun exn ->
+                    applyAddNoteError exn.Message
+                    setIsDialogBusy false
+                )
                 |> Promise.start
 
         let createFileSystemItem (name: string) =

@@ -10,7 +10,6 @@ open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Renderer.Components.Helper.NoteFileSystemHelper
 open Renderer.Components.MainContent.NoteMoveHelper
-open Renderer.Components.MainContent.NoteTargetConflictHelper
 
 [<ReactComponent(true)>]
 let MarkdownEditorTarget (content: string) =
@@ -74,19 +73,19 @@ let MarkdownEditorTarget (content: string) =
             }
             |> Promise.start
 
-    let completeMovePlan (plan: ExistingTargetNoteMovePlan) = promise {
-        fileStateCtx.setSelection (ArcSelection.forTreePath (Some plan.TargetPath))
+    let completeMove targetPath = promise {
+        fileStateCtx.setSelection (ArcSelection.forTreePath (Some targetPath))
         setLastSavedContent markdown
         setSelectedExistingTarget None
 
-        match! ensureAssetsFolder plan.TargetPath with
+        match! ensureAssetsFolder targetPath with
         | Error exn ->
             setMoveError (
-                Some $"Moved note to '{plan.TargetPath}', but failed to create the assets folder: {exn.Message}"
+                Some $"Moved note to '{targetPath}', but failed to create the assets folder: {exn.Message}"
             )
         | Ok() -> ()
 
-        let! previewResult = Api.ipcArcVaultApi.openFile plan.TargetPath
+        let! previewResult = Api.ipcArcVaultApi.openFile targetPath
 
         match previewResult with
         | Ok previewData ->
@@ -95,61 +94,61 @@ let MarkdownEditorTarget (content: string) =
         | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.MarkdownPage markdown))
     }
 
-    let executeFileMovePlan (plan: ExistingTargetNoteMovePlan) = promise {
-        match! writeMarkdown plan.TargetPath with
-        | Error exn -> return Error $"Failed to move note: {exn.Message}"
-        | Ok() ->
-            match! Api.ipcArcVaultApi.deletePath plan.SourcePath with
-            | Error exn ->
-                return Error $"Moved note to '{plan.TargetPath}', but failed to delete the original note: {exn.Message}"
-            | Ok() -> return Ok()
-    }
-
-    let renameSourceMarkdownForFolderMove (plan: ExistingTargetNoteMovePlan) = promise {
-        let targetFileName = PathHelpers.getFileName plan.TargetPath
-
-        if PathHelpers.pathsEqual (PathHelpers.getFileName plan.SourcePath) targetFileName then
-            return Ok()
-        else
-            return!
-                Api.ipcArcVaultApi.renamePath {
-                    relativePath = plan.SourcePath
-                    newName = targetFileName
-                }
-    }
-
-    let executeFolderMovePlan (plan: ExistingTargetNoteMovePlan) folderMove overwrite = promise {
-        match! writeMarkdown plan.SourcePath with
-        | Error exn -> return Error $"Failed to save note before moving it: {exn.Message}"
-        | Ok() ->
-            match! renameSourceMarkdownForFolderMove plan with
-            | Error exn -> return Error $"Failed to rename note file before moving it: {exn.Message}"
-            | Ok() ->
-                match!
-                    Api.ipcArcVaultApi.movePath {
-                        sourceRelativePath = folderMove.SourceFolderPath
-                        targetRelativePath = folderMove.TargetFolderPath
-                        overwrite = overwrite
-                    }
-                with
-                | Error exn -> return Error $"Failed to move note folder: {exn.Message}"
-                | Ok() -> return Ok()
-    }
-
-    let runMovePlan plan overwrite =
-        match plan.FolderMove with
-        | Some folderMove -> executeFolderMovePlan plan folderMove overwrite
-        | None -> executeFileMovePlan plan
-
-    let executeMovePlan (plan: ExistingTargetNoteMovePlan) overwrite =
+    let executeMove sourcePath targetPath overwrite =
         promise {
             setIsMovingToExistingTarget true
             setSaveError None
             setMoveError None
 
-            match! runMovePlan plan overwrite with
+            let moveLegacyFile () = promise {
+                match! writeMarkdown targetPath with
+                | Error exn -> return Error $"Failed to move note: {exn.Message}"
+                | Ok() ->
+                    match! Api.ipcArcVaultApi.deletePath sourcePath with
+                    | Error exn ->
+                        return
+                            Error
+                                $"Moved note to '{targetPath}', but failed to delete the original note: {exn.Message}"
+                    | Ok() -> return Ok()
+            }
+
+            let moveFolder sourceFolderPath targetFolderPath = promise {
+                match! writeMarkdown sourcePath with
+                | Error exn -> return Error $"Failed to save note before moving it: {exn.Message}"
+                | Ok() ->
+                    let targetFileName = PathHelpers.getFileName targetPath
+
+                    let! renameResult =
+                        if PathHelpers.pathsEqual (PathHelpers.getFileName sourcePath) targetFileName then
+                            promise { return Ok() }
+                        else
+                            Api.ipcArcVaultApi.renamePath {
+                                relativePath = sourcePath
+                                newName = targetFileName
+                            }
+
+                    match renameResult with
+                    | Error exn -> return Error $"Failed to rename note file before moving it: {exn.Message}"
+                    | Ok() ->
+                        match!
+                            Api.ipcArcVaultApi.movePath {
+                                sourceRelativePath = sourceFolderPath
+                                targetRelativePath = targetFolderPath
+                                overwrite = overwrite
+                            }
+                        with
+                        | Error exn -> return Error $"Failed to move note folder: {exn.Message}"
+                        | Ok() -> return Ok()
+            }
+
+            let! moveResult =
+                match tryGetStructuredNoteFolderMove sourcePath targetPath with
+                | Some(sourceFolderPath, targetFolderPath) -> moveFolder sourceFolderPath targetFolderPath
+                | None -> moveLegacyFile ()
+
+            match moveResult with
             | Error errorMessage -> setMoveError (Some errorMessage)
-            | Ok() -> do! completeMovePlan plan
+            | Ok() -> do! completeMove targetPath
 
             setIsMovingToExistingTarget false
         }
@@ -159,44 +158,40 @@ let MarkdownEditorTarget (content: string) =
         )
         |> Promise.start
 
-    let showMoveConflict (plan: ExistingTargetNoteMovePlan) =
-        setMoveError None
-        showOverwriteConflictModal errorModalCtx (movePlanConflictPath plan) (fun () -> executeMovePlan plan true)
-
-    let blockOrExecuteMovePlan (plan: ExistingTargetNoteMovePlan) =
-        promise {
-            setIsMovingToExistingTarget true
-            setSaveError None
-            setMoveError None
-
-            let! targetExists = targetExistsOnDisk (movePlanConflictPath plan)
-
-            if targetExists then
-                setIsMovingToExistingTarget false
-                showMoveConflict plan
-            else
-                executeMovePlan plan false
-        }
-        |> Promise.catch (fun exn ->
-            setMoveError (Some $"Failed to check target note: {exn.Message}")
-            setIsMovingToExistingTarget false
-        )
-        |> Promise.start
-
     let requestMoveToExistingTarget () =
         match selectedExistingTarget with
         | None -> setMoveError (Some "Select a Study or Assay target first.")
         | Some targetRef ->
             match
-                tryBuildMoveToExistingTargetPlan
+                tryResolveMoveToExistingTargetPaths
                     selectedPath
                     markdown
                     targetRef
-                    (fileStateCtx.state.FileTree |> Array.map _.path)
             with
             | Error errorMessage -> setMoveError (Some errorMessage)
-            | Ok(ExistingTargetNoteMovePlanResult.Ready plan) -> blockOrExecuteMovePlan plan
-            | Ok(ExistingTargetNoteMovePlanResult.TargetConflict plan) -> showMoveConflict plan
+            | Ok(sourcePath, targetPath) ->
+                promise {
+                    setIsMovingToExistingTarget true
+                    setSaveError None
+                    setMoveError None
+
+                    let! shouldMoveResult =
+                        shouldRunOrShowOverwriteModal errorModalCtx targetPath (fun () -> executeMove sourcePath targetPath true)
+
+                    match shouldMoveResult with
+                    | Error exn ->
+                        setMoveError (Some $"Failed to check target note: {exn.Message}")
+                        setIsMovingToExistingTarget false
+                    | Ok false -> setIsMovingToExistingTarget false
+                    | Ok true ->
+                        setIsMovingToExistingTarget false
+                        executeMove sourcePath targetPath false
+                }
+                |> Promise.catch (fun exn ->
+                    setMoveError (Some $"Failed to check target note: {exn.Message}")
+                    setIsMovingToExistingTarget false
+                )
+                |> Promise.start
 
     let saveStatusText =
         match saveError, moveError with

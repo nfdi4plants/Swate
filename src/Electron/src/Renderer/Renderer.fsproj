@@ -20,6 +20,7 @@
     <Compile Include="Components\Helper\ArcViewHelper.fs" />
     <Compile Include="Components\Helper\GitLfsHelper.fs" />
     <Compile Include="Components\Helper\ArcVaultHelper.fs" />
+    <Compile Include="Components\Helper\NotePathHelper.fs" />
     <Compile Include="Components\Helper\NoteFileSystemHelper.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\FileExplorerLfs.fs" />
@@ -47,7 +48,6 @@
     <Compile Include="Components\MainContent\ArcFilePreviewTargetHelper.fs" />
     <Compile Include="Components\MainContent\ArcFilePreviewTarget.fs" />
     <Compile Include="Components\MainContent\TextPreviewTarget.fs" />
-    <Compile Include="Components\MainContent\NoteTargetConflictHelper.fs" />
     <Compile Include="Components\MainContent\NoteMoveHelper.fs" />
     <Compile Include="Components\MainContent\MarkdownEditorTarget.fs" />
     <Compile Include="Components\MainContent\UnknownPreviewTarget.fs" />

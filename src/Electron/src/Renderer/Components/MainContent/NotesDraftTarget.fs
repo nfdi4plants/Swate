@@ -7,7 +7,6 @@ open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Renderer.Components.Helper.NoteFileSystemHelper
-open Renderer.Components.MainContent.NoteTargetConflictHelper
 
 
 [<ReactComponent>]
@@ -72,19 +71,16 @@ let NotesDraftTarget () =
 
             let submit () = submitRequest request
 
-            let showConflict () =
-                setSubmitState false None
-                showOverwriteConflictModal errorModalCtx targetPath submit
-
             promise {
                 setSubmitState true None
 
-                if PathHelpers.pathExistsInSnapshot (fileStateCtx.state.FileTree |> Array.map _.path) targetPath then
-                    showConflict ()
-                else
-                    let! targetExists = targetExistsOnDisk targetPath
+                let! shouldSubmitResult =
+                    shouldRunOrShowOverwriteModal errorModalCtx targetPath submit
 
-                    if targetExists then showConflict () else submit ()
+                match shouldSubmitResult with
+                | Error exn -> setSubmitState false (Some $"Failed to check target note: {exn.Message}")
+                | Ok true -> submit ()
+                | Ok false -> setSubmitState false None
             }
             |> Promise.catch (fun exn -> setSubmitState false (Some $"Failed to check target note: {exn.Message}"))
             |> Promise.start

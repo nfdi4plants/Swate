@@ -138,31 +138,13 @@ let isRootNotesFolder (item: FileItem) =
     && (tryGetItemRelativePath item
         |> Option.exists (fun path -> PathHelpers.pathsEqual path "notes"))
 
-let createUntitledRootNotePath (dateCreated: DateTime) (existingPaths: string seq) =
-    let rec loop index =
-        let suffix = if index = 1 then "" else $"-{index}"
-        let protocolName = $"untitled-note{suffix}"
+let createUntitledRootNotePath (dateCreated: DateTime) =
+    NoteConversion.mkNewRootNoteRelativePath dateCreated.Date "untitled-note"
+    |> Option.defaultWith (fun () -> failwith "Could not create a safe untitled note path.")
 
-        let candidate =
-            NoteConversion.mkNewRootNoteRelativePath dateCreated.Date protocolName
-            |> Option.defaultWith (fun () -> failwith "Could not create a safe untitled note path.")
-
-        let candidateFolder = NoteConversion.tryGetNoteFolderRelativePath candidate
-
-        let alreadyExists =
-            existingPaths
-            |> Seq.exists (fun path ->
-                PathHelpers.pathsEqual path candidate
-                || (candidateFolder |> Option.exists (PathHelpers.pathsEqual path))
-            )
-
-        if alreadyExists then loop (index + 1) else candidate
-
-    loop 1
-
-let createUntitledRootNoteRequest (dateCreated: DateTime) (existingPaths: string seq) =
+let createUntitledRootNoteRequest (dateCreated: DateTime) =
     let dateCreated = dateCreated.Date
-    let path = createUntitledRootNotePath dateCreated existingPaths
+    let path = createUntitledRootNotePath dateCreated
 
     let draft: NotesDraft = {
         NotesDraft.init with

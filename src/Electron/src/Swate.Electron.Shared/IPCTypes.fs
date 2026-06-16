@@ -43,6 +43,7 @@ type IArcVaultsApi = {
     pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
+    pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
     openArcFolderInFileExplorer: unit -> JS.Promise<Result<unit, exn>>
     showPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>

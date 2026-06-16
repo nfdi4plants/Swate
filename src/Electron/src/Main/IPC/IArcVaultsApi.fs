@@ -54,6 +54,15 @@ let private tryResolveExistingArcRelativePath
                 return Error(exn $"Path '{relativePath}' does not exist.")
     }
 
+let pathExistsAtArcRelativePath (arcPath: string) (relativePath: string) : JS.Promise<Result<bool, exn>> =
+    promise {
+        match tryResolveArcRelativePath arcPath relativePath with
+        | Error pathError -> return Error pathError
+        | Ok absolutePath ->
+            let! exists = pathExistsAsync absolutePath
+            return Ok exists
+    }
+
 let private showPathInFileExplorerAsync (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {
     match! tryResolveExistingArcRelativePath arcPath relativePath with
     | Error pathError -> return Error pathError
@@ -384,6 +393,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    pathExists =
+        fun (relativePath: string) ->
+            runLoadedArcPathAction event (fun arcPath -> pathExistsAtArcRelativePath arcPath relativePath)
     readNotes =
         fun () -> promise {
             try

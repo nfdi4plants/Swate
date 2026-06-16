@@ -4,6 +4,7 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Path
+open Main.IPC.ArcVaultsApi
 open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -74,6 +75,12 @@ let private expectRelativePathExists arcPath relativePath expected = promise {
     Vitest.expect(exists).toBe (expected)
 }
 
+let private expectPathExistsRequest arcPath relativePath expected = promise {
+    match! pathExistsAtArcRelativePath arcPath relativePath with
+    | Error error -> return failwith error.Message
+    | Ok exists -> Vitest.expect(exists).toBe (expected)
+}
+
 let private writeRelativeFileAsync arcPath relativePath content = promise {
     let absolutePath = absoluteArcPath arcPath relativePath
 
@@ -97,6 +104,40 @@ let private createRelativeDirectoryAsync arcPath relativePath = promise {
 Vitest.describe (
     "ArcFileSystemHelper generic filesystem operations",
     fun () ->
+
+        Vitest.test (
+            "checks whether relative files and directories exist",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "notes/existing-note"
+                    do! writeRelativeFileAsync arcPath "notes/existing-note/existing-note.md" "hello"
+
+                    do! expectPathExistsRequest arcPath "notes/existing-note/existing-note.md" true
+                    do! expectPathExistsRequest arcPath "notes/existing-note" true
+                })
+        )
+
+        Vitest.test (
+            "reports missing safe relative paths as absent",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    do! expectPathExistsRequest arcPath "notes/missing-note" false
+                })
+        )
+
+        Vitest.test (
+            "rejects unsafe path existence requests",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    match! pathExistsAtArcRelativePath arcPath "../outside" with
+                    | Ok _ -> failwith "Expected traversal path to be rejected."
+                    | Error error -> Vitest.expect(error.Message.Length > 0).toBe (true)
+
+                    match! pathExistsAtArcRelativePath arcPath arcPath with
+                    | Ok _ -> failwith "Expected absolute path to be rejected."
+                    | Error error -> Vitest.expect(error.Message.Length > 0).toBe (true)
+                })
+        )
 
         Vitest.test (
             "creates generic folders through the ARCtrl-backed create path",
