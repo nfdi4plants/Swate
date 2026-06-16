@@ -1045,6 +1045,12 @@ type ProvenanceGrouping =
                         "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:overflow-hidden"
                     prop.children [
                         Html.button [
+                            prop.title (
+                                        if side = ProvenanceSide.Input then
+                                            "Hide input properties"
+                                        else
+                                            "Hide output properties"
+                                    )
                             prop.type'.button
                             prop.className [
                                 "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
@@ -1057,6 +1063,7 @@ type ProvenanceGrouping =
                             prop.onClick (fun _ -> toggleRail side)
                             prop.children [
                                 Html.i [
+                                    
                                     prop.className [
                                         "swt:iconify swt:size-4"
                                         if side = ProvenanceSide.Input then
@@ -1072,6 +1079,12 @@ type ProvenanceGrouping =
                 ]
             else
                 Html.button [
+                    prop.title (
+                        if side = ProvenanceSide.Input then
+                            "Show input properties"
+                        else
+                            "Show output properties"
+                    )
                     prop.type'.button
                     prop.className
                         "swt:btn swt:btn-ghost swt:btn-xs swt:h-auto swt:min-h-24 swt:w-fit swt:px-1 swt:py-2"
@@ -1263,6 +1276,10 @@ type ProvenanceGrouping =
                                         debug = debug
                                     )
                                     Html.button [
+                                        match density with
+                                        | Density.EditorDensity.Compact -> prop.title "Toggle comfortable density"
+                                        | Density.EditorDensity.Comfortable -> prop.title "Toggle compact density"
+
                                         prop.type'.button
                                         prop.className [
                                             "swt:btn swt:btn-xs"
@@ -1272,7 +1289,12 @@ type ProvenanceGrouping =
                                                 "swt:btn-ghost"
                                         ]
                                         prop.custom ("aria-pressed", (density = Density.EditorDensity.Compact))
-                                        prop.ariaLabel "Toggle compact density"
+                                        prop.ariaLabel (
+                                            if density = Density.EditorDensity.Compact then
+                                                "Switch to comfortable density"
+                                            else
+                                                "Switch to compact density"
+                                        )
                                         if debug then
                                             prop.testId "provenance-density-toggle"
                                         prop.onClick (fun _ ->

@@ -194,6 +194,7 @@ type Controls =
                     let right = session.Layers |> List.find (fun layer -> layer.Id = pair.RightLayerId)
 
                     Html.button [
+                        prop.title $"View provenance for {left.Label} and {right.Label}"
                         prop.className [
                             "swt:btn swt:btn-sm"
                             if pairId = session.ActivePairId then
@@ -201,12 +202,14 @@ type Controls =
                             else
                                 "swt:btn-outline"
                         ]
+                        prop.ariaLabel $"View provenance for {left.Label} and {right.Label}"
                         if defaultArg debug false then
                             prop.testId $"provenance-pair-{pairId}"
                         prop.onClick (fun _ -> onSelect pairId)
                         prop.text $"{left.Label} -> {right.Label}"
                     ]
                 Html.button [
+                    prop.title "Add layer"
                     prop.className "swt:btn swt:btn-sm swt:btn-primary"
                     if defaultArg debug false then
                         prop.testId "provenance-add-layer"
@@ -232,6 +235,7 @@ type Controls =
         let sideName = SideLabels.sideName side
 
         Html.button [
+            prop.title $"Move {header.Category.Name} grouping from {sideName}"
             prop.type'.button
             prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:btn-outline swt:z-10"
             prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
@@ -401,6 +405,7 @@ type Controls =
         let bothButton =
             Html.button [
                 prop.type'.button
+                prop.title $"Group {header.Category.Name} on both sides"
                 prop.className [
                     "swt:btn swt:btn-xs swt:btn-square swt:z-10"
                     if bothSelected then
