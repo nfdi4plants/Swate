@@ -7,6 +7,8 @@ open Feliz.UseElmish
 
 open Renderer.Types
 open Swate.Components.Page.GitSidebarTypes
+open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
 
@@ -54,7 +56,7 @@ module private Helper =
         | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
         | Error message -> Error message
 
-    let dependencies: GitDependencies = {
+    let dependencies (reportError: GitErrorNotification -> unit) : GitDependencies = {
         getGitStatus = Renderer.GitApiClient.getGitStatus
         getGitBranches = Renderer.GitApiClient.getGitBranches
         getOriginRemoteRepositoryWebUrl = Renderer.GitApiClient.getOriginRepositoryWebUrl
@@ -93,6 +95,7 @@ module private Helper =
         confirmGitMergeResolution = Renderer.GitApiClient.confirmGitMergeResolution
         confirmLfsPrune = fun message -> window.confirm message
         confirmInstall = fun message -> window.confirm message
+        reportError = reportError
     }
 
 let GitStateCtx =
@@ -134,9 +137,25 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let errorModalCtx = useErrorModalCtx ()
+    let errorModalCtxRef = React.useRef errorModalCtx
+    errorModalCtxRef.current <- errorModalCtx
+
+    let reportGitError =
+        React.useCallback (
+            (fun (notification: GitErrorNotification) ->
+                errorModalCtxRef.current.enqueue (
+                    ErrorModalRequest.create (notification.Message, title = notification.Title)
+                )
+            ),
+            [||]
+        )
+
+    let dependencies =
+        React.useMemo ((fun _ -> Helper.dependencies reportGitError), [||])
 
     let gitState, dispatch =
-        React.useElmish ((fun () -> init ()), update Helper.dependencies pageStateCtx.setState, subscribe, [||])
+        React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
 
     let refresh () = dispatch RefreshRequested
 

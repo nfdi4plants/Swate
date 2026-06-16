@@ -69,6 +69,8 @@ type GitPullWorkflowResult = {
 
 type InitRepositoryOutcome = { WarningMessage: string option }
 
+type GitErrorNotification = { Title: string; Message: string }
+
 type GitState = {
     Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
@@ -257,6 +259,7 @@ type GitDependencies = {
         GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, string>>
     confirmLfsPrune: string -> bool
     confirmInstall: string -> bool
+    reportError: GitErrorNotification -> unit
 }
 
 let staleMergeConflictTokens = [|
@@ -508,6 +511,29 @@ let private applyPageChangeCmd (setPageState: PageState option -> unit) =
     | GitPageChange.Clear -> [
         fun _dispatch -> setPageState None
       ]
+
+let private reportErrorCmd (deps: GitDependencies) (title: string) (message: string) : Cmd<Msg> = [
+    fun _dispatch -> deps.reportError { Title = title; Message = message }
+]
+
+let private titleForWriteRequest =
+    function
+    | Fetch -> "Could not fetch changes"
+    | Pull -> "Could not pull changes"
+    | Push -> "Could not push changes"
+    | PrimarySave _ -> "Could not save changes"
+    | Clone _ -> "Could not clone repository"
+    | CommitSelection _
+    | CommitAll _ -> "Could not commit changes"
+    | DiscardSelection _ -> "Could not discard changes"
+    | SaveLfsSettings _ -> "Could not save Git LFS settings"
+    | PruneLfsCache -> "Could not clean Git LFS cache"
+    | DedupLfsStorage -> "Could not reduce Git LFS storage"
+    | CreateBranch _ -> "Could not create branch"
+    | SwitchBranch _ -> "Could not switch branch"
+
+let private reportWriteErrorCmd deps request message =
+    reportErrorCmd deps (titleForWriteRequest request) message
 
 let private withBusyOperation busyOperation model = {
     model with
@@ -1048,7 +1074,11 @@ let update
                 PendingRefreshWarningNotice = None
         }
 
-        nextModel, applyPageChangeCmd setPageState GitPageChange.Clear
+        nextModel,
+        Cmd.batch [
+            applyPageChangeCmd setPageState GitPageChange.Clear
+            reportErrorCmd deps "Could not refresh Git state" message
+        ]
     | RefreshCompleted(_, Ok refreshResult) when
         refreshErrorMessage refreshResult |> Option.exists isMissingRepositoryMessage
         ->
@@ -1060,17 +1090,16 @@ let update
             |> withBusyOperation None
             |> fun state -> { state with CurrentProgress = None }
 
-        let hasError =
-            match refreshResult.Status, refreshErrorMessage refreshResult with
-            | Error _, _
-            | Ok _, Some _ -> true
-            | Ok _, None -> false
+        let refreshError = refreshErrorMessage refreshResult
 
         let cmd =
-            if hasError then
-                applyPageChangeCmd setPageState GitPageChange.Clear
-            else
-                Cmd.none
+            match refreshError with
+            | Some message ->
+                Cmd.batch [
+                    applyPageChangeCmd setPageState GitPageChange.Clear
+                    reportErrorCmd deps "Could not refresh Git state" message
+                ]
+            | None -> Cmd.none
 
         nextModel, cmd
     | InitRepositoryRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
@@ -1104,7 +1133,7 @@ let update
                 PendingRefreshWarningNotice = None
         }
 
-        nextModel, Cmd.none
+        nextModel, reportErrorCmd deps "Could not initialize Git repository" message
     | InitRepositoryCompleted(_, Ok outcome) ->
         let nextModel = {
             model with
@@ -1159,7 +1188,11 @@ let update
                 ErrorNotice = Some message
         }
 
-        nextModel, resolveReplyCmd reply (Error message)
+        nextModel,
+        Cmd.batch [
+            resolveReplyCmd reply (Error message)
+            reportErrorCmd deps "Could not open Git change" message
+        ]
     | ConfirmMergeResolutionRequested _ when model.CurrentArcPath.IsNone -> model, Cmd.none
     | ConfirmMergeResolutionRequested request ->
         match model.BusyOperation with
@@ -1206,9 +1239,10 @@ let update
             Cmd.batch [
                 applyPageChangeCmd setPageState GitPageChange.Clear
                 Cmd.ofMsg RefreshRequested
+                reportErrorCmd deps "Could not confirm merge resolution" message
             ]
         else
-            nextModel, Cmd.none
+            nextModel, reportErrorCmd deps "Could not confirm merge resolution" message
     | ConfirmMergeResolutionCompleted(_, Ok outcome) ->
         let nextModel =
             model
@@ -1336,7 +1370,7 @@ let update
                 BusyNotice = None
                 ErrorNotice = Some message
         },
-        Cmd.none
+        reportErrorCmd deps "Could not preview update from online" message
     | CloneRequested(request, reply) -> model, Cmd.ofMsg (WriteRequested(Clone(request, reply)))
     | PrimarySaveSelectionRequested request ->
         model, Cmd.ofMsg (WriteRequested(PrimarySave(prepareCommitSelection model request)))
@@ -1394,7 +1428,7 @@ let update
                 model with
                     ErrorNotice = Some "ARC folder name must not be empty."
             },
-            Cmd.none
+            reportErrorCmd deps "Could not rename ARC" "ARC folder name must not be empty."
         else
             let nextModel =
                 model
@@ -1434,7 +1468,7 @@ let update
                 CurrentProgress = None
                 ErrorNotice = Some message
         },
-        Cmd.none
+        reportErrorCmd deps "Could not rename ARC" message
     | PublishRenameCompleted(_, Ok _) ->
         {
             model with
@@ -1526,7 +1560,12 @@ let update
         model, resolveStaleWriteCompletedCmd request result
     | WriteCompleted(_, request, Error message) ->
         let nextModel = writeErrorModel message model
-        nextModel, resolveCloneReplyCmd request (Error message)
+
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportWriteErrorCmd deps request message
+        ]
     | WriteCompleted(_, _, Ok(RequiresRemoteProjectRename message)) ->
         let nextModel = {
             model with
@@ -1565,7 +1604,11 @@ let update
                     InstallRetryState = GitInstallRetryState.Idle
             }
 
-        nextModel, resolveCloneReplyCmd request (Error message)
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportErrorCmd deps "Git LFS installation required" message
+        ]
     | WriteInstallPromptAnswered(sessionId, request, true) ->
         let busyOperation = busyOperationForWriteRequest request
 
@@ -1595,7 +1638,11 @@ let update
                     InstallRetryState = GitInstallRetryState.Idle
             }
 
-        nextModel, resolveCloneReplyCmd request (Error message)
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportErrorCmd deps "Could not install Git LFS" message
+        ]
     | WriteInstallCompleted(_, request, Ok operationResult) when not operationResult.Success ->
         let message =
             operationResult.Message |> Option.defaultValue "Git LFS installation failed."
@@ -1608,7 +1655,11 @@ let update
                     InstallRetryState = GitInstallRetryState.Idle
             }
 
-        nextModel, resolveCloneReplyCmd request (Error message)
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportErrorCmd deps "Could not install Git LFS" message
+        ]
     | WriteInstallCompleted(sessionId, request, Ok _) ->
         let busyOperation = busyOperationForWriteRequest request
 
@@ -1658,15 +1709,29 @@ let update
                 PendingPostMergePush = false
         }
 
-        nextModel, applyPageChangeCmd setPageState pageChange
+        nextModel,
+        Cmd.batch [
+            applyPageChangeCmd setPageState pageChange
+            reportErrorCmd deps "Could not push saved changes" message
+        ]
     | WriteCompleted(_, request, Ok(CompletedWithPendingRemoteConfirmation(_, _, _))) ->
         let message = "Git operation produced an invalid pending remote confirmation."
         let nextModel = writeErrorModel message model
-        nextModel, resolveCloneReplyCmd request (Error message)
+
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportWriteErrorCmd deps request message
+        ]
     | WriteCompleted(_, request, Ok(CompletedWithPendingRemoteFailure(_, _))) ->
         let message = "Git operation produced an invalid pending remote failure."
         let nextModel = writeErrorModel message model
-        nextModel, resolveCloneReplyCmd request (Error message)
+
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportWriteErrorCmd deps request message
+        ]
     | WriteCompleted(_, request, Ok(Completed success)) ->
         let baseModel, pageChange, warningMessage = applyWriteSuccessModel model success
 

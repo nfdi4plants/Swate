@@ -286,6 +286,7 @@ let private defaultDependencies: GitDependencies = {
     gitLfsDedup = fun () -> unexpectedPromise "gitLfsDedup"
     confirmLfsPrune = fun message -> failwith $"Unexpected LFS prune confirmation: {message}"
     confirmInstall = fun message -> failwith $"Unexpected install prompt: {message}"
+    reportError = fun _ -> ()
 }
 
 let private diffPage path : PageState =
@@ -564,6 +565,35 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "RefreshCompleted reports current failures through the Git error modal",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        RefreshRequestId = 2
+                        RefreshState = GitRefreshState.Loading
+                }
+
+                let nextState, cmd =
+                    update deps ignore (RefreshCompleted(2, Error "remote status failed")) state
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "remote status failed")
+                Vitest.expect(reportedErrors.Count).toBe (1)
+                Vitest.expect(reportedErrors[0].Title).toBe ("Could not refresh Git state")
+                Vitest.expect(reportedErrors[0].Message).toBe ("remote status failed")
+            }
+        )
+
+        Vitest.test (
             "RefreshCompleted ignores stale responses without emitting follow-up callback work",
             fun () -> promise {
                 let state = {
@@ -590,6 +620,34 @@ Vitest.describe (
 
                 Vitest.expect(nextState.Status.CurrentBranch).toEqual (Some "feature/live")
                 Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "RefreshCompleted does not report stale failures through the Git error modal",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                        RefreshRequestId = 2
+                        ErrorNotice = Some "keep current error"
+                }
+
+                let nextState, cmd =
+                    update deps ignore (RefreshCompleted(1, Error "older refresh failed")) state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "keep current error")
+                Vitest.expect(reportedErrors.Count).toBe (0)
             }
         )
 
@@ -879,6 +937,36 @@ Vitest.describe (
 Vitest.describe (
     "GitWorkflow write request flow",
     fun () ->
+        Vitest.test (
+            "WriteCompleted reports write failures through the Git error modal",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ArcSessionId = 3
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                        BusyNotice = Some "Pushing to remote"
+                }
+
+                let nextState, cmd =
+                    update deps ignore (WriteCompleted(3, Push, Error "remote rejected the push")) state
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "remote rejected the push")
+                Vitest.expect(reportedErrors.Count).toBe (1)
+                Vitest.expect(reportedErrors[0].Title).toBe ("Could not push changes")
+                Vitest.expect(reportedErrors[0].Message).toBe ("remote rejected the push")
+            }
+        )
+
         Vitest.test (
             "SaveDownloadLargeFilesRequested updates local state immediately when no ARC is loaded",
             fun () -> promise {

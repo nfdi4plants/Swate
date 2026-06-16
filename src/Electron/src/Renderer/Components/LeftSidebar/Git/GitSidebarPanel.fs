@@ -4,6 +4,7 @@ open Browser.Dom
 open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 
 let mutable private gitVersionCheckStarted = false
 
@@ -28,7 +29,8 @@ let Main () =
             |> Promise.map (
                 function
                 | Ok() -> ()
-                | Error message -> Browser.Dom.window.alert message
+                | Error message ->
+                    errorCtx.enqueue (ErrorModalRequest.create (message, title = "Could not verify Git installation"))
             )
             |> ignore
     )
