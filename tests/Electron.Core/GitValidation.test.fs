@@ -634,6 +634,44 @@ Vitest.describe (
                         Vitest.expect(options).toEqual ([| "--branch"; "feature/clone-flow" |])
                 )
         )
+
+        Vitest.describe (
+            "clone progress events",
+            fun () ->
+                Vitest.test (
+                    "reports an initial clone phase before Git emits percentage progress",
+                    fun () -> promise {
+                        let progressEvents = ResizeArray<GitProgressDto>()
+
+                        let! result = GitProvisioningService.cloneRepository "" "" None false (Some progressEvents.Add)
+
+                        match result with
+                        | Ok _ -> failwith "Expected clone to fail for an invalid request."
+                        | Error _ -> ()
+
+                        Vitest.expect(progressEvents.Count).toBe (1)
+                        Vitest.expect(progressEvents[0].Method).toEqual (Some "clone")
+                        Vitest.expect(progressEvents[0].Stage).toEqual (Some "Preparing clone")
+                        Vitest.expect(progressEvents[0].Progress).toEqual (None)
+                    }
+                )
+
+                Vitest.test (
+                    "parses Git LFS download progress into the shared Git progress shape",
+                    fun () ->
+                        match
+                            GitProvisioningService.tryParseGitLfsProgressMessage
+                                "Downloading LFS objects: 42% (5/12), 128 MB | 2.0 MB/s"
+                        with
+                        | None -> failwith "Expected Git LFS progress to be parsed."
+                        | Some progress ->
+                            Vitest.expect(progress.Method).toEqual (Some "lfs")
+                            Vitest.expect(progress.Stage).toEqual (Some "Downloading LFS objects")
+                            Vitest.expect(progress.Progress).toEqual (Some 42.0)
+                            Vitest.expect(progress.Processed).toEqual (Some 5.0)
+                            Vitest.expect(progress.Total).toEqual (Some 12.0)
+                )
+        )
 )
 
 Vitest.describe (

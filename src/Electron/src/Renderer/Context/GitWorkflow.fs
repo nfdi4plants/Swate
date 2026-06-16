@@ -539,6 +539,7 @@ let private withBusyOperation busyOperation model = {
     model with
         BusyOperation = busyOperation
         BusyNotice = busyOperation |> Option.bind busyNoticeFromOperation
+        CurrentProgress = None
 }
 
 let private startRefreshRequest requestId model = {
@@ -999,12 +1000,13 @@ let update
     : GitState * Cmd<Msg> =
     match msg with
     | ResetWorkflow -> GitState.Empty, Cmd.none
-    | SetCurrentProgress currentProgress ->
+    | SetCurrentProgress(Some progress) when model.BusyOperation.IsSome ->
         {
             model with
-                CurrentProgress = currentProgress
+                CurrentProgress = Some progress
         },
         Cmd.none
+    | SetCurrentProgress _ -> { model with CurrentProgress = None }, Cmd.none
     | ArcPathChanged arcPath when arcPath = model.CurrentArcPath -> model, Cmd.none
     | ArcPathChanged arcPath ->
         let nextModel = {

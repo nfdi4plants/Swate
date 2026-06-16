@@ -96,11 +96,17 @@ module private GitSidebarInternal =
         | GitSidebarBranchKind.Local -> "Local"
         | GitSidebarBranchKind.Remote -> "Remote"
 
+    let progressPercentValue (progress: GitSidebarProgress) =
+        progress.ProgressPercent
+        |> Option.map (fun value -> value |> max 0.0 |> min 100.0)
+
     let progressText (progress: GitSidebarProgress) =
         [
             progress.Method
             progress.Stage
-            progress.ProgressPercent |> Option.map (fun value -> $"{Math.Round(value)}%%")
+            progress
+            |> progressPercentValue
+            |> Option.map (fun value -> $"{Math.Round(value)}%%")
         ]
         |> List.choose id
         |> String.concat " | "
@@ -258,6 +264,8 @@ type GitSidebar =
         React.Fragment [
             match runStatus with
             | GitSidebarRunStatus.Progress progress ->
+                let progressValue = GitSidebarInternal.progressPercentValue progress
+
                 Html.div [
                     prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
@@ -268,17 +276,32 @@ type GitSidebar =
                                 "swt:alert swt:alert-info swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className
-                                        "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
+                                    prop.className "swt:loading swt:loading-spinner swt:loading-xs swt:shrink-0"
                                 ]
-                                Html.span [
-                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
-                                    prop.text (
-                                        GitSidebarInternal.progressText progress
-                                        |> function
-                                            | "" -> "Git operation in progress"
-                                            | text -> text
-                                    )
+                                Html.div [
+                                    prop.className "swt:flex swt:min-w-0 swt:flex-1 swt:flex-col swt:gap-2"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:min-w-0 swt:wrap-anywhere"
+                                            prop.text (
+                                                GitSidebarInternal.progressText progress
+                                                |> function
+                                                    | "" -> "Git operation in progress"
+                                                    | text -> text
+                                            )
+                                        ]
+
+                                        match progressValue with
+                                        | Some value ->
+                                            Html.progress [
+                                                prop.testId "GitSidebarProgressBar"
+                                                prop.className "swt:progress swt:progress-info swt:h-1.5 swt:w-full"
+                                                prop.value value
+                                                prop.max 100
+                                                prop.ariaLabel "Git operation progress"
+                                            ]
+                                        | None -> Html.none
+                                    ]
                                 ]
                             ]
                         ]
@@ -295,7 +318,7 @@ type GitSidebar =
                                 "swt:alert swt:alert-info swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4 swt:shrink-0"
+                                    prop.className "swt:loading swt:loading-spinner swt:loading-xs swt:shrink-0"
                                 ]
                                 Html.span [
                                     prop.className "swt:min-w-0 swt:wrap-anywhere"

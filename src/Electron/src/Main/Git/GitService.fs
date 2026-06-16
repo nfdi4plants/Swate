@@ -953,17 +953,23 @@ let private applyLfsDownloadPreference (downloadLargeFiles: bool) (git: ISimpleG
         git.env (GitLfsSkipSmudgeEnvKey, "1")
 
 // GitService keeps explicit post-pull hydration here because it must reuse the authenticated git instance created for the pull workflow.
-let private hydratePulledLfsContent (git: ISimpleGit) : JS.Promise<GitResult<unit>> = promise {
-    let! result =
-        runSimpleGit
-            (fun currentGit -> promise {
-                let! _ = currentGit.raw [| "lfs"; "pull" |]
-                return ()
-            })
-            git
+let private hydratePulledLfsContent
+    (progressCallback: GitProgressCallback option)
+    (git: ISimpleGit)
+    : JS.Promise<GitResult<unit>> =
+    promise {
+        reportPhase progressCallback "lfs" "Downloading Git LFS files"
 
-    return result
-}
+        let! result =
+            runSimpleGit
+                (fun currentGit -> promise {
+                    let! _ = currentGit.raw [| "lfs"; "pull" |]
+                    return ()
+                })
+                (withGitLfsOutputProgress progressCallback git)
+
+        return result
+    }
 
 let private createPullHydrationFailure (failure: GitFailure) = {
     failure with
@@ -1697,7 +1703,7 @@ let pull
                                 ()
 
                             if downloadLargeFiles then
-                                let! lfsPullResult = hydratePulledLfsContent effectiveGit
+                                let! lfsPullResult = hydratePulledLfsContent progressCallback effectiveGit
 
                                 match lfsPullResult with
                                 | Ok() -> return { Warning = None }
@@ -1782,6 +1788,8 @@ let push
                                 executePushWorkflow
                                     pushTarget
                                     (fun () ->
+                                        reportPhase progressCallback "lfs" "Checking Git LFS objects"
+
                                         planOutboundPush
                                             runSimpleGit
                                             runGitCaptured
@@ -1795,6 +1803,8 @@ let push
                                             git
                                     )
                                     (fun objectIds -> promise {
+                                        reportPhase progressCallback "lfs" "Uploading Git LFS objects"
+
                                         let! uploadResult =
                                             GitLfsService.uploadObjects
                                                 runGitCaptured

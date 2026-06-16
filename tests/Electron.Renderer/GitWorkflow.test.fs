@@ -968,6 +968,69 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "SetCurrentProgress ignores late Git progress after the busy operation has finished",
+            fun () ->
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (SetCurrentProgress(Some(sidebarProgress "Receiving objects" 72.0)))
+                        GitState.Empty
+
+                Vitest.expect(nextState.CurrentProgress).toEqual (None)
+                Vitest.expect(currentRunStatus nextState).toEqual (None)
+                Vitest.expect(cmd).toEqual (Cmd.none)
+        )
+
+        Vitest.test (
+            "WriteRequested clears stale transfer progress before showing the new operation notice",
+            fun () ->
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        CurrentProgress = Some(sidebarProgress "Receiving objects" 72.0)
+                }
+
+                let nextState, _cmd =
+                    update defaultDependencies ignore (WriteRequested WriteRequest.Push) initialState
+
+                Vitest.expect(nextState.CurrentProgress).toEqual (None)
+                Vitest.expect(currentRunStatus nextState).toEqual (Some(GitSidebarRunStatus.Busy "Pushing to remote"))
+        )
+
+        Vitest.test (
+            "UpdateFromOnline safe preflight clears fetch progress before scheduling the pull phase",
+            fun () -> promise {
+                let initialState = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        BusyOperation = Some GitBusyOperation.FetchingFromRemote
+                        BusyNotice = Some "Fetching from remote"
+                        CurrentProgress = Some(sidebarProgress "Receiving objects" 88.0)
+                }
+
+                let nextState, cmd =
+                    update
+                        defaultDependencies
+                        ignore
+                        (UpdatePreflightCompleted(
+                            initialState.ArcSessionId,
+                            Ok {
+                                Status = GitPullPreflightStatus.SafeToPull
+                                Message = None
+                            }
+                        ))
+                        initialState
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.CurrentProgress).toEqual (None)
+                Vitest.expect(currentRunStatus nextState).toEqual (None)
+                Vitest.expect(messages).toEqual ([| WriteRequested WriteRequest.Pull |])
+            }
+        )
+
+        Vitest.test (
             "SaveDownloadLargeFilesRequested updates local state immediately when no ARC is loaded",
             fun () -> promise {
                 let state = {
@@ -1065,6 +1128,31 @@ Vitest.describe (
                 Vitest.expect(stateAfterRequest.BusyOperation).toEqual (Some GitBusyOperation.CloningRepository)
                 Vitest.expect(replyResult).toEqual (Some(Ok "C:/clone-target"))
             }
+        )
+
+        Vitest.test (
+            "clone progress updates the current run status while the start-page clone is busy",
+            fun () ->
+                let reply _ = ()
+
+                let request = {
+                    RemoteUrl = "https://example.org/repo.git"
+                    TargetPath = "C:/clone-target"
+                    Branch = None
+                    DownloadLargeFiles = false
+                }
+
+                let stateAfterRequest, _ =
+                    update defaultDependencies ignore (WriteRequested(Clone(request, reply))) GitState.Empty
+
+                let progress = sidebarProgress "Receiving objects" 48.0
+
+                let nextState, cmd =
+                    update defaultDependencies ignore (SetCurrentProgress(Some progress)) stateAfterRequest
+
+                Vitest.expect(nextState.CurrentProgress).toEqual (Some progress)
+                Vitest.expect(currentRunStatus nextState).toEqual (Some(GitSidebarRunStatus.Progress progress))
+                Vitest.expect(cmd).toEqual (Cmd.none)
         )
 
         Vitest.test (

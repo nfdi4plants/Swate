@@ -54,9 +54,9 @@ const buildBusyRunStatus = (notice: string) => ({
 });
 
 const buildProgressRunStatus = (progress: {
-  Method: string;
-  Stage: string;
-  ProgressPercent: number;
+  Method?: string;
+  Stage?: string;
+  ProgressPercent?: number;
 }) => ({
   // Fable DU: GitSidebarRunStatus.Progress
   tag: 2,
@@ -576,6 +576,30 @@ export const BusyProgressState: Story = {
     await expect(canvas.getByTestId("GitSidebarProgressNotice")).toHaveTextContent(
       "pull | Receiving objects | 54%",
     );
+    await expect(canvas.getByTestId("GitSidebarProgressBar")).toHaveAttribute("value", "54");
+    await expect(canvas.getByTestId("GitSidebarProgressBar")).toHaveAttribute("max", "100");
+  },
+};
+
+export const ClonePhaseProgressState: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    runStatus: buildProgressRunStatus({
+      Method: "clone",
+      Stage: "Preparing clone",
+    }),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarProgressNotice")).toHaveTextContent(
+      "clone | Preparing clone",
+    );
+    await expect(canvas.queryByTestId("GitSidebarProgressBar")).not.toBeInTheDocument();
   },
 };
 

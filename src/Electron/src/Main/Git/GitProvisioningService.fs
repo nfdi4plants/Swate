@@ -137,6 +137,8 @@ let private runSimpleGit
     : JS.Promise<GitService.GitResult<'T>> =
     GitInternals.runSimpleGit toFailure operation git
 
+let tryParseGitLfsProgressMessage = GitInternals.tryParseGitLfsProgressMessage
+
 let private resolveAbsolutePath (pathValue: string) = resolve [| pathValue |]
 
 let private dirname (pathValue: string) = Main.Bindings.Path.dirname pathValue
@@ -304,6 +306,8 @@ let cloneRepository
     (progress: GitService.GitProgressCallback option)
     : JS.Promise<GitService.GitResult<string>> =
     promise {
+        GitInternals.reportPhase progress "clone" "Preparing clone"
+
         let remoteUrlCandidate =
             remoteUrl |> Option.ofObj |> Option.defaultValue String.Empty
 
@@ -380,6 +384,11 @@ let cloneRepository
                                                 match cloneResult with
                                                 | Error _ -> return cloneResult
                                                 | Ok _ ->
+                                                    GitInternals.reportPhase
+                                                        progress
+                                                        "clone"
+                                                        "Saving Git LFS preference"
+
                                                     let! persistResult =
                                                         persistCloneDownloadPreference
                                                             normalizedTargetPath
@@ -417,7 +426,15 @@ let cloneRepository
                                                         match hydrateGitResult with
                                                         | Error authError -> return errorResult authError
                                                         | Ok hydrateGit ->
-                                                            let! hydrateResult = hydrateClonedLfsContent hydrateGit
+                                                            GitInternals.reportPhase
+                                                                progress
+                                                                "lfs"
+                                                                "Downloading Git LFS files"
+
+                                                            let! hydrateResult =
+                                                                hydrateGit
+                                                                |> GitInternals.withGitLfsOutputProgress progress
+                                                                |> hydrateClonedLfsContent
 
                                                             match hydrateResult with
                                                             | Ok() -> return cloneResult
@@ -452,6 +469,7 @@ let cloneRepository
                                                     | Error authError -> return errorResult authError
                                                     | Ok authenticatedGit ->
                                                         let configuredGit = applyCloneSkipSmudge authenticatedGit
+                                                        GitInternals.reportPhase progress "clone" "Cloning repository"
 
                                                         let! authenticatedCloneResult =
                                                             cloneWithGit
@@ -467,6 +485,8 @@ let cloneRepository
                                                 | None ->
                                                     let unauthenticatedGit =
                                                         createGit cloneOptions |> applyCloneSkipSmudge
+
+                                                    GitInternals.reportPhase progress "clone" "Cloning repository"
 
                                                     let! unauthenticatedCloneResult =
                                                         cloneWithGit
