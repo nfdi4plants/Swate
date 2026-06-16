@@ -380,7 +380,8 @@ type FileTree =
                     SetBusy = setIsDialogBusy
                 }
                 request
-            |> Promise.map (function
+            |> Promise.map (
+                function
                 | Error exn -> applyAddNoteError $"Failed to check target: {exn.Message}"
                 | Ok() -> ()
             )
