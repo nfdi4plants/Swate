@@ -513,13 +513,20 @@ type TextInputWithMarkdown =
                                                     "swt:min-w-0"
                                                     if activeMode = PreviewMode.Live then
                                                         "swt:border-b swt:border-base-300 swt:lg:border-b-0 swt:lg:border-r"
+                                                    if height = 560 then
+                                                        "swt:h-full"
+
                                                 ]
                                                 prop.children [
                                                     Html.textarea [
                                                         prop.ref textareaRef
-                                                        prop.className
+                                                        prop.className [
                                                             "swt:w-full swt:border-0 swt:swt:bg-transparent swt:resize-none swt:px-3 swt:py-2 swt:focus:outline-hidden"
-                                                        prop.style [ style.height height ]
+                                                            if height = 560 then
+                                                                "swt:h-full"
+                                                        ]
+                                                        if height = 360 then
+                                                            prop.style [ style.height height ]
                                                         prop.disabled disabled
                                                         prop.readOnly disabled
                                                         prop.value tempValue
