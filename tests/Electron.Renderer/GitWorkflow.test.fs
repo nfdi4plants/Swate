@@ -268,13 +268,11 @@ let private defaultDependencies: GitDependencies = {
     loadMergeConflictPage = fun path -> unexpectedPromise $"loadMergeConflictPage:{path}"
     initGitRepository = fun path -> unexpectedPromise $"initGitRepository:{path}"
     renameOpenArcRoot = fun name -> unexpectedPromise $"renameOpenArcRoot:{name}"
-    createDataHubProject = fun name -> unexpectedPromise $"createDataHubProject:{name}"
     installGitLfs = fun () -> unexpectedPromise "installGitLfs"
     previewGitPull = fun _ -> unexpectedPromise "previewGitPull"
     gitFetch = fun _ -> unexpectedPromise "gitFetch"
     gitPull = fun _ -> unexpectedPromise "gitPull"
     gitPush = fun _ -> unexpectedPromise "gitPush"
-    gitAddRemote = fun _ -> unexpectedPromise "gitAddRemote"
     gitCloneRepository = fun _ -> unexpectedPromise "gitCloneRepository"
     createBranch = fun _ -> unexpectedPromise "createBranch"
     checkoutBranch = fun _ -> unexpectedPromise "checkoutBranch"
@@ -288,6 +286,7 @@ let private defaultDependencies: GitDependencies = {
     gitLfsDedup = fun () -> unexpectedPromise "gitLfsDedup"
     confirmLfsPrune = fun message -> failwith $"Unexpected LFS prune confirmation: {message}"
     confirmInstall = fun message -> failwith $"Unexpected install prompt: {message}"
+    reportError = fun _ -> ()
 }
 
 let private diffPage path : PageState =
@@ -566,6 +565,35 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "RefreshCompleted reports current failures through the Git error modal",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        RefreshRequestId = 2
+                        RefreshState = GitRefreshState.Loading
+                }
+
+                let nextState, cmd =
+                    update deps ignore (RefreshCompleted(2, Error "remote status failed")) state
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "remote status failed")
+                Vitest.expect(reportedErrors.Count).toBe (1)
+                Vitest.expect(reportedErrors[0].Title).toBe ("Could not refresh Git state")
+                Vitest.expect(reportedErrors[0].Message).toBe ("remote status failed")
+            }
+        )
+
+        Vitest.test (
             "RefreshCompleted ignores stale responses without emitting follow-up callback work",
             fun () -> promise {
                 let state = {
@@ -592,6 +620,34 @@ Vitest.describe (
 
                 Vitest.expect(nextState.Status.CurrentBranch).toEqual (Some "feature/live")
                 Vitest.expect(messages).toEqual ([||])
+            }
+        )
+
+        Vitest.test (
+            "RefreshCompleted does not report stale failures through the Git error modal",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc-a"
+                        RefreshRequestId = 2
+                        ErrorNotice = Some "keep current error"
+                }
+
+                let nextState, cmd =
+                    update deps ignore (RefreshCompleted(1, Error "older refresh failed")) state
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(messages).toEqual ([||])
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "keep current error")
+                Vitest.expect(reportedErrors.Count).toBe (0)
             }
         )
 
@@ -882,6 +938,36 @@ Vitest.describe (
     "GitWorkflow write request flow",
     fun () ->
         Vitest.test (
+            "WriteCompleted reports write failures through the Git error modal",
+            fun () -> promise {
+                let reportedErrors = ResizeArray<GitErrorNotification>()
+
+                let deps = {
+                    defaultDependencies with
+                        reportError = reportedErrors.Add
+                }
+
+                let state = {
+                    GitState.Empty with
+                        CurrentArcPath = Some "C:/arc"
+                        ArcSessionId = 3
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                        BusyNotice = Some "Pushing to remote"
+                }
+
+                let nextState, cmd =
+                    update deps ignore (WriteCompleted(3, Push, Error "remote rejected the push")) state
+
+                let! _ = collectMessages cmd
+
+                Vitest.expect(nextState.ErrorNotice).toEqual (Some "remote rejected the push")
+                Vitest.expect(reportedErrors.Count).toBe (1)
+                Vitest.expect(reportedErrors[0].Title).toBe ("Could not push changes")
+                Vitest.expect(reportedErrors[0].Message).toBe ("remote rejected the push")
+            }
+        )
+
+        Vitest.test (
             "SaveDownloadLargeFilesRequested updates local state immediately when no ARC is loaded",
             fun () -> promise {
                 let state = {
@@ -914,8 +1000,7 @@ Vitest.describe (
                         RepositoryAvailability = GitRepositoryAvailability.MissingRepository
                 }
 
-                let requestedState, requestCmd =
-                    update deps ignore (InitRepositoryRequested None) state
+                let requestedState, requestCmd = update deps ignore InitRepositoryRequested state
 
                 let! requestMessages = collectMessages requestCmd
 
@@ -933,143 +1018,6 @@ Vitest.describe (
                 match finishMessages with
                 | [| RefreshRequested |] -> ()
                 | _ -> failwith "Expected init-repository success to trigger RefreshRequested."
-            }
-        )
-
-        Vitest.test (
-            "InitRepositoryRequested can create a DataHub project and add origin before refreshing",
-            fun () -> promise {
-                let mutable addedRemote = None
-
-                let deps = {
-                    defaultDependencies with
-                        initGitRepository = fun path -> promise { return Ok path }
-                        createDataHubProject =
-                            fun projectName -> promise {
-                                return
-                                    Ok {
-                                        id = 42
-                                        name = projectName
-                                        path_with_namespace = $"caroott/{projectName}"
-                                        name_with_namespace = $"caroott / {projectName}"
-                                        description = None
-                                        web_url = $"https://git.nfdi4plants.org/caroott/{projectName}"
-                                        http_url_to_repo = $"https://git.nfdi4plants.org/caroott/{projectName}.git"
-                                        ssh_url_to_repo = None
-                                        avatar_url = None
-                                        visibility = Some "private"
-                                        star_count = 0
-                                        created_at = None
-                                        last_activity_at = None
-                                        tag_list = [||]
-                                        ``namespace`` = {
-                                            id = 1
-                                            name = "caroott"
-                                            kind = "user"
-                                            full_path = "caroott"
-                                        }
-                                    }
-                            }
-                        gitAddRemote =
-                            fun request -> promise {
-                                addedRemote <- Some request
-                                return Ok okOperationResult
-                            }
-                }
-
-                let state = {
-                    GitState.Empty with
-                        CurrentArcPath = Some "C:/arc-a"
-                        RepositoryAvailability = GitRepositoryAvailability.MissingRepository
-                }
-
-                let requestedState, requestCmd =
-                    update deps ignore (InitRepositoryRequested(Some "arc-a")) state
-
-                let! requestMessages = collectMessages requestCmd
-
-                let nextState, finishCmd =
-                    match requestMessages with
-                    | [| InitRepositoryCompleted(sessionId, Ok _) |] when sessionId = state.ArcSessionId ->
-                        update deps ignore requestMessages[0] requestedState
-                    | _ -> failwith "Expected a successful init-and-remote bootstrap completion."
-
-                let! finishMessages = collectMessages finishCmd
-
-                Vitest
-                    .expect(addedRemote)
-                    .toEqual (
-                        Some {
-                            RemoteName = "origin"
-                            RemoteUrl = "https://git.nfdi4plants.org/caroott/arc-a.git"
-                        }
-                    )
-
-                Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.Ready)
-
-                match finishMessages with
-                | [| RefreshRequested |] -> ()
-                | _ -> failwith "Expected remote bootstrap success to trigger RefreshRequested."
-            }
-        )
-
-        Vitest.test (
-            "InitRepositoryRequested recovers to a ready local repository when DataHub bootstrap fails after git init",
-            fun () -> promise {
-                let warningMessage = "DataHub project creation failed."
-
-                let deps = {
-                    defaultDependencies with
-                        initGitRepository = fun path -> promise { return Ok path }
-                        createDataHubProject = fun _ -> promise { return Error warningMessage }
-                        getGitStatus = fun () -> promise { return Ok cleanStatus }
-                        getGitBranches = fun () -> promise { return Ok [| localBranch "main" true true |] }
-                        getGitLfsSettings = fun () -> promise { return Ok(lfsSettings 1 false) }
-                }
-
-                let state = {
-                    GitState.Empty with
-                        CurrentArcPath = Some "C:/arc-a"
-                        RepositoryAvailability = GitRepositoryAvailability.MissingRepository
-                }
-
-                let requestedState, requestCmd =
-                    update deps ignore (InitRepositoryRequested(Some "arc-a")) state
-
-                let! requestMessages = collectMessages requestCmd
-
-                let nextState, finishCmd =
-                    match requestMessages with
-                    | [| (InitRepositoryCompleted _ as message) |] -> update deps ignore message requestedState
-                    | _ -> failwith "Expected init-repository completion."
-
-                let! finishMessages = collectMessages finishCmd
-
-                Vitest.expect(nextState.RepositoryAvailability).toEqual (GitRepositoryAvailability.Ready)
-                Vitest.expect(nextState.BusyOperation).toEqual (None)
-
-                let afterRefreshRequestedState, refreshRequestCmd =
-                    match finishMessages with
-                    | [| RefreshRequested |] -> update deps ignore RefreshRequested nextState
-                    | _ -> failwith "Expected partial init success to trigger RefreshRequested."
-
-                let! refreshMessages = collectMessages refreshRequestCmd
-
-                let finalState, finalCmd =
-                    match refreshMessages with
-                    | [| RefreshCompleted(_, Ok refreshResult) |] ->
-                        update deps ignore refreshMessages[0] afterRefreshRequestedState
-                    | _ -> failwith "Expected queued refresh completion."
-
-                let! finalMessages = collectMessages finalCmd
-
-                Vitest.expect(finalState.RepositoryAvailability).toEqual (GitRepositoryAvailability.Ready)
-                Vitest.expect(finalState.WarningNotice).toEqual (Some warningMessage)
-                Vitest.expect(finalMessages).toEqual ([||])
-
-                match finishMessages with
-                | [| RefreshRequested |] -> ()
-                | _ -> failwith "Expected partial init success to trigger RefreshRequested."
             }
         )
 

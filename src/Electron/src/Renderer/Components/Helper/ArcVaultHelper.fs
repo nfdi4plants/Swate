@@ -5,6 +5,7 @@ open Browser.Dom
 open Fable.Core
 open Swate.Components.PageComponents.SettingsPage
 open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Electron.Shared.IPCTypes
 
 let private tryParseLocalStorageBool (raw: string option) : bool option =
     raw
@@ -62,12 +63,17 @@ let openArcByPath (onError: string -> unit) (arcPath: string) : JS.Promise<bool>
         return true
 }
 
-let createArc (onError: string -> unit) (identifier: string) : JS.Promise<bool> = promise {
-    match! Api.ipcArcVaultApi.createARC identifier with
+let createArc (onError: string -> unit) (identifier: string) (initGit: bool) : JS.Promise<string option> = promise {
+    let request = {
+        identifier = identifier
+        initGit = initGit
+    }
+
+    match! Api.ipcArcVaultApi.createARC request with
     | Error exn ->
         onError exn.Message
-        return false
-    | Ok _ ->
+        return None
+    | Ok path ->
         do! ensureNotesFolderIfEnabled onError
-        return true
+        return Some path
 }

@@ -883,7 +883,14 @@ Vitest.describe (
                             baseStatus.Current
                             |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
 
-                        let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                        let! _ =
+                            context.Git.raw [|
+                                "init"
+                                "--bare"
+                                $"--initial-branch={baseBranch}"
+                                remotePath
+                            |]
+
                         do! configureLocalRemoteRewrite context.Git remotePath
                         let! _ = context.Git.raw [| "remote"; "add"; "origin"; testRemoteUrl |]
                         let! _ = context.Git.raw [| "push"; "-u"; "origin"; baseBranch |]
@@ -934,7 +941,14 @@ Vitest.describe (
                             baseStatus.Current
                             |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
 
-                        let! _ = context.Git.raw [| "init"; "--bare"; remotePath |]
+                        let! _ =
+                            context.Git.raw [|
+                                "init"
+                                "--bare"
+                                $"--initial-branch={baseBranch}"
+                                remotePath
+                            |]
+
                         do! configureLocalRemoteRewrite context.Git remotePath
                         let! _ = context.Git.raw [| "remote"; "add"; "origin"; testRemoteUrl |]
                         let! _ = context.Git.raw [| "push"; "-u"; "origin"; baseBranch |]

@@ -21,6 +21,8 @@ module IPCTypesHelper =
 
 open IPCTypesHelper
 
+type CreateArcRequest = { identifier: string; initGit: bool }
+
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
@@ -28,7 +30,7 @@ type IArcVaultsApi = {
     /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
     openARCByPath: string -> JS.Promise<Result<string, exn>>
     /// Create ARC via folder dialog. Main decides disposition.
-    createARC: string -> JS.Promise<Result<string, exn>>
+    createARC: CreateArcRequest -> JS.Promise<Result<string, exn>>
     /// Ensure ARC notes scaffolding exists for the ARCVault root path.
     ensureNotesFolder: unit -> JS.Promise<Result<unit, exn>>
     closeARC: unit -> JS.Promise<Result<unit, exn>>
@@ -142,6 +144,10 @@ module MainToRendererIpc =
 
     type IGitProgressRendererApi = {
         gitProgressUpdate: GitProgressDto -> unit
+    }
+
+    type IGitRepositoryRendererApi = {
+        gitRepositoryInitialized: string -> unit
     }
 
     type IGitLfsProgressRendererApi = {

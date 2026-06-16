@@ -509,6 +509,14 @@ type ArcOpenDisposition =
     | CreatedInCurrent of path: string
     | CreatedInNewWindow of path: string
 
+    member this.CreatedArcPath =
+        match this with
+        | CreatedInCurrent path
+        | CreatedInNewWindow path -> Some path
+        | OpenedInCurrent _
+        | OpenedInNewWindow _
+        | FocusedExisting _ -> None
+
 module ArcOpenDisposition =
     let path =
         function

@@ -1,5 +1,6 @@
 module Renderer.Components.InitState
 
+open Browser.Dom
 open Feliz
 open Renderer.Components.Helper.ArcVaultHelper
 open Swate.Components
@@ -12,6 +13,8 @@ let CreateNewArcModalContent (close: unit -> unit) =
 
     let isValid, setIsValid = React.useState (true)
     let temp, setTemp = React.useState ("")
+    let initGit, setInitGit = React.useState (true)
+    let isBusy, setIsBusy = React.useState (false)
     let errorModal = useErrorModalCtx ()
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
@@ -20,8 +23,15 @@ let CreateNewArcModalContent (close: unit -> unit) =
 
     let handleSubmit =
         fun () ->
-            if isValid then
-                createArc onCreateArcError temp |> Promise.start
+            if isValid && not isBusy then
+                setIsBusy true
+
+                promise {
+                    let! _ = createArc onCreateArcError temp initGit
+                    ()
+                }
+                |> Promise.catch (fun ex -> console.warn ($"Error during ARC creation: {ex.Message}"))
+                |> Promise.start
 
             close ()
 
@@ -39,6 +49,7 @@ let CreateNewArcModalContent (close: unit -> unit) =
                         Html.input [
                             prop.type'.text
                             prop.required true
+                            prop.disabled isBusy
                             prop.onKeyDown (key.enter, fun _ -> handleSubmit ())
                             prop.onChange (fun (v: string) ->
                                 if System.String.IsNullOrEmpty v then
@@ -60,11 +71,33 @@ let CreateNewArcModalContent (close: unit -> unit) =
                 ]
             ]
         ]
+        Html.fieldSet [
+            prop.className "swt:fieldset swt:mt-4"
+            prop.children [
+                Html.label [
+                    prop.className "swt:label swt:cursor-pointer swt:justify-start swt:gap-2"
+                    prop.children [
+                        Html.input [
+                            prop.type'.checkbox
+                            prop.className "swt:checkbox"
+                            prop.isChecked initGit
+                            prop.onCheckedChange setInitGit
+                            prop.disabled isBusy
+                            prop.testId "CreateNewArcInitGitCheckbox"
+                        ]
+                        Html.span [
+                            prop.className "swt:label-text"
+                            prop.text "Initialize Git Repository"
+                        ]
+                    ]
+                ]
+            ]
+        ]
         Html.button [
             prop.className "swt:btn swt:mt-4"
-            prop.disabled (not isValid)
+            prop.disabled (not isValid || isBusy)
             prop.onClick (fun _ -> handleSubmit ())
-            prop.text "Create new ARC"
+            prop.text (if isBusy then "Creating..." else "Create new ARC")
         ]
     ]
 
