@@ -8,13 +8,8 @@ module ModalContext=
     let start:ModalInfo = {
             isActive = false
             location = (0,0)
-    }
-
-    let defaultModule:DropdownModal = {
-        modalState = start
-        setter = fun _ -> ()
-        }
+            }
             
-    let createModalContext: ReactContext<DropdownModal> = React.createContext(defaultModule) //makes context
+    let createModalContext:Fable.React.IContext<DropdownModal> = React.createContext(name="modal") //makes context
 
 
