@@ -68,7 +68,7 @@ let private WarningList (warnings: string list) =
             ]
         ]
 
-[<ReactComponent>]
+[<ReactComponent(true)>]
 let ProvenanceGroupingTarget () =
     let state, setState = React.useStateWithUpdater LoadState.init
 
