@@ -316,8 +316,15 @@
     <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorerTreeData.fs" />
     <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorerFilter.fs" />
     <Compile Include="Page\ArcObjectExplorer\GraphExplorer\GraphObjectExplorer.fs" />
-    
-
+    <Compile Include="Page\BOAT\BOAT.fs" />
+    <Compile Include="Page\BOAT\Builder.fs"/>
+    <Compile Include="Page\BOAT\Context.fs"/>
+    <Compile Include="Page\BOAT\Contextmenu.fs"/>
+    <Compile Include="Page\BOAT\Controller.fs"/>
+    <Compile Include="Page\BOAT\FileUploader.fs"/>
+    <Compile Include="Page\BOAT\Highlight.fs"/>
+    <Compile Include="Page\BOAT\Mammoth.fs"/>
+    <Compile Include="Page\BOAT\Types.fs"/>
     <Compile Include="Style.fs" />
   </ItemGroup>
 
