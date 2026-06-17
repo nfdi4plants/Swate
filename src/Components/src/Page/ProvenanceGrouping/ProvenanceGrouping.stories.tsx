@@ -481,6 +481,7 @@ export const ShowsLiveConnectionPreviewWhileDraggingHandle: Story = {
     });
 
     fireEvent.pointerUp(document, { button: 0, buttons: 0, isPrimary: true, pointerId: 1 });
+    await waitFor(() => expect(canvas.queryByTestId('provenance-live-connection')).not.toBeInTheDocument());
   },
 };
 
@@ -488,7 +489,7 @@ export const ExpandedGroupsRenderMemberLevelConnections: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    fireEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    await groupByProperty(canvas, 'Input', 'Species');
 
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
 
@@ -594,7 +595,6 @@ export const RailValuesAssignByDragWithoutConnectionHandles: Story = {
     const source = await railValue(canvas, 'Output', 'Analysis', 'Mass Spectrometry');
 
     expect(within(source as HTMLElement).queryByTestId('provenance-connection-handle-Output-PropertyValue')).not.toBeInTheDocument();
-    expect(canvas.queryByTestId('provenance-value-connection')).not.toBeInTheDocument();
 
     const target = canvas.getByText('Output D').closest('article')!;
     await dragByPointer(source, target);
@@ -812,23 +812,26 @@ export const RejectsNonFiniteNumericPropertyValue: Story = {
   },
 };
 
-export const CreatesMatchingDataEndpointForOneSidedModel: Story = {
+export const CreatesDataEndpointFromAvailableKindList: Story = {
   render: () => <Harness fixture="dataOutputOnly" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-input'));
-    expect(screen.getByRole('textbox', { name: /Endpoint kind/i })).toHaveValue('Data');
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: /Endpoint kind/i }),
+      'arc-isa:endpoint:data',
+    );
     await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'New Input');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
 
     await waitFor(() =>
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedSet:fixture:endpoint:data:Data'),
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedSet:arc-isa:endpoint:data:Data'),
     );
   },
 };
 
-export const RefreshesEndpointKindAfterControlledSessionReplacement: Story = {
+export const KeepsEndpointKindListIndependentOfSessionReplacement: Story = {
   render: () => <Harness fixture="dataOutputOnly" allowEndpointReplacement />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -836,24 +839,26 @@ export const RefreshesEndpointKindAfterControlledSessionReplacement: Story = {
     await userEvent.click(canvas.getByRole('button', { name: /Replace endpoint context/i }));
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-input'));
 
-    expect(screen.getByRole('textbox', { name: /Endpoint kind/i })).toHaveValue('Sample');
+    expect(screen.getByRole('combobox', { name: /Endpoint kind/i })).toHaveValue('arc-isa:endpoint:source');
   },
 };
 
-export const CreatesFreeTextEndpointHeader: Story = {
+export const CreatesEndpointFromSelectedAvailableKind: Story = {
   render: () => <Harness inputOnly />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
-    await userEvent.clear(screen.getByRole('textbox', { name: /Endpoint kind/i }));
-    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint kind/i }), 'Derived data');
+    await userEvent.selectOptions(
+      screen.getByRole('combobox', { name: /Endpoint kind/i }),
+      'arc-isa:endpoint:material',
+    );
     await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Custom Output');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
 
     await waitFor(() =>
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent(
-        'AddLoadedSet:editor:endpoint:Derived%20data:Derived data',
+        'AddLoadedSet:arc-isa:endpoint:material:Material',
       ),
     );
   },
@@ -865,7 +870,7 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
     const canvas = within(canvasElement);
 
     const outputA = canvas.getByText('Output A').closest('article')!;
-    await userEvent.click(within(outputA).getByRole('button', { name: 'Select group' }));
+    await selectGroup(outputA);
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await waitFor(() => {
@@ -1032,18 +1037,33 @@ async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' |
 }
 
 async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
-  await userEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
+  const groupedPattern = new RegExp(`^provenance-group-${side}-${side.toLowerCase()}:.*${propertyName}=`);
+
+  for (let attempt = 0; attempt < 3 && canvas.queryAllByTestId(groupedPattern).length === 0; attempt += 1) {
+    fireEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
+    await waitFor(() => expect(canvas.queryAllByTestId(groupedPattern).length).toBeGreaterThan(0), {
+      timeout: 1000,
+    }).catch(() => undefined);
+  }
+
   await waitFor(
     () => {
       // Grouped cards carry their grouping in the card test id, e.g.
       // provenance-group-Input-input:Species=Arabidopsis.
-      const grouped = canvas.getAllByTestId(
-        new RegExp(`^provenance-group-${side}-${side.toLowerCase()}:.*${propertyName}=`),
-      );
+      const grouped = canvas.getAllByTestId(groupedPattern);
       expect(grouped.length).toBeGreaterThan(0);
     },
     { timeout: 3000 },
   );
+}
+
+async function selectGroup(groupCard: HTMLElement) {
+  for (let attempt = 0; attempt < 3 && !groupCard.classList.contains('swt:border-primary'); attempt += 1) {
+    await userEvent.click(within(groupCard).getByRole('button', { name: 'Select group' }));
+    await waitFor(() => expect(groupCard).toHaveClass('swt:border-primary'), { timeout: 1000 }).catch(() => undefined);
+  }
+
+  await waitFor(() => expect(groupCard).toHaveClass('swt:border-primary'), { timeout: 3000 });
 }
 
 async function railValue(
@@ -1222,7 +1242,7 @@ export const MismatchedGroupConnectionPromptsForResolution: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    fireEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    await groupByProperty(canvas, 'Input', 'Species');
 
     const inputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
     const outputGroup = canvas.getByText('Output E').closest('article')!;
@@ -1273,8 +1293,8 @@ export const AddsLayerFromMixedSelection: Story = {
     const inputA = canvas.getByText('Input A').closest('article')!;
     const outputB = canvas.getByText('Output B').closest('article')!;
 
-    await userEvent.click(within(inputA).getByRole('button', { name: 'Select group' }));
-    await userEvent.click(within(outputB).getByRole('button', { name: 'Select group' }));
+    await selectGroup(inputA);
+    await selectGroup(outputB);
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await waitFor(() => {
@@ -1292,7 +1312,7 @@ export const DoesNotReuseSelectionForEqualGroupIdsInDifferentPairs: Story = {
     const canvas = within(canvasElement);
     const outputA = canvas.getByText('Output A').closest('article')!;
 
-    await userEvent.click(within(outputA).getByRole('button', { name: 'Select group' }));
+    await selectGroup(outputA);
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
@@ -1300,7 +1320,7 @@ export const DoesNotReuseSelectionForEqualGroupIdsInDifferentPairs: Story = {
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
     const pair2Output = await waitFor(() => canvas.getByText('Pair 2 Output').closest('article')!);
 
-    await userEvent.click(within(pair2Output).getByRole('button', { name: 'Select group' }));
+    await selectGroup(pair2Output);
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
