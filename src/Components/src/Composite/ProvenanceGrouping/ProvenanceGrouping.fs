@@ -619,7 +619,8 @@ module private EditorSurface =
         (pair: ProvenanceLayerPair)
         model
         (groups: DisplayGroup list)
-        endpointKind
+        endpointKinds
+        existingEndpointNames
         createSet
         uiState
         isExpanded
@@ -645,6 +646,14 @@ module private EditorSurface =
                 | ProvenanceSide.Output -> "swt:items-end"
             ]
             prop.children [
+                Controls.AddEndpointPopover(
+                    side,
+                    endpointKinds,
+                    existingEndpointNames,
+                    createSet,
+                    debug = debug,
+                    key = $"{pair.Id}:{keyPrefix}:{(endpointKinds |> List.map Endpoints.endpointKindIdentity |> String.concat "|")}"
+                )
                 for group in groups do
                     GroupCard.Main(
                         side,
@@ -665,13 +674,6 @@ module private EditorSurface =
                         prop.text "No entries in this layer"
                     ]
 
-                    Controls.AddEndpointPopover(
-                        side,
-                        endpointKind,
-                        createSet,
-                        debug = debug,
-                        key = $"{pair.Id}:{keyPrefix}:{Endpoints.endpointKindIdentity endpointKind}"
-                    )
             ]
         ]
 
@@ -732,17 +734,13 @@ type ProvenanceGrouping =
         activePairId.current <- pair.Id
         let panelRatios = State.PanelLayout.get pair.Id uiState
 
-        let inputEndpointKind =
-            React.useMemo(
-                (fun () -> Endpoints.defaultEndpointKind ProvenanceSide.Input pair.Model),
-                [| box pair.Model.OutputSets |]
-            )
+        let endpointKinds = Endpoints.endpointKindOptions ()
 
-        let outputEndpointKind =
-            React.useMemo(
-                (fun () -> Endpoints.defaultEndpointKind ProvenanceSide.Output pair.Model),
-                [| box pair.Model.InputSets |]
-            )
+        let existingEndpointNames =
+            [
+                yield! inputGroups |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
+                yield! outputGroups |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
+            ]
 
         let lookups = EditorLookups.create pair uiState inputGroups outputGroups
 
@@ -1011,10 +1009,10 @@ type ProvenanceGrouping =
             connectionCounts |> Map.tryFind (side, groupId) |> Option.defaultValue 0
 
         let groupColumnFor side withConnectionBadges =
-            let groups, endpointKind =
+            let groups =
                 match side with
-                | ProvenanceSide.Input -> inputGroups, inputEndpointKind
-                | ProvenanceSide.Output -> outputGroups, outputEndpointKind
+                | ProvenanceSide.Input -> inputGroups
+                | ProvenanceSide.Output -> outputGroups
 
             let counts groupId =
                 if withConnectionBadges then
@@ -1027,7 +1025,8 @@ type ProvenanceGrouping =
                 pair
                 pair.Model
                 groups
-                endpointKind
+                endpointKinds
+                existingEndpointNames
                 createSet
                 uiState
                 isGroupExpanded

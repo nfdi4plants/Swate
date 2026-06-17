@@ -98,22 +98,6 @@ module private KindNames =
 
     let editorProperty = ProvenanceKind.create "editor:property" "Property"
 
-    let private normalized (label: string) = label.Trim()
-
-    let endpointFromLabel (label: string) =
-        let trimmed = normalized label
-
-        if System.String.IsNullOrWhiteSpace trimmed then
-            ProvenanceKind.create "editor:endpoint" "Endpoint"
-        else
-            ProvenanceKind.create $"editor:endpoint:{System.Uri.EscapeDataString trimmed}" trimmed
-
-    let endpointFromDefaultOrLabel (defaultKind: ProvenanceKind) (label: string) =
-        if normalized label = normalized (ProvenanceKind.displayName defaultKind) then
-            defaultKind
-        else
-            endpointFromLabel label
-
 [<Erase; Mangle(false)>]
 type Controls =
 
@@ -336,7 +320,7 @@ type Controls =
                         "swt:btn-outline"
                     if canSwitch then
                         yield! Styles.draggableButtonClasses draggable.isDragging
-                        
+
                 ]
                 prop.custom ("data-provenance-resize-node", "true")
                 if defaultArg debug false then
@@ -357,14 +341,12 @@ type Controls =
                 prop.className [
                     "swt:btn swt:btn-xs swt:btn-square swt:z-10 swt:btn-outline"
 
-                    match side with 
+                    match side with
                     | ProvenanceSide.Input -> " swt:rounded-r-none swt:border-r-0"
                     | ProvenanceSide.Output -> "swt:rounded-l-none swt:border-l-0"
                     match density with
-                    | Density.EditorDensity.Compact ->
-                        "swt:min-h-6 swt:py-0.5"
-                    | _ ->
-                        "swt:min-h-8 swt:py-1"
+                    | Density.EditorDensity.Compact -> "swt:min-h-6 swt:py-0.5"
+                    | _ -> "swt:min-h-8 swt:py-1"
                 ]
                 if defaultArg debug false then
                     prop.testId $"provenance-property-expand-{side}-{header.Category.Name}"
@@ -457,7 +439,7 @@ type Controls =
                     | ProvenanceSide.Input ->
                         swapButton
                         bothButton
-                        
+
                     | ProvenanceSide.Output ->
                         bothButton
                         swapButton
@@ -900,7 +882,7 @@ type Controls =
 
         let wasDragging = React.useRef false
 
-        React.useEffect(
+        React.useEffect (
             (fun () ->
                 if drag.isDragging <> wasDragging.current then
                     wasDragging.current <- drag.isDragging
@@ -997,7 +979,8 @@ type Controls =
     static member AddEndpointPopover
         (
             side: ProvenanceSide,
-            defaultKind: ProvenanceKind,
+            endpointKinds: ProvenanceKind list,
+            existingEndpointNames: string list,
             onCreate: CreateLoadedSetCommand -> unit,
             ?debug: bool,
             ?key: string
@@ -1005,18 +988,49 @@ type Controls =
         let sideName = SideLabels.sideName side
         let name, setName = React.useState ""
 
-        let endpointLabel, setEndpointLabel =
-            React.useState (ProvenanceKind.displayName defaultKind)
+        let availableKinds =
+            if endpointKinds.IsEmpty then
+                [ Endpoints.fallbackKind ]
+            else
+                endpointKinds
+
+        let selectedKindId, setSelectedKindId = React.useState (availableKinds.Head.Id)
+
+        let selectedKind =
+            availableKinds
+            |> List.tryFind (fun kind -> kind.Id = selectedKindId)
+            |> Option.defaultValue availableKinds.Head
+
+        let trimmedName = name.Trim()
+
+        let duplicateName =
+            existingEndpointNames
+            |> List.exists (fun existing ->
+                String.Equals(existing.Trim(), trimmedName, StringComparison.OrdinalIgnoreCase)
+            )
+
+        let nameError =
+            if String.IsNullOrWhiteSpace trimmedName then
+                Some "Enter an endpoint name."
+            elif duplicateName then
+                Some "This endpoint already exists in the current layer."
+            else
+                None
 
         Popover.Simple(
             trigger =
                 Html.button [
                     prop.type'.button
-                    prop.className "swt:btn swt:btn-outline swt:btn-sm"
+                    prop.className Styles.addPropertyValueButtonClasses
                     if defaultArg debug false then
                         prop.testId $"provenance-add-{sideName}-trigger"
                     prop.ariaLabel $"Add {sideName}"
-                    prop.text $"Add {sideName}"
+                    prop.children [
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--add-20-regular swt:size-5 swt:shrink-0"
+                        ]
+                        Html.span [ prop.text $"Add {sideName}" ]
+                    ]
                 ],
             content =
                 Html.form [
@@ -1024,33 +1038,51 @@ type Controls =
                     prop.onSubmit (fun event ->
                         event.preventDefault ()
 
-                        onCreate {
-                            Side = side
-                            Header =
-                                endpointLabel
-                                |> KindNames.endpointFromDefaultOrLabel defaultKind
-                                |> Endpoints.endpointHeader side
-                            Name = name
-                        }
+                        if nameError.IsNone then
+                            onCreate {
+                                Side = side
+                                Header = selectedKind |> Endpoints.endpointHeader side
+                                Name = trimmedName
+                            }
                     )
                     prop.children [
                         Html.label [ prop.className "swt:label"; prop.text "Endpoint name" ]
                         Html.input [
                             prop.ariaLabel "Endpoint name"
-                            prop.className "swt:input swt:input-bordered swt:input-sm"
+                            prop.className [
+                                "swt:input swt:input-bordered swt:input-sm"
+                                if nameError.IsSome then
+                                    "swt:input-error"
+                            ]
+                            prop.required true
                             prop.value name
                             prop.onChange setName
                         ]
+                        match nameError with
+                        | Some error ->
+                            Html.p [
+                                prop.className "swt:text-xs swt:text-error"
+                                prop.text error
+                            ]
+                        | None -> Html.none
                         Html.label [ prop.className "swt:label"; prop.text "Endpoint kind" ]
-                        Html.input [
+                        Html.select [
                             prop.ariaLabel "Endpoint kind"
-                            prop.className "swt:input swt:input-bordered swt:input-sm"
-                            prop.value endpointLabel
-                            prop.onChange setEndpointLabel
+                            prop.className "swt:select swt:select-bordered swt:select-sm"
+                            prop.value selectedKind.Id
+                            prop.onChange setSelectedKindId
+                            prop.children [
+                                for kind in availableKinds do
+                                    Html.option [
+                                        prop.value kind.Id
+                                        prop.text (ProvenanceKind.displayName kind)
+                                    ]
+                            ]
                         ]
                         Html.button [
                             prop.type'.submit
                             prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                            prop.disabled nameError.IsSome
                             if defaultArg debug false then
                                 prop.testId $"provenance-create-{sideName}"
                             prop.text "Create endpoint"
