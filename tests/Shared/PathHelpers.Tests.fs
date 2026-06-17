@@ -155,6 +155,18 @@ let tests =
                 (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/.gitattributes")
                 ".gitattributes should remain non-deletable."
 
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/dataset")
+                "Structural dataset folders should remain non-deletable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/Protocols")
+                "Structural protocol folders should remain non-deletable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/dataset/raw.bin")
+                "Files below structural dataset folders should remain deletable."
+
         testCase "buildFallbackUnlinkPaths maps entity folder to canonical files"
         <| fun _ ->
             let fallbackPaths = ArcEntityPathRules.buildFallbackUnlinkPaths "runs/MyRun"
@@ -211,6 +223,18 @@ let tests =
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
                 "Safe generic descendants should be renameable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/dataset")
+                "Structural dataset folders should not be renameable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isRenamePathAllowed "assays/MyAssay/protocols")
+                "Structural protocol folders should not be renameable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/dataset/raw.tsv")
+                "Files below structural dataset folders should remain renameable."
 
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md")

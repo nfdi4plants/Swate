@@ -65,6 +65,16 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "tryBuildRenameDraft rejects protected structural entity child folders",
+            fun () ->
+                let item = createFolderItem "dataset" "assays/AssayA/dataset"
+
+                match tryBuildRenameDraft item with
+                | Ok _ -> failwith "Expected structural dataset folders to be non-renameable."
+                | Error _ -> ()
+        )
+
+        Vitest.test (
             "tryRemapSelectionPath remaps descendants under renamed source prefixes",
             fun () ->
                 let remapped =
@@ -190,6 +200,23 @@ Vitest.describe (
                 addZoneRootPaths
                 |> List.iter (fun path ->
                     let item = createFolderItem path path
+                    expectRenameMenuVisibility 0 item
+                )
+        )
+
+        Vitest.test (
+            "rename context menu item is hidden for protected structural entity child folders",
+            fun () ->
+                let protectedChildFolderPaths = [
+                    "assays/AssayA/dataset"
+                    "studies/StudyA/protocol"
+                    "workflows/WorkflowA/protocols"
+                    "runs/RunA/Dataset"
+                ]
+
+                protectedChildFolderPaths
+                |> List.iter (fun path ->
+                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
                     expectRenameMenuVisibility 0 item
                 )
         )

@@ -45,6 +45,9 @@ Vitest.describe (
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/dataset").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/protocols").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/dataset/raw.txt").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "test.fsx").toBe (true)
@@ -55,6 +58,7 @@ Vitest.describe (
             fun () ->
                 let allowedTargets = [
                     "assays/AssayA/protocols/protocol.md"
+                    "assays/AssayA/dataset/raw.txt"
                     "studies/StudyA/resources"
                     "workflows/WorkflowA/scripts/workflow.cwl"
                     "runs/RunA/data.txt"
@@ -71,6 +75,9 @@ Vitest.describe (
                     ""
                     "assays"
                     "assays/AssayA"
+                    "assays/AssayA/dataset"
+                    "assays/AssayA/protocol"
+                    "assays/AssayA/protocols"
                     "assays/AssayA/isa.assay.xlsx"
                     "assays/AssayA/isa.datamap.xlsx"
                     "assays/AssayA/.gitattributes"
@@ -84,6 +91,16 @@ Vitest.describe (
                 |> List.iter (fun path ->
                     Vitest.expect(ArcEntityPathRules.isGenericFileSystemTargetAllowed path).toBe (false)
                 )
+        )
+
+        Vitest.test (
+            "protected entity child folders can still be used as generic filesystem parents",
+            fun () ->
+                Vitest.expect(ArcEntityPathRules.isGenericFileSystemParentAllowed "assays/AssayA/dataset").toBe (true)
+
+                Vitest
+                    .expect(ArcEntityPathRules.isGenericFileSystemParentAllowed "studies/StudyA/protocols")
+                    .toBe (true)
         )
 
         Vitest.test (

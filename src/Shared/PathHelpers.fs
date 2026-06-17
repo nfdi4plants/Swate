@@ -148,8 +148,15 @@ module ArcEntityPathRules =
         | CanonicalDataMapFileTarget of zone: AddZone * identifier: string * normalizedRelativePath: string
         | GenericTarget of normalizedRelativePath: string
 
+    type private StructuralArcPath =
+        | AddZoneRoot
+        | EntityFolder
+        | ProtectedEntityChildFolder
+        | OtherPath
+
     let private protectedDeleteTargetNames = [ ".gitattributes"; ".gitkeep"; "readme.md" ]
     let private protectedRenameRootFolderNames = [ "notes" ]
+    let private protectedEntityChildFolderNames = [ "dataset"; "protocol"; "protocols" ]
     let private disallowedGenericPathSegments = [ ".git" ]
 
     let private normalizeRelativePath (path: string) =
@@ -184,6 +191,21 @@ module ArcEntityPathRules =
         else
             None
 
+    let private classifyStructuralArcPath (segments: string[]) =
+        match segments with
+        | [| zoneSegment |] when (tryParseZone zoneSegment).IsSome -> StructuralArcPath.AddZoneRoot
+        | [| zoneSegment; _ |] when (tryParseZone zoneSegment).IsSome -> StructuralArcPath.EntityFolder
+        | [| zoneSegment; _; childFolderName |] ->
+            let isProtectedEntityChildFolder =
+                (tryParseZone zoneSegment).IsSome
+                && PathHelpers.pathMatchesAny protectedEntityChildFolderNames childFolderName
+
+            if isProtectedEntityChildFolder then
+                StructuralArcPath.ProtectedEntityChildFolder
+            else
+                StructuralArcPath.OtherPath
+        | _ -> StructuralArcPath.OtherPath
+
     let private tryParseCanonicalArcFileTargetFromSegments (segments: string[]) =
         if segments.Length = 0 then
             None
@@ -214,10 +236,7 @@ module ArcEntityPathRules =
 
     let private containsDisallowedGenericPathSegment (segments: string[]) =
         segments
-        |> Array.exists (fun segment ->
-            disallowedGenericPathSegments
-            |> List.exists (fun blocked -> PathHelpers.pathsEqual segment blocked)
-        )
+        |> Array.exists (PathHelpers.pathMatchesAny disallowedGenericPathSegments)
 
     /// Parses canonical ARC file targets from the tail of a path and supports absolute paths.
     let tryParseCanonicalArcFileTarget (path: string) =
@@ -228,14 +247,17 @@ module ArcEntityPathRules =
 
     let classifyDeleteTarget (relativePath: string) =
         let normalizedRelativePath = normalizeRelativePath relativePath
+        let segments = normalizedRelativePath |> splitPathSegments
+        let structuralPath = classifyStructuralArcPath segments
 
         if String.IsNullOrWhiteSpace normalizedRelativePath then
             DeletePathClassification.DisallowedTarget normalizedRelativePath
-        elif PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath then
+        elif
+            PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+            || structuralPath = StructuralArcPath.ProtectedEntityChildFolder
+        then
             DeletePathClassification.ProtectedTarget normalizedRelativePath
         else
-            let segments = normalizedRelativePath |> splitPathSegments
-
             match segments with
             | [| singleSegment |] ->
                 match tryParseZone singleSegment with
@@ -283,21 +305,22 @@ module ArcEntityPathRules =
 
     let isGenericFileSystemTargetAllowed (relativePath: string) =
         let normalizedRelativePath = normalizeRelativePath relativePath
+        let segments = normalizedRelativePath |> splitPathSegments
+        let structuralPath = classifyStructuralArcPath segments
 
         if
             String.IsNullOrWhiteSpace normalizedRelativePath
             || PathHelpers.containsPathTraversalSegments normalizedRelativePath
             || PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+            || structuralPath = StructuralArcPath.ProtectedEntityChildFolder
         then
             false
         else
-            let segments = normalizedRelativePath |> splitPathSegments
-
             segments.Length >= 1
             && (segments |> containsDisallowedGenericPathSegment |> not)
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
-            && (segments.Length <> 1 || (tryParseZone segments.[0]).IsNone)
-            && (segments.Length <> 2 || (tryParseZone segments.[0]).IsNone)
+            && structuralPath <> StructuralArcPath.AddZoneRoot
+            && structuralPath <> StructuralArcPath.EntityFolder
 
     let tryNormalizeGenericFileSystemTarget (errorMessage: string) (relativePath: string) : Result<string, string> =
         let normalizedRelativePath = normalizeRelativePath relativePath
@@ -352,10 +375,14 @@ module ArcEntityPathRules =
             RenamePathClassification.RootTarget
         else
             let segments = normalizedRelativePath |> splitPathSegments
+            let structuralPath = classifyStructuralArcPath segments
 
             if PathHelpers.containsPathTraversalSegments normalizedRelativePath then
                 RenamePathClassification.DisallowedTarget normalizedRelativePath
-            elif PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath then
+            elif
+                PathHelpers.isProtectedDeleteTarget protectedDeleteTargetNames normalizedRelativePath
+                || structuralPath = StructuralArcPath.ProtectedEntityChildFolder
+            then
                 RenamePathClassification.ProtectedTarget normalizedRelativePath
             else
                 match segments with
@@ -403,13 +430,11 @@ module ArcEntityPathRules =
             false
         else
             let segments = normalizedRelativePath |> splitPathSegments
+            let structuralPath = classifyStructuralArcPath segments
 
-            let isArcEntityFolder = segments.Length = 2 && (tryParseZone segments.[0]).IsSome
-
-            let isSafeGenericDirectoryCandidate =
-                isGenericFileSystemTargetAllowed normalizedRelativePath
-
-            (isArcEntityFolder || isSafeGenericDirectoryCandidate)
+            (structuralPath = StructuralArcPath.EntityFolder
+             || isGenericFileSystemTargetAllowed normalizedRelativePath
+             || structuralPath = StructuralArcPath.ProtectedEntityChildFolder)
             && (segments |> containsDisallowedGenericPathSegment |> not)
             && (PathHelpers.getFileName normalizedRelativePath |> isCanonicalArcFileName |> not)
 
