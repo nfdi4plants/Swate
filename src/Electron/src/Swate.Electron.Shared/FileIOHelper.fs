@@ -17,14 +17,18 @@ let getPathDepth (path: string) =
 let pathsEqual (left: string) (right: string) =
     PathHelpers.normalizePath left = PathHelpers.normalizePath right
 
-let isRootFolderForDatedTargetPath
-    (createTargetPath: DateTime -> string option)
-    (dateCreated: DateTime)
+let isRootFolderPath (rootFolderName: string) (candidateRelativePath: string) =
+    match getNonEmptyPathParts candidateRelativePath with
+    | [| candidateRoot |] -> pathsEqual rootFolderName candidateRoot
+    | _ -> false
+
+let isRootFolderForTargetPath
+    (createTargetPath: 'Target -> string option)
+    (target: 'Target)
     (candidateRelativePath: string)
     =
     match
-        createTargetPath dateCreated.Date
-        |> Option.bind (getNonEmptyPathParts >> Array.tryHead),
+        createTargetPath target |> Option.bind (getNonEmptyPathParts >> Array.tryHead),
         getNonEmptyPathParts candidateRelativePath
     with
     | Some targetRoot, [| candidateRoot |] -> pathsEqual targetRoot candidateRoot
@@ -188,43 +192,45 @@ let rec collapseSingleChildSameName (node: FileTreeNode) : FileTreeNode =
     else
         nodeWithCollapsedChildren
 
-let tryGetExistingNotesTargetRef (path: string) : ExistingTargetRef option =
+let private tryGetExistingArcEntityTargetMatch
+    (targetSources: seq<string * string * (string -> 'Target)>)
+    (path: string)
+    =
     match getNonEmptyPathParts path with
-    | [| "studies"; name; fileName |] when
-        PathHelpers.isSafePathSegment name
-        && PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.StudyFileName
-        ->
-        Some {
-            Name = name
-            Kind = NotesTargetKind.Study
-        }
-    | [| "assays"; name; fileName |] when
-        PathHelpers.isSafePathSegment name
-        && PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.AssayFileName
-        ->
-        Some {
-            Name = name
-            Kind = NotesTargetKind.Assay
-        }
+    | [| folderName; name; fileName |] when PathHelpers.isSafePathSegment name ->
+        let targetName = name.Trim()
+
+        targetSources
+        |> Seq.indexed
+        |> Seq.tryPick (fun (sortOrder, (targetFolderName, targetFileName, createTarget)) ->
+            if
+                PathHelpers.pathsEqual folderName targetFolderName
+                && PathHelpers.pathsEqual fileName targetFileName
+            then
+                Some(createTarget targetName, targetName, sortOrder)
+            else
+                None
+        )
     | _ -> None
 
-let createAvailableNotesTargets (fileEntries: seq<FileEntry>) =
+let tryGetExistingArcEntityTargetRef (targetSources: seq<string * string * (string -> 'Target)>) (path: string) =
+    tryGetExistingArcEntityTargetMatch targetSources path
+    |> Option.map (fun (target, _, _) -> target)
+
+let createAvailableArcEntityTargets
+    (targetSources: seq<string * string * (string -> 'Target)>)
+    (fileEntries: seq<FileEntry>)
+    =
     fileEntries
     |> Seq.choose (fun entry ->
         if entry.isDirectory then
             None
         else
-            tryGetExistingNotesTargetRef entry.path
+            tryGetExistingArcEntityTargetMatch targetSources entry.path
     )
-    |> Seq.distinctBy (fun target -> target.Kind, target.Name)
-    |> Seq.sortBy (fun target ->
-        let kindOrder =
-            match target.Kind with
-            | NotesTargetKind.Study -> 0
-            | NotesTargetKind.Assay -> 1
-
-        kindOrder, target.Name.ToLowerInvariant()
-    )
+    |> Seq.distinctBy (fun (target, _, _) -> target)
+    |> Seq.sortBy (fun (_, name, sortOrder) -> sortOrder, name.ToLowerInvariant())
+    |> Seq.map (fun (target, _, _) -> target)
     |> ResizeArray
 
 let combineMany = ARCtrl.ArcPathHelper.combineMany

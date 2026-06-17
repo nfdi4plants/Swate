@@ -29,7 +29,7 @@ type Notes =
             | Some NotesTargetKind.Assay -> "Create in Assay"
             | None -> "Create in Existing Target"
 
-        let setIsOpen isOpen =
+        let setClose isOpen =
             if not isOpen then
                 close ()
 
@@ -59,7 +59,7 @@ type Notes =
 
         BaseModal.Modal(
             isOpen = isOpen,
-            setIsOpen = setIsOpen,
+            setIsOpen = setClose,
             header = Html.text "Existing Target",
             children =
                 React.Fragment [

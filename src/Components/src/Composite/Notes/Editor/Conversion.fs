@@ -163,7 +163,8 @@ module NoteConversion =
 
     let formatMarkdown (draft: NotesDraft) =
         let title =
-            Validation.toOptionalString draft.Title |> Option.defaultValue "Untitled"
+            Validation.toOptionalString draft.Title
+            |> Option.defaultWith (fun () -> invalidArg (nameof draft) "Note title is required.")
 
         let dateCreated = (draft.DateCreated |> Option.defaultValue DateTime.Today).Date
 

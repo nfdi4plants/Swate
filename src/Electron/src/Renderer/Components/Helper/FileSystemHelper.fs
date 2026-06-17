@@ -13,9 +13,8 @@ let private isAlreadyExistsError (error: exn) =
 
 let checkTargetAvailability (pathExists: string -> JS.Promise<Result<bool, exn>>) (targetPath: string) = promise {
     let normalizedTargetPath = PathHelpers.normalizePath targetPath
-    let! existsResult = pathExists normalizedTargetPath
 
-    match existsResult with
+    match! pathExists normalizedTargetPath with
     | Ok true -> return Ok TargetAvailability.Exists
     | Ok false -> return Ok TargetAvailability.Empty
     | Error error -> return Error error
@@ -27,14 +26,13 @@ let ensureChildFolder
     (folderName: string)
     =
     promise {
-        let! createResult =
+        match!
             createFileSystemItem {
                 parentPath = parentPath
                 name = folderName
                 kind = FileSystemItemKind.Folder
             }
-
-        match createResult with
+        with
         | Ok _ -> return Ok()
         | Error error when isAlreadyExistsError error -> return Ok()
         | Error error -> return Error error
@@ -57,8 +55,7 @@ let writeFileWithEnsuredChildFolder
     (createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>)
     (tryGetParentPath: string -> string option)
     (folderName: string)
-    (request: FileContentDTO)
-    =
+    (request: FileContentDTO) =
     promise {
         match! writeFile request with
         | Error error -> return Error error

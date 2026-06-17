@@ -151,6 +151,10 @@ let tests =
                 (ArcEntityPathRules.isDeletePathAllowed "workflows/MyWorkflow/readme.md")
                 "Protected files should remain non-deletable."
 
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/.gitattributes")
+                ".gitattributes should remain non-deletable."
+
         testCase "buildFallbackUnlinkPaths maps entity folder to canonical files"
         <| fun _ ->
             let fallbackPaths = ArcEntityPathRules.buildFallbackUnlinkPaths "runs/MyRun"

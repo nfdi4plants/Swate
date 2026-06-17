@@ -148,7 +148,7 @@ module ArcEntityPathRules =
         | CanonicalDataMapFileTarget of zone: AddZone * identifier: string * normalizedRelativePath: string
         | GenericTarget of normalizedRelativePath: string
 
-    let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
+    let private protectedDeleteTargetNames = [ ".gitattributes"; ".gitkeep"; "readme.md" ]
     let private protectedRenameRootFolderNames = [ "notes" ]
     let private disallowedGenericPathSegments = [ ".git" ]
 

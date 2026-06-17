@@ -23,7 +23,28 @@ let NotesDraftTarget () =
 
     let availableNotesTargets =
         React.useMemo (
-            (fun _ -> createAvailableNotesTargets fileStateCtx.state.FileTree),
+            (fun _ ->
+                createAvailableArcEntityTargets
+                    [
+                        (
+                            ARCtrl.ArcPathHelper.StudiesFolderName,
+                            ARCtrl.ArcPathHelper.StudyFileName,
+                            fun name -> {
+                                Name = name
+                                Kind = NotesTargetKind.Study
+                            }
+                        )
+                        (
+                            ARCtrl.ArcPathHelper.AssaysFolderName,
+                            ARCtrl.ArcPathHelper.AssayFileName,
+                            fun name -> {
+                                Name = name
+                                Kind = NotesTargetKind.Assay
+                            }
+                        )
+                    ]
+                    fileStateCtx.state.FileTree
+            ),
             [| box fileStateCtx.state.FileTree |]
         )
 

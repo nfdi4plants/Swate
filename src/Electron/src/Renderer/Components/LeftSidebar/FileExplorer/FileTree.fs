@@ -2,10 +2,8 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
 open Renderer.Components.Helper
-open Renderer.Components.Helper.FileSystemHelper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
-open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
@@ -28,7 +26,6 @@ module private FileTreeHelper =
         | FileSystemCreateDialog of FileSystemCreateDraft
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
-        | NoteOverwriteDialog of FileContentDTO
 
     let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
         match FileContentDTO.fromArcFile arcFile with
@@ -264,9 +261,6 @@ type FileTree =
         let applyCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
 
-        let applyAddNoteError errorMessage =
-            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not add note"))
-
         let applyFileSystemCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create file or folder"))
 
@@ -280,18 +274,13 @@ type FileTree =
             | Error errorMessage -> return Error errorMessage
         }
 
-        let (activeCreateKind,
-             activeFileSystemCreateDraft,
-             activeRenameDraft,
-             activeDeleteItem,
-             activeNoteOverwriteRequest) =
+        let (activeCreateKind, activeFileSystemCreateDraft, activeRenameDraft, activeDeleteItem) =
             match activeDialog with
-            | Some(CreateDialog kind) -> Some kind, None, None, None, None
-            | Some(FileSystemCreateDialog draft) -> None, Some draft, None, None, None
-            | Some(RenameDialog renameDraft) -> None, None, Some renameDraft, None, None
-            | Some(DeleteDialog item) -> None, None, None, Some item, None
-            | Some(NoteOverwriteDialog request) -> None, None, None, None, Some request
-            | None -> None, None, None, None, None
+            | Some(CreateDialog kind) -> Some kind, None, None, None
+            | Some(FileSystemCreateDialog draft) -> None, Some draft, None, None
+            | Some(RenameDialog renameDraft) -> None, None, Some renameDraft, None
+            | Some(DeleteDialog item) -> None, None, None, Some item
+            | None -> None, None, None, None
 
         let confirmDeleteItem () =
             if not isDialogBusy then
@@ -333,68 +322,6 @@ type FileTree =
                         applyCreateError exn.Message
                     )
                     |> Promise.start
-
-        let writeRootNoteRequest (request: FileContentDTO) closeOnSuccess = promise {
-            let selectedPath = PathHelpers.normalizePath request.path
-
-            setIsDialogBusy true
-
-            let! writeResult =
-                writeFileWithEnsuredChildFolder
-                    Api.ipcArcVaultApi.writeFile
-                    Api.ipcArcVaultApi.createFileSystemItem
-                    NoteConversion.tryGetNoteFolderRelativePath
-                    NoteConversion.noteAssetsFolderName
-                    request
-
-            match writeResult with
-            | Error exn -> applyAddNoteError exn.Message
-            | Ok() ->
-                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                match! reloadPreviewByPath selectedPath with
-                | Ok() -> ()
-                | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
-
-                if closeOnSuccess then
-                    closeDialog ()
-
-            setIsDialogBusy false
-        }
-
-        let startWriteRootNoteRequest request closeOnSuccess =
-            writeRootNoteRequest request closeOnSuccess
-            |> Promise.catch (fun exn ->
-                applyAddNoteError exn.Message
-                setIsDialogBusy false
-            )
-            |> Promise.start
-
-        let addFileTarget (request: FileContentDTO) =
-            FileTreeFileTargetWorkflow.addFileTarget
-                {
-                    IsBusy = isDialogBusy
-                    PathExists = Api.ipcArcVaultApi.pathExists
-                    WriteTarget = fun request -> writeRootNoteRequest request false
-                    RequestOverwrite = NoteOverwriteDialog >> openDialog
-                    SetBusy = setIsDialogBusy
-                }
-                request
-            |> Promise.map (
-                function
-                | Error exn -> applyAddNoteError $"Failed to check target: {exn.Message}"
-                | Ok() -> ()
-            )
-            |> Promise.catch (fun exn ->
-                applyAddNoteError exn.Message
-                setIsDialogBusy false
-            )
-            |> Promise.start
-
-        let confirmOverwriteRootNote () =
-            if not isDialogBusy then
-                activeNoteOverwriteRequest
-                |> Option.iter (fun request -> startWriteRootNoteRequest request true)
 
         let createFileSystemItem (name: string) =
             if not isDialogBusy then
@@ -445,11 +372,7 @@ type FileTree =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
         let itemActions item = [
-            yield!
-                rootNoteActionContextMenuItems
-                    System.DateTime.Today
-                    (fun _ -> createUntitledRootNoteRequest System.DateTime.Today |> addFileTarget)
-                    item
+            yield! rootNoteActionContextMenuItems (fun () -> openCreateModal ArcExplorerNodeKind.Note) item
             yield! renameContextMenuItems item
         ]
 
@@ -560,15 +483,6 @@ type FileTree =
                 isRenaming = isDialogBusy
             )
 
-        let noteOverwriteModal =
-            FileTargetConflictModal.Main(
-                isOpen = activeNoteOverwriteRequest.IsSome,
-                targetPath = (activeNoteOverwriteRequest |> Option.map _.path),
-                close = closeDialog,
-                overwrite = confirmOverwriteRootNote,
-                isBusy = isDialogBusy
-            )
-
         match fileItem with
         | Some rootItem ->
             let visibleItems = rootItem.Children |> Option.defaultValue []
@@ -600,7 +514,6 @@ type FileTree =
                 fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
-                noteOverwriteModal
             ]
         | None ->
             React.Fragment [
@@ -609,5 +522,4 @@ type FileTree =
                 fileSystemCreateModal
                 renameModal
                 deleteConfirmModal
-                noteOverwriteModal
             ]

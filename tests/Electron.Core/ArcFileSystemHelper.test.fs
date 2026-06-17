@@ -224,22 +224,22 @@ Vitest.describe (
             "moves generic note folders with nested assets and requires overwrite for conflicts",
             fun () ->
                 withAssayArc (fun arcPath -> promise {
-                    let sourceFolder = "notes/2026-06-15/untitled-note"
+                    let sourceFolder = "notes/2026-06-15/Field_observations"
                     let targetFolder = "assays/AssayA/protocols/Sampling_protocol"
 
                     do! createRelativeDirectoryAsync arcPath $"{sourceFolder}/assets"
-                    do! writeRelativeFileAsync arcPath $"{sourceFolder}/untitled-note.md" "source"
+                    do! writeRelativeFileAsync arcPath $"{sourceFolder}/Field_observations.md" "source"
                     do! writeRelativeFileAsync arcPath $"{sourceFolder}/assets/image.txt" "asset"
 
                     do! moveItemOrFail arcPath (moveRequest sourceFolder targetFolder false)
 
                     do! expectRelativePathExists arcPath sourceFolder false
-                    do! expectRelativePathExists arcPath $"{targetFolder}/untitled-note.md" true
+                    do! expectRelativePathExists arcPath $"{targetFolder}/Field_observations.md" true
                     do! expectRelativePathExists arcPath $"{targetFolder}/assets/image.txt" true
 
-                    let secondSourceFolder = "notes/2026-06-16/untitled-note"
+                    let secondSourceFolder = "notes/2026-06-16/Field_observations"
                     do! createRelativeDirectoryAsync arcPath secondSourceFolder
-                    do! writeRelativeFileAsync arcPath $"{secondSourceFolder}/untitled-note.md" "replacement"
+                    do! writeRelativeFileAsync arcPath $"{secondSourceFolder}/Field_observations.md" "replacement"
 
                     match!
                         ArcFileSystemHelper.moveGenericFileSystemItemOnDisk
@@ -251,7 +251,7 @@ Vitest.describe (
 
                     do! moveItemOrFail arcPath (moveRequest secondSourceFolder targetFolder true)
                     do! expectRelativePathExists arcPath secondSourceFolder false
-                    do! expectRelativePathExists arcPath $"{targetFolder}/untitled-note.md" true
+                    do! expectRelativePathExists arcPath $"{targetFolder}/Field_observations.md" true
                 })
         )
 

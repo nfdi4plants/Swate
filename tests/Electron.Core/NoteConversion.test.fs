@@ -104,6 +104,26 @@ Body
         )
 
         Vitest.test (
+            "formatMarkdown rejects drafts without titles",
+            fun () ->
+                let draft = {
+                    NotesDraft.init with
+                        Title = "   "
+                        DateCreated = Some(DateTime(2026, 4, 27))
+                }
+
+                let mutable didThrow = false
+
+                try
+                    NoteConversion.formatMarkdown draft |> ignore
+                with ex ->
+                    didThrow <- true
+                    Vitest.expect(ex.Message.Contains("Note title is required.")).toBe (true)
+
+                Vitest.expect(didThrow).toBe (true)
+        )
+
+        Vitest.test (
             "note path helpers use dated note folders and protocol folders",
             fun () ->
                 let studyTarget: ExistingTargetRef = {
