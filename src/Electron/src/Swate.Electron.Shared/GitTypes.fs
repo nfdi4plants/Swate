@@ -112,6 +112,7 @@ type GitProgressDto = {
     Progress: float option
     Processed: float option
     Total: float option
+    Output: string option
 }
 
 type GitRemoteOperationRequest = {

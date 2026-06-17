@@ -751,6 +751,70 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "fetch reports raw git output through the progress callback",
+            gitServiceIntegrationTestOptions,
+            fun () -> promise {
+                do!
+                    withTempRepository (fun context -> promise {
+                        let remotePath = join [| context.RootPath; "origin.git" |]
+                        let clonePath = join [| context.RootPath; "incoming" |]
+                        let repoFilePath = join [| context.RepoPath; "fetch-output.txt" |]
+                        let progressEvents = ResizeArray<GitProgressDto>()
+
+                        do! writeUtf8FileAsync repoFilePath "base\n"
+                        let! stageBase = GitService.stagePaths context.RepoPath [| "fetch-output.txt" |]
+                        expectOk "stage fetch-output base" stageBase |> ignore
+
+                        let! commitBase = GitService.commit context.RepoPath "test: fetch output base"
+                        expectOk "commit fetch-output base" commitBase |> ignore
+
+                        let! baseStatus =
+                            unwrapResultAsync
+                                (GitService.getStatus context.RepoPath)
+                                (expectOk "git status after fetch-output base commit")
+
+                        let baseBranch =
+                            baseStatus.Current
+                            |> Option.defaultWith (fun () -> failwith "Expected current branch after base commit.")
+
+                        let! _ =
+                            context.Git.raw [|
+                                "init"
+                                "--bare"
+                                $"--initial-branch={baseBranch}"
+                                remotePath
+                            |]
+
+                        do! configureLocalRemoteRewrite context.Git remotePath
+                        let! _ = context.Git.raw [| "remote"; "add"; "origin"; testRemoteUrl |]
+                        let! _ = context.Git.raw [| "push"; "-u"; "origin"; baseBranch |]
+
+                        let! _ = context.Git.raw [| "clone"; remotePath; clonePath |]
+                        let cloneGit = createSimpleGit clonePath
+                        do! configureRepositoryAsync cloneGit
+
+                        let cloneFilePath = join [| clonePath; "fetch-output.txt" |]
+                        do! writeUtf8FileAsync cloneFilePath "remote update\n"
+                        let! _ = cloneGit.raw [| "add"; "fetch-output.txt" |]
+                        let! _ = cloneGit.raw [| "commit"; "-m"; "test: remote fetch output" |]
+                        let! _ = cloneGit.raw [| "push"; "origin"; baseBranch |]
+
+                        do!
+                            withTestTokenProvider (fun () -> promise {
+                                let! fetchResult =
+                                    GitService.fetch context.RepoPath None None (Some progressEvents.Add)
+
+                                expectOk "fetch with progress output" fetchResult |> ignore
+                            })
+
+                        let rawOutput = progressEvents |> Seq.choose _.Output |> String.concat ""
+
+                        Vitest.expect(String.IsNullOrWhiteSpace rawOutput).toBe (false)
+                    })
+            }
+        )
+
+        Vitest.test (
             "push publishes a local repository by creating origin from the active DataHub account",
             gitServiceIntegrationTestOptions,
             fun () -> promise {
