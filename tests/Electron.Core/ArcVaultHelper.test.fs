@@ -156,6 +156,46 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "ARC vault save preserves note markdown files",
+            fun () ->
+                TestHelpers.withTempArcWith
+                    "swate-save-notes-"
+                    "NotesPreservingArc"
+                    ignore
+                    (fun arcPath -> promise {
+                        let rootNotesFolder = join [| arcPath; "notes"; "2026-04-27"; "root_note" |]
+                        let studyNotesFolder = join [| arcPath; "notes"; "2026-04-27"; "study_note" |]
+                        let rootNotePath = join [| rootNotesFolder; "root_note.md" |]
+                        let studyNotePath = join [| studyNotesFolder; "study_note.md" |]
+
+                        let rootNoteContent = "---\ntitle: Root note\n---\n\nRoot note body."
+                        let studyNoteContent = "---\ntitle: Study note\n---\n\nStudy note body."
+
+                        do! mkdirRecursiveAsync rootNotesFolder
+                        do! mkdirRecursiveAsync studyNotesFolder
+                        do! writeTextFileAsync rootNotePath rootNoteContent
+                        do! writeTextFileAsync studyNotePath studyNoteContent
+
+                        let vault = ArcVault(TestHelpers.testWindow ())
+                        vault.path <- Some arcPath
+                        do! vault.LoadArc()
+
+                        vault.arc.Value.Title <- Some "Saved title"
+                        vault.arc.Value.StaticHash <- 0
+
+                        match! vault.WriteArc() with
+                        | Error error -> failwith error.Message
+                        | Ok() -> ()
+
+                        let! rootNoteAfterSave = readFileAsync rootNotePath TextEncoding.Utf8
+                        let! studyNoteAfterSave = readFileAsync studyNotePath TextEncoding.Utf8
+
+                        Vitest.expect(rootNoteAfterSave).toBe (rootNoteContent)
+                        Vitest.expect(studyNoteAfterSave).toBe (studyNoteContent)
+                    })
+        )
+
+        Vitest.test (
             "ARC loading and writing ignore Git metadata and preserve payload",
             fun () ->
                 TestHelpers.withTempArcWith

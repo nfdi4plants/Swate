@@ -11,6 +11,7 @@ type ErrorModalActionsContext = {
     enqueueMany: ErrorModalRequest list -> unit
     enqueueBatch: ErrorModalBatch -> unit
     report: string -> unit
+    dismissById: string -> unit
 } with
 
     static member Empty = {
@@ -18,6 +19,7 @@ type ErrorModalActionsContext = {
         enqueueMany = ignore
         enqueueBatch = ignore
         report = ignore
+        dismissById = ignore
     }
 
 type ErrorModalHostContext = {

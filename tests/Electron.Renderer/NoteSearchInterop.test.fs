@@ -117,7 +117,7 @@ Vitest.describe (
             "round-trips note DTO metadata and ontology tags",
             fun () ->
                 let note: Note = {
-                    RelativePath = "notes/27_04_2026/test-note.md"
+                    RelativePath = "notes/2026-04-27/test-note/test-note.md"
                     Title = "Test note"
                     Date = DateTime(2026, 4, 27)
                     Tags =

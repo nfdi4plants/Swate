@@ -111,6 +111,10 @@ module PathHelpers =
         |> getFileName
         |> pathMatchesAny protectedDeleteTargetNames
 
+    let pathExistsInSnapshot (existingPaths: string seq) (targetPath: string) =
+        existingPaths
+        |> Seq.exists (fun existingPath -> pathsEqual existingPath targetPath)
+
 [<RequireQualifiedAccess>]
 module ArcEntityPathRules =
 
@@ -144,7 +148,8 @@ module ArcEntityPathRules =
         | CanonicalDataMapFileTarget of zone: AddZone * identifier: string * normalizedRelativePath: string
         | GenericTarget of normalizedRelativePath: string
 
-    let private protectedDeleteTargetNames = [ ".gitkeep"; "readme.md" ]
+    let private protectedDeleteTargetNames = [ ".gitattributes"; ".gitkeep"; "readme.md" ]
+    let private protectedRenameRootFolderNames = [ "notes" ]
     let private disallowedGenericPathSegments = [ ".git" ]
 
     let private normalizeRelativePath (path: string) =
@@ -294,6 +299,14 @@ module ArcEntityPathRules =
             && (segments.Length <> 1 || (tryParseZone segments.[0]).IsNone)
             && (segments.Length <> 2 || (tryParseZone segments.[0]).IsNone)
 
+    let tryNormalizeGenericFileSystemTarget (errorMessage: string) (relativePath: string) : Result<string, string> =
+        let normalizedRelativePath = normalizeRelativePath relativePath
+
+        if isGenericFileSystemTargetAllowed normalizedRelativePath then
+            Ok normalizedRelativePath
+        else
+            Error errorMessage
+
     let isDeletePathAllowed (relativePath: string) =
         match classifyDeleteTarget relativePath with
         | DeletePathClassification.CanonicalFileTarget(CanonicalArcFileTarget.EntityFile _, _)
@@ -347,11 +360,14 @@ module ArcEntityPathRules =
             else
                 match segments with
                 | [| singleSegment |] ->
-                    match tryParseZone singleSegment with
-                    | Some zone -> RenamePathClassification.AddZoneRootTarget(zone, normalizedRelativePath)
-                    | None when PathHelpers.pathsEqual singleSegment ARCtrl.ArcPathHelper.InvestigationFileName ->
-                        RenamePathClassification.InvestigationFileTarget normalizedRelativePath
-                    | None -> RenamePathClassification.GenericTarget normalizedRelativePath
+                    if PathHelpers.pathMatchesAny protectedRenameRootFolderNames singleSegment then
+                        RenamePathClassification.ProtectedTarget normalizedRelativePath
+                    else
+                        match tryParseZone singleSegment with
+                        | Some zone -> RenamePathClassification.AddZoneRootTarget(zone, normalizedRelativePath)
+                        | None when PathHelpers.pathsEqual singleSegment ARCtrl.ArcPathHelper.InvestigationFileName ->
+                            RenamePathClassification.InvestigationFileTarget normalizedRelativePath
+                        | None -> RenamePathClassification.GenericTarget normalizedRelativePath
                 | [| zoneSegment; identifier |] ->
                     match tryParseZone zoneSegment with
                     | Some zone -> RenamePathClassification.EntityFolderTarget(zone, identifier, normalizedRelativePath)

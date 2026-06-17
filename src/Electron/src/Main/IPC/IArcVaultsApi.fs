@@ -384,6 +384,17 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    pathExists =
+        fun (relativePath: string) ->
+            runLoadedArcPathAction
+                event
+                (fun arcPath -> promise {
+                    match tryResolveArcRelativePath arcPath relativePath with
+                    | Error pathError -> return Error pathError
+                    | Ok absolutePath ->
+                        let! exists = pathExistsAsync absolutePath
+                        return Ok exists
+                })
     readNotes =
         fun () -> promise {
             try
@@ -560,6 +571,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
+                        })
+            with e ->
+                return Error e
+        }
+    movePath =
+        fun (request: MovePathRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
                         })
             with e ->
                 return Error e

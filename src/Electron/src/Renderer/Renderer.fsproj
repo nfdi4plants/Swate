@@ -20,12 +20,15 @@
     <Compile Include="Components\Helper\ArcViewHelper.fs" />
     <Compile Include="Components\Helper\GitLfsHelper.fs" />
     <Compile Include="Components\Helper\ArcVaultHelper.fs" />
+    <Compile Include="Components\Helper\FileSystemHelper.fs" />
+    <Compile Include="Components\Helper\FileTargetConflictModal.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Types.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeMaterialization.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Helper.fs" />
+    <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeFileTargetWorkflow.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeRenameHelper.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\FileTreeContextMenu.fs" />
     <Compile Include="Components\LeftSidebar\FileExplorer\Modals\CreateArcFileModal.fs" />

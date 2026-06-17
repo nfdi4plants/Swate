@@ -4,8 +4,8 @@ open Feliz
 open Swate.Components.Composite.MarkdownText
 open Swate.Components.Composite.MarkdownText.Types
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 
 [<ReactComponent(true)>]
 let MarkdownEditorTarget (content: string) =
@@ -29,6 +29,10 @@ let MarkdownEditorTarget (content: string) =
         [| box content |]
     )
 
+    let writeMarkdown path =
+        FileContentDTO.create FileContentType.Markdown markdown path
+        |> Api.ipcArcVaultApi.writeFile
+
     let saveMarkdown () =
         match selectedPath with
         | None -> setSaveError (Some "No markdown file is selected.")
@@ -37,10 +41,7 @@ let MarkdownEditorTarget (content: string) =
                 setIsSaving true
                 setSaveError None
 
-                let request: FileContentDTO =
-                    FileContentDTO.create FileContentType.Markdown markdown relativePath
-
-                let! writeResult = Api.ipcArcVaultApi.writeFile request
+                let! writeResult = writeMarkdown relativePath
 
                 match writeResult with
                 | Ok() -> setLastSavedContent markdown
@@ -86,7 +87,7 @@ let MarkdownEditorTarget (content: string) =
                 prop.children [
                     TextInputWithMarkdown.TextInputWithMarkdown(
                         markdown,
-                        (fun value -> setMarkdown value),
+                        setMarkdown,
                         placeholder = "Write markdown...",
                         mode = PreviewMode.Live,
                         height = 560

@@ -45,6 +45,8 @@ Vitest.describe (
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "test.fsx").toBe (true)
         )
 
@@ -71,6 +73,7 @@ Vitest.describe (
                     "assays/AssayA"
                     "assays/AssayA/isa.assay.xlsx"
                     "assays/AssayA/isa.datamap.xlsx"
+                    "assays/AssayA/.gitattributes"
                     "assays/AssayA/readme.md"
                     "assays/AssayA/.git/config"
                     "../assays/AssayA/custom.txt"
@@ -101,6 +104,7 @@ Vitest.describe (
                     "runs"
                     "isa.investigation.xlsx"
                     ".git"
+                    ".gitattributes"
                     ".gitkeep"
                     "readme.md"
                     "../escape"

@@ -151,6 +151,10 @@ let tests =
                 (ArcEntityPathRules.isDeletePathAllowed "workflows/MyWorkflow/readme.md")
                 "Protected files should remain non-deletable."
 
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/.gitattributes")
+                ".gitattributes should remain non-deletable."
+
         testCase "buildFallbackUnlinkPaths maps entity folder to canonical files"
         <| fun _ ->
             let fallbackPaths = ArcEntityPathRules.buildFallbackUnlinkPaths "runs/MyRun"
@@ -194,6 +198,8 @@ let tests =
 
             Expect.isFalse (ArcEntityPathRules.isRenamePathAllowed "studies") "Add-zone roots must stay protected."
 
+            Expect.isFalse (ArcEntityPathRules.isRenamePathAllowed "notes") "Root notes folder must stay protected."
+
             Expect.isFalse
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/isa.study.xlsx")
                 "Canonical ARC files should not be renameable."
@@ -205,6 +211,10 @@ let tests =
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
                 "Safe generic descendants should be renameable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md")
+                "Nested note files should remain renameable."
 
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "test.fsx")

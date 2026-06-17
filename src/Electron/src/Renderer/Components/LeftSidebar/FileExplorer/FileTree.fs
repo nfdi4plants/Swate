@@ -1,6 +1,7 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
+open Renderer.Components.Helper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
@@ -272,7 +273,7 @@ type FileTree =
             | Error errorMessage -> return Error errorMessage
         }
 
-        let activeCreateKind, activeFileSystemCreateDraft, activeRenameDraft, activeDeleteItem =
+        let (activeCreateKind, activeFileSystemCreateDraft, activeRenameDraft, activeDeleteItem) =
             match activeDialog with
             | Some(CreateDialog kind) -> Some kind, None, None, None
             | Some(FileSystemCreateDialog draft) -> None, Some draft, None, None
@@ -368,6 +369,17 @@ type FileTree =
 
         let renameContextMenuItems =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
+
+        let itemActions item = [
+            yield!
+                rootFolderContextMenuItems
+                    "notes"
+                    "Create new item in"
+                    "swt:fluent--note-add-24-regular"
+                    (fun () -> openCreateModal ArcExplorerNodeKind.Note)
+                    item
+            yield! renameContextMenuItems item
+        ]
 
         let contextMenuConfig: FileTreeContextMenu.ContextMenuConfig = {
             openItem = openPreview
@@ -492,7 +504,7 @@ type FileTree =
                             getItemIconClass = getItemIconClass,
                             canCreateItem = canCreateFromItem,
                             onCreateItem = createFromItem,
-                            getItemActions = renameContextMenuItems,
+                            getItemActions = itemActions,
                             getItemStatusAction = getItemStatusAction,
                             canDeleteItem = canDeleteItem,
                             onDeleteItem = requestDeleteItem,

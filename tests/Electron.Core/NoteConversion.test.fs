@@ -3,6 +3,7 @@ module ElectronCore.NoteConversionTests
 open System
 open ARCtrl
 open Swate.Components.Composite.Notes.Editor
+open Swate.Components.Shared
 open Vitest
 
 let private mkTag name source accession =
@@ -100,5 +101,51 @@ Body
                     |> expectSome "Expected YAML frontmatter to decode."
 
                 Vitest.expect(frontmatter.Tags.IsNone).toBe (true)
+        )
+
+        Vitest.test (
+            "formatMarkdown rejects drafts without titles",
+            fun () ->
+                let draft = {
+                    NotesDraft.init with
+                        Title = "   "
+                        DateCreated = Some(DateTime(2026, 4, 27))
+                }
+
+                let mutable didThrow = false
+
+                try
+                    NoteConversion.formatMarkdown draft |> ignore
+                with ex ->
+                    didThrow <- true
+                    Vitest.expect(ex.Message.Contains("Note title is required.")).toBe (true)
+
+                Vitest.expect(didThrow).toBe (true)
+        )
+
+        Vitest.test (
+            "note path helpers use dated note folders and protocol folders",
+            fun () ->
+                let studyTarget: ExistingTargetRef = {
+                    Kind = NotesTargetKind.Study
+                    Name = "StudyA"
+                }
+
+                let assayTarget: ExistingTargetRef = {
+                    Kind = NotesTargetKind.Assay
+                    Name = "AssayA"
+                }
+
+                Vitest
+                    .expect(NoteConversion.mkExistingTargetRelativePath studyTarget "Sampling_protocol")
+                    .toEqual (Some "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
+
+                Vitest
+                    .expect(NoteConversion.mkExistingTargetRelativePath assayTarget "Extraction_protocol")
+                    .toEqual (Some "assays/AssayA/protocols/Extraction_protocol/Extraction_protocol.md")
+
+                Vitest
+                    .expect(NoteConversion.mkNewRootNoteRelativePath (DateTime(2026, 6, 15)) "Sampling_protocol")
+                    .toEqual (Some "notes/2026-06-15/Sampling_protocol/Sampling_protocol.md")
         )
 )

@@ -13,9 +13,3 @@ module State =
     }
 
     let stopSubmitting (state: NotesUiState) = { state with IsSubmitting = false }
-
-    let toggleExistingTargetSelector (state: NotesUiState) = {
-        state with
-            ShowExistingTargetSelector = not state.ShowExistingTargetSelector
-            Error = None
-    }
