@@ -7,6 +7,8 @@ open Feliz.UseElmish
 
 open Renderer.Types
 open Swate.Components.Page.GitSidebarTypes
+open Swate.Components.Primitive.ErrorModal.Context
+open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.IPCTypes
 
@@ -15,7 +17,7 @@ open Renderer.Context.GitWorkflow
 type GitStateController = {
     state: GitState
     refresh: unit -> unit
-    initRepository: string option -> unit
+    initRepository: unit -> unit
     fetch: unit -> unit
     pull: unit -> unit
     push: unit -> unit
@@ -28,6 +30,8 @@ type GitStateController = {
     discardSelection: string[] -> unit
     confirmPendingRemoteAction: unit -> unit
     cancelPendingRemoteAction: unit -> unit
+    submitPublishRename: string -> unit
+    cancelPublishRename: unit -> unit
     saveLfsAutoTrackThreshold: int -> unit
     saveDownloadLargeFiles: bool -> unit
     createBranch: GitSidebarCreateBranchRequest -> unit
@@ -52,7 +56,7 @@ module private Helper =
         | Ok(GitPageLoadResultDto.Unsupported unsupportedPage) -> Ok(PageState.GitUnsupportedPage unsupportedPage)
         | Error message -> Error message
 
-    let dependencies: GitDependencies = {
+    let dependencies (reportError: GitErrorNotification -> unit) : GitDependencies = {
         getGitStatus = Renderer.GitApiClient.getGitStatus
         getGitBranches = Renderer.GitApiClient.getGitBranches
         getOriginRemoteRepositoryWebUrl = Renderer.GitApiClient.getOriginRepositoryWebUrl
@@ -68,17 +72,16 @@ module private Helper =
                 return mapMergeConflictPageResult requestedPath result
             }
         initGitRepository = Renderer.GitApiClient.gitInitRepository
-        createDataHubProject =
-            fun projectName -> promise {
-                let! result = Api.ipcGitLabApi.createProject projectName
-                return result |> Result.mapError _.GitLabErrorToString
+        renameOpenArcRoot =
+            fun newName -> promise {
+                let! result = Api.ipcArcVaultApi.renameOpenArcRoot newName
+                return result |> Result.mapError _.Message
             }
         installGitLfs = Renderer.GitApiClient.installGitLfs
         previewGitPull = Renderer.GitApiClient.previewGitPull
         gitFetch = Renderer.GitApiClient.gitFetch
         gitPull = Renderer.GitApiClient.gitPull
         gitPush = Renderer.GitApiClient.gitPush
-        gitAddRemote = Renderer.GitApiClient.gitAddRemote
         gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
         createBranch = Renderer.GitApiClient.createBranch
         checkoutBranch = Renderer.GitApiClient.checkoutBranch
@@ -92,6 +95,7 @@ module private Helper =
         confirmGitMergeResolution = Renderer.GitApiClient.confirmGitMergeResolution
         confirmLfsPrune = fun message -> window.confirm message
         confirmInstall = fun message -> window.confirm message
+        reportError = reportError
     }
 
 let GitStateCtx =
@@ -99,7 +103,7 @@ let GitStateCtx =
         {
             state = GitState.Empty
             refresh = fun () -> ()
-            initRepository = fun _ -> ()
+            initRepository = fun () -> ()
             fetch = fun () -> ()
             pull = fun () -> ()
             push = fun () -> ()
@@ -112,6 +116,8 @@ let GitStateCtx =
             discardSelection = fun _ -> ()
             confirmPendingRemoteAction = fun () -> ()
             cancelPendingRemoteAction = fun () -> ()
+            submitPublishRename = fun _ -> ()
+            cancelPublishRename = fun () -> ()
             saveLfsAutoTrackThreshold = fun _ -> ()
             saveDownloadLargeFiles = fun _ -> ()
             createBranch = fun _ -> ()
@@ -131,14 +137,29 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
+    let errorModalCtx = useErrorModalCtx ()
+    let errorModalCtxRef = React.useRef errorModalCtx
+    errorModalCtxRef.current <- errorModalCtx
+
+    let reportGitError =
+        React.useCallback (
+            (fun (notification: GitErrorNotification) ->
+                errorModalCtxRef.current.enqueue (
+                    ErrorModalRequest.create (notification.Message, title = notification.Title)
+                )
+            ),
+            [||]
+        )
+
+    let dependencies =
+        React.useMemo ((fun _ -> Helper.dependencies reportGitError), [||])
 
     let gitState, dispatch =
-        React.useElmish ((fun () -> init ()), update Helper.dependencies pageStateCtx.setState, subscribe, [||])
+        React.useElmish ((fun () -> init ()), update dependencies pageStateCtx.setState, subscribe, [||])
 
     let refresh () = dispatch RefreshRequested
 
-    let initRepository remoteProjectName =
-        dispatch (InitRepositoryRequested remoteProjectName)
+    let initRepository () = dispatch InitRepositoryRequested
 
     let fetch () = dispatch FetchRequested
 
@@ -170,6 +191,11 @@ let GitStateCtxProvider (children: ReactElement) =
 
     let cancelPendingRemoteAction () =
         dispatch CancelPendingRemoteActionRequested
+
+    let submitPublishRename newName =
+        dispatch (SubmitPublishRenameRequested newName)
+
+    let cancelPublishRename () = dispatch CancelPublishRenameRequested
 
     let saveLfsAutoTrackThreshold (thresholdMb: int) =
         dispatch (SaveLfsAutoTrackThresholdRequested thresholdMb)
@@ -213,6 +239,8 @@ let GitStateCtxProvider (children: ReactElement) =
                 discardSelection = discardSelection
                 confirmPendingRemoteAction = confirmPendingRemoteAction
                 cancelPendingRemoteAction = cancelPendingRemoteAction
+                submitPublishRename = submitPublishRename
+                cancelPublishRename = cancelPublishRename
                 saveLfsAutoTrackThreshold = saveLfsAutoTrackThreshold
                 saveDownloadLargeFiles = saveDownloadLargeFiles
                 createBranch = createBranchFrom

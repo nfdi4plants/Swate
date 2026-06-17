@@ -5,6 +5,7 @@ open System.Collections.Generic
 open Fable.Electron
 open Fable.Electron.Remoting.Main
 open Main
+open Main.ARCtrlExtensions
 open Main.Bindings
 open Main.ArcMerge
 open Main.ArcVaultHelper
@@ -80,7 +81,7 @@ type ArcVault(window: BrowserWindow) =
 
     /// Sets the dirty marker for unsaved in-memory ARC mutations.
     member this.RefreshHasUnsavedArcChangesFlag() =
-        /// Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
+        // Use this value to only send updates to the renderer when the dirty state actually changes. This avoids redundant updates.
         if this.arc.IsSome then
             let hasNewChanges = this.arc.Value.hasInMemoryChanges ()
             let valueIsChanging = this.hasUnsavedArcChanges <> hasNewChanges
@@ -97,7 +98,7 @@ module ArcVaultExtensions =
         member private this.ApplyWatcherArcMerge(events: FileEvent list) = promise {
             match this.path, this.arc with
             | Some arcPath, Some arcLocal ->
-                match! ARC.tryLoadAsync arcPath with
+                match! ARC.LoadAsyncSwate arcPath with
                 | Error loadError ->
                     swatelogfn
                         this.window.id
@@ -231,7 +232,7 @@ module ArcVaultExtensions =
                     this.RefreshHasUnsavedArcChangesFlag()
                     Ok()
 
-        /// Writes the active in-memory ARC scaffold to disk using ARCtrl UpdateAsync.
+        /// Writes the active in-memory ARC scaffold to disk without touching unmanaged files such as notes.
         member this.WriteArc() : Fable.Core.JS.Promise<Result<unit, exn>> = promise {
             match this.path, this.arc with
             | Some arcPath, Some arc ->
@@ -239,9 +240,11 @@ module ArcVaultExtensions =
 
                 try
                     try
-                        do! arc.UpdateAsync(arcPath)
-                        this.RefreshHasUnsavedArcChangesFlag()
-                        return Ok()
+                        match! arc.TryUpdateAsyncSwate(arcPath) with
+                        | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
+                        | Ok _ ->
+                            this.RefreshHasUnsavedArcChangesFlag()
+                            return Ok()
                     with e ->
                         return Error(exn $"Failed to persist ARC to disk: {e.Message}")
                 finally
@@ -267,7 +270,7 @@ module ArcVaultExtensions =
                         match! arcLocal.TryAddArcFileAsync(arcPath, arcFile, false) with
                         | Error errors -> return Error(exn (PathHelpers.formatContractErrors errors))
                         | Ok _ ->
-                            match! ARC.tryLoadAsync arcPath with
+                            match! ARC.LoadAsyncSwate arcPath with
                             | Ok persistedArc ->
                                 baselineArcStaticHashes persistedArc
                                 syncAddedArcFileFromPersisted persistedArc arcLocal arcFile
@@ -317,7 +320,7 @@ module ArcVaultExtensions =
 
         member this.LoadArc() = promise {
             if this.path.IsSome then
-                match! tryLoadArcWithZeroByteRepair this.window.id this.path.Value with
+                match! ARC.LoadAsyncSwateZeroByteRepair this.path.Value with
                 | Error e -> swatefailfn this.window.id "Unable to load ARC: %s" (PathHelpers.formatContractErrors e)
                 | Ok arc ->
                     this.SetArc(arc)
@@ -343,16 +346,23 @@ module ArcVaultExtensions =
             else
                 swatefailfn this.window.id "No path set for StartFileWatcher."
 
+        member this.ClearPendingFileWatcherState() =
+            this.fileWatcherReloadArcTimeout |> Option.iter Fable.Core.JS.clearTimeout
+            this.fileWatcherReloadArcTimeout <- None
+            this.fileWatcherPendingEvents.Clear()
+            this.fileWatcherPendingArcMergeEvents.Clear()
+
         member this.StopFileWatcher() = promise {
             match this.watcher with
-            | None -> return ()
+            | None -> ()
             | Some watcher ->
                 try
                     do! watcher.close ()
                 with _ ->
                     ()
 
-                this.watcher <- None
+            this.watcher <- None
+            this.ClearPendingFileWatcherState()
         }
 
         /// This functions should be called once, when an vault is first started with a path
@@ -398,7 +408,12 @@ module ArcVaultExtensions =
                 this.isBusyWriting <- true
 
                 try
-                    do! arc.WriteAsync(normalizedPath)
+                    match! arc.TryWriteAsyncSwate(normalizedPath) with
+                    | Ok _ -> ()
+                    | Error errors ->
+                        failwithf
+                            "Could not write ARC, failed with the following errors %s"
+                            (PathHelpers.formatContractErrors errors)
                 finally
                     this.isBusyWriting <- false
 
@@ -416,6 +431,74 @@ module ArcVaultExtensions =
             | None -> ()
         }
 
+        member this.RenameOpenArcRoot(newName: string) : Fable.Core.JS.Promise<Result<string, exn>> = promise {
+            match this.path with
+            | None -> return Error(exn "ARC is not loaded.")
+            | Some currentPath ->
+                let hadWatcher = this.watcher.IsSome
+
+                if hadWatcher then
+                    do! this.StopFileWatcher()
+                else
+                    this.ClearPendingFileWatcherState()
+
+                let! renameResult = renameOpenArcRootDirectoryOnDisk currentPath newName
+
+                match renameResult with
+                | Error renameError ->
+                    if hadWatcher then
+                        this.StartFileWatcher()
+
+                    return Error renameError
+                | Ok renamedPath ->
+                    this.path <- Some renamedPath
+
+                    if this.arc.IsNone then
+                        try
+                            do! this.LoadArc()
+                        with loadError ->
+                            swatelogfn
+                                this.window.id
+                                "ARC folder was renamed to '%s', but reload failed: %s"
+                                renamedPath
+                                loadError.Message
+
+                    if hadWatcher then
+                        try
+                            this.StartFileWatcher()
+                        with watcherError ->
+                            swatelogfn
+                                this.window.id
+                                "ARC folder was renamed to '%s', but file watcher restart failed: %s"
+                                renamedPath
+                                watcherError.Message
+
+                    try
+                        do! this.RefreshFileTree()
+                    with refreshError ->
+                        swatelogfn
+                            this.window.id
+                            "ARC folder was renamed to '%s', but file tree refresh failed: %s"
+                            renamedPath
+                            refreshError.Message
+
+                    try
+                        let sendMsg =
+                            Remoting.createIpc ()
+                            |> Remoting.withWindow this.window
+                            |> Remoting.buildProxySender<IPathChangeRendererApi>
+
+                        sendMsg.pathChange (Some renamedPath)
+                    with notifyError ->
+                        swatelogfn
+                            this.window.id
+                            "ARC folder was renamed to '%s', but renderer path notification failed: %s"
+                            renamedPath
+                            notifyError.Message
+
+                    return Ok renamedPath
+        }
+
 
 /// Describes the outcome of an ARC lifecycle action performed by the controller.
 [<RequireQualifiedAccess>]
@@ -425,6 +508,14 @@ type ArcOpenDisposition =
     | FocusedExisting of path: string
     | CreatedInCurrent of path: string
     | CreatedInNewWindow of path: string
+
+    member this.CreatedArcPath =
+        match this with
+        | CreatedInCurrent path
+        | CreatedInNewWindow path -> Some path
+        | OpenedInCurrent _
+        | OpenedInNewWindow _
+        | FocusedExisting _ -> None
 
 module ArcOpenDisposition =
     let path =

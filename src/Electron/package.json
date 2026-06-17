@@ -1,7 +1,7 @@
 {
   "name": "swate",
   "productName": "Swate",
-  "version": "2.0.0-alpha.1",
+  "version": "2.0.0-alpha.4",
   "description": "An open-source, cross-platform, and user-friendly software for managing and sharing scientific data.",
   "main": ".vite/build/main.fs.js",
   "config": {
@@ -15,6 +15,8 @@
     "package": "electron-forge package",
     "make": "electron-forge make",
     "publish": "npm run fable && electron-forge publish",
+    "publish:dry-run": "npm run fable && electron-forge publish --dry-run",
+    "publish:from-dry-run": "electron-forge publish --from-dry-run",
     "test:e2e": "playwright test"
   },
   "keywords": [],
@@ -31,13 +33,13 @@
   "devDependencies": {
     "@electron-forge/cli": "^7.10.2",
     "@electron-forge/maker-deb": "^7.10.2",
+    "@electron-forge/maker-dmg": "^7.11.2",
     "@electron-forge/maker-rpm": "^7.10.2",
     "@electron-forge/maker-squirrel": "^7.10.2",
     "@electron-forge/maker-zip": "^7.10.2",
     "@electron-forge/plugin-auto-unpack-natives": "^7.10.2",
     "@electron-forge/plugin-fuses": "^7.10.2",
     "@electron-forge/plugin-vite": "^7.10.2",
-    "@electron-forge/publisher-github": "^7.11.2",
     "@electron/fuses": "^1.8.0",
     "electron": "40.10.2"
   }

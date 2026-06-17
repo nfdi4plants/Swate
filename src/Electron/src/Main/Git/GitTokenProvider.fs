@@ -23,6 +23,26 @@ let setTokenProvider (provider: GitTokenProvider) = activeTokenProvider <- provi
 let tryGetAccessToken (host: string) : JS.Promise<string option> =
     activeTokenProvider.TryGetAccessToken host
 
+module RemoteProvisioning =
+
+    type Provider = {
+        CreateProject: string -> JS.Promise<Result<string, string>>
+    }
+
+    let defaultProvider: Provider = {
+        CreateProject =
+            fun _ -> promise {
+                return Error "No usable DataHub account is signed in. Sign in before publishing this local repository."
+            }
+    }
+
+    let mutable private activeProvider = defaultProvider
+
+    let setProvider (provider: Provider) = activeProvider <- provider
+
+    let createProject (projectName: string) =
+        activeProvider.CreateProject projectName
+
 let private tryExtractHostFromAbsoluteUri (remoteUrl: string) =
     let mutable uri = Unchecked.defaultof<Uri>
 

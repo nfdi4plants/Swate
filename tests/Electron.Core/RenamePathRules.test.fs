@@ -45,6 +45,8 @@ Vitest.describe (
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/15_06_2026/foo.md").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "test.fsx").toBe (true)
         )
 

@@ -132,6 +132,7 @@ module private Authentication =
     let UserAvatar () =
         let isLoading, setIsLoading = React.useState false
         let authStateCtx = Renderer.Context.AuthStateContext.useAuthStateCtx ()
+        let errorModalCtx = useErrorModalCtx ()
 
         let onSignIn (signInInfo: SignInInformation) =
             promise {
@@ -159,7 +160,7 @@ module private Authentication =
             promise {
                 match! Api.ipcAuthApi.signOut () with
                 | Ok _ -> ()
-                | Error _ -> ()
+                | Error ex -> errorModalCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Sign Out Error"))
             }
             |> Promise.start
 
@@ -169,8 +170,12 @@ module private Authentication =
                 | Ok _ ->
                     match! Api.ipcAuthApi.revalidate () with
                     | Ok _ -> ()
-                    | Error _ -> ()
-                | Error _ -> ()
+                    | Error ex ->
+                        errorModalCtx.enqueue (
+                            ErrorModalRequest.create (ex.Message, title = "Error revalidating account")
+                        )
+                | Error ex ->
+                    errorModalCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error switching account"))
             }
             |> Promise.start
 
@@ -178,7 +183,17 @@ module private Authentication =
             promise {
                 match! Api.ipcAuthApi.removeAccount localSwateAccountId with
                 | Ok _ -> ()
-                | Error _ -> ()
+                | Error ex ->
+                    errorModalCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error removing account"))
+            }
+            |> Promise.start
+
+        let onRotateToken (localSwateAccountId: string) =
+            promise {
+                match! Api.ipcAuthApi.rotatePersonalAccessToken localSwateAccountId with
+                | Ok _ -> Browser.Dom.console.log $"Token rotation successful for account {localSwateAccountId}"
+                | Error ex ->
+                    errorModalCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error rotating token"))
             }
             |> Promise.start
 
@@ -188,6 +203,7 @@ module private Authentication =
             onLogout,
             isLoading = isLoading,
             dropdownClassName = "swt:dropdown-bottom swt:dropdown-end",
+            onRotateToken = onRotateToken,
             onSwitchAccount = onSwitchAccount,
             onRemoveAccount = onRemoveAccount
         )
@@ -237,6 +253,7 @@ type Navbar =
     static member private SaveArcButton() =
 
         let errorCtx = useErrorModalCtx ()
+        let isSaving, setIsSaving = React.useState false
 
         let hasUnsavedChanges =
             Renderer.MainSyncedState.useMainSyncedState {
@@ -260,21 +277,27 @@ type Navbar =
                 dependencies = [||]
             }
 
-        let onSaveArc =
-            fun _ ->
-                promise {
-                    if not hasUnsavedChanges.state then
-                        return ()
+        let onSaveArc _ =
+            if hasUnsavedChanges.state && not isSaving then
+                setIsSaving true
 
-                    match! Api.ipcArcVaultApi.saveArcFile () with
-                    | Ok _ -> ()
-                    | Error ex -> errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
+                promise {
+                    try
+                        match! Api.ipcArcVaultApi.saveArcFile () with
+                        | Ok _ -> ()
+                        | Error ex ->
+                            errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
+                    finally
+                        setIsSaving false
                 }
+                |> Promise.catch (fun ex ->
+                    errorCtx.enqueue (ErrorModalRequest.create (ex.Message, title = "Error saving ARC"))
+                )
                 |> Promise.start
 
         Html.button [
             prop.type'.button
-            prop.disabled (not hasUnsavedChanges.state)
+            prop.disabled (isSaving || not hasUnsavedChanges.state)
             prop.className "swt:btn swt:btn-square swt:btn-info swt:btn-sm"
             prop.onClick onSaveArc
             prop.title "Save ARC"

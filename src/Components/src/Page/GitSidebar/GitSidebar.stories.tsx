@@ -54,9 +54,10 @@ const buildBusyRunStatus = (notice: string) => ({
 });
 
 const buildProgressRunStatus = (progress: {
-  Method: string;
-  Stage: string;
-  ProgressPercent: number;
+  Method?: string;
+  Stage?: string;
+  ProgressPercent?: number;
+  Output?: string;
 }) => ({
   // Fable DU: GitSidebarRunStatus.Progress
   tag: 2,
@@ -566,6 +567,7 @@ export const BusyProgressState: Story = {
       Method: "pull",
       Stage: "Receiving objects",
       ProgressPercent: 54,
+      Output: "remote: Enumerating objects: 18, done.\nremote: Counting objects: 100% (18/18), done.\n",
     }),
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
@@ -576,6 +578,51 @@ export const BusyProgressState: Story = {
     await expect(canvas.getByTestId("GitSidebarProgressNotice")).toHaveTextContent(
       "pull | Receiving objects | 54%",
     );
+    await expect(canvas.getByTestId("GitSidebarProgressBar")).toBeInTheDocument();
+    const fillBar = canvas.getByTestId("GitSidebarProgressBar").firstElementChild;
+    await expect(fillBar).toHaveAttribute("style", expect.stringContaining("width: 54%"));
+    const outputDetails = canvas.getByTestId("GitSidebarProgressOutput");
+    await expect(outputDetails).not.toHaveAttribute("open");
+    await expect(outputDetails).toHaveTextContent("Git output");
+    await expect(outputDetails).toHaveTextContent(
+      "remote: Enumerating objects: 18, done.",
+    );
+    const outputConsole = within(outputDetails).getByText(/remote: Enumerating objects/);
+    await expect(outputConsole).toHaveClass("swt:bg-base-content");
+    await expect(outputConsole).toHaveClass("swt:text-base-100");
+
+    const sourceControlTitle = canvas.getByText("Source Control");
+    const trackingInfo = canvas.getByText("Tracking origin/feature/git-sidebar");
+    expect(
+      sourceControlTitle.compareDocumentPosition(canvas.getByTestId("GitSidebarProgressNotice")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      canvas.getByTestId("GitSidebarProgressNotice").compareDocumentPosition(trackingInfo) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  },
+};
+
+export const ClonePhaseProgressState: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    runStatus: buildProgressRunStatus({
+      Method: "clone",
+      Stage: "Preparing clone",
+    }),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarProgressNotice")).toHaveTextContent(
+      "clone | Preparing clone",
+    );
+    await expect(canvas.queryByTestId("GitSidebarProgressBar")).not.toBeInTheDocument();
   },
 };
 

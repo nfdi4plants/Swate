@@ -6,7 +6,7 @@ open Main.ArcVault
 open Main.ArcVaultTypes
 open Main.IPC.FileSystemIO
 open Main.IPC.Rename
-open Main.ArcMerge
+open Main.ARCtrlExtensions
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
@@ -212,6 +212,26 @@ Vitest.describe (
                             Vitest.expect(reloadedArc.ContainsAssay("OldAssay")).toBe (true)
                             Vitest.expect(reloadedArc.ContainsAssay("ExistingAssay")).toBe (true)
                     })
+        )
+
+        Vitest.test (
+            "ArcOpenDisposition exposes the returned created ARC path",
+            fun () ->
+                Vitest
+                    .expect((ArcOpenDisposition.CreatedInCurrent "C:/picked/ReturnedArc").CreatedArcPath)
+                    .toEqual (Some "C:/picked/ReturnedArc")
+
+                Vitest
+                    .expect((ArcOpenDisposition.CreatedInNewWindow "C:/picked/ReturnedArc").CreatedArcPath)
+                    .toEqual (Some "C:/picked/ReturnedArc")
+        )
+
+        Vitest.test (
+            "ArcOpenDisposition omits created ARC path for non-create outcomes",
+            fun () ->
+                Vitest.expect((ArcOpenDisposition.FocusedExisting "C:/existing/Arc").CreatedArcPath).toEqual (None)
+                Vitest.expect((ArcOpenDisposition.OpenedInCurrent "C:/opened/Arc").CreatedArcPath).toEqual (None)
+                Vitest.expect((ArcOpenDisposition.OpenedInNewWindow "C:/opened/Arc").CreatedArcPath).toEqual (None)
         )
 
 )

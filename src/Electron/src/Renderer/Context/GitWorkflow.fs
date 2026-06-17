@@ -5,7 +5,6 @@ open Elmish
 open Fable.Core
 
 open Renderer.Types
-open Swate.Components.Api.GitLabApi
 open Swate.Components.Page.GitSidebarTypes
 open Swate.Electron.Shared
 open Swate.Electron.Shared.GitTypes
@@ -32,6 +31,7 @@ type GitBusyOperation =
     | CreatingBranch
     | SwitchingBranch
     | InstallingGitLfs
+    | RenamingRepository
     | PruningGitLfsCache
     | DeduplicatingGitLfsStorage
     | ConfirmingMergeResolution of path: string
@@ -59,6 +59,8 @@ type GitPendingRemoteAction =
     | UpdateFromOnline
     | CompletePrimarySavePush
 
+type GitPublishRenamePrompt = { CurrentName: string; Message: string }
+
 type GitPullWorkflowResult = {
     Status: GitStatusDto option
     WarningMessage: string option
@@ -67,6 +69,8 @@ type GitPullWorkflowResult = {
 
 type InitRepositoryOutcome = { WarningMessage: string option }
 
+type GitErrorNotification = { Title: string; Message: string }
+
 type GitState = {
     Status: GitSidebarStatus
     ChangedFiles: GitSidebarChange[]
@@ -74,6 +78,7 @@ type GitState = {
     OriginRemoteRepositoryWebUrl: string option
     PendingConfirmation: GitSidebarConfirmationDialog option
     PendingRemoteAction: GitPendingRemoteAction
+    PendingPublishRename: GitPublishRenamePrompt option
     PendingPostMergePush: bool
     LfsAutoTrackThresholdMb: int
     DownloadLargeFiles: bool
@@ -108,6 +113,7 @@ type GitState = {
         OriginRemoteRepositoryWebUrl = None
         PendingConfirmation = None
         PendingRemoteAction = GitPendingRemoteAction.None
+        PendingPublishRename = None
         PendingPostMergePush = false
         LfsAutoTrackThresholdMb = 1
         DownloadLargeFiles = false
@@ -173,19 +179,22 @@ type WriteAttemptOutcome =
     | Completed of WriteSuccess
     | CompletedWithPendingRemoteConfirmation of WriteSuccess * GitSidebarConfirmationDialog * GitPendingRemoteAction
     | CompletedWithPendingRemoteFailure of WriteSuccess * string
+    | RequiresRemoteProjectRename of string
     | RequiresLfsInstall of string
 
 type private WriteOperationClassification =
     | WriteOperationReady of GitOperationResult
     | WriteOperationNeedsLfsInstall of string
+    | WriteOperationRemoteProjectAlreadyExists of string
 
 type Msg =
     | ResetWorkflow
     | SetCurrentProgress of GitSidebarProgress option
     | ArcPathChanged of ArcRootPath
+    | GitRepositoryInitialized of arcPath: string
     | RefreshRequested
     | RefreshCompleted of requestId: int * result: Result<GitRefreshResult, string>
-    | InitRepositoryRequested of remoteProjectName: string option
+    | InitRepositoryRequested
     | InitRepositoryCompleted of sessionId: int * result: Result<InitRepositoryOutcome, string>
     | SelectChangeRequested of GitSidebarChange * Reply<unit>
     | SelectChangeCompleted of
@@ -210,6 +219,9 @@ type Msg =
     | DiscardSelectionRequested of string[]
     | ConfirmPendingRemoteActionRequested
     | CancelPendingRemoteActionRequested
+    | SubmitPublishRenameRequested of newName: string
+    | CancelPublishRenameRequested
+    | PublishRenameCompleted of sessionId: int * result: Result<string, string>
     | CreateBranchRequested of GitSidebarCreateBranchRequest
     | SwitchBranchRequested of string
     | PruneLfsCacheRequested
@@ -227,13 +239,12 @@ type GitDependencies = {
     loadDiffPage: string -> JS.Promise<Result<PageState, string>>
     loadMergeConflictPage: string -> JS.Promise<Result<PageState, string>>
     initGitRepository: string -> JS.Promise<Result<string, string>>
-    createDataHubProject: string -> JS.Promise<Result<ExploreProjectDto, string>>
+    renameOpenArcRoot: string -> JS.Promise<Result<string, string>>
     installGitLfs: unit -> JS.Promise<Result<GitOperationResult, string>>
     previewGitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitPullPreflightResult, string>>
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
-    gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -248,6 +259,7 @@ type GitDependencies = {
         GitConfirmMergeResolutionRequest -> JS.Promise<Result<GitConfirmMergeResolutionResult, string>>
     confirmLfsPrune: string -> bool
     confirmInstall: string -> bool
+    reportError: GitErrorNotification -> unit
 }
 
 let staleMergeConflictTokens = [|
@@ -283,6 +295,7 @@ let busyNoticeFromOperation =
     | GitBusyOperation.CreatingBranch -> Some "Creating branch"
     | GitBusyOperation.SwitchingBranch -> Some "Switching branch"
     | GitBusyOperation.InstallingGitLfs -> Some "Installing Git LFS"
+    | GitBusyOperation.RenamingRepository -> Some "Renaming ARC"
     | GitBusyOperation.PruningGitLfsCache -> Some "Cleaning Git LFS cache"
     | GitBusyOperation.DeduplicatingGitLfsStorage -> Some "Reducing Git LFS duplicate storage"
     | GitBusyOperation.ConfirmingMergeResolution _ -> Some "Confirming merge resolution"
@@ -332,7 +345,32 @@ let mapProgress (progress: GitProgressDto) : GitSidebarProgress = {
     Method = progress.Method
     Stage = progress.Stage
     ProgressPercent = progress.Progress
+    Output = progress.Output
 }
+
+let private appendProgressOutput current incoming =
+    match current, incoming with
+    | None, None -> None
+    | Some output, None -> Some output
+    | None, Some output -> Some output
+    | Some currentOutput, Some incomingOutput -> Some(currentOutput + incomingOutput)
+
+let private mergeProgressUpdate (model: GitState) (incoming: GitSidebarProgress) =
+    let current =
+        model.CurrentProgress
+        |> Option.defaultValue {
+            Method = None
+            Stage = model.BusyNotice
+            ProgressPercent = None
+            Output = None
+        }
+
+    {
+        Method = incoming.Method |> Option.orElse current.Method
+        Stage = incoming.Stage |> Option.orElse current.Stage
+        ProgressPercent = incoming.ProgressPercent |> Option.orElse current.ProgressPercent
+        Output = appendProgressOutput current.Output incoming.Output
+    }
 
 let private hasMatchingOriginBranch (branchName: string) (model: GitState) =
     model.BranchOptions
@@ -345,6 +383,26 @@ let shouldPublishCurrentBranchFirst (model: GitState) =
     match model.Status.CurrentBranch, model.Status.TrackingBranch with
     | Some currentBranch, None -> not (hasMatchingOriginBranch currentBranch model)
     | _ -> false
+
+let private tryGetPathLeaf (pathValue: string) =
+    pathValue
+    |> Option.ofObj
+    |> Option.map (fun value -> value.Trim().TrimEnd('/', '\\'))
+    |> Option.filter (String.IsNullOrWhiteSpace >> not)
+    |> Option.bind (fun trimmed ->
+        trimmed.Split([| '/'; '\\' |], StringSplitOptions.RemoveEmptyEntries)
+        |> Array.tryLast
+    )
+    |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+let private publishRenamePrompt message model =
+    let currentName =
+        model.CurrentArcPath |> Option.bind tryGetPathLeaf |> Option.defaultValue "ARC"
+
+    {
+        CurrentName = currentName
+        Message = message
+    }
 
 let private refreshErrorMessage (refreshResult: GitRefreshResult) =
     match refreshResult.Status, refreshResult.Branches, refreshResult.LfsSettings with
@@ -479,10 +537,34 @@ let private applyPageChangeCmd (setPageState: PageState option -> unit) =
         fun _dispatch -> setPageState None
       ]
 
+let private reportErrorCmd (deps: GitDependencies) (title: string) (message: string) : Cmd<Msg> = [
+    fun _dispatch -> deps.reportError { Title = title; Message = message }
+]
+
+let private titleForWriteRequest =
+    function
+    | Fetch -> "Could not fetch changes"
+    | Pull -> "Could not pull changes"
+    | Push -> "Could not push changes"
+    | PrimarySave _ -> "Could not save changes"
+    | Clone _ -> "Could not clone repository"
+    | CommitSelection _
+    | CommitAll _ -> "Could not commit changes"
+    | DiscardSelection _ -> "Could not discard changes"
+    | SaveLfsSettings _ -> "Could not save Git LFS settings"
+    | PruneLfsCache -> "Could not clean Git LFS cache"
+    | DedupLfsStorage -> "Could not reduce Git LFS storage"
+    | CreateBranch _ -> "Could not create branch"
+    | SwitchBranch _ -> "Could not switch branch"
+
+let private reportWriteErrorCmd deps request message =
+    reportErrorCmd deps (titleForWriteRequest request) message
+
 let private withBusyOperation busyOperation model = {
     model with
         BusyOperation = busyOperation
         BusyNotice = busyOperation |> Option.bind busyNoticeFromOperation
+        CurrentProgress = None
 }
 
 let private startRefreshRequest requestId model = {
@@ -505,39 +587,12 @@ let private refreshAllAsync (deps: GitDependencies) = promise {
     }
 }
 
-let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) (remoteProjectName: string option) = promise {
+let private runInitRepositoryAsync (deps: GitDependencies) (arcPath: string) = promise {
     let! initResult = deps.initGitRepository arcPath
 
     match initResult with
     | Error message -> return Error message
-    | Ok _ ->
-        match
-            remoteProjectName
-            |> Option.map _.Trim()
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-        with
-        | None -> return Ok { WarningMessage = None }
-        | Some projectName ->
-            let! projectResult = deps.createDataHubProject projectName
-
-            match projectResult with
-            | Error message -> return Ok { WarningMessage = Some message }
-            | Ok project ->
-                let! addRemoteResult =
-                    deps.gitAddRemote {
-                        RemoteName = "origin"
-                        RemoteUrl = project.http_url_to_repo
-                    }
-
-                match addRemoteResult with
-                | Error message -> return Ok { WarningMessage = Some message }
-                | Ok operationResult when operationResult.Success -> return Ok { WarningMessage = None }
-                | Ok operationResult ->
-                    return
-                        Ok {
-                            WarningMessage =
-                                Some(operationResult.Message |> Option.defaultValue "Adding origin remote failed.")
-                        }
+    | Ok _ -> return Ok { WarningMessage = None }
 }
 
 let private loadPageAsync (deps: GitDependencies) (path: string) (isConflicted: bool) = promise {
@@ -619,6 +674,7 @@ let private resolveStaleWriteCompletedCmd request result =
     | Ok(CompletedWithPendingRemoteConfirmation(success, _, _)) -> resolveCloneReplyCmd request (Ok success)
     | Ok(CompletedWithPendingRemoteFailure(success, _)) -> resolveCloneReplyCmd request (Ok success)
     | Ok(RequiresLfsInstall _) -> resolveCloneReplyCmd request (Error staleArcSessionMessage)
+    | Ok(RequiresRemoteProjectRename _) -> resolveCloneReplyCmd request (Error staleArcSessionMessage)
     | Error message -> resolveCloneReplyCmd request (Error message)
 
 let private writeErrorModel (message: string) (model: GitState) = {
@@ -638,6 +694,13 @@ let private classifyWriteResult (busyOperation: GitBusyOperation) (result: Resul
             WriteOperationNeedsLfsInstall(
                 operationResult.Message
                 |> Option.defaultValue "Git LFS is required for this operation. Install Git LFS now?"
+            )
+        )
+    | Ok operationResult when operationResult.FailureKind = Some GitFailureKind.RemoteProjectAlreadyExists ->
+        Ok(
+            WriteOperationRemoteProjectAlreadyExists(
+                operationResult.Message
+                |> Option.defaultValue "A DataHub repository with this name already exists."
             )
         )
     | Ok operationResult when not operationResult.Success ->
@@ -678,6 +741,7 @@ let private runSimpleWriteAttemptAsync
         match classifyWriteResult busyOperation result with
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Ok(RequiresRemoteProjectRename message)
         | Ok(WriteOperationReady operationResult) ->
             return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
     }
@@ -689,6 +753,7 @@ let private runCloneAttemptAsync (deps: GitDependencies) (request: GitCloneRepos
         match classifyWriteResult GitBusyOperation.CloningRepository result with
         | Error message -> Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationRemoteProjectAlreadyExists message) -> Error message
         | Ok(WriteOperationReady operationResult) ->
             Ok(Completed(CloneSuccess(operationResult.Path |> Option.defaultValue request.TargetPath)))
 }
@@ -699,6 +764,7 @@ let private runPullAttemptAsync (deps: GitDependencies) = promise {
     match classifyWriteResult GitBusyOperation.PullingFromRemote pullResult with
     | Error message -> return Error message
     | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+    | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
     | Ok(WriteOperationReady operationResult) ->
         let! refreshResult = refreshAllAsync deps
 
@@ -743,18 +809,21 @@ let private runCommitAttemptAsync (deps: GitDependencies) (prepared: PreparedCom
         match classifyWriteResult prepared.BusyOperation unstageResult with
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
         | Ok(WriteOperationReady _) ->
             let! stageResult = deps.gitStagePaths { Pathspecs = prepared.PathsToCommit }
 
             match classifyWriteResult prepared.BusyOperation stageResult with
             | Error message -> return Error message
             | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+            | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
             | Ok(WriteOperationReady _) ->
                 let! commitResult = deps.gitCommit { Message = prepared.NormalizedMessage }
 
                 match classifyWriteResult prepared.BusyOperation commitResult with
                 | Error message -> return Error message
                 | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+                | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
                 | Ok(WriteOperationReady operationResult) ->
                     return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
 }
@@ -770,6 +839,7 @@ let private runDiscardAttemptAsync (deps: GitDependencies) (paths: string[]) = p
         match classifyWriteResult GitBusyOperation.DiscardingSelectedChanges discardResult with
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
         | Ok(WriteOperationReady operationResult) ->
             return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.Clear (Some None)
 }
@@ -798,6 +868,7 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
     match commitAttempt with
     | Error message -> return Error message
     | Ok(RequiresLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+    | Ok(RequiresRemoteProjectRename message) -> return Ok(RequiresRemoteProjectRename message)
     | Ok(Completed(UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, _))) ->
         let localSuccessWithPendingWarning =
             UnitSuccess(refreshResult, pageChange, selectedChangePathOverride, Some pendingPrimarySaveWarning)
@@ -809,6 +880,7 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
             | Error message -> return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
             | Ok(WriteOperationNeedsLfsInstall promptMessage) ->
                 return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning promptMessage
+            | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Ok(RequiresRemoteProjectRename message)
             | Ok(WriteOperationReady operationResult) ->
                 return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
         }
@@ -829,6 +901,8 @@ let private runPrimarySaveAttemptAsync (deps: GitDependencies) (state: GitState)
                 | Error message -> return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
                 | Ok(WriteOperationNeedsLfsInstall promptMessage) ->
                     return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning promptMessage
+                | Ok(WriteOperationRemoteProjectAlreadyExists message) ->
+                    return pendingPrimarySaveRemoteFailure localSuccessWithPendingWarning message
                 | Ok(WriteOperationReady _) -> return! runPushAfterLocalCommit ()
             | Ok {
                      Status = GitPullPreflightStatus.WouldRequireMergeResolution
@@ -881,6 +955,7 @@ let private runSaveLfsSettingsAttemptAsync
         match classifyWriteResult busyOperation result with
         | Error message -> return Error message
         | Ok(WriteOperationNeedsLfsInstall promptMessage) -> return Ok(RequiresLfsInstall promptMessage)
+        | Ok(WriteOperationRemoteProjectAlreadyExists message) -> return Error message
         | Ok(WriteOperationReady operationResult) ->
             return! refreshAfterSuccess deps operationResult.WarningMessage GitPageChange.NoChange None
     }
@@ -925,6 +1000,7 @@ let private missingRepositoryModel (model: GitState) = {
         OriginRemoteRepositoryWebUrl = None
         PendingConfirmation = None
         PendingRemoteAction = GitPendingRemoteAction.None
+        PendingPublishRename = None
         PendingPostMergePush = false
         LfsAutoTrackThresholdMb = GitState.Empty.LfsAutoTrackThresholdMb
         DownloadLargeFiles = GitState.Empty.DownloadLargeFiles
@@ -949,12 +1025,13 @@ let update
     : GitState * Cmd<Msg> =
     match msg with
     | ResetWorkflow -> GitState.Empty, Cmd.none
-    | SetCurrentProgress currentProgress ->
+    | SetCurrentProgress(Some progress) when model.BusyOperation.IsSome ->
         {
             model with
-                CurrentProgress = currentProgress
+                CurrentProgress = Some(mergeProgressUpdate model progress)
         },
         Cmd.none
+    | SetCurrentProgress _ -> { model with CurrentProgress = None }, Cmd.none
     | ArcPathChanged arcPath when arcPath = model.CurrentArcPath -> model, Cmd.none
     | ArcPathChanged arcPath ->
         let nextModel = {
@@ -973,6 +1050,11 @@ let update
             | None -> applyPageChangeCmd setPageState GitPageChange.Clear
 
         nextModel, cmd
+    | GitRepositoryInitialized arcPath ->
+        match model.CurrentArcPath with
+        | Some currentArcPath when Swate.Components.Shared.PathHelpers.pathsEqual currentArcPath arcPath ->
+            model, Cmd.ofMsg RefreshRequested
+        | _ -> model, Cmd.none
     | RefreshRequested when model.CurrentArcPath.IsNone ->
         {
             GitState.Empty with
@@ -1019,7 +1101,11 @@ let update
                 PendingRefreshWarningNotice = None
         }
 
-        nextModel, applyPageChangeCmd setPageState GitPageChange.Clear
+        nextModel,
+        Cmd.batch [
+            applyPageChangeCmd setPageState GitPageChange.Clear
+            reportErrorCmd deps "Could not refresh Git state" message
+        ]
     | RefreshCompleted(_, Ok refreshResult) when
         refreshErrorMessage refreshResult |> Option.exists isMissingRepositoryMessage
         ->
@@ -1031,21 +1117,20 @@ let update
             |> withBusyOperation None
             |> fun state -> { state with CurrentProgress = None }
 
-        let hasError =
-            match refreshResult.Status, refreshErrorMessage refreshResult with
-            | Error _, _
-            | Ok _, Some _ -> true
-            | Ok _, None -> false
+        let refreshError = refreshErrorMessage refreshResult
 
         let cmd =
-            if hasError then
-                applyPageChangeCmd setPageState GitPageChange.Clear
-            else
-                Cmd.none
+            match refreshError with
+            | Some message ->
+                Cmd.batch [
+                    applyPageChangeCmd setPageState GitPageChange.Clear
+                    reportErrorCmd deps "Could not refresh Git state" message
+                ]
+            | None -> Cmd.none
 
         nextModel, cmd
-    | InitRepositoryRequested _ when model.CurrentArcPath.IsNone -> model, Cmd.none
-    | InitRepositoryRequested remoteProjectName ->
+    | InitRepositoryRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
+    | InitRepositoryRequested ->
         let nextModel =
             model
             |> withBusyOperation (Some GitBusyOperation.InitializingRepository)
@@ -1057,8 +1142,8 @@ let update
 
         let cmd =
             Cmd.OfPromise.either
-                (fun (deps, arcPath, remoteProjectName) -> runInitRepositoryAsync deps arcPath remoteProjectName)
-                (deps, Option.get model.CurrentArcPath, remoteProjectName)
+                (fun (deps, arcPath) -> runInitRepositoryAsync deps arcPath)
+                (deps, Option.get model.CurrentArcPath)
                 (fun result -> InitRepositoryCompleted(model.ArcSessionId, result))
                 (fun err -> InitRepositoryCompleted(model.ArcSessionId, Error(string err)))
 
@@ -1075,7 +1160,7 @@ let update
                 PendingRefreshWarningNotice = None
         }
 
-        nextModel, Cmd.none
+        nextModel, reportErrorCmd deps "Could not initialize Git repository" message
     | InitRepositoryCompleted(_, Ok outcome) ->
         let nextModel = {
             model with
@@ -1130,7 +1215,11 @@ let update
                 ErrorNotice = Some message
         }
 
-        nextModel, resolveReplyCmd reply (Error message)
+        nextModel,
+        Cmd.batch [
+            resolveReplyCmd reply (Error message)
+            reportErrorCmd deps "Could not open Git change" message
+        ]
     | ConfirmMergeResolutionRequested _ when model.CurrentArcPath.IsNone -> model, Cmd.none
     | ConfirmMergeResolutionRequested request ->
         match model.BusyOperation with
@@ -1177,9 +1266,10 @@ let update
             Cmd.batch [
                 applyPageChangeCmd setPageState GitPageChange.Clear
                 Cmd.ofMsg RefreshRequested
+                reportErrorCmd deps "Could not confirm merge resolution" message
             ]
         else
-            nextModel, Cmd.none
+            nextModel, reportErrorCmd deps "Could not confirm merge resolution" message
     | ConfirmMergeResolutionCompleted(_, Ok outcome) ->
         let nextModel =
             model
@@ -1307,7 +1397,7 @@ let update
                 BusyNotice = None
                 ErrorNotice = Some message
         },
-        Cmd.none
+        reportErrorCmd deps "Could not preview update from online" message
     | CloneRequested(request, reply) -> model, Cmd.ofMsg (WriteRequested(Clone(request, reply)))
     | PrimarySaveSelectionRequested request ->
         model, Cmd.ofMsg (WriteRequested(PrimarySave(prepareCommitSelection model request)))
@@ -1342,6 +1432,80 @@ let update
                 PendingPostMergePush = false
         },
         Cmd.none
+    | CancelPublishRenameRequested ->
+        {
+            model with
+                PendingPublishRename = None
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+        },
+        Cmd.none
+    | SubmitPublishRenameRequested _ when model.PendingPublishRename.IsNone -> model, Cmd.none
+    | SubmitPublishRenameRequested newName ->
+        let normalizedName =
+            newName
+            |> Option.ofObj
+            |> Option.map _.Trim()
+            |> Option.defaultValue String.Empty
+
+        if String.IsNullOrWhiteSpace normalizedName then
+            {
+                model with
+                    ErrorNotice = Some "ARC folder name must not be empty."
+            },
+            reportErrorCmd deps "Could not rename ARC" "ARC folder name must not be empty."
+        else
+            let nextModel =
+                model
+                |> withBusyOperation (Some GitBusyOperation.RenamingRepository)
+                |> fun state -> {
+                    state with
+                        ErrorNotice = None
+                        CurrentProgress = None
+                }
+
+            let cmd =
+                Cmd.OfPromise.either
+                    deps.renameOpenArcRoot
+                    normalizedName
+                    (fun result -> PublishRenameCompleted(model.ArcSessionId, result))
+                    (fun err -> PublishRenameCompleted(model.ArcSessionId, Error(string err)))
+
+            nextModel, cmd
+    | PublishRenameCompleted(sessionId, Ok renamedPath) when
+        sessionId <> model.ArcSessionId && model.CurrentArcPath = Some renamedPath
+        ->
+        {
+            model with
+                PendingPublishRename = None
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+        },
+        Cmd.ofMsg (WriteRequested Push)
+    | PublishRenameCompleted(sessionId, _) when sessionId <> model.ArcSessionId -> model, Cmd.none
+    | PublishRenameCompleted(_, Error message) ->
+        {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = Some message
+        },
+        reportErrorCmd deps "Could not rename ARC" message
+    | PublishRenameCompleted(_, Ok _) ->
+        {
+            model with
+                PendingPublishRename = None
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+        },
+        Cmd.ofMsg (WriteRequested Push)
     | CreateBranchRequested request ->
         model,
         Cmd.ofMsg (
@@ -1423,7 +1587,23 @@ let update
         model, resolveStaleWriteCompletedCmd request result
     | WriteCompleted(_, request, Error message) ->
         let nextModel = writeErrorModel message model
-        nextModel, resolveCloneReplyCmd request (Error message)
+
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportWriteErrorCmd deps request message
+        ]
+    | WriteCompleted(_, _, Ok(RequiresRemoteProjectRename message)) ->
+        let nextModel = {
+            model with
+                BusyOperation = None
+                BusyNotice = None
+                CurrentProgress = None
+                ErrorNotice = None
+                PendingPublishRename = Some(publishRenamePrompt message model)
+        }
+
+        nextModel, Cmd.none
     | WriteCompleted(sessionId, request, Ok(RequiresLfsInstall promptMessage)) ->
         let nextModel = {
             model with
@@ -1451,7 +1631,11 @@ let update
                     InstallRetryState = GitInstallRetryState.Idle
             }
 
-        nextModel, resolveCloneReplyCmd request (Error message)
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportErrorCmd deps "Git LFS installation required" message
+        ]
     | WriteInstallPromptAnswered(sessionId, request, true) ->
         let busyOperation = busyOperationForWriteRequest request
 
@@ -1481,7 +1665,11 @@ let update
                     InstallRetryState = GitInstallRetryState.Idle
             }
 
-        nextModel, resolveCloneReplyCmd request (Error message)
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportErrorCmd deps "Could not install Git LFS" message
+        ]
     | WriteInstallCompleted(_, request, Ok operationResult) when not operationResult.Success ->
         let message =
             operationResult.Message |> Option.defaultValue "Git LFS installation failed."
@@ -1494,7 +1682,11 @@ let update
                     InstallRetryState = GitInstallRetryState.Idle
             }
 
-        nextModel, resolveCloneReplyCmd request (Error message)
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportErrorCmd deps "Could not install Git LFS" message
+        ]
     | WriteInstallCompleted(sessionId, request, Ok _) ->
         let busyOperation = busyOperationForWriteRequest request
 
@@ -1544,15 +1736,29 @@ let update
                 PendingPostMergePush = false
         }
 
-        nextModel, applyPageChangeCmd setPageState pageChange
+        nextModel,
+        Cmd.batch [
+            applyPageChangeCmd setPageState pageChange
+            reportErrorCmd deps "Could not push saved changes" message
+        ]
     | WriteCompleted(_, request, Ok(CompletedWithPendingRemoteConfirmation(_, _, _))) ->
         let message = "Git operation produced an invalid pending remote confirmation."
         let nextModel = writeErrorModel message model
-        nextModel, resolveCloneReplyCmd request (Error message)
+
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportWriteErrorCmd deps request message
+        ]
     | WriteCompleted(_, request, Ok(CompletedWithPendingRemoteFailure(_, _))) ->
         let message = "Git operation produced an invalid pending remote failure."
         let nextModel = writeErrorModel message model
-        nextModel, resolveCloneReplyCmd request (Error message)
+
+        nextModel,
+        Cmd.batch [
+            resolveCloneReplyCmd request (Error message)
+            reportWriteErrorCmd deps request message
+        ]
     | WriteCompleted(_, request, Ok(Completed success)) ->
         let baseModel, pageChange, warningMessage = applyWriteSuccessModel model success
 
@@ -1563,6 +1769,7 @@ let update
                 CurrentProgress = None
                 ErrorNotice = None
                 WarningNotice = warningMessage
+                PendingPublishRename = None
         }
 
         nextModel,
@@ -1577,6 +1784,16 @@ let subscribe (_model: GitState) : Sub<Msg> = [
         let dispose =
             Renderer.IpcReceiver.subscribeProxyReceiver<IGitProgressRendererApi> {
                 gitProgressUpdate = fun progress -> dispatch (SetCurrentProgress(Some(mapProgress progress)))
+            }
+
+        { new System.IDisposable with
+            member _.Dispose() = dispose ()
+        }
+    [ "gitRepositoryInitialized" ],
+    fun dispatch ->
+        let dispose =
+            Renderer.IpcReceiver.subscribeProxyReceiver<IGitRepositoryRendererApi> {
+                gitRepositoryInitialized = fun arcPath -> dispatch (GitRepositoryInitialized arcPath)
             }
 
         { new System.IDisposable with

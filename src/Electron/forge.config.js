@@ -1,16 +1,64 @@
 const { FusesPlugin } = require('@electron-forge/plugin-fuses');
 const { FuseV1Options, FuseVersion } = require('@electron/fuses');
+const { execFile } = require('node:child_process');
+const fs = require('node:fs/promises');
+const path = require('node:path');
+const { promisify } = require('node:util');
+
+const execFileAsync = promisify(execFile);
+
+const platformIcon =
+  process.platform === 'win32'
+    ? 'assets/icons/win/icon'
+    : process.platform === 'darwin'
+      ? 'assets/icons/mac/icon'
+      : 'assets/icons/png/1024x1024';
+
+const adHocSignDarwinArm64App = async (_forgeConfig, packageResult) => {
+  if (packageResult.platform !== 'darwin' || packageResult.arch !== 'arm64') {
+    return;
+  }
+
+  let signedAppCount = 0;
+
+  for (const outputPath of packageResult.outputPaths) {
+    const entries = await fs.readdir(outputPath, { withFileTypes: true });
+    const appEntry = entries.find((entry) => entry.isDirectory() && entry.name.endsWith('.app'));
+
+    if (!appEntry) {
+      continue;
+    }
+
+    const appPath = path.join(outputPath, appEntry.name);
+    await execFileAsync('codesign', ['--force', '--deep', '--sign', '-', appPath]);
+    await execFileAsync('codesign', ['--verify', '--deep', '--strict', '--verbose=2', appPath]);
+    signedAppCount++;
+  }
+
+  if (signedAppCount === 0) {
+    throw new Error(`No .app bundle found to ad-hoc sign in: ${packageResult.outputPaths.join(', ')}`);
+  }
+};
 
 module.exports = {
   packagerConfig: {
     asar: true,
     executableName: 'swate',
+    icon: platformIcon,
+    extraResource: [
+        "./assets"
+    ]
   },
   rebuildConfig: {},
+  hooks: {
+    postPackage: adHocSignDarwinArm64App,
+  },
   makers: [
     {
       name: '@electron-forge/maker-squirrel',
-      config: {},
+      config: {
+        setupIcon: 'assets/icons/win/icon.ico',
+      },
     },
     {
       name: '@electron-forge/maker-zip',
@@ -24,6 +72,10 @@ module.exports = {
       name: '@electron-forge/maker-rpm',
       config: {},
     },
+    {
+      name: '@electron-forge/maker-dmg',
+      config: { }
+    }
   ],
   plugins: [
     {
@@ -64,18 +116,4 @@ module.exports = {
       [FuseV1Options.OnlyLoadAppFromAsar]: true,
     }),
   ],
-  publishers: [
-    {
-      name: '@electron-forge/publisher-github',
-      config: {
-        repository: {
-          owner: 'nfdi4plants',
-          name: 'Swate'
-        },
-        authToken: process.env.GITHUB_TOKEN,
-        prerelease: true,
-        draft: true
-      },
-    }
-  ]
 };

@@ -4,9 +4,11 @@ open System
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
+open Fable.Electron.Remoting.Main
 open Swate.Components.Shared
 open Swate.Electron.Shared
 open Swate.Electron.Shared.IPCTypes
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 open Swate.Electron.Shared.GitTypes
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
@@ -90,6 +92,28 @@ let private runLoadedArcPathAction
             return Error e
     }
 
+let private initGitRepositoryForCreatedArcDisposition
+    (initRepository: string -> JS.Promise<Main.Git.GitService.GitResult<string>>)
+    (initGit: bool)
+    (disposition: ArcOpenDisposition)
+    : JS.Promise<Main.Git.GitService.GitResult<string option>> =
+    promise {
+        match initGit, disposition.CreatedArcPath with
+        | true, Some createdArcPath ->
+            let! initResult = initRepository createdArcPath
+            return initResult |> Result.map (fun _ -> Some createdArcPath)
+        | _ -> return Ok None
+    }
+
+let private notifyGitRepositoryInitialized (arcPath: string) =
+    ARC_VAULTS.TryGetVaultByPath arcPath
+    |> Option.iter (fun vault ->
+        Remoting.createIpc ()
+        |> Remoting.withWindow vault.window
+        |> Remoting.buildProxySender<IGitRepositoryRendererApi>
+        |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
+    )
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
@@ -126,7 +150,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 return Error e
         }
     createARC =
-        fun (identifier: string) -> promise {
+        fun (request: CreateArcRequest) -> promise {
             let window = dialogParentFromIpcEvent event
 
             let! r =
@@ -145,11 +169,25 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 let arcContainerPath = r.filePaths |> Array.exactlyOne
 
                 let arcPath =
-                    ARCtrl.ArcPathHelper.combine arcContainerPath identifier
+                    ARCtrl.ArcPathHelper.combine arcContainerPath request.identifier
                     |> PathHelpers.normalizePath
 
                 let windowId = windowIdFromIpcEvent event
-                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, identifier)
+                let! disposition = ARC_VAULTS.CreateOrFocusArc(windowId, arcPath, request.identifier)
+
+                match!
+                    initGitRepositoryForCreatedArcDisposition
+                        Main.Git.GitProvisioningService.initRepository
+                        request.initGit
+                        disposition
+                with
+                | Error failure ->
+                    Swate.Components.console.log (
+                        $"Git init failed for '{ArcOpenDisposition.path disposition}': {failure.Message}"
+                    )
+                | Ok(Some initializedArcPath) -> notifyGitRepositoryInitialized initializedArcPath
+                | Ok None -> ()
+
                 return Ok(ArcOpenDisposition.path disposition)
         }
     ensureNotesFolder =
@@ -522,6 +560,27 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
+                        })
+            with e ->
+                return Error e
+        }
+    renameOpenArcRoot =
+        fun (newName: string) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            let oldPath = vault.path
+                            let! renameResult = vault.RenameOpenArcRoot newName
+
+                            match renameResult with
+                            | Error renameError -> return Error renameError
+                            | Ok renamedPath ->
+                                oldPath |> Option.iter (fun path -> RECENT_ARCS.Remove(path) |> ignore)
+                                RECENT_ARCS.Add(renamedPath) |> ignore
+                                ARC_VAULTS.BroadcastRecentARCs()
+                                return Ok renamedPath
                         })
             with e ->
                 return Error e

@@ -125,7 +125,7 @@ export const ExistingTargetSubmit: Story = {
     });
 
     const payload = args.onSubmit.mock.calls[0][0];
-    expect(payload.Intent.RelativePath).toBe('notes/studies/MyStudy/26_02_2026/Watering_plan.md');
+    expect(payload.Intent.RelativePath).toBe('studies/MyStudy/protocols/Watering_plan.md');
   },
 };
 

@@ -7,6 +7,7 @@ module internal GitComparisonView =
     let private PanelShellClassName =
         "swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:overflow-hidden swt:shadow-sm"
 
+    [<ReactComponent>]
     let TitleStack (title: ReactElement) (description: ReactElement option) (className: string option) =
         Html.div [
             prop.className [
@@ -21,6 +22,7 @@ module internal GitComparisonView =
             ]
         ]
 
+    [<ReactComponent>]
     let HeaderRow (leading: ReactElement) (trailing: ReactElement) (className: string option) =
         Html.div [
             prop.className [
@@ -31,6 +33,7 @@ module internal GitComparisonView =
             prop.children [ leading; trailing ]
         ]
 
+    [<ReactComponent>]
     let PanelShell
         (children: ReactElement)
         (testId: string option)
@@ -50,6 +53,7 @@ module internal GitComparisonView =
             prop.children children
         ]
 
+    [<ReactComponent>]
     let SectionCard (header: ReactElement) (body: ReactElement) (key: string option) (className: string option) =
         Html.section [
             if key.IsSome then

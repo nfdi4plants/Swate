@@ -37,6 +37,7 @@ type GitSidebarProgress = {
     Method: string option
     Stage: string option
     ProgressPercent: float option
+    Output: string option
 }
 
 [<RequireQualifiedAccess>]
@@ -58,6 +59,8 @@ type GitSidebarConfirmationDialog = {
     ConfirmLabel: string
     CancelLabel: string
 }
+
+type GitSidebarPublishRenamePrompt = { CurrentName: string; Message: string }
 
 type GitSidebarCallbacks = {
     OnRefresh: unit -> unit

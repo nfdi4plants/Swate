@@ -1,8 +1,10 @@
 module ElectronRenderer.ArcFilePreviewTargetTests
 
 open Vitest
+open Fable.Core
 open ARCtrl
 open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
+open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Shared
 
@@ -39,6 +41,12 @@ let private expectMetadataView activeView =
     | Some ActiveView.Metadata -> ()
     | _ -> failwith "Expected the metadata view to be activated after table deletion."
 
+let private jsonImportRequest importedFile = {
+    ImportedFile = importedFile
+    SourceFileName = Some "import.json"
+    JsonFormat = JsonExportFormat.ARCtrl
+}
+
 Vitest.describe (
     "ArcFilePreviewTarget table deletion",
     fun () ->
@@ -66,5 +74,111 @@ Vitest.describe (
                 expectMetadataPreserved assay
                 Vitest.expect(publishedArcFile.IsSome).toBe (true)
                 expectMetadataView activeView
+        )
+)
+
+Vitest.describe (
+    "ArcFilePreviewTarget JSON import",
+    fun () ->
+        Vitest.test (
+            "rejects replacing an Assay editor with Study JSON",
+            fun () -> promise {
+                let currentArcFile, _ = createAssayArcFile [||]
+
+                let importedStudy =
+                    ArcStudy.init "ImportedStudy" |> fun study -> ArcFiles.Study(study, [])
+
+                let mutable publishedArcFile: ArcFiles option = None
+                let mutable inMemoryUpdated = false
+
+                let! result =
+                    importJsonRequestIntoCurrentTarget
+                        currentArcFile
+                        (jsonImportRequest importedStudy)
+                        (fun nextArcFile -> publishedArcFile <- Some nextArcFile)
+                        (fun _ -> promise {
+                            inMemoryUpdated <- true
+                            return Ok()
+                        })
+
+                match result with
+                | Ok() -> failwith "Expected mismatched JSON import to fail."
+                | Error exn -> Vitest.expect(exn.Message).toContain ("Cannot import study JSON")
+
+                Vitest.expect(publishedArcFile.IsNone).toBe (true)
+                Vitest.expect(inMemoryUpdated).toBe (false)
+            }
+        )
+
+        Vitest.test (
+            "preserves DataMap parent info while replacing imported DataMap content",
+            fun () ->
+                let parentInfo = DatamapParentInfo.create "assay-parent" DataMapParent.Assay
+                let currentDataMap = DataMap.init ()
+                let importedDataMap = DataMap.init ()
+                importedDataMap.DataContexts.Add(DataContext())
+
+                let result =
+                    Json.Import.applyToCurrentArcFile (
+                        ArcFiles.DataMap(Some parentInfo, currentDataMap),
+                        ArcFiles.DataMap(None, importedDataMap)
+                    )
+
+                match result with
+                | Error exn -> failwith $"Expected DataMap import preparation to succeed: {exn.Message}"
+                | Ok(ArcFiles.DataMap(importedParentInfo, preparedDataMap)) ->
+                    Vitest.expect(importedParentInfo).toEqual (Some parentInfo)
+                    Vitest.expect(preparedDataMap.DataContexts.Count).toBe (1)
+                | Ok _ -> failwith "Expected prepared import to remain a DataMap."
+        )
+
+        Vitest.test (
+            "successful table import appends tables with unique names and invokes in-memory ARC update",
+            fun () -> promise {
+                let currentArcFile, currentAssay =
+                    createAssayArcFile [| "Existing"; "Duplicate"; "Duplicate 1" |]
+
+                let importedAssay = ArcAssay.init "ImportedAssay"
+                importedAssay.AddTable(ArcTable.init "Duplicate")
+                importedAssay.AddTable(ArcTable.init "Fresh")
+                let importedFile = ArcFiles.Assay importedAssay
+                let publishedArcFiles = ResizeArray<ArcFiles>()
+                let inMemoryUpdates = ResizeArray<ArcFiles>()
+
+                let! result =
+                    importJsonRequestIntoCurrentTarget
+                        currentArcFile
+                        (jsonImportRequest importedFile)
+                        (fun nextArcFile -> publishedArcFiles.Add nextArcFile)
+                        (fun nextArcFile -> promise {
+                            inMemoryUpdates.Add nextArcFile
+                            return Ok()
+                        })
+
+                match result with
+                | Error exn -> failwith $"Expected JSON import to succeed: {exn.Message}"
+                | Ok() -> ()
+
+                Vitest.expect(publishedArcFiles.Count).toBe (1)
+                Vitest.expect(inMemoryUpdates.Count).toBe (1)
+
+                match publishedArcFiles.[0], inMemoryUpdates.[0] with
+                | ArcFiles.Assay publishedAssay, ArcFiles.Assay inMemoryAssay ->
+                    Vitest.expect(publishedAssay.Identifier).toBe ("TestAssay")
+                    Vitest.expect(inMemoryAssay.Identifier).toBe ("TestAssay")
+
+                    let expectedNames = [|
+                        "Existing"
+                        "Duplicate"
+                        "Duplicate 1"
+                        "Duplicate 2"
+                        "Fresh"
+                    |]
+
+                    Vitest.expect(publishedAssay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual (expectedNames)
+                    Vitest.expect(inMemoryAssay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual (expectedNames)
+                    Vitest.expect(currentAssay.Tables |> Seq.map _.Name |> Seq.toArray).toEqual (expectedNames)
+                | _ -> failwith "Expected imported Assay to be published and sent to in-memory update."
+            }
         )
 )

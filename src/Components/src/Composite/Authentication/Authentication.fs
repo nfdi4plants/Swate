@@ -157,9 +157,12 @@ type Authentication =
         ]
 
     [<ReactComponent>]
-    static member private NotAuthenticatedView(onSignIn: SignInInformation -> unit, setError: exn option -> unit) =
+    static member private NotAuthenticatedView
+        (onSignIn: SignInInformation -> unit, setError: exn option -> unit, ?initialDataHubUrl)
+        =
 
-        let datahubUrl, setDataHubUrl = React.useState Helper.Default_DataHub
+        let initialDataHubUrl = defaultArg initialDataHubUrl Helper.Default_DataHub
+        let dataHubUrl, setDataHubUrl = React.useState initialDataHubUrl
         let pat, setPat = React.useState ""
 
         Html.div [
@@ -190,12 +193,12 @@ type Authentication =
                         ]
                     ]
                 ]
-                Authentication.DataHubSelect(datahubUrl, setDataHubUrl)
+                Authentication.DataHubSelect(dataHubUrl, setDataHubUrl)
                 Html.a [
                     prop.testId "GeneratePatLink"
                     prop.className "swt:link swt:link-info swt:text-sm swt:text-center swt:py-2"
                     prop.text "Click here to generate a new GitLab Personal Access Token"
-                    prop.href (Helper.GitLabUrls.prefillGitLabPATScopes datahubUrl.Url)
+                    prop.href (Helper.GitLabUrls.prefillGitLabPATScopes dataHubUrl.Url)
                     prop.target.blank
                     prop.rel "noopener noreferrer"
                 ]
@@ -205,11 +208,11 @@ type Authentication =
                     prop.text "Sign In"
                     prop.disabled (
                         System.String.IsNullOrWhiteSpace pat
-                        || System.String.IsNullOrWhiteSpace datahubUrl.Url
+                        || System.String.IsNullOrWhiteSpace dataHubUrl.Url
                     )
                     prop.onClick (fun _ ->
                         onSignIn {
-                            GitLabBaseUrl = datahubUrl.Url
+                            GitLabBaseUrl = dataHubUrl.Url
                             PersonalAccessToken = pat
                             OnErrorCallback = fun ex -> setError (Some ex)
                         }
@@ -248,6 +251,7 @@ type Authentication =
             onLogout: unit -> unit,
             ?isLoading: bool,
             ?dropdownClassName: string,
+            ?onRotateToken: string -> unit,
             ?onSwitchAccount: string -> unit,
             ?onRemoveAccount: string -> unit
         ) =
@@ -256,12 +260,16 @@ type Authentication =
         let error, setError = React.useState (None: exn option)
         let showAddAccount, setShowAddAccount = React.useState false
 
+        let initialDataHubUrl, setInitialDataHubUrl =
+            React.useState (None: DataHubInformation option)
+
         let activeUser = accounts.ActiveUser()
 
         let onSignIn =
             fun signInInfo ->
                 setError None
                 setIsOpen false
+                setInitialDataHubUrl None
                 setShowAddAccount false
                 onSignIn signInInfo
 
@@ -279,6 +287,17 @@ type Authentication =
                 [| box activeUser; box isLoading; box error |]
             )
 
+        let onRegenerateToken (account: AccountSummary) =
+            setShowAddAccount true
+
+            (Some >> setInitialDataHubUrl) {
+                Name = account.User.TargetDataHub
+                Url = account.User.TargetDataHub
+                Description =
+                    Some
+                        "A browser window with prefilled scopes for regenerating your token will open. Please generate a new token and use it to sign in again."
+            }
+
         let content =
             React.useMemo (
                 (fun () ->
@@ -294,7 +313,11 @@ type Authentication =
                                         prop.onClick (fun _ -> setShowAddAccount false)
                                         prop.text "\u2190 Back to account"
                                     ]
-                                    Authentication.NotAuthenticatedView(onSignIn, setError)
+                                    Authentication.NotAuthenticatedView(
+                                        onSignIn,
+                                        setError,
+                                        ?initialDataHubUrl = initialDataHubUrl
+                                    )
                                 ]
                             ]
                         else
@@ -303,6 +326,8 @@ type Authentication =
                                 prop.children [
                                     AccountManager.Main(
                                         accounts,
+                                        onRegenerateToken = onRegenerateToken,
+                                        ?onRotateToken = onRotateToken,
                                         ?onSwitchAccount = onSwitchAccount,
                                         ?onRemoveAccount = onRemoveAccount
                                     )
@@ -317,6 +342,7 @@ type Authentication =
                     box error
                     box showAddAccount
                     box accounts
+                    box initialDataHubUrl
                 |]
             )
 
@@ -331,11 +357,55 @@ type Authentication =
             Dropdown.Main(
                 isOpen,
                 setIsOpen,
-                Html.button [
-                    prop.testId "UserButtonToggle"
-                    prop.onClick (fun _ -> setIsOpen (not isOpen))
-                    prop.className "swt:btn swt:btn-circle swt:btn-sm"
-                    prop.children [ ToggleContent ]
+                Html.div [
+                    prop.className "swt:indicator swt:indicator-bottom"
+                    prop.children [
+                        match activeUser, accounts.ActiveAccount with
+                        | Some _, Some activeAccount ->
+                            match activeAccount.TokenStatus with
+                            | TokenStatus.Invalid ->
+                                Html.span [
+                                    prop.testId "TokenInvalidIndicator"
+                                    prop.className "swt:indicator-item"
+                                    prop.ariaLabel
+                                        "Your token is invalid. Please update your token or remove the account."
+                                    prop.title "Your token is invalid. Please update your token or remove the account."
+                                    prop.children [
+                                        Html.i [
+                                            prop.ariaHidden true
+                                            prop.className "swt:iconify swt:fluent--warning-12-filled swt:text-error"
+                                        ]
+                                    ]
+                                ]
+                            | TokenStatus.Expiring ->
+                                Html.span [
+                                    prop.testId "TokenExpiringIndicator"
+                                    prop.className "swt:indicator-item"
+                                    prop.ariaLabel "Your token is expiring soon. Rotate it to avoid interruption."
+                                    prop.title (
+                                        activeAccount.TokenExpiresOn
+                                        |> Option.map (fun expiresOn ->
+                                            $"Your token expires on {expiresOn}. Rotate it soon to avoid interruption."
+                                        )
+                                        |> Option.defaultValue
+                                            "Your token is expiring soon. Rotate it to avoid interruption."
+                                    )
+                                    prop.children [
+                                        Html.i [
+                                            prop.ariaHidden true
+                                            prop.className "swt:iconify swt:fluent--warning-12-filled swt:text-warning"
+                                        ]
+                                    ]
+                                ]
+                            | TokenStatus.Ok -> ()
+                        | _ -> ()
+                        Html.button [
+                            prop.testId "UserButtonToggle"
+                            prop.onClick (fun _ -> setIsOpen (not isOpen))
+                            prop.className "swt:btn swt:btn-circle swt:btn-sm"
+                            prop.children [ ToggleContent ]
+                        ]
+                    ]
                 ],
                 Html.div [ prop.testId "UserDropdownContent"; prop.children content ],
                 contentClassName =
@@ -360,13 +430,15 @@ type Authentication =
                 Some {
                     User = Authentication.ExmpUserInformation
                     DateAdded = "2026-01-01T00:00:00.0000000Z"
-                    TokenInvalid = false
+                    TokenStatus = TokenStatus.Ok
+                    TokenExpiresOn = Some "2026-02-01"
                 }
             StoredAccounts = [|
                 {
                     User = Authentication.ExmpUserInformation
                     DateAdded = "2026-01-01T00:00:00.0000000Z"
-                    TokenInvalid = false
+                    TokenStatus = TokenStatus.Ok
+                    TokenExpiresOn = Some "2026-02-01"
                 }
             |]
     }
@@ -402,7 +474,8 @@ type Authentication =
                                     TargetDataHub = activeUser.TargetDataHub
                                 }
                                 DateAdded = "2026-01-01T00:00:00.0000000Z"
-                                TokenInvalid = false
+                                TokenStatus = TokenStatus.Ok
+                                TokenExpiresOn = Some "2026-02-01"
                             }
                         StoredAccounts = [|
                             {
@@ -415,7 +488,8 @@ type Authentication =
                                     TargetDataHub = activeUser.TargetDataHub
                                 }
                                 DateAdded = "2026-01-01T00:00:00.0000000Z"
-                                TokenInvalid = false
+                                TokenStatus = TokenStatus.Ok
+                                TokenExpiresOn = Some "2026-02-01"
                             }
                             {
                                 User = {
@@ -428,7 +502,22 @@ type Authentication =
                                     TargetDataHub = "https://datahub.rz.rptu.de/"
                                 }
                                 DateAdded = "2026-01-02T00:00:00.0000000Z"
-                                TokenInvalid = false
+                                TokenStatus = TokenStatus.Expiring
+                                TokenExpiresOn = Some "2026-01-15"
+                            }
+                            {
+                                User = {
+                                    Id = 3
+                                    LocalSwateAccountId = "acc-3"
+                                    Name = "Mr Lazy"
+                                    Email = "lazy@example.org"
+                                    AvatarUrl =
+                                        "https://www.gravatar.com/avatar/33333333333333333333333333333333?d=mp&f=y"
+                                    TargetDataHub = "https://git.nfdi4plants.org/"
+                                }
+                                DateAdded = "2022-01-02T00:00:00.0000000Z"
+                                TokenStatus = TokenStatus.Invalid
+                                TokenExpiresOn = Some "2022-02-01"
                             }
                         |]
                     }
@@ -474,6 +563,35 @@ type Authentication =
 
             setAccounts next
 
+        let onRotateToken (localSwateAccountId: string) =
+            // For testing, we just set the token status to Ok and update the expiration date. In a real implementation, this should trigger the token rotation flow and update the account information accordingly.
+            let nextAccounts =
+                accounts.StoredAccounts
+                |> Array.map (fun account ->
+                    if account.User.LocalSwateAccountId = localSwateAccountId then
+                        {
+                            account with
+                                TokenStatus = TokenStatus.Ok
+                                TokenExpiresOn = Some "2026-03-01"
+                        }
+                    else
+                        account
+                )
+
+            let nextActive =
+                match accounts.ActiveAccount with
+                | Some activeAccount when activeAccount.User.LocalSwateAccountId = localSwateAccountId ->
+                    nextAccounts
+                    |> Array.tryFind (fun account ->
+                        account.User.LocalSwateAccountId = activeAccount.User.LocalSwateAccountId
+                    )
+                | other -> other
+
+            setAccounts {
+                ActiveAccount = nextActive
+                StoredAccounts = nextAccounts
+            }
+
         Html.div [
             prop.className "swt:flex swt:flex-col swt:m-10 swt:gap-2"
             prop.children [
@@ -491,7 +609,8 @@ type Authentication =
                     onLogout,
                     isLoading = isLoading,
                     onSwitchAccount = onSwitchAccount,
-                    onRemoveAccount = onRemoveAccount
+                    onRemoveAccount = onRemoveAccount,
+                    onRotateToken = onRotateToken
                 )
             ]
         ]

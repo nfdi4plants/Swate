@@ -1,66 +1,76 @@
 name: Release Swate Electron App
-# description: Build and release the Swate Electron app. Crossplatform build and release for Windows, macOS, and Linux. Will be uploaded to GitHub releases.
-
 on:
-  # push:
-    # branches:
-    #   - main
-    #   - epic/SwateApp
   workflow_dispatch:
-    
+  push:
+    branches:
+      - epic/SwateApp
 
 permissions:
   contents: write
 
 jobs:
-  # --- Job 1: Run tests ---
-  test:
+  # # --- Job 1: Run tests ---
+  # test:
+  #   strategy:
+  #     fail-fast: false
+  #     matrix:
+  #       os: [ubuntu-latest, windows-latest, macos-latest]
+  #   runs-on: ${{ matrix.os }}
+  #   steps:
+  #     # Checkout the repository
+  #     - name: Checkout code
+  #       uses: actions/checkout@v5
+
+  #     # Set up .NET
+  #     - name: Set up .NET
+  #       uses: actions/setup-dotnet@v5
+  #       with:
+  #         dotnet-version: 10.x
+
+  #     # Restore .NET tools
+  #     - name: Restore .NET dependencies
+  #       run: dotnet tool restore
+
+  #     # Install Node.js
+  #     - name: Set up Node.js
+  #       uses: actions/setup-node@v6
+  #       with:
+  #         node-version: 22
+  #         cache: "npm"
+
+  #     # Install npm dependencies
+  #     - name: Install root npm dependencies
+  #       run: npm i
+
+  #     # Install playwright dependencies
+  #     - name: Install Playwright dependencies
+  #       working-directory: src/Components
+  #       run: npx playwright install --with-deps chromium
+
+  #     - name: Run Tests
+  #       run: dotnet run --project ./build/Build.fsproj test
+
+  build:
+    # needs: test
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
-    runs-on: ${{ matrix.os }}
-    steps:
-      # Checkout the repository
-      - name: Checkout code
-        uses: actions/checkout@v5
+        include:
+          - os: windows-latest
+            arch: x64
 
-      # Set up .NET
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v5
-        with:
-          dotnet-version: 10.x
+          # - os: windows-latest
+          #   arch: arm64
 
-      # Restore .NET tools
-      - name: Restore .NET dependencies
-        run: dotnet tool restore
+          - os: macos-latest
+            arch: x64
 
-      # Install Node.js
-      - name: Set up Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: "npm"
+          - os: macos-latest
+            arch: arm64
 
-      # Install npm dependencies
-      - name: Install root npm dependencies
-        run: npm i
+          - os: ubuntu-latest
+            arch: x64
 
-      # Install playwright dependencies
-      - name: Install Playwright dependencies
-        working-directory: src/Components
-        run: npx playwright install --with-deps chromium
-
-      - name: Run Tests
-        run: dotnet run --project ./build/Build.fsproj test
-
-  # --- Job 2: Create release ---
-  release:
-    needs: test
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
     runs-on: ${{ matrix.os }}
     steps:
       # Checkout the repository
@@ -88,9 +98,50 @@ jobs:
       - name: Install root dependencies
         run: npm i
 
-      # publish swate-app
-      - name: Publish swate-app
+      - name: Build packages
         working-directory: src/Electron
-        run: npm run publish
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          npm run fable
+          npx electron-forge make --arch=${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: make-${{ runner.os }}-${{ matrix.arch }}
+          path: |
+            src/Electron/out/make/**/*.exe
+            src/Electron/out/make/**/*.nupkg
+            src/Electron/out/make/**/*.zip
+            src/Electron/out/make/**/*.dmg
+            src/Electron/out/make/**/*.deb
+            src/Electron/out/make/**/*.rpm
+
+  publish:
+    needs: build
+
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+
+      - run: npm i
+
+      - uses: actions/download-artifact@v4
+        with:
+          path: release-assets
+
+      - name: Read version
+        id: version
+        run: |
+          echo "version=$(node -p "require('./src/Electron/package.json').version")" >> $GITHUB_OUTPUT
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          draft: true
+          prerelease: true
+          overwrite_files: true
+          files: release-assets/**/*

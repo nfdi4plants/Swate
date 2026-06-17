@@ -9,6 +9,7 @@ open Swate.Components.Primitive
 open Swate.Components.Primitive.Navbar
 open Swate.Components.Composite.Widgets.Context
 open Swate.Components.Composite.DataMapTable
+open Swate.Components.Composite.Widgets.JsonImport.Types
 open Swate.Components.Shared
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Composite.AnnotationTable
@@ -62,6 +63,26 @@ type private LazyComponents =
         )
 
     [<ReactLazyComponent>]
+    static member LazyJsonImportWidget
+        (
+            arcFile: ArcFiles,
+            setArcFile: ArcFiles -> unit,
+            onImportJson: (JsonImportRequest -> JS.Promise<Result<unit, exn>>) option,
+            onError: exn -> unit
+        ) =
+        Swate.Components.Composite.Widgets.JsonImport.JsonImport.JsonImport(
+            arcFile = arcFile,
+            setArcFile = setArcFile,
+            ?onImportJson = onImportJson,
+            onError = onError
+        )
+
+
+    [<ReactLazyComponent>]
+    static member LazyJsonExportWidget(arcFile: ArcFiles, onError: exn -> unit) =
+        Swate.Components.Composite.Widgets.JsonExport.JsonExport.JsonExport(arcFile = arcFile, onError = onError)
+
+    [<ReactLazyComponent>]
     static member LazyDataAnnotator(destination: AnnotationDestination, setAnnotationInput, onError) =
         Swate.Components.Composite.Widgets.DataAnnotator.DataAnnotator.Main(destination, setAnnotationInput, onError)
 
@@ -69,16 +90,20 @@ type private LazyComponents =
     static member LazyArcFileMetadata(arcFile: ArcFiles, setArcFile: ArcFiles -> unit) =
         Swate.Components.Page.Metadata.ArcFileMetadata.ArcFileMetadata(arcFile = arcFile, setArcFile = setArcFile)
 
+
 [<Erase; Mangle(false)>]
 type Main =
 
     [<ReactComponent>]
     static member private LazyFallback(text: string) =
         Html.div [
-            prop.className "swt:flex swt:items-center swt:justify-center swt:p-3 swt:text-sm swt:opacity-70"
-            prop.text text
+            prop.className "swt:flex swt:items-center swt:justify-center"
+            prop.children [
+                Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(text = text)
+            ]
         ]
 
+    [<ReactComponent>]
     static member LazyLoaderWithMessage(lazyComponent: ReactElement, message: string) =
         React.Suspense([ lazyComponent ], fallback = Main.LazyFallback(message))
 
@@ -259,6 +284,7 @@ type Main =
             pickPaths: unit -> Fable.Core.JS.Promise<string[]>,
             ?trailingNavbarElements: ArcFileEditorHeaderProps -> ReactElement,
             ?startingActiveView: ActiveView,
+            ?onImportJson: JsonImportRequest -> JS.Promise<Result<unit, exn>>,
             ?onError: string -> unit
         ) =
 
@@ -353,12 +379,28 @@ type Main =
                                 prop.className "swt:p-3 swt:text-sm swt:opacity-70"
                                 prop.text message
                             ]
+                    jsonImport =
+                        Main.LazyLoaderWithMessage(
+                            LazyComponents.LazyJsonImportWidget(
+                                arcFile,
+                                setArcFile,
+                                onImportJson,
+                                (fun exn -> onError exn.Message)
+                            ),
+                            "Loading JSON Import Widget..."
+                        )
+                    jsonExport =
+                        Main.LazyLoaderWithMessage(
+                            LazyComponents.LazyJsonExportWidget(arcFile, (fun exn -> onError exn.Message)),
+                            "Loading JSON Export Widget..."
+                        )
                 |}),
                 [|
                     box arcFile
                     box activeView
                     box activeTableIndex
                     box setArcFile
+                    box onImportJson
                     pickPaths
                 |]
             )
@@ -410,7 +452,9 @@ type Main =
                 widgetElements.buildingBlock,
                 widgetElements.template,
                 widgetElements.filePicker,
-                widgetElements.dataAnnotator
+                widgetElements.dataAnnotator,
+                widgetElements.jsonImport,
+                widgetElements.jsonExport
             )
         )
 

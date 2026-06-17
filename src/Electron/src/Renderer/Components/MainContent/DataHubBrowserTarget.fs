@@ -98,7 +98,7 @@ let DataHubBrowserTarget () =
         |> Promise.start
 
     Html.div [
-        prop.className "swt:size-full swt:flex swt:flex-col"
+        prop.className "swt:size-full swt:flex swt:flex-col swt:overflow-hidden"
         prop.children [
             Swate.Components.Page.GitSidebar.OperationStatusNotice(
                 ?runStatus = runStatus,
@@ -107,23 +107,11 @@ let DataHubBrowserTarget () =
                 busyTestId = "DataHubCloneProgressNotice",
                 errorTestId = "DataHubCloneErrorNotice"
             )
-            Html.div [
-                prop.className "swt:px-2 swt:pt-2"
-                prop.children [
-                    Swate.Components.Page.GitSidebar.DownloadLargeFilesToggle(
-                        gitStateCtx.state.DownloadLargeFiles,
-                        isCloneBusy,
-                        gitStateCtx.saveDownloadLargeFiles,
-                        testId = "DataHubDownloadLargeFilesCheckbox",
-                        description = "Reuse the Git LFS download preference for repository clones from DataHub."
-                    )
-                ]
-            ]
             DataHubBrowser.ExplorePanel(
                 accounts = authCtx,
                 loaders = loaders,
                 projectActionBtns = DataHubBrowserHelper.createActionBtns cloneAndOpenRepo,
-                classNames = "swt:grow swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:pb-4",
+                classNames = "swt:grow swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:overflow-hidden",
                 onClose = closePage
             )
         ]

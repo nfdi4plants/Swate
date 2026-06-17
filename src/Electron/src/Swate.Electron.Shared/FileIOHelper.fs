@@ -176,17 +176,33 @@ let rec collapseSingleChildSameName (node: FileTreeNode) : FileTreeNode =
         nodeWithCollapsedChildren
 
 let tryGetExistingNotesTargetRef (path: string) : ExistingTargetRef option =
-    let tryResolveTarget folderName kind =
-        tryGetPathSegmentAfterFolder folderName path
-        |> Option.map (fun name -> { Name = name; Kind = kind })
-
-    match tryResolveTarget "studies" NotesTargetKind.Study with
-    | Some target -> Some target
-    | None -> tryResolveTarget "assays" NotesTargetKind.Assay
+    match getNonEmptyPathParts path with
+    | [| "studies"; name; fileName |] when
+        PathHelpers.isSafePathSegment name
+        && PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.StudyFileName
+        ->
+        Some {
+            Name = name
+            Kind = NotesTargetKind.Study
+        }
+    | [| "assays"; name; fileName |] when
+        PathHelpers.isSafePathSegment name
+        && PathHelpers.pathsEqual fileName ARCtrl.ArcPathHelper.AssayFileName
+        ->
+        Some {
+            Name = name
+            Kind = NotesTargetKind.Assay
+        }
+    | _ -> None
 
 let createAvailableNotesTargets (fileEntries: seq<FileEntry>) =
     fileEntries
-    |> Seq.choose (fun entry -> tryGetExistingNotesTargetRef entry.path)
+    |> Seq.choose (fun entry ->
+        if entry.isDirectory then
+            None
+        else
+            tryGetExistingNotesTargetRef entry.path
+    )
     |> Seq.distinctBy (fun target -> target.Kind, target.Name)
     |> Seq.sortBy (fun target ->
         let kindOrder =

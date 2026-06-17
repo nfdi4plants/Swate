@@ -1,4 +1,14 @@
 const noop = () => {};
+let fromWebContentsMock: ((webContents: unknown) => unknown) | undefined;
+
+export const __electronMock = {
+    reset: () => {
+        fromWebContentsMock = undefined;
+    },
+    setBrowserWindowFromWebContents: (handler: (webContents: unknown) => unknown) => {
+        fromWebContentsMock = handler;
+    },
+};
 
 export const app = {
     getPath: () => {
@@ -23,7 +33,7 @@ export const safeStorage = {
 
 export class BrowserWindow {
     static getAllWindows = () => [];
-    static fromWebContents = () => undefined;
+    static fromWebContents = (webContents: unknown) => fromWebContentsMock?.(webContents);
 }
 
 export const contextBridge = { exposeInMainWorld: noop };

@@ -283,7 +283,7 @@ let initRepository (targetPath: string) : JS.Promise<GitService.GitResult<string
                 let! initResult =
                     runSimpleGit
                         (fun git -> promise {
-                            let! _ = git.init ()
+                            let! _ = git.init (U2.Case1 [| "--initial-branch=main" |])
                             return normalizedTargetPath
                         })
                         initGit
@@ -304,6 +304,8 @@ let cloneRepository
     (progress: GitService.GitProgressCallback option)
     : JS.Promise<GitService.GitResult<string>> =
     promise {
+        GitInternals.reportPhase progress "clone" "Preparing clone"
+
         let remoteUrlCandidate =
             remoteUrl |> Option.ofObj |> Option.defaultValue String.Empty
 
@@ -380,6 +382,11 @@ let cloneRepository
                                                 match cloneResult with
                                                 | Error _ -> return cloneResult
                                                 | Ok _ ->
+                                                    GitInternals.reportPhase
+                                                        progress
+                                                        "clone"
+                                                        "Saving Git LFS preference"
+
                                                     let! persistResult =
                                                         persistCloneDownloadPreference
                                                             normalizedTargetPath
@@ -403,20 +410,32 @@ let cloneRepository
                                                                 | Some token ->
                                                                     Ok(
                                                                         applyAuth
-                                                                            createGit
+                                                                            (fun options ->
+                                                                                createGit options
+                                                                                |> withGitOutputProgress progress
+                                                                            )
                                                                             repoOptions
                                                                             host
                                                                             token
                                                                             (Some "origin")
                                                                             (Some safeRemoteUrl)
                                                                     )
-                                                                | None -> Ok(createGit repoOptions)
+                                                                | None ->
+                                                                    Ok(
+                                                                        createGit repoOptions
+                                                                        |> withGitOutputProgress progress
+                                                                    )
                                                             with authError ->
                                                                 Error authError
 
                                                         match hydrateGitResult with
                                                         | Error authError -> return errorResult authError
                                                         | Ok hydrateGit ->
+                                                            GitInternals.reportPhase
+                                                                progress
+                                                                "lfs"
+                                                                "Downloading Git LFS files"
+
                                                             let! hydrateResult = hydrateClonedLfsContent hydrateGit
 
                                                             match hydrateResult with
@@ -438,7 +457,10 @@ let cloneRepository
                                                         try
                                                             Ok(
                                                                 applyAuth
-                                                                    createGit
+                                                                    (fun options ->
+                                                                        createGit options
+                                                                        |> withGitOutputProgress progress
+                                                                    )
                                                                     cloneOptions
                                                                     host
                                                                     token
@@ -452,6 +474,7 @@ let cloneRepository
                                                     | Error authError -> return errorResult authError
                                                     | Ok authenticatedGit ->
                                                         let configuredGit = applyCloneSkipSmudge authenticatedGit
+                                                        GitInternals.reportPhase progress "clone" "Cloning repository"
 
                                                         let! authenticatedCloneResult =
                                                             cloneWithGit
@@ -466,7 +489,11 @@ let cloneRepository
                                                                 hydrateIfRequested (Some token) authenticatedCloneResult
                                                 | None ->
                                                     let unauthenticatedGit =
-                                                        createGit cloneOptions |> applyCloneSkipSmudge
+                                                        createGit cloneOptions
+                                                        |> withGitOutputProgress progress
+                                                        |> applyCloneSkipSmudge
+
+                                                    GitInternals.reportPhase progress "clone" "Cloning repository"
 
                                                     let! unauthenticatedCloneResult =
                                                         cloneWithGit

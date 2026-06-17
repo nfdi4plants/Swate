@@ -5,6 +5,7 @@ open Fable.Core.JsInterop
 open Fable.Core.JS
 open Swate.Electron.Shared.GitTypes
 open Main.Bindings.Node
+open Main.Git.GitAuthAdapter
 
 [<Literal>]
 let private repoValidationTimeoutMs = 5000
@@ -27,21 +28,22 @@ type GitSpawnResult = {
     TimedOut: bool
 }
 
-/// Runs `git` without a shell and captures stdout/stderr for callers that need exact output or stdin support.
-let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promise {
+let private resolveGitEnvironment (environment: obj option) =
+    environment
+    |> Option.defaultWith createNonInteractiveEnv
+    |> GitCommandResolver.ensureGitToolPath
+
+let private runGitProcess (captureStdout: bool) (request: GitSpawnRequest) : Promise<GitSpawnResult> = promise {
     let! result =
         Fable.Core.JS.Constructors.Promise.Create(fun resolve _ ->
             let spawnOptions =
                 createObj [
                     "shell" ==> false
                     "windowsHide" ==> true
+                    "env" ==> resolveGitEnvironment request.Environment
 
                     match request.WorkingDirectory with
                     | Some value -> "cwd" ==> value
-                    | None -> ()
-
-                    match request.Environment with
-                    | Some value -> "env" ==> value
                     | None -> ()
                 ]
 
@@ -55,7 +57,11 @@ let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promis
                 if not finished then
                     finished <- true
 
-                    let stdoutBuffer = bufferConcat (stdoutChunks.ToArray())
+                    let stdoutBuffer =
+                        if captureStdout then
+                            bufferConcat (stdoutChunks.ToArray())
+                        else
+                            bufferConcat [||]
 
                     resolve {
                         ExitCode = exitCode
@@ -65,7 +71,13 @@ let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promis
                         TimedOut = timedOut
                     }
 
-            proc?stdout?on ("data", fun d -> stdoutChunks.Add d) |> ignore
+            proc?stdout?on (
+                "data",
+                fun d ->
+                    if captureStdout then
+                        stdoutChunks.Add d
+            )
+            |> ignore
 
             proc?stderr?on ("data", fun d -> stderrChunks.Add(d?toString ("utf8") |> unbox<string>))
             |> ignore
@@ -117,6 +129,13 @@ let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = promis
     return result
 }
 
+/// Runs `git` without a shell and captures stdout/stderr for callers that need exact output or stdin support.
+let runGitCaptured (request: GitSpawnRequest) : Promise<GitSpawnResult> = runGitProcess true request
+
+/// Runs `git` while draining and discarding stdout.
+/// This is used for commands such as `git lfs smudge`, whose stdout may contain a large file.
+let runGitDiscardingStdout (request: GitSpawnRequest) : Promise<GitSpawnResult> = runGitProcess false request
+
 /// Runs a small git command and returns stdout text, or None on command failure.
 /// Used for feature probes where failure should not surface as a user-facing Git error.
 let tryExecGitText (workingDirectory: string option) (timeoutMs: int) (args: string[]) : Promise<string option> = promise {
@@ -128,6 +147,7 @@ let tryExecGitText (workingDirectory: string option) (timeoutMs: int) (args: str
                     "stdio" ==> "pipe"
                     "shell" ==> false
                     "timeout" ==> timeoutMs
+                    "env" ==> createNonInteractiveEnv ()
 
                     match workingDirectory with
                     | Some value -> "cwd" ==> value
@@ -204,6 +224,7 @@ type NodeGitLfsAdapter() =
                         "encoding" ==> "utf8"
                         "stdio" ==> "pipe"
                         "shell" ==> false
+                        "env" ==> createNonInteractiveEnv ()
                     ]
                 )
                 |> unbox<string>
@@ -237,6 +258,7 @@ type NodeGitLfsAdapter() =
                             let spawnOptions =
                                 createObj [
                                     "shell" ==> false
+                                    "env" ==> createNonInteractiveEnv ()
 
                                     match workingDirectory with
                                     | Some value -> "cwd" ==> value
@@ -391,6 +413,7 @@ type NodeGitLfsAdapter() =
                             "encoding" ==> "utf8"
                             "stdio" ==> "pipe"
                             "shell" ==> false
+                            "env" ==> createNonInteractiveEnv ()
                         ]
                     )
                     |> unbox<string>

@@ -267,6 +267,7 @@ type ErrorModalProvider =
                             |> ErrorModalEntry.Single
                             |> Enqueue
                             |> dispatch
+                    dismissById = dismissById
                 }),
                 [| box scopeId |]
             )

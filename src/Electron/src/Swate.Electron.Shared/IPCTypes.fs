@@ -21,6 +21,8 @@ module IPCTypesHelper =
 
 open IPCTypesHelper
 
+type CreateArcRequest = { identifier: string; initGit: bool }
+
 /// Two Way Bridge: Renderer <-> Main
 type IArcVaultsApi = {
     /// Open ARC via folder dialog. Main decides: current window / new window / focus existing.
@@ -28,7 +30,7 @@ type IArcVaultsApi = {
     /// Open ARC at a known path (e.g. recent-ARC click). Main decides disposition.
     openARCByPath: string -> JS.Promise<Result<string, exn>>
     /// Create ARC via folder dialog. Main decides disposition.
-    createARC: string -> JS.Promise<Result<string, exn>>
+    createARC: CreateArcRequest -> JS.Promise<Result<string, exn>>
     /// Ensure ARC notes scaffolding exists for the ARCVault root path.
     ensureNotesFolder: unit -> JS.Promise<Result<unit, exn>>
     closeARC: unit -> JS.Promise<Result<unit, exn>>
@@ -58,6 +60,7 @@ type IArcVaultsApi = {
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
+    renameOpenArcRoot: string -> JS.Promise<Result<string, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: string -> JS.Promise<Result<string, exn>>
@@ -90,7 +93,8 @@ type IGitApi = {
     setGitLfsSettings: GitLfsSettingsDto -> JS.Promise<Result<GitOperationResult, exn>>
     gitLfsPrune: unit -> JS.Promise<Result<GitOperationResult, exn>>
     gitLfsDedup: unit -> JS.Promise<Result<GitOperationResult, exn>>
-    gitLfsFreeLocalCopy: GitLfsFreeLocalCopyRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitLfsDownloadFile: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitLfsFreeLocalCopy: GitLfsFileRequest -> JS.Promise<Result<GitOperationResult, exn>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, exn>>
     confirmGitMergeResolution:
@@ -115,6 +119,7 @@ type IAuthApi = {
     signOut: unit -> Fable.Core.JS.Promise<Result<unit, exn>>
     revalidate: unit -> Fable.Core.JS.Promise<Result<AuthResult, exn>>
     listAccounts: unit -> Fable.Core.JS.Promise<Result<AccountSummary array, exn>>
+    rotatePersonalAccessToken: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
 }
@@ -138,6 +143,10 @@ module MainToRendererIpc =
 
     type IGitProgressRendererApi = {
         gitProgressUpdate: GitProgressDto -> unit
+    }
+
+    type IGitRepositoryRendererApi = {
+        gitRepositoryInitialized: string -> unit
     }
 
     type IGitLfsProgressRendererApi = {

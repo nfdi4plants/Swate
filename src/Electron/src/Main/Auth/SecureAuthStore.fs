@@ -6,6 +6,7 @@ open Fable.Electron.Main
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
 open Thoth.Json.Core
+open Swate.Components.Composite.Authentication.Types
 
 [<Literal>]
 let private activeAccountFileName = "active-account.json"
@@ -19,7 +20,8 @@ type AuthMetadata = {
     AvatarUrl: string
     TargetDataHub: string
     DateAdded: string
-    TokenInvalid: bool
+    TokenStatus: TokenStatus
+    TokenExpiresOn: string option
 }
 
 /// In-memory representation of a full auth credential set.
@@ -82,20 +84,46 @@ let private isSafeLocalSwateAccountId (localSwateAccountId: string) : bool =
     && localSwateAccountId
        |> Seq.forall (fun c -> System.Char.IsLetterOrDigit c || c = '_' || c = '-')
 
+let private parseTokenStatus (raw: string) : TokenStatus option =
+    match raw.Trim().ToLowerInvariant() with
+    | "ok" -> Some TokenStatus.Ok
+    | "expiring" -> Some TokenStatus.Expiring
+    | "invalid" -> Some TokenStatus.Invalid
+    | _ -> None
+
+let private tokenStatusToString (status: TokenStatus) : string =
+    match status with
+    | TokenStatus.Ok -> "ok"
+    | TokenStatus.Expiring -> "expiring"
+    | TokenStatus.Invalid -> "invalid"
+
 let private authMetadataDecoder (localSwateAccountId: string) : Decoder<AuthMetadata> =
-    Decode.object (fun get -> {
-        LocalSwateAccountId = localSwateAccountId
-        Id = get.Required.Field "id" Decode.int
-        Name = get.Required.Field "name" Decode.string
-        Email = get.Required.Field "email" Decode.string
-        AvatarUrl = get.Required.Field "avatarUrl" Decode.string
-        TargetDataHub = get.Required.Field "targetDataHub" Decode.string
-        DateAdded =
-            get.Optional.Field "dateAdded" Decode.string
-            |> Option.filter (String.IsNullOrWhiteSpace >> not)
-            |> Option.defaultWith Swate.Components.DateTimeExtensions.getUtcNowISO
-        TokenInvalid = get.Optional.Field "tokenInvalid" Decode.bool |> Option.defaultValue false
-    })
+    Decode.object (fun get ->
+        let tokenStatusFromLegacyFlag =
+            get.Optional.Field "tokenInvalid" Decode.bool
+            |> Option.map (fun tokenInvalid -> if tokenInvalid then TokenStatus.Invalid else TokenStatus.Ok)
+
+        {
+            LocalSwateAccountId = localSwateAccountId
+            Id = get.Required.Field "id" Decode.int
+            Name = get.Required.Field "name" Decode.string
+            Email = get.Required.Field "email" Decode.string
+            AvatarUrl = get.Required.Field "avatarUrl" Decode.string
+            TargetDataHub = get.Required.Field "targetDataHub" Decode.string
+            DateAdded =
+                get.Optional.Field "dateAdded" Decode.string
+                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+                |> Option.defaultWith Swate.Components.DateTimeExtensions.getUtcNowISO
+            TokenStatus =
+                get.Optional.Field "tokenStatus" Decode.string
+                |> Option.bind parseTokenStatus
+                |> Option.orElse tokenStatusFromLegacyFlag
+                |> Option.defaultValue TokenStatus.Ok
+            TokenExpiresOn =
+                get.Optional.Field "tokenExpiresOn" Decode.string
+                |> Option.filter (String.IsNullOrWhiteSpace >> not)
+        }
+    )
 
 let private activeLocalSwateAccountIdDecoder: Decoder<string option> =
     Decode.object (fun get ->
@@ -166,7 +194,9 @@ let store (credential: StoredCredential) : Result<unit, string> =
                     avatarUrl = credential.Metadata.AvatarUrl
                     targetDataHub = credential.Metadata.TargetDataHub
                     dateAdded = credential.Metadata.DateAdded
-                    tokenInvalid = credential.Metadata.TokenInvalid
+                    tokenStatus = tokenStatusToString credential.Metadata.TokenStatus
+                    tokenExpiresOn = credential.Metadata.TokenExpiresOn
+                    tokenInvalid = credential.Metadata.TokenStatus = TokenStatus.Invalid
                 |}
 
             let tmpMeta = metaFilePath localSwateAccountId + ".tmp"

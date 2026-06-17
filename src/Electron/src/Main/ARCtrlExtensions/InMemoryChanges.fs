@@ -1,9 +1,9 @@
-namespace Main.ArcMerge
+namespace Main.ARCtrlExtensions
 
 open ARCtrl
 
 [<AutoOpen>]
-module ArcMergeExtensions =
+module InMemoryChangesExtensions =
 
     // Used to handle initiated but empty datamaps that have a StaticHash of 0, which would otherwise be indistinguishable from unchanged datamaps.
     let private cleanEmptyDataMapStaticHash = System.Int32.MinValue
@@ -12,6 +12,32 @@ module ArcMergeExtensions =
         let hash = dataMap.GetHashCode()
 
         if hash = 0 then cleanEmptyDataMapStaticHash else hash
+
+    let private baselineDataMapStaticHash (dataMap: DataMap option) =
+        dataMap |> Option.iter (fun dm -> dm.StaticHash <- cleanDataMapStaticHash dm)
+
+    /// Sets the current loaded ARC state as the clean in-memory baseline.
+    let baselineArcStaticHashes (arc: ARC) : unit =
+        arc.License
+        |> Option.iter (fun license -> license.StaticHash <- license.GetHashCode())
+
+        for study in arc.Studies do
+            study.StaticHash <- study.GetLightHashCode()
+            baselineDataMapStaticHash study.DataMap
+
+        for assay in arc.Assays do
+            assay.StaticHash <- assay.GetLightHashCode()
+            baselineDataMapStaticHash assay.DataMap
+
+        for workflow in arc.Workflows do
+            workflow.StaticHash <- workflow.GetLightHashCode()
+            baselineDataMapStaticHash workflow.DataMap
+
+        for run in arc.Runs do
+            run.StaticHash <- run.GetLightHashCode()
+            baselineDataMapStaticHash run.DataMap
+
+        arc.StaticHash <- arc.GetLightHashCode()
 
     type DataMap with
         member this.hasInMemoryChanges() : bool =

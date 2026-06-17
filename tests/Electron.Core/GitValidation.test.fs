@@ -19,6 +19,7 @@ open Vitest
 module GitService = Main.Git.GitService
 module GitProvisioningService = Main.Git.GitProvisioningService
 module GitAuthAdapter = Main.Git.GitAuthAdapter
+module GitCommandResolver = Main.Git.GitCommandResolver
 module GitTokenProvider = Main.Git.GitTokenProvider
 module AuthService = Main.Auth.AuthService
 
@@ -69,6 +70,9 @@ Vitest.describe (
             "maps network message", "could not resolve host github.com", GitFailureKind.Network
             "maps timeout message", "operation timed out", GitFailureKind.Timeout
             "maps canceled message", "AbortError: signal aborted", GitFailureKind.Canceled
+            "maps duplicate DataHub project message",
+            "GitLab request failed with HTTP 400: {\"message\":{\"name\":[\"has already been taken\"],\"path\":[\"has already been taken\"]}}",
+            GitFailureKind.RemoteProjectAlreadyExists
             "falls back to unknown message", "something unexpected", GitFailureKind.Unknown
             "keeps unauthorized priority over network indicators",
             "connection refused, could not read username",
@@ -323,6 +327,48 @@ Vitest.describe (
 )
 
 Vitest.describe (
+    "GitCommandResolver.resolveGitToolPath",
+    fun () ->
+        Vitest.test (
+            "keeps the inherited PATH when Git LFS resolves normally",
+            fun () ->
+                let path =
+                    GitCommandResolver.resolveGitToolPath (fun _ -> true) "darwin" "/usr/bin:/bin"
+
+                Vitest.expect(path).toBe ("/usr/bin:/bin")
+        )
+
+        Vitest.test (
+            "prepends common macOS Git tool directories when automatic resolution fails",
+            fun () ->
+                let path =
+                    GitCommandResolver.resolveGitToolPath (fun _ -> false) "darwin" "/usr/bin:/bin:/custom/bin"
+
+                Vitest.expect(path).toBe ("/opt/homebrew/bin:/usr/local/bin:/opt/local/bin:/usr/bin:/bin:/custom/bin")
+        )
+
+        Vitest.test (
+            "prepends common Linux Git tool directories when automatic resolution fails",
+            fun () ->
+                let path =
+                    GitCommandResolver.resolveGitToolPath (fun _ -> false) "linux" "/usr/bin:/bin:/custom/bin"
+
+                Vitest
+                    .expect(path)
+                    .toBe ("/home/linuxbrew/.linuxbrew/bin:/usr/local/bin:/usr/bin:/bin:/snap/bin:/custom/bin")
+        )
+
+        Vitest.test (
+            "does not alter unsupported platforms",
+            fun () ->
+                let path =
+                    GitCommandResolver.resolveGitToolPath (fun _ -> false) "win32" "C:\\Git\\cmd;C:\\Windows"
+
+                Vitest.expect(path).toBe ("C:\\Git\\cmd;C:\\Windows")
+        )
+)
+
+Vitest.describe (
     "AuthStateDto helpers",
     fun () ->
         Vitest.test (
@@ -338,7 +384,8 @@ Vitest.describe (
                         TargetDataHub = "https://git.nfdi4plants.org/"
                     }
                     DateAdded = "2026-01-01T00:00:00.0000000Z"
-                    TokenInvalid = true
+                    TokenStatus = TokenStatus.Invalid
+                    TokenExpiresOn = Some "2026-01-15"
                 }
 
                 let authState: AuthStateDto = {
@@ -486,17 +533,27 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "nextTokenInvalidState marks unauthorized and forbidden failures as invalid",
+            "nextTokenStatusState marks unauthorized and forbidden failures as invalid",
             fun () ->
-                Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Unauthorized).toBe (true)
-                Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Forbidden).toBe (true)
+                Vitest
+                    .expect(AuthService.nextTokenStatusState TokenStatus.Ok AuthFailureKind.Unauthorized)
+                    .toEqual (TokenStatus.Invalid)
+
+                Vitest
+                    .expect(AuthService.nextTokenStatusState TokenStatus.Ok AuthFailureKind.Forbidden)
+                    .toEqual (TokenStatus.Invalid)
         )
 
         Vitest.test (
-            "nextTokenInvalidState preserves the existing invalid flag for non-auth failures",
+            "nextTokenStatusState preserves the existing status for non-auth failures",
             fun () ->
-                Vitest.expect(AuthService.nextTokenInvalidState false AuthFailureKind.Network).toBe (false)
-                Vitest.expect(AuthService.nextTokenInvalidState true AuthFailureKind.Network).toBe (true)
+                Vitest
+                    .expect(AuthService.nextTokenStatusState TokenStatus.Expiring AuthFailureKind.Network)
+                    .toEqual (TokenStatus.Expiring)
+
+                Vitest
+                    .expect(AuthService.nextTokenStatusState TokenStatus.Invalid AuthFailureKind.Network)
+                    .toEqual (TokenStatus.Invalid)
         )
 )
 
@@ -575,6 +632,28 @@ Vitest.describe (
                             GitProvisioningService.buildCloneBranchOptions (Some "feature/clone-flow")
 
                         Vitest.expect(options).toEqual ([| "--branch"; "feature/clone-flow" |])
+                )
+        )
+
+        Vitest.describe (
+            "clone progress events",
+            fun () ->
+                Vitest.test (
+                    "reports an initial clone phase before Git emits percentage progress",
+                    fun () -> promise {
+                        let progressEvents = ResizeArray<GitProgressDto>()
+
+                        let! result = GitProvisioningService.cloneRepository "" "" None false (Some progressEvents.Add)
+
+                        match result with
+                        | Ok _ -> failwith "Expected clone to fail for an invalid request."
+                        | Error _ -> ()
+
+                        Vitest.expect(progressEvents.Count).toBe (1)
+                        Vitest.expect(progressEvents[0].Method).toEqual (Some "clone")
+                        Vitest.expect(progressEvents[0].Stage).toEqual (Some "Preparing clone")
+                        Vitest.expect(progressEvents[0].Progress).toEqual (None)
+                    }
                 )
         )
 )

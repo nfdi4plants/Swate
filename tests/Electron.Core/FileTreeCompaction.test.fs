@@ -5,6 +5,7 @@ module FileTreeCreator = Main.FileTreeCreator
 
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Components.Shared
 open Vitest
 
 let private fileNode (name: string) (path: string) =
@@ -153,6 +154,40 @@ Vitest.describe (
                 Vitest.expect(rootNode.children.ContainsKey("notes.txt")).toBe (true)
                 Vitest.expect(rootNode.children.["docs"].path).toBe ("docs")
                 Vitest.expect(rootNode.children.["notes.txt"].path).toBe ("notes.txt")
+        )
+)
+
+Vitest.describe (
+    "FileIOHelper.createAvailableNotesTargets",
+    fun () ->
+        Vitest.test (
+            "lists only solid study and assay entities with canonical ARC files",
+            fun () ->
+                let targets =
+                    createAvailableNotesTargets [
+                        FileEntry.create ("arc", "", true)
+                        FileEntry.create ("studies", "studies", true)
+                        FileEntry.create (".gitkeep", "studies/.gitkeep", false)
+                        FileEntry.create ("loose.txt", "studies/loose.txt", false)
+                        FileEntry.create ("StudyA", "studies/StudyA", true)
+                        FileEntry.create ("isa.study.xlsx", "studies/StudyA/isa.study.xlsx", false)
+                        FileEntry.create ("protocol.md", "studies/StudyA/protocols/protocol.md", false)
+                        FileEntry.create ("DraftOnly", "studies/DraftOnly", true)
+                        FileEntry.create ("AssayA", "assays/AssayA", true)
+                        FileEntry.create ("isa.assay.xlsx", "assays/AssayA/isa.assay.xlsx", false)
+                        FileEntry.create ("NoCanonicalAssay", "assays/NoCanonicalAssay", true)
+                    ]
+                    |> Seq.map (fun target -> target.Kind, target.Name)
+                    |> Seq.toArray
+
+                Vitest
+                    .expect(targets)
+                    .toEqual (
+                        [|
+                            NotesTargetKind.Study, "StudyA"
+                            NotesTargetKind.Assay, "AssayA"
+                        |]
+                    )
         )
 )
 
