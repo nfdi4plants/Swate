@@ -266,8 +266,7 @@ module private DropHitTesting =
         )
 
     let connectionTarget source event =
-        endpoint source event
-        |> Option.bind (fun point -> targetHandleAt point source)
+        endpoint source event |> Option.bind (fun point -> targetHandleAt point source)
 
 /// DnD event handlers that translate library events into session or UI state changes.
 module private DragHandlers =
@@ -596,7 +595,7 @@ module private EditorSurface =
         addPaletteValue
         debug
         setIsValueChipDragging
-        
+
         =
         Controls.PropertyRail(
             side,
@@ -635,6 +634,8 @@ module private EditorSurface =
             | ProvenanceSide.Input -> "Input"
             | ProvenanceSide.Output -> "Output"
 
+        let endpointKindsKey =
+            endpointKinds |> List.map Endpoints.endpointKindIdentity |> String.concat "|"
 
         Html.div [
             prop.className [
@@ -652,7 +653,7 @@ module private EditorSurface =
                     existingEndpointNames,
                     createSet,
                     debug = debug,
-                    key = $"{pair.Id}:{keyPrefix}:{(endpointKinds |> List.map Endpoints.endpointKindIdentity |> String.concat "|")}"
+                    key = $"{pair.Id}:{keyPrefix}:{endpointKindsKey}"
                 )
                 for group in groups do
                     GroupCard.Main(
@@ -701,6 +702,10 @@ type ProvenanceGrouping =
         let tier, setTier = React.useState LayoutTier.Wide
         let openRail, setOpenRail = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
+
+        let showPropertyHeaderConnectors, setShowPropertyHeaderConnectors =
+            React.useState true
+
         let liveDragStore = React.useRef (LiveDrag.create ())
         let isValueChipDragging, setIsValueChipDragging = React.useState false
 
@@ -723,10 +728,7 @@ type ProvenanceGrouping =
         let uiState = State.Layers.ensure session rawUiState
 
         let pair, inputGroups, outputGroups, connections =
-            React.useMemo(
-                (fun () -> Display.displayPair session uiState),
-                [| box session; box uiState.LayerStates |]
-            )
+            React.useMemo ((fun () -> Display.displayPair session uiState), [| box session; box uiState.LayerStates |])
 
         let latestUiState = React.useRef uiState
         let activePairId = React.useRef pair.Id
@@ -736,32 +738,39 @@ type ProvenanceGrouping =
 
         let endpointKinds = Endpoints.endpointKindOptions ()
 
-        let existingEndpointNames =
-            [
-                yield! inputGroups |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
-                yield! outputGroups |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
-            ]
+        let existingEndpointNames = [
+            yield!
+                inputGroups
+                |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
+            yield!
+                outputGroups
+                |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
+        ]
 
         let lookups = EditorLookups.create pair uiState inputGroups outputGroups
 
         let inputRailProjection =
-            React.useMemo(
+            React.useMemo (
                 (fun () -> PropertyRails.railProjection pair.Id ProvenanceSide.Input pair.Model uiState),
-                [| box pair.Id
-                   box pair.Model
-                   box uiState.PropertyRailPlacements
-                   box uiState.ExpandedProperties
-                   box uiState.PaletteValues |]
+                [|
+                    box pair.Id
+                    box pair.Model
+                    box uiState.PropertyRailPlacements
+                    box uiState.ExpandedProperties
+                    box uiState.PaletteValues
+                |]
             )
 
         let outputRailProjection =
-            React.useMemo(
+            React.useMemo (
                 (fun () -> PropertyRails.railProjection pair.Id ProvenanceSide.Output pair.Model uiState),
-                [| box pair.Id
-                   box pair.Model
-                   box uiState.PropertyRailPlacements
-                   box uiState.ExpandedProperties
-                   box uiState.PaletteValues |]
+                [|
+                    box pair.Id
+                    box pair.Model
+                    box uiState.PropertyRailPlacements
+                    box uiState.ExpandedProperties
+                    box uiState.PaletteValues
+                |]
             )
 
         let applyUiState update =
@@ -837,9 +846,7 @@ type ProvenanceGrouping =
             | Ok(next, patches) ->
                 LiveDrag.clear liveDragStore.current
 
-                let nextUiState =
-                    latestUiState.current
-                    |> State.Layers.ensure next
+                let nextUiState = latestUiState.current |> State.Layers.ensure next
 
                 commitUiState {
                     nextUiState with
@@ -885,9 +892,7 @@ type ProvenanceGrouping =
             | Ok(next, patches) ->
                 LiveDrag.clear liveDragStore.current
 
-                let nextUiState =
-                    latestUiState.current
-                    |> State.Layers.ensure next
+                let nextUiState = latestUiState.current |> State.Layers.ensure next
 
                 commitUiState {
                     nextUiState with
@@ -991,17 +996,17 @@ type ProvenanceGrouping =
             ]
 
         let connectionCounts =
-            React.useMemo(
+            React.useMemo (
                 (fun () ->
                     connections
-                    |> List.collect (fun connection ->
-                        [
-                            (ProvenanceSide.Input, connection.SourceGroupId), connection.ConnectionIds.Length
-                            (ProvenanceSide.Output, connection.TargetGroupId), connection.ConnectionIds.Length
-                        ])
+                    |> List.collect (fun connection -> [
+                        (ProvenanceSide.Input, connection.SourceGroupId), connection.ConnectionIds.Length
+                        (ProvenanceSide.Output, connection.TargetGroupId), connection.ConnectionIds.Length
+                    ])
                     |> List.groupBy fst
                     |> List.map (fun (key, grouped) -> key, grouped |> List.sumBy snd)
-                    |> Map.ofList),
+                    |> Map.ofList
+                ),
                 [| box connections |]
             )
 
@@ -1045,11 +1050,11 @@ type ProvenanceGrouping =
                     prop.children [
                         Html.button [
                             prop.title (
-                                        if side = ProvenanceSide.Input then
-                                            "Hide input properties"
-                                        else
-                                            "Hide output properties"
-                                    )
+                                if side = ProvenanceSide.Input then
+                                    "Hide input properties"
+                                else
+                                    "Hide output properties"
+                            )
                             prop.type'.button
                             prop.className [
                                 "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
@@ -1062,7 +1067,7 @@ type ProvenanceGrouping =
                             prop.onClick (fun _ -> toggleRail side)
                             prop.children [
                                 Html.i [
-                                    
+
                                     prop.className [
                                         "swt:iconify swt:size-4"
                                         if side = ProvenanceSide.Input then
@@ -1149,6 +1154,7 @@ type ProvenanceGrouping =
                 inputRailProjection,
                 outputRailProjection,
                 ConnectorOverlayState.fromUiState uiState,
+                showPropertyHeaderConnectors,
                 liveDragStore.current,
                 (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
                 onRemove = removeDisplayConnection,
@@ -1274,37 +1280,84 @@ type ProvenanceGrouping =
                                         ),
                                         debug = debug
                                     )
-                                    Html.button [
-                                        match density with
-                                        | Density.EditorDensity.Compact -> prop.title "Toggle comfortable density"
-                                        | Density.EditorDensity.Comfortable -> prop.title "Toggle compact density"
+                                    Html.div [
+                                        prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
+                                        prop.children [
+                                            Html.button [
+                                                prop.title (
+                                                    if showPropertyHeaderConnectors then
+                                                        "Hide property header connectors"
+                                                    else
+                                                        "Show property header connectors"
+                                                )
+                                                prop.type'.button
+                                                prop.className [
+                                                    "swt:btn swt:btn-xs"
+                                                    if showPropertyHeaderConnectors then
+                                                        "swt:btn-primary"
+                                                    else
+                                                        "swt:btn-ghost"
+                                                ]
+                                                prop.custom ("aria-pressed", showPropertyHeaderConnectors)
+                                                prop.ariaLabel (
+                                                    if showPropertyHeaderConnectors then
+                                                        "Hide property header connectors"
+                                                    else
+                                                        "Show property header connectors"
+                                                )
+                                                if debug then
+                                                    prop.testId "provenance-property-connectors-toggle"
+                                                prop.onClick (fun _ ->
+                                                    setShowPropertyHeaderConnectors (not showPropertyHeaderConnectors)
+                                                )
+                                                prop.children [
+                                                    Html.i [
+                                                        prop.className [
+                                                            "swt:iconify swt:size-4"
+                                                            if showPropertyHeaderConnectors then
+                                                                "swt:fluent--eye-20-regular"
+                                                            else
+                                                                "swt:fluent--eye-hide-20-regular"
+                                                        ]
+                                                    ]
+                                                    Html.span "Property connectors"
+                                                ]
+                                            ]
+                                            Html.button [
+                                                match density with
+                                                | Density.EditorDensity.Compact ->
+                                                    prop.title "Toggle comfortable density"
+                                                | Density.EditorDensity.Comfortable ->
+                                                    prop.title "Toggle compact density"
 
-                                        prop.type'.button
-                                        prop.className [
-                                            "swt:btn swt:btn-xs"
-                                            if density = Density.EditorDensity.Compact then
-                                                "swt:btn-primary"
-                                            else
-                                                "swt:btn-ghost"
+                                                prop.type'.button
+                                                prop.className [
+                                                    "swt:btn swt:btn-xs"
+                                                    if density = Density.EditorDensity.Compact then
+                                                        "swt:btn-primary"
+                                                    else
+                                                        "swt:btn-ghost"
+                                                ]
+                                                prop.custom ("aria-pressed", (density = Density.EditorDensity.Compact))
+                                                prop.ariaLabel (
+                                                    if density = Density.EditorDensity.Compact then
+                                                        "Switch to comfortable density"
+                                                    else
+                                                        "Switch to compact density"
+                                                )
+                                                if debug then
+                                                    prop.testId "provenance-density-toggle"
+                                                prop.onClick (fun _ ->
+                                                    setDensity (
+                                                        if density = Density.EditorDensity.Compact then
+                                                            Density.EditorDensity.Comfortable
+                                                        else
+                                                            Density.EditorDensity.Compact
+                                                    )
+                                                )
+                                                prop.text "Compact"
+                                            ]
                                         ]
-                                        prop.custom ("aria-pressed", (density = Density.EditorDensity.Compact))
-                                        prop.ariaLabel (
-                                            if density = Density.EditorDensity.Compact then
-                                                "Switch to comfortable density"
-                                            else
-                                                "Switch to compact density"
-                                        )
-                                        if debug then
-                                            prop.testId "provenance-density-toggle"
-                                        prop.onClick (fun _ ->
-                                            setDensity (
-                                                if density = Density.EditorDensity.Compact then
-                                                    Density.EditorDensity.Comfortable
-                                                else
-                                                    Density.EditorDensity.Compact
-                                            )
-                                        )
-                                        prop.text "Compact"
                                     ]
                                 ]
                             ]
@@ -1359,7 +1412,7 @@ type ProvenanceGrouping =
                         DndKit.DragOverlay(
                             children = EditorSurface.dragOverlay lookups.FindPropertyValue debug activeDrag
                         )
-                     ])
+                    ])
         )
 
     [<ReactComponent>]
