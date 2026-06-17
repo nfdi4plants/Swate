@@ -195,6 +195,14 @@ Vitest.describe (
                     )
                     .toBe (false)
 
+                Vitest
+                    .expect(
+                        FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval (
+                            Some PageState.ProvenanceGroupingPage
+                        )
+                    )
+                    .toBe (false)
+
                 Vitest.expect(FileExplorerDeleteHelper.shouldResetPageStateAfterSelectionRemoval None).toBe (false)
         )
 

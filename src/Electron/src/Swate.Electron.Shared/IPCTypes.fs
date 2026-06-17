@@ -7,6 +7,7 @@ open Swate.Components.Composite.Authentication.Types
 open Swate.Components.Page.DataHub.DataHubTypes
 open Swate.Components.Shared
 open Swate.Electron.Shared.DTOs.NoteSearchDto
+open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open AuthTypes
 open FileIOTypes
 open GitTypes
@@ -49,6 +50,8 @@ type IArcVaultsApi = {
     showPathInFileExplorer: string -> JS.Promise<Result<unit, exn>>
     openPathWithDefaultApplication: string -> JS.Promise<Result<unit, exn>>
     readNotes: unit -> JS.Promise<Result<NoteSearchDto[], exn>>
+    listProvenanceTables: unit -> JS.Promise<Result<ProvenanceTableSelectionDto[], exn>>
+    loadProvenanceTable: ProvenanceTableSelectionDto -> JS.Promise<Result<ProvenanceLoadResultDto, exn>>
     /// Persists the active in-memory ARC scaffold to disk.
     saveArcFile: unit -> JS.Promise<Result<unit, exn>>
     /// Applies ARC file changes to the active vault's in-memory ARC without writing to disk.

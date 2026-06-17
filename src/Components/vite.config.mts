@@ -3,6 +3,16 @@ import dts from 'vite-plugin-dts'
 import react from "@vitejs/plugin-react";
 import tailwindcss from '@tailwindcss/vite'
 
+const externalPackages = [
+    'react',
+    'react-dom',
+    'tailwindcss',
+    '@fable-org/fable-library-js',
+    "@floating-ui/react",
+    "@tanstack/react-virtual",
+    "@nfdi4plants/arctrl"
+]
+
 export default defineConfig({
     plugins: [
         react({
@@ -34,15 +44,9 @@ export default defineConfig({
         },
         rollupOptions: {
             // Exclude peer dependencies from the final bundle
-            external: [
-                'react',
-                'react-dom',
-                'tailwindcss',
-                '@fable-org/fable-library-js',
-                "@floating-ui/react",
-                "@tanstack/react-virtual",
-                "@nfdi4plants/arctrl"
-            ],
+            external: (id) =>
+                externalPackages.includes(id) ||
+                id.startsWith('@fable-org/fable-library-js/'),
             output: {
                 globals: {
                     react: 'React',

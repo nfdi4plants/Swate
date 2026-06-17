@@ -38,9 +38,24 @@ module DndKit =
         abstract member setNodeRef: obj -> unit
         abstract member isOver: bool
 
+    type IDraggable =
+        abstract member attributes: IObject
+        abstract member listeners: IObject
+        abstract member setNodeRef: obj -> unit
+        abstract member transform: obj
+        abstract member isDragging: bool
+
+    type ICoordinates =
+        abstract member x: float
+        abstract member y: float
+
     type IDndKitEvent =
         abstract member active: HTMLElement
         abstract member over: HTMLElement
+        abstract member delta: ICoordinates
+
+    type IDndKitMoveEvent =
+        inherit IDndKitEvent
 
     [<Import("closestCenter", "@dnd-kit/core")>]
     let closestCenter: obj = jsNative
@@ -80,6 +95,9 @@ type DndKit =
     [<Import("useDroppable", "@dnd-kit/core")>]
     static member useDroppable(props: obj) : IDroppable = jsNative
 
+    [<Import("useDraggable", "@dnd-kit/core")>]
+    static member useDraggable(props: obj) : IDraggable = jsNative
+
     [<Import("useSensor", "@dnd-kit/core")>]
     static member useSensor(sensor, ?props) : ISensor = jsNative
 
@@ -88,9 +106,20 @@ type DndKit =
 
     [<ReactComponent("DndContext", "@dnd-kit/core")>]
     static member DndContext
-        (?onDragStart, ?onDragCancel, ?onDragEnd, ?sensors, ?collisionDetection, ?children: ReactElement, ?key)
-        =
+        (
+            ?onDragStart,
+            ?onDragMove,
+            ?onDragCancel,
+            ?onDragEnd,
+            ?sensors,
+            ?collisionDetection,
+            ?children: ReactElement,
+            ?key
+        ) =
         React.Imported()
+
+    [<ReactComponent("DragOverlay", "@dnd-kit/core")>]
+    static member DragOverlay(?children: ReactElement, ?dropAnimation: obj, ?key) = React.Imported()
 
     [<ReactComponent("SortableContext", "@dnd-kit/sortable")>]
     static member SortableContext(items: ResizeArray<string>, strategy, children: ReactElement) = React.Imported()
