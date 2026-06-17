@@ -367,9 +367,8 @@ let groupingTests =
                 |> List.collect (fun group -> group.Members)
                 |> List.find (fun member' -> member'.SetId = "input-a")
 
-            Expect.contains
-                inputA.PropertyValueIds
-                "pv-input-a-temperature"
+            Expect.isTrue
+                (inputA.PropertyValueIds |> List.contains "pv-input-a-temperature")
                 "Grouping by Species must not hide Temperature from the member editing surface."
 
         testCase "outputs expose input properties inherited through current loaded connections"
@@ -1414,9 +1413,8 @@ let sessionTests =
                     previousBefore.PropertyValueIds
                     "Palette additions must not write through to the native boundary owner."
 
-                Expect.isGreaterThan
-                    nextInput.PropertyValueIds.Length
-                    previousBefore.PropertyValueIds.Length
+                Expect.isTrue
+                    (nextInput.PropertyValueIds.Length > previousBefore.PropertyValueIds.Length)
                     "The active pair input should receive the new property value."
             | other -> failwithf "Expected one active-pair property-add patch, got %A" other
 

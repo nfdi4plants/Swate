@@ -6,7 +6,7 @@ open Feliz
 module Actions =
 
     [<ReactComponent>]
-    let ContinueButton(onContinue: unit -> unit, error: string option) =
+    let ContinueButton (onContinue: unit -> unit, error: string option) =
         Html.div [
             prop.className "swt:flex swt:items-center swt:gap-3"
             prop.children [
@@ -16,22 +16,13 @@ module Actions =
                     prop.text "Continue"
                 ]
                 match error with
-                | Some message ->
-                    Html.span [
-                        prop.className "swt:text-error"
-                        prop.text message
-                    ]
+                | Some message -> Html.span [ prop.className "swt:text-error"; prop.text message ]
                 | None -> Html.none
             ]
         ]
 
     [<ReactComponent>]
-    let SubmitButton
-        (
-            target: LandingTarget option,
-            isSubmitting: bool,
-            onSubmit: unit -> unit
-        ) =
+    let SubmitButton (target: LandingTarget option, isSubmitting: bool, onSubmit: unit -> unit) =
         Html.button [
             prop.className [
                 "swt:btn swt:btn-secondary"

@@ -42,8 +42,47 @@ let toConfigEntries (args: string[]) =
 /// Builds a git process environment that disables terminal prompts.
 /// All Git entry points should use this so Electron never blocks waiting for credentials.
 let createNonInteractiveEnv () : obj =
-    // Keep all existing environment variables and disable git interactive prompts.
-    emitJsExpr () "{ ...process.env, GIT_TERMINAL_PROMPT: '0' }"
+    // Keep existing env variables but drop unsafe git/editor overrides that simple-git rejects by default.
+    let safeEnv: obj =
+        emitJsExpr
+            ()
+            """
+            (() => {
+                const blocked = new Set([
+                    'editor',
+                    'git_askpass',
+                    'git_config_global',
+                    'git_config_system',
+                    'git_config_count',
+                    'git_config',
+                    'git_editor',
+                    'git_exec_path',
+                    'git_external_diff',
+                    'git_pager',
+                    'git_proxy_command',
+                    'git_template_dir',
+                    'git_sequence_editor',
+                    'git_ssh',
+                    'git_ssh_command',
+                    'pager',
+                    'prefix',
+                    'ssh_askpass'
+                ]);
+                const source = process.env ?? {};
+                const safeEnv = {};
+
+                for (const [key, value] of Object.entries(source)) {
+                    if (!blocked.has(String(key).toLowerCase())) {
+                        safeEnv[key] = value;
+                    }
+                }
+
+                safeEnv.GIT_TERMINAL_PROMPT = '0';
+                return safeEnv;
+            })()
+            """
+
+    GitCommandResolver.ensureGitToolPath safeEnv
 
 /// Applies the non-interactive environment to a simple-git instance.
 let applyNonInteractiveEnv (git: ISimpleGit) = git.env (createNonInteractiveEnv ())
@@ -76,7 +115,10 @@ let private buildLfsEndpointUrl (remoteUrl: string) =
 let private tryBuildScopedAuthUrl (remoteUrl: string) =
     let mutable uri = Unchecked.defaultof<Uri>
 
-    if Uri.TryCreate(remoteUrl, UriKind.Absolute, &uri) && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase) then
+    if
+        Uri.TryCreate(remoteUrl, UriKind.Absolute, &uri)
+        && uri.Scheme.Equals("https", StringComparison.OrdinalIgnoreCase)
+    then
         let authority =
             if uri.IsDefaultPort then
                 uri.Host
@@ -96,8 +138,7 @@ let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (r
     | Some scopeUrl ->
         yield "-c"
         yield $"http.{scopeUrl}.extraHeader=Authorization: {authorizationValue}"
-    | _ ->
-        ()
+    | _ -> ()
 
     match remoteName, remoteUrl with
     | Some name, Some url when url.StartsWith("https://", StringComparison.OrdinalIgnoreCase) ->
@@ -116,8 +157,7 @@ let buildAuthArgs (_host: string) (token: string) (remoteName: string option) (r
         yield $"lfs.{plainLfsUrl}.access=basic"
         yield "-c"
         yield $"lfs.{authenticatedLfsUrl}.access=basic"
-    | _ ->
-        ()
+    | _ -> ()
 |]
 
 /// Creates auth data for lower-level spawned commands such as `git lfs push`.
@@ -167,10 +207,7 @@ let redactToken (text: string) : string =
                 MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]")
             )
         |> fun t ->
-            tokenHeaderRedactPattern.Replace(
-                t,
-                MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]")
-            )
+            tokenHeaderRedactPattern.Replace(t, MatchEvaluator(fun matched -> $"{matched.Groups.[1].Value}[REDACTED]"))
         |> fun t -> credentialUrlPattern.Replace(t, "$1[REDACTED]@")
 
 /// Redacts each command argument for diagnostic output.

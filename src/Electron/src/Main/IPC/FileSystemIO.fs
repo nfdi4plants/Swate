@@ -100,7 +100,7 @@ let tryGetNodeErrorCode (error: exn) : string option =
     with _ ->
         None
 
-type private RenameRetryStrategy = {
+type private FileSystemRetryStrategy = {
     DelaysMs: int[]
     IsTransientErrorCode: string option -> bool
 }
@@ -110,6 +110,18 @@ let private renameRetryStrategy = {
     DelaysMs = [| 0; 75; 200; 500 |]
     IsTransientErrorCode =
         function
+        | Some "EPERM"
+        | Some "EACCES"
+        | Some "EBUSY" -> true
+        | _ -> false
+}
+
+// Recursive directory deletion can briefly report non-empty or locked paths while Git/file watchers finish writes.
+let private removeRetryStrategy = {
+    DelaysMs = [| 0; 75; 200; 500 |]
+    IsTransientErrorCode =
+        function
+        | Some "ENOTEMPTY"
         | Some "EPERM"
         | Some "EACCES"
         | Some "EBUSY" -> true
@@ -144,6 +156,39 @@ let private renameWithRetriesAsync
 
     attempt 0
 
+let removePathWithRetriesAsync
+    (removePathAsync: string -> JS.Promise<unit>)
+    (absolutePath: string)
+    : JS.Promise<Result<unit, exn>> =
+    let rec attempt (attemptIndex: int) = promise {
+        if attemptIndex > 0 then
+            do! Promise.sleep removeRetryStrategy.DelaysMs.[attemptIndex]
+
+        try
+            do! removePathAsync absolutePath
+            return Ok()
+        with removeError ->
+            let errorCode = tryGetNodeErrorCode removeError
+
+            if
+                attemptIndex < removeRetryStrategy.DelaysMs.Length - 1
+                && removeRetryStrategy.IsTransientErrorCode errorCode
+            then
+                return! attempt (attemptIndex + 1)
+            else
+                return Error removeError
+    }
+
+    attempt 0
+
+let private removeGenericFileSystemItemAsync absolutePath = promise {
+    let! _ =
+        fsPromisesDynamic?rm (absolutePath, createObj [ "recursive" ==> true; "force" ==> false ])
+        |> unbox<JS.Promise<obj>>
+
+    return ()
+}
+
 let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
     match tryGetNodeErrorCode renameError with
     | Some "EPERM"
@@ -151,12 +196,8 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
         exn
             $"Cannot rename '{sourcePath}' to '{targetPath}'. Windows reported a permission or file-lock conflict. If the destination already exists, choose a different name and close apps that may be using these paths."
     | Some "ENOTEMPTY"
-    | Some "EEXIST" ->
-        exn
-            $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
-    | Some "ENOENT" ->
-        exn
-            $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
+    | Some "EEXIST" -> exn $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
+    | Some "ENOENT" -> exn $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
     | _ -> renameError
 
 [<RequireQualifiedAccess>]
@@ -173,10 +214,15 @@ module ArcFileSystemHelper =
         TargetPath: string
     }
 
+    type GenericMovePlan = {
+        SourcePath: string
+        TargetPath: string
+        Overwrite: bool
+    }
+
     let private resolveArcRelativePathPair arcPath firstRelativePath secondRelativePath =
         match
-            tryResolveArcRelativePath arcPath firstRelativePath,
-            tryResolveArcRelativePath arcPath secondRelativePath
+            tryResolveArcRelativePath arcPath firstRelativePath, tryResolveArcRelativePath arcPath secondRelativePath
         with
         | Error pathError, _
         | _, Error pathError -> Error pathError
@@ -184,8 +230,7 @@ module ArcFileSystemHelper =
 
     let private resolveCreatePathPair arcPath parentRelativePath targetRelativePath =
         let normalizedParentPath =
-            parentRelativePath
-            |> PathHelpers.normalizeCanonicalRelativePath
+            parentRelativePath |> PathHelpers.normalizeCanonicalRelativePath
 
         let parentPath =
             if String.IsNullOrWhiteSpace normalizedParentPath then
@@ -193,10 +238,7 @@ module ArcFileSystemHelper =
             else
                 tryResolveArcRelativePath arcPath normalizedParentPath
 
-        match
-            parentPath,
-            tryResolveArcRelativePath arcPath targetRelativePath
-        with
+        match parentPath, tryResolveArcRelativePath arcPath targetRelativePath with
         | Error pathError, _
         | _, Error pathError -> Error pathError
         | Ok parentAbsolutePath, Ok targetAbsolutePath -> Ok(parentAbsolutePath, targetAbsolutePath)
@@ -214,6 +256,52 @@ module ArcFileSystemHelper =
         match kind with
         | FileSystemItemKind.File -> ARCtrl.FileSystemHelper.writeFileTextAsync targetAbsolutePath ""
         | FileSystemItemKind.Folder -> mkdirAsync targetAbsolutePath
+
+    let private renameResolvedPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
+        match! renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath with
+        | Ok() -> return Ok()
+        | Error renameError -> return Error(mapRenameDiskError sourcePath targetPath renameError)
+    }
+
+    ///WIP must be simplified in future pr
+    let private renameIgnoringErrorsAsync sourceAbsolutePath targetAbsolutePath = promise {
+        try
+            let! _ =
+                fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath)
+                |> unbox<JS.Promise<obj>>
+
+            return ()
+        with _ ->
+            return ()
+    }
+
+    let private moveFileIntoDescendantPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
+        let sourceParentAbsolutePath =
+            pathDynamic?dirname (sourceAbsolutePath) |> unbox<string>
+
+        let tempFileName = ".swate-move-" + Guid.NewGuid().ToString("N") + ".tmp"
+
+        let tempAbsolutePath =
+            pathDynamic?join (sourceParentAbsolutePath, tempFileName) |> unbox<string>
+
+        match! renameWithRetriesAsync sourceAbsolutePath tempAbsolutePath with
+        | Error renameError -> return Error(mapRenameDiskError sourcePath targetPath renameError)
+        | Ok() ->
+            let targetParentAbsolutePath =
+                pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+
+            try
+                do! mkdirAsync targetParentAbsolutePath
+
+                match! renameWithRetriesAsync tempAbsolutePath targetAbsolutePath with
+                | Ok() -> return Ok()
+                | Error moveError ->
+                    do! renameIgnoringErrorsAsync tempAbsolutePath sourceAbsolutePath
+                    return Error(mapRenameDiskError sourcePath targetPath moveError)
+            with moveError ->
+                do! renameIgnoringErrorsAsync tempAbsolutePath sourceAbsolutePath
+                return Error moveError
+    }
 
     let tryBuildCreateFileSystemItemPlan
         (request: CreateFileSystemItemRequest)
@@ -260,8 +348,7 @@ module ArcFileSystemHelper =
 
     let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<GenericRenamePlan, exn> =
         let requestedRelativePath =
-            request.relativePath
-            |> PathHelpers.normalizeCanonicalRelativePath
+            request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
 
         match tryBuildGenericFileSystemRenameTargetPath requestedRelativePath request.newName with
         | Error validationError -> Error(exn validationError)
@@ -290,53 +377,113 @@ module ArcFileSystemHelper =
                     match targetCheck with
                     | Error conflictError -> return Error conflictError
                     | Ok() ->
-                        let! renameResult =
-                            renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath
+                        return!
+                            renameResolvedPathOnDisk
+                                genericRenamePlan.SourcePath
+                                genericRenamePlan.TargetPath
+                                sourceAbsolutePath
+                                targetAbsolutePath
+        }
 
-                        match renameResult with
-                        | Ok() -> return Ok()
-                        | Error renameError ->
+    let tryBuildGenericMovePlan (request: MovePathRequest) : Result<GenericMovePlan, exn> =
+        let sourcePath =
+            ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
+                "Generic filesystem move is only supported for safe non-entity source paths."
+                request.sourceRelativePath
+
+        let targetPath =
+            ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
+                "Generic filesystem move targets must stay inside safe non-entity ARC paths."
+                request.targetRelativePath
+
+        match sourcePath, targetPath with
+        | Error validationError, _
+        | _, Error validationError -> Error(exn validationError)
+        | Ok sourcePath, Ok targetPath when PathHelpers.pathsEqual sourcePath targetPath ->
+            Error(exn "Move target is identical to the current path.")
+        | Ok sourcePath, Ok targetPath ->
+            Ok {
+                SourcePath = sourcePath
+                TargetPath = targetPath
+                Overwrite = request.overwrite
+            }
+
+    let moveGenericFileSystemItemOnDisk (arcPath: string) (request: MovePathRequest) : JS.Promise<Result<unit, exn>> = promise {
+        match tryBuildGenericMovePlan request with
+        | Error validationError -> return Error validationError
+        | Ok genericMovePlan ->
+            match resolveArcRelativePathPair arcPath genericMovePlan.SourcePath genericMovePlan.TargetPath with
+            | Error pathError -> return Error pathError
+            | Ok(sourceAbsolutePath, targetAbsolutePath) ->
+                let moveToTargetAsync () = promise {
+                    let targetParentAbsolutePath =
+                        pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+
+                    do! mkdirAsync targetParentAbsolutePath
+
+                    return!
+                        renameResolvedPathOnDisk
+                            genericMovePlan.SourcePath
+                            genericMovePlan.TargetPath
+                            sourceAbsolutePath
+                            targetAbsolutePath
+                }
+
+                let! sourceExists = pathExistsAsync sourceAbsolutePath
+
+                if sourceExists |> not then
+                    return Error(exn $"Cannot move '{genericMovePlan.SourcePath}' because it does not exist.")
+                else
+                    let! sourceIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync sourceAbsolutePath
+
+                    if
+                        sourceIsDirectory
+                        && PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
+                    then
+                        return Error(exn "Move target must not be inside the source path.")
+                    else
+                        let! targetExists = pathExistsAsync targetAbsolutePath
+
+                        match targetExists, genericMovePlan.Overwrite with
+                        | true, false ->
                             return
                                 Error(
-                                    mapRenameDiskError
-                                        genericRenamePlan.SourcePath
-                                        genericRenamePlan.TargetPath
-                                        renameError
+                                    exn
+                                        $"Cannot move '{genericMovePlan.SourcePath}' to '{genericMovePlan.TargetPath}' because the destination already exists."
                                 )
-        }
+                        | true, true ->
+                            match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
+                            | Error removeError -> return Error removeError
+                            | Ok() -> return! moveToTargetAsync ()
+                        | false, _ when
+                            PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
+                            ->
+                            return!
+                                moveFileIntoDescendantPathOnDisk
+                                    genericMovePlan.SourcePath
+                                    genericMovePlan.TargetPath
+                                    sourceAbsolutePath
+                                    targetAbsolutePath
+                        | false, _ -> return! moveToTargetAsync ()
+    }
 
-    let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> =
-        promise {
-            let normalizedRelativePath = 
-                relativePath
-                |> PathHelpers.normalizeCanonicalRelativePath
+    let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {
+        let normalizedRelativePath =
+            relativePath |> PathHelpers.normalizeCanonicalRelativePath
 
-            let isGenericDeleteTarget =
-                match ArcEntityPathRules.classifyDeleteTarget normalizedRelativePath with
-                | ArcEntityPathRules.DeletePathClassification.GenericTarget _
-                | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(
-                    ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
-                    _
-                  )
-                | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget _ ->
-                    ArcEntityPathRules.isDeletePathAllowed normalizedRelativePath
-                | _ -> false
+        let isGenericDeleteTarget =
+            match ArcEntityPathRules.classifyDeleteTarget normalizedRelativePath with
+            | ArcEntityPathRules.DeletePathClassification.GenericTarget _
+            | ArcEntityPathRules.DeletePathClassification.CanonicalFileTarget(ArcEntityPathRules.CanonicalArcFileTarget.DataMapFile _,
+                                                                              _)
+            | ArcEntityPathRules.DeletePathClassification.AddZoneDescendantTarget _ ->
+                ArcEntityPathRules.isDeletePathAllowed normalizedRelativePath
+            | _ -> false
 
-            if not isGenericDeleteTarget then
-                return Error(exn "Generic filesystem delete is only supported for safe non-entity paths.")
-            else
-                match tryResolveArcRelativePath arcPath normalizedRelativePath with
-                | Error pathError -> return Error pathError
-                | Ok absolutePath ->
-                    try
-                        let! _ =
-                            fsPromisesDynamic?rm (
-                                absolutePath,
-                                createObj [ "recursive" ==> true; "force" ==> false ]
-                            )
-                            |> unbox<JS.Promise<obj>>
-
-                        return Ok()
-                    with deleteError ->
-                        return Error deleteError
-        }
+        if not isGenericDeleteTarget then
+            return Error(exn "Generic filesystem delete is only supported for safe non-entity paths.")
+        else
+            match tryResolveArcRelativePath arcPath normalizedRelativePath with
+            | Error pathError -> return Error pathError
+            | Ok absolutePath -> return! removePathWithRetriesAsync removeGenericFileSystemItemAsync absolutePath
+    }

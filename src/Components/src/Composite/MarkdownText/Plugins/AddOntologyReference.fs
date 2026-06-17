@@ -31,15 +31,13 @@ module AddOntologyReference =
             if String.IsNullOrWhiteSpace tan then
                 Error "Ontology accession is required."
             else
-                Ok(OntologyAnnotation.fromTermAnnotation(tan, name = name))
+                Ok(OntologyAnnotation.fromTermAnnotation (tan, name = name))
         | [| name; tsr; tan |] ->
             if String.IsNullOrWhiteSpace tan then
                 Error "Ontology accession is required."
             else
-                Ok(OntologyAnnotation.create(name = name, tsr = tsr, tan = tan))
-        | _ ->
-            Error
-                "Use one of: accession, name | accession, or name | source | accession."
+                Ok(OntologyAnnotation.create (name = name, tsr = tsr, tan = tan))
+        | _ -> Error "Use one of: accession, name | accession, or name | source | accession."
 
     let private formatReference (oa: OntologyAnnotation) =
         let nameText = oa.NameText
@@ -61,7 +59,10 @@ module AddOntologyReference =
     let private insertAtSelection (source: string) (startIndex: int) (endIndex: int) (content: string) =
         let boundedStart = min (max startIndex 0) source.Length
         let boundedEnd = min (max endIndex boundedStart) source.Length
-        let nextValue = $"{source.Substring(0, boundedStart)}{content}{source.Substring boundedEnd}"
+
+        let nextValue =
+            $"{source.Substring(0, boundedStart)}{content}{source.Substring boundedEnd}"
+
         let caretIndex = boundedStart + content.Length
         nextValue, (caretIndex, caretIndex)
 
@@ -69,45 +70,39 @@ module AddOntologyReference =
         { new ICommand with
             member _.name = "Add Ontology"
             member _.keyCommand = keyCommand
-            member _.icon =
-                Html.span [
-                    prop.className "swt:text-xs"
-                    prop.text "Add Ontology"
-                ]
+            member _.icon = Html.span [ prop.className "swt:text-xs"; prop.text "Add Ontology" ]
             member _.buttonProps = createObj [ "aria-label" ==> "Add Ontology Reference" ]
-            member _.execute _ _ = () }
-
-    let private prompt: MarkdownPromptPlugin =
-        {
-            Title = "Add Ontology Reference"
-            Description =
-                Some "Use: accession OR name | accession OR name | source | accession."
-            Placeholder = "instrument model | MS:1000031"
-            SubmitButtonText = "Add"
-            Validate =
-                (fun input ->
-                    match tryParseOntologyAnnotation input with
-                    | Ok _ -> Ok()
-                    | Error message -> Error message)
-            Apply =
-                (fun source selectionStart selectionEnd input ->
-                    match tryParseOntologyAnnotation input with
-                    | Ok oa ->
-                        let reference = formatReference oa
-                        insertAtSelection source selectionStart selectionEnd reference
-                    | Error _ ->
-                        source, (selectionStart, selectionEnd))
-            InputMode = None
-            Accept = None
-            AllowMultiple = None
-            ApplyFiles = None
+            member _.execute _ _ = ()
         }
 
-    let plugin: MarkdownToolbarPlugin =
-        {
-            Id = keyCommand
-            Command = command
-            Enabled = true
-            Prompt = Some prompt
-        }
+    let private prompt: MarkdownPromptPlugin = {
+        Title = "Add Ontology Reference"
+        Description = Some "Use: accession OR name | accession OR name | source | accession."
+        Placeholder = "instrument model | MS:1000031"
+        SubmitButtonText = "Add"
+        Validate =
+            (fun input ->
+                match tryParseOntologyAnnotation input with
+                | Ok _ -> Ok()
+                | Error message -> Error message
+            )
+        Apply =
+            (fun source selectionStart selectionEnd input ->
+                match tryParseOntologyAnnotation input with
+                | Ok oa ->
+                    let reference = formatReference oa
+                    insertAtSelection source selectionStart selectionEnd reference
+                | Error _ -> source, (selectionStart, selectionEnd)
+            )
+        InputMode = None
+        Accept = None
+        AllowMultiple = None
+        ApplyFiles = None
+    }
 
+    let plugin: MarkdownToolbarPlugin = {
+        Id = keyCommand
+        Command = command
+        Enabled = true
+        Prompt = Some prompt
+    }

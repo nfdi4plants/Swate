@@ -6,15 +6,14 @@ open Fable.Mocha
 open Expecto
 #endif
 
-let example_tests = testList "example" [
-    testCase "One" <| fun _ ->
-        Expect.equal 1 1 ""
-]
+let example_tests =
+    testList "example" [ testCase "One" <| fun _ -> Expect.equal 1 1 "" ]
 
-let shared = testList "Shared" [
-    example_tests
-    LandingTests.tests
-    PathHelpersTests.tests
-    ProvenanceGroupingTests.tests
-    ProvenanceGroupingARCtrlConverterTests.tests
-]
+let shared =
+    testList "Shared" [
+        example_tests
+        LandingTests.tests
+        PathHelpersTests.tests
+        ProvenanceGroupingTests.tests
+        ProvenanceGroupingARCtrlConverterTests.tests
+    ]

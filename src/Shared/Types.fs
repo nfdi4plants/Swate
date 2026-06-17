@@ -8,10 +8,7 @@ type NotesTargetKind =
     | Study
     | Assay
 
-type ExistingTargetRef = {
-    Name: string
-    Kind: NotesTargetKind
-}
+type ExistingTargetRef = { Name: string; Kind: NotesTargetKind }
 
 type NoteSearch = {
     RelativePath: string
@@ -34,8 +31,5 @@ type ARCPointer = {
     }
 
 type SelectorRef = { toggle: unit -> unit }
-    
-type ImportedTextFile = {
-    Name: string
-    Content: string
-}
+
+type ImportedTextFile = { Name: string; Content: string }

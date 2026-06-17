@@ -1226,10 +1226,11 @@ export const MismatchedGroupConnectionPromptsForResolution: Story = {
 
     const inputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
     const outputGroup = canvas.getByText('Output E').closest('article')!;
+    const outputHandle = within(outputGroup).getByTestId('provenance-connection-handle-Output-GroupCard');
 
     await dragByPointer(
       within(inputGroup).getByTestId('provenance-connection-handle-Input-GroupCard'),
-      outputGroup,
+      outputHandle,
     );
 
     await waitFor(() => expect(canvas.getByTestId('provenance-member-resolution-prompt')).toBeInTheDocument());
@@ -1246,10 +1247,11 @@ export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
 
     const inputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
     const outputGroup = canvas.getByText('Output E').closest('article')!;
+    const outputHandle = within(outputGroup).getByTestId('provenance-connection-handle-Output-GroupCard');
 
     await dragByPointer(
       within(inputGroup).getByTestId('provenance-connection-handle-Input-GroupCard'),
-      outputGroup,
+      outputHandle,
     );
     await waitFor(() => expect(canvas.getByTestId('provenance-member-resolution-prompt')).toBeInTheDocument());
     await userEvent.click(canvas.getByTestId('provenance-member-resolution-manual'));

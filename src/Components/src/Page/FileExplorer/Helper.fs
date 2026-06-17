@@ -1,15 +1,14 @@
 module Swate.Components.Page.FileExplorer.Helper
 
-open Feliz
 open Swate.Components.Page.FileExplorer.Types
 
-let handleItemClick
-    (item: FileItem)
-    (onItemClick: (FileItem -> unit) option)
-    (dispatch: FileExplorerLogic.Msg -> unit)
-    =
-    dispatch (FileExplorerLogic.SelectItem item.Id)
-    onItemClick |> Option.iter (fun fn -> fn item)
+let isLfs (item: FileItem) = item.IsLFS = Some true
+
+let needsLfsDownload (item: FileItem) =
+    isLfs item && (item.Downloaded = Some false || item.IsLFSPointer = Some true)
+
+let hasLocalLfsCopy (item: FileItem) =
+    isLfs item && item.Downloaded = Some true && item.IsLFSPointer = Some false
 
 let iconClassName (baseClasses: string list) (item: FileItem) (getItemIconClass: FileItem -> string option) = [
     yield! baseClasses

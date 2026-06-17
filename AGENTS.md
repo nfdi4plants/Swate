@@ -3,6 +3,10 @@
 - **Purpose**: These guidelines are for components in `src/Components`, which are meant to be reusable and application-agnostic. They should not contain app-specific logic or state coupling.
 - Read the full guidelines in [docs/ReactComponentDesign.md](docs/ReactComponentDesign.md) for detailed rules on file structure, syntax, and design principles for components in `src/Components`.
 
-## Icon Convention Note
+## Icon Convention rules
 
 - Use `swt:iconify` with fully qualified icon classes (prefer `swt:fluent--...`) for new icons.
+
+## Test Convention rules
+
+- You MUST NOT do source file testing to check if certain code is present. This is a brittle testing strategy that will break if the code is refactored, even if the behavior is unchanged. Instead, test the behavior directly by calling the relevant functions and checking their outputs or side effects.

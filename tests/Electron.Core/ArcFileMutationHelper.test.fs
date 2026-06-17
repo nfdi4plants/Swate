@@ -1,11 +1,11 @@
 module ElectronCore.ArcFileMutationHelperTests
 
 open ARCtrl
-open Main.ArcMerge
+open Main.ARCtrlExtensions
 open Main.ArcVaultHelper
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
-open ARCtrl.Contract
+open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 let private expectOk (result: Result<'T, exn>) : 'T =
@@ -18,178 +18,269 @@ let private expectSome (value: 'T option) (message: string) : 'T =
     | Some value -> value
     | None -> failwith message
 
-Vitest.describe("ArcFileMutationHelper", fun () ->
-    Vitest.test("normalizeArcFileRequestPath normalizes separators and trims trailing slash", fun () ->
-        let request =
-            FileContentDTO.create DTOType.ISA_Assay """{"dummy":"value"}""" @"assays\assay_1\isa.assay.xlsx\"
+Vitest.describe (
+    "ArcFileMutationHelper",
+    fun () ->
+        Vitest.test (
+            "normalizeArcFileRequestPath normalizes separators and trims trailing slash",
+            fun () ->
+                let request =
+                    FileContentDTO.create
+                        FileContentType.ISA_Assay
+                        """{"dummy":"value"}"""
+                        @"assays\assay_1\isa.assay.xlsx\"
 
-        let normalized = Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
-        Vitest.expect(normalized.path).toBe("assays/assay_1/isa.assay.xlsx"))
+                let normalized =
+                    Swate.Electron.Shared.FileIOHelper.FileContentDTO.normalizeArcFileRequestPath request
 
-    Vitest.test("updateARCByFileContentDTO updates an existing ISA assay while preserving static hash", fun () ->
-        let oldArc = ARC("test-arc")
-        let oldAssay = ArcAssay("assay_1", title = "old-title")
-        oldAssay.StaticHash <- 1337
-        oldArc.AddAssay(oldAssay)
+                Vitest.expect(normalized.path).toBe ("assays/assay_1/isa.assay.xlsx")
+        )
 
-        let updatedAssay = ArcAssay("assay_1", title = "new-title")
+        Vitest.test (
+            "inferTextFileTypeFromPath detects markdown by .md extension",
+            fun () ->
+                Vitest
+                    .expect(FileContentDTO.inferTextFileTypeFromPath "notes/readme.md")
+                    .toEqual (FileContentType.Markdown)
 
-        let request =
-            FileContentDTO.fromArcFile(ArcFiles.Assay updatedAssay)
-            |> expectSome <| "Expected assay request DTO."
+                Vitest
+                    .expect(FileContentDTO.inferTextFileTypeFromPath "notes/README.MD")
+                    .toEqual (FileContentType.Markdown)
 
-        let updatedArc = updateARCByFileContentDTO oldArc request |> expectOk
-        let resultingAssay = updatedArc.GetAssay("assay_1")
+                Vitest
+                    .expect(FileContentDTO.inferTextFileTypeFromPath "assays/assay_1/notes.txt")
+                    .toEqual (FileContentType.PlainText)
+        )
 
-        Vitest.expect(resultingAssay.Title).toEqual(Some "new-title")
-        Vitest.expect(resultingAssay.StaticHash).toBe(1337))
+        Vitest.test (
+            "updateARCByFileContentDTO updates an existing ISA assay while preserving static hash",
+            fun () ->
+                let oldArc = ARC("test-arc")
+                let oldAssay = ArcAssay("assay_1", title = "old-title")
+                oldAssay.StaticHash <- 1337
+                oldArc.AddAssay(oldAssay)
 
-    Vitest.test("updateARCByFileContentDTO updates datamap by parent info and preserves static hash", fun () ->
-        let oldArc = ARC("test-arc")
+                let updatedAssay = ArcAssay("assay_1", title = "new-title")
 
-        let existingDataMap = DataMap.init()
-        existingDataMap.StaticHash <- 777
+                let request =
+                    FileContentDTO.fromArcFile (ArcFiles.Assay updatedAssay) |> expectSome
+                    <| "Expected assay request DTO."
 
-        let assay = ArcAssay("assay_1", datamap = existingDataMap)
-        oldArc.AddAssay(assay)
+                let updatedArc = updateARCByFileContentDTO oldArc request |> expectOk
+                let resultingAssay = updatedArc.GetAssay("assay_1")
 
-        let incomingDataMap = DataMap.init()
-        incomingDataMap.StaticHash <- 5
+                Vitest.expect(resultingAssay.Title).toEqual (Some "new-title")
+                Vitest.expect(resultingAssay.StaticHash).toBe (1337)
+        )
 
-        let datamapParent = DatamapParentInfo.create "assay_1" DataMapParent.Assay
+        Vitest.test (
+            "updateARCByFileContentDTO updates datamap by parent info and preserves static hash",
+            fun () ->
+                let oldArc = ARC("test-arc")
 
-        let request =
-            FileContentDTO.fromArcFile(ArcFiles.DataMap(Some datamapParent, incomingDataMap))
-            |> expectSome <| "Expected datamap request DTO."
+                let existingDataMap = DataMap.init ()
+                existingDataMap.StaticHash <- 777
 
-        let updatedArc = updateARCByFileContentDTO oldArc request |> expectOk
+                let assay = ArcAssay("assay_1", datamap = existingDataMap)
+                oldArc.AddAssay(assay)
 
-        let updatedDataMap =
-            updatedArc.TryGetAssay("assay_1")
-            |> expectSome <| "Expected assay to exist after datamap update."
-            |> fun updatedAssay -> updatedAssay.DataMap
-            |> expectSome <| "Expected datamap to be present on assay."
+                let incomingDataMap = DataMap.init ()
+                incomingDataMap.StaticHash <- 5
 
-        Vitest.expect(updatedDataMap.StaticHash).toBe(777))
+                let datamapParent = DatamapParentInfo.create "assay_1" DataMapParent.Assay
 
-    Vitest.test("updateARCByFileContentDTO accepts semantically identical ISA content", fun () ->
-        let oldArc = ARC("test-arc")
-        oldArc.AddAssay(ArcAssay("assay_1", title = "stable"))
+                let request =
+                    FileContentDTO.fromArcFile (ArcFiles.DataMap(Some datamapParent, incomingDataMap))
+                    |> expectSome
+                    <| "Expected datamap request DTO."
 
-        let request =
-            FileContentDTO.fromArcByPath "assays/assay_1/isa.assay.xlsx" oldArc
-            |> expectSome <| "Expected current assay DTO from arc."
+                let updatedArc = updateARCByFileContentDTO oldArc request |> expectOk
 
-        let updatedArc = updateARCByFileContentDTO oldArc request |> expectOk
-        let updatedAssay = updatedArc.GetAssay("assay_1")
-        Vitest.expect(updatedAssay.Title).toEqual(Some "stable"))
+                let updatedDataMap =
+                    updatedArc.TryGetAssay("assay_1") |> expectSome
+                    <| "Expected assay to exist after datamap update."
+                    |> fun updatedAssay -> updatedAssay.DataMap
+                    |> expectSome
+                    <| "Expected datamap to be present on assay."
 
-    Vitest.test("fromArcByPath resolves ARC files through shared path lookup", fun () ->
-        let arc = ARC("test-arc")
+                Vitest.expect(updatedDataMap.StaticHash).toBe (777)
+        )
 
-        let assay = ArcAssay("assay_1")
-        assay.DataMap <- Some(DataMap.init ())
-        arc.AddAssay assay
+        Vitest.test (
+            "fromArcByPath resolves ARC files through shared path lookup",
+            fun () ->
+                let arc = ARC("test-arc")
 
-        let study = ArcStudy("study_1")
-        study.DataMap <- Some(DataMap.init ())
-        arc.AddStudy study
+                let assay = ArcAssay("assay_1")
+                assay.DataMap <- Some(DataMap.init ())
+                arc.AddAssay assay
 
-        let workflow = ArcWorkflow("workflow_1")
-        workflow.DataMap <- Some(DataMap.init ())
-        arc.AddWorkflow workflow
+                let study = ArcStudy("study_1")
+                study.DataMap <- Some(DataMap.init ())
+                arc.AddStudy study
 
-        let run = ArcRun("run_1")
-        run.DataMap <- Some(DataMap.init ())
-        arc.AddRun run
+                let workflow = ArcWorkflow("workflow_1")
+                workflow.DataMap <- Some(DataMap.init ())
+                arc.AddWorkflow workflow
 
-        let cases = [|
-            "isa.investigation.xlsx", DTOType.ISA_Investigation
-            "assays/assay_1/isa.assay.xlsx", DTOType.ISA_Assay
-            "studies/study_1/isa.study.xlsx", DTOType.ISA_Study
-            "workflows/workflow_1/isa.workflow.xlsx", DTOType.ISA_Workflow
-            "runs/run_1/isa.run.xlsx", DTOType.ISA_Run
-            "assays/assay_1/isa.datamap.xlsx", DTOType.ISA_Datamap
-        |]
+                let run = ArcRun("run_1")
+                run.DataMap <- Some(DataMap.init ())
+                arc.AddRun run
 
-        for path, expectedFileType in cases do
-            let dto =
-                FileContentDTO.fromArcByPath path arc
-                |> expectSome <| $"Expected DTO for {path}."
+                let cases = [|
+                    "isa.investigation.xlsx", FileContentType.ISA_Investigation
+                    "assays/assay_1/isa.assay.xlsx", FileContentType.ISA_Assay
+                    "studies/study_1/isa.study.xlsx", FileContentType.ISA_Study
+                    "workflows/workflow_1/isa.workflow.xlsx", FileContentType.ISA_Workflow
+                    "runs/run_1/isa.run.xlsx", FileContentType.ISA_Run
+                    "assays/assay_1/isa.datamap.xlsx", FileContentType.ISA_Datamap
+                |]
 
-            Vitest.expect(dto.fileType).toEqual(expectedFileType)
-            Vitest.expect(dto.path).toBe(path))
+                for path, expectedFileType in cases do
+                    let dto =
+                        FileContentDTO.fromArcByPath path arc |> expectSome
+                        <| $"Expected DTO for {path}."
 
-    Vitest.test("copyArcPreservingStaticHashes keeps static hashes for unchanged entities", fun () ->
-        let sourceArc = ARC("test-arc")
-        sourceArc.AddAssay(ArcAssay("assay_1", title = "stable"))
+                    Vitest.expect(dto.fileType).toEqual (expectedFileType)
+                    Vitest.expect(dto.path).toBe (path)
+        )
 
-        sourceArc.GetWriteContracts() |> ignore
+        Vitest.test (
+            "updateARCByFileContentDTO accepts semantically identical ISA content",
+            fun () ->
+                let oldArc = ARC("test-arc")
+                oldArc.AddAssay(ArcAssay("assay_1", title = "stable"))
 
-        let copiedArc = copyArcPreservingStaticHashes sourceArc
+                let request =
+                    FileContentDTO.fromArcByPath "assays/assay_1/isa.assay.xlsx" oldArc
+                    |> expectSome
+                    <| "Expected current assay DTO from arc."
 
-        Vitest.expect(copiedArc.StaticHash).toBe(sourceArc.StaticHash)
-        Vitest.expect(copiedArc.GetAssay("assay_1").StaticHash).toBe(sourceArc.GetAssay("assay_1").StaticHash)
+                let updatedArc = updateARCByFileContentDTO oldArc request |> expectOk
+                let updatedAssay = updatedArc.GetAssay("assay_1")
+                Vitest.expect(updatedAssay.Title).toEqual (Some "stable")
+        )
 
-        let updateContracts = copiedArc.GetUpdateContracts()
-        let contractPaths = updateContracts |> Array.map _.Path
-        Vitest.expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))).toBe(false))
+        Vitest.test (
+            "copyArcPreservingStaticHashes keeps static hashes for unchanged entities",
+            fun () ->
+                let sourceArc = ARC("test-arc")
+                sourceArc.AddAssay(ArcAssay("assay_1", title = "stable"))
 
-    Vitest.test("preserved-hash working copy only generates contracts for newly added entity subtree", fun () ->
-        let oldArc = ARC("test-arc")
-        oldArc.AddAssay(ArcAssay("assay_1", title = "stable"))
-        oldArc.GetWriteContracts() |> ignore
+                sourceArc.GetWriteContracts() |> ignore
 
-        let workingArc = copyArcPreservingStaticHashes oldArc
-        let newAssay = ArcAssay("assay_2", title = "new-title")
+                let copiedArc = copyArcPreservingStaticHashes sourceArc
 
-        let request =
-            FileContentDTO.fromArcFile(ArcFiles.Assay newAssay)
-            |> expectSome <| "Expected new assay request DTO."
+                Vitest.expect(copiedArc.StaticHash).toBe (sourceArc.StaticHash)
+                Vitest.expect(copiedArc.GetAssay("assay_1").StaticHash).toBe (sourceArc.GetAssay("assay_1").StaticHash)
 
-        let updatedArc = updateARCByFileContentDTO workingArc request |> expectOk
-        let updateContracts = updatedArc.GetUpdateContracts()
-        let contractPaths = updateContracts |> Array.map _.Path
+                let updateContracts = copiedArc.GetUpdateContracts()
+                let contractPaths = updateContracts |> Array.map _.Path
 
-        Vitest.expect(updateContracts.Length).toBe(4)
-        Vitest.expect(contractPaths |> Array.exists (fun path -> path = "assays/assay_2/isa.assay.xlsx")).toBe(true)
-        Vitest.expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_2/"))).toBe(true)
-        Vitest.expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))).toBe(false)
-        Vitest.expect(contractPaths |> Array.exists (fun path -> path = "isa.investigation.xlsx")).toBe(false))
+                Vitest
+                    .expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_1/")))
+                    .toBe (false)
+        )
 
-    Vitest.test("scoped add persistence does not flush unrelated in-memory entity edits", fun () ->
-        let persistedArc = ARC("test-arc")
-        persistedArc.AddAssay(ArcAssay("assay_1", title = "stable"))
-        persistedArc.GetWriteContracts() |> ignore
+        Vitest.test (
+            "preserved-hash working copy only generates contracts for newly added entity subtree",
+            fun () ->
+                let oldArc = ARC("test-arc")
+                oldArc.AddAssay(ArcAssay("assay_1", title = "stable"))
+                oldArc.GetWriteContracts() |> ignore
 
-        let localDirtyArc = copyArcPreservingStaticHashes persistedArc
-        let dirtyAssay = ArcAssay("assay_1", title = "local-unsaved-change")
+                let workingArc = copyArcPreservingStaticHashes oldArc
+                let newAssay = ArcAssay("assay_2", title = "new-title")
 
-        let dirtyRequest =
-            FileContentDTO.fromArcFile(ArcFiles.Assay dirtyAssay)
-            |> expectSome <| "Expected local dirty assay request DTO."
+                let request =
+                    FileContentDTO.fromArcFile (ArcFiles.Assay newAssay) |> expectSome
+                    <| "Expected new assay request DTO."
 
-        let localDirtyArc = updateARCByFileContentDTO localDirtyArc dirtyRequest |> expectOk
+                let updatedArc = updateARCByFileContentDTO workingArc request |> expectOk
+                let updateContracts = updatedArc.GetUpdateContracts()
+                let contractPaths = updateContracts |> Array.map _.Path
 
-        let addRequest =
-            FileContentDTO.fromArcFile(ArcFiles.Assay(ArcAssay("assay_2", title = "new-assay")))
-            |> expectSome <| "Expected add-assay request DTO."
+                Vitest.expect(updateContracts.Length).toBe (4)
 
-        // Simulate scoped disk persistence: base the write on a clean reloaded ARC.
-        let diskWorkingArc = copyArcPreservingStaticHashes persistedArc
-        let updatedArcForDiskPersistence = updateARCByFileContentDTO diskWorkingArc addRequest |> expectOk
-        let diskContracts = updatedArcForDiskPersistence.GetUpdateContracts() |> Array.map _.Path
+                Vitest
+                    .expect(
+                        contractPaths
+                        |> Array.exists (fun path -> path = "assays/assay_2/isa.assay.xlsx")
+                    )
+                    .toBe (true)
 
-        Vitest.expect(diskContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_2/"))).toBe(true)
-        Vitest.expect(diskContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))).toBe(false)
+                Vitest
+                    .expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_2/")))
+                    .toBe (true)
 
-        // Simulate post-save in-memory state: keep local edits, add the new entity, sync hash baseline from disk write.
-        let localWorkingArc = copyArcPreservingStaticHashes localDirtyArc
-        let updatedArcForInMemoryState = updateARCByFileContentDTO localWorkingArc addRequest |> expectOk
-        syncArcStaticHashes updatedArcForDiskPersistence updatedArcForInMemoryState
+                Vitest
+                    .expect(contractPaths |> Array.exists (fun path -> path.StartsWith("assays/assay_1/")))
+                    .toBe (false)
 
-        let remainingUnsavedContracts = updatedArcForInMemoryState.GetUpdateContracts() |> Array.map _.Path
+                Vitest.expect(contractPaths |> Array.exists (fun path -> path = "isa.investigation.xlsx")).toBe (false)
+        )
 
-        Vitest.expect(remainingUnsavedContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))).toBe(true)
-        Vitest.expect(remainingUnsavedContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_2/"))).toBe(false))
+        Vitest.test (
+            "scoped add persistence does not flush unrelated in-memory entity edits",
+            fun () ->
+                let persistedArc = ARC("test-arc")
+                persistedArc.AddAssay(ArcAssay("assay_1", title = "stable"))
+                persistedArc.GetWriteContracts() |> ignore
+
+                let localDirtyArc = copyArcPreservingStaticHashes persistedArc
+                let dirtyAssay = ArcAssay("assay_1", title = "local-unsaved-change")
+
+                let dirtyRequest =
+                    FileContentDTO.fromArcFile (ArcFiles.Assay dirtyAssay) |> expectSome
+                    <| "Expected local dirty assay request DTO."
+
+                let localDirtyArc = updateARCByFileContentDTO localDirtyArc dirtyRequest |> expectOk
+
+                let addRequest =
+                    FileContentDTO.fromArcFile (ArcFiles.Assay(ArcAssay("assay_2", title = "new-assay")))
+                    |> expectSome
+                    <| "Expected add-assay request DTO."
+
+                // Simulate scoped disk persistence: base the write on a clean reloaded ARC.
+                let diskWorkingArc = copyArcPreservingStaticHashes persistedArc
+
+                let updatedArcForDiskPersistence =
+                    updateARCByFileContentDTO diskWorkingArc addRequest |> expectOk
+
+                let diskContracts =
+                    updatedArcForDiskPersistence.GetUpdateContracts() |> Array.map _.Path
+
+                Vitest
+                    .expect(diskContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_2/")))
+                    .toBe (true)
+
+                Vitest
+                    .expect(diskContracts |> Array.exists (fun path -> path.StartsWith("assays/assay_1/")))
+                    .toBe (false)
+
+                // Simulate post-save in-memory state: keep local edits, add the new entity, sync hash baseline from disk write.
+                let localWorkingArc = copyArcPreservingStaticHashes localDirtyArc
+
+                let updatedArcForInMemoryState =
+                    updateARCByFileContentDTO localWorkingArc addRequest |> expectOk
+
+                syncArcStaticHashes updatedArcForDiskPersistence updatedArcForInMemoryState
+
+                let remainingUnsavedContracts =
+                    updatedArcForInMemoryState.GetUpdateContracts() |> Array.map _.Path
+
+                Vitest
+                    .expect(
+                        remainingUnsavedContracts
+                        |> Array.exists (fun path -> path.StartsWith("assays/assay_1/"))
+                    )
+                    .toBe (true)
+
+                Vitest
+                    .expect(
+                        remainingUnsavedContracts
+                        |> Array.exists (fun path -> path.StartsWith("assays/assay_2/"))
+                    )
+                    .toBe (false)
+        )
 )

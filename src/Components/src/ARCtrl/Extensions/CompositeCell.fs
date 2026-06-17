@@ -15,19 +15,19 @@ type CompositeCell with
             oa.NameText
             defaultArg oa.TermSourceREF ""
             defaultArg oa.TermAccessionNumber ""
-            |]
+          |]
         | CompositeCell.Unitized(v, oa) -> [|
             v
             oa.NameText
             defaultArg oa.TermSourceREF ""
             defaultArg oa.TermAccessionNumber ""
-            |]
+          |]
         | CompositeCell.Data d -> [|
             defaultArg d.FilePath ""
             defaultArg d.Selector ""
             defaultArg d.Format ""
             defaultArg d.SelectorFormat ""
-            |]
+          |]
 
     //static member fromContent (content: string []) =
     //    match tryFromContent' content with

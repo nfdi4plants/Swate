@@ -26,7 +26,9 @@
     <Compile Include="JsonDTOUnwrapper.test.fs" />
     <Compile Include="NoteConversion.test.fs" />
     <Compile Include="NoteSearchReader.test.fs" />
+    <Compile Include="EnsureNotesFolder.test.fs" />
     <Compile Include="GitService.test.fs" />
+    <Compile Include="GitIpcProgress.test.fs" />
     <Compile Include="IpcArchitectureReview.test.fs" />
     <Compile Include="ArcFileSystemHelper.test.fs" />
     <Compile Include="RenamePathRules.test.fs" />

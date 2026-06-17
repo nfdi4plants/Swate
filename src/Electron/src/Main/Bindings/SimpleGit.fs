@@ -25,13 +25,7 @@ type IAbortController =
     abstract member abort: ?reason: obj -> unit
 
 [<AllowNullLiteral>]
-type SimpleGitTimeoutOptions
-    [<ParamObject; Emit("$0")>]
-    (
-        ?block: int,
-        ?stdOut: bool,
-        ?stdErr: bool
-    ) =
+type SimpleGitTimeoutOptions [<ParamObject; Emit("$0")>] (?block: int, ?stdOut: bool, ?stdErr: bool) =
     member val block: int option = block with get, set
     member val stdOut: bool option = stdOut with get, set
     member val stdErr: bool option = stdErr with get, set
@@ -39,11 +33,7 @@ type SimpleGitTimeoutOptions
 [<AllowNullLiteral>]
 type SimpleGitUnsafeOptions
     [<ParamObject; Emit("$0")>]
-    (
-        ?allowUnsafeCustomBinary: bool,
-        ?allowUnsafeProtocolOverride: bool,
-        ?allowUnsafePack: bool
-    ) =
+    (?allowUnsafeCustomBinary: bool, ?allowUnsafeProtocolOverride: bool, ?allowUnsafePack: bool) =
     member val allowUnsafeCustomBinary: bool option = allowUnsafeCustomBinary with get, set
     member val allowUnsafeProtocolOverride: bool option = allowUnsafeProtocolOverride with get, set
     member val allowUnsafePack: bool option = allowUnsafePack with get, set
@@ -430,22 +420,12 @@ type CwdDirectory =
     abstract member root: bool option
 
 [<AllowNullLiteral>]
-type SimpleGitCompletionOptions
-    [<ParamObject; Emit("$0")>]
-    (
-        ?onClose: U2<bool, int>,
-        ?onExit: U2<bool, int>
-    ) =
+type SimpleGitCompletionOptions [<ParamObject; Emit("$0")>] (?onClose: U2<bool, int>, ?onExit: U2<bool, int>) =
     member val onClose: U2<bool, int> option = onClose with get, set
     member val onExit: U2<bool, int> option = onExit with get, set
 
 [<AllowNullLiteral>]
-type SimpleGitSpawnOptions
-    [<ParamObject; Emit("$0")>]
-    (
-        ?uid: int,
-        ?gid: int
-    ) =
+type SimpleGitSpawnOptions [<ParamObject; Emit("$0")>] (?uid: int, ?gid: int) =
     member val uid: int option = uid with get, set
     member val gid: int option = gid with get, set
 
@@ -518,11 +498,18 @@ type ISimpleGit =
     abstract member clean: args: string[] * ?options: TaskOptions -> Promise<CleanSummary>
     abstract member clean: mode: string * ?options: TaskOptions -> Promise<CleanSummary>
     abstract member clean: ?options: TaskOptions -> Promise<CleanSummary>
+
     [<System.Obsolete("Deprecated upstream. Removed in v2; prefer abort-plugin configuration for pending task cancellation.")>]
     abstract member clearQueue: unit -> ISimpleGit
+
     abstract member clone: repoPath: string * ?localPath: string * ?options: TaskOptions -> Promise<string>
-    abstract member commit: message: string * ?files: U2<string, string[]> * ?options: GitOptions -> Promise<CommitResult>
-    abstract member commit: message: string[] * ?files: U2<string, string[]> * ?options: GitOptions -> Promise<CommitResult>
+
+    abstract member commit:
+        message: string * ?files: U2<string, string[]> * ?options: GitOptions -> Promise<CommitResult>
+
+    abstract member commit:
+        message: string[] * ?files: U2<string, string[]> * ?options: GitOptions -> Promise<CommitResult>
+
     abstract member countObjects: unit -> Promise<CountObjectsResult>
     abstract member customBinary: command: U2<string, string[]> -> ISimpleGit
     abstract member deleteLocalBranch: branchName: string * ?forceDelete: bool -> Promise<BranchSingleDeleteResult>
@@ -556,7 +543,10 @@ type ISimpleGit =
     abstract member raw: a: string * b: string * options: TaskOptions -> Promise<string>
     abstract member raw: a: string * b: string * c: string * options: TaskOptions -> Promise<string>
     abstract member raw: a: string * b: string * c: string * d: string * options: TaskOptions -> Promise<string>
-    abstract member raw: a: string * b: string * c: string * d: string * e: string * options: TaskOptions -> Promise<string>
+
+    abstract member raw:
+        a: string * b: string * c: string * d: string * e: string * options: TaskOptions -> Promise<string>
+
     abstract member raw: a: string * b: string -> Promise<string>
     abstract member raw: a: string * b: string * c: string -> Promise<string>
     abstract member raw: a: string * b: string * c: string * d: string -> Promise<string>
@@ -587,12 +577,12 @@ type ISimpleGit =
 [<Erase>]
 type AbortController =
     [<Emit("new AbortController()")>]
-    static member create (): IAbortController = jsNative
+    static member create() : IAbortController = jsNative
 
 [<Erase>]
 type SimpleGit =
     [<Import("simpleGit", "simple-git")>]
-    static member create (): ISimpleGit = jsNative
+    static member create() : ISimpleGit = jsNative
 
     [<Import("simpleGit", "simple-git")>]
     static member create(baseDir: string) : ISimpleGit = jsNative

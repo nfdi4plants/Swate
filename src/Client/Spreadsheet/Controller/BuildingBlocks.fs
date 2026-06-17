@@ -142,6 +142,7 @@ let addDataAnnotation
     let values = [|
         for rowIndex in 0 .. targetRowCount - 1 do
             let d = Data()
+
             if rowIndex < data.fragmentSelectors.Length then
                 let selector = data.fragmentSelectors.[rowIndex]
                 d.FilePath <- Some data.fileName

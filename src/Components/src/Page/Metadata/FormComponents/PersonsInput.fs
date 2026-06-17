@@ -18,8 +18,7 @@ type private AsyncState<'T> =
 
 module private PersonsInputHelper =
 
-    let toOptionalString (value: string) =
-        if value = "" then None else Some value
+    let toOptionalString (value: string) = if value = "" then None else Some value
 
     let countFilledFieldsString (person: Person) =
         let fields = [

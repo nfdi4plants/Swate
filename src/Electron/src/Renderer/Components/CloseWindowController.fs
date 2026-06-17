@@ -3,7 +3,6 @@ module Renderer.Components.CloseWindowController
 
 open Feliz
 open Fable.Core
-open Renderer.Components.ARCHelper
 open Swate.Components
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.ErrorModal.Context
@@ -23,10 +22,9 @@ type CloseWindowController =
 
         let modalIsOpen, setModalIsOpen = React.useState false
         let errorModal = useErrorModalCtx ()
-        let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
 
         let enqueueCloseError (title: string) (saveError: exn) =
-            errorModal.enqueue (ErrorModalRequest.create (saveError.Message, title = title, ?scopeId = appStateCtx))
+            errorModal.enqueue (ErrorModalRequest.create (saveError.Message, title = title))
 
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =
             Api.ipcArcVaultApi.resolveCloseRequest decision

@@ -403,8 +403,15 @@ type DataHubBrowser =
         | Some pageMeta ->
             Html.div [
                 prop.testId "GitLabExplorePagination"
-                prop.className "swt:flex swt:items-center swt:justify-between swt:pt-1"
+                prop.className "swt:flex swt:items-center swt:justify-center swt:gap-6"
                 prop.children [
+                    Html.button [
+                        prop.testId "GitLabExploreFirstPageButton"
+                        prop.className "swt:btn swt:btn-xs"
+                        prop.text "First"
+                        prop.disabled (pageMeta.PrevPage.IsNone || pageMeta.Page = Some 1)
+                        prop.onClick (fun _ -> Some 1 |> Option.iter onPageChange)
+                    ]
                     Html.button [
                         prop.testId "GitLabExplorePrevPageButton"
                         prop.className "swt:btn swt:btn-xs"
@@ -423,6 +430,13 @@ type DataHubBrowser =
                         prop.text "Next"
                         prop.disabled pageMeta.NextPage.IsNone
                         prop.onClick (fun _ -> pageMeta.NextPage |> Option.iter onPageChange)
+                    ]
+                    Html.button [
+                        prop.testId "GitLabExploreLastPageButton"
+                        prop.className "swt:btn swt:btn-xs"
+                        prop.text (string pageMeta.TotalPages)
+                        prop.disabled (pageMeta.TotalPages.IsNone || pageMeta.Page = pageMeta.TotalPages)
+                        prop.onClick (fun _ -> pageMeta.TotalPages |> Option.iter onPageChange)
                     ]
                 ]
             ]
@@ -571,7 +585,8 @@ type DataHubBrowser =
             prop.testId "GitLabExplorePanel"
             prop.className [
                 classNames
-                |> Option.defaultValue "swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:grow swt:overflow-hidden"
+                |> Option.defaultValue
+                    "swt:flex swt:flex-col swt:gap-2 swt:p-2 swt:grow swt:overflow-hidden swt:h-full swt:w-full swt:overflow-y-hidden"
             ]
             prop.children [
                 Html.div [
@@ -582,9 +597,7 @@ type DataHubBrowser =
                         | Some closeFn ->
                             Html.div [
                                 prop.className "swt:ml-auto"
-                                prop.children [
-                                    Buttons.DeleteButton(props = [ prop.onClick closeFn ])
-                                ]
+                                prop.children [ Buttons.DeleteButton(props = [ prop.onClick closeFn ]) ]
                             ]
                         | None -> Html.none
                     ]
@@ -611,62 +624,58 @@ type DataHubBrowser =
                     (fun gid -> dispatch (DataHubBrowserModel.SetSelectedGroupId gid)),
                     model.GroupsLoadError
                 )
-                if model.IsLoading then
+                match model with
+                | { IsLoading = true } ->
                     Html.div [
-                        prop.testId "GitLabExploreLoading"
-                        prop.className "swt:flex swt:items-center swt:gap-2"
+                        prop.className "swt:grow"
                         prop.children [
-                            Html.span [
-                                prop.className "swt:loading swt:loading-spinner swt:loading-sm"
-                            ]
-                            Html.span "Loading repositories..."
+                            Primitive.LoadingSpinner.LoadingSpinner.LoadingSpinner(
+                                size = DaisyuiSize.XL,
+                                text = "Loading repositories..."
+                            )
                         ]
                     ]
-                else
-                    Html.none
-                match model.Error with
-                | Some err ->
+                | { Error = Some err } ->
                     Html.div [
                         prop.testId "GitLabExploreError"
                         prop.className "swt:alert swt:alert-error swt:text-xs"
                         prop.children [ Html.span err.GitLabErrorToString ]
                     ]
-                | None -> Html.none
-                let showOrgNoGroups =
-                    model.Tab = ExploreTab.YourOrganisations
-                    && model.IsAuthenticated
-                    && model.GroupsLoaded
-                    && model.Groups.Length = 0
-                    && model.GroupsLoadError.IsNone
+                | {
+                      Tab = ExploreTab.YourOrganisations
+                      IsAuthenticated = true
+                      GroupsLoaded = true
+                      Groups = groups
+                      GroupsLoadError = None
+                  } when groups.Length = 0 ->
 
-                let showOrgLoadError =
-                    model.Tab = ExploreTab.YourOrganisations && model.GroupsLoadError.IsSome
+                    let showOrgLoadError =
+                        model.Tab = ExploreTab.YourOrganisations && model.GroupsLoadError.IsSome
 
-                if showOrgLoadError then
-                    Html.p [
-                        prop.testId "GitLabExploreGroupsError"
-                        prop.className "swt:text-sm swt:text-error"
-                        prop.text "Failed to load groups"
-                    ]
-                elif showOrgNoGroups then
-                    Html.p [
-                        prop.testId "GitLabExploreGroupsEmpty"
-                        prop.className "swt:text-sm swt:text-base-content/60"
-                        prop.text "No groups found"
-                    ]
-                elif (not model.IsLoading) && model.Repos.Length = 0 then
+                    if showOrgLoadError then
+                        Html.p [
+                            prop.testId "GitLabExploreGroupsError"
+                            prop.className "swt:text-sm swt:text-error"
+                            prop.text "Failed to load groups"
+                        ]
+                    else
+                        Html.p [
+                            prop.testId "GitLabExploreGroupsEmpty"
+                            prop.className "swt:text-sm swt:text-base-content/60"
+                            prop.text "No groups found"
+                        ]
+                | { IsLoading = false; Repos = [||] } ->
                     Html.p [
                         prop.testId "GitLabExploreEmpty"
                         prop.className "swt:text-sm swt:text-base-content/60"
                         prop.text "No repositories found for current filter and search."
                     ]
-                elif model.Repos.Length > 0 then
+                | { IsLoading = false; Repos = repos } ->
                     Html.ul [
                         prop.testId "GitLabExploreRepoList"
-                        prop.className
-                            "swt:list swt:bg-base-100 swt:rounded-box swt:shadow-md swt:overflow-x-auto swt:grow-2"
+                        prop.className "swt:list swt:bg-base-100 swt:grow swt:overflow-y-auto swt:h-full"
                         prop.children [
-                            for repo in model.Repos do
+                            for repo in repos do
                                 DataHubBrowser.RepoListRow(repo, ?extraButtons = projectActionBtns)
                         ]
                     ]
@@ -678,19 +687,20 @@ type DataHubBrowser =
 
     [<ReactComponent>]
     static member Entry() =
-        let accounts, setAccounts =
-            React.useState (AuthStateDto.Empty: AuthStateDto)
+        let accounts, setAccounts = React.useState (AuthStateDto.Empty: AuthStateDto)
 
         let mockUser: AccountSummary = {
             User = {
-                AccountId = "1"
+                Id = 1
+                LocalSwateAccountId = "1"
                 Name = "storybook-user"
                 Email = "Storybook User"
                 AvatarUrl = ""
                 TargetDataHub = ""
             }
             DateAdded = "2026-01-01T00:00:00.0000000Z"
-            TokenInvalid = false
+            TokenStatus = TokenStatus.Ok
+            TokenExpiresOn = None
         }
 
         let login () =
@@ -702,8 +712,7 @@ type DataHubBrowser =
                 }
             )
 
-        let logout () =
-            setAccounts AuthStateDto.Empty
+        let logout () = setAccounts AuthStateDto.Empty
 
         let reloadTrigger = 0
 
@@ -921,10 +930,7 @@ type DataHubBrowser =
 
             do! Promise.sleep delayMs
 
-            let source =
-                orgRepos
-                |> Map.tryFind query.GroupId
-                |> Option.defaultValue [||]
+            let source = orgRepos |> Map.tryFind query.GroupId |> Option.defaultValue [||]
 
             let filtered =
                 source
@@ -1052,14 +1058,16 @@ type DataHubBrowser =
                 | Ok user ->
                     let userDTO: AccountSummary = {
                         User = {
-                            AccountId = string user.id
+                            Id = user.id
+                            LocalSwateAccountId = string user.id
                             Name = user.name
                             AvatarUrl = user.avatar_url |> Option.defaultValue ""
-                            Email = ""
+                            Email = user.email
                             TargetDataHub = baseUrl
                         }
                         DateAdded = "2026-01-01T00:00:00.0000000Z"
-                        TokenInvalid = false
+                        TokenStatus = TokenStatus.Ok
+                        TokenExpiresOn = None
                     }
 
                     setAccounts {
@@ -1116,14 +1124,7 @@ type DataHubBrowser =
                 GitLabApi.ListUserPersonalProjects(
                     baseUrl,
                     pat,
-                    ?userId =
-                        (currentUser
-                         |> Option.bind (fun u ->
-                             System.Int32.TryParse(u.AccountId)
-                             |> function
-                                 | true, id -> Some id
-                                 | _ -> None
-                         )),
+                    ?userId = (currentUser |> Option.map _.Id),
                     page = query.Page,
                     perPage = query.PerPage,
                     search = query.SearchTerm,
@@ -1236,4 +1237,3 @@ type DataHubBrowser =
                 DataHubBrowser.ExplorePanel(accounts, loaders, reloadTrigger, projectActionBtns = btnInfo)
             ]
         ]
-

@@ -47,9 +47,7 @@ type ArcTable with
 
         let compositeColumns = ArcTable.composeColumns columnsList
 
-        let arcTable =
-            ArcTable.init name
-            |> ArcTable.addColumns (compositeColumns)
+        let arcTable = ArcTable.init name |> ArcTable.addColumns (compositeColumns)
 
         arcTable
 
@@ -75,19 +73,22 @@ type ArcTable with
                     let headers =
                         headerRange.values.[0]
                         |> Seq.map (fun item ->
-                            item |> Option.map string |> Option.defaultValue "" |> (fun s -> s.TrimEnd()))
+                            item |> Option.map string |> Option.defaultValue "" |> (fun s -> s.TrimEnd())
+                        )
 
                     let bodyRows =
                         bodyRowRange.values
                         |> Seq.map (fun items ->
                             items
-                            |> Seq.map (fun item -> item |> Option.map string |> Option.defaultValue ""))
+                            |> Seq.map (fun item -> item |> Option.map string |> Option.defaultValue "")
+                        )
 
                     try
                         ArcTable.fromStringSeqs (excelTable.worksheet.name, headers, bodyRows)
                         |> Result.Ok
                     with exn ->
-                        Result.Error exn)
+                        Result.Error exn
+                )
     }
 
     /// <summary>

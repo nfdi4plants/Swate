@@ -114,11 +114,7 @@ type Main =
         let copyArcPathToClipboard =
             copyArcPathToClipboard (fun ex ->
                 errorModalCtx.enqueue (
-                    ErrorModalRequest.create (
-                        $"Failed to copy path: {ex.Message}",
-                        title = "Copy path failed",
-                        ?scopeId = appStateCtx
-                    )
+                    ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
                 )
             )
             >> Promise.start
@@ -126,11 +122,7 @@ type Main =
         let openArcFolderInFileExplorer =
             openArcFolderInFileExplorer (fun ex ->
                 errorModalCtx.enqueue (
-                    ErrorModalRequest.create (
-                        $"Failed to open folder: {ex.Message}",
-                        title = "Open folder failed",
-                        ?scopeId = appStateCtx
-                    )
+                    ErrorModalRequest.create ($"Failed to open folder: {ex.Message}", title = "Open folder failed")
                 )
             )
             >> Promise.start
@@ -165,7 +157,8 @@ type Main =
                                     ButtonInfo.create (
                                         "swt:fluent--text-paragraph-24-regular swt:size-5",
                                         "Provenance Grouping",
-                                        fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.ProvenanceGroupingPage)
+                                        fun _ ->
+                                            pageStateCtx.setState (Some Renderer.Types.PageState.ProvenanceGroupingPage)
                                     )
                                 |],
                                 3
@@ -186,7 +179,9 @@ type Main =
                         prop.testId "left-sidebar-file-explorer-tree"
                         prop.className
                             "swt:flex-1 swt:min-h-0 swt:overflow-y-auto swt:overflow-x-auto swt:[scrollbar-gutter:stable]"
-                        prop.children [ FileTree.FileTree(rootContextMenuRef = arcNameContextMenuRef) ]
+                        prop.children [
+                            FileTree.FileTree(rootContextMenuRef = arcNameContextMenuRef)
+                        ]
                     ]
                 ]
             ]

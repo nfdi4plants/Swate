@@ -21,5 +21,5 @@ let AnnotationTableStateCtx =
     )
 
 [<Hook>]
-let useAnnotationTableStateCtx () = React.useContext AnnotationTableStateCtx
-     
+let useAnnotationTableStateCtx () =
+    React.useContext AnnotationTableStateCtx

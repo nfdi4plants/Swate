@@ -4,10 +4,7 @@ open Swate.Components
 open Swate.Components.Primitive.Select.Types
 open Swate.Components.Page.ARCObjectExplorer.GraphExplorer.Model
 
-let private createOption(label: string) : SelectItem<string> = {|
-    label = label
-    item = label
-|}
+let private createOption (label: string) : SelectItem<string> = {| label = label; item = label |}
 
 let arcObjectExplorerOptions: SelectItem<string>[] =
     [|
@@ -29,16 +26,10 @@ let graphObjectExplorerOptions: SelectItem<string>[] =
     |> Array.map createOption
 
 let defaultSelectedIndices (options: SelectItem<string>[]) =
-    options
-    |> Array.mapi (fun index _ -> index)
-    |> Set.ofArray
+    options |> Array.mapi (fun index _ -> index) |> Set.ofArray
 
 let selectedLabels (options: SelectItem<string>[]) (selectedKindIndices: Set<int>) =
     selectedKindIndices
     |> Seq.sort
-    |> Seq.choose (fun index ->
-        options
-        |> Array.tryItem index
-        |> Option.map (fun option -> option.item))
+    |> Seq.choose (fun index -> options |> Array.tryItem index |> Option.map (fun option -> option.item))
     |> Set.ofSeq
-

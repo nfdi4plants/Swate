@@ -18,12 +18,7 @@ type TemplateMetadata =
             LayoutComponents.BoxedField(
                 "Template Metadata",
                 content = [
-                    TextInput.TextInput(
-                        template.Id.ToString(),
-                        (fun _ -> ()),
-                        label = "Identifier",
-                        disabled = true
-                    )
+                    TextInput.TextInput(template.Id.ToString(), (fun _ -> ()), label = "Identifier", disabled = true)
                     TextInput.TextInput(
                         template.Name,
                         (fun value ->
@@ -95,4 +90,3 @@ type TemplateMetadata =
                 ]
             )
         ]
-

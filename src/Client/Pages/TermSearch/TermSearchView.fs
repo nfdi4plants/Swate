@@ -21,8 +21,7 @@ open Swate.Components.Composite.TermSearch.Types
 /// "Fill selected cells with this term" - button //
 [<ReactComponent>]
 let private AddButton (model: Model, dispatch) =
-    let ctx =
-        useAnnotationTableStateCtx ()
+    let ctx = useAnnotationTableStateCtx ()
 
     let selectedCells =
         ctx.state

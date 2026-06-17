@@ -9,10 +9,7 @@ type ARCObjectExplorerVisibleItem = {
     Lineage: string list
 }
 
-type ARCObjectExplorerContextItem = {
-    Item: FileItem
-    IsCurrent: bool
-}
+type ARCObjectExplorerContextItem = { Item: FileItem; IsCurrent: bool }
 
 type ARCObjectExplorerSection = {
     Label: string
@@ -26,4 +23,3 @@ type ARCObjectExplorerItems = {
     ContextItems: ARCObjectExplorerContextItem list
     Sections: ARCObjectExplorerSection list
 }
-

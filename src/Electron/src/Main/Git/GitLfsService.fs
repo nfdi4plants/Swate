@@ -51,11 +51,29 @@ let private indexUsingRelativePath (files: GitLfsLsFileInfo[]) : Dictionary<stri
 
     filesByRelativePath
 
+let tryFindLsFileInfoByRelativePath (filesByRelativePath: Dictionary<string, GitLfsLsFileInfo>) (relativePath: string) =
+    let normalizedPath = PathHelpers.normalizeSeparators relativePath
+
+    match filesByRelativePath.TryGetValue normalizedPath with
+    | true, info -> Some info
+    | false, _ ->
+        filesByRelativePath
+        |> Seq.tryPick (fun entry ->
+            if PathHelpers.pathsEqual entry.Key normalizedPath then
+                Some entry.Value
+            else
+                None
+        )
+
+let buildLsFilesJsonArgs () = [| "lfs"; "ls-files"; "-j" |]
 
 /// Chooses the most useful text from a Git LFS adapter result for user-facing errors.
 let extractFailureMessage (result: GitLfsResult) =
-    let errorText = result.Error |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
-    let outputText = result.Output |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
+    let errorText =
+        result.Error |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
+
+    let outputText =
+        result.Output |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
 
     if not (String.IsNullOrWhiteSpace errorText) then
         errorText
@@ -104,73 +122,94 @@ let run
     }
 
 /// Runs Git LFS without progress or cancellation hooks.
-let runSilently (request: GitLfsRequest) : JS.Promise<Result<GitLfsResult, exn>> =
-    run request ignore (fun () -> false)
+let runSilently (request: GitLfsRequest) : JS.Promise<Result<GitLfsResult, exn>> = run request ignore (fun () -> false)
 
 /// Tracks a repository-relative path in Git LFS. GitService uses this during automatic large-file staging.
-let track (repoPath: string) (relativePath: string) : JS.Promise<Result<unit, string>> =
-    promise {
-        let! result =
-            createRequest repoPath Track (Some relativePath) None
-            |> runSilently
+let track (repoPath: string) (relativePath: string) : JS.Promise<Result<unit, string>> = promise {
+    let! result = createRequest repoPath Track (Some relativePath) None |> runSilently
 
-        return
-            match result with
-            | Ok _ -> Ok()
-            | Error exn -> Error exn.Message
-    }
+    return
+        match result with
+        | Ok _ -> Ok()
+        | Error exn -> Error exn.Message
+}
 
 /// Runs `git lfs install` for a specific repository.
-let install (repoPath: string) : JS.Promise<Result<unit, string>> =
-    promise {
-        let! result =
-            createRequest repoPath Install None None
-            |> runSilently
+let install (repoPath: string) : JS.Promise<Result<unit, string>> = promise {
+    let! result = createRequest repoPath Install None None |> runSilently
 
-        return
-            match result with
-            | Ok _ -> Ok()
-            | Error exn -> Error exn.Message
-    }
+    return
+        match result with
+        | Ok _ -> Ok()
+        | Error exn -> Error exn.Message
+}
 
 /// Runs system-level Git LFS install from the Main IPC endpoint and updates the installation cache on success.
-let installSystem () : JS.Promise<Result<unit, string>> =
-    promise {
-        try
-            let! result = gitLfs.Install (Some DefaultTimeoutMs) ignore (fun () -> false)
+let installSystem () : JS.Promise<Result<unit, string>> = promise {
+    try
+        let! result = gitLfs.Install (Some DefaultTimeoutMs) ignore (fun () -> false)
 
-            return
-                if result.Success then
-                    cachedSystemInstalled <- true
-                    Ok()
-                else
-                    Error(extractFailureMessage result)
-        with ex ->
-            return Error ex.Message
-    }
+        return
+            if result.Success then
+                cachedSystemInstalled <- true
+                Ok()
+            else
+                Error(extractFailureMessage result)
+    with ex ->
+        return Error ex.Message
+}
 
 /// Probes whether `git lfs` is available on PATH. The positive result is cached for the Main process lifetime.
-let isSystemInstalled () : JS.Promise<bool> =
-    promise {
-        if cachedSystemInstalled then
-            return true
-        else
-            let! output = tryExecGitText None DefaultTimeoutMs [| "lfs"; "version" |]
-            let isInstalled = output |> Option.exists (fun text -> not (String.IsNullOrWhiteSpace text))
+let isSystemInstalled () : JS.Promise<bool> = promise {
+    if cachedSystemInstalled then
+        return true
+    else
+        let! output = tryExecGitText None DefaultTimeoutMs [| "lfs"; "version" |]
 
-            if isInstalled then
-                cachedSystemInstalled <- true
+        let isInstalled =
+            output |> Option.exists (fun text -> not (String.IsNullOrWhiteSpace text))
 
-            return isInstalled
-    }
+        if isInstalled then
+            cachedSystemInstalled <- true
+
+        return isInstalled
+}
 
 /// Checks whether `.gitattributes` marks a path for Git LFS.
 let isTrackedByAttributes (repoRoot: string) (relativePath: string) =
     gitLfs.IsTrackedByAttributes repoRoot relativePath
 
-/// Tries to read `git lfs ls-files -j` metadata keyed by repository-relative path.
-/// Fail-open behavior: command or parse failures yield an empty dictionary.
-let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<string, GitLfsLsFileInfo>> =
+let private extractLsFilesFailureMessage (result: GitSpawnResult) =
+    let stderrText =
+        result.StderrText
+        |> Option.ofObj
+        |> Option.defaultValue String.Empty
+        |> _.Trim()
+
+    let stdoutText =
+        result.StdoutText
+        |> Option.ofObj
+        |> Option.defaultValue String.Empty
+        |> _.Trim()
+
+    let message =
+        if result.TimedOut then
+            if not (String.IsNullOrWhiteSpace stderrText) then
+                stderrText
+            else
+                "Git LFS metadata command timed out."
+        elif not (String.IsNullOrWhiteSpace stderrText) then
+            stderrText
+        elif not (String.IsNullOrWhiteSpace stdoutText) then
+            stdoutText
+        else
+            "Git LFS metadata command failed."
+
+    redactToken message
+
+let private readLsFilesByRelativePath
+    (repoRoot: string)
+    : JS.Promise<Result<Dictionary<string, GitLfsLsFileInfo>, string>> =
     promise {
         let normalizedRepoRoot = PathHelpers.normalizePath repoRoot
 
@@ -178,14 +217,14 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
             let! commandResult =
                 runGitCaptured {
                     WorkingDirectory = Some normalizedRepoRoot
-                    Arguments = [| "lfs"; "ls-files"; "-j" |]
+                    Arguments = buildLsFilesJsonArgs ()
                     Environment = None
                     StandardInput = None
                     TimeoutMs = Some lfsLsFilesTimeoutMs
                 }
 
             if commandResult.ExitCode <> 0 || commandResult.TimedOut then
-                return Dictionary<string, GitLfsLsFileInfo>()
+                return Error(extractLsFilesFailureMessage commandResult)
             else
                 let stdoutText =
                     commandResult.StdoutText
@@ -194,10 +233,10 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
                     |> _.Trim()
 
                 if String.IsNullOrWhiteSpace stdoutText then
-                    return Dictionary<string, GitLfsLsFileInfo>()
+                    return Ok(Dictionary<string, GitLfsLsFileInfo>())
                 else
                     try
-                        return stdoutText |> parseLsFiles |> indexUsingRelativePath
+                        return stdoutText |> parseLsFiles |> indexUsingRelativePath |> Ok
                     with parseError ->
                         let reason =
                             if String.IsNullOrWhiteSpace parseError.Message then
@@ -206,43 +245,71 @@ let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<strin
                                 parseError.Message
 
                         Browser.Dom.console.warn $"Git LFS ls-files parse warning: {reason}"
-                        return Dictionary<string, GitLfsLsFileInfo>()
-        with _ ->
-            return Dictionary<string, GitLfsLsFileInfo>()
+                        return Error reason
+        with error ->
+            let message =
+                if String.IsNullOrWhiteSpace error.Message then
+                    "Unknown Git LFS metadata error."
+                else
+                    error.Message
+
+            return Error(redactToken message)
     }
 
-let storagePruneArgs =
-    [| "lfs"; "prune"; "--verify-remote"; "--verify-unreachable"; "--when-unverified=halt" |]
+/// Tries to read `git lfs ls-files -j` metadata keyed by repository-relative path.
+/// Fail-open behavior: command or parse failures yield an empty dictionary.
+let tryGetLsFilesByRelativePath (repoRoot: string) : JS.Promise<Dictionary<string, GitLfsLsFileInfo>> = promise {
+    match! readLsFilesByRelativePath repoRoot with
+    | Ok filesByRelativePath -> return filesByRelativePath
+    | Error message ->
+        Browser.Dom.console.warn $"Git LFS ls-files warning: {message}"
+        return Dictionary<string, GitLfsLsFileInfo>()
+}
+
+let tryFindListingForPath (repoRoot: string) (relativePath: string) : JS.Promise<Result<GitLfsLsFileInfo, string>> = promise {
+    try
+        match! readLsFilesByRelativePath repoRoot with
+        | Error message -> return Error $"Could not read Git LFS file metadata: {message}"
+        | Ok filesByRelativePath ->
+            return
+                match tryFindLsFileInfoByRelativePath filesByRelativePath relativePath with
+                | Some listing -> Ok listing
+                | None -> Error "The file is not listed by Git LFS in the current checkout."
+    with error ->
+        return Error $"Could not read Git LFS file metadata: {error.Message}"
+}
+
+let storagePruneArgs = [|
+    "lfs"
+    "prune"
+    "--verify-remote"
+    "--verify-unreachable"
+    "--when-unverified=halt"
+|]
 
 let storageDedupArgs = [| "lfs"; "dedup" |]
 
-let buildFetchRefetchArgs (relativePath: string) =
-    [|
-        "lfs"
-        "fetch"
-        "--refetch"
-        $"--include={relativePath}"
-        "origin"
-        "HEAD"
-    |]
+let buildFetchRefetchArgs (relativePath: string) = [|
+    "lfs"
+    "fetch"
+    "--refetch"
+    $"--include={relativePath}"
+    "origin"
+    "HEAD"
+|]
 
-let buildLsFilesJsonArgs (relativePath: string) =
-    [| "lfs"; "ls-files"; "-l"; "--size"; "--json"; $"--include={relativePath}" |]
+let private buildSmudgePointerArgs (relativePath: string) = [|
+    "-c"
+    "lfs.fetchinclude="
+    "-c"
+    "lfs.fetchexclude="
+    "lfs"
+    "smudge"
+    "--"
+    relativePath
+|]
 
-let tryFindListingForPath (relativePath: string) (listingJson: string) : Result<GitLfsLsFileInfo, string> =
-    try
-        let normalizedPath = PathHelpers.normalizeSeparators relativePath
-
-        match
-            listingJson
-            |> parseLsFiles
-            |> Array.tryFind (fun file ->
-                String.Equals(PathHelpers.normalizeSeparators file.name, normalizedPath, StringComparison.Ordinal))
-        with
-        | None -> Error "The file is not listed by Git LFS in the current checkout."
-        | Some file -> Ok { file with name = PathHelpers.normalizeSeparators file.name }
-    with error ->
-        Error $"Could not read Git LFS file metadata: {error.Message}"
+let buildCheckoutArgs (relativePath: string) = [| "lfs"; "checkout"; "--"; relativePath |]
 
 let private formatDiagnosticsSection (title: string) (content: string option) =
     match content |> Option.map _.Trim() with
@@ -277,16 +344,18 @@ let collectPushDiagnostics
     : JS.Promise<string option> =
     promise {
         let! pushRemoteUrl =
-            tryRunRawDiagnosticCommand runSimpleGitRaw getFailureMessage git [| "remote"; "get-url"; "--push"; remoteName |]
+            tryRunRawDiagnosticCommand runSimpleGitRaw getFailureMessage git [|
+                "remote"
+                "get-url"
+                "--push"
+                remoteName
+            |]
 
-        let! lfsVersion =
-            tryRunRawDiagnosticCommand runSimpleGitRaw getFailureMessage git [| "lfs"; "version" |]
+        let! lfsVersion = tryRunRawDiagnosticCommand runSimpleGitRaw getFailureMessage git [| "lfs"; "version" |]
 
-        let! lfsEnv =
-            tryRunRawDiagnosticCommand runSimpleGitRaw getFailureMessage git [| "lfs"; "env" |]
+        let! lfsEnv = tryRunRawDiagnosticCommand runSimpleGitRaw getFailureMessage git [| "lfs"; "env" |]
 
-        let! lfsLogsLast =
-            tryRunRawDiagnosticCommand runSimpleGitRaw getFailureMessage git [| "lfs"; "logs"; "last" |]
+        let! lfsLogsLast = tryRunRawDiagnosticCommand runSimpleGitRaw getFailureMessage git [| "lfs"; "logs"; "last" |]
 
         return
             [
@@ -304,10 +373,8 @@ let collectPushDiagnostics
 /// Appends optional LFS diagnostic sections to the original push failure message.
 let appendPushDiagnostics (message: string) (diagnostics: string option) =
     match diagnostics |> Option.map _.Trim() with
-    | Some value when not (String.IsNullOrWhiteSpace value) ->
-        $"{message}\n\nLFS diagnostics:\n{value}"
-    | _ ->
-        message
+    | Some value when not (String.IsNullOrWhiteSpace value) -> $"{message}\n\nLFS diagnostics:\n{value}"
+    | _ -> message
 
 let private resolvePushRefSpec
     (runStatus: ISimpleGit -> JS.Promise<Result<StatusResult, 'Failure>>)
@@ -330,8 +397,7 @@ let private resolvePushRefSpec
                     |> Option.defaultValue "HEAD"
 
                 return currentBranch
-            | Error _ ->
-                return "HEAD"
+            | Error _ -> return "HEAD"
     }
 
 let private splitNonEmptyLines (text: string) =
@@ -349,9 +415,11 @@ let private shouldSkipLfsUploadFromPushDryRun (output: string) =
         )
 
     statusLines.Length = 0
-    || statusLines |> Array.forall (fun line -> line.StartsWith("=", StringComparison.Ordinal))
+    || statusLines
+       |> Array.forall (fun line -> line.StartsWith("=", StringComparison.Ordinal))
     // Rejected dry runs still mean there is no successful outbound push to upload LFS objects for.
-    || statusLines |> Array.exists (fun line -> line.StartsWith("!", StringComparison.Ordinal))
+    || statusLines
+       |> Array.exists (fun line -> line.StartsWith("!", StringComparison.Ordinal))
 
 let private getKnownRemoteRefs
     (runSimpleGitRaw: (ISimpleGit -> JS.Promise<string>) -> ISimpleGit -> JS.Promise<Result<string, 'Failure>>)
@@ -361,7 +429,13 @@ let private getKnownRemoteRefs
     promise {
         let! result =
             runSimpleGitRaw
-                (fun currentGit -> currentGit.raw [| "for-each-ref"; "--format=%(refname)"; $"refs/remotes/{remoteName}" |])
+                (fun currentGit ->
+                    currentGit.raw [|
+                        "for-each-ref"
+                        "--format=%(refname)"
+                        $"refs/remotes/{remoteName}"
+                    |]
+                )
                 git
 
         return
@@ -380,15 +454,12 @@ let private getOutboundObjectIds
     (git: ISimpleGit)
     : JS.Promise<Result<string[], 'Failure>> =
     promise {
-        let args =
-            [|
-                "rev-list"
-                "--objects"
-                refSpec
-                yield!
-                    remoteRefs
-                    |> Array.map (fun remoteRef -> $"^{remoteRef}")
-            |]
+        let args = [|
+            "rev-list"
+            "--objects"
+            refSpec
+            yield! remoteRefs |> Array.map (fun remoteRef -> $"^{remoteRef}")
+        |]
 
         let! result = runSimpleGitRaw (fun currentGit -> currentGit.raw args) git
 
@@ -422,7 +493,12 @@ let private buildRevListStandardInput (refSpec: string) (remoteTipIds: string[])
     if remoteTipIds.Length = 0 then
         $"{refSpec}\n"
     else
-        String.concat "\n" [| yield refSpec; yield "--not"; yield! remoteTipIds; yield "" |]
+        String.concat "\n" [|
+            yield refSpec
+            yield "--not"
+            yield! remoteTipIds
+            yield ""
+        |]
 
 let private tryParsePointerOid (content: string) =
     let lines =
@@ -435,9 +511,15 @@ let private tryParsePointerOid (content: string) =
         |> Array.tryPick (fun line ->
             let prefix = "oid sha256:"
 
-            if line.StartsWith(prefix, StringComparison.Ordinal) && line.Length = prefix.Length + 64 then
+            if
+                line.StartsWith(prefix, StringComparison.Ordinal)
+                && line.Length = prefix.Length + 64
+            then
                 let oid = line.Substring(prefix.Length)
-                let isLowerHex = oid |> Seq.forall (fun c -> Char.IsDigit c || ('a' <= c && c <= 'f'))
+
+                let isLowerHex =
+                    oid |> Seq.forall (fun c -> Char.IsDigit c || ('a' <= c && c <= 'f'))
+
                 if isLowerHex then Some oid else None
             else
                 None
@@ -447,6 +529,7 @@ let private tryParsePointerOid (content: string) =
         lines
         |> Array.exists (fun line ->
             let prefix = "size "
+
             line.StartsWith(prefix, StringComparison.Ordinal)
             && line.Length > prefix.Length
             && (line.Substring(prefix.Length) |> Seq.forall Char.IsDigit)
@@ -500,8 +583,7 @@ let private tryReadBatchPointerOids (stdoutBuffer: obj) =
                     malformed <- true
                 else
                     let content =
-                        bufferSubarray stdoutBuffer contentStart contentEnd
-                        |> bufferToUtf8String
+                        bufferSubarray stdoutBuffer contentStart contentEnd |> bufferToUtf8String
 
                     match tryParsePointerOid content with
                     | Some pointerOid -> pointerOids.Add pointerOid
@@ -512,11 +594,23 @@ let private tryReadBatchPointerOids (stdoutBuffer: obj) =
                     if index < totalLength && bufferByteAt stdoutBuffer index = 10 then
                         index <- index + 1
 
-    if malformed then None else Some(pointerOids.ToArray() |> Array.distinct)
+    if malformed then
+        None
+    else
+        Some(pointerOids.ToArray() |> Array.distinct)
 
 let private extractSpawnFailureMessage (result: GitSpawnResult) =
-    let stderrText = result.StderrText |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
-    let stdoutText = result.StdoutText |> Option.ofObj |> Option.defaultValue String.Empty |> _.Trim()
+    let stderrText =
+        result.StderrText
+        |> Option.ofObj
+        |> Option.defaultValue String.Empty
+        |> _.Trim()
+
+    let stdoutText =
+        result.StdoutText
+        |> Option.ofObj
+        |> Option.defaultValue String.Empty
+        |> _.Trim()
 
     if result.TimedOut then
         if not (String.IsNullOrWhiteSpace stderrText) then
@@ -532,16 +626,47 @@ let private extractSpawnFailureMessage (result: GitSpawnResult) =
 
 let private spawnFailure (result: GitSpawnResult) = exn (extractSpawnFailureMessage result)
 
+let private buildPointerInput (listing: GitLfsLsFileInfo) =
+    let sizeText = listing.size |> int64 |> string
+
+    $"version {listing.version}\noid {listing.``oid_type``}:{listing.oid}\nsize {sizeText}\n"
+
+/// Downloads the exact LFS object described by `listing` without path include filtering.
+/// `git lfs smudge` reads the pointer OID from stdin and stores the object locally; stdout is discarded.
+let downloadObjectFromListing
+    (repoPath: string)
+    (commandAuth: GitCommandAuthentication)
+    (relativePath: string)
+    (listing: GitLfsLsFileInfo)
+    : JS.Promise<Result<unit, exn>> =
+    promise {
+        let! result =
+            runGitDiscardingStdout {
+                WorkingDirectory = Some repoPath
+                Arguments = [|
+                    yield! commandAuth.ConfigArgs
+                    yield! buildSmudgePointerArgs relativePath
+                |]
+                Environment = Some commandAuth.Environment
+                StandardInput = Some(buildPointerInput listing)
+                TimeoutMs = Some DefaultTimeoutMs
+            }
+
+        return
+            if result.ExitCode = 0 && not result.TimedOut then
+                Ok()
+            else
+                Error(exn (extractSpawnFailureMessage result))
+    }
+
 let private isUnsupportedOptionFailure (result: GitSpawnResult) =
     let diagnosticText = $"{result.StdoutText}\n{result.StderrText}".ToLowerInvariant()
 
     result.ExitCode <> 0
-    && (
-        diagnosticText.Contains("unknown option")
+    && (diagnosticText.Contains("unknown option")
         || diagnosticText.Contains("unknown flag")
         || diagnosticText.Contains("unrecognized option")
-        || diagnosticText.Contains("invalid option")
-    )
+        || diagnosticText.Contains("invalid option"))
 
 let private filterResolvableRemoteTipIds
     (runSpawnedGit: GitSpawnRequest -> JS.Promise<GitSpawnResult>)
@@ -580,7 +705,11 @@ let private filterResolvableRemoteTipIds
                             let isMissing = parts.[1].Equals("missing", StringComparison.Ordinal)
                             statusByObjectId.[parts.[0]] <- not isMissing
 
-                if malformed || (distinctRemoteTipIds |> Array.exists (fun objectId -> not (statusByObjectId.ContainsKey objectId))) then
+                if
+                    malformed
+                    || (distinctRemoteTipIds
+                        |> Array.exists (fun objectId -> not (statusByObjectId.ContainsKey objectId)))
+                then
                     return Error(exn "Failed to parse git cat-file --batch-check output while filtering remote tips.")
                 else
                     return
@@ -600,33 +729,32 @@ let private getLfsObjectIdsFromObjectIds
 
         for objectId in objectIds do
             if failure.IsNone then
-                let! objectTypeResult = runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-t"; objectId |]) git
+                let! objectTypeResult =
+                    runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-t"; objectId |]) git
 
                 match objectTypeResult with
-                | Error currentFailure ->
-                    failure <- Some currentFailure
+                | Error currentFailure -> failure <- Some currentFailure
                 | Ok objectType when objectType.Trim().Equals("blob", StringComparison.Ordinal) ->
                     // These object IDs come from outbound history, not working tree paths, so query the git object store directly.
-                    let! objectSizeResult = runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-s"; objectId |]) git
+                    let! objectSizeResult =
+                        runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-s"; objectId |]) git
 
                     match objectSizeResult with
-                    | Error currentFailure ->
-                        failure <- Some currentFailure
+                    | Error currentFailure -> failure <- Some currentFailure
                     | Ok objectSizeText ->
                         let success, objectSize = Int64.TryParse(objectSizeText.Trim())
 
                         if success && objectSize <= maxLfsPointerProbeBytes then
-                            let! contentResult = runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-p"; objectId |]) git
+                            let! contentResult =
+                                runSimpleGitRaw (fun currentGit -> currentGit.raw [| "cat-file"; "-p"; objectId |]) git
 
                             match contentResult with
-                            | Error currentFailure ->
-                                failure <- Some currentFailure
+                            | Error currentFailure -> failure <- Some currentFailure
                             | Ok content ->
                                 match tryParsePointerOid content with
                                 | Some lfsObjectId -> lfsObjectIds.Add lfsObjectId
                                 | None -> ()
-                | Ok _ ->
-                    ()
+                | Ok _ -> ()
 
         match failure with
         | Some currentFailure -> return Error currentFailure
@@ -643,17 +771,16 @@ let private tryGetOptimizedLfsObjectIds
         let! revListResult =
             runSpawnedGit {
                 WorkingDirectory = Some repoPath
-                Arguments =
-                    [|
-                        "rev-list"
-                        "--objects"
-                        "--no-object-names"
-                        "--stdin"
-                        "--ignore-missing"
-                        $"--filter=blob:limit={maxLfsPointerProbeBytes}"
-                        "--filter=object:type=blob"
-                        "--filter-provided-objects"
-                    |]
+                Arguments = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                    $"--filter=blob:limit={maxLfsPointerProbeBytes}"
+                    "--filter=object:type=blob"
+                    "--filter-provided-objects"
+                |]
                 Environment = None
                 StandardInput = Some(buildRevListStandardInput refSpec remoteTipIds)
                 TimeoutMs = Some DefaultTimeoutMs
@@ -666,7 +793,8 @@ let private tryGetOptimizedLfsObjectIds
                 else
                     Error(spawnFailure revListResult)
         else
-            let candidateBlobIds = revListResult.StdoutText |> splitNonEmptyLines |> Array.distinct
+            let candidateBlobIds =
+                revListResult.StdoutText |> splitNonEmptyLines |> Array.distinct
 
             if candidateBlobIds.Length = 0 then
                 return Ok(Some [||])
@@ -690,7 +818,8 @@ let private tryGetOptimizedLfsObjectIds
                     return
                         match tryReadBatchPointerOids catFileResult.StdoutBuffer with
                         | Some pointerOids -> Ok(Some pointerOids)
-                        | None -> Error(exn "Failed to parse git cat-file --batch output while planning Git LFS upload.")
+                        | None ->
+                            Error(exn "Failed to parse git cat-file --batch output while planning Git LFS upload.")
     }
 
 let private getOutboundObjectIdsFromRemoteTips
@@ -703,7 +832,13 @@ let private getOutboundObjectIdsFromRemoteTips
         let! revListResult =
             runSpawnedGit {
                 WorkingDirectory = Some repoPath
-                Arguments = [| "rev-list"; "--objects"; "--no-object-names"; "--stdin"; "--ignore-missing" |]
+                Arguments = [|
+                    "rev-list"
+                    "--objects"
+                    "--no-object-names"
+                    "--stdin"
+                    "--ignore-missing"
+                |]
                 Environment = None
                 StandardInput = Some(buildRevListStandardInput refSpec remoteTipIds)
                 TimeoutMs = Some DefaultTimeoutMs
@@ -733,14 +868,22 @@ let planOutboundPush
     : JS.Promise<Result<OutboundPushPlan, 'Failure>> =
     promise {
         let! refSpec = resolvePushRefSpec runStatus branchName git
+
         let! dryRunResult =
             runSimpleGitRaw
-                (fun currentGit -> currentGit.raw [| "push"; "--porcelain"; "--dry-run"; remoteName; refSpec |])
+                (fun currentGit ->
+                    currentGit.raw [|
+                        "push"
+                        "--porcelain"
+                        "--dry-run"
+                        remoteName
+                        refSpec
+                    |]
+                )
                 git
 
         match dryRunResult with
-        | Error failure ->
-            return Error failure
+        | Error failure -> return Error failure
         | Ok dryRunOutput when shouldSkipLfsUploadFromPushDryRun dryRunOutput ->
             return Ok OutboundPushPlan.SkipLfsUpload
         | Ok _ ->
@@ -748,36 +891,28 @@ let planOutboundPush
                 runSimpleGitRaw (fun currentGit -> currentGit.raw [| "ls-remote"; "--refs"; remoteName |]) git
 
             match remoteTipIdsResult with
-            | Error failure ->
-                return Error failure
+            | Error failure -> return Error failure
             | Ok remoteTipOutput ->
                 let remoteTipIds = parseLsRemoteTipIds remoteTipOutput
-                let! resolvableRemoteTipIdsResult =
-                    filterResolvableRemoteTipIds runSpawnedGit repoPath remoteTipIds
+                let! resolvableRemoteTipIdsResult = filterResolvableRemoteTipIds runSpawnedGit repoPath remoteTipIds
 
                 match resolvableRemoteTipIdsResult with
-                | Error failure ->
-                    return Error(mapSpawnFailure failure)
+                | Error failure -> return Error(mapSpawnFailure failure)
                 | Ok remoteTipIds ->
                     let! optimizedLfsObjectIdsResult =
                         tryGetOptimizedLfsObjectIds runSpawnedGit repoPath refSpec remoteTipIds
 
                     match optimizedLfsObjectIdsResult with
-                    | Error failure ->
-                        return Error(mapSpawnFailure failure)
-                    | Ok(Some [||]) ->
-                        return Ok OutboundPushPlan.SkipLfsUpload
-                    | Ok(Some lfsObjectIds) ->
-                        return Ok(OutboundPushPlan.UploadLfsObjects lfsObjectIds)
+                    | Error failure -> return Error(mapSpawnFailure failure)
+                    | Ok(Some [||]) -> return Ok OutboundPushPlan.SkipLfsUpload
+                    | Ok(Some lfsObjectIds) -> return Ok(OutboundPushPlan.UploadLfsObjects lfsObjectIds)
                     | Ok None ->
                         let! remoteTruthObjectIdsResult =
                             getOutboundObjectIdsFromRemoteTips runSpawnedGit repoPath refSpec remoteTipIds
 
                         match remoteTruthObjectIdsResult with
-                        | Error failure ->
-                            return Error(mapSpawnFailure failure)
-                        | Ok(Some [||]) ->
-                            return Ok OutboundPushPlan.SkipLfsUpload
+                        | Error failure -> return Error(mapSpawnFailure failure)
+                        | Ok(Some [||]) -> return Ok OutboundPushPlan.SkipLfsUpload
                         | Ok(Some objectIds) ->
                             let! lfsObjectIdsResult = getLfsObjectIdsFromObjectIds runSimpleGitRaw objectIds git
 
@@ -793,16 +928,14 @@ let planOutboundPush
                             let! remoteRefsResult = getKnownRemoteRefs runSimpleGitRaw remoteName git
 
                             match remoteRefsResult with
-                            | Error failure ->
-                                return Error failure
+                            | Error failure -> return Error failure
                             | Ok remoteRefs ->
-                                let! outboundObjectIdsResult = getOutboundObjectIds runSimpleGitRaw refSpec remoteRefs git
+                                let! outboundObjectIdsResult =
+                                    getOutboundObjectIds runSimpleGitRaw refSpec remoteRefs git
 
                                 match outboundObjectIdsResult with
-                                | Error failure ->
-                                    return Error failure
-                                | Ok [||] ->
-                                    return Ok OutboundPushPlan.SkipLfsUpload
+                                | Error failure -> return Error failure
+                                | Ok [||] -> return Ok OutboundPushPlan.SkipLfsUpload
                                 | Ok objectIds ->
                                     let! lfsObjectIdsResult = getLfsObjectIdsFromObjectIds runSimpleGitRaw objectIds git
 
@@ -833,15 +966,14 @@ let uploadObjects
             let! exactUploadResult =
                 runSpawnedGit {
                     WorkingDirectory = Some repoPath
-                    Arguments =
-                        [|
-                            yield! commandAuth.ConfigArgs
-                            "lfs"
-                            "push"
-                            "--object-id"
-                            remoteName
-                            "--stdin"
-                        |]
+                    Arguments = [|
+                        yield! commandAuth.ConfigArgs
+                        "lfs"
+                        "push"
+                        "--object-id"
+                        remoteName
+                        "--stdin"
+                    |]
                     Environment = Some commandAuth.Environment
                     StandardInput = Some(String.concat "\n" [| yield! lfsObjectIds; yield "" |])
                     TimeoutMs = Some DefaultTimeoutMs
@@ -853,14 +985,13 @@ let uploadObjects
                 let! fallbackResult =
                     runSpawnedGit {
                         WorkingDirectory = Some repoPath
-                        Arguments =
-                            [|
-                                yield! commandAuth.ConfigArgs
-                                "lfs"
-                                "push"
-                                remoteName
-                                refSpec
-                            |]
+                        Arguments = [|
+                            yield! commandAuth.ConfigArgs
+                            "lfs"
+                            "push"
+                            remoteName
+                            refSpec
+                        |]
                         Environment = Some commandAuth.Environment
                         StandardInput = None
                         TimeoutMs = Some DefaultTimeoutMs

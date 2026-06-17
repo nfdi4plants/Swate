@@ -99,27 +99,22 @@ type ErrorModalProvider =
         ]
 
     [<ReactComponent>]
-    static member private ErrorModalHost
-        (
-            currentEntry: ErrorModalEntry option,
-            queue: ErrorModalEntry list,
-            dismissById: string -> unit,
-            dismissBatchItem: string -> string -> unit,
-            dismissAll: unit -> unit
-        ) =
+    static member private ErrorModalHost() =
+        let modalState = useErrorModalStateCtx ()
+
         let currentScopeEntries =
-            match currentEntry with
-            | Some entry -> Helper.entriesInScope entry.ScopeId queue
+            match modalState.current with
+            | Some entry -> Helper.entriesInScope entry.ScopeId modalState.queue
             | None -> []
 
         let hasAdditionalScopeEntries = currentScopeEntries.Length > 1
 
         let remainingEntries =
-            match queue with
+            match modalState.queue with
             | _ :: rest -> rest
             | [] -> []
 
-        match currentEntry with
+        match modalState.current with
         | None -> Html.none
         | Some(ErrorModalEntry.Single request) ->
             ErrorModal.Modal(
@@ -127,7 +122,7 @@ type ErrorModalProvider =
                 setIsOpen =
                     (fun isOpen ->
                         if not isOpen then
-                            Helper.dismissSingleRequest dismissById request
+                            Helper.dismissSingleRequest modalState.dismissById request
                     ),
                 title = request.Title,
                 children =
@@ -148,11 +143,13 @@ type ErrorModalProvider =
                                     for action in request.Actions do
                                         ErrorModal.ActionButton action
                                     if hasAdditionalScopeEntries then
-                                        ErrorModalProvider.BulkDismissButton dismissAll
+                                        ErrorModalProvider.BulkDismissButton modalState.dismissAll
                                     Html.button [
                                         prop.className "swt:btn swt:btn-primary"
                                         prop.text request.DismissLabel
-                                        prop.onClick (fun _ -> Helper.dismissSingleRequest dismissById request)
+                                        prop.onClick (fun _ ->
+                                            Helper.dismissSingleRequest modalState.dismissById request
+                                        )
                                     ]
                                 ]
                             ]
@@ -166,7 +163,7 @@ type ErrorModalProvider =
                 setIsOpen =
                     (fun isOpen ->
                         if not isOpen then
-                            Helper.dismissBatch dismissById batch
+                            Helper.dismissBatch modalState.dismissById batch
                     ),
                 title = batch.Title,
                 headerAdornment =
@@ -189,7 +186,7 @@ type ErrorModalProvider =
                                 prop.className "swt:flex swt:flex-col swt:gap-3"
                                 prop.children [
                                     for request in batch.Errors do
-                                        ErrorModalProvider.RequestCard(dismissBatchItem, batch, request)
+                                        ErrorModalProvider.RequestCard(modalState.dismissBatchItem, batch, request)
                                 ]
                             ]
                             ErrorModalProvider.PendingEntriesBox remainingEntries
@@ -200,11 +197,11 @@ type ErrorModalProvider =
                         prop.className "swt:flex swt:w-full swt:flex-wrap swt:justify-end swt:gap-2"
                         prop.children [
                             if hasAdditionalScopeEntries then
-                                ErrorModalProvider.BulkDismissButton dismissAll
+                                ErrorModalProvider.BulkDismissButton modalState.dismissAll
                             Html.button [
                                 prop.className "swt:btn swt:btn-primary"
                                 prop.text batch.DismissLabel
-                                prop.onClick (fun _ -> Helper.dismissBatch dismissById batch)
+                                prop.onClick (fun _ -> Helper.dismissBatch modalState.dismissById batch)
                             ]
                         ]
                     ],
@@ -212,7 +209,7 @@ type ErrorModalProvider =
             )
 
     [<ReactComponent(true)>]
-    static member ErrorModalProvider(children: ReactElement) =
+    static member ErrorModalProvider(children: ReactElement, ?scopeId: string) =
         let queue, dispatch = React.useReducer (Helper.reducer, [])
         let currentEntry = queue |> List.tryHead
 
@@ -239,22 +236,47 @@ type ErrorModalProvider =
             | Some(ErrorModalEntry.Batch batch) -> Helper.dismissBatch dismissById batch
             | None -> ()
 
-        let contextValue: ErrorModalContext =
+        let contextValue: ErrorModalActionsContext =
             React.useMemo (
                 (fun _ -> {
-                    current = currentEntry
-                    queue = queue
-                    enqueue = fun request -> dispatch (Enqueue(ErrorModalEntry.Single request))
+                    enqueue =
+                        fun request ->
+                            request
+                            |> Helper.withDefaultRequestScope scopeId
+                            |> ErrorModalEntry.Single
+                            |> Enqueue
+                            |> dispatch
                     enqueueMany =
-                        fun requests -> requests |> List.map ErrorModalEntry.Single |> EnqueueMany |> dispatch
+                        fun requests ->
+                            requests
+                            |> List.map (Helper.withDefaultRequestScope scopeId >> ErrorModalEntry.Single)
+                            |> EnqueueMany
+                            |> dispatch
                     enqueueBatch =
                         fun batch ->
+                            let batch = Helper.withDefaultBatchScope scopeId batch
+
                             if batch.Errors.IsEmpty then
                                 ()
                             else
                                 dispatch (Enqueue(ErrorModalEntry.Batch batch))
                     report =
-                        fun message -> dispatch (Enqueue(ErrorModalEntry.Single(ErrorModalRequest.create (message))))
+                        fun message ->
+                            ErrorModalRequest.create (message)
+                            |> Helper.withDefaultRequestScope scopeId
+                            |> ErrorModalEntry.Single
+                            |> Enqueue
+                            |> dispatch
+                    dismissById = dismissById
+                }),
+                [| box scopeId |]
+            )
+
+        let stateContextValue: ErrorModalHostContext =
+            React.useMemo (
+                (fun _ -> {
+                    current = currentEntry
+                    queue = queue
                     dismissCurrent = dismissCurrent
                     dismissById = dismissById
                     dismissBatchItem = dismissBatchItem
@@ -267,7 +289,7 @@ type ErrorModalProvider =
             contextValue,
             React.Fragment [
                 children
-                ErrorModalProvider.ErrorModalHost(currentEntry, queue, dismissById, dismissBatchItem, dismissAll)
+                ErrorModalStateCtx.Provider(stateContextValue, ErrorModalProvider.ErrorModalHost())
             ]
         )
 
@@ -381,6 +403,44 @@ type ErrorModalProvider =
         ]
 
     [<ReactComponent>]
+    static member private ProviderScopedEntryContent() =
+        let errorModal = useErrorModalCtx ()
+
+        let enqueueProviderScopedQueue () =
+            errorModal.enqueue (
+                ErrorModalRequest.create (
+                    "The visible error inherits the provider ARC scope.",
+                    title = "Provider ARC error"
+                )
+            )
+
+            errorModal.enqueue (
+                ErrorModalRequest.create (
+                    "This queued error also inherits the provider ARC scope.",
+                    title = "Provider ARC follow-up error"
+                )
+            )
+
+            errorModal.enqueue (
+                ErrorModalRequest.create (
+                    "This error keeps its explicit scope and should remain queued.",
+                    title = "Explicit other ARC error",
+                    scopeId = "arc-b"
+                )
+            )
+
+        Html.div [
+            prop.className "swt:flex swt:flex-col swt:gap-3"
+            prop.children [
+                Html.button [
+                    prop.className "swt:btn swt:btn-primary"
+                    prop.text "Queue Provider Scoped Errors"
+                    prop.onClick (fun _ -> enqueueProviderScopedQueue ())
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
     static member SingleEntry() =
         ErrorModalProvider.ErrorModalProvider(ErrorModalProvider.EntryContent(true, false, false))
 
@@ -395,3 +455,7 @@ type ErrorModalProvider =
     [<ReactComponent>]
     static member ScopedQueueEntry() =
         ErrorModalProvider.ErrorModalProvider(ErrorModalProvider.ScopedEntryContent())
+
+    [<ReactComponent>]
+    static member ProviderScopedQueueEntry() =
+        ErrorModalProvider.ErrorModalProvider(ErrorModalProvider.ProviderScopedEntryContent(), scopeId = "arc-a")

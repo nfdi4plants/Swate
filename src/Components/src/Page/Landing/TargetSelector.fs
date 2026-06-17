@@ -28,12 +28,7 @@ module TargetSelector =
         ]
 
     [<ReactComponent>]
-    let Main
-        (
-            selectedTarget: LandingTarget option,
-            setSelectedTarget: LandingTarget -> unit,
-            isSubmitting: bool
-        ) =
+    let Main (selectedTarget: LandingTarget option, setSelectedTarget: LandingTarget -> unit, isSubmitting: bool) =
         Html.div [
             prop.className "swt:flex swt:gap-3"
             prop.children [

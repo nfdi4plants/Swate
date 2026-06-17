@@ -14,6 +14,7 @@ const noopWithPaths = (_paths: string[]) => {};
 const noopWithBranch = (_branchName: string) => {};
 const noopWithThreshold = (_thresholdMb: number) => {};
 const noopWithDownloadPreference = (_downloadLargeFiles: boolean) => {};
+const noopOpenRemoteRepository = () => {};
 const noopSelectChange = (_change: unknown) =>
   Promise.resolve(FSharpResult$2_Ok<void, string>(undefined));
 
@@ -53,9 +54,10 @@ const buildBusyRunStatus = (notice: string) => ({
 });
 
 const buildProgressRunStatus = (progress: {
-  Method: string;
-  Stage: string;
-  ProgressPercent: number;
+  Method?: string;
+  Stage?: string;
+  ProgressPercent?: number;
+  Output?: string;
 }) => ({
   // Fable DU: GitSidebarRunStatus.Progress
   tag: 2,
@@ -285,9 +287,12 @@ export const AdvancedActions: Story = {
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
     lfsAutoTrackThresholdMb: 1,
+    canOpenRemoteRepository: true,
+    onOpenRemoteRepository: noopOpenRemoteRepository,
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeEnabled();
     await userEvent.click(canvas.getByTestId("GitSidebarAdvancedActionsButton"));
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsButton")).toHaveClass("swt:btn-primary");
     await expect(canvas.getByTestId("GitSidebarAdvancedActionsDivider")).toBeInTheDocument();
@@ -562,6 +567,7 @@ export const BusyProgressState: Story = {
       Method: "pull",
       Stage: "Receiving objects",
       ProgressPercent: 54,
+      Output: "remote: Enumerating objects: 18, done.\nremote: Counting objects: 100% (18/18), done.\n",
     }),
     callbacks: buildCallbacks(),
     downloadLargeFiles: true,
@@ -572,6 +578,51 @@ export const BusyProgressState: Story = {
     await expect(canvas.getByTestId("GitSidebarProgressNotice")).toHaveTextContent(
       "pull | Receiving objects | 54%",
     );
+    await expect(canvas.getByTestId("GitSidebarProgressBar")).toBeInTheDocument();
+    const fillBar = canvas.getByTestId("GitSidebarProgressBar").firstElementChild;
+    await expect(fillBar).toHaveAttribute("style", expect.stringContaining("width: 54%"));
+    const outputDetails = canvas.getByTestId("GitSidebarProgressOutput");
+    await expect(outputDetails).not.toHaveAttribute("open");
+    await expect(outputDetails).toHaveTextContent("Git output");
+    await expect(outputDetails).toHaveTextContent(
+      "remote: Enumerating objects: 18, done.",
+    );
+    const outputConsole = within(outputDetails).getByText(/remote: Enumerating objects/);
+    await expect(outputConsole).toHaveClass("swt:bg-base-content");
+    await expect(outputConsole).toHaveClass("swt:text-base-100");
+
+    const sourceControlTitle = canvas.getByText("Source Control");
+    const trackingInfo = canvas.getByText("Tracking origin/feature/git-sidebar");
+    expect(
+      sourceControlTitle.compareDocumentPosition(canvas.getByTestId("GitSidebarProgressNotice")) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(
+      canvas.getByTestId("GitSidebarProgressNotice").compareDocumentPosition(trackingInfo) &
+        Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+  },
+};
+
+export const ClonePhaseProgressState: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    runStatus: buildProgressRunStatus({
+      Method: "clone",
+      Stage: "Preparing clone",
+    }),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarProgressNotice")).toHaveTextContent(
+      "clone | Preparing clone",
+    );
+    await expect(canvas.queryByTestId("GitSidebarProgressBar")).not.toBeInTheDocument();
   },
 };
 
@@ -707,12 +758,36 @@ export const RemoteActionsDisabled: Story = {
   },
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeDisabled();
     await expect(canvas.getByTestId("GitSidebarUpdateArcButton")).toBeDisabled();
     await expect(
       canvas.getByTestId("GitSidebarRemoteAuthWarning"),
     ).toHaveTextContent(
       "Sign in to a DataHub account to use fetch, pull, push, or update.",
     );
+  },
+};
+
+const openRemoteRepositorySpy = fn();
+
+export const OpenRemoteRepositoryButton: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    callbacks: buildCallbacks(),
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+    canOpenRemoteRepository: true,
+    onOpenRemoteRepository: openRemoteRepositorySpy,
+  },
+  play: async ({ canvasElement }) => {
+    openRemoteRepositorySpy.mockClear();
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton")).toBeEnabled();
+    await userEvent.click(canvas.getByTestId("GitSidebarOpenRemoteRepositoryButton"));
+    await expect(openRemoteRepositorySpy).toHaveBeenCalledTimes(1);
   },
 };
 

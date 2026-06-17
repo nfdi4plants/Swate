@@ -90,4 +90,3 @@ module AddStep =
         Enabled = true
         Prompt = Some prompt
     }
-

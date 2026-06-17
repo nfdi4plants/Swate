@@ -12,7 +12,7 @@ module private GraphObjectFixtureHelper =
         | ARCDatasets.Workflow -> "Workflow"
         | ARCDatasets.Run -> "Run"
 
-    let makeProperty(id: string, name: string, value: string) : PropertyValue = {
+    let makeProperty (id: string, name: string, value: string) : PropertyValue = {
         id = id
         type' = "PropertyValue"
         additionalType = None
@@ -25,13 +25,9 @@ module private GraphObjectFixtureHelper =
     }
 
     let makeOwnerProperty (ownerKind: string) (ownerId: string) (name: string) (value: string) =
-        makeProperty(
-            $"prop:{ownerKind}:{sanitizeSegment ownerId}",
-            name,
-            value
-        )
+        makeProperty ($"prop:{ownerKind}:{sanitizeSegment ownerId}", name, value)
 
-    let makeMaterial(id: string, name: string, materialType: string, additionalType: string option) : Material = {
+    let makeMaterial (id: string, name: string, materialType: string, additionalType: string option) : Material = {
         id = id
         type' = materialType
         additionalType = additionalType
@@ -41,7 +37,7 @@ module private GraphObjectFixtureHelper =
         |]
     }
 
-    let makeFilesData(id: string, path: string, dataType: string) : Data = {
+    let makeFilesData (id: string, path: string, dataType: string) : Data = {
         id = Some id
         type' = dataType
         additionalType = None
@@ -49,19 +45,12 @@ module private GraphObjectFixtureHelper =
         selector = None
         selectorFormat = None
         encodingFormat = Some "text/tab-separated-values"
-        additionalProperty = [|
-            makeOwnerProperty "data" id "Data Property" path
-        |]
+        additionalProperty = [| makeOwnerProperty "data" id "Data Property" path |]
     }
 
     let makeFragmentSelectorData
-        (
-            id: string,
-            path: string,
-            dataType: string,
-            selector: string,
-            selectorFormat: string
-        ) : Data =
+        (id: string, path: string, dataType: string, selector: string, selectorFormat: string)
+        : Data =
         {
             id = Some id
             type' = dataType
@@ -70,9 +59,7 @@ module private GraphObjectFixtureHelper =
             selector = Some selector
             selectorFormat = Some selectorFormat
             encodingFormat = Some "application/json"
-            additionalProperty = [|
-                makeOwnerProperty "data" id "Data Property" selector
-            |]
+            additionalProperty = [| makeOwnerProperty "data" id "Data Property" selector |]
         }
 
     let makeProcessType
@@ -81,14 +68,13 @@ module private GraphObjectFixtureHelper =
             sampleMaterials: Material list,
             filesData: Data list,
             fragmentSelectorData: Data list
-        )
-        : ProcessType =
-        let materialKinds : MaterialKinds = {
+        ) : ProcessType =
+        let materialKinds: MaterialKinds = {
             Sources = sourceMaterials |> List.toArray
             Samples = sampleMaterials |> List.toArray
         }
 
-        let dataKinds : DataKinds = {
+        let dataKinds: DataKinds = {
             Files = filesData |> List.toArray
             FragmentSelector = fragmentSelectorData |> List.toArray
         }
@@ -101,20 +87,18 @@ module private GraphObjectFixtureHelper =
     let processTypeMaterials (processType: ProcessType) =
         processType.Materials
         |> Array.toList
-        |> List.collect (fun materialKinds ->
-            [
-                yield! materialKinds.Sources |> Array.toList
-                yield! materialKinds.Samples |> Array.toList
-            ])
+        |> List.collect (fun materialKinds -> [
+            yield! materialKinds.Sources |> Array.toList
+            yield! materialKinds.Samples |> Array.toList
+        ])
 
     let processTypeData (processType: ProcessType) =
         processType.Data
         |> Array.toList
-        |> List.collect (fun dataKinds ->
-            [
-                yield! dataKinds.Files |> Array.toList
-                yield! dataKinds.FragmentSelector |> Array.toList
-            ])
+        |> List.collect (fun dataKinds -> [
+            yield! dataKinds.Files |> Array.toList
+            yield! dataKinds.FragmentSelector |> Array.toList
+        ])
 
     let makeProcessWithUnassociated
         (
@@ -124,29 +108,26 @@ module private GraphObjectFixtureHelper =
             outputs: ProcessType list,
             additionalMaterials: Material list,
             additionalData: Data list
-        )
-        : LabProcess =
-        let processMaterials =
-            [|
-                for processType in inputs do
-                    yield! processTypeMaterials processType
+        ) : LabProcess =
+        let processMaterials = [|
+            for processType in inputs do
+                yield! processTypeMaterials processType
 
-                for processType in outputs do
-                    yield! processTypeMaterials processType
+            for processType in outputs do
+                yield! processTypeMaterials processType
 
-                yield! additionalMaterials |> List.toArray
-            |]
+            yield! additionalMaterials |> List.toArray
+        |]
 
-        let processData =
-            [|
-                for processType in inputs do
-                    yield! processTypeData processType
+        let processData = [|
+            for processType in inputs do
+                yield! processTypeData processType
 
-                for processType in outputs do
-                    yield! processTypeData processType
+            for processType in outputs do
+                yield! processTypeData processType
 
-                yield! additionalData |> List.toArray
-            |]
+            yield! additionalData |> List.toArray
+        |]
 
         {
             id = Some(($"{executesProtocol}:{name}").ToLowerInvariant().Replace(" ", "-"))
@@ -164,23 +145,11 @@ module private GraphObjectFixtureHelper =
         }
 
     let makeProcess
-        (
-            name: string,
-            executesProtocol: string,
-            inputs: ProcessType list,
-            outputs: ProcessType list
-        )
+        (name: string, executesProtocol: string, inputs: ProcessType list, outputs: ProcessType list)
         : LabProcess =
-        makeProcessWithUnassociated(
-            name,
-            executesProtocol,
-            inputs,
-            outputs,
-            [],
-            []
-        )
+        makeProcessWithUnassociated (name, executesProtocol, inputs, outputs, [], [])
 
-    let makeFormalParameter(id: string, name: string, defaultValue: string option) : FormalParameter = {
+    let makeFormalParameter (id: string, name: string, defaultValue: string option) : FormalParameter = {
         id = id
         type' = "FormalParameter"
         name = Some name
@@ -188,7 +157,7 @@ module private GraphObjectFixtureHelper =
         defaultValue = defaultValue
     }
 
-    let makeDefinedTerm(id: string, name: string, termCode: string option) : DefinedTerm = {
+    let makeDefinedTerm (id: string, name: string, termCode: string option) : DefinedTerm = {
         id = id
         type' = "DefinedTerm"
         name = name
@@ -205,8 +174,7 @@ module private GraphObjectFixtureHelper =
             intendedUse: (DefinedTerm * string) option,
             parameters: FormalParameter list,
             processes: LabProcess list
-        )
-        : LabProtocol =
+        ) : LabProtocol =
         {
             id = Some id
             type' = "LabProtocol"
@@ -230,8 +198,7 @@ module private GraphObjectFixtureHelper =
             aboutProtocols: LabProtocol list,
             hasPart: Dataset list,
             additionalProperties: PropertyValue array
-        )
-        : Dataset =
+        ) : Dataset =
         {
             id = $"{(kindLabel kind).ToLowerInvariant()}:{identifier}"
             type' = kind
@@ -242,9 +209,9 @@ module private GraphObjectFixtureHelper =
             about = aboutProtocols |> List.toArray
             hasPart = hasPart |> List.toArray
             additionalProperty =
-                Array.append
-                    additionalProperties
-                    [| makeOwnerProperty "dataset" identifier "Dataset Property" (kindLabel kind) |]
+                Array.append additionalProperties [|
+                    makeOwnerProperty "dataset" identifier "Dataset Property" (kindLabel kind)
+                |]
         }
 
     let mapDatasetKinds (f: Dataset -> Dataset) (datasetKinds: DatasetKinds) : DatasetKinds = {
@@ -254,20 +221,17 @@ module private GraphObjectFixtureHelper =
         Runs = datasetKinds.Runs |> Array.map f
     }
 
-    let rec withSecondarySuffix (dataset: Dataset) : Dataset =
-        {
-            dataset with
-                id = $"{dataset.id}-secondary"
-                identifier = $"{dataset.identifier}-secondary"
-                name = dataset.name |> Option.map (fun value -> $"{value} (Secondary ARC)")
-                hasPart = dataset.hasPart |> Array.map withSecondarySuffix
-        }
+    let rec withSecondarySuffix (dataset: Dataset) : Dataset = {
+        dataset with
+            id = $"{dataset.id}-secondary"
+            identifier = $"{dataset.identifier}-secondary"
+            name = dataset.name |> Option.map (fun value -> $"{value} (Secondary ARC)")
+            hasPart = dataset.hasPart |> Array.map withSecondarySuffix
+    }
 
     let collapseExplorerItems (items: FileItem list) =
         let rec collapseItem (item: FileItem) =
-            let collapsedChildren =
-                item.Children
-                |> Option.map (List.map collapseItem)
+            let collapsedChildren = item.Children |> Option.map (List.map collapseItem)
 
             {
                 item with
@@ -277,21 +241,34 @@ module private GraphObjectFixtureHelper =
 
         items |> List.map collapseItem
 
-    let fakeGraphModel() : ARCGraph =
-        let sourceLeaf = makeMaterial("leaf-a", "Leaf-A", "Source", None)
-        let sampleLeaf = makeMaterial("leaf-a", "Leaf-A", "Sample", None)
-        let replicateLeaf = makeMaterial("leaf-a-replicate", "Leaf-A Replicate", "Sample", None)
-        let extractMaterial = makeMaterial("extract-a", "Leaf-Extract-A", "Extract", None)
-        let measurementSample = makeMaterial("measurement-qc", "Measurement QC", "Sample", Some "QualityControl")
+    let fakeGraphModel () : ARCGraph =
+        let sourceLeaf = makeMaterial ("leaf-a", "Leaf-A", "Source", None)
+        let sampleLeaf = makeMaterial ("leaf-a", "Leaf-A", "Sample", None)
 
-        let cultivationLogData = makeFilesData("cultivation-log", "studies/drought-response/cultivation-log.tsv", "Data")
-        let extractionManifestData = makeFilesData("extraction-manifest", "workflows/extraction/extraction-manifest.tsv", "Data")
-        let assaySampleSheetData = makeFilesData("sample-sheet", "assays/metabolomics/sample-sheet.tsv", "Data")
-        let quantTableData = makeFilesData("feature-table", "assays/metabolomics/feature-table.tsv", "Data")
-        let runLogData = makeFilesData("run-log", "runs/week-01/source-log.tsv", "Data")
+        let replicateLeaf =
+            makeMaterial ("leaf-a-replicate", "Leaf-A Replicate", "Sample", None)
+
+        let extractMaterial = makeMaterial ("extract-a", "Leaf-Extract-A", "Extract", None)
+
+        let measurementSample =
+            makeMaterial ("measurement-qc", "Measurement QC", "Sample", Some "QualityControl")
+
+        let cultivationLogData =
+            makeFilesData ("cultivation-log", "studies/drought-response/cultivation-log.tsv", "Data")
+
+        let extractionManifestData =
+            makeFilesData ("extraction-manifest", "workflows/extraction/extraction-manifest.tsv", "Data")
+
+        let assaySampleSheetData =
+            makeFilesData ("sample-sheet", "assays/metabolomics/sample-sheet.tsv", "Data")
+
+        let quantTableData =
+            makeFilesData ("feature-table", "assays/metabolomics/feature-table.tsv", "Data")
+
+        let runLogData = makeFilesData ("run-log", "runs/week-01/source-log.tsv", "Data")
 
         let cultivationFragmentData =
-            makeFragmentSelectorData(
+            makeFragmentSelectorData (
                 "cultivation-window",
                 "studies/drought-response/cultivation-log.tsv",
                 "Data",
@@ -300,7 +277,7 @@ module private GraphObjectFixtureHelper =
             )
 
         let extractionFragmentData =
-            makeFragmentSelectorData(
+            makeFragmentSelectorData (
                 "extraction-window",
                 "workflows/extraction/extraction-manifest.tsv",
                 "Data",
@@ -309,7 +286,7 @@ module private GraphObjectFixtureHelper =
             )
 
         let measurementFragmentData =
-            makeFragmentSelectorData(
+            makeFragmentSelectorData (
                 "measurement-window",
                 "assays/metabolomics/feature-table.tsv",
                 "Data",
@@ -318,7 +295,7 @@ module private GraphObjectFixtureHelper =
             )
 
         let runFragmentData =
-            makeFragmentSelectorData(
+            makeFragmentSelectorData (
                 "window",
                 "runs/week-01/source-log.tsv",
                 "Data",
@@ -337,12 +314,7 @@ module private GraphObjectFixtureHelper =
             (filesData: Data)
             (fragmentSelectorData: Data)
             =
-            makeProcessType(
-                [ sourceMaterial ],
-                [ sampleMaterial ],
-                [ filesData ],
-                [ fragmentSelectorData ]
-            )
+            makeProcessType ([ sourceMaterial ], [ sampleMaterial ], [ filesData ], [ fragmentSelectorData ])
 
         let cultivationInput =
             endpointBundle sourceLeaf sampleLeaf cultivationLogData cultivationFragmentData
@@ -362,20 +334,19 @@ module private GraphObjectFixtureHelper =
         let measurementOutput =
             endpointBundle sourceLeaf measurementSample quantTableData measurementFragmentData
 
-        let runInput =
-            endpointBundle sourceLeaf extractMaterial runLogData runFragmentData
+        let runInput = endpointBundle sourceLeaf extractMaterial runLogData runFragmentData
 
         let runOutput =
             endpointBundle sourceLeaf extractMaterial quantTableData runFragmentData
 
         let cultivationUnassociatedMaterial =
-            makeMaterial("sample:cultivation-reference", "Cultivation Reference Pool", "Sample", Some "Reference")
+            makeMaterial ("sample:cultivation-reference", "Cultivation Reference Pool", "Sample", Some "Reference")
 
         let cultivationUnassociatedData =
-            makeFilesData("data:cultivation-observations", "studies/drought-response/observations.tsv", "Data")
+            makeFilesData ("data:cultivation-observations", "studies/drought-response/observations.tsv", "Data")
 
         let cultivationProcesses = [
-            makeProcessWithUnassociated(
+            makeProcessWithUnassociated (
                 "Grow plants",
                 cultivationProtocolId,
                 [ cultivationInput ],
@@ -383,84 +354,81 @@ module private GraphObjectFixtureHelper =
                 [ cultivationUnassociatedMaterial ],
                 [ cultivationUnassociatedData ]
             )
-            makeProcess("Snapshot source inventory", cultivationProtocolId, [ cultivationInput ], [ cultivationInput ])
+            makeProcess ("Snapshot source inventory", cultivationProtocolId, [ cultivationInput ], [ cultivationInput ])
         ]
 
         let extractionProcesses = [
-            makeProcess("Extract metabolites", extractionProtocolId, [ extractionInput ], [ extractionOutput ])
+            makeProcess ("Extract metabolites", extractionProtocolId, [ extractionInput ], [ extractionOutput ])
         ]
 
         let measurementProcesses = [
-            makeProcess("Quantify features", measurementProtocolId, [ measurementInput ], [ measurementOutput ])
+            makeProcess ("Quantify features", measurementProtocolId, [ measurementInput ], [ measurementOutput ])
         ]
 
         let runProcesses = [
-            makeProcess("Inject extracts", runProtocolId, [ runInput ], [ runOutput ])
+            makeProcess ("Inject extracts", runProtocolId, [ runInput ], [ runOutput ])
         ]
 
         let cultivationProtocol =
-            makeProtocol(
+            makeProtocol (
                 cultivationProtocolId,
                 "Plant Cultivation",
                 "Prepare biological source material before extraction.",
                 Some(
-                    makeDefinedTerm("dt:cultivation", "Plant Cultivation", Some "SWATE:CULTIVATION"),
+                    makeDefinedTerm ("dt:cultivation", "Plant Cultivation", Some "SWATE:CULTIVATION"),
                     "Generate healthy source and sample material."
                 ),
                 [
-                    makeFormalParameter("fp:light-cycle", "Light Cycle", Some "16h/8h")
+                    makeFormalParameter ("fp:light-cycle", "Light Cycle", Some "16h/8h")
                 ],
                 cultivationProcesses
             )
 
         let extractionProtocol =
-            makeProtocol(
+            makeProtocol (
                 extractionProtocolId,
                 "Extraction",
                 "Transform samples into assay-ready extracts.",
                 Some(
-                    makeDefinedTerm("dt:extraction", "Extraction", Some "SWATE:EXTRACTION"),
+                    makeDefinedTerm ("dt:extraction", "Extraction", Some "SWATE:EXTRACTION"),
                     "Generate measurable extract material."
                 ),
                 [
-                    makeFormalParameter("fp:solvent", "Extraction Solvent", Some "80% methanol")
-                    makeFormalParameter("fp:temperature", "Extraction Temperature", Some "4C")
+                    makeFormalParameter ("fp:solvent", "Extraction Solvent", Some "80% methanol")
+                    makeFormalParameter ("fp:temperature", "Extraction Temperature", Some "4C")
                 ],
                 extractionProcesses
             )
 
         let measurementProtocol =
-            makeProtocol(
+            makeProtocol (
                 measurementProtocolId,
                 "LC-MS Measurement",
                 "Instrument acquisition for metabolomics feature detection.",
                 Some(
-                    makeDefinedTerm("dt:measurement", "LC-MS Measurement", Some "MS:1001837"),
+                    makeDefinedTerm ("dt:measurement", "LC-MS Measurement", Some "MS:1001837"),
                     "Produce quantified metabolite features."
                 ),
                 [
-                    makeFormalParameter("fp:instrument", "Instrument Model", Some "Q Exactive")
+                    makeFormalParameter ("fp:instrument", "Instrument Model", Some "Q Exactive")
                 ],
                 measurementProcesses
             )
 
         let runProtocol =
-            makeProtocol(
+            makeProtocol (
                 runProtocolId,
                 "Week 1 Injection",
                 "Run-specific acquisition execution.",
-                Some(
-                    makeDefinedTerm("dt:run", "Run", Some "SWATE:RUN"),
-                    "Track one acquisition cycle."
-                ),
+                Some(makeDefinedTerm ("dt:run", "Run", Some "SWATE:RUN"), "Track one acquisition cycle."),
                 [
-                    makeFormalParameter("fp:batch", "Batch Identifier", Some "batch-001")
+                    makeFormalParameter ("fp:batch", "Batch Identifier", Some "batch-001")
                 ],
                 runProcesses
             )
 
         let studySubsetDataset =
-            makeDataset(
+            makeDataset (
                 ARCDatasets.Study,
                 "study-drought-response-subset",
                 "Drought Response Subset",
@@ -471,18 +439,18 @@ module private GraphObjectFixtureHelper =
             )
 
         let studyDataset =
-            makeDataset(
+            makeDataset (
                 ARCDatasets.Study,
                 "study-drought-response",
                 "Drought Response",
                 "Field study tracking response to drought stress.",
                 [ cultivationProtocol ],
                 [ studySubsetDataset ],
-                [| makeProperty("prop:region", "Region", "Field-01") |]
+                [| makeProperty ("prop:region", "Region", "Field-01") |]
             )
 
         let assayDataset =
-            makeDataset(
+            makeDataset (
                 ARCDatasets.Assay,
                 "assay-metabolomics",
                 "Metabolomics",
@@ -493,7 +461,7 @@ module private GraphObjectFixtureHelper =
             )
 
         let workflowDataset =
-            makeDataset(
+            makeDataset (
                 ARCDatasets.Workflow,
                 "workflow-extraction",
                 "Extraction",
@@ -504,7 +472,7 @@ module private GraphObjectFixtureHelper =
             )
 
         let runDataset =
-            makeDataset(
+            makeDataset (
                 ARCDatasets.Run,
                 "run-week-01",
                 "Week 1 Instrument",
@@ -524,7 +492,7 @@ module private GraphObjectFixtureHelper =
             }
         }
 
-    let fakeGraphModels() : ARCGraph list =
+    let fakeGraphModels () : ARCGraph list =
         let primaryArc = fakeGraphModel ()
 
         let secondaryArc = {
@@ -535,19 +503,16 @@ module private GraphObjectFixtureHelper =
 
         [ primaryArc; secondaryArc ]
 
-    let fakeGraphObjects() : ARCObjects list =
+    let fakeGraphObjects () : ARCObjects list =
         let arcs = fakeGraphModels () |> List.toArray
 
-        [
-            ARCObjects.Arc arcs
-        ]
+        [ ARCObjects.Arc arcs ]
 
-let collapseExplorerItems(items: FileItem list) =
+let collapseExplorerItems (items: FileItem list) =
     GraphObjectFixtureHelper.collapseExplorerItems items
 
-let fakeGraphModels() =
+let fakeGraphModels () =
     GraphObjectFixtureHelper.fakeGraphModels ()
 
-let fakeGraphObjects() =
+let fakeGraphObjects () =
     GraphObjectFixtureHelper.fakeGraphObjects ()
-

@@ -3,6 +3,7 @@ namespace Main.ArcMerge
 open ARCtrl
 open ARCtrl.Contract
 open CrossAsync
+open Main.ARCtrlExtensions
 open Swate.Components.Shared
 
 [<AutoOpen>]
@@ -104,48 +105,56 @@ module ArcAddExtensions =
     type ARC with
 
         member this.GetAssayAddContracts(assay: ArcAssay, ?includeUpdateContractsFlag: bool) =
-            let _, contracts = prepareAddContracts this (ArcFiles.Assay assay) includeUpdateContractsFlag
+            let _, contracts =
+                prepareAddContracts this (ArcFiles.Assay assay) includeUpdateContractsFlag
+
             contracts
 
         member this.GetStudyAddContracts(study: ArcStudy, ?includeUpdateContractsFlag: bool) =
-            let _, contracts = prepareAddContracts this (ArcFiles.Study(study, [])) includeUpdateContractsFlag
+            let _, contracts =
+                prepareAddContracts this (ArcFiles.Study(study, [])) includeUpdateContractsFlag
+
             contracts
 
         member this.GetRunAddContracts(run: ArcRun, ?includeUpdateContractsFlag: bool) =
-            let _, contracts = prepareAddContracts this (ArcFiles.Run run) includeUpdateContractsFlag
+            let _, contracts =
+                prepareAddContracts this (ArcFiles.Run run) includeUpdateContractsFlag
+
             contracts
 
         member this.GetWorkflowAddContracts(workflow: ArcWorkflow, ?includeUpdateContractsFlag: bool) =
-            let _, contracts = prepareAddContracts this (ArcFiles.Workflow workflow) includeUpdateContractsFlag
+            let _, contracts =
+                prepareAddContracts this (ArcFiles.Workflow workflow) includeUpdateContractsFlag
+
             contracts
 
         member this.GetAddContracts(arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) =
             let _, contracts = prepareAddContracts this arcFile includeUpdateContractsFlag
             contracts
-            
-        member this.TryAddArcFileAsync(arcPath: string, arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) =
-            crossAsync {
-                try
-                    let workingArc, contracts = prepareAddContracts this arcFile includeUpdateContractsFlag
-                    let! result = fullFillContractBatchAsync arcPath contracts
 
-                    match result with
-                    | Ok _ -> commitAddedArcFile this workingArc arcFile
-                    | Error _ -> ()
+        member this.TryAddArcFileAsync(arcPath: string, arcFile: ArcFiles, ?includeUpdateContractsFlag: bool) = crossAsync {
+            try
+                let workingArc, contracts =
+                    prepareAddContracts this arcFile includeUpdateContractsFlag
 
-                    return result
-                with error ->
-                    return Error [| error.Message |]
-            }
-
-        member this.AddArcFileAsync(arcPath: string, arcFile: ArcFiles) =
-            crossAsync {
-                let! result = this.TryAddArcFileAsync(arcPath, arcFile)
+                let! result = fullFillContractBatchAsync arcPath contracts
 
                 match result with
-                | Ok _ -> ()
-                | Error errors ->
-                    failwithf
-                        "Could not add ARC file, failed with the following errors %s"
-                        (PathHelpers.formatContractErrors errors)
-            }
+                | Ok _ -> commitAddedArcFile this workingArc arcFile
+                | Error _ -> ()
+
+                return result
+            with error ->
+                return Error [| error.Message |]
+        }
+
+        member this.AddArcFileAsync(arcPath: string, arcFile: ArcFiles) = crossAsync {
+            let! result = this.TryAddArcFileAsync(arcPath, arcFile)
+
+            match result with
+            | Ok _ -> ()
+            | Error errors ->
+                failwithf
+                    "Could not add ARC file, failed with the following errors %s"
+                    (PathHelpers.formatContractErrors errors)
+        }

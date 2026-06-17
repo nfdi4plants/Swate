@@ -2,10 +2,7 @@ namespace Swate.Components.Page.Landing
 
 module State =
 
-    let setError (error: string option) (state: LandingUiState) = {
-        state with
-            Error = error
-    }
+    let setError (error: string option) (state: LandingUiState) = { state with Error = error }
 
     let continueToQuestions (state: LandingUiState) = {
         state with
@@ -25,7 +22,4 @@ module State =
             Error = None
     }
 
-    let stopSubmitting (state: LandingUiState) = {
-        state with
-            IsSubmitting = false
-    }
+    let stopSubmitting (state: LandingUiState) = { state with IsSubmitting = false }

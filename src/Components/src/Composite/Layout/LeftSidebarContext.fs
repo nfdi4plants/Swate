@@ -11,8 +11,7 @@ module private Helper =
 
 open Helper
 
-let LeftSidebarCtx =
-    React.createContext<LeftSidebarCtxState>(Empty)
+let LeftSidebarCtx = React.createContext<LeftSidebarCtxState> (Empty)
 
 [<Hook>]
 let useLeftSidebarCtx () = React.useContext LeftSidebarCtx

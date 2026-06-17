@@ -37,7 +37,8 @@ let getAllTableNames (context: RequestContext) =
             /// Get all names of all tables in the whole workbook.
             let tableNames = tables.items |> Seq.toArray |> Array.map (fun x -> x.name)
 
-            tableNames)
+            tableNames
+        )
 
 let createMatrixForTables (colCount: int) (rowCount: int) value =
     [|
@@ -154,7 +155,8 @@ let getTableValues (tableRange: Range) =
     |> Array.map (fun row ->
         row
         |> Array.ofSeq
-        |> Array.map (fun column -> column |> Option.map string |> Option.defaultValue "" |> (fun s -> s.TrimEnd())))
+        |> Array.map (fun column -> column |> Option.map string |> Option.defaultValue "" |> (fun s -> s.TrimEnd()))
+    )
 
 [<AutoOpen>]
 module Table =
@@ -256,12 +258,14 @@ let tryGetPrevAnnotationTableName (context: RequestContext) = promise {
                         if table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix) then
                             Some(table.worksheet.position, table.name)
                         else
-                            None)
+                            None
+                    )
                     |> Array.filter (fun (wp, _) -> activeWorksheet.position - wp > 0.)
                     |> Array.sortBy (fun (wp, _) -> activeWorksheet.position - wp)
                     |> Array.tryHead
 
-                Option.bind (snd >> Some) prevTable)
+                Option.bind (snd >> Some) prevTable
+            )
 
     return prevTable
 }
@@ -315,7 +319,17 @@ let tryGetActiveExcelTable (context: RequestContext) = promise {
         |> ignore
 
         tables.load (
-            propertyNames = U2.Case2(ResizeArray [| "items"; "worksheet"; "name"; "position"; "style"; "values" |])
+            propertyNames =
+                U2.Case2(
+                    ResizeArray [|
+                        "items"
+                        "worksheet"
+                        "name"
+                        "position"
+                        "style"
+                        "values"
+                    |]
+                )
         )
 
     return!
@@ -328,9 +342,11 @@ let tryGetActiveExcelTable (context: RequestContext) = promise {
                     |> Seq.toArray
                     |> Array.tryFind (fun table ->
                         table.name.StartsWith(ARCtrl.Spreadsheet.ArcTable.annotationTablePrefix)
-                        && table.worksheet.position = activeWorksheet.position)
+                        && table.worksheet.position = activeWorksheet.position
+                    )
 
-                activeTable)
+                activeTable
+            )
 }
 
 /// <summary>
@@ -357,7 +373,8 @@ let format (table: Table, context: RequestContext, shallHide: bool) = promise {
             ARCtrl.Spreadsheet.ArcTable.helperColumnStrings
             |> List.exists (fun cName -> column.name.StartsWith cName)
         then
-            column.getRange().columnHidden <- shallHide)
+            column.getRange().columnHidden <- shallHide
+    )
 }
 
 /// <summary>

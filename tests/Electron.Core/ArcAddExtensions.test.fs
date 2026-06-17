@@ -1,14 +1,12 @@
 module ElectronCore.ArcAddExtensionsTests
 
-open Fable.Core
+open Main.ARCtrlExtensions
 open Main.ArcMerge
 open Main.ArcVault
 open Main.Bindings.Path
-open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open ARCtrl
-open ARCtrl.Contract
 open Vitest
 
 let private expectSome (value: 'T option) (message: string) : 'T =

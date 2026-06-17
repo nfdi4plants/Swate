@@ -10,8 +10,7 @@ open Swate.Components.Primitive.LayoutComponents
 
 module private PublicationsInputHelper =
 
-    let toOptionalString (value: string) =
-        if value = "" then None else Some value
+    let toOptionalString (value: string) = if value = "" then None else Some value
 
     let countFilledFieldsString (publication: Publication) =
         let fields = [
@@ -30,13 +29,13 @@ module private PublicationsInputHelper =
 type PublicationsInput =
 
     [<ReactComponent>]
-    static member private PublicationInput(publication: Publication, setter: Publication -> unit, ?rmv: MouseEvent -> unit) =
+    static member private PublicationInput
+        (publication: Publication, setter: Publication -> unit, ?rmv: MouseEvent -> unit)
+        =
         let title = Option.defaultValue "<title>" publication.Title
         let doi = Option.defaultValue "<doi>" publication.DOI
 
-        let createFieldTextInput
-            (field: string option, label: string, publicationSetter: string option -> unit)
-            =
+        let createFieldTextInput (field: string option, label: string, publicationSetter: string option -> unit) =
             TextInput.TextInput(
                 field |> Option.defaultValue "",
                 (fun value ->
@@ -79,11 +78,8 @@ type PublicationsInput =
 
     [<ReactComponent>]
     static member PublicationsInput
-        (
-            publications: ResizeArray<Publication>,
-            setter: ResizeArray<Publication> -> unit,
-            label: string
-        ) =
+        (publications: ResizeArray<Publication>, setter: ResizeArray<Publication> -> unit, label: string)
+        =
         InputSequence.InputSequence(
             publications,
             Publication,

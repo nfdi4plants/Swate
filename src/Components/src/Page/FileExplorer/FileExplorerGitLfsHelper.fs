@@ -3,6 +3,13 @@ module Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper
 open Fable.Core
 open Swate.Components.Page.FileExplorer.Types
 
+module FileItemHelper = Swate.Components.Page.FileExplorer.Helper
+
+let private downloadLabel = "Download LFS file"
+let private downloadIcon = "swt:fluent--cloud-arrow-down-24-regular"
+let private freeCopyLabel = "Free local LFS copy"
+let private freeCopyIcon = "swt:fluent--document-arrow-up-20-regular"
+
 let toggleLfsMark
     (setError: string option -> unit)
     (runToggle: string -> bool -> JS.Promise<Result<unit, string>>)
@@ -23,42 +30,88 @@ let toggleLfsMark
         }
         |> Promise.start
 
-let freeLocalLfsCopy
+let private runLfsFileAction
     (setError: string option -> unit)
-    (runCleanup: string -> JS.Promise<Result<unit, string>>)
-    : (FileItem -> unit) =
+    (runAction: string -> JS.Promise<Result<unit, string>>)
+    (rootError: string)
+    (canRun: FileItem -> bool)
+    (blockedMessage: FileItem -> string)
+    (failureMessage: FileItem -> string -> string)
+    : FileItem -> unit =
     fun item ->
         promise {
             match item.Path with
             | None -> ()
-            | Some relativePath ->
-                if System.String.IsNullOrWhiteSpace relativePath then
-                    setError (Some "Cannot free the ARC root as a Git LFS file.")
-                elif item.IsLFS <> Some true then
-                    setError (Some $"'{item.Name}' is not marked as a Git LFS file.")
-                elif item.Downloaded <> Some true || item.IsLFSPointer = Some true then
-                    setError (Some $"'{item.Name}' is already stored locally as an LFS pointer.")
-                else
-                    let! result = runCleanup relativePath
-
-                    match result with
-                    | Ok _ -> setError None
-                    | Error msg -> setError (Some $"Git LFS cleanup failed for '{item.Name}': {msg}")
+            | Some path when System.String.IsNullOrWhiteSpace path -> setError (Some rootError)
+            | Some _ when not (FileItemHelper.isLfs item) ->
+                setError (Some $"'{item.Name}' is not marked as a Git LFS file.")
+            | Some _ when not (canRun item) -> setError (Some(blockedMessage item))
+            | Some path ->
+                match! runAction path with
+                | Ok _ -> setError None
+                | Error msg -> setError (Some(failureMessage item msg))
         }
         |> Promise.start
+
+let freeLocalLfsCopy
+    (setError: string option -> unit)
+    (runCleanup: string -> JS.Promise<Result<unit, string>>)
+    : FileItem -> unit =
+    runLfsFileAction
+        setError
+        runCleanup
+        "Cannot free the ARC root as a Git LFS file."
+        FileItemHelper.hasLocalLfsCopy
+        (fun item -> $"'{item.Name}' is already stored locally as an LFS pointer.")
+        (fun item msg -> $"Git LFS cleanup failed for '{item.Name}': {msg}")
+
+let downloadLfsFile
+    (setError: string option -> unit)
+    (runDownload: string -> JS.Promise<Result<unit, string>>)
+    : FileItem -> unit =
+    runLfsFileAction
+        setError
+        runDownload
+        "Cannot download the ARC root as a Git LFS file."
+        FileItemHelper.needsLfsDownload
+        (fun item -> $"'{item.Name}' is already downloaded.")
+        (fun item msg -> $"Git LFS download failed for '{item.Name}': {msg}")
+
+let private lfsAction label icon item enabled action =
+    action
+    |> Option.map (fun handler ->
+        if enabled then
+            ContextMenuItem.forItem label icon handler item
+        else
+            ContextMenuItem.disabled label icon
+    )
+
+let lfsPillAction (item: FileItem) onDownloadLfsFile onFreeLocalLfsCopy =
+    let withFallback label icon enabled action =
+        lfsAction label icon item enabled action
+        |> Option.defaultValue (ContextMenuItem.disabled label icon)
+
+    if item.IsDirectory || not (FileItemHelper.isLfs item) then
+        None
+    elif FileItemHelper.needsLfsDownload item then
+        withFallback downloadLabel downloadIcon true onDownloadLfsFile |> Some
+    elif FileItemHelper.hasLocalLfsCopy item then
+        withFallback freeCopyLabel freeCopyIcon true onFreeLocalLfsCopy |> Some
+    else
+        ContextMenuItem.disabled downloadLabel downloadIcon |> Some
 
 let contextMenuItems
     (item: FileItem)
     (onToggleLfsMark: FileItem -> bool -> unit)
+    (onDownloadLfsFile: (FileItem -> unit) option)
     (onFreeLocalLfsCopy: (FileItem -> unit) option)
     : ContextMenuItem list =
     if item.IsDirectory then
         []
     else
-        let isMarked = item.IsLFS = Some true
-
-        let hasLocalLfsCopy =
-            isMarked && item.Downloaded = Some true && item.IsLFSPointer <> Some true
+        let isMarked = FileItemHelper.isLfs item
+        let needsDownload = FileItemHelper.needsLfsDownload item
+        let hasLocalCopy = FileItemHelper.hasLocalLfsCopy item
 
         [
             ContextMenuItem.create
@@ -68,18 +121,16 @@ let contextMenuItems
                  else
                      "swt:fluent--document-add-24-regular")
                 (fun () -> onToggleLfsMark item (not isMarked))
-            yield!
-                match onFreeLocalLfsCopy with
-                | Some freeLocalCopy when hasLocalLfsCopy -> [
-                    ContextMenuItem.create
-                        "Free local LFS copy"
-                        "swt:fluent--document-arrow-up-20-regular"
-                        (fun () -> freeLocalCopy item)
-                  ]
-                | Some _ when isMarked -> [
-                    ContextMenuItem.disabled "Free local LFS copy" "swt:fluent--document-arrow-up-20-regular"
-                  ]
-                | _ -> []
+
+            if isMarked then
+                yield!
+                    lfsAction downloadLabel downloadIcon item needsDownload onDownloadLfsFile
+                    |> Option.toList
+
+                yield!
+                    lfsAction freeCopyLabel freeCopyIcon item hasLocalCopy onFreeLocalLfsCopy
+                    |> Option.toList
+
             ContextMenuItem.disabled
                 (if isMarked then
                      "Git LFS: marked"

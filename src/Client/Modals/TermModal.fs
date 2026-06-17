@@ -37,7 +37,10 @@ type TermModal =
 
         let mkInfoPart (txt: string) (desc: string) =
             Html.div [
-                Html.h3 [ prop.className "swt:text-lg swt:font-semibold"; prop.text txt ]
+                Html.h3 [
+                    prop.className "swt:text-lg swt:font-semibold"
+                    prop.text txt
+                ]
                 if desc <> "" then
                     Html.p [ prop.text desc ]
             ]
@@ -45,7 +48,10 @@ type TermModal =
         let headerElement =
             Html.div [
                 Html.span [ prop.className "swt:font-bold"; prop.text oa.NameText ]
-                Html.div [ prop.className "swt:text-xs"; prop.text oa.TermAccessionShort ]
+                Html.div [
+                    prop.className "swt:text-xs"
+                    prop.text oa.TermAccessionShort
+                ]
             ]
 
         let modalActivity =
@@ -75,10 +81,4 @@ type TermModal =
                 ]
             ]
 
-        BaseModal.Modal(
-            isOpen,
-            setIsOpen,
-            Html.p headerElement,
-            Html.div [],
-            modalActions = modalActivity
-        )
+        BaseModal.Modal(isOpen, setIsOpen, Html.p headerElement, Html.div [], modalActions = modalActivity)

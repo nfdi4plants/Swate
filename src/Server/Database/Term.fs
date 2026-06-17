@@ -267,7 +267,10 @@ type Term(?credentials: Neo4JCredentials, ?session: IAsyncSession) =
             let! tree_query =
                 let parameters =
                     System.Collections.Generic.Dictionary<string, obj>(
-                        [ KeyValuePair("Parent", box parentId); KeyValuePair("Limit", box limit) ]
+                        [
+                            KeyValuePair("Parent", box parentId)
+                            KeyValuePair("Limit", box limit)
+                        ]
                     )
 
                 session.RunAsync(query, parameters, config)
@@ -428,7 +431,10 @@ type Term(?credentials: Neo4JCredentials, ?session: IAsyncSession) =
                 FullTextSearch.Complete.ofQueryString termName
 
         let param =
-            Map [ "Accession", box parentAccession; "Search", box fulltextSearchStr ]
+            Map [
+                "Accession", box parentAccession
+                "Search", box fulltextSearchStr
+            ]
             |> Some
 
         Neo4j.runQuery (
@@ -450,7 +456,10 @@ type Term(?credentials: Neo4JCredentials, ?session: IAsyncSession) =
                 FullTextSearch.Complete.ofQueryString term.Name
 
         let param =
-            Map [ "Accession", box parent.TermAccession; "Search", box fulltextSearchStr ]
+            Map [
+                "Accession", box parent.TermAccession
+                "Search", box fulltextSearchStr
+            ]
             |> Some
 
         if session.IsSome then
@@ -536,7 +545,11 @@ type Term(?credentials: Neo4JCredentials, ?session: IAsyncSession) =
             RETURN node.accession, node.name, node.definition, node.is_obsolete"""
 
         let param =
-            Map [ "Accession", box childAccession; "Search", box fulltextSearchStr ] |> Some
+            Map [
+                "Accession", box childAccession
+                "Search", box fulltextSearchStr
+            ]
+            |> Some
 
         if session.IsSome then
             Neo4j.runQuery (query, param, (Term.asTerm ("node")), session = session.Value)

@@ -7,17 +7,18 @@ open Main
 
 [<AutoOpen>]
 module IPCHelper =
-    let windowFromIpcEvent(event: IpcMainInvokeEvent) =
-        BrowserWindow.fromWebContents(event.sender)
+    let windowFromIpcEvent (event: IpcMainInvokeEvent) =
+        BrowserWindow.fromWebContents (event.sender)
 
-    let dialogParentFromIpcEvent(event: IpcMainInvokeEvent) : BaseWindow option =
-        windowFromIpcEvent event
-        |> Option.map (fun window -> unbox<BaseWindow> window)
+    let dialogParentFromIpcEvent (event: IpcMainInvokeEvent) : BaseWindow option =
+        windowFromIpcEvent event |> Option.map (fun window -> unbox<BaseWindow> window)
 
-    let windowIdFromIpcEvent(event: IpcMainInvokeEvent) =
-        BrowserWindow.fromWebContents(event.sender)
+    let windowIdFromIpcEvent (event: IpcMainInvokeEvent) =
+        BrowserWindow.fromWebContents (event.sender)
         |> Option.map _.id
-        |> function | Some id -> id | None -> failwith $"Unable to access window from web-contents-id: '{event.sender.id}'"
+        |> function
+            | Some id -> id
+            | None -> failwith $"Unable to access window from web-contents-id: '{event.sender.id}'"
 
     let tryGetVaultAndArcPath (event: IpcMainInvokeEvent) =
         let windowId = windowIdFromIpcEvent event
@@ -29,7 +30,10 @@ module IPCHelper =
             | Some arcPath -> Ok(vault, arcPath)
             | None -> Error(exn "ARC is not loaded.")
 
-    let withBusyWriting (vault: ArcVault) (operation: unit -> JS.Promise<Result<'T, exn>>) : JS.Promise<Result<'T, exn>> =
+    let withBusyWriting
+        (vault: ArcVault)
+        (operation: unit -> JS.Promise<Result<'T, exn>>)
+        : JS.Promise<Result<'T, exn>> =
         promise {
             vault.isBusyWriting <- true
 
