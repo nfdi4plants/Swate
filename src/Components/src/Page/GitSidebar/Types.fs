@@ -37,6 +37,7 @@ type GitSidebarProgress = {
     Method: string option
     Stage: string option
     ProgressPercent: float option
+    Output: string option
 }
 
 [<RequireQualifiedAccess>]

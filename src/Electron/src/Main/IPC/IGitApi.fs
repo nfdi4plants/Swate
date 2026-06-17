@@ -87,20 +87,19 @@ let private toGitPageLoadResultDto
         | Some unsupported -> Ok(GitPageLoadResultDto.Unsupported unsupported)
         | None -> Error(exn $"{operationName} failed ({failure.Kind}): {failure.Message}")
 
-let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgressCallback =
+let private createGitProgressReporterForWindow (window: BrowserWindow) : GitService.GitProgressCallback =
     let rendererApi =
         Remoting.createIpc ()
-        |> Remoting.withWindow vault.window
+        |> Remoting.withWindow window
         |> Remoting.buildProxySender<IGitProgressRendererApi>
 
-    fun progressEvent ->
-        rendererApi.gitProgressUpdate {
-            Method = Some progressEvent.method
-            Stage = Some progressEvent.stage
-            Progress = Some progressEvent.progress
-            Processed = Some progressEvent.processed
-            Total = Some progressEvent.total
-        }
+    fun progress -> rendererApi.gitProgressUpdate progress
+
+let private createGitProgressReporter (vault: ArcVault) : GitService.GitProgressCallback =
+    createGitProgressReporterForWindow vault.window
+
+let tryCreateGitProgressReporterFromIpcEvent (event: IpcMainInvokeEvent) : GitService.GitProgressCallback option =
+    windowFromIpcEvent event |> Option.map createGitProgressReporterForWindow
 
 let api (event: IpcMainInvokeEvent) : IGitApi = {
     checkGitVersions = fun () -> checkGitVersions ()
@@ -289,9 +288,7 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
         }
     gitCloneRepository =
         fun (request: GitCloneRepositoryRequest) -> promise {
-            let progressReporter =
-                ARC_VAULTS.TryGetVault(windowIdFromIpcEvent event)
-                |> Option.map createGitProgressReporter
+            let progressReporter = tryCreateGitProgressReporterFromIpcEvent event
 
             let! result =
                 GitProvisioningService.cloneRepository
@@ -392,11 +389,13 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+
                 return!
                     withBusyWriting
                         vault
                         (fun () -> promise {
-                            let! result = GitService.pruneLfsCache arcPath
+                            let! result = GitService.pruneLfsCacheWithProgress arcPath (Some progressReporter)
 
                             return
                                 toGitOperationResult (fun _ -> Some "Hidden Git LFS cache cleaned.") None None result
@@ -429,11 +428,13 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
             match tryGetVaultAndArcPath event with
             | Error error -> return Error error
             | Ok(vault, arcPath) ->
+                let progressReporter = createGitProgressReporter vault
+
                 return!
                     withBusyWriting
                         vault
                         (fun () -> promise {
-                            let! result = GitService.dedupLfsStorage arcPath
+                            let! result = GitService.dedupLfsStorageWithProgress arcPath (Some progressReporter)
 
                             return
                                 toGitOperationResult

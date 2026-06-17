@@ -96,14 +96,25 @@ module private GitSidebarInternal =
         | GitSidebarBranchKind.Local -> "Local"
         | GitSidebarBranchKind.Remote -> "Remote"
 
+    let progressPercentValue (progress: GitSidebarProgress) =
+        progress.ProgressPercent
+        |> Option.map (fun value -> value |> max 0.0 |> min 100.0)
+
     let progressText (progress: GitSidebarProgress) =
         [
             progress.Method
             progress.Stage
-            progress.ProgressPercent |> Option.map (fun value -> $"{Math.Round(value)}%%")
+            progress
+            |> progressPercentValue
+            |> Option.map (fun value -> $"{Math.Round(value)}%%")
         ]
         |> List.choose id
         |> String.concat " | "
+
+    let progressOutput (progress: GitSidebarProgress) =
+        progress.Output
+        |> Option.bind Option.ofObj
+        |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
     let formatThresholdInput (thresholdMb: int) = string thresholdMb
 
@@ -258,6 +269,9 @@ type GitSidebar =
         React.Fragment [
             match runStatus with
             | GitSidebarRunStatus.Progress progress ->
+                let progressValue = GitSidebarInternal.progressPercentValue progress
+                let progressOutput = GitSidebarInternal.progressOutput progress
+
                 Html.div [
                     prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                     prop.children [
@@ -268,17 +282,62 @@ type GitSidebar =
                                 "swt:alert swt:alert-info swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className
-                                        "swt:iconify swt:fluent--arrow-sync-24-regular swt:size-4 swt:shrink-0"
+                                    prop.className "swt:loading swt:loading-spinner swt:loading-xs swt:shrink-0"
                                 ]
-                                Html.span [
-                                    prop.className "swt:min-w-0 swt:wrap-anywhere"
-                                    prop.text (
-                                        GitSidebarInternal.progressText progress
-                                        |> function
-                                            | "" -> "Git operation in progress"
-                                            | text -> text
-                                    )
+                                Html.div [
+                                    prop.className "swt:flex swt:min-w-0 swt:flex-1 swt:flex-col swt:gap-2"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:min-w-0 swt:wrap-anywhere"
+                                            prop.text (
+                                                GitSidebarInternal.progressText progress
+                                                |> function
+                                                    | "" -> "Git operation in progress"
+                                                    | text -> text
+                                            )
+                                        ]
+
+                                        match progressValue with
+                                        | Some value ->
+                                            Html.div [
+                                                prop.testId "GitSidebarProgressBar"
+                                                prop.className "swt:h-1.5 swt:w-full swt:rounded-full swt:bg-base-300"
+                                                prop.children [
+                                                    Html.div [
+                                                        prop.className
+                                                            "swt:h-full swt:rounded-full swt:transition-all swt:duration-300"
+                                                        prop.style [
+                                                            style.width (length.percent value)
+                                                            style.custom (
+                                                                "backgroundColor",
+                                                                "var(--color-base-content)"
+                                                            )
+                                                        ]
+                                                    ]
+                                                ]
+                                            ]
+                                        | None -> Html.none
+
+                                        match progressOutput with
+                                        | Some output ->
+                                            Html.details [
+                                                prop.testId "GitSidebarProgressOutput"
+                                                prop.className "swt:min-w-0"
+                                                prop.children [
+                                                    Html.summary [
+                                                        prop.className
+                                                            "swt:cursor-pointer swt:select-none swt:text-xs swt:font-medium"
+                                                        prop.text "Git output"
+                                                    ]
+                                                    Html.pre [
+                                                        prop.className
+                                                            "swt:mt-2 swt:max-h-36 swt:overflow-auto swt:whitespace-pre-wrap swt:break-words swt:rounded swt:border swt:border-base-content/30 swt:bg-base-content swt:p-2 swt:font-mono swt:text-xs swt:text-base-100"
+                                                        prop.text output
+                                                    ]
+                                                ]
+                                            ]
+                                        | None -> Html.none
+                                    ]
                                 ]
                             ]
                         ]
@@ -295,7 +354,7 @@ type GitSidebar =
                                 "swt:alert swt:alert-info swt:min-w-0 swt:px-3 swt:py-2 swt:text-sm swt:@max-xs:px-2"
                             prop.children [
                                 Html.span [
-                                    prop.className "swt:iconify swt:fluent--clock-24-regular swt:size-4 swt:shrink-0"
+                                    prop.className "swt:loading swt:loading-spinner swt:loading-xs swt:shrink-0"
                                 ]
                                 Html.span [
                                     prop.className "swt:min-w-0 swt:wrap-anywhere"
@@ -550,6 +609,11 @@ type GitSidebar =
                     ]
                 ]
             ]
+        ]
+
+    [<ReactComponent>]
+    static member private BranchStatusDetails(props: BranchHeaderProps) =
+        React.Fragment [
             Html.div [
                 prop.className "swt:px-3 swt:pt-3 swt:@max-xs:px-2"
                 prop.children [
@@ -1890,24 +1954,34 @@ type GitSidebar =
                 )
             )
 
+        let branchHeaderProps = {
+            Status = status
+            HasConflicts = hasConflicts
+            IsBusy = isBusy
+            CanOpenRemoteRepository = canOpenRemoteRepository
+            OnOpenRemoteRepository = onOpenRemoteRepository
+            OnRefresh =
+                fun () ->
+                    setLocalError None
+                    onRefresh ()
+        }
+
         Html.div [
             prop.testId "GitSidebar"
             prop.className
                 "swt:@container/gitSidebar swt:flex swt:h-full swt:min-h-0 swt:min-w-0 swt:flex-col swt:overflow-x-hidden swt:bg-base-100"
             prop.children [
-                GitSidebar.BranchHeader(
-                    {
-                        Status = status
-                        HasConflicts = hasConflicts
-                        IsBusy = isBusy
-                        CanOpenRemoteRepository = canOpenRemoteRepository
-                        OnOpenRemoteRepository = onOpenRemoteRepository
-                        OnRefresh =
-                            fun () ->
-                                setLocalError None
-                                onRefresh ()
-                    }
+                GitSidebar.BranchHeader(branchHeaderProps)
+
+                GitSidebar.OperationStatusNotice(
+                    ?runStatus = Some runStatus,
+                    ?errorNotice = visibleError,
+                    ?warningNotice = warningNotice,
+                    busyTestId = "GitSidebarProgressNotice",
+                    errorTestId = "GitSidebarErrorNotice"
                 )
+
+                GitSidebar.BranchStatusDetails(branchHeaderProps)
 
                 GitSidebar.AdvancedActions(
                     {
@@ -1971,14 +2045,6 @@ type GitSidebar =
                         SubmitPrimarySave = submitPrimarySave
                         SubmitLocalCommit = submitLocalCommit
                     }
-                )
-
-                GitSidebar.OperationStatusNotice(
-                    ?runStatus = Some runStatus,
-                    ?errorNotice = visibleError,
-                    ?warningNotice = warningNotice,
-                    busyTestId = "GitSidebarProgressNotice",
-                    errorTestId = "GitSidebarErrorNotice"
                 )
 
                 if hasConflicts then
