@@ -8,11 +8,9 @@ open Swate.Components.Page.ProvenanceGrouping.Types
 /// Shared key helpers used by the UI state maps and sets.
 module Keys =
 
-    let groupingKey header : GroupingKey =
-        { Header = header }
+    let groupingKey header : GroupingKey = { Header = header }
 
-    let propertySlot pairId side header =
-        pairId, side, groupingKey header
+    let propertySlot pairId side header = pairId, side, groupingKey header
 
     let paletteKey pairId side = pairId, side
 
@@ -24,23 +22,12 @@ module PanelLayout =
     let minimumSide = 15
     let minimumMiddle = 30
 
-    let defaultRatios =
-        {
-            Left = 20
-            Middle = 60
-            Right = 20
-        }
+    let defaultRatios = { Left = 20; Middle = 60; Right = 20 }
 
     let private clamp left right =
-        let left =
-            left
-            |> max minimumSide
-            |> min (100 - minimumMiddle - minimumSide)
+        let left = left |> max minimumSide |> min (100 - minimumMiddle - minimumSide)
 
-        let right =
-            right
-            |> max minimumSide
-            |> min (100 - minimumMiddle - left)
+        let right = right |> max minimumSide |> min (100 - minimumMiddle - left)
 
         {
             Left = left
@@ -49,12 +36,12 @@ module PanelLayout =
         }
 
     let get pairId state =
-        state.PanelRatios
-        |> Map.tryFind pairId
-        |> Option.defaultValue defaultRatios
+        state.PanelRatios |> Map.tryFind pairId |> Option.defaultValue defaultRatios
 
-    let set pairId ratios state =
-        { state with PanelRatios = state.PanelRatios |> Map.add pairId (clamp ratios.Left ratios.Right) }
+    let set pairId ratios state = {
+        state with
+            PanelRatios = state.PanelRatios |> Map.add pairId (clamp ratios.Left ratios.Right)
+    }
 
     let setLeft pairId left state =
         let current = get pairId state
@@ -67,19 +54,23 @@ module PanelLayout =
 /// Tracks the in-app prompt and expansion state for mismatched group connections.
 module MemberResolution =
 
-    let request (pending: PendingMemberResolution) state =
-        { state with PendingMemberResolution = Some pending; Error = None }
+    let request (pending: PendingMemberResolution) state = {
+        state with
+            PendingMemberResolution = Some pending
+            Error = None
+    }
 
-    let clearPending state =
-        { state with PendingMemberResolution = None }
+    let clearPending state = {
+        state with
+            PendingMemberResolution = None
+    }
 
     let chooseManual (pending: PendingMemberResolution) state =
-        let pair: ManualResolutionPair =
-            {
-                PairId = pending.PairId
-                InputGroupId = pending.InputGroupId
-                OutputGroupId = pending.OutputGroupId
-            }
+        let pair: ManualResolutionPair = {
+            PairId = pending.PairId
+            InputGroupId = pending.InputGroupId
+            OutputGroupId = pending.OutputGroupId
+        }
 
         let pairs =
             if state.ManualResolutionPairs |> List.exists ((=) pair) then
@@ -99,33 +90,31 @@ module MemberResolution =
         |> List.exists (fun (pair: ManualResolutionPair) ->
             pair.PairId = pairId
             && pair.InputGroupId = inputGroupId
-            && pair.OutputGroupId = outputGroupId)
+            && pair.OutputGroupId = outputGroupId
+        )
 
 /// Creates, finds, and synchronizes layer-local state with the current session.
 module Layers =
 
-    let empty =
-        {
-            GroupingAssignments = []
-        }
+    let empty = { GroupingAssignments = [] }
 
     let get layerId state =
         state.LayerStates |> Map.tryFind layerId |> Option.defaultValue empty
 
     let private retainCurrentLayers session state =
-        let currentIds =
-            session.Layers
-            |> List.map (fun layer -> layer.Id)
-            |> Set.ofList
+        let currentIds = session.Layers |> List.map (fun layer -> layer.Id) |> Set.ofList
 
-        let retained : Map<ProvenanceLayerId, LayerViewState> =
-            state.LayerStates
-            |> Map.filter (fun id _ -> currentIds.Contains id)
+        let retained: Map<ProvenanceLayerId, LayerViewState> =
+            state.LayerStates |> Map.filter (fun id _ -> currentIds.Contains id)
 
         session.Layers
         |> List.fold
             (fun (map: Map<ProvenanceLayerId, LayerViewState>) layer ->
-                if map.ContainsKey layer.Id then map else map |> Map.add layer.Id empty)
+                if map.ContainsKey layer.Id then
+                    map
+                else
+                    map |> Map.add layer.Id empty
+            )
             retained
 
     let ensure session state =
@@ -137,8 +126,7 @@ module Layers =
             |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
 
         let panelRatios =
-            state.PanelRatios
-            |> Map.filter (fun pairId _ -> currentPairIds.Contains pairId)
+            state.PanelRatios |> Map.filter (fun pairId _ -> currentPairIds.Contains pairId)
 
         let expandedProperties =
             state.ExpandedProperties
@@ -156,13 +144,15 @@ module Layers =
             state.ManualResolutionPairs
             |> List.filter (fun pair -> currentPairIds.Contains pair.PairId)
 
-        if layerStates = state.LayerStates
-           && propertyRailPlacements = state.PropertyRailPlacements
-           && panelRatios = state.PanelRatios
-           && expandedProperties = state.ExpandedProperties
-           && paletteValues = state.PaletteValues
-           && pendingMemberResolution = state.PendingMemberResolution
-           && manualResolutionPairs = state.ManualResolutionPairs then
+        if
+            layerStates = state.LayerStates
+            && propertyRailPlacements = state.PropertyRailPlacements
+            && panelRatios = state.PanelRatios
+            && expandedProperties = state.ExpandedProperties
+            && paletteValues = state.PaletteValues
+            && pendingMemberResolution = state.PendingMemberResolution
+            && manualResolutionPairs = state.ManualResolutionPairs
+        then
             state
         else
             {
@@ -179,7 +169,11 @@ module Layers =
     let update layerId updateLayer state =
         let current = get layerId state
         let next = updateLayer current
-        { state with LayerStates = state.LayerStates |> Map.add layerId next }
+
+        {
+            state with
+                LayerStates = state.LayerStates |> Map.add layerId next
+        }
 
 /// Tracks expanded property value panels on the side rails.
 module PropertyExpansion =
@@ -189,13 +183,17 @@ module PropertyExpansion =
 
     let toggle pairId side header state =
         let slot = Keys.propertySlot pairId side header
+
         let expanded =
             if state.ExpandedProperties.Contains slot then
                 state.ExpandedProperties.Remove slot
             else
                 state.ExpandedProperties.Add slot
 
-        { state with ExpandedProperties = expanded }
+        {
+            state with
+                ExpandedProperties = expanded
+        }
 
 /// Stores property values that exist only in the rail until they are applied to a group.
 module Palette =
@@ -242,14 +240,15 @@ module Palette =
 
     let addValue pairId side header value unit state =
         let key = Keys.paletteKey pairId side
-        let propertyValue : ProvenancePropertyValue =
-            {
-                Id = nextValueId pairId side state
-                Header = header
-                Value = value
-                Unit = unit
-                Source = None
-            }
+
+        let propertyValue: ProvenancePropertyValue = {
+            Id = nextValueId pairId side state
+            Header = header
+            Value = value
+            Unit = unit
+            Source = None
+        }
+
         let nextValues = valuesForSide pairId side state @ [ propertyValue ]
 
         {
@@ -262,11 +261,13 @@ module Palette =
 /// Manages overwrite confirmation state for dropped property values.
 module Overwrite =
 
-    let set warning state =
-        { state with PendingOverwrite = Some warning; Error = None }
+    let set warning state = {
+        state with
+            PendingOverwrite = Some warning
+            Error = None
+    }
 
-    let clear state =
-        { state with PendingOverwrite = None }
+    let clear state = { state with PendingOverwrite = None }
 
 /// Updates grouping assignments and side placement for properties.
 module GroupingAssignments =
@@ -277,9 +278,14 @@ module GroupingAssignments =
 
     let private removeHeaderScope header scope (assignments: GroupingAssignment list) : GroupingAssignment list =
         let key = Keys.groupingKey header
-        assignments |> List.filter (fun assignment -> assignment.Key <> key || assignment.Scope <> scope)
 
-    let private upsert (assignment: GroupingAssignment) (assignments: GroupingAssignment list) : GroupingAssignment list =
+        assignments
+        |> List.filter (fun assignment -> assignment.Key <> key || assignment.Scope <> scope)
+
+    let private upsert
+        (assignment: GroupingAssignment)
+        (assignments: GroupingAssignment list)
+        : GroupingAssignment list =
         assignments
         |> List.filter (fun current -> current.Key <> assignment.Key)
         |> fun retained -> retained @ [ assignment ]
@@ -290,7 +296,8 @@ module GroupingAssignments =
             (fun current ->
                 let key = Keys.groupingKey header
                 let scope = scopeForSide side
-                let assignment : GroupingAssignment = { Key = key; Scope = scope }
+                let assignment: GroupingAssignment = { Key = key; Scope = scope }
+
                 let isSelected =
                     current.GroupingAssignments
                     |> List.exists (fun current -> current.Key = key && current.Scope = scope)
@@ -301,16 +308,22 @@ module GroupingAssignments =
                     else
                         upsert assignment current.GroupingAssignments
 
-                { current with GroupingAssignments = nextAssignments })
+                {
+                    current with
+                        GroupingAssignments = nextAssignments
+                }
+            )
             state
 
     let toggleBoth leftLayerId rightLayerId header state =
         let key = Keys.groupingKey header
+
         let isSelected =
             [ leftLayerId; rightLayerId ]
             |> List.exists (fun layerId ->
                 (Layers.get layerId state).GroupingAssignments
-                |> List.exists (fun assignment -> assignment.Key = key && assignment.Scope = GroupingScope.Both))
+                |> List.exists (fun assignment -> assignment.Key = key && assignment.Scope = GroupingScope.Both)
+            )
 
         let setLayer state layerId =
             Layers.update
@@ -320,9 +333,19 @@ module GroupingAssignments =
                         if isSelected then
                             removeHeaderScope header GroupingScope.Both current.GroupingAssignments
                         else
-                            upsert ({ Key = key; Scope = GroupingScope.Both } : GroupingAssignment) current.GroupingAssignments
+                            upsert
+                                ({
+                                    Key = key
+                                    Scope = GroupingScope.Both
+                                }
+                                : GroupingAssignment)
+                                current.GroupingAssignments
 
-                    { current with GroupingAssignments = nextAssignments })
+                    {
+                        current with
+                            GroupingAssignments = nextAssignments
+                    }
+                )
                 state
 
         let withLeft = setLayer state leftLayerId
@@ -330,22 +353,28 @@ module GroupingAssignments =
 
     let move pairId sourceLayerId targetLayerId targetSide header state =
         let key = Keys.groupingKey header
-        let targetAssignment : GroupingAssignment =
-            {
-                Key = key
-                Scope = scopeForSide targetSide
-            }
+
+        let targetAssignment: GroupingAssignment = {
+            Key = key
+            Scope = scopeForSide targetSide
+        }
 
         let withoutSource =
             Layers.update
                 sourceLayerId
-                (fun current -> { current with GroupingAssignments = removeHeader header current.GroupingAssignments })
+                (fun current -> {
+                    current with
+                        GroupingAssignments = removeHeader header current.GroupingAssignments
+                })
                 state
 
         let withTarget =
             Layers.update
                 targetLayerId
-                (fun current -> { current with GroupingAssignments = upsert targetAssignment current.GroupingAssignments })
+                (fun current -> {
+                    current with
+                        GroupingAssignments = upsert targetAssignment current.GroupingAssignments
+                })
                 withoutSource
 
         {
@@ -358,21 +387,34 @@ module Selection =
 
     let contains pairId side groupId state =
         let identity = Keys.selectedGroup pairId groupId
+
         match side with
         | ProvenanceSide.Input -> state.SelectedInputs.Contains identity
         | ProvenanceSide.Output -> state.SelectedOutputs.Contains identity
 
     let toggle pairId side groupId state =
         let identity = Keys.selectedGroup pairId groupId
+
         match side with
         | ProvenanceSide.Input ->
             let selected =
-                if state.SelectedInputs.Contains identity then state.SelectedInputs.Remove identity else state.SelectedInputs.Add identity
+                if state.SelectedInputs.Contains identity then
+                    state.SelectedInputs.Remove identity
+                else
+                    state.SelectedInputs.Add identity
+
             { state with SelectedInputs = selected }
         | ProvenanceSide.Output ->
             let selected =
-                if state.SelectedOutputs.Contains identity then state.SelectedOutputs.Remove identity else state.SelectedOutputs.Add identity
-            { state with SelectedOutputs = selected }
+                if state.SelectedOutputs.Contains identity then
+                    state.SelectedOutputs.Remove identity
+                else
+                    state.SelectedOutputs.Add identity
+
+            {
+                state with
+                    SelectedOutputs = selected
+            }
 
 /// Tracks the details panel target shown beneath the editor surface.
 module Detail =
@@ -382,26 +424,30 @@ module Detail =
 
     let toggleGroup side groupId state =
         let next =
-            if isGroupExpanded side groupId state then None
-            else Some(ProvenanceDetail.Group(side, groupId))
+            if isGroupExpanded side groupId state then
+                None
+            else
+                Some(ProvenanceDetail.Group(side, groupId))
+
         { state with Detail = next }
 
-    let showConnection connectionId state =
-        { state with Detail = Some(ProvenanceDetail.Connection connectionId) }
+    let showConnection connectionId state = {
+        state with
+            Detail = Some(ProvenanceDetail.Connection connectionId)
+    }
 
 /// Creates the complete UI state for a provenance session.
-let init (session: ProvenanceSession) =
-    {
-        LayerStates = session.Layers |> List.map (fun layer -> layer.Id, Layers.empty) |> Map.ofList
-        PropertyRailPlacements = Map.empty
-        ExpandedProperties = Set.empty
-        PaletteValues = Map.empty
-        PendingOverwrite = None
-        PanelRatios = Map.empty
-        PendingMemberResolution = None
-        ManualResolutionPairs = []
-        SelectedInputs = Set.empty
-        SelectedOutputs = Set.empty
-        Detail = None
-        Error = None
-    }
+let init (session: ProvenanceSession) = {
+    LayerStates = session.Layers |> List.map (fun layer -> layer.Id, Layers.empty) |> Map.ofList
+    PropertyRailPlacements = Map.empty
+    ExpandedProperties = Set.empty
+    PaletteValues = Map.empty
+    PendingOverwrite = None
+    PanelRatios = Map.empty
+    PendingMemberResolution = None
+    ManualResolutionPairs = []
+    SelectedInputs = Set.empty
+    SelectedOutputs = Set.empty
+    Detail = None
+    Error = None
+}

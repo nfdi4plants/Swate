@@ -9,17 +9,16 @@ let private selectionsFor scope parentIdentifier (tables: ResizeArray<ArcTable>)
     |> Seq.map (fun table -> ProvenanceTableSelectionDto.create scope parentIdentifier table.Name)
     |> Seq.toArray
 
-let listTables (arc: ARC) : ProvenanceTableSelectionDto[] =
-    [|
-        for study in arc.Studies do
-            yield! selectionsFor ProvenanceTableScopeDto.Study study.Identifier study.Tables
+let listTables (arc: ARC) : ProvenanceTableSelectionDto[] = [|
+    for study in arc.Studies do
+        yield! selectionsFor ProvenanceTableScopeDto.Study study.Identifier study.Tables
 
-        for assay in arc.Assays do
-            yield! selectionsFor ProvenanceTableScopeDto.Assay assay.Identifier assay.Tables
+    for assay in arc.Assays do
+        yield! selectionsFor ProvenanceTableScopeDto.Assay assay.Identifier assay.Tables
 
-        for run in arc.Runs do
-            yield! selectionsFor ProvenanceTableScopeDto.Run run.Identifier run.Tables
-    |]
+    for run in arc.Runs do
+        yield! selectionsFor ProvenanceTableScopeDto.Run run.Identifier run.Tables
+|]
 
 let loadTable (selection: ProvenanceTableSelectionDto) (arc: ARC) : ProvenanceLoadResultDto =
     let result =

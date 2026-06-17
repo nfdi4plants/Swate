@@ -106,8 +106,16 @@ type DndKit =
 
     [<ReactComponent("DndContext", "@dnd-kit/core")>]
     static member DndContext
-        (?onDragStart, ?onDragMove, ?onDragCancel, ?onDragEnd, ?sensors, ?collisionDetection, ?children: ReactElement, ?key)
-        =
+        (
+            ?onDragStart,
+            ?onDragMove,
+            ?onDragCancel,
+            ?onDragEnd,
+            ?sensors,
+            ?collisionDetection,
+            ?children: ReactElement,
+            ?key
+        ) =
         React.Imported()
 
     [<ReactComponent("DragOverlay", "@dnd-kit/core")>]

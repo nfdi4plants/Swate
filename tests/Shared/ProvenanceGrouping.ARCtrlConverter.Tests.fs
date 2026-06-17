@@ -10,102 +10,97 @@ open ARCtrl
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.ARCtrlConverter
 
-let private oa name =
-    OntologyAnnotation.create (name = name)
+let private oa name = OntologyAnnotation.create (name = name)
 
-let private text value =
-    CompositeCell.createFreeText value
+let private text value = CompositeCell.createFreeText value
 
 let private term value =
     CompositeCell.createTermFromString (name = value)
 
 let private table (name: string) (headers: CompositeHeader list) (rows: CompositeCell list list) =
     let rows =
-        rows
-        |> List.map (fun row -> ResizeArray<CompositeCell>(row))
-        |> ResizeArray
+        rows |> List.map (fun row -> ResizeArray<CompositeCell>(row)) |> ResizeArray
 
-    ArcTable.createFromRows(name, ResizeArray<CompositeHeader>(headers), rows)
+    ArcTable.createFromRows (name, ResizeArray<CompositeHeader>(headers), rows)
 
 let private loadedAssayTable () =
-    table
-        "assay-table"
+    table "assay-table" [
+        CompositeHeader.Input IOType.Sample
+        CompositeHeader.Characteristic(oa "Species")
+        CompositeHeader.Parameter(oa "Temperature")
+        CompositeHeader.Output IOType.Sample
+        CompositeHeader.Factor(oa "Replicate")
+    ] [
         [
-            CompositeHeader.Input IOType.Sample
-            CompositeHeader.Characteristic(oa "Species")
-            CompositeHeader.Parameter(oa "Temperature")
-            CompositeHeader.Output IOType.Sample
-            CompositeHeader.Factor(oa "Replicate")
+            text "sample-a"
+            term "Arabidopsis"
+            term "22"
+            text "extract-a"
+            term "R1"
         ]
         [
-            [ text "sample-a"; term "Arabidopsis"; term "22"; text "extract-a"; term "R1" ]
-            [ text "sample-b"; term "Arabidopsis"; term "23"; text "extract-b"; term "R2" ]
+            text "sample-b"
+            term "Arabidopsis"
+            term "23"
+            text "extract-b"
+            term "R2"
         ]
+    ]
 
 let private previousStudyTable () =
-    table
-        "study-table"
-        [
-            CompositeHeader.Input IOType.Source
-            CompositeHeader.Characteristic(oa "Organism")
-            CompositeHeader.Output IOType.Sample
-        ]
-        [
-            [ text "source-a"; term "Plant"; text "sample-a" ]
-            [ text "source-b"; term "Plant"; text "sample-b" ]
-        ]
+    table "study-table" [
+        CompositeHeader.Input IOType.Source
+        CompositeHeader.Characteristic(oa "Organism")
+        CompositeHeader.Output IOType.Sample
+    ] [
+        [ text "source-a"; term "Plant"; text "sample-a" ]
+        [ text "source-b"; term "Plant"; text "sample-b" ]
+    ]
 
 let private loadedAssayTableWithDuplicateTemperatureColumns () =
-    table
-        "assay-table"
-        [
-            CompositeHeader.Input IOType.Sample
-            CompositeHeader.Parameter(oa "Temperature")
-            CompositeHeader.Parameter(oa "Temperature")
-            CompositeHeader.Output IOType.Sample
-        ]
-        [
-            [ text "sample-a"; term "22"; term "22"; text "extract-a" ]
-        ]
+    table "assay-table" [
+        CompositeHeader.Input IOType.Sample
+        CompositeHeader.Parameter(oa "Temperature")
+        CompositeHeader.Parameter(oa "Temperature")
+        CompositeHeader.Output IOType.Sample
+    ] [
+        [ text "sample-a"; term "22"; term "22"; text "extract-a" ]
+    ]
 
 let private inputOnlyAssayTable () =
-    table
-        "input-only-table"
-        [
-            CompositeHeader.Input IOType.Sample
-            CompositeHeader.Characteristic(oa "Species")
-            CompositeHeader.Parameter(oa "Temperature")
-        ]
-        [
-            [ text "sample-a"; term "Arabidopsis"; term "22" ]
-            [ text "sample-b"; term "Arabidopsis"; term "23" ]
-        ]
+    table "input-only-table" [
+        CompositeHeader.Input IOType.Sample
+        CompositeHeader.Characteristic(oa "Species")
+        CompositeHeader.Parameter(oa "Temperature")
+    ] [
+        [ text "sample-a"; term "Arabidopsis"; term "22" ]
+        [ text "sample-b"; term "Arabidopsis"; term "23" ]
+    ]
 
 let private outputOnlyAssayTable () =
-    table
-        "output-only-table"
-        [
-            CompositeHeader.Parameter(oa "Temperature")
-            CompositeHeader.Output IOType.Sample
-            CompositeHeader.Factor(oa "Replicate")
-        ]
-        [
-            [ term "22"; text "extract-a"; term "R1" ]
-            [ term "23"; text "extract-b"; term "R2" ]
-        ]
+    table "output-only-table" [
+        CompositeHeader.Parameter(oa "Temperature")
+        CompositeHeader.Output IOType.Sample
+        CompositeHeader.Factor(oa "Replicate")
+    ] [
+        [ term "22"; text "extract-a"; term "R1" ]
+        [ term "23"; text "extract-b"; term "R2" ]
+    ]
 
 let private previousStudyTableWithDuplicateOrganismColumns () =
-    table
-        "study-table"
+    table "study-table" [
+        CompositeHeader.Input IOType.Source
+        CompositeHeader.Characteristic(oa "Organism")
+        CompositeHeader.Characteristic(oa "Organism")
+        CompositeHeader.Output IOType.Sample
+    ] [
         [
-            CompositeHeader.Input IOType.Source
-            CompositeHeader.Characteristic(oa "Organism")
-            CompositeHeader.Characteristic(oa "Organism")
-            CompositeHeader.Output IOType.Sample
+            text "source-a"
+            term "Plant"
+            term "Plant"
+            text "sample-a"
         ]
-        [
-            [ text "source-a"; term "Plant"; term "Plant"; text "sample-a" ]
-        ]
+    ]
 
 let private arcFixture () =
     let study =
@@ -116,16 +111,9 @@ let private arcFixture () =
         )
 
     let assay =
-        ArcAssay.create (
-            identifier = "assay-1",
-            tables = ResizeArray [ loadedAssayTable () ]
-        )
+        ArcAssay.create (identifier = "assay-1", tables = ResizeArray [ loadedAssayTable () ])
 
-    ARC(
-        identifier = "arc-1",
-        studies = ResizeArray [ study ],
-        assays = ResizeArray [ assay ]
-    )
+    ARC(identifier = "arc-1", studies = ResizeArray [ study ], assays = ResizeArray [ assay ])
 
 let private arcFixtureWithDuplicateTemperatureColumns () =
     let assay =
@@ -134,26 +122,31 @@ let private arcFixtureWithDuplicateTemperatureColumns () =
             tables = ResizeArray [ loadedAssayTableWithDuplicateTemperatureColumns () ]
         )
 
-    ARC(
-        identifier = "arc-1",
-        studies = ResizeArray [],
-        assays = ResizeArray [ assay ]
-    )
+    ARC(identifier = "arc-1", studies = ResizeArray [], assays = ResizeArray [ assay ])
 
 let private previousStudyTableWithOutputContext () =
-    table
-        "study-table"
+    table "study-table" [
+        CompositeHeader.Input IOType.Source
+        CompositeHeader.Characteristic(oa "Organism")
+        CompositeHeader.Output IOType.Sample
+        CompositeHeader.Characteristic(oa "Tissue")
+        CompositeHeader.Factor(oa "Batch")
+    ] [
         [
-            CompositeHeader.Input IOType.Source
-            CompositeHeader.Characteristic(oa "Organism")
-            CompositeHeader.Output IOType.Sample
-            CompositeHeader.Characteristic(oa "Tissue")
-            CompositeHeader.Factor(oa "Batch")
+            text "source-a"
+            term "Plant"
+            text "sample-a"
+            term "Leaf"
+            term "B1"
         ]
         [
-            [ text "source-a"; term "Plant"; text "sample-a"; term "Leaf"; term "B1" ]
-            [ text "source-b"; term "Plant"; text "sample-b"; term "Root"; term "B2" ]
+            text "source-b"
+            term "Plant"
+            text "sample-b"
+            term "Root"
+            term "B2"
         ]
+    ]
 
 let private arcFixtureWithPreviousOutputContext () =
     let study =
@@ -164,16 +157,9 @@ let private arcFixtureWithPreviousOutputContext () =
         )
 
     let assay =
-        ArcAssay.create (
-            identifier = "assay-1",
-            tables = ResizeArray [ loadedAssayTable () ]
-        )
+        ArcAssay.create (identifier = "assay-1", tables = ResizeArray [ loadedAssayTable () ])
 
-    ARC(
-        identifier = "arc-1",
-        studies = ResizeArray [ study ],
-        assays = ResizeArray [ assay ]
-    )
+    ARC(identifier = "arc-1", studies = ResizeArray [ study ], assays = ResizeArray [ assay ])
 
 let private arcFixtureWithDuplicatePreviousColumns () =
     let study =
@@ -184,23 +170,15 @@ let private arcFixtureWithDuplicatePreviousColumns () =
         )
 
     let assay =
-        ArcAssay.create (
-            identifier = "assay-1",
-            tables = ResizeArray [ loadedAssayTable () ]
-        )
+        ArcAssay.create (identifier = "assay-1", tables = ResizeArray [ loadedAssayTable () ])
 
-    ARC(
-        identifier = "arc-1",
-        studies = ResizeArray [ study ],
-        assays = ResizeArray [ assay ]
-    )
+    ARC(identifier = "arc-1", studies = ResizeArray [ study ], assays = ResizeArray [ assay ])
 
-let private loadedTable : ArcTableLocation =
-    {
-        Scope = ArcTableScope.Assay
-        ParentIdentifier = "assay-1"
-        TableName = "assay-table"
-    }
+let private loadedTable: ArcTableLocation = {
+    Scope = ArcTableScope.Assay
+    ParentIdentifier = "assay-1"
+    TableName = "assay-table"
+}
 
 let private convertWithPreviousContext () =
     fromLoadedArc
@@ -227,7 +205,8 @@ let private expectText expected value =
 
 let tests =
     testList "ProvenanceGrouping ARCtrl converter" [
-        testCase "converts loaded input and output names into first-class sets" <| fun _ ->
+        testCase "converts loaded input and output names into first-class sets"
+        <| fun _ ->
             let result = convertWithPreviousContext ()
 
             let inputNames =
@@ -245,7 +224,8 @@ let tests =
             Expect.equal inputNames [ "sample-a"; "sample-b" ] "Loaded inputs should come from loaded input cells."
             Expect.equal outputNames [ "extract-a"; "extract-b" ] "Loaded outputs should come from loaded output cells."
 
-        testCase "omits previous context when IncludePreviousContext is false" <| fun _ ->
+        testCase "omits previous context when IncludePreviousContext is false"
+        <| fun _ ->
             let result = convertWithoutPreviousContext ()
 
             let previousValues =
@@ -258,9 +238,12 @@ let tests =
                 )
                 |> Seq.toList
 
-            Expect.isEmpty previousValues "No property values from non-loaded tables should appear when previous context is excluded."
+            Expect.isEmpty
+                previousValues
+                "No property values from non-loaded tables should appear when previous context is excluded."
 
-        testCase "converts loaded row input-to-output connections" <| fun _ ->
+        testCase "converts loaded row input-to-output connections"
+        <| fun _ ->
             let result = convertWithPreviousContext ()
 
             let connectionPairs =
@@ -281,7 +264,8 @@ let tests =
                 ]
                 "Each loaded row should produce a loaded input/output connection."
 
-        testCase "attaches loaded property values to loaded sets" <| fun _ ->
+        testCase "attaches loaded property values to loaded sets"
+        <| fun _ ->
             let result = convertWithPreviousContext ()
 
             let sampleA =
@@ -316,7 +300,8 @@ let tests =
             expectText "22" temperature.Value
             expectText "R1" replicate.Value
 
-        testCase "collapses previous table context into property values on loaded inputs" <| fun _ ->
+        testCase "collapses previous table context into property values on loaded inputs"
+        <| fun _ ->
             let result = convertWithPreviousContext ()
 
             let sampleA =
@@ -332,12 +317,26 @@ let tests =
 
             expectText "Plant" organism.Value
             let location = result.Index.PropertyValueLocations.[organism.Id]
-            Expect.equal location.Table.Scope ArcTableScope.Study "Collapsed previous value should remember study scope."
-            Expect.equal location.Table.ParentIdentifier "study-1" "Collapsed previous value should remember parent identifier."
-            Expect.equal location.Table.TableName "study-table" "Collapsed previous value should remember source table."
-            Expect.equal location.OutputNames [ "sample-a" ] "Collapsed previous value should remember where it pointed to."
 
-        testCase "collapses connected previous output property values into loaded input context" <| fun _ ->
+            Expect.equal
+                location.Table.Scope
+                ArcTableScope.Study
+                "Collapsed previous value should remember study scope."
+
+            Expect.equal
+                location.Table.ParentIdentifier
+                "study-1"
+                "Collapsed previous value should remember parent identifier."
+
+            Expect.equal location.Table.TableName "study-table" "Collapsed previous value should remember source table."
+
+            Expect.equal
+                location.OutputNames
+                [ "sample-a" ]
+                "Collapsed previous value should remember where it pointed to."
+
+        testCase "collapses connected previous output property values into loaded input context"
+        <| fun _ ->
             let result =
                 fromLoadedArc
                     {
@@ -357,24 +356,35 @@ let tests =
                 |> List.map (fun id -> result.Model.PropertyValues.[id])
 
             let tissue =
-                values
-                |> List.find (fun value -> value.Header.Category.Name = "Tissue")
+                values |> List.find (fun value -> value.Header.Category.Name = "Tissue")
 
-            let batch =
-                values
-                |> List.find (fun value -> value.Header.Category.Name = "Batch")
+            let batch = values |> List.find (fun value -> value.Header.Category.Name = "Batch")
 
             expectText "Leaf" tissue.Value
             expectText "B1" batch.Value
 
             let tissueLocation = result.Index.PropertyValueLocations.[tissue.Id]
-            Expect.equal tissueLocation.Table.Scope ArcTableScope.Study "Previous output characteristic should keep study scope."
-            Expect.equal tissueLocation.OutputNames [ "sample-a" ] "Previous output characteristic should keep the connected previous output name."
+
+            Expect.equal
+                tissueLocation.Table.Scope
+                ArcTableScope.Study
+                "Previous output characteristic should keep study scope."
+
+            Expect.equal
+                tissueLocation.OutputNames
+                [ "sample-a" ]
+                "Previous output characteristic should keep the connected previous output name."
 
             let batchLocation = result.Index.PropertyValueLocations.[batch.Id]
-            Expect.equal batchLocation.OutputNames [ "sample-a" ] "Previous output factor should keep the connected previous output name."
 
-        testCase "identical duplicate loaded values collapse to one model value and one representative writeback location" <| fun _ ->
+            Expect.equal
+                batchLocation.OutputNames
+                [ "sample-a" ]
+                "Previous output factor should keep the connected previous output name."
+
+        testCase
+            "identical duplicate loaded values collapse to one model value and one representative writeback location"
+        <| fun _ ->
             let result =
                 fromLoadedArc
                     {
@@ -397,9 +407,14 @@ let tests =
             Expect.equal temperatures.Length 1 "Equal duplicate loaded values should collapse into one model value."
 
             let writebackLocation = result.Index.PropertyValueLocations.[temperatures.Head.Id]
-            Expect.equal writebackLocation.Table.TableName "assay-table" "A representative writeback location should still be preserved."
 
-        testCase "collapsed previous-context duplicates keep one representative writeback slot" <| fun _ ->
+            Expect.equal
+                writebackLocation.Table.TableName
+                "assay-table"
+                "A representative writeback location should still be preserved."
+
+        testCase "collapsed previous-context duplicates keep one representative writeback slot"
+        <| fun _ ->
             let result =
                 fromLoadedArc
                     {
@@ -421,9 +436,13 @@ let tests =
 
             let location = result.Index.PropertyValueLocations.[organism.Id]
 
-            Expect.equal location.Table.TableName "study-table" "Collapsed previous-context duplicates should keep a representative source location."
+            Expect.equal
+                location.Table.TableName
+                "study-table"
+                "Collapsed previous-context duplicates should keep a representative source location."
 
-        testCase "keeps ARCtrl table locations in the sidecar index" <| fun _ ->
+        testCase "keeps ARCtrl table locations in the sidecar index"
+        <| fun _ ->
             let result = convertWithPreviousContext ()
 
             let sampleA =
@@ -435,30 +454,28 @@ let tests =
             let endpointLocation = result.Index.EndpointLocations.[sampleA.Id]
 
             Expect.equal endpointLocation.Table.Scope ArcTableScope.Assay "Loaded endpoint should remember assay scope."
-            Expect.equal endpointLocation.Table.ParentIdentifier "assay-1" "Loaded endpoint should remember assay identifier."
+
+            Expect.equal
+                endpointLocation.Table.ParentIdentifier
+                "assay-1"
+                "Loaded endpoint should remember assay identifier."
+
             Expect.equal endpointLocation.Table.TableName "assay-table" "Loaded endpoint should remember table name."
             Expect.equal endpointLocation.Name "sample-a" "Endpoint location should keep the actual loaded input name."
 
-        testCase "converts an input-only loaded table into loaded inputs without fake outputs or connections" <| fun _ ->
+        testCase "converts an input-only loaded table into loaded inputs without fake outputs or connections"
+        <| fun _ ->
             let assay =
-                ArcAssay.create (
-                    identifier = "assay-1",
-                    tables = ResizeArray [ inputOnlyAssayTable () ]
-                )
+                ArcAssay.create (identifier = "assay-1", tables = ResizeArray [ inputOnlyAssayTable () ])
 
             let arc =
-                ARC(
-                    identifier = "arc-1",
-                    studies = ResizeArray [],
-                    assays = ResizeArray [ assay ]
-                )
+                ARC(identifier = "arc-1", studies = ResizeArray [], assays = ResizeArray [ assay ])
 
-            let location : ArcTableLocation =
-                {
-                    Scope = ArcTableScope.Assay
-                    ParentIdentifier = "assay-1"
-                    TableName = "input-only-table"
-                }
+            let location: ArcTableLocation = {
+                Scope = ArcTableScope.Assay
+                ParentIdentifier = "assay-1"
+                TableName = "input-only-table"
+            }
 
             let result =
                 fromLoadedArc
@@ -478,26 +495,19 @@ let tests =
             Expect.equal result.Model.OutputSets.Count 0 "Missing output columns must not create synthetic output sets."
             Expect.equal result.Model.Connections.Count 0 "One-sided loaded tables must not synthesize connections."
 
-        testCase "converts an output-only loaded table into loaded outputs without fake inputs or connections" <| fun _ ->
+        testCase "converts an output-only loaded table into loaded outputs without fake inputs or connections"
+        <| fun _ ->
             let assay =
-                ArcAssay.create (
-                    identifier = "assay-1",
-                    tables = ResizeArray [ outputOnlyAssayTable () ]
-                )
+                ArcAssay.create (identifier = "assay-1", tables = ResizeArray [ outputOnlyAssayTable () ])
 
             let arc =
-                ARC(
-                    identifier = "arc-1",
-                    studies = ResizeArray [],
-                    assays = ResizeArray [ assay ]
-                )
+                ARC(identifier = "arc-1", studies = ResizeArray [], assays = ResizeArray [ assay ])
 
-            let location : ArcTableLocation =
-                {
-                    Scope = ArcTableScope.Assay
-                    ParentIdentifier = "assay-1"
-                    TableName = "output-only-table"
-                }
+            let location: ArcTableLocation = {
+                Scope = ArcTableScope.Assay
+                ParentIdentifier = "assay-1"
+                TableName = "output-only-table"
+            }
 
             let result =
                 fromLoadedArc
@@ -513,17 +523,21 @@ let tests =
                 |> List.map (fun (_, set) -> set.Name)
                 |> List.sort
 
-            Expect.equal outputNames [ "extract-a"; "extract-b" ] "Real output cells should still load as first-class sets."
+            Expect.equal
+                outputNames
+                [ "extract-a"; "extract-b" ]
+                "Real output cells should still load as first-class sets."
+
             Expect.equal result.Model.InputSets.Count 0 "Missing input columns must not create synthetic input sets."
             Expect.equal result.Model.Connections.Count 0 "One-sided loaded tables must not synthesize connections."
 
-        testCase "missing table lookup surfaces the ARCtrl exception instead of a converter-owned error DU" <| fun _ ->
-            let missing =
-                {
-                    Scope = ArcTableScope.Assay
-                    ParentIdentifier = "assay-1"
-                    TableName = "missing-table"
-                }
+        testCase "missing table lookup surfaces the ARCtrl exception instead of a converter-owned error DU"
+        <| fun _ ->
+            let missing = {
+                Scope = ArcTableScope.Assay
+                ParentIdentifier = "assay-1"
+                TableName = "missing-table"
+            }
 
             Expect.throws
                 (fun () ->
@@ -533,6 +547,7 @@ let tests =
                             IncludePreviousContext = false
                         }
                         (arcFixture ())
-                    |> ignore)
+                    |> ignore
+                )
                 "Missing table lookup should be delegated to ARCtrl."
     ]

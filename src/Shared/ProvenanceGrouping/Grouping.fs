@@ -2,10 +2,7 @@ module Swate.Components.Shared.ProvenanceGrouping.Grouping
 
 open Swate.Components.Shared.ProvenanceGrouping.Types
 
-type GroupingKey =
-    {
-        Header: ProvenancePropertyHeader
-    }
+type GroupingKey = { Header: ProvenancePropertyHeader }
 
 [<RequireQualifiedAccess>]
 type GroupingScope =
@@ -13,45 +10,39 @@ type GroupingScope =
     | Output
     | Both
 
-type GroupingAssignment =
-    {
-        Key: GroupingKey
-        Scope: GroupingScope
-    }
+type GroupingAssignment = {
+    Key: GroupingKey
+    Scope: GroupingScope
+}
 
-type DisplayMember =
-    {
-        SetId: ProvenanceSetId
-        Name: string
-        PropertyValueIds: ProvenancePropertyValueId list
-    }
+type DisplayMember = {
+    SetId: ProvenanceSetId
+    Name: string
+    PropertyValueIds: ProvenancePropertyValueId list
+}
 
-type DisplayGroupingValue =
-    {
-        Key: GroupingKey
-        Value: ProvenanceValue
-        Unit: ProvenanceTerm option
-    }
+type DisplayGroupingValue = {
+    Key: GroupingKey
+    Value: ProvenanceValue
+    Unit: ProvenanceTerm option
+}
 
-type DisplayGroup =
-    {
-        Id: string
-        TableName: ProvenanceTableName
-        Side: ProvenanceSide
-        GroupingValues: DisplayGroupingValue list
-        Members: DisplayMember list
-    }
+type DisplayGroup = {
+    Id: string
+    TableName: ProvenanceTableName
+    Side: ProvenanceSide
+    GroupingValues: DisplayGroupingValue list
+    Members: DisplayMember list
+}
 
-type DisplayConnection =
-    {
-        Id: string
-        SourceGroupId: string
-        TargetGroupId: string
-        ConnectionIds: ProvenanceConnectionId list
-    }
+type DisplayConnection = {
+    Id: string
+    SourceGroupId: string
+    TargetGroupId: string
+    ConnectionIds: ProvenanceConnectionId list
+}
 
-let private mapValues map =
-    map |> Map.toList |> List.map snd
+let private mapValues map = map |> Map.toList |> List.map snd
 
 let valueText (value: ProvenanceValue) (unit: ProvenanceTerm option) =
     let text =
@@ -79,7 +70,8 @@ let private groupingValuesText keyValueSeparator keySeparator values =
             |> List.map (fun groupingValue -> valueText groupingValue.Value groupingValue.Unit)
             |> String.concat " | "
 
-        sprintf "%s%s%s" key.Header.Category.Name keyValueSeparator valuesText)
+        sprintf "%s%s%s" key.Header.Category.Name keyValueSeparator valuesText
+    )
     |> String.concat keySeparator
 
 let private sideText side =
@@ -116,14 +108,14 @@ let private valueSetForKey key propertyValues : GroupingValue list list =
             propertyValues
             |> List.map (fun propertyValue -> propertyValue.Id)
             |> List.distinct
-            |> List.sort)
+            |> List.sort
+        )
         |> List.sortBy (fun (_, value, unit, _) -> valueText value unit)
 
     if values.IsEmpty then [] else [ values ]
 
 let private valuesForKey model set key =
-    setPropertyValues model set
-    |> valueSetForKey key
+    setPropertyValues model set |> valueSetForKey key
 
 let private combineValueSets key valueSets : GroupingValue list list =
     let values =
@@ -137,10 +129,8 @@ let private combineValueSets key valueSets : GroupingValue list list =
                 |> List.distinct
                 |> List.sort
 
-            key,
-            value,
-            unit,
-            propertyValueIds)
+            key, value, unit, propertyValueIds
+        )
         |> List.sortBy (fun (_, value, unit, _) -> valueText value unit)
 
     if values.IsEmpty then [] else [ values ]
@@ -148,7 +138,10 @@ let private combineValueSets key valueSets : GroupingValue list list =
 let private connectedOutputSets model inputSetId =
     model.Connections
     |> mapValues
-    |> List.filter (fun connection -> connection.TableName = model.LoadedTableName && connection.InputSetId = inputSetId)
+    |> List.filter (fun connection ->
+        connection.TableName = model.LoadedTableName
+        && connection.InputSetId = inputSetId
+    )
     |> List.choose (fun connection -> model.OutputSets.TryFind connection.OutputSetId)
     |> List.filter (fun set -> set.TableName = model.LoadedTableName)
 
@@ -176,42 +169,43 @@ let private normalizeAssignments side assignments =
     |> List.groupBy (fun assignment -> assignment.Key)
     |> List.map (fun (key, grouped) ->
         if grouped |> List.exists (fun assignment -> assignment.Scope = GroupingScope.Both) then
-            { Key = key; Scope = GroupingScope.Both }
+            {
+                Key = key
+                Scope = GroupingScope.Both
+            }
         else
-            grouped.Head)
+            grouped.Head
+    )
 
 let private valuesForAssignment model side set assignment =
     match side, assignment.Scope with
     | ProvenanceSide.Input, GroupingScope.Both ->
         let ownValues = valuesForKey model set assignment.Key
-        if ownValues.IsEmpty then inheritedOutputValuesForKey model set.Id assignment.Key
-        else ownValues
+
+        if ownValues.IsEmpty then
+            inheritedOutputValuesForKey model set.Id assignment.Key
+        else
+            ownValues
     | _ -> valuesForKey model set assignment.Key
 
 let private combinations values =
     let rec loop collected remaining =
         match remaining with
         | [] -> [ List.rev collected ]
-        | head :: tail ->
-            head
-            |> List.collect (fun value -> loop (value :: collected) tail)
+        | head :: tail -> head |> List.collect (fun value -> loop (value :: collected) tail)
 
     loop [] values
 
-let private displayMember (set: ProvenanceSet) propertyValueIds =
-    {
-        SetId = set.Id
-        Name = set.Name
-        PropertyValueIds = propertyValueIds |> List.distinct
-    }
+let private displayMember (set: ProvenanceSet) propertyValueIds = {
+    SetId = set.Id
+    Name = set.Name
+    PropertyValueIds = propertyValueIds |> List.distinct
+}
 
 let private groupId side (values: DisplayGroupingValue list) fallbackSetId =
     match values with
     | [] -> sprintf "%s:%s" (sideText side) fallbackSetId
-    | _ ->
-        values
-        |> groupingValuesText "=" "|"
-        |> sprintf "%s:%s" (sideText side)
+    | _ -> values |> groupingValuesText "=" "|" |> sprintf "%s:%s" (sideText side)
 
 let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
     let sets = loadedSets model side
@@ -220,38 +214,43 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
     match assignments with
     | [] ->
         sets
-        |> List.map (fun set ->
-            {
-                Id = groupId side [] set.Id
-                TableName = set.TableName
-                Side = side
-                GroupingValues = []
-                Members = [ displayMember set (ProvenanceSet.effectivePropertyValueIds set) ]
-            })
-    | activeAssignments ->
-        let grouped =
-            [
-                for set in sets do
-                    let keyValues =
-                        activeAssignments
-                        |> List.map (valuesForAssignment model side set)
-
-                    if keyValues |> List.exists List.isEmpty then
-                        yield groupId side [] set.Id, set.TableName, [], displayMember set (ProvenanceSet.effectivePropertyValueIds set)
-                    else
-                        for combination in combinations keyValues do
-                            let groupingValues =
-                                combination
-                                |> List.collect id
-                                |> List.map (fun (key, value, unit, _) ->
-                                    {
-                                        Key = key
-                                        Value = value
-                                        Unit = unit
-                                    })
-
-                            yield groupId side groupingValues set.Id, set.TableName, groupingValues, displayMember set (ProvenanceSet.effectivePropertyValueIds set)
+        |> List.map (fun set -> {
+            Id = groupId side [] set.Id
+            TableName = set.TableName
+            Side = side
+            GroupingValues = []
+            Members = [
+                displayMember set (ProvenanceSet.effectivePropertyValueIds set)
             ]
+        })
+    | activeAssignments ->
+        let grouped = [
+            for set in sets do
+                let keyValues = activeAssignments |> List.map (valuesForAssignment model side set)
+
+                if keyValues |> List.exists List.isEmpty then
+                    yield
+                        groupId side [] set.Id,
+                        set.TableName,
+                        [],
+                        displayMember set (ProvenanceSet.effectivePropertyValueIds set)
+                else
+                    for combination in combinations keyValues do
+                        let groupingValues =
+                            combination
+                            |> List.collect id
+                            |> List.map (fun (key, value, unit, _) -> {
+                                Key = key
+                                Value = value
+                                Unit = unit
+                            })
+
+                        yield
+                            groupId side groupingValues set.Id,
+                            set.TableName,
+                            groupingValues,
+                            displayMember set (ProvenanceSet.effectivePropertyValueIds set)
+        ]
 
         grouped
         |> List.groupBy (fun (groupId, _, _, _) -> groupId)
@@ -267,7 +266,8 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
                     groupedMembers
                     |> List.map (fun (_, _, _, member') -> member')
                     |> List.sortBy (fun member' -> member'.Name, member'.SetId)
-            })
+            }
+        )
         |> List.sortBy (fun group -> group.Id)
 
 let displayGroups (model: ProvenanceModel) side groupingKeys =
@@ -293,20 +293,21 @@ let displayConnections (model: ProvenanceModel) inputGroups outputGroups =
         |> mapValues
         |> List.filter (fun connection -> connection.TableName = model.LoadedTableName)
         |> List.collect (fun connection ->
-            match inputGroupBySetId.TryFind connection.InputSetId, outputGroupBySetId.TryFind connection.OutputSetId with
-            | Some inputGroupIds, Some outputGroupIds ->
-                [
-                    for inputGroupId in inputGroupIds do
-                        for outputGroupId in outputGroupIds do
-                            yield (inputGroupId, outputGroupId), connection.Id
-                ]
-            | _ -> [])
+            match
+                inputGroupBySetId.TryFind connection.InputSetId, outputGroupBySetId.TryFind connection.OutputSetId
+            with
+            | Some inputGroupIds, Some outputGroupIds -> [
+                for inputGroupId in inputGroupIds do
+                    for outputGroupId in outputGroupIds do
+                        yield (inputGroupId, outputGroupId), connection.Id
+              ]
+            | _ -> []
+        )
         |> List.groupBy fst
-        |> List.map (fun ((inputGroupId, outputGroupId), grouped) ->
-            {
-                Id = sprintf "%s-to-%s" inputGroupId outputGroupId
-                SourceGroupId = inputGroupId
-                TargetGroupId = outputGroupId
-                ConnectionIds = grouped |> List.map snd |> List.distinct |> List.sort
-            })
+        |> List.map (fun ((inputGroupId, outputGroupId), grouped) -> {
+            Id = sprintf "%s-to-%s" inputGroupId outputGroupId
+            SourceGroupId = inputGroupId
+            TargetGroupId = outputGroupId
+            ConnectionIds = grouped |> List.map snd |> List.distinct |> List.sort
+        })
         |> List.sortBy (fun connection -> connection.Id)

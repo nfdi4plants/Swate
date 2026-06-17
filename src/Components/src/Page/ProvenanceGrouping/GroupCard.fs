@@ -22,17 +22,35 @@ module private EntityType =
         let contains (token: string) = id.Contains token
 
         if contains "endpoint:source" then
-            { Label = "Source"; Icon = "swt:fluent--branch-fork-20-regular" }
+            {
+                Label = "Source"
+                Icon = "swt:fluent--branch-fork-20-regular"
+            }
         elif contains "endpoint:sample" then
-            { Label = "Sample"; Icon = "swt:fluent--beaker-20-regular" }
+            {
+                Label = "Sample"
+                Icon = "swt:fluent--beaker-20-regular"
+            }
         elif contains "endpoint:data" then
-            { Label = "File"; Icon = "swt:fluent--document-20-regular" }
+            {
+                Label = "File"
+                Icon = "swt:fluent--document-20-regular"
+            }
         elif contains "endpoint:material" then
-            { Label = "Material"; Icon = "swt:fluent--cube-20-regular" }
+            {
+                Label = "Material"
+                Icon = "swt:fluent--cube-20-regular"
+            }
         elif contains "endpoint:free-text" then
-            { Label = ProvenanceKind.displayName kind; Icon = "swt:fluent--text-field-20-regular" }
+            {
+                Label = ProvenanceKind.displayName kind
+                Icon = "swt:fluent--text-field-20-regular"
+            }
         else
-            { Label = ProvenanceKind.displayName kind; Icon = "swt:fluent--tag-20-regular" }
+            {
+                Label = ProvenanceKind.displayName kind
+                Icon = "swt:fluent--tag-20-regular"
+            }
 
     /// Small type line shown above an entity name.
     let line (descriptor: Descriptor) =
@@ -76,7 +94,8 @@ module private GroupCardData =
         group.GroupingValues
         |> List.sortBy (fun value ->
             $"{value.Key.Header.Kind.Id}:{value.Key.Header.Category.Name}",
-            Formatting.formatValue value.Value value.Unit)
+            Formatting.formatValue value.Value value.Unit
+        )
 
     let title (group: DisplayGroup) =
         match tabs group with
@@ -84,7 +103,8 @@ module private GroupCardData =
         | tabs ->
             tabs
             |> List.map (fun value ->
-                $"{value.Key.Header.Category.Name}: {Formatting.formatValue value.Value value.Unit}")
+                $"{value.Key.Header.Category.Name}: {Formatting.formatValue value.Value value.Unit}"
+            )
             |> String.concat ", "
 
 /// Thin ResizeObserver binding used to re-check whether a tab's header still fits.
@@ -106,12 +126,9 @@ module private TabText =
     let splitInitial (text: string) =
         let trimmed = text.Trim()
 
-        if trimmed.Length = 0 then
-            "", ""
-        elif trimmed.Length = 1 then
-            trimmed, ""
-        else
-            trimmed.Substring(0, 1), trimmed.Substring(1)
+        if trimmed.Length = 0 then "", ""
+        elif trimmed.Length = 1 then trimmed, ""
+        else trimmed.Substring(0, 1), trimmed.Substring(1)
 
 type private OrganizerTabMode =
     | Responsive
@@ -147,8 +164,7 @@ type GroupCard =
 
         let measure () =
             match fullLabelRef.current with
-            | Some fullLabel ->
-                setShowHeader (fullLabel.scrollWidth <= fullLabel.clientWidth + 1.0)
+            | Some fullLabel -> setShowHeader (fullLabel.scrollWidth <= fullLabel.clientWidth + 1.0)
             | _ -> ()
 
         React.useEffectOnce (fun () ->
@@ -159,11 +175,11 @@ type GroupCard =
             | Some element -> TabObserver.observe observer element
             | None -> ()
 
-            FsReact.createDisposable (fun () -> TabObserver.disconnect observer))
+            FsReact.createDisposable (fun () -> TabObserver.disconnect observer)
+        )
 
         Html.span [
-            prop.ref (fun element ->
-                tabRef.current <- (if isNull element then None else Some(unbox element)))
+            prop.ref (fun element -> tabRef.current <- (if isNull element then None else Some(unbox element)))
             prop.role.button
             prop.tabIndex 0
             prop.title label
@@ -177,7 +193,8 @@ type GroupCard =
             prop.onKeyDown (fun (event: Browser.Types.KeyboardEvent) ->
                 if event.key = "Enter" || event.key = " " then
                     event.preventDefault ()
-                    onToggleFocus ())
+                    onToggleFocus ()
+            )
             prop.onMouseEnter (fun _ -> setHighlighted true)
             prop.onMouseLeave (fun _ -> setHighlighted false)
             prop.onFocus (fun _ -> setHighlighted true)
@@ -205,9 +222,11 @@ type GroupCard =
                 // fits in the actual visible tab width.
                 Html.span [
                     prop.ref (fun element ->
-                        fullLabelRef.current <- (if isNull element then None else Some(unbox element)))
+                        fullLabelRef.current <- (if isNull element then None else Some(unbox element))
+                    )
                     prop.ariaHidden true
-                    prop.className "swt:pointer-events-none swt:absolute swt:inset-0 swt:invisible swt:flex swt:items-baseline swt:overflow-visible swt:px-3 swt:py-1"
+                    prop.className
+                        "swt:pointer-events-none swt:absolute swt:inset-0 swt:invisible swt:flex swt:items-baseline swt:overflow-visible swt:px-3 swt:py-1"
                     prop.children [
                         Html.span [
                             prop.className "swt:mr-1 swt:shrink-0"
@@ -223,10 +242,7 @@ type GroupCard =
                 Html.span [
                     prop.className [
                         "swt:absolute swt:inset-0 swt:flex swt:items-baseline swt:py-1"
-                        if isCollapsed then
-                            "swt:px-2"
-                        else
-                            "swt:px-3"
+                        if isCollapsed then "swt:px-2" else "swt:px-3"
                     ]
                     prop.children [
                         if isCollapsed then
@@ -234,6 +250,7 @@ type GroupCard =
                                 prop.className "swt:shrink-0 swt:font-medium"
                                 prop.text collapsedInitial
                             ]
+
                             if collapsedRemainder.Length > 0 then
                                 Html.span [
                                     prop.className "swt:min-w-0 swt:truncate swt:font-medium"
@@ -245,6 +262,7 @@ type GroupCard =
                                     prop.className "swt:mr-1 swt:shrink-0"
                                     prop.text $"{category}:"
                                 ]
+
                             Html.span [
                                 prop.className [
                                     "swt:font-medium"
@@ -275,7 +293,9 @@ type GroupCard =
             ?debug: bool,
             ?key: string
         ) =
-        let hoveredMemberId, setHoveredMemberId = React.useState<ProvenanceSetId option> None
+        let hoveredMemberId, setHoveredMemberId =
+            React.useState<ProvenanceSetId option> None
+
         let hoveredTabIndex, setHoveredTabIndex = React.useState<int option> None
         let focusedTabIndex, setFocusedTabIndex = React.useStateWithUpdater<int option> None
         let articleRef = React.useElementRef ()
@@ -297,7 +317,8 @@ type GroupCard =
             setFocusedTabIndex (fun current ->
                 match current with
                 | Some focused when focused = index -> None
-                | _ -> Some index)
+                | _ -> Some index
+            )
 
         let setArticleRef element =
             articleRef.current <- (if isNull element then None else Some(unbox element))
@@ -333,21 +354,19 @@ type GroupCard =
                 "swt:absolute swt:top-1/2 swt:left-0 swt:-translate-x-1/2 swt:-translate-y-1/2 swt:z-10",
                 "swt:top-1/2 swt:right-0 swt:translate-x-1/2 swt:-translate-y-1/2"
 
-        let groupHandle : ConnectionHandleRef =
-            {
-                Kind = ConnectionHandleKind.GroupCard
-                Side = side
-                Id = group.Id
-                ParentGroupId = None
-            }
+        let groupHandle: ConnectionHandleRef = {
+            Kind = ConnectionHandleKind.GroupCard
+            Side = side
+            Id = group.Id
+            ParentGroupId = None
+        }
 
-        let propertyAnchor : ConnectionHandleRef =
-            {
-                Kind = ConnectionHandleKind.GroupPropertyAnchor
-                Side = side
-                Id = group.Id
-                ParentGroupId = None
-            }
+        let propertyAnchor: ConnectionHandleRef = {
+            Kind = ConnectionHandleKind.GroupPropertyAnchor
+            Side = side
+            Id = group.Id
+            ParentGroupId = None
+        }
 
         let memberDetailsPosition =
             match side with
@@ -455,7 +474,8 @@ type GroupCard =
                         group.Members
                         |> List.choose (fun member' ->
                             GroupCardData.endpointKind side model member'.SetId
-                            |> Option.map EntityType.descriptor)
+                            |> Option.map EntityType.descriptor
+                        )
 
                     let maxInlineSymbols = 4
 
@@ -490,8 +510,7 @@ type GroupCard =
                                     for index, groupingValue in List.indexed tabs do
                                         let category = groupingValue.Key.Header.Category.Name
 
-                                        let valueText =
-                                            Formatting.formatValue groupingValue.Value groupingValue.Unit
+                                        let valueText = Formatting.formatValue groupingValue.Value groupingValue.Unit
 
                                         let tabMode =
                                             match focusedTabIndex with
@@ -505,9 +524,8 @@ type GroupCard =
                                             tabPalette.[index % tabPalette.Length],
                                             (hoveredTabIndex = Some index || focusedTabIndex = Some index),
                                             (fun highlighted ->
-                                                setHoveredTabIndex (
-                                                    if highlighted then Some index else None
-                                                )),
+                                                setHoveredTabIndex (if highlighted then Some index else None)
+                                            ),
                                             tabMode,
                                             (fun () -> toggleFocusedTab index),
                                             ?testId =
@@ -561,8 +579,7 @@ type GroupCard =
 
                                                         let icon =
                                                             descriptors
-                                                            |> List.find (fun descriptor ->
-                                                                descriptor.Label = dominant)
+                                                            |> List.find (fun descriptor -> descriptor.Label = dominant)
 
                                                         symbolIcon icon
                                                         countLabel descriptors.Length
@@ -581,6 +598,7 @@ type GroupCard =
                             ]
                         ]
                     ]
+
                 if expanded then
                     Html.ul [
                         prop.className [
@@ -593,13 +611,13 @@ type GroupCard =
                             for member' in group.Members do
                                 let memberValues = GroupCardData.memberValues member' model
                                 let isHovered = hoveredMemberId = Some member'.SetId
-                                let memberHandle : ConnectionHandleRef =
-                                    {
-                                        Kind = ConnectionHandleKind.GroupMember
-                                        Side = side
-                                        Id = member'.SetId
-                                        ParentGroupId = Some group.Id
-                                    }
+
+                                let memberHandle: ConnectionHandleRef = {
+                                    Kind = ConnectionHandleKind.GroupMember
+                                    Side = side
+                                    Id = member'.SetId
+                                    ParentGroupId = Some group.Id
+                                }
 
                                 Html.li [
                                     prop.className "swt:relative"
@@ -616,7 +634,8 @@ type GroupCard =
                                                 Html.div [
                                                     prop.tabIndex 0
                                                     prop.ariaLabel $"Show values for {member'.Name}"
-                                                    prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5 swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
+                                                    prop.className
+                                                        "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5 swt:rounded-md swt:px-2 swt:py-1 swt:outline-none swt:transition-colors hover:swt:bg-base-200 focus:swt:bg-base-200 focus:swt:ring-2 focus:swt:ring-primary/40"
                                                     if defaultArg debug false then
                                                         prop.testId $"provenance-group-member-{side}-{member'.SetId}"
                                                     prop.onMouseEnter (fun _ -> setHoveredMemberId (Some member'.SetId))
@@ -663,7 +682,11 @@ type GroupCard =
                                                             prop.className "swt:flex swt:flex-wrap swt:gap-1"
                                                             prop.children [
                                                                 for value in memberValues do
-                                                                    Controls.ValueLabel(value, key = $"member:{member'.SetId}:{DragDrop.propertyValueIdentity value}")
+                                                                    Controls.ValueLabel(
+                                                                        value,
+                                                                        key =
+                                                                            $"member:{member'.SetId}:{DragDrop.propertyValueIdentity value}"
+                                                                    )
                                                             ]
                                                         ]
                                                 ]
