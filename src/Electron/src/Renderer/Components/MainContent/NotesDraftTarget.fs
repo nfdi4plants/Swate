@@ -26,22 +26,18 @@ let NotesDraftTarget () =
             (fun _ ->
                 createAvailableArcEntityTargets
                     [
-                        (
-                            ARCtrl.ArcPathHelper.StudiesFolderName,
-                            ARCtrl.ArcPathHelper.StudyFileName,
-                            fun name -> {
-                                Name = name
-                                Kind = NotesTargetKind.Study
-                            }
-                        )
-                        (
-                            ARCtrl.ArcPathHelper.AssaysFolderName,
-                            ARCtrl.ArcPathHelper.AssayFileName,
-                            fun name -> {
-                                Name = name
-                                Kind = NotesTargetKind.Assay
-                            }
-                        )
+                        (ARCtrl.ArcPathHelper.StudiesFolderName,
+                         ARCtrl.ArcPathHelper.StudyFileName,
+                         fun name -> {
+                             Name = name
+                             Kind = NotesTargetKind.Study
+                         })
+                        (ARCtrl.ArcPathHelper.AssaysFolderName,
+                         ARCtrl.ArcPathHelper.AssayFileName,
+                         fun name -> {
+                             Name = name
+                             Kind = NotesTargetKind.Assay
+                         })
                     ]
                     fileStateCtx.state.FileTree
             ),

@@ -55,7 +55,8 @@ let writeFileWithEnsuredChildFolder
     (createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>)
     (tryGetParentPath: string -> string option)
     (folderName: string)
-    (request: FileContentDTO) =
+    (request: FileContentDTO)
+    =
     promise {
         match! writeFile request with
         | Error error -> return Error error

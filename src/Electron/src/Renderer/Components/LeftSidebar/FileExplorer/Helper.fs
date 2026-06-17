@@ -132,6 +132,19 @@ let canCreateFileSystemItemIn (item: FileItem) =
             || ArcEntityPathRules.isGenericFileSystemParentAllowed path
         ))
 
+let rootFolderContextMenuItems
+    (rootFolderName: string)
+    (label: string)
+    (icon: string)
+    (onClick: unit -> unit)
+    (item: FileItem)
+    =
+    let isMatchingRootFolder (item: FileItem) =
+        item.IsDirectory
+        && (tryGetItemRelativePath item |> Option.exists (isRootFolderPath rootFolderName))
+
+    ContextMenuItem.whenItem isMatchingRootFolder label icon (fun _ -> onClick ()) item
+
 let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
 
 let fileSystemCreateKindLabel =

@@ -256,6 +256,52 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "moves generic files into descendant paths",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceFile = "notes/raw"
+                    let targetFile = "notes/raw/archive/raw.txt"
+
+                    do! createRelativeDirectoryAsync arcPath "notes"
+                    do! writeRelativeFileAsync arcPath sourceFile "raw"
+
+                    do! moveItemOrFail arcPath (moveRequest sourceFile targetFile false)
+
+                    let! sourceFileStillExists =
+                        ARCtrl.FileSystemHelper.fileExistsAsync (absoluteArcPath arcPath sourceFile)
+
+                    let! sourcePathIsDirectory =
+                        ARCtrl.FileSystemHelper.directoryExistsAsync (absoluteArcPath arcPath sourceFile)
+
+                    Vitest.expect(sourceFileStillExists).toBe (false)
+                    Vitest.expect(sourcePathIsDirectory).toBe (true)
+                    do! expectRelativePathExists arcPath targetFile true
+                })
+        )
+
+        Vitest.test (
+            "rejects moving generic folders into descendant paths",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceFolder = "notes/folder"
+                    let targetFolder = "notes/folder/archive/folder"
+
+                    do! createRelativeDirectoryAsync arcPath sourceFolder
+
+                    match!
+                        ArcFileSystemHelper.moveGenericFileSystemItemOnDisk
+                            arcPath
+                            (moveRequest sourceFolder targetFolder false)
+                    with
+                    | Ok() -> failwith "Expected moving a folder into itself to fail."
+                    | Error error -> Vitest.expect(error.Message).toContain ("inside the source path")
+
+                    do! expectRelativePathExists arcPath sourceFolder true
+                    do! expectRelativePathExists arcPath targetFolder false
+                })
+        )
+
+        Vitest.test (
             "retries transient recursive remove errors",
             fun () -> promise {
                 let mutable attempts = 0

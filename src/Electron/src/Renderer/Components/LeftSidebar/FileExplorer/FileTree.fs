@@ -17,7 +17,6 @@ open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Types
 open Helper
 open FileTreeMaterialization
-open RootNoteHelper
 
 module private FileTreeHelper =
 
@@ -372,7 +371,13 @@ type FileTree =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
         let itemActions item = [
-            yield! rootNoteActionContextMenuItems (fun () -> openCreateModal ArcExplorerNodeKind.Note) item
+            yield!
+                rootFolderContextMenuItems
+                    "notes"
+                    "Create new item in"
+                    "swt:fluent--note-add-24-regular"
+                    (fun () -> openCreateModal ArcExplorerNodeKind.Note)
+                    item
             yield! renameContextMenuItems item
         ]
 

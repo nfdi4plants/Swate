@@ -1,7 +1,6 @@
 module ElectronRenderer.FileTreeContextMenuTests
 
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
-open Renderer.Components.LeftSidebar.FileExplorer.RootNoteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
@@ -60,6 +59,9 @@ let private groupedLabels items =
             item.Label
     )
     |> List.toArray
+
+let private rootNotesActionContextMenuItems =
+    rootFolderContextMenuItems "notes" "Create new item in" "swt:fluent--note-add-24-regular"
 
 Vitest.describe (
     "FileTreeContextMenu",
@@ -227,7 +229,7 @@ Vitest.describe (
                 let mutable didRequestNote = false
 
                 let menuItems =
-                    rootNoteActionContextMenuItems (fun () -> didRequestNote <- true) item
+                    rootNotesActionContextMenuItems (fun () -> didRequestNote <- true) item
 
                 Vitest.expect(labels menuItems).toEqual ([| "Create new item in" |])
                 Vitest.expect(menuItems.Head.Icon).toBe ("swt:fluent--note-add-24-regular")
@@ -241,7 +243,7 @@ Vitest.describe (
             "root notes action is hidden for nested notes folders",
             fun () ->
                 let item = createFolderItem "2026-06-15" (Some "notes/2026-06-15")
-                let menuItems = rootNoteActionContextMenuItems ignore item
+                let menuItems = rootNotesActionContextMenuItems ignore item
 
                 Vitest.expect(menuItems.Length).toBe (0)
         )
