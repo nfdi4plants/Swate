@@ -91,7 +91,7 @@ function Harness({
 }
 
 const meta = {
-  title: 'Composite Components/ProvenanceGrouping',
+  title: 'Page Components/ProvenanceGrouping',
   component: ProvenanceGrouping,
   tags: ['autodocs'],
   parameters: { layout: 'fullscreen', isolated: true },

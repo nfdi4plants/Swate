@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.ProvenanceGrouping
+namespace Swate.Components.Page.ProvenanceGrouping
 
 /// Formatting helpers for provenance values rendered in labels, chips, and sort keys.
 module Formatting =
@@ -71,7 +71,7 @@ module Styles =
 module DragDrop =
 
     open Swate.Components.Shared.ProvenanceGrouping.Types
-    open Swate.Components.Composite.ProvenanceGrouping.Types
+    open Swate.Components.Page.ProvenanceGrouping.Types
 
     let private encode (value: string) = System.Uri.EscapeDataString value
     let private decode (value: string) = System.Uri.UnescapeDataString value
@@ -202,7 +202,7 @@ module DragDrop =
 /// repaint the overlay layer that needs the live path.
 module LiveDrag =
 
-    open Swate.Components.Composite.ProvenanceGrouping.Types
+    open Swate.Components.Page.ProvenanceGrouping.Types
 
     type Store = {
         mutable Current: LiveConnectionDrag option
@@ -246,7 +246,7 @@ module LiveDrag =
 module ConnectionRouting =
 
     open Swate.Components.Shared.ProvenanceGrouping.Types
-    open Swate.Components.Composite.ProvenanceGrouping.Types
+    open Swate.Components.Page.ProvenanceGrouping.Types
 
     type ConnectionAction =
         | ConnectGroups of inputGroupId: string * outputGroupId: string
@@ -313,7 +313,7 @@ module PropertyRails =
 
     open Swate.Components.Shared.ProvenanceGrouping.Types
     open Swate.Components.Shared.ProvenanceGrouping.Grouping
-    open Swate.Components.Composite.ProvenanceGrouping.Types
+    open Swate.Components.Page.ProvenanceGrouping.Types
 
     type RailProjection = {
         Headers: ProvenancePropertyHeader list
@@ -476,7 +476,7 @@ module Display =
     open Swate.Components.Shared.ProvenanceGrouping.Types
     open Swate.Components.Shared.ProvenanceGrouping.Grouping
     open Swate.Components.Shared.ProvenanceGrouping.Session
-    open Swate.Components.Composite.ProvenanceGrouping.Types
+    open Swate.Components.Page.ProvenanceGrouping.Types
 
     let displayPair session uiState =
         let pair = Session.activePair session
@@ -524,7 +524,7 @@ module ValueAssignment =
     open Swate.Components.Shared.ProvenanceGrouping.Types
     open Swate.Components.Shared.ProvenanceGrouping.Edit
     open Swate.Components.Shared.ProvenanceGrouping.Grouping
-    open Swate.Components.Composite.ProvenanceGrouping.Types
+    open Swate.Components.Page.ProvenanceGrouping.Types
 
     let private targetForGroup side (group: DisplayGroup) =
         let ids = group.Members |> List.map (fun m -> m.SetId)

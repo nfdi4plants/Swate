@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.ProvenanceGrouping
+namespace Swate.Components.Page.ProvenanceGrouping
 
 open Fable.Core
 open Fable.Core.JsInterop
@@ -9,7 +9,7 @@ open Swate.Components.Shared.ProvenanceGrouping.Grouping
 open Swate.Components.Shared.ProvenanceGrouping.Session
 open Swate.Components.Primitive.ContextMenu
 open Swate.Components.Primitive.ContextMenu.Types
-open Swate.Components.Composite.ProvenanceGrouping.Types
+open Swate.Components.Page.ProvenanceGrouping.Types
 
 type private MeasuredConnector = {
     Key: string

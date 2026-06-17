@@ -1,4 +1,4 @@
-module Swate.Components.Composite.ProvenanceGrouping.Types
+module Swate.Components.Page.ProvenanceGrouping.Types
 
 open Fable.Core
 open Swate.Components.Shared.ProvenanceGrouping.Types

@@ -4,7 +4,7 @@ open Fable.Core
 open Feliz
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Session
-open Swate.Components.Composite.ProvenanceGrouping.Types
+open Swate.Components.Page.ProvenanceGrouping.Types
 open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 
 module ProvenanceGroupingTargetHelper =
@@ -15,34 +15,31 @@ module ProvenanceGroupingTargetHelper =
         | ProvenanceTableScopeDto.Assay -> "Assay"
         | ProvenanceTableScopeDto.Run -> "Run"
 
-    let buttonClasses isSelected =
-        [
-            "swt:btn swt:btn-sm swt:justify-start swt:w-full"
-            if isSelected then "swt:btn-primary" else "swt:btn-ghost"
-        ]
+    let buttonClasses isSelected = [
+        "swt:btn swt:btn-sm swt:justify-start swt:w-full"
+        if isSelected then "swt:btn-primary" else "swt:btn-ghost"
+    ]
 
-type private LoadState =
-    {
-        Tables: ProvenanceTableSelectionDto[]
-        Selected: ProvenanceTableSelectionDto option
-        Session: ProvenanceSession option
-        Warnings: string list
-        Patches: ProvenanceTablePatch list
-        IsLoading: bool
-        Error: string option
-    }
+type private LoadState = {
+    Tables: ProvenanceTableSelectionDto[]
+    Selected: ProvenanceTableSelectionDto option
+    Session: ProvenanceSession option
+    Warnings: string list
+    Patches: ProvenanceTablePatch list
+    IsLoading: bool
+    Error: string option
+}
 
 module private LoadState =
-    let init =
-        {
-            Tables = [||]
-            Selected = None
-            Session = None
-            Warnings = []
-            Patches = []
-            IsLoading = true
-            Error = None
-        }
+    let init = {
+        Tables = [||]
+        Selected = None
+        Session = None
+        Warnings = []
+        Patches = []
+        IsLoading = true
+        Error = None
+    }
 
 [<ReactComponent>]
 let private WarningList (warnings: string list) =
@@ -52,7 +49,9 @@ let private WarningList (warnings: string list) =
         Html.div [
             prop.className "swt:alert swt:alert-warning swt:items-start"
             prop.children [
-                Html.i [ prop.className "swt:iconify swt:fluent--warning-20-regular swt:size-5" ]
+                Html.i [
+                    prop.className "swt:iconify swt:fluent--warning-20-regular swt:size-5"
+                ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
                     prop.children [
@@ -76,99 +75,111 @@ let ProvenanceGroupingTarget () =
     let loadSelection =
         React.useCallback (
             (fun (selection: ProvenanceTableSelectionDto) ->
-                setState (fun current ->
-                    {
-                        current with
-                            Selected = Some selection
-                            Session = None
-                            Warnings = []
-                            Patches = []
-                            IsLoading = true
-                            Error = None
-                    })
+                setState (fun current -> {
+                    current with
+                        Selected = Some selection
+                        Session = None
+                        Warnings = []
+                        Patches = []
+                        IsLoading = true
+                        Error = None
+                })
 
                 promise {
                     match! Api.ipcArcVaultApi.loadProvenanceTable selection with
                     | Ok result ->
                         let model = ProvenanceModelDto.toModel result.Model
 
-                        setState (fun current ->
-                            {
-                                current with
-                                    Selected = Some result.Selection
-                                    Session = Some(Session.init model)
-                                    Warnings = result.Warnings |> Array.toList
-                                    Patches = []
-                                    IsLoading = false
-                                    Error = None
-                            })
+                        setState (fun current -> {
+                            current with
+                                Selected = Some result.Selection
+                                Session = Some(Session.init model)
+                                Warnings = result.Warnings |> Array.toList
+                                Patches = []
+                                IsLoading = false
+                                Error = None
+                        })
                     | Error exn ->
-                        setState (fun current ->
-                            {
-                                current with
-                                    Session = None
-                                    Warnings = []
-                                    Patches = []
-                                    IsLoading = false
-                                    Error = Some $"Could not load provenance table: {exn.Message}"
-                            })
+                        setState (fun current -> {
+                            current with
+                                Session = None
+                                Warnings = []
+                                Patches = []
+                                IsLoading = false
+                                Error = Some $"Could not load provenance table: {exn.Message}"
+                        })
                 }
-                |> Promise.start),
+                |> Promise.start
+            ),
             [||]
         )
 
     React.useEffect (
         (fun () ->
             promise {
-                setState (fun current -> { current with IsLoading = true; Error = None })
+                setState (fun current -> {
+                    current with
+                        IsLoading = true
+                        Error = None
+                })
 
                 match! Api.ipcArcVaultApi.listProvenanceTables () with
                 | Ok tables ->
-                    setState (fun current -> { current with Tables = tables; IsLoading = false })
+                    setState (fun current -> {
+                        current with
+                            Tables = tables
+                            IsLoading = false
+                    })
 
                     match tables |> Array.tryHead with
                     | Some first -> loadSelection first
                     | None ->
-                        setState (fun current ->
-                            {
-                                current with
-                                    IsLoading = false
-                                    Error = Some "No study, assay, or run tables are available in the active ARC."
-                            })
-                | Error exn ->
-                    setState (fun current ->
-                        {
+                        setState (fun current -> {
                             current with
-                                Tables = [||]
-                                Session = None
                                 IsLoading = false
-                                Error = Some $"Could not list provenance tables: {exn.Message}"
+                                Error = Some "No study, assay, or run tables are available in the active ARC."
                         })
+                | Error exn ->
+                    setState (fun current -> {
+                        current with
+                            Tables = [||]
+                            Session = None
+                            IsLoading = false
+                            Error = Some $"Could not list provenance tables: {exn.Message}"
+                    })
             }
-            |> Promise.start),
+            |> Promise.start
+        ),
         [| box loadSelection |]
     )
 
     let onChange (change: ProvenanceEditorChange) =
-        setState (fun current ->
-            {
-                current with
-                    Session = Some change.Session
-                    Patches = current.Patches @ change.Patches
-            })
+        setState (fun current -> {
+            current with
+                Session = Some change.Session
+                Patches = current.Patches @ change.Patches
+        })
 
     Html.div [
-        prop.className "swt:size-full swt:min-w-0 swt:min-h-0 swt:grid swt:grid-cols-[18rem_minmax(0,1fr)] swt:overflow-hidden"
+        prop.className
+            "swt:size-full swt:min-w-0 swt:min-h-0 swt:grid swt:grid-cols-[18rem_minmax(0,1fr)] swt:overflow-hidden"
         prop.testId "provenance-grouping-page"
         prop.children [
             Html.aside [
-                prop.className "swt:min-h-0 swt:overflow-y-auto swt:border-r swt:border-base-300 swt:bg-base-100 swt:p-3"
+                prop.className
+                    "swt:min-h-0 swt:overflow-y-auto swt:border-r swt:border-base-300 swt:bg-base-100 swt:p-3"
                 prop.children [
                     Html.div [
                         prop.className "swt:flex swt:items-center swt:gap-2 swt:pb-3"
                         prop.children [
-                            Html.i [ prop.className "swt:iconify swt:fluent--text-paragraph-24-regular swt:size-5 swt:text-primary" ]
-                            Html.h2 [ prop.className "swt:text-sm swt:font-semibold"; prop.text "Provenance" ]
+                            Html.i [
+                                prop.className
+                                    "swt:iconify swt:fluent--text-paragraph-24-regular swt:size-5 swt:text-primary"
+                            ]
+                            Html.h2 [
+                                prop.className "swt:text-sm swt:font-semibold"
+                                prop.text "Provenance"
+                            ]
                         ]
                     ]
                     Html.div [
@@ -176,6 +187,7 @@ let ProvenanceGroupingTarget () =
                         prop.children [
                             for table in state.Tables do
                                 let isSelected = state.Selected |> Option.exists ((=) table)
+
                                 Html.button [
                                     prop.type'.button
                                     prop.className (ProvenanceGroupingTargetHelper.buttonClasses isSelected)
@@ -206,7 +218,9 @@ let ProvenanceGroupingTarget () =
                                 Html.div [
                                     prop.className "swt:alert swt:alert-error"
                                     prop.children [
-                                        Html.i [ prop.className "swt:iconify swt:fluent--error-circle-24-regular swt:size-5" ]
+                                        Html.i [
+                                            prop.className "swt:iconify swt:fluent--error-circle-24-regular swt:size-5"
+                                        ]
                                         Html.span error
                                     ]
                                 ]
@@ -217,18 +231,20 @@ let ProvenanceGroupingTarget () =
                             match state.Session, state.IsLoading with
                             | _, true ->
                                 Html.div [
-                                    prop.className "swt:flex swt:flex-1 swt:items-center swt:justify-center swt:text-sm swt:text-base-content/70"
+                                    prop.className
+                                        "swt:flex swt:flex-1 swt:items-center swt:justify-center swt:text-sm swt:text-base-content/70"
                                     prop.text "Loading provenance..."
                                 ]
                             | Some session, false ->
-                                Swate.Components.Composite.ProvenanceGrouping.ProvenanceGrouping.Main(
+                                Swate.Components.Page.ProvenanceGrouping.ProvenanceGrouping.Main(
                                     session,
                                     onChange,
                                     height = 760
                                 )
                             | None, false ->
                                 Html.div [
-                                    prop.className "swt:flex swt:flex-1 swt:items-center swt:justify-center swt:text-sm swt:text-base-content/70"
+                                    prop.className
+                                        "swt:flex swt:flex-1 swt:items-center swt:justify-center swt:text-sm swt:text-base-content/70"
                                     prop.text "Select a provenance table to load the editor."
                                 ]
                         ]

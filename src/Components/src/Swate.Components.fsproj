@@ -130,13 +130,6 @@
     <Compile Include="Composite\TermSearch\ConfigProvider.fs" />
     <Compile Include="Composite\TermSearch\ConfigSetter.fs" />
     <Compile Include="Composite\TermSearch\TermSearch.fs" />
-    <Compile Include="Composite\ProvenanceGrouping\Types.fs" />
-    <Compile Include="Composite\ProvenanceGrouping\State.fs" />
-    <Compile Include="Composite\ProvenanceGrouping\Helper.fs" />
-    <Compile Include="Composite\ProvenanceGrouping\Controls.fs" />
-    <Compile Include="Composite\ProvenanceGrouping\GroupCard.fs" />
-    <Compile Include="Composite\ProvenanceGrouping\ConnectorOverlay.fs" />
-    <Compile Include="Composite\ProvenanceGrouping\ProvenanceGrouping.fs" />
     <Compile Include="Composite\Table\Types.fs" />
     <Compile Include="Composite\Table\Constants.fs" />
     <Compile Include="Composite\Table\Context.fs" />
@@ -207,6 +200,13 @@
     <Compile Include="Composite\Widgets\TemplateWidget.fs" />
     <Compile Include="Composite\Widgets\Widgets.fs" />
     
+    <Compile Include="Page\ProvenanceGrouping\Types.fs" />
+    <Compile Include="Page\ProvenanceGrouping\State.fs" />
+    <Compile Include="Page\ProvenanceGrouping\Helper.fs" />
+    <Compile Include="Page\ProvenanceGrouping\Controls.fs" />
+    <Compile Include="Page\ProvenanceGrouping\GroupCard.fs" />
+    <Compile Include="Page\ProvenanceGrouping\ConnectorOverlay.fs" />
+    <Compile Include="Page\ProvenanceGrouping\ProvenanceGrouping.fs" />
     <Compile Include="Page\SettingsPage\SettingsPage.fs" />
     <Compile Include="Page\Metadata\FormComponents\Helpers.fs" />
     <Compile Include="Page\Metadata\FormComponents\InputSequence.fs" />

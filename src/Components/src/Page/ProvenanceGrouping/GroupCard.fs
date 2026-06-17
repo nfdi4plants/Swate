@@ -1,4 +1,4 @@
-namespace Swate.Components.Composite.ProvenanceGrouping
+namespace Swate.Components.Page.ProvenanceGrouping
 
 open Fable.Core
 open Feliz
@@ -8,7 +8,7 @@ open Swate.Components.Primitive.Buttons
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
-open Swate.Components.Composite.ProvenanceGrouping.Types
+open Swate.Components.Page.ProvenanceGrouping.Types
 
 /// Maps loaded endpoint kinds (Source, Sample, Data, ...) to a display label and icon.
 /// The kind id carries an adapter prefix (`arc-isa:endpoint:sample`, `fixture:endpoint:data`, ...),
