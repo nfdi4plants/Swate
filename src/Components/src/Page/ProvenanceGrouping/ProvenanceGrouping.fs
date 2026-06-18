@@ -650,6 +650,7 @@ module private EditorSurface =
 
     let propertyRail
         side
+        sideId
         (projection: PropertyRails.RailProjection)
         activeAssignments
         toggleSide
@@ -682,6 +683,7 @@ module private EditorSurface =
             (fun header -> projection.OriginByHeader |> Map.tryFind header),
             setPropertyColor,
             sourceInfoForValue,
+            sideId = sideId,
             debug = debug
         )
 
@@ -1077,24 +1079,27 @@ type ProvenanceGrouping =
             setOpenRail (if openRail = Some side then None else Some side)
 
         let railPanel side =
-            let layerId, oppositeLayerId, targetSide =
+            let layer = Session.activeLayer session
+
+            let sideId, oppositeSideId, targetSide =
                 match side with
-                | ProvenanceSide.Input -> pair.InputSideId, pair.OutputSideId, ProvenanceSide.Output
-                | ProvenanceSide.Output -> pair.OutputSideId, pair.InputSideId, ProvenanceSide.Input
+                | ProvenanceSide.Input -> layer.InputSideId, layer.OutputSideId, ProvenanceSide.Output
+                | ProvenanceSide.Output -> layer.OutputSideId, layer.InputSideId, ProvenanceSide.Input
 
             EditorSurface.propertyRail
                 side
+                sideId
                 (match side with
                  | ProvenanceSide.Input -> inputRailProjection
                  | ProvenanceSide.Output -> outputRailProjection)
-                (State.Sides.get layerId uiState).GroupingAssignments
-                (fun header -> toggleSideGrouping layerId side header)
+                (State.Sides.get sideId uiState).GroupingAssignments
+                (fun header -> toggleSideGrouping sideId side header)
                 (fun header ->
-                    State.GroupingAssignments.toggleBoth pair.InputSideId pair.OutputSideId header uiState
+                    State.GroupingAssignments.toggleBoth layer.InputSideId layer.OutputSideId header uiState
                     |> setUiState
                 )
                 (fun header ->
-                    State.GroupingAssignments.move pair.Id layerId oppositeLayerId targetSide header uiState
+                    State.GroupingAssignments.move layer.Id sideId oppositeSideId targetSide header uiState
                     |> setUiState
                 )
                 (fun header -> togglePropertyExpanded side header)
@@ -1386,7 +1391,7 @@ type ProvenanceGrouping =
                                 prop.children [
                                     Controls.LayerTabs(
                                         session,
-                                        (fun pairId -> Session.selectPair pairId session |> publish),
+                                        (fun layerId -> Session.selectLayer layerId session |> publish),
                                         (fun () ->
                                             EditorActions.addLayer
                                                 session
@@ -1402,7 +1407,9 @@ type ProvenanceGrouping =
                                     Html.div [
                                         prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1"
                                         prop.children [
-                                            for layer in session.Layers do
+                                            for layerId in session.LayerOrder do
+                                                let layer = Session.layerById layerId session
+
                                                 Controls.LayerColorButton(
                                                     layer.Id,
                                                     uiState.PropertyColors.LayerColors |> Map.tryFind layer.Id,

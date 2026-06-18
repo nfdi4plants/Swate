@@ -1286,6 +1286,30 @@ export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
   },
 };
 
+export const LayerTabsUseConceptualLayerColorsAndSideRails: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const layer1 = canvas.getByTestId('provenance-layer-layer-1');
+    const layerColor = layer1.getAttribute('data-provenance-layer-color') ?? '';
+
+    expect(layer1).toHaveClass('swt:btn-primary');
+    expect(layerColor).toMatch(/^#/);
+    expect(layerColor).not.toContain('|');
+    expect(canvas.queryByTestId('provenance-pair-pair-1')).not.toBeInTheDocument();
+
+    expect(canvas.getByTestId('provenance-property-rail-Input')).toHaveAttribute(
+      'data-provenance-side-id',
+      'layer-1-input',
+    );
+    expect(canvas.getByTestId('provenance-property-rail-Output')).toHaveAttribute(
+      'data-provenance-side-id',
+      'layer-1-output',
+    );
+  },
+};
+
 export const AddsLayerFromMixedSelection: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -1298,8 +1322,8 @@ export const AddsLayerFromMixedSelection: Story = {
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await waitFor(() => {
-      expect(canvas.getByTestId('provenance-pair-pair-2')).toHaveClass('swt:btn-primary');
-      expect(canvasElement).toHaveTextContent('Selection 3');
+      expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
+      expect(canvas.queryByText('Selection 3')).not.toBeInTheDocument();
       expect(canvasElement).toHaveTextContent('Input A');
       expect(canvasElement).toHaveTextContent('Output B');
     });

@@ -169,7 +169,7 @@ type Controls =
     static member LayerTabs
         (
             session: ProvenanceSession,
-            onSelect: ProvenancePairId -> unit,
+            onSelect: ProvenanceLayerId -> unit,
             onAddLayer: unit -> unit,
             ?debug: bool,
             ?layerColors: Map<ProvenanceLayerId, ProvenanceColor>
@@ -177,54 +177,35 @@ type Controls =
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
             prop.children [
-                for pairId in session.PairOrder do
-                    let pair = session.Pairs.[pairId]
-                    let left = session.Layers |> List.find (fun layer -> layer.Id = pair.LeftLayerId)
-                    let right = session.Layers |> List.find (fun layer -> layer.Id = pair.RightLayerId)
+                for layerId in session.LayerOrder do
+                    let layer = Session.layerById layerId session
 
-                    let leftColor =
-                        layerColors |> Option.bind (fun colors -> colors |> Map.tryFind left.Id)
-
-                    let rightColor =
-                        layerColors |> Option.bind (fun colors -> colors |> Map.tryFind right.Id)
+                    let layerColor =
+                        layerColors |> Option.bind (fun colors -> colors |> Map.tryFind layer.Id)
 
                     Html.button [
-                        prop.title $"View provenance for {left.Label} and {right.Label}"
+                        prop.title $"View provenance layer {layer.Label}"
                         prop.className [
                             "swt:btn swt:btn-sm"
-                            if pairId = session.ActivePairId then
+                            if layerId = session.ActiveLayerId then
                                 "swt:btn-primary"
                             else
                                 "swt:btn-outline"
                         ]
-                        prop.ariaLabel $"View provenance for {left.Label} and {right.Label}"
+                        prop.ariaLabel $"View provenance layer {layer.Label}"
                         if defaultArg debug false then
-                            prop.testId $"provenance-pair-{pairId}"
-                            let lc = leftColor |> Option.defaultValue ""
-                            let rc = rightColor |> Option.defaultValue ""
-                            prop.custom ("data-provenance-layer-color", $"{lc}|{rc}")
-                        prop.onClick (fun _ -> onSelect pairId)
+                            prop.testId $"provenance-layer-{layerId}"
+                            prop.custom ("data-provenance-layer-color", layerColor |> Option.defaultValue "")
+                        prop.onClick (fun _ -> onSelect layerId)
                         prop.children [
-                            match leftColor with
-                            | Some c when c <> "" ->
+                            match layerColor with
+                            | Some color when color <> "" ->
                                 Html.span [
                                     prop.className "swt:size-3 swt:shrink-0 swt:rounded"
-                                    prop.style [ style.backgroundColor c ]
+                                    prop.style [ style.backgroundColor color ]
                                 ]
                             | _ -> Html.none
-                            Html.span left.Label
-                            Html.i [
-                                prop.className
-                                    "swt:iconify swt:fluent--arrow-right-20-regular swt:size-3 swt:shrink-0 swt:mx-0.5"
-                            ]
-                            match rightColor with
-                            | Some c when c <> "" ->
-                                Html.span [
-                                    prop.className "swt:size-3 swt:shrink-0 swt:rounded"
-                                    prop.style [ style.backgroundColor c ]
-                                ]
-                            | _ -> Html.none
-                            Html.span right.Label
+                            Html.span layer.Label
                         ]
                     ]
                 Html.button [
@@ -695,6 +676,7 @@ type Controls =
             originsForHeader: ProvenancePropertyHeader -> Set<PropertyOrigin> option,
             onSetColor: ProvenancePropertyHeader -> ProvenanceColor option -> unit,
             sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
+            ?sideId: ProvenanceLayerSideId,
             ?debug: bool
         ) =
         let droppable =
@@ -739,6 +721,10 @@ type Controls =
             ]
             if defaultArg debug false then
                 prop.testId $"provenance-property-rail-{side}"
+
+                match sideId with
+                | Some sideId -> prop.custom ("data-provenance-side-id", sideId)
+                | None -> ()
             prop.children [
                 Html.h3 [
                     prop.className [

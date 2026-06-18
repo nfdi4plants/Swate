@@ -790,23 +790,24 @@ module Display =
     open Swate.Components.Page.ProvenanceGrouping.Types
 
     let displayPair session uiState =
-        let pair = Session.activePair session
-        let leftState = State.Sides.get pair.InputSideId uiState
-        let rightState = State.Sides.get pair.OutputSideId uiState
+        let layer = Session.activeLayer session
+        let inputState = State.Sides.get layer.InputSideId uiState
+        let outputState = State.Sides.get layer.OutputSideId uiState
 
         let assignments =
             [
-                yield! leftState.GroupingAssignments
-                yield! rightState.GroupingAssignments
+                yield! inputState.GroupingAssignments
+                yield! outputState.GroupingAssignments
             ]
             |> List.distinct
 
-        let inputs = displayGroupsForAssignments pair.Model ProvenanceSide.Input assignments
+        let inputs =
+            displayGroupsForAssignments layer.Model ProvenanceSide.Input assignments
 
         let outputs =
-            displayGroupsForAssignments pair.Model ProvenanceSide.Output assignments
+            displayGroupsForAssignments layer.Model ProvenanceSide.Output assignments
 
-        pair, inputs, outputs, displayConnections pair.Model inputs outputs
+        layer, inputs, outputs, displayConnections layer.Model inputs outputs
 
     let setsInGroups pairId (groups: DisplayGroup list) selectedIds =
         groups
