@@ -18,8 +18,7 @@ let NotesDraftTarget () =
     let pendingOverwriteRequest, setPendingOverwriteRequest =
         React.useState<FileContentDTO option> None
 
-    let pendingImageAssetsRef =
-        React.useRef ([]: ExternalAssetLink list)
+    let pendingImageAssetsRef = React.useRef ([]: ExternalAssetLink list)
 
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()

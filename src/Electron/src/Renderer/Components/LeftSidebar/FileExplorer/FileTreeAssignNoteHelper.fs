@@ -31,10 +31,7 @@ module FileTreeAssignNoteHelper =
         if String.IsNullOrWhiteSpace entityName then
             None
         else
-            Some {
-                Name = entityName
-                Kind = kind
-            }
+            Some { Name = entityName; Kind = kind }
 
     let tryGetNoteAssignmentTarget (item: FileItem) =
         if not item.IsDirectory then
@@ -51,7 +48,8 @@ module FileTreeAssignNoteHelper =
                 | _ -> None
             )
 
-    let canAssignNoteToItem item = tryGetNoteAssignmentTarget item |> Option.isSome
+    let canAssignNoteToItem item =
+        tryGetNoteAssignmentTarget item |> Option.isSome
 
     let private markdownExtension = ".md"
 
@@ -64,7 +62,10 @@ module FileTreeAssignNoteHelper =
     let private tryGetRootNoteFromFilePath (relativePath: string) =
         let normalizedPath = PathHelpers.normalizeCanonicalRelativePath relativePath
 
-        if normalizedPath.EndsWith(markdownExtension, StringComparison.OrdinalIgnoreCase) |> not then
+        if
+            normalizedPath.EndsWith(markdownExtension, StringComparison.OrdinalIgnoreCase)
+            |> not
+        then
             None
         else
             match getNonEmptyPathParts normalizedPath with

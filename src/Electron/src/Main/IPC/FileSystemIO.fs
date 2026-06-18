@@ -360,8 +360,11 @@ module ArcFileSystemHelper =
         : JS.Promise<Result<string, exn>> =
         promise {
             try
-                let sourcePath = request.sourceAbsolutePath |> Option.ofObj |> Option.defaultValue ""
-                let targetPath = request.targetRelativePath |> PathHelpers.normalizeCanonicalRelativePath
+                let sourcePath =
+                    request.sourceAbsolutePath |> Option.ofObj |> Option.defaultValue ""
+
+                let targetPath =
+                    request.targetRelativePath |> PathHelpers.normalizeCanonicalRelativePath
 
                 if String.IsNullOrWhiteSpace sourcePath then
                     raise (exn "Source file path is required.")

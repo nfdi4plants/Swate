@@ -24,7 +24,9 @@ type FileTreeAssignNoteModal =
         let isAssigning = defaultArg isAssigning false
         let displayName = itemName |> Option.defaultValue "this target"
         let hasNotes = availableNotes.Count > 0
-        let selectedValue = selectedNote |> Option.map _.SourceFolderPath |> Option.defaultValue ""
+
+        let selectedValue =
+            selectedNote |> Option.map _.SourceFolderPath |> Option.defaultValue ""
 
         let setIsOpen isOpen =
             if not isOpen then

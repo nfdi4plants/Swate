@@ -524,15 +524,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                 vault
                                 (fun () -> promise {
                                     match!
-                                        ArcFileSystemHelper.copyExternalFilesToArcOnDisk
-                                            vault.path.Value
-                                            requests
+                                        ArcFileSystemHelper.copyExternalFilesToArcOnDisk vault.path.Value requests
                                     with
                                     | Error error -> return Error error
                                     | Ok copiedPaths ->
                                         do! vault.RefreshFileTree()
                                         return Ok copiedPaths
-                                }))
+                                })
+                        )
             with e ->
                 return Error e
         }

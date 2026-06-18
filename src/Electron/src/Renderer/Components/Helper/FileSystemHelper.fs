@@ -59,7 +59,11 @@ let private fileNameFromPath (path: string) =
     |> Option.ofObj
     |> Option.map PathHelpers.getNameFromPath
     |> Option.defaultValue "image"
-    |> fun name -> if String.IsNullOrWhiteSpace name then "image" else name.Trim()
+    |> fun name ->
+        if String.IsNullOrWhiteSpace name then
+            "image"
+        else
+            name.Trim()
 
 let private assetMarkdownPath assetFolderName (fileName: string) =
     let assetFolder = PathHelpers.normalizeCanonicalRelativePath assetFolderName

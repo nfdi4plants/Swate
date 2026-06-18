@@ -16,8 +16,7 @@ let MarkdownEditorTarget (content: string) =
     let lastSavedContent, setLastSavedContent = React.useState content
     let isSaving, setIsSaving = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
-    let pendingImageAssetsRef =
-        React.useRef ([]: ExternalAssetLink list)
+    let pendingImageAssetsRef = React.useRef ([]: ExternalAssetLink list)
 
     let selectedPath =
         fileStateCtx.state.Selection.TreePath |> Option.map PathHelpers.normalizePath

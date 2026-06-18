@@ -69,6 +69,7 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
+
         let selectedAssignableNote, setSelectedAssignableNote =
             React.useState<AssignableNoteRef option> None
 
@@ -468,7 +469,7 @@ type FileTree =
                     }
                     newName
 
-        let assignNoteMoveConfig : FileTreeAssignNoteHelper.AssignNoteMoveConfig = {
+        let assignNoteMoveConfig: FileTreeAssignNoteHelper.AssignNoteMoveConfig = {
             selectedTreePath = fileStateCtx.state.Selection.TreePath
             pageState = pageStateCtx.state
             closeDialog = closeDialog
@@ -485,8 +486,7 @@ type FileTree =
                 match activeAssignNoteTarget, selectedAssignableNote with
                 | None, _ -> closeDialog ()
                 | _, None -> FileTreeAssignNoteHelper.enqueueAssignNoteError errorModal.enqueue "Select a note."
-                | Some target, Some note ->
-                    FileTreeAssignNoteHelper.assignNoteToTarget assignNoteMoveConfig target note
+                | Some target, Some note -> FileTreeAssignNoteHelper.assignNoteToTarget assignNoteMoveConfig target note
 
         let createModalKind =
             activeCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study

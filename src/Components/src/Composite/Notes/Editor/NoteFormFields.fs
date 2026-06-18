@@ -17,12 +17,7 @@ open Swate.Components.Composite.MarkdownText.Types
 module NoteFormFields =
 
     [<ReactComponent>]
-    let Main
-        (
-            draft: NotesDraft,
-            setDraft: NotesDraft -> unit,
-            filePickerAdapter: MarkdownFilePickerAdapter option
-        ) =
+    let Main (draft: NotesDraft, setDraft: NotesDraft -> unit, filePickerAdapter: MarkdownFilePickerAdapter option) =
         let dateInputValue =
             draft.DateCreated
             |> Option.map (fun dateValue -> dateValue.ToString("yyyy-MM-dd"))

@@ -62,10 +62,7 @@ Vitest.describe (
                 let copyRequests = ResizeArray<CopyExternalFileRequest[]>()
 
                 let request =
-                    FileContentDTO.create
-                        FileContentType.Markdown
-                        "plain note"
-                        "notes/2026-06-15/plain/plain.md"
+                    FileContentDTO.create FileContentType.Markdown "plain note" "notes/2026-06-15/plain/plain.md"
 
                 let writeFile _ = promise { return Ok() }
 
@@ -147,9 +144,11 @@ Vitest.describe (
                     Vitest.expect(copyRequests.Count).toBe (1)
                     Vitest.expect(copyRequests.[0].Length).toBe (1)
                     Vitest.expect(copyRequests.[0].[0].sourceAbsolutePath).toBe ("C:/outside/diagram.png")
+
                     Vitest
                         .expect(copyRequests.[0].[0].targetRelativePath)
                         .toBe ("notes/2026-06-15/plain/assets/diagram.png")
+
                     Vitest.expect(copyRequests.[0].[0].overwrite).toBe (true)
             }
         )
