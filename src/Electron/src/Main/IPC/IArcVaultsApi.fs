@@ -319,7 +319,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error(exn $"Could not pick directory: {e.Message}")
         }
-    pickAbsolutePaths =
+    pickImagePaths =
         fun () -> promise {
             try
                 let properties = [|
@@ -327,16 +327,38 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                 |]
 
+                let filters = [|
+                    FileFilter(
+                        "Images",
+                        [|
+                            "apng"
+                            "avif"
+                            "bmp"
+                            "gif"
+                            "heic"
+                            "heif"
+                            "ico"
+                            "jpeg"
+                            "jpg"
+                            "png"
+                            "svg"
+                            "tif"
+                            "tiff"
+                            "webp"
+                        |]
+                    )
+                |]
+
                 let window = dialogParentFromIpcEvent event
 
-                let! result = dialog.showOpenDialog (?window = window, properties = properties)
+                let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
 
                 if result.canceled then
                     return Error(exn "Cancelled")
                 else
                     return Ok result.filePaths
             with e ->
-                return Error(exn $"Could not pick files: {e.Message}")
+                return Error(exn $"Could not pick image files: {e.Message}")
         }
     pickExternalTextFiles =
         fun _ -> promise {
@@ -488,6 +510,29 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                         (fun vault -> promise {
                             return! ArcFileSystemHelper.createFileSystemItemOnDisk vault.path.Value request
                         })
+            with e ->
+                return Error e
+        }
+    copyExternalFilesToArc =
+        fun (requests: CopyExternalFileRequest[]) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault ->
+                            withBusyWriting
+                                vault
+                                (fun () -> promise {
+                                    match!
+                                        ArcFileSystemHelper.copyExternalFilesToArcOnDisk
+                                            vault.path.Value
+                                            requests
+                                    with
+                                    | Error error -> return Error error
+                                    | Ok copiedPaths ->
+                                        do! vault.RefreshFileTree()
+                                        return Ok copiedPaths
+                                }))
             with e ->
                 return Error e
         }

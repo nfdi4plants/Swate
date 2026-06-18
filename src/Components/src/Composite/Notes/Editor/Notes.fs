@@ -4,6 +4,7 @@ open Fable.Core
 open Feliz
 open Browser.Dom
 open Swate.Components.Shared
+open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Primitive.BaseModal
 
 
@@ -80,7 +81,8 @@ type Notes =
             uiState: NotesUiState,
             setUiState: NotesUiState -> unit,
             onSubmit: NotesSubmitPayload -> unit,
-            availableExistingTargets: ResizeArray<ExistingTargetRef>
+            availableExistingTargets: ResizeArray<ExistingTargetRef>,
+            ?filePickerAdapter: MarkdownFilePickerAdapter
         ) =
 
         let setError (value: string option) =
@@ -170,7 +172,7 @@ type Notes =
                             prop.className "swt:text-3xl swt:font-bold swt:text-primary"
                             prop.text "Notes"
                         ]
-                        NoteFormFields.Main(draft, setDraft)
+                        NoteFormFields.Main(draft, setDraft, filePickerAdapter)
                         Actions.Main(uiState.IsSubmitting, openExistingTargetSelector, submitNewRootNote, uiState.Error)
                         Notes.ExistingTargetModal(
                             uiState.ShowExistingTargetSelector,

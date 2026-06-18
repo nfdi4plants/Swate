@@ -1,6 +1,8 @@
 module ElectronRenderer.FileSystemHelperTests
 
 open Renderer.Components.Helper.FileSystemHelper
+open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
 Vitest.describe (
@@ -50,6 +52,131 @@ Vitest.describe (
                 match result with
                 | Error actualError -> Vitest.expect(actualError.Message).toBe ("path check failed")
                 | Ok availability -> failwith $"Expected path check failure, got {availability}."
+            }
+        )
+
+        Vitest.test (
+            "writeFileWithOptionalExternalAssetLinks does not create asset folder for plain note writes",
+            fun () -> promise {
+                let createdFolders = ResizeArray<CreateFileSystemItemRequest>()
+                let copyRequests = ResizeArray<CopyExternalFileRequest[]>()
+
+                let request =
+                    FileContentDTO.create
+                        FileContentType.Markdown
+                        "plain note"
+                        "notes/2026-06-15/plain/plain.md"
+
+                let writeFile _ = promise { return Ok() }
+
+                let createFileSystemItem request = promise {
+                    createdFolders.Add request
+                    return Ok $"{request.parentPath}/{request.name}"
+                }
+
+                let copyExternalFilesToArc requests = promise {
+                    copyRequests.Add requests
+                    return Ok [||]
+                }
+
+                match!
+                    writeFileWithOptionalExternalAssetLinks
+                        writeFile
+                        createFileSystemItem
+                        copyExternalFilesToArc
+                        (fun path -> Some(path.Substring(0, path.LastIndexOf('/'))))
+                        "assets"
+                        request
+                        []
+                with
+                | Error error -> failwith error.Message
+                | Ok() ->
+                    Vitest.expect(createdFolders.Count).toBe (0)
+                    Vitest.expect(copyRequests.Count).toBe (0)
+            }
+        )
+
+        Vitest.test (
+            "writeFileWithOptionalExternalAssetLinks creates asset folder and copies referenced images",
+            fun () -> promise {
+                let createdFolders = ResizeArray<CreateFileSystemItemRequest>()
+                let copyRequests = ResizeArray<CopyExternalFileRequest[]>()
+
+                let request =
+                    FileContentDTO.create
+                        FileContentType.Markdown
+                        "![diagram](assets/diagram.png)"
+                        "notes/2026-06-15/plain/plain.md"
+
+                let assets = [
+                    {
+                        sourceAbsolutePath = "C:/outside/diagram.png"
+                        markdownRelativePath = "assets/diagram.png"
+                    }
+                ]
+
+                let writeFile _ = promise { return Ok() }
+
+                let createFileSystemItem request = promise {
+                    createdFolders.Add request
+                    return Ok $"{request.parentPath}/{request.name}"
+                }
+
+                let copyExternalFilesToArc requests = promise {
+                    copyRequests.Add requests
+                    return Ok(requests |> Array.map _.targetRelativePath)
+                }
+
+                match!
+                    writeFileWithOptionalExternalAssetLinks
+                        writeFile
+                        createFileSystemItem
+                        copyExternalFilesToArc
+                        (fun path -> Some(path.Substring(0, path.LastIndexOf('/'))))
+                        "assets"
+                        request
+                        assets
+                with
+                | Error error -> failwith error.Message
+                | Ok() ->
+                    Vitest.expect(createdFolders.Count).toBe (1)
+                    Vitest.expect(createdFolders.[0].parentPath).toBe ("notes/2026-06-15/plain")
+                    Vitest.expect(createdFolders.[0].name).toBe ("assets")
+                    Vitest.expect(createdFolders.[0].kind).toEqual (FileSystemItemKind.Folder)
+
+                    Vitest.expect(copyRequests.Count).toBe (1)
+                    Vitest.expect(copyRequests.[0].Length).toBe (1)
+                    Vitest.expect(copyRequests.[0].[0].sourceAbsolutePath).toBe ("C:/outside/diagram.png")
+                    Vitest
+                        .expect(copyRequests.[0].[0].targetRelativePath)
+                        .toBe ("notes/2026-06-15/plain/assets/diagram.png")
+                    Vitest.expect(copyRequests.[0].[0].overwrite).toBe (true)
+            }
+        )
+
+        Vitest.test (
+            "createAssetFilePickerAdapter resolves selected images and tracks copy source",
+            fun () -> promise {
+                let mutable pendingAssets = []
+
+                let adapter =
+                    createAssetFilePickerAdapter
+                        (fun () -> promise { return Ok [| "C:/outside/diagram.png" |] })
+                        "assets"
+                        (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
+
+                let! pickedFiles = adapter.PickFiles()
+                Vitest.expect(pickedFiles.Length).toBe (1)
+                Vitest.expect(pickedFiles.[0].Name).toBe ("diagram.png")
+                Vitest.expect(pickedFiles.[0].MimeType).toEqual (Some "image/*")
+                Vitest.expect(pickedFiles.[0].HostPath).toEqual (Some "C:/outside/diagram.png")
+
+                let! markdownPath = adapter.ResolveMarkdownPath pickedFiles.[0]
+                Vitest.expect(markdownPath).toBe ("assets/diagram.png")
+
+                Vitest.expect(pendingAssets.Length).toBe (1)
+                Vitest.expect(pendingAssets.[0].sourceAbsolutePath).toBe ("C:/outside/diagram.png")
+                Vitest.expect(pendingAssets.[0].markdownRelativePath).toBe ("assets/diagram.png")
             }
         )
 )

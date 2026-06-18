@@ -32,6 +32,12 @@ let private moveRequest sourcePath targetPath overwrite = {
     overwrite = overwrite
 }
 
+let private copyRequest sourceAbsolutePath targetRelativePath overwrite = {
+    sourceAbsolutePath = sourceAbsolutePath
+    targetRelativePath = targetRelativePath
+    overwrite = overwrite
+}
+
 let private createItemRequest parentPath name kind = {
     parentPath = parentPath
     name = name
@@ -91,6 +97,10 @@ let private writeRelativeFileAsync arcPath relativePath content = promise {
 
     return ()
 }
+
+let private readRelativeFileAsync arcPath relativePath =
+    fsPromisesDynamic?readFile (absoluteArcPath arcPath relativePath, "utf8")
+    |> unbox<JS.Promise<string>>
 
 let private createRelativeDirectoryAsync arcPath relativePath = promise {
     let absolutePath = absoluteArcPath arcPath relativePath
@@ -252,6 +262,31 @@ Vitest.describe (
                     do! moveItemOrFail arcPath (moveRequest secondSourceFolder targetFolder true)
                     do! expectRelativePathExists arcPath secondSourceFolder false
                     do! expectRelativePathExists arcPath $"{targetFolder}/Field_observations.md" true
+                })
+        )
+
+        Vitest.test (
+            "copies external image files into safe ARC asset paths",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourcePath = absoluteArcPath arcPath "../external-diagram.png"
+                    let targetPath = "notes/2026-06-15/Field_observations/assets/external-diagram.png"
+
+                    let! _ =
+                        fsPromisesDynamic?writeFile (sourcePath, "image-content", "utf8")
+                        |> unbox<JS.Promise<obj>>
+
+                    match!
+                        ArcFileSystemHelper.copyExternalFileToArcOnDisk
+                            arcPath
+                            (copyRequest sourcePath targetPath false)
+                    with
+                    | Error error -> failwith error.Message
+                    | Ok copiedPath ->
+                        Vitest.expect(copiedPath).toBe (targetPath)
+
+                        let! copiedContent = readRelativeFileAsync arcPath targetPath
+                        Vitest.expect(copiedContent).toBe ("image-content")
                 })
         )
 

@@ -18,8 +18,22 @@ let NotesDraftTarget () =
     let pendingOverwriteRequest, setPendingOverwriteRequest =
         React.useState<FileContentDTO option> None
 
+    let pendingImageAssetsRef =
+        React.useRef ([]: ExternalAssetLink list)
+
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+
+    let imageFilePickerAdapter =
+        React.useMemo (
+            (fun _ ->
+                createAssetFilePickerAdapter
+                    Api.ipcArcVaultApi.pickImagePaths
+                    NoteConversion.noteAssetsFolderName
+                    (fun asset -> pendingImageAssetsRef.current <- pendingImageAssetsRef.current @ [ asset ])
+            ),
+            [||]
+        )
 
     let availableNotesTargets =
         React.useMemo (
@@ -53,17 +67,20 @@ let NotesDraftTarget () =
 
     let writeRequest (request: FileContentDTO) = promise {
         let! writeResult =
-            writeFileWithEnsuredChildFolder
+            writeFileWithOptionalExternalAssetLinks
                 Api.ipcArcVaultApi.writeFile
                 Api.ipcArcVaultApi.createFileSystemItem
+                Api.ipcArcVaultApi.copyExternalFilesToArc
                 NoteConversion.tryGetNoteFolderRelativePath
                 NoteConversion.noteAssetsFolderName
                 request
+                pendingImageAssetsRef.current
 
         match writeResult with
         | Result.Error exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}")
         | Ok() ->
             setPendingOverwriteRequest None
+            pendingImageAssetsRef.current <- []
 
             let selectedPath = PathHelpers.normalizePath request.path
 
@@ -114,7 +131,15 @@ let NotesDraftTarget () =
             submitRequest false request
 
     React.Fragment [
-        Notes.Wizard(notesDraft, setNotesDraft, notesUiState, setNotesUiState, onSubmit, availableNotesTargets)
+        Notes.Wizard(
+            notesDraft,
+            setNotesDraft,
+            notesUiState,
+            setNotesUiState,
+            onSubmit,
+            availableNotesTargets,
+            filePickerAdapter = imageFilePickerAdapter
+        )
         FileTargetConflictModal.Main(
             isOpen = pendingOverwriteRequest.IsSome,
             targetPath = (pendingOverwriteRequest |> Option.map _.path),

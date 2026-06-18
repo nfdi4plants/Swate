@@ -103,3 +103,9 @@ type CreateFileSystemItemRequest = {
     name: string
     kind: FileSystemItemKind
 }
+
+type CopyExternalFileRequest = {
+    sourceAbsolutePath: string
+    targetRelativePath: string
+    overwrite: bool
+}

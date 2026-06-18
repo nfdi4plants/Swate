@@ -3,9 +3,11 @@ module Renderer.Components.MainContent.MarkdownEditorTargetView
 open Feliz
 open Swate.Components.Composite.MarkdownText
 open Swate.Components.Composite.MarkdownText.Types
+open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Renderer.Components.Helper.FileSystemHelper
 
 [<ReactComponent(true)>]
 let MarkdownEditorTarget (content: string) =
@@ -14,6 +16,8 @@ let MarkdownEditorTarget (content: string) =
     let lastSavedContent, setLastSavedContent = React.useState content
     let isSaving, setIsSaving = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
+    let pendingImageAssetsRef =
+        React.useRef ([]: ExternalAssetLink list)
 
     let selectedPath =
         fileStateCtx.state.Selection.TreePath |> Option.map PathHelpers.normalizePath
@@ -25,13 +29,33 @@ let MarkdownEditorTarget (content: string) =
             setMarkdown content
             setLastSavedContent content
             setSaveError None
+            pendingImageAssetsRef.current <- []
         ),
         [| box content |]
     )
 
+    let imageFilePickerAdapter =
+        React.useMemo (
+            (fun _ ->
+                createAssetFilePickerAdapter
+                    Api.ipcArcVaultApi.pickImagePaths
+                    NoteConversion.noteAssetsFolderName
+                    (fun asset -> pendingImageAssetsRef.current <- pendingImageAssetsRef.current @ [ asset ])
+            ),
+            [||]
+        )
+
     let writeMarkdown path =
-        FileContentDTO.create FileContentType.Markdown markdown path
-        |> Api.ipcArcVaultApi.writeFile
+        let request = FileContentDTO.create FileContentType.Markdown markdown path
+
+        writeFileWithOptionalExternalAssetLinks
+            Api.ipcArcVaultApi.writeFile
+            Api.ipcArcVaultApi.createFileSystemItem
+            Api.ipcArcVaultApi.copyExternalFilesToArc
+            NoteConversion.tryGetNoteFolderRelativePath
+            NoteConversion.noteAssetsFolderName
+            request
+            pendingImageAssetsRef.current
 
     let saveMarkdown () =
         match selectedPath with
@@ -44,7 +68,9 @@ let MarkdownEditorTarget (content: string) =
                 let! writeResult = writeMarkdown relativePath
 
                 match writeResult with
-                | Ok() -> setLastSavedContent markdown
+                | Ok() ->
+                    setLastSavedContent markdown
+                    pendingImageAssetsRef.current <- []
                 | Error exn -> setSaveError (Some $"Failed to save markdown file: {exn.Message}")
 
                 setIsSaving false
@@ -90,7 +116,8 @@ let MarkdownEditorTarget (content: string) =
                         setMarkdown,
                         placeholder = "Write markdown...",
                         mode = PreviewMode.Live,
-                        height = 560
+                        height = 560,
+                        filePickerAdapter = imageFilePickerAdapter
                     )
                 ]
             ]

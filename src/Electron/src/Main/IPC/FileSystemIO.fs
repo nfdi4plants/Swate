@@ -257,6 +257,14 @@ module ArcFileSystemHelper =
         | FileSystemItemKind.File -> ARCtrl.FileSystemHelper.writeFileTextAsync targetAbsolutePath ""
         | FileSystemItemKind.Folder -> mkdirAsync targetAbsolutePath
 
+    let private copyFileAsync sourceAbsolutePath targetAbsolutePath = promise {
+        let! _ =
+            fsPromisesDynamic?copyFile (sourceAbsolutePath, targetAbsolutePath)
+            |> unbox<JS.Promise<obj>>
+
+        return ()
+    }
+
     let private renameResolvedPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
         match! renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath with
         | Ok() -> return Ok()
@@ -345,6 +353,68 @@ module ArcFileSystemHelper =
                     with createError ->
                         return Error createError
         }
+
+    let copyExternalFileToArcOnDisk
+        (arcPath: string)
+        (request: CopyExternalFileRequest)
+        : JS.Promise<Result<string, exn>> =
+        promise {
+            try
+                let sourcePath = request.sourceAbsolutePath |> Option.ofObj |> Option.defaultValue ""
+                let targetPath = request.targetRelativePath |> PathHelpers.normalizeCanonicalRelativePath
+
+                if String.IsNullOrWhiteSpace sourcePath then
+                    raise (exn "Source file path is required.")
+
+                if pathDynamic?isAbsolute (sourcePath) |> unbox<bool> |> not then
+                    raise (exn "Source file path must be absolute.")
+
+                if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath |> not then
+                    raise (exn "Copy target must stay inside a safe generic ARC path.")
+
+                let targetAbsolutePath =
+                    match tryResolveArcRelativePath arcPath targetPath with
+                    | Ok absolutePath -> absolutePath
+                    | Error pathError -> raise pathError
+
+                let sourceAbsolutePath = resolveAbsolutePath sourcePath
+                let! sourceExists = ARCtrl.FileSystemHelper.fileExistsAsync sourceAbsolutePath
+
+                if sourceExists |> not then
+                    raise (exn $"Source file '{request.sourceAbsolutePath}' does not exist.")
+
+                let! targetExists = pathExistsAsync targetAbsolutePath
+
+                if targetExists && not request.overwrite then
+                    raise (
+                        exn
+                            $"Cannot copy '{request.sourceAbsolutePath}' to '{targetPath}' because the destination already exists."
+                    )
+
+                let targetParentAbsolutePath =
+                    pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+
+                do! mkdirAsync targetParentAbsolutePath
+                do! copyFileAsync sourceAbsolutePath targetAbsolutePath
+                return Ok targetPath
+            with copyError ->
+                return Error copyError
+        }
+
+    let copyExternalFilesToArcOnDisk
+        (arcPath: string)
+        (requests: CopyExternalFileRequest[])
+        : JS.Promise<Result<string[], exn>> =
+        let rec copyNext copiedPaths remainingRequests = promise {
+            match remainingRequests with
+            | [] -> return Ok(copiedPaths |> List.rev |> List.toArray)
+            | request :: rest ->
+                match! copyExternalFileToArcOnDisk arcPath request with
+                | Ok copiedPath -> return! copyNext (copiedPath :: copiedPaths) rest
+                | Error copyError -> return Error copyError
+        }
+
+        requests |> Array.toList |> copyNext []
 
     let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<GenericRenamePlan, exn> =
         let requestedRelativePath =

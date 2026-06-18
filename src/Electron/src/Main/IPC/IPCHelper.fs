@@ -35,10 +35,11 @@ module IPCHelper =
         (operation: unit -> JS.Promise<Result<'T, exn>>)
         : JS.Promise<Result<'T, exn>> =
         promise {
+            let wasBusyWriting = vault.isBusyWriting
             vault.isBusyWriting <- true
 
             try
                 return! operation ()
             finally
-                vault.isBusyWriting <- false
+                vault.isBusyWriting <- wasBusyWriting
         }

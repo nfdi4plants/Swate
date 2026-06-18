@@ -41,7 +41,7 @@ type IArcVaultsApi = {
 
     pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
     pickDirectory: unit -> JS.Promise<Result<string, exn>>
-    pickAbsolutePaths: unit -> JS.Promise<Result<string[], exn>>
+    pickImagePaths: unit -> JS.Promise<Result<string[], exn>>
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
@@ -60,6 +60,8 @@ type IArcVaultsApi = {
     addArcFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     /// Creates a generic file or folder inside a safe ARC directory.
     createFileSystemItem: CreateFileSystemItemRequest -> JS.Promise<Result<string, exn>>
+    /// Copies external files into safe generic ARC paths.
+    copyExternalFilesToArc: CopyExternalFileRequest[] -> JS.Promise<Result<string[], exn>>
     /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
