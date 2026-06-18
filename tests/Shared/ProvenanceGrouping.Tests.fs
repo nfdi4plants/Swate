@@ -1190,21 +1190,24 @@ let sessionTests =
                 Expect.isEmpty patches "Navigation is view/session state only."
             | Error error -> failwithf "Expected pair selection success, got %A" error
 
-        testCase "addLayer defaults to active outputs and creates an input-only next pair"
+        testCase "addLayer defaults to active outputs and creates a new layer with seeded inputs"
         <| fun _ ->
             let session = Session.init (sampleModel ())
 
             match Session.addLayer { SelectedSets = [] } session with
             | Ok(next, patches) ->
-                let pair = Session.activePair next
+                let layer = Session.activeLayer next
 
                 let names =
-                    pair.Model.InputSets
+                    layer.Model.InputSets
                     |> Map.toList
                     |> List.map (fun (_, set) -> set.Name)
                     |> List.sort
 
-                Expect.equal next.PairOrder [ "pair-1"; "pair-2" ] "A second adjacent pair should be created."
+                Expect.equal next.LayerOrder [ "layer-1"; "layer-2" ] "A second conceptual layer should be created."
+                Expect.equal next.ActiveLayerId "layer-2" "The new layer should become active."
+                Expect.equal layer.InputSideId "layer-2-input" "New input side should belong to layer-2."
+                Expect.equal layer.OutputSideId "layer-2-output" "New output side should belong to layer-2."
 
                 Expect.equal
                     names
@@ -1215,26 +1218,39 @@ let sessionTests =
                         "Output D"
                         "Output E"
                     ]
-                    "Outputs seed later inputs by default."
+                    "Active outputs should seed later inputs by default."
 
-                Expect.isEmpty pair.Model.OutputSets "New pair starts as a legitimate input-only transition."
-                Expect.isEmpty pair.Model.Connections "No connector exists until the user creates one."
+                Expect.isEmpty layer.Model.OutputSets "New layer starts without designated outputs."
+                Expect.isEmpty layer.Model.Connections "No connector exists until the user creates one."
+                Expect.equal next.ReferenceLinks.Length 5 "Each seeded input should keep an upstream reference."
+                Expect.isEmpty patches "Layer derivation should not write ARC data."
+            | Error error -> failwithf "Expected layer addition success, got %A" error
+
+        testCase "addLayer treats selected active inputs as new layer inputs"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+
+            match
+                Session.addLayer
+                    {
+                        SelectedSets = [ ProvenanceSide.Input, "input-a" ]
+                    }
+                    session
+            with
+            | Ok(next, patches) ->
+                let layer = Session.activeLayer next
+                let input = layer.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
 
                 Expect.equal
-                    next.BoundaryLinks.Length
-                    5
-                    "Each carried output must be linked to its next input projection."
+                    next.LayerOrder
+                    [ "layer-1"; "layer-2" ]
+                    "Input-only selection should create one new conceptual layer."
 
-                Expect.isTrue
-                    (pair.Model.PropertyValues
-                     |> Map.forall (fun id _ ->
-                         pair.Model.InputSets
-                         |> Map.exists (fun _ set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains id)
-                     ))
-                    "Derived pairs should retain only values referenced by their projected endpoints."
-
-                Expect.isEmpty patches "Creating an empty editing layer does not write ARC data."
-            | Error error -> failwithf "Expected layer addition success, got %A" error
+                Expect.equal input.Name "Input A" "The selected active input should become a new layer input snapshot."
+                Expect.equal next.ReferenceLinks.Length 1 "The selected active input should keep an upstream reference."
+                Expect.isEmpty layer.Model.OutputSets "New layer starts without designated outputs."
+                Expect.isEmpty patches "Layer derivation should not write ARC data."
+            | Error error -> failwithf "Expected input-seeded layer addition success, got %A" error
 
         testCase "addLayer carries output properties inherited through loaded connections"
         <| fun _ ->
@@ -1281,7 +1297,7 @@ let sessionTests =
                     "A projected output should keep properties inherited from its previously connected loaded input."
             | Error error -> failwithf "Expected layer addition success, got %A" error
 
-        testCase "addLayer supports a mixed selected seed"
+        testCase "addLayer treats mixed input and output seeds as new layer inputs"
         <| fun _ ->
             let session = Session.init (sampleModel ())
 
@@ -1293,24 +1309,28 @@ let sessionTests =
             }
 
             match Session.addLayer selected session with
-            | Ok(next, _) ->
-                let pair = Session.activePair next
+            | Ok(next, patches) ->
+                let layer = Session.activeLayer next
 
                 let names =
-                    pair.Model.InputSets
+                    layer.Model.InputSets
                     |> Map.toList
                     |> List.map (fun (_, set) -> set.Name)
                     |> List.sort
 
-                Expect.equal names [ "Input A"; "Output B" ] "Mixed selection becomes the next input side."
-                Expect.equal next.BoundaryLinks.Length 2 "Only seeded items should be linked."
-
                 Expect.equal
-                    pair.LeftLayerId
-                    "selection-3"
-                    "Mixed input/output selections use a virtual selection layer."
+                    next.LayerOrder
+                    [ "layer-1"; "layer-2" ]
+                    "Mixed selection should create one new conceptual layer."
 
-                Expect.equal next.Layers.[2].Label "Selection 3" "Selection layer should be visible in navigation."
+                Expect.equal names [ "Input A"; "Output B" ] "Mixed selection should become the next input side."
+                Expect.equal next.ReferenceLinks.Length 2 "Only seeded entities should be linked."
+
+                Expect.isFalse
+                    (next.Layers |> List.exists (fun layer -> layer.Id = "selection-3"))
+                    "Mixed selection should not create a virtual selection layer."
+
+                Expect.isEmpty patches "Layer derivation should not write ARC data."
             | Error error -> failwithf "Expected mixed layer addition success, got %A" error
 
         testCase "updating a carried property from the next pair updates the previous view once"

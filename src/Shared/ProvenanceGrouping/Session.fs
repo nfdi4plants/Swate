@@ -135,13 +135,13 @@ module Session =
 
     let private nextIndex session = session.LayerOrder.Length + 1
 
-    let private nextInputSetId pairId side index setId =
+    let private nextInputSetId layerId side index setId =
         let sideText =
             match side with
             | ProvenanceSide.Input -> "input"
             | ProvenanceSide.Output -> "output"
 
-        $"{pairId}-from-{sideText}-{index}-{setId}"
+        $"{layerId}-from-{sideText}-{index}-{setId}"
 
     let addLayer command session : SessionResult =
         let current = activeLayer session
@@ -171,26 +171,14 @@ module Session =
         match missing with
         | Some setRef -> Error(SessionError.SetNotFound setRef)
         | None ->
-            let pairIndex = nextIndex session
-            let layerNumber = pairIndex + 1
-            let pairId = $"pair-{pairIndex}"
-            let layerId = $"layer-{layerNumber}"
-            let hasSelectedInput = selectedSets |> List.exists (fst >> (=) ProvenanceSide.Input)
-
-            let hasSelectedOutput =
-                selectedSets |> List.exists (fst >> (=) ProvenanceSide.Output)
-
-            let leftLayerId =
-                match hasSelectedInput, hasSelectedOutput with
-                | true, true -> $"selection-{layerNumber}"
-                | true, false -> current.LeftLayerId
-                | false, _ -> current.RightLayerId
+            let layerIndex = nextIndex session
+            let layerId = $"layer-{layerIndex}"
 
             let inputs, links =
                 selectedSets
                 |> List.mapi (fun seedIndex (side, setId) ->
                     let source = (setAt side setId current).Value
-                    let nextId = nextInputSetId pairId side seedIndex setId
+                    let nextId = nextInputSetId layerId side seedIndex setId
                     let projected = { source with Id = nextId }
 
                     let link = {
@@ -200,7 +188,7 @@ module Session =
                             SetId = setId
                         }
                         Target = {
-                            LayerId = pairId
+                            LayerId = layerId
                             Side = ProvenanceSide.Input
                             SetId = nextId
                         }
@@ -223,10 +211,10 @@ module Session =
                 |> Map.filter (fun id _ -> projectedPropertyValueIds.Contains id)
 
             let pair = {
-                Id = pairId
-                Label = $"Layer {pairIndex}"
-                InputSideId = leftLayerId
-                OutputSideId = layerId
+                Id = layerId
+                Label = layerLabel layerIndex
+                InputSideId = sideId layerId ProvenanceSide.Input
+                OutputSideId = sideId layerId ProvenanceSide.Output
                 Model = {
                     LoadedTableName = current.Model.LoadedTableName
                     PropertyValues = projectedPropertyValues
