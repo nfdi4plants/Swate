@@ -167,8 +167,13 @@ type Controls =
 
     [<ReactComponent>]
     static member LayerTabs
-        (session: ProvenanceSession, onSelect: ProvenancePairId -> unit, onAddLayer: unit -> unit, ?debug: bool)
-        =
+        (
+            session: ProvenanceSession,
+            onSelect: ProvenancePairId -> unit,
+            onAddLayer: unit -> unit,
+            ?debug: bool,
+            ?layerColors: Map<ProvenanceLayerId, ProvenanceColor>
+        ) =
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
             prop.children [
@@ -176,6 +181,12 @@ type Controls =
                     let pair = session.Pairs.[pairId]
                     let left = session.Layers |> List.find (fun layer -> layer.Id = pair.LeftLayerId)
                     let right = session.Layers |> List.find (fun layer -> layer.Id = pair.RightLayerId)
+
+                    let leftColor =
+                        layerColors |> Option.bind (fun colors -> colors |> Map.tryFind left.Id)
+
+                    let rightColor =
+                        layerColors |> Option.bind (fun colors -> colors |> Map.tryFind right.Id)
 
                     Html.button [
                         prop.title $"View provenance for {left.Label} and {right.Label}"
@@ -189,8 +200,32 @@ type Controls =
                         prop.ariaLabel $"View provenance for {left.Label} and {right.Label}"
                         if defaultArg debug false then
                             prop.testId $"provenance-pair-{pairId}"
+                            let lc = leftColor |> Option.defaultValue ""
+                            let rc = rightColor |> Option.defaultValue ""
+                            prop.custom ("data-provenance-layer-color", $"{lc}|{rc}")
                         prop.onClick (fun _ -> onSelect pairId)
-                        prop.text $"{left.Label} -> {right.Label}"
+                        prop.children [
+                            match leftColor with
+                            | Some c when c <> "" ->
+                                Html.span [
+                                    prop.className "swt:size-3 swt:shrink-0 swt:rounded"
+                                    prop.style [ style.backgroundColor c ]
+                                ]
+                            | _ -> Html.none
+                            Html.span left.Label
+                            Html.i [
+                                prop.className
+                                    "swt:iconify swt:fluent--arrow-right-20-regular swt:size-3 swt:shrink-0 swt:mx-0.5"
+                            ]
+                            match rightColor with
+                            | Some c when c <> "" ->
+                                Html.span [
+                                    prop.className "swt:size-3 swt:shrink-0 swt:rounded"
+                                    prop.style [ style.backgroundColor c ]
+                                ]
+                            | _ -> Html.none
+                            Html.span right.Label
+                        ]
                     ]
                 Html.button [
                     prop.title "Add layer"
@@ -207,6 +242,44 @@ type Controls =
                 ]
             ]
         ]
+
+    [<ReactComponent>]
+    static member LayerColorButton
+        (layerId: ProvenanceLayerId, currentColor: ProvenanceColor option, onSetColor: ProvenanceColor option -> unit)
+        =
+        Popover.Simple(
+            trigger =
+                Html.button [
+                    prop.type'.button
+                    prop.className
+                        "swt:size-4 swt:shrink-0 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer swt:align-middle"
+                    match currentColor with
+                    | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
+                    | _ -> ()
+                    prop.ariaLabel $"Set color for layer {layerId}"
+                ],
+            content =
+                Html.div [
+                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:p-1"
+                    prop.children [
+                        for color in State.PropertyColors.palette do
+                            Html.button [
+                                prop.type'.button
+                                prop.className
+                                    "swt:size-6 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer"
+                                prop.style [ style.backgroundColor color ]
+                                prop.ariaLabel $"Set layer color {color}"
+                                prop.onClick (fun _ -> onSetColor (Some color))
+                            ]
+                        Html.button [
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:min-h-0 swt:py-0"
+                            prop.text "None"
+                            prop.onClick (fun _ -> onSetColor None)
+                        ]
+                    ]
+                ]
+        )
 
     [<ReactComponent>]
     static member private PropertySwapButton
@@ -250,7 +323,11 @@ type Controls =
             onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             setIsValueChipDragging: bool -> unit,
             ?debug: bool,
-            ?key: string
+            ?key: string,
+            ?stats: PropertyStats,
+            ?badge: PropertyCountBadge,
+            ?color: ProvenanceColor,
+            ?origins: Set<PropertyOrigin>
         ) =
         let draggable =
             DndKit.useDraggable (
@@ -328,10 +405,72 @@ type Controls =
                 prop.onClick (fun _ -> onToggleSide header)
                 prop.children [
                     propertyAnchor
+                    match color with
+                    | Some c when c <> "" ->
+                        Html.span [
+                            prop.className "swt:size-2.5 swt:shrink-0 swt:rounded"
+                            prop.style [ style.backgroundColor c ]
+                        ]
+                    | _ -> Html.none
                     Html.span [
                         prop.className "swt:min-w-0 swt:truncate swt:text-left"
                         prop.text header.Category.Name
                     ]
+                    match badge with
+                    | Some badge ->
+                        match badge with
+                        | PropertyCountBadge.Hide -> Html.none
+                        | PropertyCountBadge.DistinctValues n ->
+                            Html.span [
+                                prop.className "swt:badge swt:badge-xs swt:shrink-0"
+                                prop.text (string n)
+                            ]
+                        | PropertyCountBadge.Coverage(setsWithValue, total) ->
+                            Html.span [
+                                prop.className "swt:badge swt:badge-xs swt:badge-warning swt:shrink-0"
+                                prop.text $"{setsWithValue}/{total}"
+                            ]
+                    | None -> Html.none
+                    match origins with
+                    | Some origins ->
+                        let hasCurrent =
+                            origins
+                            |> Set.exists (
+                                function
+                                | PropertyOrigin.Current _ -> true
+                                | _ -> false
+                            )
+
+                        let hasUpstream =
+                            origins
+                            |> Set.exists (
+                                function
+                                | PropertyOrigin.UpstreamLayer _
+                                | PropertyOrigin.PreviousContext _ -> true
+                                | _ -> false
+                            )
+
+                        if hasCurrent && hasUpstream then
+                            Html.i [
+                                prop.className
+                                    "swt:iconify swt:fluent--layer-diagonal-20-regular swt:size-3 swt:shrink-0 swt:text-base-content/60"
+                                prop.title "Current and upstream"
+                            ]
+                        elif hasCurrent then
+                            Html.i [
+                                prop.className
+                                    "swt:iconify swt:fluent--target-arrow-20-regular swt:size-3 swt:shrink-0 swt:text-base-content/60"
+                                prop.title "Current"
+                            ]
+                        elif hasUpstream then
+                            Html.i [
+                                prop.className
+                                    "swt:iconify swt:fluent--arrow-trending-lines-20-regular swt:size-3 swt:shrink-0 swt:text-base-content/60"
+                                prop.title "Upstream"
+                            ]
+                        else
+                            Html.none
+                    | None -> Html.none
                 ]
             ]
 
@@ -843,9 +982,30 @@ type Controls =
         )
 
     [<ReactComponent>]
-    static member ValueLabel(propertyValue: ProvenancePropertyValue, ?debug: bool, ?key: string) : ReactElement =
+    static member ValueLabel
+        (propertyValue: ProvenancePropertyValue, ?debug: bool, ?key: string, ?sourceInfo: PropertyValueSourceInfo option) : ReactElement =
         let label =
             $"{propertyValue.Header.Category.Name}: {Formatting.formatValue propertyValue.Value propertyValue.Unit}"
+
+        let sourceTitle =
+            match sourceInfo with
+            | Some(Some info) ->
+                let parts = [
+                    match info.TableName with
+                    | Some tn -> $"Table: {tn}"
+                    | None -> ()
+                    match info.ProcessName with
+                    | Some pn -> $"Process: {pn}"
+                    | None -> ()
+                    if info.IsCurrentTable then
+                        "Current table"
+                ]
+
+                if parts.IsEmpty then
+                    None
+                else
+                    Some(System.String.Join("; ", parts))
+            | _ -> None
 
         Html.div [
             match key with
@@ -853,6 +1013,9 @@ type Controls =
             | None -> ()
             prop.className
                 "swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"
+            match sourceTitle with
+            | Some title -> prop.title title
+            | None -> ()
             if defaultArg debug false then
                 prop.testId $"provenance-value-{propertyValue.Id}"
             prop.children [ Html.span [ prop.text label ] ]
@@ -867,7 +1030,8 @@ type Controls =
             ?showHeader: bool,
             ?anchorSide: ProvenanceSide,
             ?debug: bool,
-            ?key: string
+            ?key: string,
+            ?sourceInfo: PropertyValueSourceInfo option
         ) : ReactElement =
         let canDrag = defaultArg draggable true
         let showHeader = defaultArg showHeader true
@@ -939,6 +1103,22 @@ type Controls =
             if defaultArg debug false then
                 prop.testId $"provenance-value-{propertyValue.Id}"
             prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"
+            match sourceInfo with
+            | Some(Some info) ->
+                let parts = [
+                    match info.TableName with
+                    | Some tn -> $"Table: {tn}"
+                    | None -> ()
+                    match info.ProcessName with
+                    | Some pn -> $"Process: {pn}"
+                    | None -> ()
+                    if info.IsCurrentTable then
+                        "Current table"
+                ]
+
+                if not parts.IsEmpty then
+                    prop.title (System.String.Join("; ", parts))
+            | _ -> ()
             prop.children [
                 match valueAnchor with
                 | Some anchor -> anchor
@@ -1095,3 +1275,212 @@ type Controls =
                  else
                      None)
         )
+
+    [<ReactComponent>]
+    static member FilterToolbar
+        (
+            filters: FilterState,
+            onSearch: string -> unit,
+            onPropertySort: PropertySort -> unit,
+            onGroupSort: GroupSort -> unit,
+            onValueCountFilter: PropertyValueCountFilter -> unit,
+            onOriginFilter: PropertyOriginFilter -> unit,
+            ?debug: bool
+        ) =
+        Html.div [
+            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2 swt:p-2"
+            prop.children [
+                Html.div [
+                    prop.className "swt:relative swt:flex swt:items-center"
+                    prop.children [
+                        Html.i [
+                            prop.className
+                                "swt:iconify swt:fluent--search-20-regular swt:absolute swt:left-2 swt:size-4 swt:text-base-content/50"
+                        ]
+                        Html.input [
+                            prop.className "swt:input swt:input-bordered swt:input-sm swt:pl-8"
+                            prop.placeholder "Search properties & values..."
+                            prop.value filters.SearchText
+                            prop.onChange onSearch
+                        ]
+                    ]
+                ]
+                Html.select [
+                    prop.className "swt:select swt:select-bordered swt:select-sm"
+                    prop.value (
+                        match filters.PropertySort with
+                        | PropertySort.ValueCountDesc -> "ValueCountDesc"
+                        | PropertySort.NameAsc -> "NameAsc"
+                        | PropertySort.Origin -> "Origin"
+                    )
+                    prop.onChange (fun v ->
+                        match v with
+                        | "ValueCountDesc" -> onPropertySort PropertySort.ValueCountDesc
+                        | "NameAsc" -> onPropertySort PropertySort.NameAsc
+                        | "Origin" -> onPropertySort PropertySort.Origin
+                        | _ -> ()
+                    )
+                    prop.children [
+                        Html.option [ prop.value "ValueCountDesc"; prop.text "Value count" ]
+                        Html.option [ prop.value "NameAsc"; prop.text "Name" ]
+                        Html.option [ prop.value "Origin"; prop.text "Origin" ]
+                    ]
+                ]
+                Html.select [
+                    prop.className "swt:select swt:select-bordered swt:select-sm"
+                    prop.value (
+                        match filters.GroupSort with
+                        | GroupSort.NameAsc -> "NameAsc"
+                        | GroupSort.MemberCountDesc -> "MemberCountDesc"
+                        | GroupSort.ConnectionCountDesc -> "ConnectionCountDesc"
+                    )
+                    prop.onChange (fun v ->
+                        match v with
+                        | "NameAsc" -> onGroupSort GroupSort.NameAsc
+                        | "MemberCountDesc" -> onGroupSort GroupSort.MemberCountDesc
+                        | "ConnectionCountDesc" -> onGroupSort GroupSort.ConnectionCountDesc
+                        | _ -> ()
+                    )
+                    prop.children [
+                        Html.option [ prop.value "NameAsc"; prop.text "Name" ]
+                        Html.option [ prop.value "MemberCountDesc"; prop.text "Members" ]
+                        Html.option [
+                            prop.value "ConnectionCountDesc"
+                            prop.text "Connections"
+                        ]
+                    ]
+                ]
+                Html.select [
+                    prop.className "swt:select swt:select-bordered swt:select-sm"
+                    prop.value (
+                        match filters.ValueCountFilter with
+                        | PropertyValueCountFilter.Any -> "Any"
+                        | PropertyValueCountFilter.Singleton -> "Singleton"
+                        | PropertyValueCountFilter.Multiple -> "Multiple"
+                        | PropertyValueCountFilter.CoverageGap -> "CoverageGap"
+                    )
+                    prop.onChange (fun v ->
+                        match v with
+                        | "Any" -> onValueCountFilter PropertyValueCountFilter.Any
+                        | "Singleton" -> onValueCountFilter PropertyValueCountFilter.Singleton
+                        | "Multiple" -> onValueCountFilter PropertyValueCountFilter.Multiple
+                        | "CoverageGap" -> onValueCountFilter PropertyValueCountFilter.CoverageGap
+                        | _ -> ()
+                    )
+                    prop.children [
+                        Html.option [ prop.value "Any"; prop.text "Any" ]
+                        Html.option [ prop.value "Singleton"; prop.text "1 value" ]
+                        Html.option [ prop.value "Multiple"; prop.text "2+ values" ]
+                        Html.option [ prop.value "CoverageGap"; prop.text "Coverage gap" ]
+                    ]
+                ]
+                Html.select [
+                    prop.className "swt:select swt:select-bordered swt:select-sm"
+                    prop.value (
+                        match filters.OriginFilter with
+                        | PropertyOriginFilter.AnyOrigin -> "AnyOrigin"
+                        | PropertyOriginFilter.CurrentOnly -> "CurrentOnly"
+                        | PropertyOriginFilter.AnyUpstream -> "AnyUpstream"
+                        | PropertyOriginFilter.UpstreamLayer _ -> "UpstreamLayer"
+                        | PropertyOriginFilter.PreviousContext _ -> "PreviousContext"
+                    )
+                    prop.onChange (fun v ->
+                        match v with
+                        | "AnyOrigin" -> onOriginFilter PropertyOriginFilter.AnyOrigin
+                        | "CurrentOnly" -> onOriginFilter PropertyOriginFilter.CurrentOnly
+                        | "AnyUpstream" -> onOriginFilter PropertyOriginFilter.AnyUpstream
+                        | _ -> ()
+                    )
+                    prop.children [
+                        Html.option [ prop.value "AnyOrigin"; prop.text "Any" ]
+                        Html.option [ prop.value "CurrentOnly"; prop.text "Current only" ]
+                        Html.option [ prop.value "AnyUpstream"; prop.text "Upstream" ]
+                    ]
+                ]
+                if defaultArg debug false then
+                    Html.span [ prop.testId "provenance-filter-toolbar" ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member PropertyColorButton(header: ProvenancePropertyHeader, onSetColor: ProvenanceColor option -> unit) =
+        Popover.Simple(
+            trigger =
+                Html.button [
+                    prop.type'.button
+                    prop.className
+                        "swt:size-5 swt:shrink-0 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer swt:align-middle"
+                    prop.ariaLabel $"Set color for property {header.Category.Name}"
+                ],
+            content =
+                Html.div [
+                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:p-1"
+                    prop.children [
+                        for color in State.PropertyColors.palette do
+                            Html.button [
+                                prop.type'.button
+                                prop.className
+                                    "swt:size-6 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer"
+                                prop.style [ style.backgroundColor color ]
+                                prop.ariaLabel $"Set property color {color}"
+                                prop.onClick (fun _ -> onSetColor (Some color))
+                            ]
+                        Html.button [
+                            prop.type'.button
+                            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:min-h-0 swt:py-0"
+                            prop.text "None"
+                            prop.onClick (fun _ -> onSetColor None)
+                        ]
+                    ]
+                ]
+        )
+
+    [<ReactComponent>]
+    static member SourceInfoPopover(sourceInfo: PropertyValueSourceInfo option) =
+        match sourceInfo with
+        | None -> Html.none
+        | Some info ->
+            Html.div [
+                prop.className "swt:text-xs swt:space-y-1 swt:p-1"
+                prop.children [
+                    if info.IsCurrentTable then
+                        Html.span [
+                            prop.className "swt:font-semibold"
+                            prop.text "Current table"
+                        ]
+                    else
+                        match info.TableName with
+                        | Some tableName ->
+                            Html.span [
+                                prop.className "swt:font-semibold"
+                                prop.text $"Table: {tableName}"
+                            ]
+                        | None -> Html.none
+
+                    match info.ProcessName with
+                    | Some processName -> Html.span [ prop.text $"Process: {processName}" ]
+                    | None -> Html.none
+
+                    if not info.InputNames.IsEmpty then
+                        Html.div [
+                            prop.children [
+                                Html.span [ prop.className "swt:font-medium"; prop.text "Inputs:" ]
+                                for inputName in info.InputNames do
+                                    Html.span [ prop.text $" {inputName}" ]
+                            ]
+                        ]
+                    else
+                        Html.none
+
+                    if not info.OutputNames.IsEmpty then
+                        Html.div [
+                            prop.children [
+                                Html.span [ prop.className "swt:font-medium"; prop.text "Outputs:" ]
+                                for outputName in info.OutputNames do
+                                    Html.span [ prop.text $" {outputName}" ]
+                            ]
+                        ]
+                    else
+                        Html.none
+                ]
+            ]

@@ -834,3 +834,75 @@ module ValueAssignment =
                 )
             else
                 Error(ValueAssignmentError.MixedPropertyValueCounts source.Header)
+
+    let private combineGroupsForAssignment (groups: DisplayGroup list) : DisplayGroup option =
+        match groups with
+        | [] -> None
+        | head :: _ ->
+            let allMembers =
+                groups
+                |> List.collect (fun g -> g.Members)
+                |> List.distinctBy (fun m -> m.SetId)
+
+            Some { head with Members = allMembers }
+
+    let planPropertyValueDropToGroups
+        (source: ValueAssignmentSource)
+        (groups: DisplayGroup list)
+        (model: ProvenanceModel)
+        : Result<PropertyAssignmentBatch, ValueAssignmentError> =
+        groups
+        |> List.groupBy (fun group -> group.Side)
+        |> List.fold
+            (fun result (side, sideGroups) ->
+                result
+                |> Result.bind (fun (batch: PropertyAssignmentBatch) ->
+                    match combineGroupsForAssignment sideGroups with
+                    | None -> Ok batch
+                    | Some combinedGroup ->
+                        planPropertyValueDrop source combinedGroup model
+                        |> Result.map (fun plan ->
+                            match plan with
+                            | AddCurrent command -> {
+                                batch with
+                                    Adds = batch.Adds @ [ command ]
+                              }
+                            | ConfirmOverwrite warning -> {
+                                batch with
+                                    Overwrites = batch.Overwrites @ [ warning ]
+                              }
+                        )
+                )
+            )
+            (Ok { Adds = []; Overwrites = [] })
+
+/// Builds property-value views with source and origin info for display.
+module PropertyValueViewing =
+
+    open Swate.Components.Shared.ProvenanceGrouping.Types
+    open Swate.Components.Shared.ProvenanceGrouping.Session
+    open Swate.Components.Page.ProvenanceGrouping.Types
+
+    type PropertyValueView = {
+        Value: ProvenancePropertyValue
+        SourceInfo: PropertyValueSourceInfo option
+        Origin: PropertyOrigin option
+        Color: ProvenanceColor option
+    }
+
+    let buildPropertyValueView
+        (pairId: ProvenancePairId)
+        (side: ProvenanceSide)
+        (session: ProvenanceSession)
+        (color: ProvenanceColor option)
+        (value: ProvenancePropertyValue)
+        : PropertyValueView =
+        let sourceInfo = Session.propertyValueSourceInfo (Session.activePair session) value
+        let origin = Session.propertyValueOriginInSession pairId side value.Id session
+
+        {
+            Value = value
+            SourceInfo = sourceInfo
+            Origin = origin
+            Color = color
+        }
