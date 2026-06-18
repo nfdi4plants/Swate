@@ -86,6 +86,60 @@ type ManualResolutionPair = {
     OutputGroupId: string
 }
 
+type ProvenanceColor = string
+
+type PropertyColorSettings = {
+    ManualPropertyColors: Map<GroupingKey, ProvenanceColor>
+    LayerColors: Map<ProvenanceLayerId, ProvenanceColor>
+}
+
+[<RequireQualifiedAccess>]
+type PropertySort =
+    | ValueCountDesc
+    | NameAsc
+    | Origin
+
+[<RequireQualifiedAccess>]
+type GroupSort =
+    | NameAsc
+    | MemberCountDesc
+    | ConnectionCountDesc
+
+[<RequireQualifiedAccess>]
+type PropertyValueCountFilter =
+    | Any
+    | Singleton
+    | Multiple
+    | CoverageGap
+
+[<RequireQualifiedAccess>]
+type PropertyOriginFilter =
+    | AnyOrigin
+    | CurrentOnly
+    | AnyUpstream
+    | UpstreamLayer of ProvenanceLayerId
+    | PreviousContext of tableName: ProvenanceTableName * processName: ProvenanceProcessName option
+
+type FilterState = {
+    SearchText: string
+    PropertySort: PropertySort
+    GroupSort: GroupSort
+    ValueCountFilter: PropertyValueCountFilter
+    OriginFilter: PropertyOriginFilter
+}
+
+type PropertyStats = {
+    Header: ProvenancePropertyHeader
+    DistinctValueCount: int
+    SetsWithValueCount: int
+    TotalSetCount: int
+}
+
+type PropertyCountBadge =
+    | Hide
+    | DistinctValues of int
+    | Coverage of setsWithValueCount: int * totalSetCount: int
+
 type UiState = {
     LayerStates: Map<ProvenanceLayerId, LayerViewState>
     PropertyRailPlacements: Map<ProvenancePairId * GroupingKey, ProvenanceSide>
@@ -99,6 +153,8 @@ type UiState = {
     SelectedOutputs: Set<ProvenancePairId * string>
     Detail: ProvenanceDetail option
     Error: string option
+    PropertyColors: PropertyColorSettings
+    Filters: FilterState
 }
 
 /// Builds demo sessions used by ProvenanceGrouping stories and browser tests.

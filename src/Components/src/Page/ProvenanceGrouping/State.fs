@@ -93,6 +93,131 @@ module MemberResolution =
             && pair.OutputGroupId = outputGroupId
         )
 
+module PropertyColors =
+
+    let palette = [|
+        "#2563eb"
+        "#16a34a"
+        "#d97706"
+        "#dc2626"
+        "#7c3aed"
+        "#0891b2"
+        "#be185d"
+    |]
+
+    let empty = {
+        ManualPropertyColors = Map.empty
+        LayerColors = Map.empty
+    }
+
+    let private automaticColorForLayer layerIndex = palette.[layerIndex % palette.Length]
+
+    let setColor (header: ProvenancePropertyHeader) color state =
+        let key = Keys.groupingKey header
+
+        {
+            state with
+                PropertyColors = {
+                    state.PropertyColors with
+                        ManualPropertyColors = state.PropertyColors.ManualPropertyColors |> Map.add key color
+                }
+        }
+
+    let clearColor (header: ProvenancePropertyHeader) state =
+        let key = Keys.groupingKey header
+
+        {
+            state with
+                PropertyColors = {
+                    state.PropertyColors with
+                        ManualPropertyColors = state.PropertyColors.ManualPropertyColors |> Map.remove key
+                }
+        }
+
+    let setLayerColor (layerId: ProvenanceLayerId) color state = {
+        state with
+            PropertyColors = {
+                state.PropertyColors with
+                    LayerColors = state.PropertyColors.LayerColors |> Map.add layerId color
+            }
+    }
+
+    let clearLayerColor (layerId: ProvenanceLayerId) state = {
+        state with
+            PropertyColors = {
+                state.PropertyColors with
+                    LayerColors = state.PropertyColors.LayerColors |> Map.remove layerId
+            }
+    }
+
+    let ensureLayerColors (session: ProvenanceSession) (state: UiState) : PropertyColorSettings =
+        let liveLayerIds = session.Layers |> List.map _.Id |> Set.ofList
+
+        let retained =
+            state.PropertyColors.LayerColors
+            |> Map.filter (fun layerId _ -> liveLayerIds.Contains layerId)
+
+        let withMissingDefaults =
+            session.Layers
+            |> List.mapi (fun index layer -> layer.Id, automaticColorForLayer index)
+            |> List.fold
+                (fun (colors: Map<ProvenanceLayerId, ProvenanceColor>) (layerId, color) ->
+                    if colors.ContainsKey layerId then
+                        colors
+                    else
+                        colors |> Map.add layerId color
+                )
+                retained
+
+        {
+            state.PropertyColors with
+                LayerColors = withMissingDefaults
+        }
+
+module Filters =
+
+    let defaultState = {
+        SearchText = ""
+        PropertySort = PropertySort.ValueCountDesc
+        GroupSort = GroupSort.NameAsc
+        ValueCountFilter = PropertyValueCountFilter.Any
+        OriginFilter = PropertyOriginFilter.AnyOrigin
+    }
+
+    let setSearch text state = {
+        state with
+            Filters = { state.Filters with SearchText = text }
+    }
+
+    let setValueCountFilter filter state = {
+        state with
+            Filters = {
+                state.Filters with
+                    ValueCountFilter = filter
+            }
+    }
+
+    let setOriginFilter filter state = {
+        state with
+            Filters = {
+                state.Filters with
+                    OriginFilter = filter
+            }
+    }
+
+    let setPropertySort sort state = {
+        state with
+            Filters = {
+                state.Filters with
+                    PropertySort = sort
+            }
+    }
+
+    let setGroupSort sort state = {
+        state with
+            Filters = { state.Filters with GroupSort = sort }
+    }
+
 /// Creates, finds, and synchronizes layer-local state with the current session.
 module Layers =
 
@@ -144,6 +269,8 @@ module Layers =
             state.ManualResolutionPairs
             |> List.filter (fun pair -> currentPairIds.Contains pair.PairId)
 
+        let propertyColors = PropertyColors.ensureLayerColors session state
+
         if
             layerStates = state.LayerStates
             && propertyRailPlacements = state.PropertyRailPlacements
@@ -152,6 +279,7 @@ module Layers =
             && paletteValues = state.PaletteValues
             && pendingMemberResolution = state.PendingMemberResolution
             && manualResolutionPairs = state.ManualResolutionPairs
+            && propertyColors = state.PropertyColors
         then
             state
         else
@@ -164,6 +292,7 @@ module Layers =
                     PaletteValues = paletteValues
                     PendingMemberResolution = pendingMemberResolution
                     ManualResolutionPairs = manualResolutionPairs
+                    PropertyColors = propertyColors
             }
 
     let update layerId updateLayer state =
@@ -450,4 +579,6 @@ let init (session: ProvenanceSession) = {
     SelectedOutputs = Set.empty
     Detail = None
     Error = None
+    PropertyColors = PropertyColors.empty
+    Filters = Filters.defaultState
 }

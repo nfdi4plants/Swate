@@ -2130,6 +2130,145 @@ let uiStateTests =
                 Expect.equal header species "Multi-value members should reject the drop for that property."
                 Expect.equal setIds [ "input-b" ] "The rejection should identify the multi-value member."
             | other -> failwithf "Expected a multiple-value rejection, got %A" other
+
+        testCase "default state initializes with empty colors and filters"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let state = State.init session
+
+            Expect.equal
+                state.PropertyColors
+                State.PropertyColors.empty
+                "Initial state should have empty property colors."
+
+            Expect.equal state.Filters State.Filters.defaultState "Initial state should have default filters."
+
+        testCase "set and clear property color"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let state = State.init session
+            let header = propertyHeader FixtureKinds.characteristicProperty "Species"
+
+            let withColor = State.PropertyColors.setColor header "#2563eb" state
+            let key = { Header = header }
+
+            Expect.equal
+                withColor.PropertyColors.ManualPropertyColors.[key]
+                "#2563eb"
+                "Property color should be set by header."
+
+            let cleared = State.PropertyColors.clearColor header withColor
+
+            Expect.isFalse
+                (cleared.PropertyColors.ManualPropertyColors.ContainsKey key)
+                "Property color should be cleared."
+
+        testCase "set and clear layer color"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let state = State.init session
+
+            let withColor = State.PropertyColors.setLayerColor "layer-1" "#16a34a" state
+            Expect.equal withColor.PropertyColors.LayerColors.["layer-1"] "#16a34a" "Layer color should be set."
+
+            let cleared = State.PropertyColors.clearLayerColor "layer-1" withColor
+            Expect.isFalse (cleared.PropertyColors.LayerColors.ContainsKey "layer-1") "Layer color should be cleared."
+
+        testCase "new layers get automatic colors from palette"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let state = State.init session
+
+            let afterEnsure = State.PropertyColors.ensureLayerColors session state
+
+            Expect.isTrue
+                (afterEnsure.PropertyColors.LayerColors.ContainsKey "layer-1")
+                "Initial layer should have an automatic color."
+
+            Expect.isTrue
+                (afterEnsure.PropertyColors.LayerColors.ContainsKey "layer-2")
+                "Initial layer should have an automatic color."
+
+        testCase "automatic colors do not overwrite existing manual layer colors"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let state = State.init session
+
+            let withManual = State.PropertyColors.setLayerColor "layer-1" "#be185d" state
+            let afterEnsure = State.PropertyColors.ensureLayerColors session withManual
+
+            Expect.equal
+                afterEnsure.PropertyColors.LayerColors.["layer-1"]
+                "#be185d"
+                "Manual layer color should be preserved."
+
+        testCase "stale layer colors are removed during cleanup"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let state = State.init session
+
+            let withStale = {
+                state with
+                    PropertyColors = {
+                        state.PropertyColors with
+                            LayerColors = Map.ofList [ "nonexistent", "#000000" ]
+                    }
+            }
+
+            let afterEnsure = State.PropertyColors.ensureLayerColors session withStale
+
+            Expect.isFalse
+                (afterEnsure.PropertyColors.LayerColors.ContainsKey "nonexistent")
+                "Stale layer color should be removed."
+
+        testCase "default filter state uses Any filter and ValueCountDesc sort"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let state = State.init session
+
+            Expect.equal state.Filters.SearchText "" "Default search should be empty."
+
+            Expect.equal
+                state.Filters.PropertySort
+                Types.PropertySort.ValueCountDesc
+                "Default sort should be value count desc."
+
+            Expect.equal
+                state.Filters.ValueCountFilter
+                Types.PropertyValueCountFilter.Any
+                "Default value count filter should be Any."
+
+        testCase "filters can be updated through state helpers"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let state = State.init session
+
+            let withSearch = State.Filters.setSearch "Arabidopsis" state
+            Expect.equal withSearch.Filters.SearchText "Arabidopsis" "Search text should be updated."
+
+            let withSort = State.Filters.setPropertySort Types.PropertySort.NameAsc withSearch
+            Expect.equal withSort.Filters.PropertySort Types.PropertySort.NameAsc "Property sort should be updated."
+
+            let withFilter =
+                State.Filters.setValueCountFilter Types.PropertyValueCountFilter.Multiple withSort
+
+            Expect.equal
+                withFilter.Filters.ValueCountFilter
+                Types.PropertyValueCountFilter.Multiple
+                "Value count filter should be updated."
+
+            let withOrigin =
+                State.Filters.setOriginFilter Types.PropertyOriginFilter.CurrentOnly withFilter
+
+            Expect.equal
+                withOrigin.Filters.OriginFilter
+                Types.PropertyOriginFilter.CurrentOnly
+                "Origin filter should be updated."
+
+            let withGroupSort =
+                State.Filters.setGroupSort Types.GroupSort.MemberCountDesc withOrigin
+
+            Expect.equal withGroupSort.Filters.GroupSort Types.GroupSort.MemberCountDesc "Group sort should be updated."
     ]
 
 let sourceTests =
