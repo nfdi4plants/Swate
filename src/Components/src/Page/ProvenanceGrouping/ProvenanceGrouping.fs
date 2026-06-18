@@ -155,22 +155,31 @@ module private EditorActions =
     let createSet session publish command =
         Session.createLoadedSet command session |> publish
 
-    let confirmPendingOverwrite session publish setUiState uiState warning =
-        let rec apply current patches propertyValueIds =
-            match propertyValueIds with
-            | [] -> Ok(current, patches)
-            | propertyValueId :: rest ->
-                match Session.updatePropertyValue propertyValueId warning.Value warning.Unit current with
-                | Ok(next, addedPatches) -> apply next (patches @ addedPatches) rest
-                | Error error -> Error error
+    let private applyOverwrite result warning =
+        warning.ExistingValueIds
+        |> List.distinct
+        |> List.fold
+            (fun result propertyValueId ->
+                result
+                |> Result.bind (fun (currentSession, patches) ->
+                    Session.updatePropertyValue propertyValueId warning.Value warning.Unit currentSession
+                    |> Result.map (fun (next, added) -> next, patches @ added)
+                )
+            )
+            result
 
-        match warning.ExistingValueIds with
-        | [] ->
-            setUiState {
-                uiState with
-                    Error = Some "Cannot overwrite because the target value context is no longer available."
-            }
-        | propertyValueIds -> apply session [] propertyValueIds |> publish
+    let private applyAdd result command =
+        result
+        |> Result.bind (fun (currentSession, patches) ->
+            Session.createLoadedPropertyValue command currentSession
+            |> Result.map (fun (next, added) -> next, patches @ added)
+        )
+
+    let applyAssignmentBatch session publish batch =
+        batch.Overwrites
+        |> List.fold applyOverwrite (Ok(session, []))
+        |> Result.bind (fun afterOverwrites -> batch.Adds |> List.fold applyAdd (Ok afterOverwrites))
+        |> publish
 
     let connectSetPairs session publish pairs =
         pairs
@@ -303,19 +312,54 @@ module private DragHandlers =
         | ProvenanceSide.Output -> pair.RightLayerId
 
     let private routePropertyValueDrop context side groupId propertyValueId =
-        match context.Lookups.FindGroup side groupId, context.Lookups.FindPropertyValue propertyValueId with
-        | Some group, Some propertyValue ->
+        match context.Lookups.FindPropertyValue propertyValueId with
+        | Some propertyValue ->
+            let selectedIds =
+                (match side with
+                 | ProvenanceSide.Input -> context.UiState.SelectedInputs
+                 | ProvenanceSide.Output -> context.UiState.SelectedOutputs)
+                |> Set.filter (fun (pid, _) -> pid = context.Pair.Id)
+
+            let targetGroupIds =
+                if selectedIds.IsEmpty then
+                    [ groupId ]
+                else
+                    selectedIds |> Set.toList |> List.map snd
+
+            let targetGroups =
+                targetGroupIds |> List.choose (fun gid -> context.Lookups.FindGroup side gid)
+
             match
-                ValueAssignment.planPropertyValueDrop
+                ValueAssignment.planPropertyValueDropToGroups
                     (context.Lookups.SourceForValue propertyValueId propertyValue)
-                    group
+                    targetGroups
                     context.Pair.Model
             with
-            | Ok(ValueAssignmentPlan.AddCurrent command) ->
-                Session.createCurrentLoadedPropertyValue command context.Session
-                |> context.Publish
-            | Ok(ValueAssignmentPlan.ConfirmOverwrite warning) ->
-                State.Overwrite.set warning context.UiState |> context.SetUiState
+            | Ok batch ->
+                let affectedValueCount =
+                    batch.Overwrites |> List.sumBy (fun w -> w.ExistingValueIds.Length)
+
+                if batch.Overwrites.IsEmpty then
+                    if not batch.Adds.IsEmpty then
+                        batch.Adds
+                        |> List.fold
+                            (fun (result: SessionResult) cmd ->
+                                match result with
+                                | Ok(current, patches) ->
+                                    Session.createCurrentLoadedPropertyValue cmd current
+                                    |> Result.map (fun (next, added) -> next, patches @ added)
+                                | Error _ -> result
+                            )
+                            (Ok(context.Session, []))
+                        |> context.Publish
+                else
+                    let pendingBatch = {
+                        Batch = batch
+                        AffectedSideCount = 1
+                        AffectedValueCount = affectedValueCount
+                    }
+
+                    State.AssignmentBatch.set pendingBatch context.UiState |> context.SetUiState
             | Error error ->
                 context.SetUiState {
                     context.UiState with
@@ -423,9 +467,21 @@ module private EditorPanels =
             prop.text error
         ]
 
-    let overwriteWarning debug warning onConfirm onCancel =
-        let count = warning.ExistingValueIds.Length
-        let valueText = Formatting.formatValue warning.Value warning.Unit
+    let assignmentBatchWarning debug (pending: PendingAssignmentBatch) onConfirm onCancel =
+        let overwriteCount = pending.AffectedValueCount
+        let sideCount = pending.AffectedSideCount
+
+        let headerText =
+            pending.Batch.Overwrites
+            |> List.tryHead
+            |> Option.map (fun w -> w.Header.Category.Name)
+            |> Option.defaultValue "property"
+
+        let valueText =
+            pending.Batch.Overwrites
+            |> List.tryHead
+            |> Option.map (fun w -> Formatting.formatValue w.Value w.Unit)
+            |> Option.defaultValue "new value"
 
         Html.div [
             prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
@@ -440,16 +496,16 @@ module private EditorPanels =
                     prop.children [
                         Html.strong [
                             prop.text (
-                                if count > 1 then
-                                    $"Overwrite {count} {warning.Header.Category.Name} values?"
+                                if overwriteCount > 1 then
+                                    $"Overwrite {overwriteCount} {headerText} values?"
                                 else
-                                    $"Overwrite {warning.Header.Category.Name} value?"
+                                    $"Overwrite {headerText} value?"
                             )
                         ]
                         Html.span [
                             prop.className "swt:text-sm"
                             prop.text
-                                $"The selected targets already have {warning.Header.Category.Name}. Confirm to replace with {valueText} using the existing edit path."
+                                $"The selected targets already have {headerText}. Confirm to replace with {valueText} using the existing edit path."
                         ]
                     ]
                 ]
@@ -461,8 +517,8 @@ module private EditorPanels =
                             prop.className "swt:btn swt:btn-warning swt:btn-sm"
                             if debug then
                                 prop.testId "provenance-confirm-overwrite"
-                            prop.onPointerUp (fun _ -> onConfirm warning)
-                            prop.onClick (fun _ -> onConfirm warning)
+                            prop.onPointerUp (fun _ -> onConfirm pending)
+                            prop.onClick (fun _ -> onConfirm pending)
                             prop.text "Overwrite"
                         ]
                         Html.button [
@@ -851,7 +907,7 @@ type ProvenanceGrouping =
                 commitUiState {
                     nextUiState with
                         Error = None
-                        PendingOverwrite = None
+                        PendingAssignmentBatch = None
                         PendingMemberResolution = None
                 }
 
@@ -882,8 +938,8 @@ type ProvenanceGrouping =
         let toggleGroupDetail side groupId =
             State.Detail.toggleGroup side groupId uiState |> setUiState
 
-        let confirmPendingOverwrite =
-            EditorActions.confirmPendingOverwrite session publish setUiState uiState
+        let confirmBatch (pending: PendingAssignmentBatch) =
+            EditorActions.applyAssignmentBatch session publish pending.Batch
 
         let connectSetPairs = EditorActions.connectSetPairs session publish
 
@@ -897,7 +953,7 @@ type ProvenanceGrouping =
                 commitUiState {
                     nextUiState with
                         Error = None
-                        PendingOverwrite = None
+                        PendingAssignmentBatch = None
                         PendingMemberResolution = None
                         Detail = None
                 }
@@ -1014,10 +1070,12 @@ type ProvenanceGrouping =
             connectionCounts |> Map.tryFind (side, groupId) |> Option.defaultValue 0
 
         let groupColumnFor side withConnectionBadges =
-            let groups =
+            let unsorted =
                 match side with
                 | ProvenanceSide.Input -> inputGroups
                 | ProvenanceSide.Output -> outputGroups
+
+            let groups = Display.sortGroups uiState.Filters.GroupSort connections unsorted
 
             let counts groupId =
                 if withConnectionBadges then
@@ -1364,13 +1422,13 @@ type ProvenanceGrouping =
                             match uiState.Error with
                             | Some error -> EditorPanels.errorAlert error
                             | None -> Html.none
-                            match uiState.PendingOverwrite with
-                            | Some warning ->
-                                EditorPanels.overwriteWarning
+                            match uiState.PendingAssignmentBatch with
+                            | Some batch ->
+                                EditorPanels.assignmentBatchWarning
                                     debug
-                                    warning
-                                    confirmPendingOverwrite
-                                    (fun () -> State.Overwrite.clear uiState |> setUiState)
+                                    batch
+                                    confirmBatch
+                                    (fun () -> State.AssignmentBatch.clear uiState |> setUiState)
                             | None -> Html.none
                             match uiState.PendingMemberResolution with
                             | Some pending ->

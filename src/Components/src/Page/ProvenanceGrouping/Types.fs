@@ -45,6 +45,17 @@ type ValueAssignmentError =
     | MixedPropertyValueCounts of ProvenancePropertyHeader
     | MultiplePropertyValues of ProvenancePropertyHeader * ProvenanceSetId list
 
+type PropertyAssignmentBatch = {
+    Adds: CreateLoadedPropertyValueCommand list
+    Overwrites: ValueAssignmentWarning list
+}
+
+type PendingAssignmentBatch = {
+    Batch: PropertyAssignmentBatch
+    AffectedSideCount: int
+    AffectedValueCount: int
+}
+
 type PanelRatios = { Left: int; Middle: int; Right: int }
 
 [<RequireQualifiedAccess>]
@@ -145,7 +156,7 @@ type UiState = {
     PropertyRailPlacements: Map<ProvenancePairId * GroupingKey, ProvenanceSide>
     ExpandedProperties: Set<ProvenancePairId * ProvenanceSide * GroupingKey>
     PaletteValues: Map<ProvenancePairId * ProvenanceSide, ProvenancePropertyValue list>
-    PendingOverwrite: ValueAssignmentWarning option
+    PendingAssignmentBatch: PendingAssignmentBatch option
     PanelRatios: Map<ProvenancePairId, PanelRatios>
     PendingMemberResolution: PendingMemberResolution option
     ManualResolutionPairs: ManualResolutionPair list

@@ -387,16 +387,19 @@ module Palette =
                 Error = None
         }
 
-/// Manages overwrite confirmation state for dropped property values.
-module Overwrite =
+/// Manages batch assignment confirmation state for dropped property values.
+module AssignmentBatch =
 
-    let set warning state = {
+    let set (batch: PendingAssignmentBatch) state = {
         state with
-            PendingOverwrite = Some warning
+            PendingAssignmentBatch = Some batch
             Error = None
     }
 
-    let clear state = { state with PendingOverwrite = None }
+    let clear state = {
+        state with
+            PendingAssignmentBatch = None
+    }
 
 /// Updates grouping assignments and side placement for properties.
 module GroupingAssignments =
@@ -571,7 +574,7 @@ let init (session: ProvenanceSession) = {
     PropertyRailPlacements = Map.empty
     ExpandedProperties = Set.empty
     PaletteValues = Map.empty
-    PendingOverwrite = None
+    PendingAssignmentBatch = None
     PanelRatios = Map.empty
     PendingMemberResolution = None
     ManualResolutionPairs = []
