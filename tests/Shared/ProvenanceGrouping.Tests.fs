@@ -2307,7 +2307,7 @@ let uiStateTests =
                 |> State.PropertyColors.setColor species "#2563eb"
 
             let projection =
-                PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Input pair.Model uiState
+                PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Output pair.Model uiState
 
             Expect.contains projection.Headers species "Search should keep headers with matching projected values."
             Expect.equal projection.ColorByHeader.[species] (Some "#2563eb") "Manual color should be projected."
@@ -2316,9 +2316,97 @@ let uiStateTests =
                 uiState |> State.Filters.setSearch "definitely-not-a-provenance-value"
 
             let emptyProjection =
-                PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Input pair.Model nonMatching
+                PropertyProjection.railProjectionWithFilters
+                    session
+                    pair.Id
+                    ProvenanceSide.Output
+                    pair.Model
+                    nonMatching
 
             Expect.isEmpty emptyProjection.Headers "Search should remove non-matching property headers."
+
+        testCase "current input properties default to output rail when connected to outputs"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let state = State.init session
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+
+            let inputHeaders =
+                (PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Input pair.Model state)
+                    .Headers
+
+            let outputHeaders =
+                (PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Output pair.Model state)
+                    .Headers
+
+            Expect.isFalse
+                (inputHeaders |> List.contains species)
+                "A connected current input property should not be duplicated on the input rail by default."
+
+            Expect.contains
+                outputHeaders
+                species
+                "A connected current input property should default to the output rail."
+
+        testCase "previous context properties stay on input rail even when inherited by outputs"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let state = State.init session
+
+            let previousTreatment =
+                propertyHeader FixtureKinds.characteristicProperty "Previous Treatment"
+
+            let inputHeaders =
+                (PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Input pair.Model state)
+                    .Headers
+
+            let outputHeaders =
+                (PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Output pair.Model state)
+                    .Headers
+
+            Expect.contains inputHeaders previousTreatment "A previous-context property should stay on the input rail."
+
+            Expect.isFalse
+                (outputHeaders |> List.contains previousTreatment)
+                "A previous-context property should not move to the output rail just because it is inherited."
+
+        testCase "current input properties remain on input rail until an output is designated"
+        <| fun _ ->
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+
+            let model =
+                model
+                    "assay-table"
+                    [
+                        propertyValue "pv-input-a-species" species (ProvenanceValue.Text "Arabidopsis") None None
+                    ]
+                    [
+                        inputSet "input-a" "assay-table" inputHeader "Input A" [ "pv-input-a-species" ]
+                    ] [] []
+
+            let session = Session.init model
+            let pair = Session.activePair session
+            let state = State.init session
+
+            let inputHeaders =
+                (PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Input pair.Model state)
+                    .Headers
+
+            let outputHeaders =
+                (PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Output pair.Model state)
+                    .Headers
+
+            Expect.contains
+                inputHeaders
+                species
+                "An incomplete layer with no output should keep current properties on the input rail."
+
+            Expect.isFalse
+                (outputHeaders |> List.contains species)
+                "A property should not move to the output rail before any output is designated."
 
         testCase "selected drop targets include selected inputs and outputs only when dropped group is selected"
         <| fun _ ->

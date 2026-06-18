@@ -383,15 +383,54 @@ module PropertyRails =
     let private railPlacement pairId header (uiState: UiState) =
         uiState.PropertyRailPlacements |> Map.tryFind (pairId, { Header = header })
 
-    let propertyRailHeadersForSide pairId side model uiState =
-        let ownHeaders = ownedHeadersForSide side model
+    let private hasPaletteHeaderForSide pairId side header uiState =
+        State.Palette.headersForSide pairId side uiState |> List.contains header
+
+    let private defaultRailSide header model =
+        if hasHeaderForSide ProvenanceSide.Output header model then
+            Some ProvenanceSide.Output
+        elif hasHeaderForSide ProvenanceSide.Input header model then
+            Some ProvenanceSide.Input
+        else
+            None
+
+    let private referencedPropertyValuesForHeader header model =
+        [
+            yield! setsForSide ProvenanceSide.Input model |> Map.toList
+            yield! setsForSide ProvenanceSide.Output model |> Map.toList
+        ]
+        |> List.collect (fun (_, set) -> ProvenanceSet.effectivePropertyValueIds set)
+        |> List.distinct
+        |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
+        |> List.filter (fun propertyValue -> propertyValue.Header = header)
+
+    let private hasPreviousOrigin session pairId header model =
+        referencedPropertyValuesForHeader header model
+        |> List.exists (fun propertyValue ->
+            match Session.propertyValueOriginInSession pairId ProvenanceSide.Input propertyValue.Id session with
+            | Some(PropertyOrigin.UpstreamLayer _)
+            | Some(PropertyOrigin.PreviousContext _) -> true
+            | _ -> false
+        )
+
+    let private defaultRailSideInSession session pairId header model =
+        if hasPreviousOrigin session pairId header model then
+            Some ProvenanceSide.Input
+        else
+            defaultRailSide header model
+
+    let private isValidRailSide pairId side header model uiState =
+        hasHeaderForSide side header model
+        || hasPaletteHeaderForSide pairId side header uiState
+
+    let private propertyRailHeadersForSideUsing defaultSideForHeader pairId side model uiState =
         let paletteHeaders = State.Palette.headersForSide pairId side uiState
 
         let knownHeaders =
             [ yield! headersForModel model; yield! paletteHeaders ] |> List.distinct
 
         [
-            yield! ownHeaders
+            yield! headersForModel model
             yield! placedHeadersForSide pairId side uiState
             yield! paletteHeaders
         ]
@@ -399,11 +438,27 @@ module PropertyRails =
         |> List.filter (fun header -> knownHeaders |> List.contains header)
         |> List.filter (fun header ->
             match railPlacement pairId header uiState with
-            | Some targetSide when hasHeaderForSide targetSide header model -> targetSide = side
-            | Some _ -> ownHeaders |> List.contains header
-            | None -> true
+            | Some targetSide when isValidRailSide pairId targetSide header model uiState -> targetSide = side
+            | Some _ ->
+                defaultSideForHeader header = Some side
+                || hasPaletteHeaderForSide pairId side header uiState
+            | None ->
+                defaultSideForHeader header = Some side
+                || (defaultSideForHeader header).IsNone
+                   && hasPaletteHeaderForSide pairId side header uiState
         )
         |> List.sortBy (fun header -> header.Category.Name)
+
+    let propertyRailHeadersForSide pairId side model uiState =
+        propertyRailHeadersForSideUsing (fun header -> defaultRailSide header model) pairId side model uiState
+
+    let propertyRailHeadersForSideInSession session pairId side model uiState =
+        propertyRailHeadersForSideUsing
+            (fun header -> defaultRailSideInSession session pairId header model)
+            pairId
+            side
+            model
+            uiState
 
     let propertyValuesForSideHeader pairId side header (model: ProvenanceModel) uiState =
         let modelValues =
@@ -602,7 +657,9 @@ module PropertyProjection =
         : PropertyRails.RailProjection =
         let pair = Session.activePair session
         let filters = uiState.Filters
-        let headers = PropertyRails.propertyRailHeadersForSide pairId side model uiState
+
+        let headers =
+            PropertyRails.propertyRailHeadersForSideInSession session pairId side model uiState
 
         let valuesByHeader =
             headers
