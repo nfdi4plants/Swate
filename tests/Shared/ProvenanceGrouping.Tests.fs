@@ -1311,9 +1311,10 @@ let sessionTests =
                 Expect.equal names [ "Input A"; "Output B" ] "Mixed selection should become the next input side."
                 Expect.equal next.ReferenceLinks.Length 2 "Only seeded entities should be linked."
 
-                Expect.isFalse
-                    (next.Layers |> List.exists (fun layer -> layer.Id = "selection-3"))
-                    "Mixed selection should not create a virtual selection layer."
+                Expect.all
+                    next.LayerOrder
+                    (fun layerId -> layerId.StartsWith "layer-")
+                    "Mixed selection should keep conceptual layer ids."
 
                 Expect.isEmpty patches "Layer derivation should not write ARC data."
             | Error error -> failwithf "Expected mixed layer addition success, got %A" error

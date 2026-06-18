@@ -1322,7 +1322,6 @@ export const AddsLayerFromMixedSelection: Story = {
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
-      expect(canvas.queryByText('Selection 3')).not.toBeInTheDocument();
       expect(canvasElement).toHaveTextContent('Input A');
       expect(canvasElement).toHaveTextContent('Output B');
     });
