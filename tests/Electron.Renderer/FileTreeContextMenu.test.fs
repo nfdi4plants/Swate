@@ -1,6 +1,7 @@
 module ElectronRenderer.FileTreeContextMenuTests
 
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
+open Renderer.Components.LeftSidebar.FileExplorer.FileTreeAssignNoteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
@@ -18,6 +19,7 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     arcRootPath = Some "C:\\arc-root"
     openCreateModal = ignore
     openFileSystemCreateModal = fun _ _ -> ()
+    requestAssignNoteItem = ignore
     requestRenameItem = ignore
     requestDeleteItem = ignore
     pathActionConfig = createConfig ()
@@ -151,6 +153,7 @@ Vitest.describe (
                             "Add Run"
                             "Add Note"
                             "<divider>"
+                            "Assign Note"
                             "Rename"
                             "Delete"
                         |]
@@ -286,6 +289,97 @@ Vitest.describe (
                 let menuItems = fileSystemCreateContextMenuItems (fun _ _ -> ()) item
 
                 Vitest.expect(menuItems.Length).toBe (0)
+        )
+
+        Vitest.test (
+            "assign note context menu item is shown for assay folders",
+            fun () ->
+                let item = createFolderItem "AssayA" (Some "assays/AssayA")
+
+                let mutable assignedItem = None
+                let menuItems = assignNoteContextMenuItems (fun item -> assignedItem <- Some item) item
+
+                Vitest.expect(labels menuItems).toEqual ([| "Assign Note" |])
+
+                menuItems.Head.OnClick()
+
+                let assignedPath = assignedItem |> Option.bind _.Path
+                Vitest.expect(assignedPath).toEqual (Some "assays/AssayA")
+        )
+
+        Vitest.test (
+            "assign note context menu item is shown for study folders",
+            fun () ->
+                let item = createFolderItem "StudyA" (Some "studies/StudyA")
+
+                let menuItems = assignNoteContextMenuItems ignore item
+
+                Vitest.expect(labels menuItems).toEqual ([| "Assign Note" |])
+        )
+
+        Vitest.test (
+            "note assignment target resolves study and assay folders",
+            fun () ->
+                let assayItem = createFolderItem "AssayA" (Some "assays/AssayA")
+                let studyItem = createFolderItem "StudyA" (Some "studies/StudyA")
+
+                Vitest
+                    .expect(tryGetNoteAssignmentTarget assayItem)
+                    .toEqual (Some { Name = "AssayA"; Kind = NotesTargetKind.Assay })
+
+                Vitest
+                    .expect(tryGetNoteAssignmentTarget studyItem)
+                    .toEqual (Some { Name = "StudyA"; Kind = NotesTargetKind.Study })
+        )
+
+        Vitest.test (
+            "assign note context menu item is hidden for note markdown files",
+            fun () ->
+                let item =
+                    createFileItem "Sampling_protocol.md" (Some "notes/2026-06-15/Sampling_protocol/Sampling_protocol.md")
+
+                let menuItems = assignNoteContextMenuItems ignore item
+
+                Vitest.expect(menuItems.Length).toBe (0)
+        )
+
+        Vitest.test (
+            "assign note context menu item is hidden for note folders",
+            fun () ->
+                let item = createFolderItem "Sampling_protocol" (Some "notes/2026-06-15/Sampling_protocol")
+                let menuItems = assignNoteContextMenuItems ignore item
+
+                Vitest.expect(menuItems.Length).toBe (0)
+        )
+
+        Vitest.test (
+            "assignable note options list root notes only",
+            fun () ->
+                let notes =
+                    createAssignableNoteOptions [
+                        FileEntry.create ("Sampling_protocol.md", "notes/2026-06-15/Sampling_protocol/Sampling_protocol.md", false)
+                        FileEntry.create ("Sampling_protocol", "notes/2026-06-15/Sampling_protocol", true)
+                        FileEntry.create (
+                            "Assigned_protocol.md",
+                            "assays/AssayA/protocols/Assigned_protocol/Assigned_protocol.md",
+                            false
+                        )
+                        FileEntry.create ("draft.md", "notes/2026-06-15/Other_folder/draft.md", false)
+                    ]
+
+                Vitest.expect(notes.Count).toBe (1)
+                Vitest.expect(notes.[0].SourceFolderPath).toBe ("notes/2026-06-15/Sampling_protocol")
+                Vitest.expect(notes.[0].NoteFolderName).toBe ("Sampling_protocol")
+        )
+
+        Vitest.test (
+            "assigned note folder path targets the protocol folder",
+            fun () ->
+                let target = { Name = "AssayA"; Kind = NotesTargetKind.Assay }
+
+                Vitest
+                    .expect(buildAssignedNoteFolderPath target "Sampling_protocol")
+                    .toBe ("assays/AssayA/protocols/Sampling_protocol")
         )
 
         Vitest.test (

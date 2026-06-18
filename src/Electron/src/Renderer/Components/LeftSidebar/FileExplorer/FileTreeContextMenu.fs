@@ -7,6 +7,7 @@ open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
+open Renderer.Components.LeftSidebar.FileExplorer.FileTreeAssignNoteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 
@@ -21,6 +22,7 @@ type ContextMenuConfig = {
     arcRootPath: string option
     openCreateModal: ArcExplorerNodeKind -> unit
     openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit
+    requestAssignNoteItem: FileItem -> unit
     requestRenameItem: FileItem -> unit
     requestDeleteItem: FileItem -> unit
     pathActionConfig: PathActionConfig
@@ -194,7 +196,19 @@ let deleteContextMenuItems (requestDeleteItem: FileItem -> unit) (item: FileItem
     else
         []
 
+let assignNoteContextMenuItems (requestAssignNoteItem: FileItem -> unit) (item: FileItem) =
+    if canAssignNoteToItem item then
+        [
+            ContextMenuItem.create
+                "Assign Note"
+                "swt:fluent--arrow-move-24-regular"
+                (fun () -> requestAssignNoteItem item)
+        ]
+    else
+        []
+
 let arcDeleteAndRenameContextMenuItems (config: ContextMenuConfig) (item: FileItem) = [
+    yield! assignNoteContextMenuItems config.requestAssignNoteItem item
     yield! renameContextMenuItems config.requestRenameItem item
     yield! deleteContextMenuItems config.requestDeleteItem item
 ]

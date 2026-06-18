@@ -23,6 +23,7 @@ module private FileTreeHelper =
     type FileTreeDialog =
         | CreateDialog of ArcExplorerNodeKind
         | FileSystemCreateDialog of FileSystemCreateDraft
+        | AssignNoteDialog of ExistingTargetRef
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
 
@@ -68,6 +69,9 @@ type FileTree =
 
         let activeDialog, setActiveDialog = React.useState<FileTreeDialog option> None
         let isDialogBusy, setIsDialogBusy = React.useState false
+        let selectedAssignableNote, setSelectedAssignableNote =
+            React.useState<AssignableNoteRef option> None
+
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
 
@@ -227,6 +231,7 @@ type FileTree =
 
         let closeDialog () =
             setIsDialogBusy false
+            setSelectedAssignableNote None
             setActiveDialog None
 
         let openCreateModal kind =
@@ -243,6 +248,14 @@ type FileTree =
 
         let requestRenameItem =
             FileTreeRenameWorkflow.requestRenameItem (Option.iter (RenameDialog >> openDialog)) errorModal.enqueue
+
+        let requestAssignNoteItem item =
+            match FileTreeAssignNoteHelper.tryGetNoteAssignmentTarget item with
+            | Some target -> openDialog (AssignNoteDialog target)
+            | None ->
+                FileTreeAssignNoteHelper.enqueueAssignNoteError
+                    errorModal.enqueue
+                    "Notes can only be assigned to study or assay folders."
 
         let rootPath = fileTree |> Option.map (fun (tree: FileTreeNode) -> tree.path)
 
@@ -277,9 +290,21 @@ type FileTree =
             match activeDialog with
             | Some(CreateDialog kind) -> Some kind, None, None, None
             | Some(FileSystemCreateDialog draft) -> None, Some draft, None, None
+            | Some(AssignNoteDialog _) -> None, None, None, None
             | Some(RenameDialog renameDraft) -> None, None, Some renameDraft, None
             | Some(DeleteDialog item) -> None, None, None, Some item
             | None -> None, None, None, None
+
+        let activeAssignNoteTarget =
+            match activeDialog with
+            | Some(AssignNoteDialog target) -> Some target
+            | _ -> None
+
+        let availableAssignableNotes =
+            React.useMemo (
+                (fun _ -> FileTreeAssignNoteHelper.createAssignableNoteOptions fileStateCtx.state.FileTree),
+                [| box fileStateCtx.state.FileTree |]
+            )
 
         let confirmDeleteItem () =
             if not isDialogBusy then
@@ -386,6 +411,7 @@ type FileTree =
             arcRootPath = appStateCtx
             openCreateModal = openCreateModal
             openFileSystemCreateModal = openFileSystemCreateModal
+            requestAssignNoteItem = requestAssignNoteItem
             requestRenameItem = requestRenameItem
             requestDeleteItem = requestDeleteItem
             pathActionConfig = {
@@ -442,6 +468,26 @@ type FileTree =
                     }
                     newName
 
+        let assignNoteMoveConfig : FileTreeAssignNoteHelper.AssignNoteMoveConfig = {
+            selectedTreePath = fileStateCtx.state.Selection.TreePath
+            pageState = pageStateCtx.state
+            closeDialog = closeDialog
+            setIsAssigning = setIsDialogBusy
+            setSelection = fileStateCtx.setSelection
+            refreshGitStatus = gitStateCtx.refresh
+            reloadPreviewByPath = reloadPreviewByPath
+            movePath = Api.ipcArcVaultApi.movePath
+            enqueueError = errorModal.enqueue
+        }
+
+        let confirmAssignNote () =
+            if not isDialogBusy then
+                match activeAssignNoteTarget, selectedAssignableNote with
+                | None, _ -> closeDialog ()
+                | _, None -> FileTreeAssignNoteHelper.enqueueAssignNoteError errorModal.enqueue "Select a note."
+                | Some target, Some note ->
+                    FileTreeAssignNoteHelper.assignNoteToTarget assignNoteMoveConfig target note
+
         let createModalKind =
             activeCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
 
@@ -488,6 +534,18 @@ type FileTree =
                 isRenaming = isDialogBusy
             )
 
+        let assignNoteModal =
+            FileTreeAssignNoteModal.Main(
+                isOpen = activeAssignNoteTarget.IsSome,
+                itemName = (activeAssignNoteTarget |> Option.map _.Name),
+                selectedNote = selectedAssignableNote,
+                setSelectedNote = setSelectedAssignableNote,
+                availableNotes = availableAssignableNotes,
+                close = closeDialog,
+                submit = confirmAssignNote,
+                isAssigning = isDialogBusy
+            )
+
         match fileItem with
         | Some rootItem ->
             let visibleItems = rootItem.Children |> Option.defaultValue []
@@ -517,6 +575,7 @@ type FileTree =
                 rootContextMenu rootItem
                 arcCreateModal
                 fileSystemCreateModal
+                assignNoteModal
                 renameModal
                 deleteConfirmModal
             ]
@@ -525,6 +584,7 @@ type FileTree =
                 FileTree.EmptyFileTreePlaceholder()
                 arcCreateModal
                 fileSystemCreateModal
+                assignNoteModal
                 renameModal
                 deleteConfirmModal
             ]
