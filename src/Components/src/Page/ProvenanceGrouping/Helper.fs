@@ -313,6 +313,7 @@ module PropertyRails =
 
     open Swate.Components.Shared.ProvenanceGrouping.Types
     open Swate.Components.Shared.ProvenanceGrouping.Grouping
+    open Swate.Components.Shared.ProvenanceGrouping.Session
     open Swate.Components.Page.ProvenanceGrouping.Types
 
     type RailProjection = {
@@ -320,9 +321,14 @@ module PropertyRails =
         ValuesByHeader: Map<ProvenancePropertyHeader, ProvenancePropertyValue list>
         ExpandedHeaders: Set<ProvenancePropertyHeader>
         CanSwitchHeaders: Set<ProvenancePropertyHeader>
+        StatsByHeader: Map<ProvenancePropertyHeader, PropertyStats>
+        BadgeByHeader: Map<ProvenancePropertyHeader, PropertyCountBadge>
+        ColorByHeader: Map<ProvenancePropertyHeader, ProvenanceColor option>
+        OriginByHeader: Map<ProvenancePropertyHeader, Set<PropertyOrigin>>
+        OriginFilterOptions: PropertyOriginFilter list
     }
 
-    let private setsForSide side (model: ProvenanceModel) =
+    let setsForSide side (model: ProvenanceModel) =
         if side = ProvenanceSide.Input then
             model.InputSets
         else
@@ -439,6 +445,236 @@ module PropertyRails =
             ValuesByHeader = valuesByHeader
             ExpandedHeaders = expandedHeaders
             CanSwitchHeaders = canSwitchHeaders
+            StatsByHeader = Map.empty
+            BadgeByHeader = Map.empty
+            ColorByHeader = Map.empty
+            OriginByHeader = Map.empty
+            OriginFilterOptions = []
+        }
+
+module Search =
+
+    let contains (needle: string) (haystack: string) =
+        let needle = if isNull needle then "" else needle.Trim()
+
+        if System.String.IsNullOrWhiteSpace needle then
+            true
+        elif isNull haystack then
+            false
+        else
+            haystack.ToLowerInvariant().Contains(needle.ToLowerInvariant())
+
+module PropertyProjection =
+
+    open Swate.Components.Shared.ProvenanceGrouping.Types
+    open Swate.Components.Shared.ProvenanceGrouping.Session
+    open Swate.Components.Page.ProvenanceGrouping.Types
+
+    let propertyStatsForSide
+        (side: ProvenanceSide)
+        (header: ProvenancePropertyHeader)
+        (model: ProvenanceModel)
+        : PropertyStats =
+        let sets = PropertyRails.setsForSide side model
+        let setCount = sets.Count
+
+        let distinctValues =
+            sets
+            |> Map.toList
+            |> List.collect (fun (_, set) ->
+                ProvenanceSet.effectivePropertyValueIds set
+                |> List.choose (fun id -> model.PropertyValues.TryFind id)
+                |> List.filter (fun pv -> pv.Header = header)
+                |> List.map (fun pv -> pv.Value, pv.Unit)
+            )
+            |> List.distinct
+
+        let setsWithValue =
+            sets
+            |> Map.toList
+            |> List.filter (fun (_, set) ->
+                ProvenanceSet.effectivePropertyValueIds set
+                |> List.exists (fun id ->
+                    model.PropertyValues.TryFind id |> Option.exists (fun pv -> pv.Header = header)
+                )
+            )
+            |> List.length
+
+        {
+            Header = header
+            DistinctValueCount = distinctValues.Length
+            SetsWithValueCount = setsWithValue
+            TotalSetCount = setCount
+        }
+
+    let badgeForStats (stats: PropertyStats) : PropertyCountBadge =
+        if stats.DistinctValueCount = 1 && stats.SetsWithValueCount = stats.TotalSetCount then
+            Hide
+        elif stats.DistinctValueCount = 1 && stats.SetsWithValueCount < stats.TotalSetCount then
+            Coverage(stats.SetsWithValueCount, stats.TotalSetCount)
+        else
+            DistinctValues stats.DistinctValueCount
+
+    let headerMatchesProjectedValues
+        (searchText: string)
+        (header: ProvenancePropertyHeader)
+        (projectedValues: ProvenancePropertyValue list)
+        =
+        Search.contains searchText header.Category.Name
+        || Search.contains searchText header.Kind.Id
+        || Search.contains searchText (ProvenanceKind.displayName header.Kind)
+        || projectedValues
+           |> List.exists (fun propertyValue ->
+               Search.contains searchText (Formatting.formatValue propertyValue.Value propertyValue.Unit)
+           )
+
+    let valueCountFilterMatches (filter: PropertyValueCountFilter) (badge: PropertyCountBadge) =
+        match filter, badge with
+        | PropertyValueCountFilter.Any, _ -> true
+        | PropertyValueCountFilter.Singleton, PropertyCountBadge.Hide -> true
+        | PropertyValueCountFilter.Singleton, PropertyCountBadge.Coverage _ -> true
+        | PropertyValueCountFilter.Multiple, PropertyCountBadge.DistinctValues n -> n > 1
+        | PropertyValueCountFilter.CoverageGap, PropertyCountBadge.Coverage _ -> true
+        | _ -> false
+
+    let originFilterMatches (filter: PropertyOriginFilter) (origins: Set<PropertyOrigin>) =
+        match filter with
+        | PropertyOriginFilter.AnyOrigin -> true
+        | PropertyOriginFilter.CurrentOnly ->
+            origins
+            |> Set.exists (
+                function
+                | PropertyOrigin.Current _ -> true
+                | _ -> false
+            )
+        | PropertyOriginFilter.AnyUpstream ->
+            origins
+            |> Set.exists (
+                function
+                | PropertyOrigin.UpstreamLayer _
+                | PropertyOrigin.PreviousContext _ -> true
+                | _ -> false
+            )
+        | PropertyOriginFilter.UpstreamLayer layerId -> origins |> Set.contains (PropertyOrigin.UpstreamLayer layerId)
+        | PropertyOriginFilter.PreviousContext(tableName, processName) ->
+            origins
+            |> Set.exists (
+                function
+                | PropertyOrigin.PreviousContext source ->
+                    source.TableName = Some tableName && source.ProcessName = processName
+                | _ -> false
+            )
+
+    let sortHeaders
+        (sort: PropertySort)
+        (statsByHeader: Map<ProvenancePropertyHeader, PropertyStats>)
+        (headers: ProvenancePropertyHeader list)
+        =
+        match sort with
+        | PropertySort.ValueCountDesc ->
+            headers
+            |> List.sortByDescending (fun header ->
+                statsByHeader.TryFind header
+                |> Option.map (fun stats -> stats.DistinctValueCount)
+                |> Option.defaultValue 0
+            )
+            |> List.sortBy (fun header -> header.Category.Name)
+            |> List.sortBy (fun header -> header.Kind.Id)
+        | PropertySort.NameAsc -> headers |> List.sortBy (fun header -> header.Category.Name, header.Kind.Id)
+        | PropertySort.Origin -> headers |> List.sortBy (fun header -> header.Category.Name)
+
+    let originFilterOptions
+        (_originByHeader: Map<ProvenancePropertyHeader, Set<PropertyOrigin>>)
+        : PropertyOriginFilter list =
+        [
+            PropertyOriginFilter.AnyOrigin
+            PropertyOriginFilter.CurrentOnly
+            PropertyOriginFilter.AnyUpstream
+        ]
+
+    let railProjectionWithFilters
+        (session: ProvenanceSession)
+        (pairId: ProvenancePairId)
+        (side: ProvenanceSide)
+        (model: ProvenanceModel)
+        (uiState: UiState)
+        : PropertyRails.RailProjection =
+        let pair = Session.activePair session
+        let filters = uiState.Filters
+        let headers = PropertyRails.propertyRailHeadersForSide pairId side model uiState
+
+        let valuesByHeader =
+            headers
+            |> List.map (fun header ->
+                header, PropertyRails.propertyValuesForSideHeader pairId side header model uiState
+            )
+            |> Map.ofList
+
+        let statsByHeader =
+            headers
+            |> List.map (fun header -> header, propertyStatsForSide side header model)
+            |> Map.ofList
+
+        let originByHeader =
+            headers
+            |> List.map (fun header ->
+                let values = valuesByHeader.[header]
+
+                let origins =
+                    values
+                    |> List.choose (fun pv -> Session.propertyValueOriginInSession pairId side pv.Id session)
+                    |> Set.ofList
+
+                header, origins
+            )
+            |> Map.ofList
+
+        let badgeByHeader = statsByHeader |> Map.map (fun _ stats -> badgeForStats stats)
+
+        let colorByHeader =
+            headers
+            |> List.map (fun header ->
+                let manual =
+                    uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header }
+
+                header, manual
+            )
+            |> Map.ofList
+
+        let filtered =
+            headers
+            |> List.filter (fun header ->
+                let badge = badgeByHeader.[header]
+                let values = valuesByHeader.[header]
+                let origins = originByHeader.[header]
+
+                headerMatchesProjectedValues filters.SearchText header values
+                && valueCountFilterMatches filters.ValueCountFilter badge
+                && originFilterMatches filters.OriginFilter origins
+            )
+
+        let sorted = sortHeaders filters.PropertySort statsByHeader filtered
+
+        let expandedHeaders =
+            sorted
+            |> List.filter (fun header -> State.PropertyExpansion.isExpanded pairId side header uiState)
+            |> Set.ofList
+
+        let canSwitchHeaders =
+            sorted
+            |> List.filter (fun header -> PropertyRails.canSwitchHeader header model)
+            |> Set.ofList
+
+        {
+            Headers = sorted
+            ValuesByHeader = sorted |> List.map (fun header -> header, valuesByHeader.[header]) |> Map.ofList
+            StatsByHeader = statsByHeader
+            BadgeByHeader = badgeByHeader
+            ColorByHeader = sorted |> List.map (fun header -> header, colorByHeader.[header]) |> Map.ofList
+            OriginByHeader = originByHeader
+            OriginFilterOptions = originFilterOptions originByHeader
+            ExpandedHeaders = expandedHeaders
+            CanSwitchHeaders = canSwitchHeaders
         }
 
 /// Derives endpoint defaults, identities, and display headers for empty-side creation.
@@ -517,6 +753,22 @@ module Display =
         {
             AddLayerCommand.SelectedSets = inputs @ outputs
         }
+
+    let sortGroups (sort: GroupSort) (connections: DisplayConnection list) (groups: DisplayGroup list) =
+        match sort with
+        | GroupSort.NameAsc -> groups |> List.sortBy (fun group -> group.Id)
+        | GroupSort.MemberCountDesc -> groups |> List.sortByDescending (fun group -> group.Members.Length)
+        | GroupSort.ConnectionCountDesc ->
+            groups
+            |> List.sortByDescending (fun group ->
+                connections
+                |> List.sumBy (fun connection ->
+                    if connection.SourceGroupId = group.Id || connection.TargetGroupId = group.Id then
+                        connection.ConnectionIds.Length
+                    else
+                        0
+                )
+            )
 
 /// Plans how dropped property values should be added or overwritten across a target group.
 module ValueAssignment =
