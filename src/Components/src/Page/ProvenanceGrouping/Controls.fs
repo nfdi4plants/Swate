@@ -327,7 +327,9 @@ type Controls =
             ?stats: PropertyStats,
             ?badge: PropertyCountBadge,
             ?color: ProvenanceColor,
-            ?origins: Set<PropertyOrigin>
+            ?origins: Set<PropertyOrigin>,
+            ?onSetColor: ProvenanceColor option -> unit,
+            ?sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option
         ) =
         let draggable =
             DndKit.useDraggable (
@@ -564,6 +566,11 @@ type Controls =
                     ]
                 ]
 
+        let colorButton =
+            match onSetColor with
+            | Some setColor -> Controls.PropertyColorButton(header, setColor)
+            | None -> Html.none
+
         // The secondary controls leave the layout entirely until their row is
         // hovered or holds focus, so idle rows are only as wide as their label.
         let rowControls =
@@ -576,12 +583,14 @@ type Controls =
                 prop.children [
                     match side with
                     | ProvenanceSide.Input ->
+                        colorButton
                         swapButton
                         bothButton
 
                     | ProvenanceSide.Output ->
                         bothButton
                         swapButton
+                        colorButton
                 ]
             ]
 
@@ -637,6 +646,9 @@ type Controls =
                             prop.testId $"provenance-property-values-{side}-{header.Category.Name}"
                         prop.children [
                             for propertyValue in propertyValues do
+                                let sourceInfo =
+                                    sourceInfoForValue |> Option.bind (fun resolver -> resolver propertyValue)
+
                                 Controls.ValueChip(
                                     propertyValue,
                                     onDragChanged = setIsValueChipDragging,
@@ -644,6 +656,7 @@ type Controls =
                                     showHeader = false,
                                     anchorSide = side,
                                     ?debug = debug,
+                                    ?sourceInfo = sourceInfo,
                                     key = DragDrop.propertyValueIdentity propertyValue
                                 )
                             Controls.AddValuePopover(
@@ -676,6 +689,12 @@ type Controls =
             onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             canSwitch: ProvenancePropertyHeader -> bool,
             setIsValueChipDragging: bool -> unit,
+            statsForHeader: ProvenancePropertyHeader -> PropertyStats option,
+            badgeForHeader: ProvenancePropertyHeader -> PropertyCountBadge option,
+            colorForHeader: ProvenancePropertyHeader -> ProvenanceColor option,
+            originsForHeader: ProvenancePropertyHeader -> Set<PropertyOrigin> option,
+            onSetColor: ProvenancePropertyHeader -> ProvenanceColor option -> unit,
+            sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
             ?debug: bool
         ) =
         let droppable =
@@ -743,6 +762,12 @@ type Controls =
                         onToggleExpanded,
                         onAddValue,
                         setIsValueChipDragging,
+                        ?stats = statsForHeader header,
+                        ?badge = badgeForHeader header,
+                        ?color = colorForHeader header,
+                        ?origins = originsForHeader header,
+                        onSetColor = onSetColor header,
+                        sourceInfoForValue = sourceInfoForValue,
                         debug = defaultArg debug false,
                         key = DragDrop.propertyHeaderIdentity header
                     )
@@ -983,13 +1008,14 @@ type Controls =
 
     [<ReactComponent>]
     static member ValueLabel
-        (propertyValue: ProvenancePropertyValue, ?debug: bool, ?key: string, ?sourceInfo: PropertyValueSourceInfo option) : ReactElement =
+        (propertyValue: ProvenancePropertyValue, ?debug: bool, ?key: string, ?sourceInfo: PropertyValueSourceInfo)
+        : ReactElement =
         let label =
             $"{propertyValue.Header.Category.Name}: {Formatting.formatValue propertyValue.Value propertyValue.Unit}"
 
         let sourceTitle =
             match sourceInfo with
-            | Some(Some info) ->
+            | Some info ->
                 let parts = [
                     match info.TableName with
                     | Some tn -> $"Table: {tn}"
@@ -1012,13 +1038,23 @@ type Controls =
             | Some key -> prop.key key
             | None -> ()
             prop.className
-                "swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"
+                "swt:group swt:relative swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"
             match sourceTitle with
             | Some title -> prop.title title
             | None -> ()
             if defaultArg debug false then
                 prop.testId $"provenance-value-{propertyValue.Id}"
-            prop.children [ Html.span [ prop.text label ] ]
+            prop.children [
+                Html.span [ prop.text label ]
+                match sourceInfo with
+                | Some info ->
+                    Html.div [
+                        prop.className
+                            "swt:pointer-events-none swt:absolute swt:left-0 swt:top-full swt:z-30 swt:mt-1 swt:hidden swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg group-hover:swt:block group-focus-within:swt:block"
+                        prop.children [ Controls.SourceInfoPopover(Some info) ]
+                    ]
+                | None -> Html.none
+            ]
         ]
 
     [<ReactComponent>]
@@ -1031,7 +1067,7 @@ type Controls =
             ?anchorSide: ProvenanceSide,
             ?debug: bool,
             ?key: string,
-            ?sourceInfo: PropertyValueSourceInfo option
+            ?sourceInfo: PropertyValueSourceInfo
         ) : ReactElement =
         let canDrag = defaultArg draggable true
         let showHeader = defaultArg showHeader true
@@ -1094,7 +1130,7 @@ type Controls =
                 yield! prop.spread (!!drag.attributes)
                 yield! prop.spread (!!drag.listeners)
             prop.className [
-                "swt:relative"
+                "swt:group swt:relative"
                 yield! Styles.propertyValueButtonClasses density drag.isDragging
                 if not canDrag then
                     "swt:cursor-default"
@@ -1104,7 +1140,7 @@ type Controls =
                 prop.testId $"provenance-value-{propertyValue.Id}"
             prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"
             match sourceInfo with
-            | Some(Some info) ->
+            | Some info ->
                 let parts = [
                     match info.TableName with
                     | Some tn -> $"Table: {tn}"
@@ -1127,6 +1163,14 @@ type Controls =
                     prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-left"
                     prop.text label
                 ]
+                match sourceInfo with
+                | Some info ->
+                    Html.div [
+                        prop.className
+                            "swt:pointer-events-none swt:absolute swt:left-0 swt:top-full swt:z-30 swt:mt-1 swt:hidden swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg group-hover:swt:block group-focus-within:swt:block"
+                        prop.children [ Controls.SourceInfoPopover(Some info) ]
+                    ]
+                | None -> Html.none
             ]
         ]
 

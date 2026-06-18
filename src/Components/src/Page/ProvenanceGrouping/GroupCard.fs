@@ -8,6 +8,7 @@ open Swate.Components.Primitive.Buttons
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
+open Swate.Components.Shared.ProvenanceGrouping.Session
 open Swate.Components.Page.ProvenanceGrouping.Types
 
 /// Maps loaded endpoint kinds (Source, Sample, Data, ...) to a display label and icon.
@@ -290,6 +291,7 @@ type GroupCard =
             onExpand: unit -> unit,
             isValueChipDragging: bool,
             ?connectionCount: int,
+            ?sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
             ?debug: bool,
             ?key: string
         ) =
@@ -682,8 +684,13 @@ type GroupCard =
                                                             prop.className "swt:flex swt:flex-wrap swt:gap-1"
                                                             prop.children [
                                                                 for value in memberValues do
+                                                                    let sourceInfo =
+                                                                        sourceInfoForValue
+                                                                        |> Option.bind (fun resolver -> resolver value)
+
                                                                     Controls.ValueLabel(
                                                                         value,
+                                                                        ?sourceInfo = sourceInfo,
                                                                         key =
                                                                             $"member:{member'.SetId}:{DragDrop.propertyValueIdentity value}"
                                                                     )

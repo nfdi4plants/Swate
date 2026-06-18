@@ -319,7 +319,11 @@ module private ConnectorPaths =
         railProjection.Headers
         |> List.filter (fun header -> not (ConnectorOverlayState.isPropertyExpanded pairId side header overlayState))
         |> List.collect (fun header ->
-            let color = colorByHeader |> Map.tryFind header |> Option.bind id
+            let color =
+                railProjection.ColorByHeader
+                |> Map.tryFind header
+                |> Option.bind id
+                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
 
             groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
             |> List.choose (fun group ->
@@ -359,7 +363,11 @@ module private ConnectorPaths =
         railProjection.Headers
         |> List.filter (fun header -> ConnectorOverlayState.isPropertyExpanded pairId side header overlayState)
         |> List.collect (fun header ->
-            let color = colorByHeader |> Map.tryFind header |> Option.bind id
+            let color =
+                railProjection.ColorByHeader
+                |> Map.tryFind header
+                |> Option.bind id
+                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
 
             railProjection.ValuesByHeader
             |> Map.tryFind header

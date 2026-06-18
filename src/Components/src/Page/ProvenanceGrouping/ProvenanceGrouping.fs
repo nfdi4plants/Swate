@@ -314,20 +314,14 @@ module private DragHandlers =
     let private routePropertyValueDrop context side groupId propertyValueId =
         match context.Lookups.FindPropertyValue propertyValueId with
         | Some propertyValue ->
-            let selectedIds =
-                (match side with
-                 | ProvenanceSide.Input -> context.UiState.SelectedInputs
-                 | ProvenanceSide.Output -> context.UiState.SelectedOutputs)
-                |> Set.filter (fun (pid, _) -> pid = context.Pair.Id)
-
-            let targetGroupIds =
-                if selectedIds.IsEmpty then
-                    [ groupId ]
-                else
-                    selectedIds |> Set.toList |> List.map snd
-
             let targetGroups =
-                targetGroupIds |> List.choose (fun gid -> context.Lookups.FindGroup side gid)
+                ValueAssignment.selectedTargetGroupsForDrop
+                    context.Pair.Id
+                    side
+                    groupId
+                    context.UiState.SelectedInputs
+                    context.UiState.SelectedOutputs
+                    context.Lookups.FindGroup
 
             match
                 ValueAssignment.planPropertyValueDropToGroups
@@ -338,6 +332,20 @@ module private DragHandlers =
             | Ok batch ->
                 let affectedValueCount =
                     batch.Overwrites |> List.sumBy (fun w -> w.ExistingValueIds.Length)
+
+                let sideForTarget target =
+                    match target with
+                    | ProvenancePropertyTarget.InputSets _ -> Some ProvenanceSide.Input
+                    | ProvenancePropertyTarget.OutputSets _ -> Some ProvenanceSide.Output
+                    | ProvenancePropertyTarget.Connections _ -> None
+
+                let affectedSideCount =
+                    [
+                        yield! batch.Adds |> List.choose (fun command -> sideForTarget command.Target)
+                        yield! batch.Overwrites |> List.choose (fun warning -> sideForTarget warning.Target)
+                    ]
+                    |> List.distinct
+                    |> List.length
 
                 if batch.Overwrites.IsEmpty then
                     if not batch.Adds.IsEmpty then
@@ -355,7 +363,7 @@ module private DragHandlers =
                 else
                     let pendingBatch = {
                         Batch = batch
-                        AffectedSideCount = 1
+                        AffectedSideCount = affectedSideCount
                         AffectedValueCount = affectedValueCount
                     }
 
@@ -505,7 +513,7 @@ module private EditorPanels =
                         Html.span [
                             prop.className "swt:text-sm"
                             prop.text
-                                $"The selected targets already have {headerText}. Confirm to replace with {valueText} using the existing edit path."
+                                $"The selected targets already have {headerText}. Confirm to replace with {valueText} across {sideCount} side(s) using the existing edit path."
                         ]
                     ]
                 ]
@@ -649,6 +657,8 @@ module private EditorSurface =
         move
         toggleExpanded
         addPaletteValue
+        setPropertyColor
+        sourceInfoForValue
         debug
         setIsValueChipDragging
 
@@ -666,6 +676,12 @@ module private EditorSurface =
             addPaletteValue,
             (fun header -> projection.CanSwitchHeaders.Contains header),
             setIsValueChipDragging,
+            (fun header -> projection.StatsByHeader |> Map.tryFind header),
+            (fun header -> projection.BadgeByHeader |> Map.tryFind header),
+            (fun header -> projection.ColorByHeader |> Map.tryFind header |> Option.bind id),
+            (fun header -> projection.OriginByHeader |> Map.tryFind header),
+            setPropertyColor,
+            sourceInfoForValue,
             debug = debug
         )
 
@@ -682,6 +698,7 @@ module private EditorSurface =
         toggleSelection
         toggleDetail
         (connectionCountFor: string -> int option)
+        sourceInfoForValue
         debug
         isValueChipDragging
         =
@@ -722,6 +739,7 @@ module private EditorSurface =
                         (fun () -> toggleDetail side group.Id),
                         isValueChipDragging,
                         ?connectionCount = connectionCountFor group.Id,
+                        sourceInfoForValue = sourceInfoForValue,
                         debug = debug,
                         key = $"{keyPrefix}:{group.Id}"
                     )
@@ -807,25 +825,45 @@ type ProvenanceGrouping =
 
         let inputRailProjection =
             React.useMemo (
-                (fun () -> PropertyRails.railProjection pair.Id ProvenanceSide.Input pair.Model uiState),
+                (fun () ->
+                    PropertyProjection.railProjectionWithFilters
+                        session
+                        pair.Id
+                        ProvenanceSide.Input
+                        pair.Model
+                        uiState
+                ),
                 [|
+                    box session
                     box pair.Id
                     box pair.Model
                     box uiState.PropertyRailPlacements
                     box uiState.ExpandedProperties
                     box uiState.PaletteValues
+                    box uiState.PropertyColors
+                    box uiState.Filters
                 |]
             )
 
         let outputRailProjection =
             React.useMemo (
-                (fun () -> PropertyRails.railProjection pair.Id ProvenanceSide.Output pair.Model uiState),
+                (fun () ->
+                    PropertyProjection.railProjectionWithFilters
+                        session
+                        pair.Id
+                        ProvenanceSide.Output
+                        pair.Model
+                        uiState
+                ),
                 [|
+                    box session
                     box pair.Id
                     box pair.Model
                     box uiState.PropertyRailPlacements
                     box uiState.ExpandedProperties
                     box uiState.PaletteValues
+                    box uiState.PropertyColors
+                    box uiState.Filters
                 |]
             )
 
@@ -938,6 +976,25 @@ type ProvenanceGrouping =
         let toggleGroupDetail side groupId =
             State.Detail.toggleGroup side groupId uiState |> setUiState
 
+        let sourceInfoForValue value =
+            Session.propertyValueSourceInfo pair value
+
+        let setPropertyColor header color =
+            let update =
+                match color with
+                | Some selectedColor -> State.PropertyColors.setColor header selectedColor
+                | None -> State.PropertyColors.clearColor header
+
+            applyUiState update
+
+        let setLayerColor layerId color =
+            let update =
+                match color with
+                | Some selectedColor -> State.PropertyColors.setLayerColor layerId selectedColor
+                | None -> State.PropertyColors.clearLayerColor layerId
+
+            applyUiState update
+
         let confirmBatch (pending: PendingAssignmentBatch) =
             EditorActions.applyAssignmentBatch session publish pending.Batch
 
@@ -1042,6 +1099,8 @@ type ProvenanceGrouping =
                 )
                 (fun header -> togglePropertyExpanded side header)
                 (fun header value unit -> addPaletteValue side header value unit)
+                setPropertyColor
+                sourceInfoForValue
                 debug
                 setIsValueChipDragging
 
@@ -1096,6 +1155,7 @@ type ProvenanceGrouping =
                 toggleSelection
                 toggleGroupDetail
                 counts
+                sourceInfoForValue
                 debug
                 isValueChipDragging
 
@@ -1336,8 +1396,20 @@ type ProvenanceGrouping =
                                                 uiState
                                                 publish
                                         ),
+                                        layerColors = uiState.PropertyColors.LayerColors,
                                         debug = debug
                                     )
+                                    Html.div [
+                                        prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1"
+                                        prop.children [
+                                            for layer in session.Layers do
+                                                Controls.LayerColorButton(
+                                                    layer.Id,
+                                                    uiState.PropertyColors.LayerColors |> Map.tryFind layer.Id,
+                                                    setLayerColor layer.Id
+                                                )
+                                        ]
+                                    ]
                                     Html.div [
                                         prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
                                         prop.children [
@@ -1419,6 +1491,15 @@ type ProvenanceGrouping =
                                     ]
                                 ]
                             ]
+                            Controls.FilterToolbar(
+                                uiState.Filters,
+                                (fun text -> applyUiState (State.Filters.setSearch text)),
+                                (fun sort -> applyUiState (State.Filters.setPropertySort sort)),
+                                (fun sort -> applyUiState (State.Filters.setGroupSort sort)),
+                                (fun filter -> applyUiState (State.Filters.setValueCountFilter filter)),
+                                (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),
+                                debug = debug
+                            )
                             match uiState.Error with
                             | Some error -> EditorPanels.errorAlert error
                             | None -> Html.none

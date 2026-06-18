@@ -2182,11 +2182,11 @@ let uiStateTests =
             let afterEnsure = State.PropertyColors.ensureLayerColors session state
 
             Expect.isTrue
-                (afterEnsure.PropertyColors.LayerColors.ContainsKey "layer-1")
+                (afterEnsure.LayerColors.ContainsKey "layer-1")
                 "Initial layer should have an automatic color."
 
             Expect.isTrue
-                (afterEnsure.PropertyColors.LayerColors.ContainsKey "layer-2")
+                (afterEnsure.LayerColors.ContainsKey "layer-2")
                 "Initial layer should have an automatic color."
 
         testCase "automatic colors do not overwrite existing manual layer colors"
@@ -2197,10 +2197,7 @@ let uiStateTests =
             let withManual = State.PropertyColors.setLayerColor "layer-1" "#be185d" state
             let afterEnsure = State.PropertyColors.ensureLayerColors session withManual
 
-            Expect.equal
-                afterEnsure.PropertyColors.LayerColors.["layer-1"]
-                "#be185d"
-                "Manual layer color should be preserved."
+            Expect.equal afterEnsure.LayerColors.["layer-1"] "#be185d" "Manual layer color should be preserved."
 
         testCase "stale layer colors are removed during cleanup"
         <| fun _ ->
@@ -2217,9 +2214,7 @@ let uiStateTests =
 
             let afterEnsure = State.PropertyColors.ensureLayerColors session withStale
 
-            Expect.isFalse
-                (afterEnsure.PropertyColors.LayerColors.ContainsKey "nonexistent")
-                "Stale layer color should be removed."
+            Expect.isFalse (afterEnsure.LayerColors.ContainsKey "nonexistent") "Stale layer color should be removed."
 
         testCase "default filter state uses Any filter and ValueCountDesc sort"
         <| fun _ ->
@@ -2269,6 +2264,125 @@ let uiStateTests =
                 State.Filters.setGroupSort Types.GroupSort.MemberCountDesc withOrigin
 
             Expect.equal withGroupSort.Filters.GroupSort Types.GroupSort.MemberCountDesc "Group sort should be updated."
+
+        testCase "value count sort keeps distinct value count as primary key"
+        <| fun _ ->
+            let highCount = propertyHeader (ProvenanceKind.create "z-kind" "Zeta kind") "Zeta"
+            let lowCount = propertyHeader (ProvenanceKind.create "a-kind" "Alpha kind") "Alpha"
+
+            let stats =
+                Map.ofList [
+                    highCount,
+                    ({
+                        Header = highCount
+                        DistinctValueCount = 3
+                        SetsWithValueCount = 3
+                        TotalSetCount = 3
+                    }
+                    : Types.PropertyStats)
+                    lowCount,
+                    ({
+                        Header = lowCount
+                        DistinctValueCount = 1
+                        SetsWithValueCount = 1
+                        TotalSetCount = 1
+                    }
+                    : Types.PropertyStats)
+                ]
+
+            let sorted =
+                PropertyProjection.sortHeaders Types.PropertySort.ValueCountDesc stats [ lowCount; highCount ]
+
+            Expect.equal sorted [ highCount; lowCount ] "Higher value count should sort before name/kind."
+
+        testCase "rail projection applies search and resolves manual property color"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let species = propertyHeader FixtureKinds.characteristicProperty "Species"
+
+            let uiState =
+                State.init session
+                |> State.Filters.setSearch "Arabidopsis"
+                |> State.PropertyColors.setColor species "#2563eb"
+
+            let projection =
+                PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Input pair.Model uiState
+
+            Expect.contains projection.Headers species "Search should keep headers with matching projected values."
+            Expect.equal projection.ColorByHeader.[species] (Some "#2563eb") "Manual color should be projected."
+
+            let nonMatching =
+                uiState |> State.Filters.setSearch "definitely-not-a-provenance-value"
+
+            let emptyProjection =
+                PropertyProjection.railProjectionWithFilters session pair.Id ProvenanceSide.Input pair.Model nonMatching
+
+            Expect.isEmpty emptyProjection.Headers "Search should remove non-matching property headers."
+
+        testCase "selected drop targets include selected inputs and outputs only when dropped group is selected"
+        <| fun _ ->
+            let inputGroup: DisplayGroup = {
+                Id = "input-group"
+                TableName = "assay-table"
+                Side = ProvenanceSide.Input
+                GroupingValues = []
+                Members = []
+            }
+
+            let outputGroup: DisplayGroup = {
+                inputGroup with
+                    Id = "output-group"
+                    Side = ProvenanceSide.Output
+            }
+
+            let findGroup side groupId =
+                match side, groupId with
+                | ProvenanceSide.Input, "input-group" -> Some inputGroup
+                | ProvenanceSide.Output, "output-group" -> Some outputGroup
+                | _ -> None
+
+            let selectedInputs = Set.ofList [ "pair-1", "input-group" ]
+            let selectedOutputs = Set.ofList [ "pair-1", "output-group" ]
+
+            let selectedTargets =
+                ValueAssignment.selectedTargetGroupsForDrop
+                    "pair-1"
+                    ProvenanceSide.Input
+                    "input-group"
+                    selectedInputs
+                    selectedOutputs
+                    findGroup
+
+            Expect.equal
+                (selectedTargets |> List.map (fun (group: DisplayGroup) -> group.Side, group.Id))
+                [
+                    ProvenanceSide.Input, "input-group"
+                    ProvenanceSide.Output, "output-group"
+                ]
+                "Dropping onto a selected group should target selected groups on both sides."
+
+            let unselectedDrop =
+                ValueAssignment.selectedTargetGroupsForDrop
+                    "pair-1"
+                    ProvenanceSide.Input
+                    "unselected-input"
+                    selectedInputs
+                    selectedOutputs
+                    (fun side groupId ->
+                        if side = ProvenanceSide.Input && groupId = "unselected-input" then
+                            Some {
+                                inputGroup with
+                                    Id = "unselected-input"
+                            }
+                        else
+                            findGroup side groupId
+                    )
+
+            Expect.equal
+                (unselectedDrop |> List.map (fun (group: DisplayGroup) -> group.Id))
+                [ "unselected-input" ]
+                "Dropping onto an unselected group should keep single-target behavior."
     ]
 
 let sourceTests =

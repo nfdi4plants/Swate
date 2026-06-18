@@ -573,13 +573,14 @@ module PropertyProjection =
         match sort with
         | PropertySort.ValueCountDesc ->
             headers
-            |> List.sortByDescending (fun header ->
-                statsByHeader.TryFind header
-                |> Option.map (fun stats -> stats.DistinctValueCount)
-                |> Option.defaultValue 0
+            |> List.sortBy (fun header ->
+                let count =
+                    statsByHeader.TryFind header
+                    |> Option.map (fun stats -> stats.DistinctValueCount)
+                    |> Option.defaultValue 0
+
+                -count, header.Category.Name, header.Kind.Id
             )
-            |> List.sortBy (fun header -> header.Category.Name)
-            |> List.sortBy (fun header -> header.Kind.Id)
         | PropertySort.NameAsc -> headers |> List.sortBy (fun header -> header.Category.Name, header.Kind.Id)
         | PropertySort.Origin -> headers |> List.sortBy (fun header -> header.Category.Name)
 
@@ -631,14 +632,31 @@ module PropertyProjection =
 
         let badgeByHeader = statsByHeader |> Map.map (fun _ stats -> badgeForStats stats)
 
+        let stableSourceColor (source: PropertyValueSourceInfo) =
+            let key =
+                [
+                    source.TableName |> Option.defaultValue ""
+                    source.ProcessName |> Option.defaultValue ""
+                    yield! source.InputNames
+                    yield! source.OutputNames
+                ]
+                |> String.concat "|"
+
+            let index = (hash key |> abs) % State.PropertyColors.palette.Length
+            State.PropertyColors.palette.[index]
+
+        let resolvedColorForHeader header origins =
+            match uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header } with
+            | Some color -> Some color
+            | None ->
+                match origins |> Set.toList with
+                | [ PropertyOrigin.UpstreamLayer layerId ] -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
+                | [ PropertyOrigin.PreviousContext source ] -> Some(stableSourceColor source)
+                | _ -> None
+
         let colorByHeader =
             headers
-            |> List.map (fun header ->
-                let manual =
-                    uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header }
-
-                header, manual
-            )
+            |> List.map (fun header -> header, resolvedColorForHeader header originByHeader.[header])
             |> Map.ofList
 
         let filtered =
@@ -776,6 +794,7 @@ module ValueAssignment =
     open Swate.Components.Shared.ProvenanceGrouping.Types
     open Swate.Components.Shared.ProvenanceGrouping.Edit
     open Swate.Components.Shared.ProvenanceGrouping.Grouping
+    open Swate.Components.Shared.ProvenanceGrouping.Session
     open Swate.Components.Page.ProvenanceGrouping.Types
 
     let private targetForGroup side (group: DisplayGroup) =
@@ -875,6 +894,35 @@ module ValueAssignment =
                 )
             )
             (Ok { Adds = []; Overwrites = [] })
+
+    let selectedTargetGroupsForDrop
+        (pairId: ProvenancePairId)
+        (dropSide: ProvenanceSide)
+        (dropGroupId: string)
+        (selectedInputs: Set<ProvenancePairId * string>)
+        (selectedOutputs: Set<ProvenancePairId * string>)
+        (findGroup: ProvenanceSide -> string -> DisplayGroup option)
+        : DisplayGroup list =
+        let idsForPair selected =
+            selected
+            |> Set.filter (fun (currentPairId, _) -> currentPairId = pairId)
+            |> Set.map snd
+
+        let inputIds = idsForPair selectedInputs
+        let outputIds = idsForPair selectedOutputs
+
+        let dropIsSelected =
+            match dropSide with
+            | ProvenanceSide.Input -> inputIds.Contains dropGroupId
+            | ProvenanceSide.Output -> outputIds.Contains dropGroupId
+
+        if dropIsSelected && (not inputIds.IsEmpty || not outputIds.IsEmpty) then
+            [
+                yield! inputIds |> Set.toList |> List.choose (findGroup ProvenanceSide.Input)
+                yield! outputIds |> Set.toList |> List.choose (findGroup ProvenanceSide.Output)
+            ]
+        else
+            findGroup dropSide dropGroupId |> Option.toList
 
 /// Builds property-value views with source and origin info for display.
 module PropertyValueViewing =
