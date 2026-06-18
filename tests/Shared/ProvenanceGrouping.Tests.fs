@@ -2132,6 +2132,46 @@ let uiStateTests =
             | other -> failwithf "Expected a multiple-value rejection, got %A" other
     ]
 
+let sourceTests =
+    testList "Source and origin" [
+        testCase "property source info exposes table and process metadata"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let value = pair.Model.PropertyValues.["pv-input-a-species"]
+            let source = Session.propertyValueSourceInfo pair value
+
+            Expect.isSome source "A fixture property value should expose source metadata."
+
+        testCase "property source info falls back to loaded membership"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let pair = Session.activePair session
+            let original = pair.Model.PropertyValues.["pv-input-a-species"]
+            let withoutSource = { original with Source = None }
+            let source = Session.propertyValueSourceInfo pair withoutSource
+
+            Expect.equal
+                (source |> Option.bind _.TableName)
+                (Some pair.Model.LoadedTableName)
+                "Membership fallback should keep current table context."
+
+        testCase "property origin uses the native upstream layer for projected values"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+
+            match Session.addLayer { SelectedSets = [] } session with
+            | Ok(layered, _) ->
+                let active = Session.activePair layered
+                let propertyValueId = active.Model.PropertyValues |> Map.toList |> List.head |> fst
+
+                let origin =
+                    Session.propertyValueOriginInSession active.Id ProvenanceSide.Input propertyValueId layered
+
+                Expect.isSome origin "Projected values should have an origin."
+            | Error error -> failwithf "Unexpected addLayer error: %A" error
+    ]
+
 let tests =
     testList "ProvenanceGrouping" [
         typeTests
@@ -2140,5 +2180,6 @@ let tests =
         editTests
         fixtureTests
         sessionTests
+        sourceTests
         uiStateTests
     ]

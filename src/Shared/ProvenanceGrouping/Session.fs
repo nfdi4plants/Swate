@@ -6,6 +6,20 @@ open Swate.Components.Shared.ProvenanceGrouping.Edit
 type ProvenanceLayerId = string
 type ProvenancePairId = string
 
+type PropertyValueSourceInfo = {
+    TableName: ProvenanceTableName option
+    ProcessName: ProvenanceProcessName option
+    InputNames: string list
+    OutputNames: string list
+    IsCurrentTable: bool
+}
+
+[<RequireQualifiedAccess>]
+type PropertyOrigin =
+    | Current of pairId: ProvenancePairId * side: ProvenanceSide
+    | UpstreamLayer of layerId: ProvenanceLayerId
+    | PreviousContext of source: PropertyValueSourceInfo
+
 type ProvenanceLayer = { Id: ProvenanceLayerId; Label: string }
 
 type ProvenanceSetReference = {
@@ -562,3 +576,98 @@ module Session =
                 )
             )
             (Ok(session, []))
+
+    let private sourceInfoFromAnchor
+        (pair: ProvenanceLayerPair)
+        (source: ProvenanceWritebackAnchor)
+        : PropertyValueSourceInfo =
+        {
+            TableName = Some source.TableName
+            ProcessName = source.ProcessName
+            InputNames = source.InputNames
+            OutputNames = source.OutputNames
+            IsCurrentTable = source.TableName = pair.Model.LoadedTableName
+        }
+
+    let private propertyValueSourceFromLoadedMembership
+        (pair: ProvenanceLayerPair)
+        (propertyValue: ProvenancePropertyValue)
+        : PropertyValueSourceInfo option =
+        let inputSets =
+            pair.Model.InputSets
+            |> values
+            |> List.filter (fun set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValue.Id)
+
+        let outputSets =
+            pair.Model.OutputSets
+            |> values
+            |> List.filter (fun set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValue.Id)
+
+        match inputSets, outputSets with
+        | [], [] -> None
+        | _ ->
+            Some {
+                TableName = Some pair.Model.LoadedTableName
+                ProcessName = None
+                InputNames = inputSets |> List.map (fun set -> set.Name) |> List.distinct
+                OutputNames = outputSets |> List.map (fun set -> set.Name) |> List.distinct
+                IsCurrentTable = true
+            }
+
+    let propertyValueSourceInfo
+        (pair: ProvenanceLayerPair)
+        (propertyValue: ProvenancePropertyValue)
+        : PropertyValueSourceInfo option =
+        propertyValue.Source
+        |> Option.map (sourceInfoFromAnchor pair)
+        |> Option.orElseWith (fun () -> propertyValueSourceFromLoadedMembership pair propertyValue)
+
+    let private ownerReferences
+        (propertyValueId: ProvenancePropertyValueId)
+        (session: ProvenanceSession)
+        : ProvenanceSetReference list =
+        let pair = activePair session
+
+        [
+            for setId, set in pair.Model.InputSets |> Map.toList do
+                if ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValueId then
+                    yield activeRef ProvenanceSide.Input setId session
+            for setId, set in pair.Model.OutputSets |> Map.toList do
+                if ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValueId then
+                    yield activeRef ProvenanceSide.Output setId session
+        ]
+        |> List.map (fun reference -> nativeOwner reference session)
+        |> List.distinct
+
+    let private layerIdForReference
+        (reference: ProvenanceSetReference)
+        (session: ProvenanceSession)
+        : ProvenanceLayerId =
+        let pair = session.Pairs.[reference.PairId]
+
+        match reference.Side with
+        | ProvenanceSide.Input -> pair.LeftLayerId
+        | ProvenanceSide.Output -> pair.RightLayerId
+
+    let propertyValueOriginInSession
+        (pairId: ProvenancePairId)
+        (side: ProvenanceSide)
+        (propertyValueId: ProvenancePropertyValueId)
+        (session: ProvenanceSession)
+        : PropertyOrigin option =
+        match session.Pairs.TryFind pairId with
+        | None -> None
+        | Some pair ->
+            pair.Model.PropertyValues.TryFind propertyValueId
+            |> Option.map (fun propertyValue ->
+                let scoped = { session with ActivePairId = pairId }
+
+                match propertyValueSourceInfo pair propertyValue with
+                | Some source when source.TableName <> Some pair.Model.LoadedTableName ->
+                    PropertyOrigin.PreviousContext source
+                | _ ->
+                    match ownerReferences propertyValueId scoped with
+                    | owner :: _ when owner.PairId = pairId -> PropertyOrigin.Current(pairId, side)
+                    | owner :: _ -> PropertyOrigin.UpstreamLayer(layerIdForReference owner scoped)
+                    | [] -> PropertyOrigin.Current(pairId, side)
+            )
