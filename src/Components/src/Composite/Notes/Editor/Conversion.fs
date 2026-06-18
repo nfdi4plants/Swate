@@ -7,9 +7,15 @@ open Swate.Components.Shared
 [<RequireQualifiedAccess>]
 module NoteConversion =
 
-    let private notesRootFolder = "notes"
+    let notesRootFolder = "notes"
     let private frontmatterDelimiter = "---"
     let noteAssetsFolderName = "assets"
+
+    let existingTargetFolders =
+        function
+        | NotesTargetKind.Study ->
+            ARCtrl.ArcPathHelper.StudiesFolderName, ARCtrl.ArcPathHelper.StudiesProtocolsFolderName
+        | NotesTargetKind.Assay -> ARCtrl.ArcPathHelper.AssaysFolderName, ARCtrl.ArcPathHelper.AssayProtocolsFolderName
 
     type NoteFrontmatter = {
         Title: string
@@ -129,16 +135,13 @@ module NoteConversion =
         $"{parentPath}/{protocolName}/{protocolName}.md"
 
     let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (protocolName: string) =
-        let folder =
-            match targetRef.Kind with
-            | NotesTargetKind.Study -> "studies"
-            | NotesTargetKind.Assay -> "assays"
+        let folder, protocolsFolder = existingTargetFolders targetRef.Kind
 
         if
             PathHelpers.isSafePathSegment targetRef.Name
             && PathHelpers.isSafePathSegment protocolName
         then
-            Some(mkNoteMarkdownRelativePath $"{folder}/{targetRef.Name}/protocols" protocolName)
+            Some(mkNoteMarkdownRelativePath $"{folder}/{targetRef.Name}/{protocolsFolder}" protocolName)
         else
             None
 

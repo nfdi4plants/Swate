@@ -16,6 +16,9 @@ type FileTreeAssignNoteModal =
             selectedNote: AssignableNoteRef option,
             setSelectedNote: AssignableNoteRef option -> unit,
             availableNotes: ResizeArray<AssignableNoteRef>,
+            availableAssets: ResizeArray<AssignableNoteAssetRef>,
+            assetDestinations: Map<string, AssignNoteAssetDestination>,
+            setAssetDestination: string -> AssignNoteAssetDestination option -> unit,
             close: unit -> unit,
             submit: unit -> unit,
             ?isAssigning: bool
@@ -81,7 +84,19 @@ type FileTreeAssignNoteModal =
             setIsOpen = setIsOpen,
             header = Html.text "Assign Note",
             description = Html.text $"Assign a note to '{displayName}'.",
-            children = noteSelector,
+            children =
+                Html.div [
+                    prop.className "swt:flex swt:flex-col swt:gap-4"
+                    prop.children [
+                        noteSelector
+                        FileTreeAssignNoteAssetSelector.Main(
+                            availableAssets,
+                            assetDestinations,
+                            setAssetDestination,
+                            isAssigning
+                        )
+                    ]
+                ],
             footer = footer,
             debug = "arc-assign-note"
         )

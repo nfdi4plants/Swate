@@ -1,9 +1,9 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
-open Renderer.Components.Helper
 open Renderer.Components.FileExplorerDeleteHelper
 open Swate.Components
+open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
@@ -72,6 +72,9 @@ type FileTree =
 
         let selectedAssignableNote, setSelectedAssignableNote =
             React.useState<AssignableNoteRef option> None
+
+        let selectedAssetDestinations, setSelectedAssetDestinations =
+            React.useStateWithUpdater<Map<string, AssignNoteAssetDestination>> Map.empty
 
         // The file watcher emits the initial tree too; only later tree updates should refresh open previews.
         let hasObservedFileTreeUpdateRef = React.useRef false
@@ -233,7 +236,19 @@ type FileTree =
         let closeDialog () =
             setIsDialogBusy false
             setSelectedAssignableNote None
+            setSelectedAssetDestinations (fun _ -> Map.empty)
             setActiveDialog None
+
+        let selectAssignableNote note =
+            setSelectedAssignableNote note
+            setSelectedAssetDestinations (fun _ -> Map.empty)
+
+        let setAssetDestination assetPath destination =
+            setSelectedAssetDestinations (fun current ->
+                match destination with
+                | Some destination -> current |> Map.add assetPath destination
+                | None -> current |> Map.remove assetPath
+            )
 
         let openCreateModal kind =
             match kind with
@@ -305,6 +320,16 @@ type FileTree =
             React.useMemo (
                 (fun _ -> FileTreeAssignNoteHelper.createAssignableNoteOptions fileStateCtx.state.FileTree),
                 [| box fileStateCtx.state.FileTree |]
+            )
+
+        let availableAssignableNoteAssets =
+            React.useMemo (
+                (fun _ ->
+                    FileTreeAssignNoteHelper.createAssignableNoteAssetOptions
+                        fileStateCtx.state.FileTree
+                        selectedAssignableNote
+                ),
+                [| box fileStateCtx.state.FileTree; box selectedAssignableNote |]
             )
 
         let confirmDeleteItem () =
@@ -399,7 +424,7 @@ type FileTree =
         let itemActions item = [
             yield!
                 rootFolderContextMenuItems
-                    "notes"
+                    NoteConversion.notesRootFolder
                     "Create new item in"
                     "swt:fluent--note-add-24-regular"
                     (fun () -> openCreateModal ArcExplorerNodeKind.Note)
@@ -486,7 +511,13 @@ type FileTree =
                 match activeAssignNoteTarget, selectedAssignableNote with
                 | None, _ -> closeDialog ()
                 | _, None -> FileTreeAssignNoteHelper.enqueueAssignNoteError errorModal.enqueue "Select a note."
-                | Some target, Some note -> FileTreeAssignNoteHelper.assignNoteToTarget assignNoteMoveConfig target note
+                | Some target, Some note ->
+                    FileTreeAssignNoteHelper.assignNoteToTarget
+                        assignNoteMoveConfig
+                        target
+                        note
+                        (availableAssignableNoteAssets |> Seq.toList)
+                        selectedAssetDestinations
 
         let createModalKind =
             activeCreateKind |> Option.defaultValue ArcExplorerNodeKind.Study
@@ -539,8 +570,11 @@ type FileTree =
                 isOpen = activeAssignNoteTarget.IsSome,
                 itemName = (activeAssignNoteTarget |> Option.map _.Name),
                 selectedNote = selectedAssignableNote,
-                setSelectedNote = setSelectedAssignableNote,
+                setSelectedNote = selectAssignableNote,
                 availableNotes = availableAssignableNotes,
+                availableAssets = availableAssignableNoteAssets,
+                assetDestinations = selectedAssetDestinations,
+                setAssetDestination = setAssetDestination,
                 close = closeDialog,
                 submit = confirmAssignNote,
                 isAssigning = isDialogBusy

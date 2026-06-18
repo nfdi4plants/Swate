@@ -2,13 +2,14 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open System
 open Fable.Core
+open Swate.Components.Shared
+open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Types
-open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
-open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
+open Swate.Electron.Shared.FileIOHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
+open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 
 module FileTreeAssignNoteHelper =
 
@@ -27,6 +28,19 @@ module FileTreeAssignNoteHelper =
     let enqueueAssignNoteError (enqueueError: ErrorModalRequest -> unit) errorMessage =
         enqueueError (ErrorModalRequest.create (errorMessage, title = "Could not assign note"))
 
+    let private assignableTargetKinds = [ NotesTargetKind.Study; NotesTargetKind.Assay ]
+
+    let private combineRelativePaths (paths: string[]) =
+        ARCtrl.ArcPathHelper.combineMany paths
+        |> PathHelpers.normalizeCanonicalRelativePath
+
+    let private tryGetTargetKindFromRootFolder rootFolder =
+        assignableTargetKinds
+        |> List.tryFind (fun kind ->
+            let targetFolder, _ = NoteConversion.existingTargetFolders kind
+            PathHelpers.pathsEqual rootFolder targetFolder
+        )
+
     let private tryCreateNoteAssignmentTarget kind entityName =
         if String.IsNullOrWhiteSpace entityName then
             None
@@ -41,10 +55,10 @@ module FileTreeAssignNoteHelper =
             |> Option.map PathHelpers.normalizeCanonicalRelativePath
             |> Option.bind (fun path ->
                 match getNonEmptyPathParts path with
-                | [| root; entityName |] when PathHelpers.pathsEqual root ARCtrl.ArcPathHelper.StudiesFolderName ->
-                    tryCreateNoteAssignmentTarget NotesTargetKind.Study entityName
-                | [| root; entityName |] when PathHelpers.pathsEqual root ARCtrl.ArcPathHelper.AssaysFolderName ->
-                    tryCreateNoteAssignmentTarget NotesTargetKind.Assay entityName
+                | [| root; entityName |] ->
+                    root
+                    |> tryGetTargetKindFromRootFolder
+                    |> Option.bind (fun kind -> tryCreateNoteAssignmentTarget kind entityName)
                 | _ -> None
             )
 
@@ -69,10 +83,12 @@ module FileTreeAssignNoteHelper =
             None
         else
             match getNonEmptyPathParts normalizedPath with
-            | [| root; dateFolder; noteFolderName; fileName |] when PathHelpers.pathsEqual root "notes" ->
+            | [| root; dateFolder; noteFolderName; fileName |] when
+                PathHelpers.pathsEqual root NoteConversion.notesRootFolder ->
                 if PathHelpers.pathsEqual noteFolderName (withoutMarkdownExtension fileName) then
                     Some {
-                        SourceFolderPath = $"notes/{dateFolder}/{noteFolderName}"
+                        SourceFolderPath =
+                            combineRelativePaths [| NoteConversion.notesRootFolder; dateFolder; noteFolderName |]
                         NoteFolderName = noteFolderName
                         Label = $"{dateFolder} / {noteFolderName}"
                     }
@@ -92,14 +108,88 @@ module FileTreeAssignNoteHelper =
         |> Seq.sortBy (fun note -> note.Label.ToLowerInvariant())
         |> ResizeArray
 
-    let buildAssignedNoteFolderPath (target: ExistingTargetRef) (noteFolderName: string) =
-        let targetFolderName =
-            match target.Kind with
-            | NotesTargetKind.Study -> ARCtrl.ArcPathHelper.StudiesFolderName
-            | NotesTargetKind.Assay -> ARCtrl.ArcPathHelper.AssaysFolderName
+    let private tryGetRelativePathFromParent parentPath childPath =
+        let normalizedParentPath = PathHelpers.normalizeCanonicalRelativePath parentPath
+        let normalizedChildPath = PathHelpers.normalizeCanonicalRelativePath childPath
 
-        $"{targetFolderName}/{target.Name}/protocols/{noteFolderName}"
+        if PathHelpers.isSameOrDescendantPath normalizedChildPath normalizedParentPath |> not then
+            None
+        else
+            let parentSegments = getNonEmptyPathParts normalizedParentPath
+            let childSegments = getNonEmptyPathParts normalizedChildPath
+
+            if childSegments.Length <= parentSegments.Length then
+                None
+            else
+                childSegments |> Array.skip parentSegments.Length |> String.concat "/" |> Some
+
+    let createAssignableNoteAssetOptions (fileEntries: FileEntry seq) (note: AssignableNoteRef option) =
+        match note with
+        | None -> ResizeArray()
+        | Some note ->
+            let assetFolderPath =
+                combineRelativePaths [| note.SourceFolderPath; NoteConversion.noteAssetsFolderName |]
+
+            fileEntries
+            |> Seq.choose (fun entry ->
+                if entry.isDirectory then
+                    None
+                else
+                    entry.path
+                    |> tryGetRelativePathFromParent assetFolderPath
+                    |> Option.map (fun relativeAssetPath -> {
+                        SourceRelativePath = entry.path |> PathHelpers.normalizeCanonicalRelativePath
+                        RelativeAssetPath = relativeAssetPath
+                    })
+            )
+            |> Seq.distinctBy (fun asset -> PathHelpers.normalizeForComparison asset.SourceRelativePath)
+            |> Seq.sortBy (fun asset -> asset.RelativeAssetPath.ToLowerInvariant())
+            |> ResizeArray
+
+    let private targetRootPath (target: ExistingTargetRef) =
+        let targetFolder, _ = NoteConversion.existingTargetFolders target.Kind
+        combineRelativePaths [| targetFolder; target.Name |]
+
+    let buildAssignedNoteFolderPath (target: ExistingTargetRef) (noteFolderName: string) =
+        NoteConversion.mkExistingTargetRelativePath target noteFolderName
+        |> Option.bind NoteConversion.tryGetNoteFolderRelativePath
+        |> Option.defaultWith (fun () ->
+            let _, protocolsFolder = NoteConversion.existingTargetFolders target.Kind
+
+            combineRelativePaths
+                [| targetRootPath target; protocolsFolder; noteFolderName |]
+        )
         |> PathHelpers.normalizeCanonicalRelativePath
+
+    let private buildAssignedAssetFolderPath
+        (target: ExistingTargetRef)
+        (note: AssignableNoteRef)
+        destination
+        =
+        let folderPath =
+            match destination with
+            | AssignNoteAssetDestination.Protocol -> buildAssignedNoteFolderPath target note.NoteFolderName
+            | AssignNoteAssetDestination.Dataset ->
+                combineRelativePaths
+                    [| targetRootPath target; ARCtrl.ArcPathHelper.AssayDatasetFolderName; note.NoteFolderName |]
+            | AssignNoteAssetDestination.Resource ->
+                combineRelativePaths
+                    [| targetRootPath target; ARCtrl.ArcPathHelper.StudiesResourcesFolderName; note.NoteFolderName |]
+
+        folderPath |> PathHelpers.normalizeCanonicalRelativePath
+
+    let buildAssignedAssetTargetPath
+        (target: ExistingTargetRef)
+        (note: AssignableNoteRef)
+        (asset: AssignableNoteAssetRef)
+        destination
+        =
+        combineRelativePaths
+            [|
+                buildAssignedAssetFolderPath target note destination
+                NoteConversion.noteAssetsFolderName
+                asset.RelativeAssetPath
+            |]
 
     let private reloadAssignedNotePreviewIfNeeded config path = promise {
         match config.pageState with
@@ -118,7 +208,43 @@ module FileTreeAssignNoteHelper =
         | _ -> ()
     }
 
-    let assignNoteToTarget (config: AssignNoteMoveConfig) (target: ExistingTargetRef) (note: AssignableNoteRef) =
+    let private moveAssignedAssets config target note targetFolderPath assets assetDestinations =
+        let rec moveNext assets = promise {
+            match assets with
+            | [] -> return Ok()
+            | asset :: remainingAssets ->
+                match assetDestinations |> Map.tryFind asset.SourceRelativePath with
+                | None
+                | Some AssignNoteAssetDestination.Protocol -> return! moveNext remainingAssets
+                | Some destination ->
+                    let sourcePath =
+                        combineRelativePaths
+                            [| targetFolderPath; NoteConversion.noteAssetsFolderName; asset.RelativeAssetPath |]
+
+                    let targetPath =
+                        buildAssignedAssetTargetPath target note asset destination
+
+                    let! moveResult =
+                        config.movePath {
+                            sourceRelativePath = sourcePath
+                            targetRelativePath = targetPath
+                            overwrite = false
+                        }
+
+                    match moveResult with
+                    | Ok() -> return! moveNext remainingAssets
+                    | Error moveError -> return Error moveError
+        }
+
+        moveNext assets
+
+    let assignNoteToTarget
+        (config: AssignNoteMoveConfig)
+        (target: ExistingTargetRef)
+        (note: AssignableNoteRef)
+        (assets: AssignableNoteAssetRef list)
+        (assetDestinations: Map<string, AssignNoteAssetDestination>)
+        =
         let targetFolderPath = buildAssignedNoteFolderPath target note.NoteFolderName
 
         if PathHelpers.pathsEqual note.SourceFolderPath targetFolderPath then
@@ -137,18 +263,21 @@ module FileTreeAssignNoteHelper =
                 match moveResult with
                 | Error moveError -> enqueueAssignNoteError config.enqueueError moveError.Message
                 | Ok() ->
-                    let remappedSelectionPath =
-                        tryRemapSelectionPath note.SourceFolderPath targetFolderPath config.selectedTreePath
+                    match! moveAssignedAssets config target note targetFolderPath assets assetDestinations with
+                    | Error assetMoveError -> enqueueAssignNoteError config.enqueueError assetMoveError.Message
+                    | Ok() ->
+                        let remappedSelectionPath =
+                            tryRemapSelectionPath note.SourceFolderPath targetFolderPath config.selectedTreePath
 
-                    remappedSelectionPath
-                    |> Option.iter (fun path -> config.setSelection (ArcSelection.forTreePath (Some path)))
+                        remappedSelectionPath
+                        |> Option.iter (fun path -> config.setSelection (ArcSelection.forTreePath (Some path)))
 
-                    match remappedSelectionPath with
-                    | Some path -> do! reloadAssignedNotePreviewIfNeeded config path
-                    | None -> ()
+                        match remappedSelectionPath with
+                        | Some path -> do! reloadAssignedNotePreviewIfNeeded config path
+                        | None -> ()
 
-                    config.refreshGitStatus ()
-                    config.closeDialog ()
+                        config.refreshGitStatus ()
+                        config.closeDialog ()
             }
             |> Promise.catch (fun error -> enqueueAssignNoteError config.enqueueError error.Message)
             |> Promise.map (fun _ -> config.setIsAssigning false)

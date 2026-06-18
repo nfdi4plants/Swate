@@ -1,6 +1,7 @@
 module ElectronRenderer.FileTreeContextMenuTests
 
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
+open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeAssignNoteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 open Swate.Components.Page.FileExplorer.Types
@@ -64,6 +65,27 @@ let private groupedLabels items =
 
 let private rootNotesActionContextMenuItems =
     rootFolderContextMenuItems "notes" "Create new item in" "swt:fluent--note-add-24-regular"
+
+let rec private waitUntil (predicate: unit -> bool, attempts: int) = promise {
+    if predicate () then
+        return ()
+    elif attempts <= 0 then
+        failwith "Timed out waiting for condition."
+    else
+        do! Promise.sleep 0
+        return! waitUntil (predicate, attempts - 1)
+}
+
+let private assignableNote sourceFolderPath noteFolderName : AssignableNoteRef = {
+    SourceFolderPath = sourceFolderPath
+    NoteFolderName = noteFolderName
+    Label = noteFolderName
+}
+
+let private assignableAsset sourceRelativePath relativeAssetPath : AssignableNoteAssetRef = {
+    SourceRelativePath = sourceRelativePath
+    RelativeAssetPath = relativeAssetPath
+}
 
 Vitest.describe (
     "FileTreeContextMenu",
@@ -393,6 +415,43 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "assignable note asset options list assets for the selected note",
+            fun () ->
+                let note =
+                    assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+
+                let assets =
+                    createAssignableNoteAssetOptions
+                        [
+                            FileEntry.create (
+                                "diagram.png",
+                                "notes/2026-06-15/Sampling_protocol/assets/diagram.png",
+                                false
+                            )
+                            FileEntry.create (
+                                "raw.csv",
+                                "notes/2026-06-15/Sampling_protocol/assets/nested/raw.csv",
+                                false
+                            )
+                            FileEntry.create (
+                                "other.png",
+                                "notes/2026-06-15/Other/assets/other.png",
+                                false
+                            )
+                            FileEntry.create (
+                                "assets",
+                                "notes/2026-06-15/Sampling_protocol/assets",
+                                true
+                            )
+                        ]
+                        (Some note)
+
+                Vitest.expect(assets.Count).toBe (2)
+                Vitest.expect(assets.[0].RelativeAssetPath).toBe ("diagram.png")
+                Vitest.expect(assets.[1].RelativeAssetPath).toBe ("nested/raw.csv")
+        )
+
+        Vitest.test (
             "assigned note folder path targets the protocol folder",
             fun () ->
                 let target = {
@@ -403,6 +462,109 @@ Vitest.describe (
                 Vitest
                     .expect(buildAssignedNoteFolderPath target "Sampling_protocol")
                     .toBe ("assays/AssayA/protocols/Sampling_protocol")
+        )
+
+        Vitest.test (
+            "assigned asset target path follows the selected asset destination",
+            fun () ->
+                let target = {
+                    Name = "AssayA"
+                    Kind = NotesTargetKind.Assay
+                }
+
+                let note =
+                    assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+
+                let asset =
+                    assignableAsset
+                        "notes/2026-06-15/Sampling_protocol/assets/diagram.png"
+                        "nested/diagram.png"
+
+                Vitest
+                    .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Protocol)
+                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/nested/diagram.png")
+
+                Vitest
+                    .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Dataset)
+                    .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/nested/diagram.png")
+
+                Vitest
+                    .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Resource)
+                    .toBe ("assays/AssayA/resources/Sampling_protocol/assets/nested/diagram.png")
+        )
+
+        Vitest.test (
+            "assignNoteToTarget moves selected assets to their selected destinations",
+            fun () -> promise {
+                let target = {
+                    Name = "AssayA"
+                    Kind = NotesTargetKind.Assay
+                }
+
+                let note =
+                    assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+
+                let moveRequests = ResizeArray<MovePathRequest>()
+                let mutable closed = false
+
+                let config: AssignNoteMoveConfig = {
+                    selectedTreePath = None
+                    pageState = None
+                    closeDialog = fun () -> closed <- true
+                    setIsAssigning = ignore
+                    setSelection = ignore
+                    refreshGitStatus = ignore
+                    reloadPreviewByPath = fun _ -> promise { return Ok() }
+                    movePath =
+                        fun request -> promise {
+                            moveRequests.Add request
+                            return Ok()
+                        }
+                    enqueueError = ignore
+                }
+
+                let assets = [
+                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/unassigned.png" "unassigned.png"
+                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/protocol.png" "protocol.png"
+                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+                    assignableAsset
+                        "notes/2026-06-15/Sampling_protocol/assets/nested/reference.pdf"
+                        "nested/reference.pdf"
+                ]
+
+                let selectedDestinations =
+                    [
+                        "notes/2026-06-15/Sampling_protocol/assets/protocol.png",
+                        AssignNoteAssetDestination.Protocol
+                        "notes/2026-06-15/Sampling_protocol/assets/data.csv",
+                        AssignNoteAssetDestination.Dataset
+                        "notes/2026-06-15/Sampling_protocol/assets/nested/reference.pdf",
+                        AssignNoteAssetDestination.Resource
+                    ]
+                    |> Map.ofList
+
+                assignNoteToTarget config target note assets selectedDestinations
+                do! waitUntil ((fun () -> closed && moveRequests.Count = 3), 50)
+
+                Vitest.expect(moveRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
+                Vitest.expect(moveRequests.[0].targetRelativePath).toBe ("assays/AssayA/protocols/Sampling_protocol")
+
+                Vitest
+                    .expect(moveRequests.[1].sourceRelativePath)
+                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/data.csv")
+
+                Vitest
+                    .expect(moveRequests.[1].targetRelativePath)
+                    .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
+
+                Vitest
+                    .expect(moveRequests.[2].sourceRelativePath)
+                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/nested/reference.pdf")
+
+                Vitest
+                    .expect(moveRequests.[2].targetRelativePath)
+                    .toBe ("assays/AssayA/resources/Sampling_protocol/assets/nested/reference.pdf")
+            }
         )
 
         Vitest.test (

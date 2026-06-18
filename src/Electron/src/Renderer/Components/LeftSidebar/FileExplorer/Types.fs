@@ -22,3 +22,14 @@ type AssignableNoteRef = {
     NoteFolderName: string
     Label: string
 }
+
+[<RequireQualifiedAccess>]
+type AssignNoteAssetDestination =
+    | Protocol
+    | Dataset
+    | Resource
+
+type AssignableNoteAssetRef = {
+    SourceRelativePath: string
+    RelativeAssetPath: string
+}
