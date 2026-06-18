@@ -10,11 +10,11 @@ module Keys =
 
     let groupingKey header : GroupingKey = { Header = header }
 
-    let propertySlot pairId side header = pairId, side, groupingKey header
+    let propertySlot layerId side header = layerId, side, groupingKey header
 
-    let paletteKey pairId side = pairId, side
+    let paletteKey layerId side = layerId, side
 
-    let selectedGroup pairId groupId = pairId, groupId
+    let selectedGroup layerId groupId = layerId, groupId
 
 /// Stores and clamps the three-panel editor layout ratios.
 module PanelLayout =
@@ -35,21 +35,21 @@ module PanelLayout =
             Right = right
         }
 
-    let get pairId state =
-        state.PanelRatios |> Map.tryFind pairId |> Option.defaultValue defaultRatios
+    let get layerId state =
+        state.PanelRatios |> Map.tryFind layerId |> Option.defaultValue defaultRatios
 
-    let set pairId ratios state = {
+    let set layerId ratios state = {
         state with
-            PanelRatios = state.PanelRatios |> Map.add pairId (clamp ratios.Left ratios.Right)
+            PanelRatios = state.PanelRatios |> Map.add layerId (clamp ratios.Left ratios.Right)
     }
 
-    let setLeft pairId left state =
-        let current = get pairId state
-        set pairId { current with Left = left } state
+    let setLeft layerId left state =
+        let current = get layerId state
+        set layerId { current with Left = left } state
 
-    let setRight pairId right state =
-        let current = get pairId state
-        set pairId { current with Right = right } state
+    let setRight layerId right state =
+        let current = get layerId state
+        set layerId { current with Right = right } state
 
 /// Tracks the in-app prompt and expansion state for mismatched group connections.
 module MemberResolution =
@@ -67,7 +67,7 @@ module MemberResolution =
 
     let chooseManual (pending: PendingMemberResolution) state =
         let pair: ManualResolutionPair = {
-            PairId = pending.PairId
+            LayerId = pending.LayerId
             InputGroupId = pending.InputGroupId
             OutputGroupId = pending.OutputGroupId
         }
@@ -85,10 +85,10 @@ module MemberResolution =
                 Detail = Some(ProvenanceDetail.Group(ProvenanceSide.Input, pending.InputGroupId))
         }
 
-    let isManualPair pairId inputGroupId outputGroupId state =
+    let isManualPair layerId inputGroupId outputGroupId state =
         state.ManualResolutionPairs
         |> List.exists (fun (pair: ManualResolutionPair) ->
-            pair.PairId = pairId
+            pair.LayerId = layerId
             && pair.InputGroupId = inputGroupId
             && pair.OutputGroupId = outputGroupId
         )
@@ -250,31 +250,32 @@ module Sides =
             retained
 
     let ensure (session: ProvenanceSession) state =
-        let currentPairIds = session.PairOrder |> Set.ofList
+        let currentLayerIds = session.LayerOrder |> Set.ofList
         let sideStates = retainCurrentSides session state
 
         let propertyRailPlacements =
             state.PropertyRailPlacements
-            |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
+            |> Map.filter (fun (layerId, _) _ -> currentLayerIds.Contains layerId)
 
         let panelRatios =
-            state.PanelRatios |> Map.filter (fun pairId _ -> currentPairIds.Contains pairId)
+            state.PanelRatios
+            |> Map.filter (fun layerId _ -> currentLayerIds.Contains layerId)
 
         let expandedProperties =
             state.ExpandedProperties
-            |> Set.filter (fun (pairId, _, _) -> currentPairIds.Contains pairId)
+            |> Set.filter (fun (layerId, _, _) -> currentLayerIds.Contains layerId)
 
         let paletteValues =
             state.PaletteValues
-            |> Map.filter (fun (pairId, _) _ -> currentPairIds.Contains pairId)
+            |> Map.filter (fun (layerId, _) _ -> currentLayerIds.Contains layerId)
 
         let pendingMemberResolution =
             state.PendingMemberResolution
-            |> Option.filter (fun pending -> currentPairIds.Contains pending.PairId)
+            |> Option.filter (fun pending -> currentLayerIds.Contains pending.LayerId)
 
         let manualResolutionPairs =
             state.ManualResolutionPairs
-            |> List.filter (fun pair -> currentPairIds.Contains pair.PairId)
+            |> List.filter (fun pair -> currentLayerIds.Contains pair.LayerId)
 
         let propertyColors = PropertyColors.ensureLayerColors session state
 
@@ -314,11 +315,11 @@ module Sides =
 /// Tracks expanded property value panels on the side rails.
 module PropertyExpansion =
 
-    let isExpanded pairId side header state =
-        state.ExpandedProperties |> Set.contains (Keys.propertySlot pairId side header)
+    let isExpanded layerId side header state =
+        state.ExpandedProperties |> Set.contains (Keys.propertySlot layerId side header)
 
-    let toggle pairId side header state =
-        let slot = Keys.propertySlot pairId side header
+    let toggle layerId side header state =
+        let slot = Keys.propertySlot layerId side header
 
         let expanded =
             if state.ExpandedProperties.Contains slot then
@@ -334,17 +335,17 @@ module PropertyExpansion =
 /// Stores property values that exist only in the rail until they are applied to a group.
 module Palette =
 
-    let valuesForSide pairId side state =
+    let valuesForSide layerId side state =
         state.PaletteValues
-        |> Map.tryFind (Keys.paletteKey pairId side)
+        |> Map.tryFind (Keys.paletteKey layerId side)
         |> Option.defaultValue []
 
-    let valuesForHeader pairId side header state =
-        valuesForSide pairId side state
+    let valuesForHeader layerId side header state =
+        valuesForSide layerId side state
         |> List.filter (fun propertyValue -> propertyValue.Header = header)
 
-    let headersForSide pairId side state =
-        valuesForSide pairId side state
+    let headersForSide layerId side state =
+        valuesForSide layerId side state
         |> List.map (fun propertyValue -> propertyValue.Header)
         |> List.distinct
         |> List.sortBy (fun header -> header.Category.Name)
@@ -355,7 +356,7 @@ module Palette =
         |> List.collect snd
         |> List.tryFind (fun propertyValue -> propertyValue.Id = propertyValueId)
 
-    let private nextValueId pairId side state =
+    let private nextValueId layerId side state =
         let sideText =
             match side with
             | ProvenanceSide.Input -> "input"
@@ -369,28 +370,28 @@ module Palette =
             |> Set.ofList
 
         let rec loop index =
-            let id = $"palette-{pairId}-{sideText}-{index}"
+            let id = $"palette-{layerId}-{sideText}-{index}"
             if existing.Contains id then loop (index + 1) else id
 
         loop (existing.Count + 1)
 
-    let addValue pairId side header value unit state =
-        let key = Keys.paletteKey pairId side
+    let addValue layerId side header value unit state =
+        let key = Keys.paletteKey layerId side
 
         let propertyValue: ProvenancePropertyValue = {
-            Id = nextValueId pairId side state
+            Id = nextValueId layerId side state
             Header = header
             Value = value
             Unit = unit
             Source = None
         }
 
-        let nextValues = valuesForSide pairId side state @ [ propertyValue ]
+        let nextValues = valuesForSide layerId side state @ [ propertyValue ]
 
         {
             state with
                 PaletteValues = state.PaletteValues |> Map.add key nextValues
-                ExpandedProperties = state.ExpandedProperties |> Set.add (Keys.propertySlot pairId side header)
+                ExpandedProperties = state.ExpandedProperties |> Set.add (Keys.propertySlot layerId side header)
                 Error = None
         }
 
@@ -524,15 +525,15 @@ module GroupingAssignments =
 /// Tracks selected input/output groups for layer creation.
 module Selection =
 
-    let contains pairId side groupId state =
-        let identity = Keys.selectedGroup pairId groupId
+    let contains layerId side groupId state =
+        let identity = Keys.selectedGroup layerId groupId
 
         match side with
         | ProvenanceSide.Input -> state.SelectedInputs.Contains identity
         | ProvenanceSide.Output -> state.SelectedOutputs.Contains identity
 
-    let toggle pairId side groupId state =
-        let identity = Keys.selectedGroup pairId groupId
+    let toggle layerId side groupId state =
+        let identity = Keys.selectedGroup layerId groupId
 
         match side with
         | ProvenanceSide.Input ->

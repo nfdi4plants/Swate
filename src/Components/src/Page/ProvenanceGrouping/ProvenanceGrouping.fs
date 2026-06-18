@@ -20,7 +20,7 @@ type private EditorLookups = {
 
 type private DragContext = {
     Session: ProvenanceSession
-    Pair: ProvenanceLayerPair
+    Layer: ProvenanceLayer
     UiState: UiState
     Publish: SessionResult -> unit
     SetUiState: UiState -> unit
@@ -93,10 +93,10 @@ module private TierObserver =
     [<Emit("$0.disconnect()")>]
     let disconnect (observer: obj) : unit = jsNative
 
-/// Resolves drag payload ids and display ids against the active pair and UI palette.
+/// Resolves drag payload ids and display ids against the active layer and UI palette.
 module private EditorLookups =
 
-    let create pair uiState inputGroups outputGroups =
+    let create layer uiState inputGroups outputGroups =
         let findGroup side groupId =
             let groups: DisplayGroup list =
                 if side = ProvenanceSide.Input then
@@ -107,16 +107,16 @@ module private EditorLookups =
             groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
 
         let findHeader headerId =
-            PropertyRails.headersForModel pair.Model
+            PropertyRails.headersForModel layer.Model
             |> List.tryFind (fun header -> DragDrop.propertyHeaderIdentity header = headerId)
 
         let findPropertyValue propertyValueId =
-            pair.Model.PropertyValues.TryFind propertyValueId
+            layer.Model.PropertyValues.TryFind propertyValueId
             |> Option.orElseWith (fun () -> State.Palette.tryFindValue propertyValueId uiState)
 
         let sourceForValue propertyValueId (propertyValue: ProvenancePropertyValue) : ValueAssignmentSource = {
             CopiedFrom =
-                if pair.Model.PropertyValues.ContainsKey propertyValueId then
+                if layer.Model.PropertyValues.ContainsKey propertyValueId then
                     Some propertyValueId
                 else
                     None
@@ -147,8 +147,8 @@ module private AssignmentErrors =
 /// Session-changing actions that publish patches back to the host component.
 module private EditorActions =
 
-    let addLayer session pairId inputGroups outputGroups uiState publish =
-        Display.layerCommand pairId inputGroups outputGroups uiState
+    let addLayer session layerId inputGroups outputGroups uiState publish =
+        Display.layerCommand layerId inputGroups outputGroups uiState
         |> fun command -> Session.addLayer command session
         |> publish
 
@@ -306,17 +306,17 @@ module private DragHandlers =
                 liveDragStore
         | None -> ()
 
-    let private layerIdForSide (pair: ProvenanceLayerPair) side =
+    let private layerIdForSide (layer: ProvenanceLayer) side =
         match side with
-        | ProvenanceSide.Input -> pair.InputSideId
-        | ProvenanceSide.Output -> pair.OutputSideId
+        | ProvenanceSide.Input -> layer.InputSideId
+        | ProvenanceSide.Output -> layer.OutputSideId
 
     let private routePropertyValueDrop context side groupId propertyValueId =
         match context.Lookups.FindPropertyValue propertyValueId with
         | Some propertyValue ->
             let targetGroups =
                 ValueAssignment.selectedTargetGroupsForDrop
-                    context.Pair.Id
+                    context.Layer.Id
                     side
                     groupId
                     context.UiState.SelectedInputs
@@ -327,7 +327,7 @@ module private DragHandlers =
                 ValueAssignment.planPropertyValueDropToGroups
                     (context.Lookups.SourceForValue propertyValueId propertyValue)
                     targetGroups
-                    context.Pair.Model
+                    context.Layer.Model
             with
             | Ok batch ->
                 let affectedValueCount =
@@ -386,7 +386,7 @@ module private DragHandlers =
             | None ->
                 State.MemberResolution.request
                     {
-                        PairId = context.Pair.Id
+                        LayerId = context.Layer.Id
                         InputGroupId = inputGroup.Id
                         OutputGroupId = outputGroup.Id
                         InputMemberCount = inputGroup.Members.Length
@@ -429,11 +429,11 @@ module private DragHandlers =
             routePropertyValueDrop context side groupId propertyValueId
         | Some(DragDrop.Payload.PropertyHeader(sourceSide, headerId)), _, Some targetSide when sourceSide <> targetSide ->
             match context.Lookups.FindHeader headerId with
-            | Some header when PropertyRails.canSwitchHeader header context.Pair.Model ->
+            | Some header when PropertyRails.canSwitchHeader header context.Layer.Model ->
                 State.GroupingAssignments.move
-                    context.Pair.Id
-                    (layerIdForSide context.Pair sourceSide)
-                    (layerIdForSide context.Pair targetSide)
+                    context.Layer.Id
+                    (layerIdForSide context.Layer sourceSide)
+                    (layerIdForSide context.Layer targetSide)
                     targetSide
                     header
                     context.UiState
@@ -689,7 +689,7 @@ module private EditorSurface =
 
     let groupColumn
         side
-        (pair: ProvenanceLayerPair)
+        (layer: ProvenanceLayer)
         model
         (groups: DisplayGroup list)
         endpointKinds
@@ -728,14 +728,14 @@ module private EditorSurface =
                     existingEndpointNames,
                     createSet,
                     debug = debug,
-                    key = $"{pair.Id}:{keyPrefix}:{endpointKindsKey}"
+                    key = $"{layer.Id}:{keyPrefix}:{endpointKindsKey}"
                 )
                 for group in groups do
                     GroupCard.Main(
                         side,
                         group,
                         model,
-                        State.Selection.contains pair.Id side group.Id uiState,
+                        State.Selection.contains layer.Id side group.Id uiState,
                         isExpanded side group.Id,
                         (fun () -> toggleSelection side group.Id),
                         (fun () -> toggleDetail side group.Id),
@@ -803,14 +803,14 @@ type ProvenanceGrouping =
 
         let uiState = State.Sides.ensure session rawUiState
 
-        let pair, inputGroups, outputGroups, connections =
-            React.useMemo ((fun () -> Display.displayPair session uiState), [| box session; box uiState.SideStates |])
+        let layer, inputGroups, outputGroups, connections =
+            React.useMemo ((fun () -> Display.displayLayer session uiState), [| box session; box uiState.SideStates |])
 
         let latestUiState = React.useRef uiState
-        let activePairId = React.useRef pair.Id
+        let activeLayerId = React.useRef layer.Id
         latestUiState.current <- uiState
-        activePairId.current <- pair.Id
-        let panelRatios = State.PanelLayout.get pair.Id uiState
+        activeLayerId.current <- layer.Id
+        let panelRatios = State.PanelLayout.get layer.Id uiState
 
         let endpointKinds = Endpoints.endpointKindOptions ()
 
@@ -823,22 +823,22 @@ type ProvenanceGrouping =
                 |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
         ]
 
-        let lookups = EditorLookups.create pair uiState inputGroups outputGroups
+        let lookups = EditorLookups.create layer uiState inputGroups outputGroups
 
         let inputRailProjection =
             React.useMemo (
                 (fun () ->
                     PropertyProjection.railProjectionWithFilters
                         session
-                        pair.Id
+                        layer.Id
                         ProvenanceSide.Input
-                        pair.Model
+                        layer.Model
                         uiState
                 ),
                 [|
                     box session
-                    box pair.Id
-                    box pair.Model
+                    box layer.Id
+                    box layer.Model
                     box uiState.PropertyRailPlacements
                     box uiState.ExpandedProperties
                     box uiState.PaletteValues
@@ -852,15 +852,15 @@ type ProvenanceGrouping =
                 (fun () ->
                     PropertyProjection.railProjectionWithFilters
                         session
-                        pair.Id
+                        layer.Id
                         ProvenanceSide.Output
-                        pair.Model
+                        layer.Model
                         uiState
                 ),
                 [|
                     box session
-                    box pair.Id
-                    box pair.Model
+                    box layer.Id
+                    box layer.Model
                     box uiState.PropertyRailPlacements
                     box uiState.ExpandedProperties
                     box uiState.PaletteValues
@@ -896,8 +896,8 @@ type ProvenanceGrouping =
 
                 let next =
                     match side with
-                    | Splitter.Left -> State.PanelLayout.setLeft activePairId.current splitPercent current
-                    | Splitter.Right -> State.PanelLayout.setRight activePairId.current (100 - splitPercent) current
+                    | Splitter.Left -> State.PanelLayout.setLeft activeLayerId.current splitPercent current
+                    | Splitter.Right -> State.PanelLayout.setRight activeLayerId.current (100 - splitPercent) current
 
                 latestUiState.current <- next
                 setUiState next
@@ -964,22 +964,22 @@ type ProvenanceGrouping =
             EditorActions.createSet session publish command
 
         let addPaletteValue side header value unit =
-            State.Palette.addValue pair.Id side header value unit uiState |> setUiState
+            State.Palette.addValue layer.Id side header value unit uiState |> setUiState
 
         let toggleSideGrouping layerId side header =
             State.GroupingAssignments.toggleSide layerId side header uiState |> setUiState
 
         let togglePropertyExpanded side header =
-            State.PropertyExpansion.toggle pair.Id side header uiState |> setUiState
+            State.PropertyExpansion.toggle layer.Id side header uiState |> setUiState
 
         let toggleSelection side groupId =
-            State.Selection.toggle pair.Id side groupId uiState |> setUiState
+            State.Selection.toggle layer.Id side groupId uiState |> setUiState
 
         let toggleGroupDetail side groupId =
             State.Detail.toggleGroup side groupId uiState |> setUiState
 
         let sourceInfoForValue value =
-            Session.propertyValueSourceInfo pair value
+            Session.propertyValueSourceInfo layer value
 
         let setPropertyColor header color =
             let update =
@@ -1038,7 +1038,7 @@ type ProvenanceGrouping =
         let isManuallyResolving side groupId =
             uiState.ManualResolutionPairs
             |> List.exists (fun resolution ->
-                resolution.PairId = pair.Id
+                resolution.LayerId = layer.Id
                 && ((side = ProvenanceSide.Input && resolution.InputGroupId = groupId)
                     || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId))
             )
@@ -1062,7 +1062,7 @@ type ProvenanceGrouping =
 
         let dragContext = {
             Session = session
-            Pair = pair
+            Layer = layer
             UiState = uiState
             Publish = publish
             SetUiState = commitUiState
@@ -1149,8 +1149,8 @@ type ProvenanceGrouping =
 
             EditorSurface.groupColumn
                 side
-                pair
-                pair.Model
+                layer
+                layer.Model
                 groups
                 endpointKinds
                 existingEndpointNames
@@ -1269,8 +1269,8 @@ type ProvenanceGrouping =
         let connectorOverlay =
             ConnectorOverlay.Main(
                 surfaceRef,
-                pair.Id,
-                pair.Model,
+                layer.Id,
+                layer.Model,
                 inputGroups,
                 outputGroups,
                 connections,
@@ -1395,7 +1395,7 @@ type ProvenanceGrouping =
                                         (fun () ->
                                             EditorActions.addLayer
                                                 session
-                                                pair.Id
+                                                layer.Id
                                                 inputGroups
                                                 outputGroups
                                                 uiState

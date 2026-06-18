@@ -27,7 +27,7 @@ type ConnectorOverlayState = {
     ExpandedGroup: (ProvenanceSide * string) option
     SelectedConnectionId: string option
     ManualResolutionPairs: ManualResolutionPair list
-    ExpandedProperties: Set<ProvenancePairId * ProvenanceSide * GroupingKey>
+    ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
 }
 
 module ConnectorOverlayState =
@@ -53,8 +53,8 @@ module ConnectorOverlayState =
     let isGroupExpanded side groupId state =
         state.ExpandedGroup = Some(side, groupId)
 
-    let isPropertyExpanded pairId side header state =
-        state.ExpandedProperties.Contains(pairId, side, { Header = header })
+    let isPropertyExpanded layerId side header state =
+        state.ExpandedProperties.Contains(layerId, side, { Header = header })
 
 type private ConnectorMeasureContext = {
     Container: HTMLElement
@@ -187,10 +187,10 @@ module private ConnectorPaths =
         Color = color
     }
 
-    let private isManuallyResolving pairId side groupId overlayState =
+    let private isManuallyResolving layerId side groupId overlayState =
         overlayState.ManualResolutionPairs
         |> List.exists (fun resolution ->
-            resolution.PairId = pairId
+            resolution.LayerId = layerId
             && ((side = ProvenanceSide.Input && resolution.InputGroupId = groupId)
                 || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId))
         )
@@ -207,19 +207,19 @@ module private ConnectorPaths =
                 && ConnectorOverlayState.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId overlayState
         )
 
-    let private isGroupExpanded pairId connections side groupId overlayState =
+    let private isGroupExpanded layerId connections side groupId overlayState =
         ConnectorOverlayState.isGroupExpanded side groupId overlayState
-        || isManuallyResolving pairId side groupId overlayState
+        || isManuallyResolving layerId side groupId overlayState
         || isConnectedToExpanded connections side groupId overlayState
 
-    let groupConnections context pairId connections overlayState =
+    let groupConnections context layerId connections overlayState =
         connections
         // Expanded endpoints swap the aggregate group connector for the
         // member-level connectors, so the group line disappears instead of
         // doubling up underneath them.
         |> List.filter (fun connection ->
-            not (isGroupExpanded pairId connections ProvenanceSide.Input connection.SourceGroupId overlayState)
-            && not (isGroupExpanded pairId connections ProvenanceSide.Output connection.TargetGroupId overlayState)
+            not (isGroupExpanded layerId connections ProvenanceSide.Input connection.SourceGroupId overlayState)
+            && not (isGroupExpanded layerId connections ProvenanceSide.Output connection.TargetGroupId overlayState)
         )
         |> List.choose (fun connection ->
             ConnectorMeasure.pathBetweenHandles
@@ -239,14 +239,14 @@ module private ConnectorPaths =
             )
         )
 
-    let memberConnections context pairId (model: ProvenanceModel) connections overlayState =
+    let memberConnections context layerId (model: ProvenanceModel) connections overlayState =
         connections
         |> List.collect (fun displayConnection ->
             let inputExpanded =
-                isGroupExpanded pairId connections ProvenanceSide.Input displayConnection.SourceGroupId overlayState
+                isGroupExpanded layerId connections ProvenanceSide.Input displayConnection.SourceGroupId overlayState
 
             let outputExpanded =
-                isGroupExpanded pairId connections ProvenanceSide.Output displayConnection.TargetGroupId overlayState
+                isGroupExpanded layerId connections ProvenanceSide.Output displayConnection.TargetGroupId overlayState
 
             if not inputExpanded && not outputExpanded then
                 []
@@ -308,7 +308,7 @@ module private ConnectorPaths =
     /// draw one line per same-side group containing any value for that property.
     let private railConnectionsForSide
         context
-        pairId
+        layerId
         (model: ProvenanceModel)
         side
         groups
@@ -317,7 +317,7 @@ module private ConnectorPaths =
         overlayState
         =
         railProjection.Headers
-        |> List.filter (fun header -> not (ConnectorOverlayState.isPropertyExpanded pairId side header overlayState))
+        |> List.filter (fun header -> not (ConnectorOverlayState.isPropertyExpanded layerId side header overlayState))
         |> List.collect (fun header ->
             let color =
                 railProjection.ColorByHeader
@@ -352,7 +352,7 @@ module private ConnectorPaths =
 
     let private valueRailConnectionsForSide
         context
-        pairId
+        layerId
         (model: ProvenanceModel)
         side
         groups
@@ -361,7 +361,7 @@ module private ConnectorPaths =
         overlayState
         =
         railProjection.Headers
-        |> List.filter (fun header -> ConnectorOverlayState.isPropertyExpanded pairId side header overlayState)
+        |> List.filter (fun header -> ConnectorOverlayState.isPropertyExpanded layerId side header overlayState)
         |> List.collect (fun header ->
             let color =
                 railProjection.ColorByHeader
@@ -396,7 +396,7 @@ module private ConnectorPaths =
 
     let railConnections
         context
-        pairId
+        layerId
         model
         inputGroups
         outputGroups
@@ -411,7 +411,7 @@ module private ConnectorPaths =
                 yield!
                     railConnectionsForSide
                         context
-                        pairId
+                        layerId
                         model
                         ProvenanceSide.Input
                         inputGroups
@@ -422,7 +422,7 @@ module private ConnectorPaths =
                 yield!
                     railConnectionsForSide
                         context
-                        pairId
+                        layerId
                         model
                         ProvenanceSide.Output
                         outputGroups
@@ -432,7 +432,7 @@ module private ConnectorPaths =
             yield!
                 valueRailConnectionsForSide
                     context
-                    pairId
+                    layerId
                     model
                     ProvenanceSide.Input
                     inputGroups
@@ -442,7 +442,7 @@ module private ConnectorPaths =
             yield!
                 valueRailConnectionsForSide
                     context
-                    pairId
+                    layerId
                     model
                     ProvenanceSide.Output
                     outputGroups
@@ -470,7 +470,7 @@ module private ConnectorPaths =
 
     let all
         context
-        pairId
+        layerId
         model
         inputGroups
         outputGroups
@@ -485,7 +485,7 @@ module private ConnectorPaths =
             yield!
                 railConnections
                     context
-                    pairId
+                    layerId
                     model
                     inputGroups
                     outputGroups
@@ -494,8 +494,8 @@ module private ConnectorPaths =
                     colorByHeader
                     overlayState
                     showPropertyHeaderConnectors
-            yield! groupConnections context pairId connections overlayState
-            yield! memberConnections context pairId model connections overlayState
+            yield! groupConnections context layerId connections overlayState
+            yield! memberConnections context layerId model connections overlayState
         ]
 
 module private ConnectorSvg =
@@ -693,7 +693,7 @@ type ConnectorOverlay =
     static member Main
         (
             containerRef: IRefValue<HTMLElement option>,
-            pairId: ProvenancePairId,
+            layerId: ProvenanceLayerId,
             model: ProvenanceModel,
             inputGroups: DisplayGroup list,
             outputGroups: DisplayGroup list,
@@ -727,7 +727,7 @@ type ConnectorOverlay =
 
                 ConnectorPaths.all
                     context
-                    pairId
+                    layerId
                     model
                     inputGroups
                     outputGroups
@@ -781,7 +781,7 @@ type ConnectorOverlay =
                     )
             ),
             [|
-                box pairId
+                box layerId
                 box model
                 box inputGroups
                 box outputGroups

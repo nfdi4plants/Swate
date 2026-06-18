@@ -84,7 +84,7 @@ type LiveConnectionDrag = {
 }
 
 type PendingMemberResolution = {
-    PairId: ProvenancePairId
+    LayerId: ProvenanceLayerId
     InputGroupId: string
     OutputGroupId: string
     InputMemberCount: int
@@ -92,7 +92,7 @@ type PendingMemberResolution = {
 }
 
 type ManualResolutionPair = {
-    PairId: ProvenancePairId
+    LayerId: ProvenanceLayerId
     InputGroupId: string
     OutputGroupId: string
 }
@@ -153,15 +153,15 @@ type PropertyCountBadge =
 
 type UiState = {
     SideStates: Map<ProvenanceLayerSideId, SideViewState>
-    PropertyRailPlacements: Map<ProvenancePairId * GroupingKey, ProvenanceSide>
-    ExpandedProperties: Set<ProvenancePairId * ProvenanceSide * GroupingKey>
-    PaletteValues: Map<ProvenancePairId * ProvenanceSide, ProvenancePropertyValue list>
+    PropertyRailPlacements: Map<ProvenanceLayerId * GroupingKey, ProvenanceSide>
+    ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
+    PaletteValues: Map<ProvenanceLayerId * ProvenanceSide, ProvenancePropertyValue list>
     PendingAssignmentBatch: PendingAssignmentBatch option
-    PanelRatios: Map<ProvenancePairId, PanelRatios>
+    PanelRatios: Map<ProvenanceLayerId, PanelRatios>
     PendingMemberResolution: PendingMemberResolution option
     ManualResolutionPairs: ManualResolutionPair list
-    SelectedInputs: Set<ProvenancePairId * string>
-    SelectedOutputs: Set<ProvenancePairId * string>
+    SelectedInputs: Set<ProvenanceLayerId * string>
+    SelectedOutputs: Set<ProvenanceLayerId * string>
     Detail: ProvenanceDetail option
     Error: string option
     PropertyColors: PropertyColorSettings

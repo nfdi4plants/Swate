@@ -874,7 +874,7 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await waitFor(() => {
-      expect(canvas.getByTestId('provenance-pair-pair-2')).toHaveClass('swt:btn-primary');
+      expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
       expect(canvasElement).toHaveTextContent('Output A');
     });
 
@@ -884,13 +884,13 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
     await dragByPointer(source, carried);
     await userEvent.click(canvas.getByTestId('provenance-confirm-overwrite'));
 
-    await userEvent.click(canvas.getByTestId('provenance-pair-pair-1'));
+    await userEvent.click(canvas.getByTestId('provenance-layer-layer-1'));
     await waitFor(() => expect(canvasElement).toHaveTextContent('Imaging'));
     expect(canvas.getByTestId('provenance-patch-preview')).not.toHaveTextContent('No patches emitted.');
   },
 };
 
-export const CompletesAnInputOnlyPair: Story = {
+export const CompletesAnInputOnlyLayer: Story = {
   render: () => <Harness inputOnly />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -1297,7 +1297,6 @@ export const LayerTabsUseConceptualLayerColorsAndSideRails: Story = {
     expect(layer1).toHaveClass('swt:btn-primary');
     expect(layerColor).toMatch(/^#/);
     expect(layerColor).not.toContain('|');
-    expect(canvas.queryByTestId('provenance-pair-pair-1')).not.toBeInTheDocument();
 
     expect(canvas.getByTestId('provenance-property-rail-Input')).toHaveAttribute(
       'data-provenance-side-id',
@@ -1330,7 +1329,7 @@ export const AddsLayerFromMixedSelection: Story = {
   },
 };
 
-export const DoesNotReuseSelectionForEqualGroupIdsInDifferentPairs: Story = {
+export const DoesNotReuseSelectionForEqualGroupIdsInDifferentLayers: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -1340,18 +1339,18 @@ export const DoesNotReuseSelectionForEqualGroupIdsInDifferentPairs: Story = {
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Pair 2 Output');
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Layer 2 Output');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
-    const pair2Output = await waitFor(() => canvas.getByText('Pair 2 Output').closest('article')!);
+    const layer2Output = await waitFor(() => canvas.getByText('Layer 2 Output').closest('article')!);
 
-    await selectGroup(pair2Output);
+    await selectGroup(layer2Output);
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Pair 3 Output');
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Layer 3 Output');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
-    const pair3Output = await waitFor(() => canvas.getByText('Pair 3 Output').closest('article')!);
+    const layer3Output = await waitFor(() => canvas.getByText('Layer 3 Output').closest('article')!);
 
-    expect(pair3Output).not.toHaveClass('swt:border-primary');
+    expect(layer3Output).not.toHaveClass('swt:border-primary');
   },
 };

@@ -370,21 +370,21 @@ module PropertyRails =
         hasHeaderForSide ProvenanceSide.Input header model
         && hasHeaderForSide ProvenanceSide.Output header model
 
-    let private placedHeadersForSide pairId side (uiState: UiState) =
+    let private placedHeadersForSide layerId side (uiState: UiState) =
         uiState.PropertyRailPlacements
         |> Map.toList
-        |> List.choose (fun ((currentPairId, key), targetSide) ->
-            if currentPairId = pairId && targetSide = side then
+        |> List.choose (fun ((currentLayerId, key), targetSide) ->
+            if currentLayerId = layerId && targetSide = side then
                 Some key.Header
             else
                 None
         )
 
-    let private railPlacement pairId header (uiState: UiState) =
-        uiState.PropertyRailPlacements |> Map.tryFind (pairId, { Header = header })
+    let private railPlacement layerId header (uiState: UiState) =
+        uiState.PropertyRailPlacements |> Map.tryFind (layerId, { Header = header })
 
-    let private hasPaletteHeaderForSide pairId side header uiState =
-        State.Palette.headersForSide pairId side uiState |> List.contains header
+    let private hasPaletteHeaderForSide layerId side header uiState =
+        State.Palette.headersForSide layerId side uiState |> List.contains header
 
     let private defaultRailSide header model =
         if hasHeaderForSide ProvenanceSide.Output header model then
@@ -404,63 +404,63 @@ module PropertyRails =
         |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
         |> List.filter (fun propertyValue -> propertyValue.Header = header)
 
-    let private hasPreviousOrigin session pairId header model =
+    let private hasPreviousOrigin session layerId header model =
         referencedPropertyValuesForHeader header model
         |> List.exists (fun propertyValue ->
-            match Session.propertyValueOriginInSession pairId ProvenanceSide.Input propertyValue.Id session with
+            match Session.propertyValueOriginInSession layerId ProvenanceSide.Input propertyValue.Id session with
             | Some(PropertyOrigin.UpstreamLayer _)
             | Some(PropertyOrigin.PreviousContext _) -> true
             | _ -> false
         )
 
-    let private defaultRailSideInSession session pairId header model =
-        if hasPreviousOrigin session pairId header model then
+    let private defaultRailSideInSession session layerId header model =
+        if hasPreviousOrigin session layerId header model then
             Some ProvenanceSide.Input
         else
             defaultRailSide header model
 
-    let private isValidRailSide pairId side header model uiState =
+    let private isValidRailSide layerId side header model uiState =
         hasHeaderForSide side header model
-        || hasPaletteHeaderForSide pairId side header uiState
+        || hasPaletteHeaderForSide layerId side header uiState
 
-    let private propertyRailHeadersForSideUsing defaultSideForHeader pairId side model uiState =
-        let paletteHeaders = State.Palette.headersForSide pairId side uiState
+    let private propertyRailHeadersForSideUsing defaultSideForHeader layerId side model uiState =
+        let paletteHeaders = State.Palette.headersForSide layerId side uiState
 
         let knownHeaders =
             [ yield! headersForModel model; yield! paletteHeaders ] |> List.distinct
 
         [
             yield! headersForModel model
-            yield! placedHeadersForSide pairId side uiState
+            yield! placedHeadersForSide layerId side uiState
             yield! paletteHeaders
         ]
         |> List.distinct
         |> List.filter (fun header -> knownHeaders |> List.contains header)
         |> List.filter (fun header ->
-            match railPlacement pairId header uiState with
-            | Some targetSide when isValidRailSide pairId targetSide header model uiState -> targetSide = side
+            match railPlacement layerId header uiState with
+            | Some targetSide when isValidRailSide layerId targetSide header model uiState -> targetSide = side
             | Some _ ->
                 defaultSideForHeader header = Some side
-                || hasPaletteHeaderForSide pairId side header uiState
+                || hasPaletteHeaderForSide layerId side header uiState
             | None ->
                 defaultSideForHeader header = Some side
                 || (defaultSideForHeader header).IsNone
-                   && hasPaletteHeaderForSide pairId side header uiState
+                   && hasPaletteHeaderForSide layerId side header uiState
         )
         |> List.sortBy (fun header -> header.Category.Name)
 
-    let propertyRailHeadersForSide pairId side model uiState =
-        propertyRailHeadersForSideUsing (fun header -> defaultRailSide header model) pairId side model uiState
+    let propertyRailHeadersForSide layerId side model uiState =
+        propertyRailHeadersForSideUsing (fun header -> defaultRailSide header model) layerId side model uiState
 
-    let propertyRailHeadersForSideInSession session pairId side model uiState =
+    let propertyRailHeadersForSideInSession session layerId side model uiState =
         propertyRailHeadersForSideUsing
-            (fun header -> defaultRailSideInSession session pairId header model)
-            pairId
+            (fun header -> defaultRailSideInSession session layerId header model)
+            layerId
             side
             model
             uiState
 
-    let propertyValuesForSideHeader pairId side header (model: ProvenanceModel) uiState =
+    let propertyValuesForSideHeader layerId side header (model: ProvenanceModel) uiState =
         let modelValues =
             setsForSide side model
             |> Map.toList
@@ -471,23 +471,23 @@ module PropertyRails =
 
         [
             yield! modelValues
-            yield! State.Palette.valuesForHeader pairId side header uiState
+            yield! State.Palette.valuesForHeader layerId side header uiState
         ]
         |> List.groupBy (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
         |> List.map (fun (_, values) -> values |> List.sortBy (fun value -> value.Id) |> List.head)
         |> List.sortBy (fun propertyValue -> Formatting.formatValue propertyValue.Value propertyValue.Unit)
 
-    let railProjection pairId side model uiState =
-        let headers = propertyRailHeadersForSide pairId side model uiState
+    let railProjection layerId side model uiState =
+        let headers = propertyRailHeadersForSide layerId side model uiState
 
         let valuesByHeader =
             headers
-            |> List.map (fun header -> header, propertyValuesForSideHeader pairId side header model uiState)
+            |> List.map (fun header -> header, propertyValuesForSideHeader layerId side header model uiState)
             |> Map.ofList
 
         let expandedHeaders =
             headers
-            |> List.filter (fun header -> State.PropertyExpansion.isExpanded pairId side header uiState)
+            |> List.filter (fun header -> State.PropertyExpansion.isExpanded layerId side header uiState)
             |> Set.ofList
 
         let canSwitchHeaders =
@@ -650,21 +650,20 @@ module PropertyProjection =
 
     let railProjectionWithFilters
         (session: ProvenanceSession)
-        (pairId: ProvenancePairId)
+        (layerId: ProvenanceLayerId)
         (side: ProvenanceSide)
         (model: ProvenanceModel)
         (uiState: UiState)
         : PropertyRails.RailProjection =
-        let pair = Session.activePair session
         let filters = uiState.Filters
 
         let headers =
-            PropertyRails.propertyRailHeadersForSideInSession session pairId side model uiState
+            PropertyRails.propertyRailHeadersForSideInSession session layerId side model uiState
 
         let valuesByHeader =
             headers
             |> List.map (fun header ->
-                header, PropertyRails.propertyValuesForSideHeader pairId side header model uiState
+                header, PropertyRails.propertyValuesForSideHeader layerId side header model uiState
             )
             |> Map.ofList
 
@@ -680,7 +679,7 @@ module PropertyProjection =
 
                 let origins =
                     values
-                    |> List.choose (fun pv -> Session.propertyValueOriginInSession pairId side pv.Id session)
+                    |> List.choose (fun pv -> Session.propertyValueOriginInSession layerId side pv.Id session)
                     |> Set.ofList
 
                 header, origins
@@ -732,7 +731,7 @@ module PropertyProjection =
 
         let expandedHeaders =
             sorted
-            |> List.filter (fun header -> State.PropertyExpansion.isExpanded pairId side header uiState)
+            |> List.filter (fun header -> State.PropertyExpansion.isExpanded layerId side header uiState)
             |> Set.ofList
 
         let canSwitchHeaders =
@@ -781,7 +780,7 @@ module Endpoints =
             Text = $"{prefix} [{label}]"
         }
 
-/// Projects the active session pair into renderable groups, connections, and layer commands.
+/// Projects the active session layer into renderable groups, connections, and layer commands.
 module Display =
 
     open Swate.Components.Shared.ProvenanceGrouping.Types
@@ -789,7 +788,7 @@ module Display =
     open Swate.Components.Shared.ProvenanceGrouping.Session
     open Swate.Components.Page.ProvenanceGrouping.Types
 
-    let displayPair session uiState =
+    let displayLayer session uiState =
         let layer = Session.activeLayer session
         let inputState = State.Sides.get layer.InputSideId uiState
         let outputState = State.Sides.get layer.OutputSideId uiState
@@ -809,21 +808,21 @@ module Display =
 
         layer, inputs, outputs, displayConnections layer.Model inputs outputs
 
-    let setsInGroups pairId (groups: DisplayGroup list) selectedIds =
+    let setsInGroups layerId (groups: DisplayGroup list) selectedIds =
         groups
-        |> List.filter (fun (group: DisplayGroup) -> selectedIds |> Set.contains (pairId, group.Id))
+        |> List.filter (fun (group: DisplayGroup) -> selectedIds |> Set.contains (layerId, group.Id))
         |> List.collect (fun (group: DisplayGroup) ->
             group.Members |> List.map (fun (member': DisplayMember) -> member'.SetId)
         )
         |> List.distinct
 
-    let layerCommand pairId inputGroups outputGroups uiState =
+    let layerCommand layerId inputGroups outputGroups uiState =
         let inputs =
-            setsInGroups pairId inputGroups uiState.SelectedInputs
+            setsInGroups layerId inputGroups uiState.SelectedInputs
             |> List.map (fun id -> ProvenanceSide.Input, id)
 
         let outputs =
-            setsInGroups pairId outputGroups uiState.SelectedOutputs
+            setsInGroups layerId outputGroups uiState.SelectedOutputs
             |> List.map (fun id -> ProvenanceSide.Output, id)
 
         {
@@ -954,20 +953,20 @@ module ValueAssignment =
             (Ok { Adds = []; Overwrites = [] })
 
     let selectedTargetGroupsForDrop
-        (pairId: ProvenancePairId)
+        (layerId: ProvenanceLayerId)
         (dropSide: ProvenanceSide)
         (dropGroupId: string)
-        (selectedInputs: Set<ProvenancePairId * string>)
-        (selectedOutputs: Set<ProvenancePairId * string>)
+        (selectedInputs: Set<ProvenanceLayerId * string>)
+        (selectedOutputs: Set<ProvenanceLayerId * string>)
         (findGroup: ProvenanceSide -> string -> DisplayGroup option)
         : DisplayGroup list =
-        let idsForPair selected =
+        let idsForLayer selected =
             selected
-            |> Set.filter (fun (currentPairId, _) -> currentPairId = pairId)
+            |> Set.filter (fun (currentLayerId, _) -> currentLayerId = layerId)
             |> Set.map snd
 
-        let inputIds = idsForPair selectedInputs
-        let outputIds = idsForPair selectedOutputs
+        let inputIds = idsForLayer selectedInputs
+        let outputIds = idsForLayer selectedOutputs
 
         let dropIsSelected =
             match dropSide with
@@ -997,14 +996,14 @@ module PropertyValueViewing =
     }
 
     let buildPropertyValueView
-        (pairId: ProvenancePairId)
+        (layerId: ProvenanceLayerId)
         (side: ProvenanceSide)
         (session: ProvenanceSession)
         (color: ProvenanceColor option)
         (value: ProvenancePropertyValue)
         : PropertyValueView =
-        let sourceInfo = Session.propertyValueSourceInfo (Session.activePair session) value
-        let origin = Session.propertyValueOriginInSession pairId side value.Id session
+        let sourceInfo = Session.propertyValueSourceInfo (Session.activeLayer session) value
+        let origin = Session.propertyValueOriginInSession layerId side value.Id session
 
         {
             Value = value
