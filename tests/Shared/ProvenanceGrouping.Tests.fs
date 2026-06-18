@@ -1333,7 +1333,7 @@ let sessionTests =
                 Expect.isEmpty patches "Layer derivation should not write ARC data."
             | Error error -> failwithf "Expected mixed layer addition success, got %A" error
 
-        testCase "updating a carried property from the next pair updates the previous view once"
+        testCase "property edits propagate through linked snapshots on focus change"
         <| fun _ ->
             let first = Session.init (sampleModel ())
 
@@ -1348,66 +1348,288 @@ let sessionTests =
                 | Ok(next, _) -> next
                 | Error error -> failwithf "Unexpected addLayer error: %A" error
 
-            let nextPair = Session.activePair layered
-            let carriedInput = nextPair.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
+            let layer2 = Session.activeLayer layered
+            let carriedInput = layer2.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
             let analysisId = carriedInput.PropertyValueIds |> List.head
 
-            match Session.updatePropertyValue analysisId (ProvenanceValue.Text "Imaging") None layered with
-            | Ok(next, [ ProvenanceTablePatch.UpdatePropertyValue(id, _, _, ProvenanceValue.Text "Imaging", _) ]) ->
-                let originalValue = next.Pairs.["pair-1"].Model.PropertyValues.[analysisId].Value
-                let carriedValue = next.Pairs.["pair-2"].Model.PropertyValues.[analysisId].Value
-
-                Expect.equal id analysisId "Edit patch should identify the edited occurrence."
-                Expect.equal originalValue (ProvenanceValue.Text "Imaging") "Previous output view should update."
-                Expect.equal carriedValue (ProvenanceValue.Text "Imaging") "Later input view should update."
-            | other -> failwithf "Expected one synchronized update patch, got %A" other
-
-        testCase "assigning a value to a carried next input is reflected on its previous output"
-        <| fun _ ->
-            let first = Session.init (sampleModel ())
-
-            let layered =
-                match
-                    Session.addLayer
-                        {
-                            SelectedSets = [ ProvenanceSide.Output, "output-d" ]
-                        }
-                        first
-                with
+            let edited =
+                match Session.updatePropertyValue analysisId (ProvenanceValue.Text "Imaging") None layered with
                 | Ok(next, _) -> next
-                | Error error -> failwithf "Unexpected addLayer error: %A" error
+                | Error error -> failwithf "Unexpected updatePropertyValue error: %A" error
 
-            let projectedId =
-                (Session.activePair layered).Model.InputSets
-                |> Map.toList
-                |> List.exactlyOne
-                |> fst
+            let layer1BeforeFocus =
+                (Session.layerById "layer-1" edited).Model.PropertyValues.[analysisId].Value
+
+            let layer2BeforeFocus =
+                (Session.layerById "layer-2" edited).Model.PropertyValues.[analysisId].Value
+
+            Expect.notEqual
+                layer1BeforeFocus
+                (ProvenanceValue.Text "Imaging")
+                "Upstream layer should not update before focus refresh."
+
+            Expect.equal
+                layer2BeforeFocus
+                (ProvenanceValue.Text "Imaging")
+                "Focused downstream layer should update immediately."
+
+            match Session.selectLayer "layer-1" edited with
+            | Ok(refreshed, patches) ->
+                let layer1Value =
+                    (Session.layerById "layer-1" refreshed).Model.PropertyValues.[analysisId].Value
+
+                let layer2Value =
+                    (Session.layerById "layer-2" refreshed).Model.PropertyValues.[analysisId].Value
+
+                Expect.isEmpty patches "Focus refresh should not emit writeback patches."
+
+                Expect.equal
+                    layer1Value
+                    (ProvenanceValue.Text "Imaging")
+                    "Upstream layer should receive linked property edit."
+
+                Expect.equal
+                    layer2Value
+                    (ProvenanceValue.Text "Imaging")
+                    "Downstream layer should keep linked property edit."
+
+                Expect.isEmpty refreshed.DirtyPropertyValueIds "Focus refresh should clear dirty property ids."
+            | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+        testCase "upstream property additions refresh into downstream referenced inputs on focus change"
+        <| fun _ ->
+            let layered =
+                Session.init (sampleModel ())
+                |> Session.addLayer {
+                    SelectedSets = [ ProvenanceSide.Output, "output-d" ]
+                }
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let backToLayer1 =
+                match Session.selectLayer "layer-1" layered with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
 
             let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
 
             let command = {
-                Target = ProvenancePropertyTarget.InputSets [ projectedId ]
+                Target = ProvenancePropertyTarget.OutputSets [ "output-d" ]
                 CopiedFrom = None
                 Header = treatment
                 Value = ProvenanceValue.Text "Drought"
                 Unit = None
             }
 
-            match Session.createLoadedPropertyValue command layered with
-            | Ok(next, [ ProvenanceTablePatch.AddLoadedPropertyValue(target, _, _, _, _) ]) ->
-                let previousOutput = next.Pairs.["pair-1"].Model.OutputSets.["output-d"]
-                let nextInput = next.Pairs.["pair-2"].Model.InputSets.[projectedId]
+            let edited =
+                match Session.createLoadedPropertyValue command backToLayer1 with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected createLoadedPropertyValue error: %A" error
+
+            let layer2BeforeFocus = Session.layerById "layer-2" edited
+
+            let inputBeforeFocus =
+                layer2BeforeFocus.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
+
+            let valuesBeforeFocus =
+                ProvenanceSet.effectivePropertyValueIds inputBeforeFocus
+                |> List.choose (fun id -> layer2BeforeFocus.Model.PropertyValues.TryFind id)
+
+            Expect.isFalse
+                (valuesBeforeFocus |> List.exists (fun pv -> pv.Header = treatment))
+                "Downstream input should not receive upstream structural additions before focus refresh."
+
+            match Session.selectLayer "layer-2" edited with
+            | Ok(refreshed, patches) ->
+                let layer2 = Session.layerById "layer-2" refreshed
+                let input = layer2.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
+
+                let values =
+                    ProvenanceSet.effectivePropertyValueIds input
+                    |> List.choose (fun id -> layer2.Model.PropertyValues.TryFind id)
+
+                Expect.isEmpty patches "Focus refresh should not emit writeback patches."
+
+                Expect.isTrue
+                    (values |> List.exists (fun pv -> pv.Header = treatment))
+                    "Downstream input should receive upstream property addition."
+            | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+        testCase "upstream property removals refresh into downstream referenced inputs on focus change"
+        <| fun _ ->
+            let layered =
+                Session.init (sampleModel ())
+                |> Session.addLayer {
+                    SelectedSets = [ ProvenanceSide.Output, "output-d" ]
+                }
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let backToLayer1 =
+                match Session.selectLayer "layer-1" layered with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let layer1 = Session.layerById "layer-1" backToLayer1
+            let output = layer1.Model.OutputSets.["output-d"]
+            let removedId = ProvenanceSet.effectivePropertyValueIds output |> List.head
+
+            let trimmedOutput =
+                if output.PropertyValueIds |> List.contains removedId then
+                    {
+                        output with
+                            PropertyValueIds = output.PropertyValueIds |> List.filter ((<>) removedId)
+                    }
+                else
+                    {
+                        output with
+                            InheritedPropertyValueIds =
+                                output.InheritedPropertyValueIds
+                                |> Map.map (fun _ ids -> ids |> List.filter ((<>) removedId))
+                                |> Map.filter (fun _ ids -> not ids.IsEmpty)
+                    }
+
+            let trimmedLayer = {
+                layer1 with
+                    Model = {
+                        layer1.Model with
+                            OutputSets = layer1.Model.OutputSets |> Map.add output.Id trimmedOutput
+                    }
+            }
+
+            let edited = {
+                backToLayer1 with
+                    Layers =
+                        backToLayer1.Layers
+                        |> List.map (fun layer -> if layer.Id = trimmedLayer.Id then trimmedLayer else layer)
+            }
+
+            let layer2BeforeFocus = Session.layerById "layer-2" edited
+
+            let inputBeforeFocus =
+                layer2BeforeFocus.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
+
+            Expect.isTrue
+                (ProvenanceSet.effectivePropertyValueIds inputBeforeFocus
+                 |> List.contains removedId)
+                "Downstream input should keep removed upstream property ids until focus refresh."
+
+            match Session.selectLayer "layer-2" edited with
+            | Ok(refreshed, patches) ->
+                let layer2 = Session.layerById "layer-2" refreshed
+                let input = layer2.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
+                let inputIds = ProvenanceSet.effectivePropertyValueIds input
+
+                Expect.isEmpty patches "Focus refresh should not emit writeback patches."
+
+                Expect.isFalse
+                    (inputIds |> List.contains removedId)
+                    "Downstream input should drop removed upstream property ids."
+            | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+        testCase "connection-derived properties refresh downstream on focus change"
+        <| fun _ ->
+            let layered =
+                Session.init (sampleModel ())
+                |> Session.addLayer {
+                    SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                }
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let backToLayer1 =
+                match Session.selectLayer "layer-1" layered with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let command = {
+                Target = ProvenancePropertyTarget.Connections [ "connection-a" ]
+                CopiedFrom = None
+                Header = propertyHeader FixtureKinds.parameterProperty "Analysis"
+                Value = ProvenanceValue.Text "Microscopy"
+                Unit = None
+            }
+
+            let edited =
+                match Session.createLoadedPropertyValue command backToLayer1 with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected createLoadedPropertyValue error: %A" error
+
+            let outputBeforeFocus =
+                (Session.layerById "layer-1" edited).Model.OutputSets.["output-a"]
+
+            let inputBeforeFocus =
+                (Session.layerById "layer-2" edited).Model.InputSets.["layer-2-from-output-0-output-a"]
+
+            Expect.notEqual
+                inputBeforeFocus.PropertyValueIds
+                outputBeforeFocus.PropertyValueIds
+                "Downstream input should not mirror connection-derived upstream property changes before focus refresh."
+
+            match Session.selectLayer "layer-2" edited with
+            | Ok(refreshed, patches) ->
+                let firstOutput =
+                    (Session.layerById "layer-1" refreshed).Model.OutputSets.["output-a"]
+
+                let nextInput =
+                    (Session.layerById "layer-2" refreshed).Model.InputSets.["layer-2-from-output-0-output-a"]
+
+                Expect.isEmpty patches "Focus refresh should not emit writeback patches."
 
                 Expect.equal
-                    target
-                    (ProvenancePropertyTarget.OutputSets [ "output-d" ])
-                    "A carried pair-2 input must write through its native pair-1 output owner."
-
-                Expect.equal
-                    previousOutput.PropertyValueIds
                     nextInput.PropertyValueIds
-                    "Linked endpoint views should share new properties."
-            | other -> failwithf "Expected one property-add patch, got %A" other
+                    firstOutput.PropertyValueIds
+                    "Downstream input should mirror connection-derived upstream output properties after refresh."
+            | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+        testCase "focus refresh does not change unreferenced downstream snapshots"
+        <| fun _ ->
+            let layered =
+                Session.init (sampleModel ())
+                |> Session.addLayer {
+                    SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                }
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let backToLayer1 =
+                match Session.selectLayer "layer-1" layered with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let addedOutput =
+                match
+                    Session.createLoadedSet
+                        {
+                            Side = ProvenanceSide.Output
+                            Header = ioHeader FixtureKinds.dataEndpoint "Output [Data]"
+                            Name = "Unreferenced output"
+                        }
+                        backToLayer1
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected createLoadedSet error: %A" error
+
+            match Session.selectLayer "layer-2" addedOutput with
+            | Ok(refreshed, patches) ->
+                let layer2 = Session.layerById "layer-2" refreshed
+
+                Expect.isEmpty patches "Focus refresh should not emit writeback patches."
+
+                Expect.equal
+                    layer2.Model.InputSets.Count
+                    1
+                    "Only the referenced downstream input snapshot should remain present."
+
+                Expect.isFalse
+                    (layer2.Model.InputSets
+                     |> Map.exists (fun _ set -> set.Name = "Unreferenced output"))
+                    "Unreferenced upstream structural additions should not appear downstream."
+            | Error error -> failwithf "Unexpected selectLayer error: %A" error
 
         testCase "assigning a palette value to a carried next input writes only to the active pair"
         <| fun _ ->
@@ -1564,154 +1786,6 @@ let sessionTests =
                 Expect.isEmpty pair.Model.OutputSets "A newly displayed transition has no invented outputs."
                 Expect.isEmpty patches "View-layer derivation is not a persistence edit."
             | Error error -> failwithf "Expected output-only layer derivation success, got %A" error
-
-        testCase "adding a connection property synchronizes a carried boundary endpoint"
-        <| fun _ ->
-            let session = Session.init (sampleModel ())
-
-            let layered =
-                Session.addLayer
-                    {
-                        SelectedSets = [ ProvenanceSide.Output, "output-a" ]
-                    }
-                    session
-                |> fun result ->
-                    match result with
-                    | Ok(next, _) -> next
-                    | Error error -> failwithf "Unexpected addLayer error: %A" error
-
-            let pair1 =
-                Session.selectPair "pair-1" layered
-                |> fun result ->
-                    match result with
-                    | Ok(next, _) -> next
-                    | Error error -> failwithf "Unexpected selectPair error: %A" error
-
-            let command = {
-                Target = ProvenancePropertyTarget.Connections [ "connection-a" ]
-                CopiedFrom = None
-                Header = propertyHeader FixtureKinds.parameterProperty "Analysis"
-                Value = ProvenanceValue.Text "Microscopy"
-                Unit = None
-            }
-
-            let edited =
-                Session.createLoadedPropertyValue command pair1
-                |> fun result ->
-                    match result with
-                    | Ok(next, _) -> next
-                    | Error error -> failwithf "Unexpected createLoadedPropertyValue error: %A" error
-
-            let firstOutput = edited.Pairs.["pair-1"].Model.OutputSets.["output-a"]
-
-            let nextInput =
-                edited.Pairs.["pair-2"].Model.InputSets.["pair-2-from-output-0-output-a"]
-
-            Expect.equal
-                nextInput.PropertyValueIds
-                firstOutput.PropertyValueIds
-                "linked input mirrors the edited output"
-
-        testCase "synchronizing a carried input back to an output recomputes output inherited pointers"
-        <| fun _ ->
-            let session = Session.init (sampleModel ())
-
-            let layered =
-                Session.addLayer
-                    {
-                        SelectedSets = [ ProvenanceSide.Output, "output-a" ]
-                    }
-                    session
-                |> function
-                    | Ok(next, _) -> next
-                    | Error error -> failwithf "Unexpected addLayer error: %A" error
-
-            let pair2 = Session.activePair layered
-            let projectedId = pair2.Model.InputSets |> Map.toList |> List.exactlyOne |> fst
-            let foreignHeader = propertyHeader FixtureKinds.parameterProperty "Foreign"
-
-            let foreignValue =
-                propertyValue "pv-foreign" foreignHeader (ProvenanceValue.Text "stale") None None
-
-            let pollutedInput = {
-                pair2.Model.InputSets.[projectedId] with
-                    InheritedPropertyValueIds =
-                        pair2.Model.InputSets.[projectedId].InheritedPropertyValueIds
-                        |> Map.add "foreign-connection" [ foreignValue.Id ]
-            }
-
-            let pollutedPair2 = {
-                pair2 with
-                    Model = {
-                        pair2.Model with
-                            PropertyValues = pair2.Model.PropertyValues |> Map.add foreignValue.Id foreignValue
-                            InputSets = pair2.Model.InputSets |> Map.add projectedId pollutedInput
-                    }
-            }
-
-            let polluted = {
-                layered with
-                    Layers =
-                        layered.Layers
-                        |> List.map (fun layer -> if layer.Id = pair2.Id then pollutedPair2 else layer)
-            }
-
-            let outputHeader = ioHeader FixtureKinds.dataEndpoint "Output [Data]"
-
-            let withOutput =
-                Session.createLoadedSet
-                    {
-                        Side = ProvenanceSide.Output
-                        Header = outputHeader
-                        Name = "Pair 2 Output"
-                    }
-                    polluted
-                |> function
-                    | Ok(next, _) -> next
-                    | Error error -> failwithf "Unexpected createLoadedSet error: %A" error
-
-            let pair2WithOutput = Session.activePair withOutput
-
-            let outputId =
-                pair2WithOutput.Model.OutputSets |> Map.toList |> List.exactlyOne |> fst
-
-            let connected =
-                Session.connectSets projectedId outputId None withOutput
-                |> function
-                    | Ok(next, _) -> next
-                    | Error error -> failwithf "Unexpected connectSets error: %A" error
-
-            let pair2ConnectionId =
-                (Session.activePair connected).Model.Connections
-                |> Map.toList
-                |> List.exactlyOne
-                |> fst
-
-            let syncHeader = propertyHeader FixtureKinds.parameterProperty "Sync"
-
-            let command = {
-                Target = ProvenancePropertyTarget.Connections [ pair2ConnectionId ]
-                CopiedFrom = None
-                Header = syncHeader
-                Value = ProvenanceValue.Text "pair-2"
-                Unit = None
-            }
-
-            let edited =
-                Session.createLoadedPropertyValue command connected
-                |> function
-                    | Ok(next, _) -> next
-                    | Error error -> failwithf "Unexpected createLoadedPropertyValue error: %A" error
-
-            let previousOutput = edited.Pairs.["pair-1"].Model.OutputSets.["output-a"]
-
-            Expect.isFalse
-                (previousOutput.InheritedPropertyValueIds.ContainsKey "foreign-connection")
-                "Synchronizing into an output must not copy inherited pointers from another pair verbatim."
-
-            Expect.isTrue
-                (previousOutput.InheritedPropertyValueIds.ContainsKey "connection-a")
-                "The output should keep inherited pointers recomputed from its own loaded connections."
 
         testCase "adding a value to a removed connection returns a session error"
         <| fun _ ->
