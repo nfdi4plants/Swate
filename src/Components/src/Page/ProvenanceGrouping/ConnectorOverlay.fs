@@ -20,6 +20,7 @@ type private MeasuredConnector = {
     StrokeDasharray: string option
     InteractiveConnection: DisplayConnection option
     AriaLabel: string option
+    Color: string option
 }
 
 type ConnectorOverlayState = {
@@ -174,7 +175,7 @@ module private ConnectorHandles =
 /// Projects model/UI state into concrete connector path definitions.
 module private ConnectorPaths =
 
-    let private measured key testId className strokeWidth strokeDasharray interactiveConnection ariaLabel path = {
+    let private measured key testId className strokeWidth strokeDasharray interactiveConnection ariaLabel color path = {
         Key = key
         Path = path
         TestId = testId
@@ -183,6 +184,7 @@ module private ConnectorPaths =
         StrokeDasharray = strokeDasharray
         InteractiveConnection = interactiveConnection
         AriaLabel = ariaLabel
+        Color = color
     }
 
     let private isManuallyResolving pairId side groupId overlayState =
@@ -233,6 +235,7 @@ module private ConnectorPaths =
                     None
                     (Some connection)
                     (Some $"Select connection {connection.Id}")
+                    None
             )
         )
 
@@ -285,6 +288,7 @@ module private ConnectorPaths =
                                 None
                                 (Some singleConnection)
                                 (Some $"Select connection {displayConnection.Id}")
+                                None
                         )
                     )
                 )
@@ -309,11 +313,14 @@ module private ConnectorPaths =
         side
         groups
         (railProjection: PropertyRails.RailProjection)
+        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         =
         railProjection.Headers
         |> List.filter (fun header -> not (ConnectorOverlayState.isPropertyExpanded pairId side header overlayState))
         |> List.collect (fun header ->
+            let color = colorByHeader |> Map.tryFind header |> Option.bind id
+
             groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
             |> List.choose (fun group ->
                 ConnectorMeasure.pathBetweenDistantHandles
@@ -329,6 +336,7 @@ module private ConnectorPaths =
                         (Some "4 4")
                         None
                         None
+                        color
                 )
             )
         )
@@ -345,11 +353,14 @@ module private ConnectorPaths =
         side
         groups
         (railProjection: PropertyRails.RailProjection)
+        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         =
         railProjection.Headers
         |> List.filter (fun header -> ConnectorOverlayState.isPropertyExpanded pairId side header overlayState)
         |> List.collect (fun header ->
+            let color = colorByHeader |> Map.tryFind header |> Option.bind id
+
             railProjection.ValuesByHeader
             |> Map.tryFind header
             |> Option.defaultValue []
@@ -369,6 +380,7 @@ module private ConnectorPaths =
                             (Some "4 4")
                             None
                             None
+                            color
                     )
                 )
             )
@@ -382,6 +394,7 @@ module private ConnectorPaths =
         outputGroups
         inputRailProjection
         outputRailProjection
+        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         showPropertyHeaderConnectors
         =
@@ -395,6 +408,7 @@ module private ConnectorPaths =
                         ProvenanceSide.Input
                         inputGroups
                         inputRailProjection
+                        colorByHeader
                         overlayState
 
                 yield!
@@ -405,6 +419,7 @@ module private ConnectorPaths =
                         ProvenanceSide.Output
                         outputGroups
                         outputRailProjection
+                        colorByHeader
                         overlayState
             yield!
                 valueRailConnectionsForSide
@@ -414,6 +429,7 @@ module private ConnectorPaths =
                     ProvenanceSide.Input
                     inputGroups
                     inputRailProjection
+                    colorByHeader
                     overlayState
             yield!
                 valueRailConnectionsForSide
@@ -423,6 +439,7 @@ module private ConnectorPaths =
                     ProvenanceSide.Output
                     outputGroups
                     outputRailProjection
+                    colorByHeader
                     overlayState
         ]
 
@@ -439,6 +456,7 @@ module private ConnectorPaths =
                     (Some "6 4")
                     None
                     None
+                    None
             )
         )
 
@@ -451,6 +469,7 @@ module private ConnectorPaths =
         connections
         inputRailProjection
         outputRailProjection
+        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         showPropertyHeaderConnectors
         =
@@ -464,6 +483,7 @@ module private ConnectorPaths =
                     outputGroups
                     inputRailProjection
                     outputRailProjection
+                    colorByHeader
                     overlayState
                     showPropertyHeaderConnectors
             yield! groupConnections context pairId connections overlayState
@@ -479,6 +499,7 @@ module private ConnectorSvg =
     ]
 
     let strokeElements measured strokeWidth strokeOpacity debug =
+        let strokeColor = measured.Color |> Option.defaultValue "currentColor"
         let debugAttributes = debugAttributes debug measured
 
         [
@@ -497,13 +518,16 @@ module private ConnectorSvg =
             Svg.path [
                 svg.d measured.Path
                 svg.fill "none"
-                svg.stroke "currentColor"
+                svg.stroke strokeColor
                 svg.strokeWidth strokeWidth
                 svg.strokeLineCap "round"
                 svg.custom ("strokeOpacity", strokeOpacity)
                 svg.className measured.ClassName
                 match measured.StrokeDasharray with
                 | Some dash -> svg.custom ("strokeDasharray", dash)
+                | None -> ()
+                match measured.Color with
+                | Some color -> svg.custom ("data-provenance-color", color)
                 | None -> ()
                 if measured.InteractiveConnection.IsNone then
                     yield! debugAttributes
@@ -673,12 +697,14 @@ type ConnectorOverlay =
             liveDragStore: LiveDrag.Store,
             onSelect: DisplayConnection -> unit,
             ?onRemove: DisplayConnection -> unit,
-            ?debug: bool
+            ?debug: bool,
+            ?railColorByHeader: Map<ProvenancePropertyHeader, string option>
         ) =
         let paths, setPaths = React.useStateWithUpdater ([]: MeasuredConnector list)
         let hoveredKey, setHoveredKey = React.useState<string option> None
         let pendingFrame = React.useRef (None: float option)
         let debugEnabled = defaultArg debug false
+        let colorByHeader = defaultArg railColorByHeader Map.empty
 
         let setMeasuredPaths next =
             setPaths (fun current -> if current = next then current else next)
@@ -700,6 +726,7 @@ type ConnectorOverlay =
                     connections
                     inputRailProjection
                     outputRailProjection
+                    colorByHeader
                     overlayState
                     showPropertyHeaderConnectors
                 |> setMeasuredPaths
