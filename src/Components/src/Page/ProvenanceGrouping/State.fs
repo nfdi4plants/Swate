@@ -151,15 +151,15 @@ module PropertyColors =
     }
 
     let ensureLayerColors (session: ProvenanceSession) (state: UiState) : PropertyColorSettings =
-        let liveLayerIds = session.Layers |> List.map _.Id |> Set.ofList
+        let liveLayerIds = session.LayerOrder |> Set.ofList
 
         let retained =
             state.PropertyColors.LayerColors
             |> Map.filter (fun layerId _ -> liveLayerIds.Contains layerId)
 
         let withMissingDefaults =
-            session.Layers
-            |> List.mapi (fun index layer -> layer.Id, automaticColorForLayer index)
+            session.LayerOrder
+            |> List.mapi (fun index layerId -> layerId, automaticColorForLayer index)
             |> List.fold
                 (fun (colors: Map<ProvenanceLayerId, ProvenanceColor>) (layerId, color) ->
                     if colors.ContainsKey layerId then

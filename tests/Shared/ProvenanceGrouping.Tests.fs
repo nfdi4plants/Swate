@@ -2340,20 +2340,26 @@ let uiStateTests =
             let cleared = State.PropertyColors.clearLayerColor "layer-1" withColor
             Expect.isFalse (cleared.PropertyColors.LayerColors.ContainsKey "layer-1") "Layer color should be cleared."
 
-        testCase "new layers get automatic colors from palette"
+        testCase "layer colors are assigned once per conceptual layer"
         <| fun _ ->
             let session = Session.init (sampleModel ())
             let state = State.init session
 
             let afterEnsure = State.PropertyColors.ensureLayerColors session state
 
-            Expect.isTrue
-                (afterEnsure.LayerColors.ContainsKey "layer-1")
-                "Initial layer should have an automatic color."
+            Expect.equal
+                afterEnsure.LayerColors.Count
+                session.LayerOrder.Length
+                "Each conceptual layer should receive exactly one automatic color."
 
             Expect.isTrue
-                (afterEnsure.LayerColors.ContainsKey "layer-2")
-                "Initial layer should have an automatic color."
+                (afterEnsure.LayerColors.ContainsKey "layer-1")
+                "Initial conceptual layer should have an automatic color."
+
+            Expect.isFalse
+                (afterEnsure.LayerColors.ContainsKey "layer-1-input"
+                 || afterEnsure.LayerColors.ContainsKey "layer-1-output")
+                "Input and output side ids should not receive separate default colors."
 
         testCase "automatic colors do not overwrite existing manual layer colors"
         <| fun _ ->
@@ -2663,19 +2669,28 @@ let sourceTests =
                 (Some pair.Model.LoadedTableName)
                 "Membership fallback should keep current table context."
 
-        testCase "property origin uses the native upstream layer for projected values"
+        testCase "property origin uses conceptual upstream layer id"
         <| fun _ ->
             let session = Session.init (sampleModel ())
 
-            match Session.addLayer { SelectedSets = [] } session with
+            match
+                Session.addLayer
+                    {
+                        SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                    }
+                    session
+            with
             | Ok(layered, _) ->
-                let active = Session.activePair layered
+                let active = Session.activeLayer layered
                 let propertyValueId = active.Model.PropertyValues |> Map.toList |> List.head |> fst
 
                 let origin =
                     Session.propertyValueOriginInSession active.Id ProvenanceSide.Input propertyValueId layered
 
-                Expect.isSome origin "Projected values should have an origin."
+                Expect.equal
+                    origin
+                    (Some(PropertyOrigin.UpstreamLayer "layer-1"))
+                    "Origin should report conceptual upstream layer id."
             | Error error -> failwithf "Unexpected addLayer error: %A" error
     ]
 

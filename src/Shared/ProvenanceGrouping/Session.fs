@@ -645,13 +645,9 @@ module Session =
 
     let private layerIdForReference
         (reference: ProvenanceSetReference)
-        (session: ProvenanceSession)
+        (_session: ProvenanceSession)
         : ProvenanceLayerId =
-        let pair = session.Pairs.[reference.PairId]
-
-        match reference.Side with
-        | ProvenanceSide.Input -> pair.LeftLayerId
-        | ProvenanceSide.Output -> pair.RightLayerId
+        reference.LayerId
 
     let propertyValueOriginInSession
         (pairId: ProvenancePairId)
