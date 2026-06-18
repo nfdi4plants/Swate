@@ -4,7 +4,8 @@ open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 
 type ProvenanceLayerId = string
-type ProvenancePairId = string
+type ProvenancePairId = ProvenanceLayerId
+type ProvenanceLayerSideId = string
 
 type PropertyValueSourceInfo = {
     TableName: ProvenanceTableName option
@@ -20,33 +21,51 @@ type PropertyOrigin =
     | UpstreamLayer of layerId: ProvenanceLayerId
     | PreviousContext of source: PropertyValueSourceInfo
 
-type ProvenanceLayer = { Id: ProvenanceLayerId; Label: string }
+type ProvenanceLayer = {
+    Id: ProvenanceLayerId
+    Label: string
+    InputSideId: ProvenanceLayerSideId
+    OutputSideId: ProvenanceLayerSideId
+    Model: ProvenanceModel
+} with
+
+    member this.LeftLayerId = this.InputSideId
+    member this.RightLayerId = this.OutputSideId
+
+type ProvenanceLayerPair = ProvenanceLayer
 
 type ProvenanceSetReference = {
-    PairId: ProvenancePairId
+    LayerId: ProvenanceLayerId
     Side: ProvenanceSide
     SetId: ProvenanceSetId
-}
+} with
 
-type ProvenanceBoundaryLink = {
-    Previous: ProvenanceSetReference
-    Next: ProvenanceSetReference
-}
+    member this.PairId = this.LayerId
 
-type ProvenanceLayerPair = {
-    Id: ProvenancePairId
-    LeftLayerId: ProvenanceLayerId
-    RightLayerId: ProvenanceLayerId
-    Model: ProvenanceModel
-}
+type ProvenanceReferenceLink = {
+    Source: ProvenanceSetReference
+    Target: ProvenanceSetReference
+} with
+
+    member this.Previous = this.Source
+    member this.Next = this.Target
+
+type ProvenanceBoundaryLink = ProvenanceReferenceLink
 
 type ProvenanceSession = {
     Layers: ProvenanceLayer list
-    Pairs: Map<ProvenancePairId, ProvenanceLayerPair>
-    PairOrder: ProvenancePairId list
-    ActivePairId: ProvenancePairId
-    BoundaryLinks: ProvenanceBoundaryLink list
-}
+    LayerOrder: ProvenanceLayerId list
+    ActiveLayerId: ProvenanceLayerId
+    ReferenceLinks: ProvenanceReferenceLink list
+    DirtyPropertyValueIds: Set<ProvenancePropertyValueId>
+} with
+    // Temporary adapter for component migration. Remove after downstream callers stop using pair terminology.
+    member this.Pairs =
+        this.Layers |> List.map (fun layer -> layer.Id, layer) |> Map.ofList
+
+    member this.PairOrder = this.LayerOrder
+    member this.ActivePairId = this.ActiveLayerId
+    member this.BoundaryLinks = this.ReferenceLinks
 
 [<RequireQualifiedAccess>]
 type SessionError =
@@ -62,31 +81,50 @@ type SessionResult = Result<ProvenanceSession * ProvenanceTablePatch list, Sessi
 
 module Session =
 
+    let private sideId layerId side =
+        match side with
+        | ProvenanceSide.Input -> $"{layerId}-input"
+        | ProvenanceSide.Output -> $"{layerId}-output"
+
+    let private layerLabel index =
+        if index = 1 then "Layer 1" else $"Layer {index}"
+
     let init model =
-        let pair = {
-            Id = "pair-1"
-            LeftLayerId = "layer-1"
-            RightLayerId = "layer-2"
+        let layerId = "layer-1"
+
+        let layer = {
+            Id = layerId
+            Label = layerLabel 1
+            InputSideId = sideId layerId ProvenanceSide.Input
+            OutputSideId = sideId layerId ProvenanceSide.Output
             Model = model
         }
 
         {
-            Layers = [
-                { Id = "layer-1"; Label = "Inputs" }
-                { Id = "layer-2"; Label = "Outputs" }
-            ]
-            Pairs = Map.ofList [ pair.Id, pair ]
-            PairOrder = [ pair.Id ]
-            ActivePairId = pair.Id
-            BoundaryLinks = []
+            Layers = [ layer ]
+            LayerOrder = [ layer.Id ]
+            ActiveLayerId = layer.Id
+            ReferenceLinks = []
+            DirtyPropertyValueIds = Set.empty
         }
 
-    let activePair session = session.Pairs.[session.ActivePairId]
+    let tryLayer layerId session =
+        session.Layers |> List.tryFind (fun layer -> layer.Id = layerId)
 
-    let selectPair pairId session : SessionResult =
-        match session.Pairs.TryFind pairId with
-        | Some _ -> Ok({ session with ActivePairId = pairId }, [])
-        | None -> Error(SessionError.PairNotFound pairId)
+    let layerById layerId session =
+        tryLayer layerId session
+        |> Option.defaultWith (fun () -> failwithf "Unknown provenance layer '%s'." layerId)
+
+    let activeLayer session = layerById session.ActiveLayerId session
+
+    let activePair session = activeLayer session
+
+    let selectLayer layerId session : SessionResult =
+        match tryLayer layerId session with
+        | Some _ -> Ok({ session with ActiveLayerId = layerId }, [])
+        | None -> Error(SessionError.PairNotFound layerId)
+
+    let selectPair pairId session : SessionResult = selectLayer pairId session
 
     let private values map = map |> Map.toList |> List.map snd
 
@@ -95,7 +133,7 @@ module Session =
         | ProvenanceSide.Input -> pair.Model.InputSets.TryFind setId
         | ProvenanceSide.Output -> pair.Model.OutputSets.TryFind setId
 
-    let private nextIndex session = session.PairOrder.Length + 1
+    let private nextIndex session = session.LayerOrder.Length + 1
 
     let private nextInputSetId pairId side index setId =
         let sideText =
@@ -106,7 +144,7 @@ module Session =
         $"{pairId}-from-{sideText}-{index}-{setId}"
 
     let addLayer command session : SessionResult =
-        let current = activePair session
+        let current = activeLayer session
 
         let selectedSets =
             match command.SelectedSets with
@@ -122,7 +160,7 @@ module Session =
             |> List.tryPick (fun (side, setId) ->
                 if setAt side setId current |> Option.isNone then
                     Some {
-                        PairId = current.Id
+                        LayerId = current.Id
                         Side = side
                         SetId = setId
                     }
@@ -142,38 +180,11 @@ module Session =
             let hasSelectedOutput =
                 selectedSets |> List.exists (fst >> (=) ProvenanceSide.Output)
 
-            let leftLayerId, newLayers =
+            let leftLayerId =
                 match hasSelectedInput, hasSelectedOutput with
-                | true, true ->
-                    let selectionId = $"selection-{layerNumber}"
-
-                    selectionId,
-                    [
-                        {
-                            Id = selectionId
-                            Label = $"Selection {layerNumber}"
-                        }
-                        {
-                            Id = layerId
-                            Label = $"Layer {layerNumber}"
-                        }
-                    ]
-                | true, false ->
-                    current.LeftLayerId,
-                    [
-                        {
-                            Id = layerId
-                            Label = $"Layer {layerNumber}"
-                        }
-                    ]
-                | false, _ ->
-                    current.RightLayerId,
-                    [
-                        {
-                            Id = layerId
-                            Label = $"Layer {layerNumber}"
-                        }
-                    ]
+                | true, true -> $"selection-{layerNumber}"
+                | true, false -> current.LeftLayerId
+                | false, _ -> current.RightLayerId
 
             let inputs, links =
                 selectedSets
@@ -183,13 +194,13 @@ module Session =
                     let projected = { source with Id = nextId }
 
                     let link = {
-                        Previous = {
-                            PairId = current.Id
+                        Source = {
+                            LayerId = current.Id
                             Side = side
                             SetId = setId
                         }
-                        Next = {
-                            PairId = pairId
+                        Target = {
+                            LayerId = pairId
                             Side = ProvenanceSide.Input
                             SetId = nextId
                         }
@@ -213,8 +224,9 @@ module Session =
 
             let pair = {
                 Id = pairId
-                LeftLayerId = leftLayerId
-                RightLayerId = layerId
+                Label = $"Layer {pairIndex}"
+                InputSideId = leftLayerId
+                OutputSideId = layerId
                 Model = {
                     LoadedTableName = current.Model.LoadedTableName
                     PropertyValues = projectedPropertyValues
@@ -227,32 +239,37 @@ module Session =
             Ok(
                 {
                     session with
-                        Layers = session.Layers @ newLayers
-                        Pairs = session.Pairs |> Map.add pair.Id pair
-                        PairOrder = session.PairOrder @ [ pair.Id ]
-                        ActivePairId = pair.Id
-                        BoundaryLinks = session.BoundaryLinks @ List.rev links
+                        Layers = session.Layers @ [ pair ]
+                        LayerOrder = session.LayerOrder @ [ pair.Id ]
+                        ActiveLayerId = pair.Id
+                        ReferenceLinks = session.ReferenceLinks @ List.rev links
                 },
                 []
             )
 
-    let private replacePair pair session = {
+    let private replaceLayer layer session = {
         session with
-            Pairs = session.Pairs |> Map.add pair.Id pair
+            Layers =
+                session.Layers
+                |> List.map (fun current -> if current.Id = layer.Id then layer else current)
     }
 
     let private mapEditError = Result.mapError SessionError.EditFailed
 
-    let private updatePairModel pairId model session =
-        match session.Pairs.TryFind pairId with
-        | None -> Error(SessionError.PairNotFound pairId)
-        | Some pair -> Ok(replacePair { pair with Model = model } session)
+    let private updateLayerModel layerId model session =
+        match tryLayer layerId session with
+        | None -> Error(SessionError.PairNotFound layerId)
+        | Some layer -> Ok(replaceLayer { layer with Model = model } session)
 
     let private referencedPropertyValues set model =
         ProvenanceSet.effectivePropertyValueIds set
         |> List.choose (fun id -> model.PropertyValues.TryFind id |> Option.map (fun value -> id, value))
 
-    let private copySetData sourceRef targetRef session =
+    let private copySetData
+        (sourceRef: ProvenanceSetReference)
+        (targetRef: ProvenanceSetReference)
+        (session: ProvenanceSession)
+        =
         let sourcePair = session.Pairs.[sourceRef.PairId]
         let targetPair = session.Pairs.[targetRef.PairId]
         let sourceSet = (setAt sourceRef.Side sourceRef.SetId sourcePair).Value
@@ -288,7 +305,7 @@ module Session =
               }
             |> ProvenanceModel.refreshInheritedOutputProperties
 
-        replacePair { targetPair with Model = targetModel } session
+        replaceLayer { targetPair with Model = targetModel } session
 
     let private linkedRefs origin session =
         let rec collect pending seen =
@@ -297,7 +314,7 @@ module Session =
             | current :: rest when Set.contains current seen -> collect rest seen
             | current :: rest ->
                 let adjacent =
-                    session.BoundaryLinks
+                    session.ReferenceLinks
                     |> List.collect (fun link ->
                         if link.Previous = current then [ link.Next ]
                         elif link.Next = current then [ link.Previous ]
@@ -314,12 +331,15 @@ module Session =
         |> List.fold (fun state target -> copySetData origin target state) session
 
     let private activeRef side setId session = {
-        PairId = session.ActivePairId
+        LayerId = session.ActiveLayerId
         Side = side
         SetId = setId
     }
 
-    let private displayTargetRefs target session : Result<ProvenanceSetReference list, SessionError> =
+    let private displayTargetRefs
+        (target: ProvenancePropertyTarget)
+        (session: ProvenanceSession)
+        : Result<ProvenanceSetReference list, SessionError> =
         match target with
         | ProvenancePropertyTarget.InputSets ids ->
             ids |> List.map (fun id -> activeRef ProvenanceSide.Input id session) |> Ok
@@ -348,11 +368,11 @@ module Session =
                 (Ok [])
 
     let rec private nativeOwner reference session =
-        match session.BoundaryLinks |> List.tryFind (fun link -> link.Next = reference) with
+        match session.ReferenceLinks |> List.tryFind (fun link -> link.Next = reference) with
         | Some link -> nativeOwner link.Previous session
         | None -> reference
 
-    let private ownedSetTargets target session =
+    let private ownedSetTargets (target: ProvenancePropertyTarget) session =
         match target with
         | ProvenancePropertyTarget.Connections _ -> Ok []
         | _ ->
@@ -396,7 +416,7 @@ module Session =
         Edit.updatePropertyValue propertyValueId value unit pair.Model
         |> mapEditError
         |> Result.bind (fun (model, patches) ->
-            updatePairModel pair.Id model session
+            updateLayerModel pair.Id model session
             |> Result.map (fun next ->
                 let propagated =
                     next.Pairs
@@ -410,7 +430,7 @@ module Session =
                                             |> Map.add propertyValueId model.PropertyValues.[propertyValueId]
                                 }
 
-                                replacePair
+                                replaceLayer
                                     {
                                         candidate with
                                             Model = candidateModel
@@ -463,16 +483,16 @@ module Session =
                 (Ok(session, []))
         )
 
-    let createCurrentLoadedPropertyValue command session : SessionResult =
+    let createCurrentLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) session : SessionResult =
         let pair = activePair session
 
         Edit.createLoadedPropertyValue command pair.Model
         |> mapEditError
         |> Result.bind (fun (model, patches) ->
-            updatePairModel pair.Id model session |> Result.map (fun next -> next, patches)
+            updateLayerModel pair.Id model session |> Result.map (fun next -> next, patches)
         )
 
-    let createLoadedPropertyValue command session : SessionResult =
+    let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) session : SessionResult =
         match command.Target with
         | ProvenancePropertyTarget.Connections _ ->
             let pair = activePair session
@@ -482,7 +502,7 @@ module Session =
                 Edit.createLoadedPropertyValue command pair.Model
                 |> mapEditError
                 |> Result.bind (fun (model, patches) ->
-                    updatePairModel pair.Id model session
+                    updateLayerModel pair.Id model session
                     |> Result.map (fun next ->
                         let synchronized =
                             references
@@ -505,7 +525,7 @@ module Session =
                             Edit.createLoadedPropertyValue { command with Target = target } pair.Model
                             |> mapEditError
                             |> Result.bind (fun (model, addedPatches) ->
-                                updatePairModel pair.Id model state
+                                updateLayerModel pair.Id model state
                                 |> Result.map (fun next ->
                                     let synchronized =
                                         references
@@ -521,7 +541,7 @@ module Session =
                     (Ok(session, []))
             )
 
-    let copyPropertyValueToLoadedTarget propertyValueId target session : SessionResult =
+    let copyPropertyValueToLoadedTarget propertyValueId (target: ProvenancePropertyTarget) session : SessionResult =
         let pair = activePair session
 
         match pair.Model.PropertyValues.TryFind propertyValueId with
@@ -543,7 +563,7 @@ module Session =
         Edit.createLoadedSet command pair.Model
         |> mapEditError
         |> Result.bind (fun (model, patches) ->
-            updatePairModel pair.Id model session |> Result.map (fun next -> next, patches)
+            updateLayerModel pair.Id model session |> Result.map (fun next -> next, patches)
         )
 
     let connectSets inputSetId outputSetId processName session : SessionResult =
@@ -552,7 +572,7 @@ module Session =
         Edit.connectSets inputSetId outputSetId processName pair.Model
         |> mapEditError
         |> Result.bind (fun (model, patches) ->
-            updatePairModel pair.Id model session |> Result.map (fun next -> next, patches)
+            updateLayerModel pair.Id model session |> Result.map (fun next -> next, patches)
         )
 
     let removeConnection connectionId session : SessionResult =
@@ -561,7 +581,7 @@ module Session =
         Edit.removeConnection connectionId pair.Model
         |> mapEditError
         |> Result.bind (fun (model, patches) ->
-            updatePairModel pair.Id model session |> Result.map (fun next -> next, patches)
+            updateLayerModel pair.Id model session |> Result.map (fun next -> next, patches)
         )
 
     let removeConnections connectionIds session : SessionResult =
@@ -660,7 +680,7 @@ module Session =
         | Some pair ->
             pair.Model.PropertyValues.TryFind propertyValueId
             |> Option.map (fun propertyValue ->
-                let scoped = { session with ActivePairId = pairId }
+                let scoped = { session with ActiveLayerId = pairId }
 
                 match propertyValueSourceInfo pair propertyValue with
                 | Some source when source.TableName <> Some pair.Model.LoadedTableName ->

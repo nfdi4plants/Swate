@@ -242,7 +242,7 @@ module Layers =
             )
             retained
 
-    let ensure session state =
+    let ensure (session: ProvenanceSession) state =
         let currentPairIds = session.PairOrder |> Set.ofList
         let layerStates = retainCurrentLayers session state
 

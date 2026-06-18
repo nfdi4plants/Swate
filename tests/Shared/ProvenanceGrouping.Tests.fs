@@ -1143,16 +1143,42 @@ let fixtureTests =
 
 let sessionTests =
     testList "Session" [
-        testCase "init exposes the loaded model as the first active pair"
+        testCase "init creates one conceptual layer with input and output sides"
         <| fun _ ->
             let initial = sampleModel ()
             let session = Session.init initial
+            let active = Session.activeLayer session
+
+            Expect.equal session.LayerOrder [ "layer-1" ] "Initial session should contain one conceptual layer."
+            Expect.equal session.ActiveLayerId "layer-1" "Initial layer should be active."
+            Expect.equal active.Id "layer-1" "Active layer id should be layer-1."
+            Expect.equal active.InputSideId "layer-1-input" "Input side id should belong to layer-1."
+            Expect.equal active.OutputSideId "layer-1-output" "Output side id should belong to layer-1."
+            Expect.equal active.Model initial "Initial active layer should preserve the converted model."
+
+        testCase "pair adapters expose active layer during migration"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
             let active = Session.activePair session
 
-            Expect.equal session.Layers.Length 2 "Initial session should render input and output layers."
-            Expect.equal active.Model initial "Initial active pair should preserve the converted model."
-            Expect.equal active.LeftLayerId "layer-1" "The first pair should start on layer 1."
-            Expect.equal active.RightLayerId "layer-2" "The first pair should end on layer 2."
+            Expect.equal session.PairOrder session.LayerOrder "PairOrder should alias LayerOrder during migration."
+
+            Expect.equal
+                session.ActivePairId
+                session.ActiveLayerId
+                "ActivePairId should alias ActiveLayerId during migration."
+
+            Expect.equal
+                active.Id
+                "layer-1"
+                "activePair should return the active conceptual layer while callers migrate."
+
+            Expect.equal active.LeftLayerId active.InputSideId "LeftLayerId should alias InputSideId during migration."
+
+            Expect.equal
+                active.RightLayerId
+                active.OutputSideId
+                "RightLayerId should alias OutputSideId during migration."
 
         testCase "selectPair switches display pairs without producing writeback patches"
         <| fun _ ->
@@ -1605,7 +1631,9 @@ let sessionTests =
 
             let polluted = {
                 layered with
-                    Pairs = layered.Pairs |> Map.add pair2.Id pollutedPair2
+                    Layers =
+                        layered.Layers
+                        |> List.map (fun layer -> if layer.Id = pair2.Id then pollutedPair2 else layer)
             }
 
             let outputHeader = ioHeader FixtureKinds.dataEndpoint "Output [Data]"

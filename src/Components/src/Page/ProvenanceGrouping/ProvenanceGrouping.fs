@@ -306,7 +306,7 @@ module private DragHandlers =
                 liveDragStore
         | None -> ()
 
-    let private layerIdForSide pair side =
+    let private layerIdForSide (pair: ProvenanceLayerPair) side =
         match side with
         | ProvenanceSide.Input -> pair.LeftLayerId
         | ProvenanceSide.Output -> pair.RightLayerId
