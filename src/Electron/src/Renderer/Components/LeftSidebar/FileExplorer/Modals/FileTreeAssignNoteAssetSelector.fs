@@ -17,6 +17,7 @@ type FileTreeAssignNoteAssetSelector =
         ) =
 
         let isAssigning = defaultArg isAssigning false
+
         let destinationOptions = [
             "", "Do not assign", None
             "protocol", "Protocol", Some AssignNoteAssetDestination.Protocol
@@ -69,11 +70,7 @@ type FileTreeAssignNoteAssetSelector =
                                     )
                                     prop.children [
                                         for value, label, _ in destinationOptions do
-                                            Html.option [
-                                                prop.key value
-                                                prop.value value
-                                                prop.text label
-                                            ]
+                                            Html.option [ prop.key value; prop.value value; prop.text label ]
                                     ]
                                 ]
                             ]

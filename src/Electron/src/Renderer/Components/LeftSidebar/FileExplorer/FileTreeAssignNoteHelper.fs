@@ -84,11 +84,16 @@ module FileTreeAssignNoteHelper =
         else
             match getNonEmptyPathParts normalizedPath with
             | [| root; dateFolder; noteFolderName; fileName |] when
-                PathHelpers.pathsEqual root NoteConversion.notesRootFolder ->
+                PathHelpers.pathsEqual root NoteConversion.notesRootFolder
+                ->
                 if PathHelpers.pathsEqual noteFolderName (withoutMarkdownExtension fileName) then
                     Some {
                         SourceFolderPath =
-                            combineRelativePaths [| NoteConversion.notesRootFolder; dateFolder; noteFolderName |]
+                            combineRelativePaths [|
+                                NoteConversion.notesRootFolder
+                                dateFolder
+                                noteFolderName
+                            |]
                         NoteFolderName = noteFolderName
                         Label = $"{dateFolder} / {noteFolderName}"
                     }
@@ -112,7 +117,10 @@ module FileTreeAssignNoteHelper =
         let normalizedParentPath = PathHelpers.normalizeCanonicalRelativePath parentPath
         let normalizedChildPath = PathHelpers.normalizeCanonicalRelativePath childPath
 
-        if PathHelpers.isSameOrDescendantPath normalizedChildPath normalizedParentPath |> not then
+        if
+            PathHelpers.isSameOrDescendantPath normalizedChildPath normalizedParentPath
+            |> not
+        then
             None
         else
             let parentSegments = getNonEmptyPathParts normalizedParentPath
@@ -128,7 +136,10 @@ module FileTreeAssignNoteHelper =
         | None -> ResizeArray()
         | Some note ->
             let assetFolderPath =
-                combineRelativePaths [| note.SourceFolderPath; NoteConversion.noteAssetsFolderName |]
+                combineRelativePaths [|
+                    note.SourceFolderPath
+                    NoteConversion.noteAssetsFolderName
+                |]
 
             fileEntries
             |> Seq.choose (fun entry ->
@@ -156,25 +167,26 @@ module FileTreeAssignNoteHelper =
         |> Option.defaultWith (fun () ->
             let _, protocolsFolder = NoteConversion.existingTargetFolders target.Kind
 
-            combineRelativePaths
-                [| targetRootPath target; protocolsFolder; noteFolderName |]
+            combineRelativePaths [| targetRootPath target; protocolsFolder; noteFolderName |]
         )
         |> PathHelpers.normalizeCanonicalRelativePath
 
-    let private buildAssignedAssetFolderPath
-        (target: ExistingTargetRef)
-        (note: AssignableNoteRef)
-        destination
-        =
+    let private buildAssignedAssetFolderPath (target: ExistingTargetRef) (note: AssignableNoteRef) destination =
         let folderPath =
             match destination with
             | AssignNoteAssetDestination.Protocol -> buildAssignedNoteFolderPath target note.NoteFolderName
             | AssignNoteAssetDestination.Dataset ->
-                combineRelativePaths
-                    [| targetRootPath target; ARCtrl.ArcPathHelper.AssayDatasetFolderName; note.NoteFolderName |]
+                combineRelativePaths [|
+                    targetRootPath target
+                    ARCtrl.ArcPathHelper.AssayDatasetFolderName
+                    note.NoteFolderName
+                |]
             | AssignNoteAssetDestination.Resource ->
-                combineRelativePaths
-                    [| targetRootPath target; ARCtrl.ArcPathHelper.StudiesResourcesFolderName; note.NoteFolderName |]
+                combineRelativePaths [|
+                    targetRootPath target
+                    ARCtrl.ArcPathHelper.StudiesResourcesFolderName
+                    note.NoteFolderName
+                |]
 
         folderPath |> PathHelpers.normalizeCanonicalRelativePath
 
@@ -184,12 +196,11 @@ module FileTreeAssignNoteHelper =
         (asset: AssignableNoteAssetRef)
         destination
         =
-        combineRelativePaths
-            [|
-                buildAssignedAssetFolderPath target note destination
-                NoteConversion.noteAssetsFolderName
-                asset.RelativeAssetPath
-            |]
+        combineRelativePaths [|
+            buildAssignedAssetFolderPath target note destination
+            NoteConversion.noteAssetsFolderName
+            asset.RelativeAssetPath
+        |]
 
     let private reloadAssignedNotePreviewIfNeeded config path = promise {
         match config.pageState with
@@ -218,11 +229,13 @@ module FileTreeAssignNoteHelper =
                 | Some AssignNoteAssetDestination.Protocol -> return! moveNext remainingAssets
                 | Some destination ->
                     let sourcePath =
-                        combineRelativePaths
-                            [| targetFolderPath; NoteConversion.noteAssetsFolderName; asset.RelativeAssetPath |]
+                        combineRelativePaths [|
+                            targetFolderPath
+                            NoteConversion.noteAssetsFolderName
+                            asset.RelativeAssetPath
+                        |]
 
-                    let targetPath =
-                        buildAssignedAssetTargetPath target note asset destination
+                    let targetPath = buildAssignedAssetTargetPath target note asset destination
 
                     let! moveResult =
                         config.movePath {

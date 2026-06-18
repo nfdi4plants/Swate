@@ -329,7 +329,10 @@ type FileTree =
                         fileStateCtx.state.FileTree
                         selectedAssignableNote
                 ),
-                [| box fileStateCtx.state.FileTree; box selectedAssignableNote |]
+                [|
+                    box fileStateCtx.state.FileTree
+                    box selectedAssignableNote
+                |]
             )
 
         let confirmDeleteItem () =

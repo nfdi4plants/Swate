@@ -417,8 +417,7 @@ Vitest.describe (
         Vitest.test (
             "assignable note asset options list assets for the selected note",
             fun () ->
-                let note =
-                    assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
 
                 let assets =
                     createAssignableNoteAssetOptions
@@ -433,16 +432,8 @@ Vitest.describe (
                                 "notes/2026-06-15/Sampling_protocol/assets/nested/raw.csv",
                                 false
                             )
-                            FileEntry.create (
-                                "other.png",
-                                "notes/2026-06-15/Other/assets/other.png",
-                                false
-                            )
-                            FileEntry.create (
-                                "assets",
-                                "notes/2026-06-15/Sampling_protocol/assets",
-                                true
-                            )
+                            FileEntry.create ("other.png", "notes/2026-06-15/Other/assets/other.png", false)
+                            FileEntry.create ("assets", "notes/2026-06-15/Sampling_protocol/assets", true)
                         ]
                         (Some note)
 
@@ -472,13 +463,10 @@ Vitest.describe (
                     Kind = NotesTargetKind.Assay
                 }
 
-                let note =
-                    assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
 
                 let asset =
-                    assignableAsset
-                        "notes/2026-06-15/Sampling_protocol/assets/diagram.png"
-                        "nested/diagram.png"
+                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/diagram.png" "nested/diagram.png"
 
                 Vitest
                     .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Protocol)
@@ -501,8 +489,7 @@ Vitest.describe (
                     Kind = NotesTargetKind.Assay
                 }
 
-                let note =
-                    assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
 
                 let moveRequests = ResizeArray<MovePathRequest>()
                 let mutable closed = false
@@ -534,10 +521,8 @@ Vitest.describe (
 
                 let selectedDestinations =
                     [
-                        "notes/2026-06-15/Sampling_protocol/assets/protocol.png",
-                        AssignNoteAssetDestination.Protocol
-                        "notes/2026-06-15/Sampling_protocol/assets/data.csv",
-                        AssignNoteAssetDestination.Dataset
+                        "notes/2026-06-15/Sampling_protocol/assets/protocol.png", AssignNoteAssetDestination.Protocol
+                        "notes/2026-06-15/Sampling_protocol/assets/data.csv", AssignNoteAssetDestination.Dataset
                         "notes/2026-06-15/Sampling_protocol/assets/nested/reference.pdf",
                         AssignNoteAssetDestination.Resource
                     ]
