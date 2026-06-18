@@ -308,8 +308,8 @@ module private DragHandlers =
 
     let private layerIdForSide (pair: ProvenanceLayerPair) side =
         match side with
-        | ProvenanceSide.Input -> pair.LeftLayerId
-        | ProvenanceSide.Output -> pair.RightLayerId
+        | ProvenanceSide.Input -> pair.InputSideId
+        | ProvenanceSide.Output -> pair.OutputSideId
 
     let private routePropertyValueDrop context side groupId propertyValueId =
         match context.Lookups.FindPropertyValue propertyValueId with
@@ -799,10 +799,10 @@ type ProvenanceGrouping =
             FsReact.createDisposable (fun () -> TierObserver.disconnect observer)
         )
 
-        let uiState = State.Layers.ensure session rawUiState
+        let uiState = State.Sides.ensure session rawUiState
 
         let pair, inputGroups, outputGroups, connections =
-            React.useMemo ((fun () -> Display.displayPair session uiState), [| box session; box uiState.LayerStates |])
+            React.useMemo ((fun () -> Display.displayPair session uiState), [| box session; box uiState.SideStates |])
 
         let latestUiState = React.useRef uiState
         let activePairId = React.useRef pair.Id
@@ -940,7 +940,7 @@ type ProvenanceGrouping =
             | Ok(next, patches) ->
                 LiveDrag.clear liveDragStore.current
 
-                let nextUiState = latestUiState.current |> State.Layers.ensure next
+                let nextUiState = latestUiState.current |> State.Sides.ensure next
 
                 commitUiState {
                     nextUiState with
@@ -1005,7 +1005,7 @@ type ProvenanceGrouping =
             | Ok(next, patches) ->
                 LiveDrag.clear liveDragStore.current
 
-                let nextUiState = latestUiState.current |> State.Layers.ensure next
+                let nextUiState = latestUiState.current |> State.Sides.ensure next
 
                 commitUiState {
                     nextUiState with
@@ -1079,18 +1079,18 @@ type ProvenanceGrouping =
         let railPanel side =
             let layerId, oppositeLayerId, targetSide =
                 match side with
-                | ProvenanceSide.Input -> pair.LeftLayerId, pair.RightLayerId, ProvenanceSide.Output
-                | ProvenanceSide.Output -> pair.RightLayerId, pair.LeftLayerId, ProvenanceSide.Input
+                | ProvenanceSide.Input -> pair.InputSideId, pair.OutputSideId, ProvenanceSide.Output
+                | ProvenanceSide.Output -> pair.OutputSideId, pair.InputSideId, ProvenanceSide.Input
 
             EditorSurface.propertyRail
                 side
                 (match side with
                  | ProvenanceSide.Input -> inputRailProjection
                  | ProvenanceSide.Output -> outputRailProjection)
-                (State.Layers.get layerId uiState).GroupingAssignments
+                (State.Sides.get layerId uiState).GroupingAssignments
                 (fun header -> toggleSideGrouping layerId side header)
                 (fun header ->
-                    State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState
+                    State.GroupingAssignments.toggleBoth pair.InputSideId pair.OutputSideId header uiState
                     |> setUiState
                 )
                 (fun header ->

@@ -1731,23 +1731,67 @@ let sessionTests =
 
 let uiStateTests =
     testList "UI state" [
+        testCase "initial UI state creates side states for the active layer sides"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let layer = Session.activeLayer session
+            let state = State.init session
+
+            Expect.isTrue (state.SideStates.ContainsKey layer.InputSideId) "Input side state should exist."
+            Expect.isTrue (state.SideStates.ContainsKey layer.OutputSideId) "Output side state should exist."
+            Expect.equal state.SideStates.Count 2 "Initial layer should create exactly two side states."
+
+        testCase "new layer side states do not inherit grouping assignments"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let layer1 = Session.activeLayer session
+            let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
+
+            let grouped =
+                State.init session
+                |> State.GroupingAssignments.toggleSide layer1.OutputSideId ProvenanceSide.Output replicate
+
+            let layered =
+                match
+                    Session.addLayer
+                        {
+                            SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                        }
+                        session
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let layer2 = Session.activeLayer layered
+            let nextState = State.Sides.ensure layered grouped
+
+            Expect.equal
+                (State.Sides.get layer2.InputSideId nextState).GroupingAssignments
+                []
+                "New layer input side should not inherit upstream grouping assignments."
+
+            Expect.equal
+                (State.Sides.get layer2.OutputSideId nextState).GroupingAssignments
+                []
+                "New layer output side should not inherit upstream grouping assignments."
+
         testCase "toggleSideGrouping applies grouping only to the selected layer side"
         <| fun _ ->
             let session = Session.init (sampleModel ())
-            let pair = Session.activePair session
+            let layer = Session.activeLayer session
             let state = State.init session
             let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
 
             let next =
-                State.GroupingAssignments.toggleSide pair.RightLayerId ProvenanceSide.Output replicate state
+                State.GroupingAssignments.toggleSide layer.OutputSideId ProvenanceSide.Output replicate state
 
             Expect.equal
-                (State.Layers.get pair.LeftLayerId next).GroupingAssignments
+                (State.Sides.get layer.InputSideId next).GroupingAssignments
                 []
                 "Side-only output grouping should not change the input layer state."
 
             Expect.equal
-                (State.Layers.get pair.RightLayerId next).GroupingAssignments
+                (State.Sides.get layer.OutputSideId next).GroupingAssignments
                 [
                     {
                         Key = { Header = replicate }
@@ -1759,12 +1803,12 @@ let uiStateTests =
         testCase "toggleBothGrouping applies grouping to both active layer states"
         <| fun _ ->
             let session = Session.init (sampleModel ())
-            let pair = Session.activePair session
+            let layer = Session.activeLayer session
             let state = State.init session
             let replicate = propertyHeader FixtureKinds.parameterProperty "Replicate"
 
             let next =
-                State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId replicate state
+                State.GroupingAssignments.toggleBoth layer.InputSideId layer.OutputSideId replicate state
 
             let expected = [
                 {
@@ -1774,41 +1818,41 @@ let uiStateTests =
             ]
 
             Expect.equal
-                (State.Layers.get pair.LeftLayerId next).GroupingAssignments
+                (State.Sides.get layer.InputSideId next).GroupingAssignments
                 expected
                 "Both-side grouping should be visible from the input layer."
 
             Expect.equal
-                (State.Layers.get pair.RightLayerId next).GroupingAssignments
+                (State.Sides.get layer.OutputSideId next).GroupingAssignments
                 expected
                 "Both-side grouping should be visible from the output layer."
 
         testCase "moveGrouping switches a property to the target side only"
         <| fun _ ->
             let session = Session.init (sampleModel ())
-            let pair = Session.activePair session
+            let layer = Session.activeLayer session
             let state = State.init session
             let species = propertyHeader FixtureKinds.characteristicProperty "Species"
 
             let selected =
-                State.GroupingAssignments.toggleSide pair.LeftLayerId ProvenanceSide.Input species state
+                State.GroupingAssignments.toggleSide layer.InputSideId ProvenanceSide.Input species state
 
             let next =
                 State.GroupingAssignments.move
-                    pair.Id
-                    pair.LeftLayerId
-                    pair.RightLayerId
+                    layer.Id
+                    layer.InputSideId
+                    layer.OutputSideId
                     ProvenanceSide.Output
                     species
                     selected
 
             Expect.equal
-                (State.Layers.get pair.LeftLayerId next).GroupingAssignments
+                (State.Sides.get layer.InputSideId next).GroupingAssignments
                 []
                 "Dragging a property away should remove it from the source layer."
 
             Expect.equal
-                (State.Layers.get pair.RightLayerId next).GroupingAssignments
+                (State.Sides.get layer.OutputSideId next).GroupingAssignments
                 [
                     {
                         Key = { Header = species }
@@ -1818,14 +1862,14 @@ let uiStateTests =
                 "Dragging a property to output should make it output-only."
 
             Expect.equal
-                (next.PropertyRailPlacements |> Map.tryFind (pair.Id, { Header = species }))
+                (next.PropertyRailPlacements |> Map.tryFind (layer.Id, { Header = species }))
                 (Some ProvenanceSide.Output)
                 "Dragging a property to output should move its rail control to the output side."
 
         testCase "toggleBothGrouping removes only both-scope assignments from inconsistent state"
         <| fun _ ->
             let session = Session.init (sampleModel ())
-            let pair = Session.activePair session
+            let layer = Session.activeLayer session
             let state = State.init session
             let species = propertyHeader FixtureKinds.characteristicProperty "Species"
             let key = { Header = species }
@@ -1842,26 +1886,26 @@ let uiStateTests =
 
             let inconsistent = {
                 state with
-                    LayerStates =
-                        state.LayerStates
-                        |> Map.add pair.LeftLayerId {
+                    SideStates =
+                        state.SideStates
+                        |> Map.add layer.InputSideId {
                             GroupingAssignments = [ sideAssignment; bothAssignment ]
                         }
-                        |> Map.add pair.RightLayerId {
+                        |> Map.add layer.OutputSideId {
                             GroupingAssignments = [ bothAssignment ]
                         }
             }
 
             let next =
-                State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId species inconsistent
+                State.GroupingAssignments.toggleBoth layer.InputSideId layer.OutputSideId species inconsistent
 
             Expect.equal
-                (State.Layers.get pair.LeftLayerId next).GroupingAssignments
+                (State.Sides.get layer.InputSideId next).GroupingAssignments
                 [ sideAssignment ]
                 "Removing a both-side grouping should not silently drop an existing side-specific assignment for the same key."
 
             Expect.equal
-                (State.Layers.get pair.RightLayerId next).GroupingAssignments
+                (State.Sides.get layer.OutputSideId next).GroupingAssignments
                 []
                 "Only the both-side assignment should be removed from the opposite layer."
 

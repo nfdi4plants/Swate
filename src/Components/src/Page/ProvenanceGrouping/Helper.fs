@@ -791,8 +791,8 @@ module Display =
 
     let displayPair session uiState =
         let pair = Session.activePair session
-        let leftState = State.Layers.get pair.LeftLayerId uiState
-        let rightState = State.Layers.get pair.RightLayerId uiState
+        let leftState = State.Sides.get pair.InputSideId uiState
+        let rightState = State.Sides.get pair.OutputSideId uiState
 
         let assignments =
             [

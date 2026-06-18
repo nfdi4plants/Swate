@@ -12,7 +12,7 @@ type ProvenanceEditorChange = {
     Patches: ProvenanceTablePatch list
 }
 
-type LayerViewState = {
+type SideViewState = {
     GroupingAssignments: GroupingAssignment list
 }
 
@@ -152,7 +152,7 @@ type PropertyCountBadge =
     | Coverage of setsWithValueCount: int * totalSetCount: int
 
 type UiState = {
-    LayerStates: Map<ProvenanceLayerId, LayerViewState>
+    SideStates: Map<ProvenanceLayerSideId, SideViewState>
     PropertyRailPlacements: Map<ProvenancePairId * GroupingKey, ProvenanceSide>
     ExpandedProperties: Set<ProvenancePairId * ProvenanceSide * GroupingKey>
     PaletteValues: Map<ProvenancePairId * ProvenanceSide, ProvenancePropertyValue list>
