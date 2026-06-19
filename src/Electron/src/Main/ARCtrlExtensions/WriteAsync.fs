@@ -137,7 +137,6 @@ module ArcWriteExtensions =
             | None -> ()
 
             [|
-                yield Main.ArcScaffold.defaultGitignoreContract
                 yield! collectionGitKeepContracts
 
                 for entry in filemap do

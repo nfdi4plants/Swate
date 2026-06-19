@@ -41,3 +41,6 @@ $RECYCLE.BIN/
 
     let defaultGitignoreContract =
         Contract.createCreate (".gitignore", DTOType.PlainText, DTO.Text defaultGitignoreContent)
+
+    let tryWriteDefaultGitignoreAsync (arcPath: string) =
+        [| defaultGitignoreContract |] |> fullFillContractBatchAsync arcPath

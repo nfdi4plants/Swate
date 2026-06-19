@@ -98,6 +98,29 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "ArcScaffold writes the default gitignore into an ARC root",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-default-gitignore-"
+                let arcPath = join [| rootPath; "arc" |]
+                let gitignorePath = join [| arcPath; ".gitignore" |]
+
+                try
+                    do! mkdirRecursiveAsync arcPath
+
+                    match! Main.ArcScaffold.tryWriteDefaultGitignoreAsync arcPath with
+                    | Error errors -> failwith (String.concat "\n" errors)
+                    | Ok _ -> ()
+
+                    let! gitignoreContent = readFileAsync gitignorePath TextEncoding.Utf8
+                    Vitest.expect(gitignoreContent).toBe (Main.ArcScaffold.defaultGitignoreContent)
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
+        )
+
+        Vitest.test (
             "TryWriteAsyncSwate preserves payload and does not create unmanaged file-tree entries",
             fun () -> promise {
                 let! rootPath = TestHelpers.createTempDirectoryAsync "swate-targeted-write-"
