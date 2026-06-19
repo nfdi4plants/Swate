@@ -1281,6 +1281,7 @@ type Controls =
             ?key: string
         ) =
         let sideName = SideLabels.sideName side
+        let isOpen, setIsOpen = React.useState false
         let name, setName = React.useState ""
 
         let availableKinds =
@@ -1312,83 +1313,108 @@ type Controls =
             else
                 None
 
-        Popover.Simple(
-            trigger =
-                Html.button [
-                    prop.type'.button
-                    prop.className Styles.addPropertyValueButtonClasses
-                    if defaultArg debug false then
-                        prop.testId $"provenance-add-{sideName}-trigger"
-                    prop.ariaLabel $"Add {sideName}"
-                    prop.children [
-                        Html.i [
-                            prop.className "swt:iconify swt:fluent--add-20-regular swt:size-5 swt:shrink-0"
-                        ]
-                        Html.span [ prop.text $"Add {sideName}" ]
-                    ]
-                ],
-            content =
-                Html.form [
-                    prop.className "swt:flex swt:flex-col swt:gap-2"
-                    prop.onSubmit (fun event ->
-                        event.preventDefault ()
+        let content =
+            Html.form [
+                prop.className "swt:flex swt:flex-col swt:gap-2"
+                prop.onSubmit (fun event ->
+                    event.preventDefault ()
 
-                        if nameError.IsNone then
-                            onCreate {
-                                Side = side
-                                Header = selectedKind |> Endpoints.endpointHeader side
-                                Name = trimmedName
-                            }
-                    )
-                    prop.children [
-                        Html.label [ prop.className "swt:label"; prop.text "Endpoint name" ]
-                        Html.input [
-                            prop.ariaLabel "Endpoint name"
-                            prop.className [
-                                "swt:input swt:input-bordered swt:input-sm"
-                                if nameError.IsSome then
-                                    "swt:input-error"
-                            ]
-                            prop.required true
-                            prop.value name
-                            prop.onChange setName
+                    onCreate {
+                        Side = side
+                        Header = selectedKind |> Endpoints.endpointHeader side
+                        Name = trimmedName
+                    }
+
+                    setName ""
+                    setSelectedKindId availableKinds.Head.Id
+                    setIsOpen false
+                )
+                prop.children [
+                    Html.label [ prop.className "swt:label"; prop.text "Endpoint name" ]
+                    Html.input [
+                        prop.ariaLabel "Endpoint name"
+                        prop.className [
+                            "swt:input swt:input-bordered swt:input-sm"
+                            if nameError.IsSome then
+                                "swt:input-error"
                         ]
-                        match nameError with
-                        | Some error ->
-                            Html.p [
-                                prop.className "swt:text-xs swt:text-error"
-                                prop.text error
-                            ]
-                        | None -> Html.none
-                        Html.label [ prop.className "swt:label"; prop.text "Endpoint kind" ]
-                        Html.select [
-                            prop.ariaLabel "Endpoint kind"
-                            prop.className "swt:select swt:select-bordered swt:select-sm"
-                            prop.value selectedKind.Id
-                            prop.onChange setSelectedKindId
-                            prop.children [
-                                for kind in availableKinds do
-                                    Html.option [
-                                        prop.value kind.Id
-                                        prop.text (ProvenanceKind.displayName kind)
-                                    ]
-                            ]
+                        prop.required true
+                        prop.value name
+                        prop.onChange setName
+                    ]
+                    match nameError with
+                    | Some error ->
+                        Html.p [
+                            prop.className "swt:text-xs swt:text-error"
+                            prop.text error
                         ]
-                        Html.button [
-                            prop.type'.submit
-                            prop.className "swt:btn swt:btn-primary swt:btn-sm"
-                            prop.disabled nameError.IsSome
-                            if defaultArg debug false then
-                                prop.testId $"provenance-create-{sideName}"
-                            prop.text "Create endpoint"
+                    | None -> Html.none
+                    Html.label [ prop.className "swt:label"; prop.text "Endpoint kind" ]
+                    Html.select [
+                        prop.ariaLabel "Endpoint kind"
+                        prop.className "swt:select swt:select-bordered swt:select-sm"
+                        prop.value selectedKind.Id
+                        prop.onChange setSelectedKindId
+                        prop.children [
+                            for kind in availableKinds do
+                                Html.option [
+                                    prop.value kind.Id
+                                    prop.text (ProvenanceKind.displayName kind)
+                                ]
                         ]
                     ]
-                ],
+                    Html.button [
+                        prop.type'.submit
+                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                        prop.disabled nameError.IsSome
+                        if defaultArg debug false then
+                            prop.testId $"provenance-create-{sideName}"
+                        prop.text "Create endpoint"
+                    ]
+                ]
+            ]
+
+        Popover.Popover(
+            isOpen = isOpen,
+            onOpenChange = setIsOpen,
             ?debug =
                 (if defaultArg debug false then
                      Some $"provenance-add-{sideName}"
                  else
-                     None)
+                     None),
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.button [
+                            prop.type'.button
+                            prop.className Styles.addPropertyValueButtonClasses
+                            if defaultArg debug false then
+                                prop.testId $"provenance-add-{sideName}-trigger"
+                            prop.ariaLabel $"Add {sideName}"
+                            prop.children [
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--add-20-regular swt:size-5 swt:shrink-0"
+                                ]
+                                Html.span [ prop.text $"Add {sideName}" ]
+                            ]
+                        ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:flex swt:items-start swt:justify-between swt:gap-2"
+                                        prop.children [
+                                            Html.div [ prop.className "swt:flex-1"; prop.children content ]
+                                            Popover.Close()
+                                        ]
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
         )
 
     [<ReactComponent>]
