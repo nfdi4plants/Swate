@@ -263,6 +263,61 @@ export const GroupingPropertiesStayOnOwningSide: Story = {
   },
 };
 
+export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
+
+    expect(toolbar.getByPlaceholderText('Search properties & values...')).toBeInTheDocument();
+
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
+    expect(toolbar.getByRole('button', { name: /^Property Value Count$/i })).toBeInTheDocument();
+    expect(toolbar.getByRole('button', { name: /^Name$/i })).toBeInTheDocument();
+    expect(toolbar.getAllByRole('button', { name: /^Connection Count$/i })).toHaveLength(1);
+
+    expect(toolbar.getByRole('button', { name: /^Show upstream properties$/i }).querySelector('[class*="fluent--arrow-up-20"]'))
+      .toBeInTheDocument();
+    expect(toolbar.getByRole('button', { name: /^Show current properties$/i }).querySelector('[class*="fluent--circle-20-filled"]'))
+      .toBeInTheDocument();
+    const both = toolbar.getByRole('button', { name: /^Show current and upstream properties$/i });
+    expect(both.querySelector('[class*="fluent--arrow-up-20"]')).toBeInTheDocument();
+    expect(both.querySelector('[class*="fluent--circle-20-filled"]')).toBeInTheDocument();
+  },
+};
+
+export const SortsPropertiesByNameAndConnectionCount: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
+
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Name$/i }));
+
+    await waitFor(() => {
+      expect(propertyOrder(canvas, 'Output').slice(0, 4)).toEqual([
+        'Analysis',
+        'Replicate',
+        'Species',
+        'Temperature',
+      ]);
+    });
+
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Connection Count$/i }));
+
+    await waitFor(() => {
+      expect(propertyOrder(canvas, 'Output').slice(0, 4)).toEqual([
+        'Species',
+        'Analysis',
+        'Temperature',
+        'Replicate',
+      ]);
+    });
+  },
+};
+
 export const PropertyRailExpandsValuesAndAddControls: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -1066,6 +1121,13 @@ async function selectGroup(groupCard: HTMLElement) {
   }
 
   await waitFor(() => expect(groupCard).toHaveClass('swt:border-primary'), { timeout: 3000 });
+}
+
+function propertyOrder(canvas: ReturnType<typeof within>, side: 'Input' | 'Output') {
+  const prefix = `provenance-property-${side}-`;
+  const rail = canvas.getByTestId(`provenance-property-rail-${side}`);
+  return Array.from(rail.querySelectorAll<HTMLElement>(`[data-testid^="${prefix}"]`))
+    .map((element) => element.getAttribute('data-testid')!.slice(prefix.length));
 }
 
 async function railValue(

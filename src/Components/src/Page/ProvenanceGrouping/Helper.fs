@@ -620,9 +620,43 @@ module PropertyProjection =
                 | _ -> false
             )
 
+    let private headerNameSortKey (header: ProvenancePropertyHeader) =
+        header.Category.Name.Trim().ToLowerInvariant(), header.Category.Name, header.Kind.Id
+
+    let private setHasHeader header model (set: ProvenanceSet) =
+        ProvenanceSet.effectivePropertyValueIds set
+        |> List.exists (fun propertyValueId ->
+            model.PropertyValues.TryFind propertyValueId
+            |> Option.exists (fun propertyValue -> propertyValue.Header = header)
+        )
+
+    let connectionCountForSideHeader
+        (side: ProvenanceSide)
+        (header: ProvenancePropertyHeader)
+        (model: ProvenanceModel)
+        =
+        let sets = PropertyRails.setsForSide side model
+
+        model.Connections
+        |> Map.toList
+        |> List.sumBy (fun (_, connection) ->
+            if connection.TableName <> model.LoadedTableName then
+                0
+            else
+                let setId =
+                    match side with
+                    | ProvenanceSide.Input -> connection.InputSetId
+                    | ProvenanceSide.Output -> connection.OutputSetId
+
+                match sets.TryFind setId with
+                | Some set when setHasHeader header model set -> 1
+                | _ -> 0
+        )
+
     let sortHeaders
         (sort: PropertySort)
         (statsByHeader: Map<ProvenancePropertyHeader, PropertyStats>)
+        (connectionCountsByHeader: Map<ProvenancePropertyHeader, int>)
         (headers: ProvenancePropertyHeader list)
         =
         match sort with
@@ -634,10 +668,20 @@ module PropertyProjection =
                     |> Option.map (fun stats -> stats.DistinctValueCount)
                     |> Option.defaultValue 0
 
-                -count, header.Category.Name, header.Kind.Id
+                let name, rawName, kindId = headerNameSortKey header
+
+                -count, name, rawName, kindId
             )
-        | PropertySort.NameAsc -> headers |> List.sortBy (fun header -> header.Category.Name, header.Kind.Id)
-        | PropertySort.Origin -> headers |> List.sortBy (fun header -> header.Category.Name)
+        | PropertySort.NameAsc -> headers |> List.sortBy headerNameSortKey
+        | PropertySort.ConnectionCountDesc ->
+            headers
+            |> List.sortBy (fun header ->
+                let count = connectionCountsByHeader.TryFind header |> Option.defaultValue 0
+
+                let name, rawName, kindId = headerNameSortKey header
+
+                -count, name, rawName, kindId
+            )
 
     let originFilterOptions
         (_originByHeader: Map<ProvenancePropertyHeader, Set<PropertyOrigin>>)
@@ -670,6 +714,11 @@ module PropertyProjection =
         let statsByHeader =
             headers
             |> List.map (fun header -> header, propertyStatsForSide side header model)
+            |> Map.ofList
+
+        let connectionCountsByHeader =
+            headers
+            |> List.map (fun header -> header, connectionCountForSideHeader side header model)
             |> Map.ofList
 
         let originByHeader =
@@ -713,7 +762,8 @@ module PropertyProjection =
                 && originFilterMatches filters.OriginFilter origins
             )
 
-        let sorted = sortHeaders filters.PropertySort statsByHeader filtered
+        let sorted =
+            sortHeaders filters.PropertySort statsByHeader connectionCountsByHeader filtered
 
         let expandedHeaders =
             sorted

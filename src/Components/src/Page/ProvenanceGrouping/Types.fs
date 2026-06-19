@@ -108,7 +108,7 @@ type PropertyColorSettings = {
 type PropertySort =
     | ValueCountDesc
     | NameAsc
-    | Origin
+    | ConnectionCountDesc
 
 [<RequireQualifiedAccess>]
 type GroupSort =

@@ -7,6 +7,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Primitive.Buttons
+open Swate.Components.Primitive.Dropdown
 open Swate.Components.Primitive.Popover
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
@@ -66,6 +67,30 @@ module private ColorPicker =
                         onSetColor None
                     )
                 ]
+            ]
+        ]
+
+module private OriginSymbols =
+
+    let upstreamIcon size =
+        Html.i [
+            prop.className [ "swt:iconify swt:fluent--arrow-up-20-regular"; size ]
+        ]
+
+    let currentIcon size =
+        Html.i [
+            prop.className [ "swt:iconify swt:fluent--circle-20-filled"; size ]
+        ]
+
+    let bothIcons size =
+        Html.span [
+            prop.className "swt:inline-flex swt:items-center swt:gap-1"
+            prop.children [
+                upstreamIcon size
+                Html.span [
+                    prop.className "swt:h-4 swt:w-px swt:bg-current swt:opacity-60"
+                ]
+                currentIcon size
             ]
         ]
 
@@ -492,22 +517,22 @@ type Controls =
                             )
 
                         if hasCurrent && hasUpstream then
-                            Html.i [
-                                prop.className
-                                    "swt:iconify swt:fluent--layer-diagonal-20-regular swt:size-3 swt:shrink-0 swt:text-base-content/60"
+                            Html.span [
+                                prop.className "swt:shrink-0 swt:text-base-content/60"
                                 prop.title "Current and upstream"
+                                prop.children [ OriginSymbols.bothIcons "swt:size-3" ]
                             ]
                         elif hasCurrent then
-                            Html.i [
-                                prop.className
-                                    "swt:iconify swt:fluent--target-arrow-20-regular swt:size-3 swt:shrink-0 swt:text-base-content/60"
+                            Html.span [
+                                prop.className "swt:shrink-0 swt:text-base-content/60"
                                 prop.title "Current"
+                                prop.children [ OriginSymbols.currentIcon "swt:size-3" ]
                             ]
                         elif hasUpstream then
-                            Html.i [
-                                prop.className
-                                    "swt:iconify swt:fluent--arrow-trending-lines-20-regular swt:size-3 swt:shrink-0 swt:text-base-content/60"
+                            Html.span [
+                                prop.className "swt:shrink-0 swt:text-base-content/60"
                                 prop.title "Upstream"
+                                prop.children [ OriginSymbols.upstreamIcon "swt:size-3" ]
                             ]
                         else
                             Html.none
@@ -1372,13 +1397,58 @@ type Controls =
             filters: FilterState,
             onSearch: string -> unit,
             onPropertySort: PropertySort -> unit,
-            onGroupSort: GroupSort -> unit,
+            _onGroupSort: GroupSort -> unit,
             onValueCountFilter: PropertyValueCountFilter -> unit,
             onOriginFilter: PropertyOriginFilter -> unit,
             ?debug: bool
         ) =
+        let sortOpen, setSortOpen = React.useState false
+
+        let propertySortOption sort label =
+            let active = filters.PropertySort = sort
+
+            Html.li [
+                Html.button [
+                    prop.type'.button
+                    prop.className [
+                        "swt:btn swt:btn-sm swt:w-full swt:justify-start"
+                        if active then "swt:btn-primary" else "swt:btn-ghost"
+                    ]
+                    prop.ariaLabel label
+                    prop.onClick (fun _ -> onPropertySort sort)
+                    prop.children [ Html.span label ]
+                ]
+            ]
+
+        let originActive filter =
+            match filter, filters.OriginFilter with
+            | PropertyOriginFilter.AnyOrigin, PropertyOriginFilter.AnyOrigin -> true
+            | PropertyOriginFilter.CurrentOnly, PropertyOriginFilter.CurrentOnly -> true
+            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.AnyUpstream
+            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.UpstreamLayer _
+            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.PreviousContext _ -> true
+            | _ -> false
+
+        let originButton filter label icon =
+            Html.button [
+                prop.type'.button
+                prop.className [
+                    "swt:btn swt:btn-sm swt:join-item swt:w-11 swt:px-0"
+                    if originActive filter then
+                        "swt:btn-primary"
+                    else
+                        "swt:btn-outline"
+                ]
+                prop.ariaLabel label
+                prop.title label
+                prop.onClick (fun _ -> onOriginFilter filter)
+                prop.children [ icon ]
+            ]
+
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2 swt:p-2"
+            if defaultArg debug false then
+                prop.testId "provenance-filter-toolbar"
             prop.children [
                 Html.div [
                     prop.className "swt:relative swt:flex swt:items-center"
@@ -1395,53 +1465,33 @@ type Controls =
                         ]
                     ]
                 ]
-                Html.select [
-                    prop.className "swt:select swt:select-bordered swt:select-sm"
-                    prop.value (
-                        match filters.PropertySort with
-                        | PropertySort.ValueCountDesc -> "ValueCountDesc"
-                        | PropertySort.NameAsc -> "NameAsc"
-                        | PropertySort.Origin -> "Origin"
-                    )
-                    prop.onChange (fun v ->
-                        match v with
-                        | "ValueCountDesc" -> onPropertySort PropertySort.ValueCountDesc
-                        | "NameAsc" -> onPropertySort PropertySort.NameAsc
-                        | "Origin" -> onPropertySort PropertySort.Origin
-                        | _ -> ()
-                    )
-                    prop.children [
-                        Html.option [ prop.value "ValueCountDesc"; prop.text "Value count" ]
-                        Html.option [ prop.value "NameAsc"; prop.text "Name" ]
-                        Html.option [ prop.value "Origin"; prop.text "Origin" ]
-                    ]
-                ]
-                Html.select [
-                    prop.className "swt:select swt:select-bordered swt:select-sm"
-                    prop.value (
-                        match filters.GroupSort with
-                        | GroupSort.NameAsc -> "NameAsc"
-                        | GroupSort.MemberCountDesc -> "MemberCountDesc"
-                        | GroupSort.ConnectionCountDesc -> "ConnectionCountDesc"
-                    )
-                    prop.onChange (fun v ->
-                        match v with
-                        | "NameAsc" -> onGroupSort GroupSort.NameAsc
-                        | "MemberCountDesc" -> onGroupSort GroupSort.MemberCountDesc
-                        | "ConnectionCountDesc" -> onGroupSort GroupSort.ConnectionCountDesc
-                        | _ -> ()
-                    )
-                    prop.children [
-                        Html.option [ prop.value "NameAsc"; prop.text "Name" ]
-                        Html.option [ prop.value "MemberCountDesc"; prop.text "Members" ]
-                        Html.option [
-                            prop.value "ConnectionCountDesc"
-                            prop.text "Connections"
+                Dropdown.Main(
+                    sortOpen,
+                    setSortOpen,
+                    Html.button [
+                        prop.type'.button
+                        prop.className "swt:btn swt:btn-sm swt:btn-outline"
+                        prop.ariaLabel "Sort By"
+                        prop.custom ("aria-expanded", sortOpen)
+                        prop.onClick (fun _ -> setSortOpen (not sortOpen))
+                        prop.children [
+                            Html.i [
+                                prop.className "swt:iconify swt:fluent--arrow-sort-20-regular swt:size-4"
+                            ]
+                            Html.span "Sort By"
                         ]
-                    ]
-                ]
+                    ],
+                    React.Fragment [
+                        propertySortOption PropertySort.ValueCountDesc "Property Value Count"
+                        propertySortOption PropertySort.NameAsc "Name"
+                        propertySortOption PropertySort.ConnectionCountDesc "Connection Count"
+                    ],
+                    contentClassName =
+                        "swt:w-52 swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110%"
+                )
                 Html.select [
                     prop.className "swt:select swt:select-bordered swt:select-sm"
+                    prop.ariaLabel "Filter by property value count"
                     prop.value (
                         match filters.ValueCountFilter with
                         | PropertyValueCountFilter.Any -> "Any"
@@ -1464,31 +1514,23 @@ type Controls =
                         Html.option [ prop.value "CoverageGap"; prop.text "Coverage gap" ]
                     ]
                 ]
-                Html.select [
-                    prop.className "swt:select swt:select-bordered swt:select-sm"
-                    prop.value (
-                        match filters.OriginFilter with
-                        | PropertyOriginFilter.AnyOrigin -> "AnyOrigin"
-                        | PropertyOriginFilter.CurrentOnly -> "CurrentOnly"
-                        | PropertyOriginFilter.AnyUpstream -> "AnyUpstream"
-                        | PropertyOriginFilter.UpstreamLayer _ -> "UpstreamLayer"
-                        | PropertyOriginFilter.PreviousContext _ -> "PreviousContext"
-                    )
-                    prop.onChange (fun v ->
-                        match v with
-                        | "AnyOrigin" -> onOriginFilter PropertyOriginFilter.AnyOrigin
-                        | "CurrentOnly" -> onOriginFilter PropertyOriginFilter.CurrentOnly
-                        | "AnyUpstream" -> onOriginFilter PropertyOriginFilter.AnyUpstream
-                        | _ -> ()
-                    )
+                Html.div [
+                    prop.className "swt:join"
                     prop.children [
-                        Html.option [ prop.value "AnyOrigin"; prop.text "Any" ]
-                        Html.option [ prop.value "CurrentOnly"; prop.text "Current only" ]
-                        Html.option [ prop.value "AnyUpstream"; prop.text "Upstream" ]
+                        originButton
+                            PropertyOriginFilter.AnyUpstream
+                            "Show upstream properties"
+                            (OriginSymbols.upstreamIcon "swt:size-4")
+                        originButton
+                            PropertyOriginFilter.CurrentOnly
+                            "Show current properties"
+                            (OriginSymbols.currentIcon "swt:size-4")
+                        originButton
+                            PropertyOriginFilter.AnyOrigin
+                            "Show current and upstream properties"
+                            (OriginSymbols.bothIcons "swt:size-4")
                     ]
                 ]
-                if defaultArg debug false then
-                    Html.span [ prop.testId "provenance-filter-toolbar" ]
             ]
         ]
 
