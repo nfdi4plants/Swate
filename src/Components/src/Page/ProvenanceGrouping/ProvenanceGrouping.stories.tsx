@@ -228,6 +228,27 @@ export const GroupsBothSidesFromOutputProperty: Story = {
   },
 };
 
+export const MissingSecondGroupingKeyKeepsAvailableGroupingKeys: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Species'));
+    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Species'));
+    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Temperature'));
+    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Temperature'));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis|Temperature=12 C'))
+        .toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis|Temperature=24 C'))
+        .toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas')).toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Input-input:input-d')).not.toBeInTheDocument();
+    });
+  },
+};
+
 export const ConnectedOutputsKeepPropertiesInRailsAndConnections: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
