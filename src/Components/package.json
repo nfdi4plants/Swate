@@ -63,7 +63,8 @@
     "fuse.js": "^7.1.0",
     "mermaid": "^11.12.3",
     "rehype-rewrite": "^4.0.4",
-    "rehype-sanitize": "^6.0.0"
+    "rehype-sanitize": "^6.0.0",
+    "react-highlight-words": "^0.20.0"
   },
   "peerDependencies": {
     "react": "^19.0.0",
