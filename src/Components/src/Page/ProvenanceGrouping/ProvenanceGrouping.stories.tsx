@@ -1424,10 +1424,30 @@ export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
     await waitFor(() => {
       const currentInputGroup = canvas.getByTestId('provenance-group-Input-input:input-d');
       const currentOutputGroup = canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis');
-      expect(within(currentInputGroup).getAllByTestId('provenance-connection-handle-Input-GroupMember').length).toBeGreaterThan(0);
+      expect(within(currentInputGroup).queryByTestId('provenance-connection-handle-Input-GroupMember')).not.toBeInTheDocument();
       expect(within(currentOutputGroup).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
     });
+    expect(canvas.queryByTestId('provenance-member-resolution-prompt')).not.toBeInTheDocument();
     expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
+  },
+};
+
+export const ExpandedGroupedCardsDoNotExpandConnectedSingleCards: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await groupByProperty(canvas, 'Output', 'Species');
+
+    const inputA = canvas.getByText('Input A').closest('article')!;
+    const outputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
+
+    await userEvent.click(within(outputGroup).getByRole('button', { name: 'Show members' }));
+
+    await waitFor(() => {
+      expect(within(outputGroup).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
+      expect(within(inputA).queryByTestId('provenance-group-member-Input-input-a')).not.toBeInTheDocument();
+      expect(within(inputA).queryByTestId('provenance-connection-handle-Input-GroupMember')).not.toBeInTheDocument();
+    });
   },
 };
 

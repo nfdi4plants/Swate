@@ -1075,29 +1075,25 @@ type ProvenanceGrouping =
                 EditorActions.allMemberPairs inputGroup outputGroup |> connectSetPairs
             | _ -> State.MemberResolution.clearPending uiState |> setUiState
 
-        let isManuallyResolving side groupId =
-            uiState.ManualResolutionPairs
-            |> List.exists (fun resolution ->
-                resolution.LayerId = layer.Id
-                && ((side = ProvenanceSide.Input && resolution.InputGroupId = groupId)
-                    || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId))
-            )
+        let isGroupedCard side groupId =
+            lookups.FindGroup side groupId
+            |> Option.exists (fun group -> group.GroupingValues |> List.isEmpty |> not)
 
         let isConnectedToExpanded side groupId =
-            connections
-            |> List.exists (fun connection ->
-                match side with
-                | ProvenanceSide.Input ->
-                    connection.SourceGroupId = groupId
-                    && State.Detail.isGroupExpanded ProvenanceSide.Output connection.TargetGroupId uiState
-                | ProvenanceSide.Output ->
-                    connection.TargetGroupId = groupId
-                    && State.Detail.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId uiState
-            )
+            isGroupedCard side groupId
+            && (connections
+                |> List.exists (fun connection ->
+                    match side with
+                    | ProvenanceSide.Input ->
+                        connection.SourceGroupId = groupId
+                        && State.Detail.isGroupExpanded ProvenanceSide.Output connection.TargetGroupId uiState
+                    | ProvenanceSide.Output ->
+                        connection.TargetGroupId = groupId
+                        && State.Detail.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId uiState
+                ))
 
         let isGroupExpanded side groupId =
             State.Detail.isGroupExpanded side groupId uiState
-            || isManuallyResolving side groupId
             || isConnectedToExpanded side groupId
 
         let dragContext = {

@@ -66,32 +66,19 @@ module MemberResolution =
     }
 
     let chooseManual (pending: PendingMemberResolution) state =
-        let pair: ManualResolutionPair = {
-            LayerId = pending.LayerId
-            InputGroupId = pending.InputGroupId
-            OutputGroupId = pending.OutputGroupId
-        }
-
-        let pairs =
-            if state.ManualResolutionPairs |> List.exists ((=) pair) then
-                state.ManualResolutionPairs
+        let detail =
+            if pending.OutputMemberCount > 1 then
+                Some(ProvenanceDetail.Group(ProvenanceSide.Output, pending.OutputGroupId))
+            elif pending.InputMemberCount > 1 then
+                Some(ProvenanceDetail.Group(ProvenanceSide.Input, pending.InputGroupId))
             else
-                state.ManualResolutionPairs @ [ pair ]
+                None
 
         {
             state with
                 PendingMemberResolution = None
-                ManualResolutionPairs = pairs
-                Detail = Some(ProvenanceDetail.Group(ProvenanceSide.Input, pending.InputGroupId))
+                Detail = detail
         }
-
-    let isManualPair layerId inputGroupId outputGroupId state =
-        state.ManualResolutionPairs
-        |> List.exists (fun (pair: ManualResolutionPair) ->
-            pair.LayerId = layerId
-            && pair.InputGroupId = inputGroupId
-            && pair.OutputGroupId = outputGroupId
-        )
 
 module PropertyColors =
 
@@ -277,10 +264,6 @@ module Sides =
             state.PendingMemberResolution
             |> Option.filter (fun pending -> currentLayerIds.Contains pending.LayerId)
 
-        let manualResolutionPairs =
-            state.ManualResolutionPairs
-            |> List.filter (fun pair -> currentLayerIds.Contains pair.LayerId)
-
         let propertyColors = PropertyColors.ensureLayerColors session state
 
         if
@@ -291,7 +274,6 @@ module Sides =
             && expandedProperties = state.ExpandedProperties
             && paletteValues = state.PaletteValues
             && pendingMemberResolution = state.PendingMemberResolution
-            && manualResolutionPairs = state.ManualResolutionPairs
             && propertyColors = state.PropertyColors
         then
             state
@@ -305,7 +287,6 @@ module Sides =
                     ExpandedProperties = expandedProperties
                     PaletteValues = paletteValues
                     PendingMemberResolution = pendingMemberResolution
-                    ManualResolutionPairs = manualResolutionPairs
                     PropertyColors = propertyColors
             }
 
@@ -675,7 +656,6 @@ let init (session: ProvenanceSession) = {
     PendingAssignmentBatch = None
     PanelRatios = Map.empty
     PendingMemberResolution = None
-    ManualResolutionPairs = []
     SelectedInputs = Set.empty
     SelectedOutputs = Set.empty
     Detail = None

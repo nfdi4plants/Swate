@@ -26,7 +26,6 @@ type private MeasuredConnector = {
 type ConnectorOverlayState = {
     ExpandedGroup: (ProvenanceSide * string) option
     SelectedConnectionId: string option
-    ManualResolutionPairs: ManualResolutionPair list
     ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
 }
 
@@ -46,7 +45,6 @@ module ConnectorOverlayState =
         {
             ExpandedGroup = expandedGroup
             SelectedConnectionId = selectedConnectionId
-            ManualResolutionPairs = uiState.ManualResolutionPairs
             ExpandedProperties = uiState.ExpandedProperties
         }
 
@@ -187,39 +185,82 @@ module private ConnectorPaths =
         Color = color
     }
 
-    let private isManuallyResolving layerId side groupId overlayState =
-        overlayState.ManualResolutionPairs
-        |> List.exists (fun resolution ->
-            resolution.LayerId = layerId
-            && ((side = ProvenanceSide.Input && resolution.InputGroupId = groupId)
-                || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId))
-        )
-
-    let private isConnectedToExpanded connections side groupId overlayState =
-        connections
-        |> List.exists (fun connection ->
+    let private groupById (inputGroups: DisplayGroup list) (outputGroups: DisplayGroup list) side groupId =
+        let groups =
             match side with
-            | ProvenanceSide.Input ->
-                connection.SourceGroupId = groupId
-                && ConnectorOverlayState.isGroupExpanded ProvenanceSide.Output connection.TargetGroupId overlayState
-            | ProvenanceSide.Output ->
-                connection.TargetGroupId = groupId
-                && ConnectorOverlayState.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId overlayState
-        )
+            | ProvenanceSide.Input -> inputGroups
+            | ProvenanceSide.Output -> outputGroups
 
-    let private isGroupExpanded layerId connections side groupId overlayState =
+        groups |> List.tryFind (fun group -> group.Id = groupId)
+
+    let private isGroupedCard (inputGroups: DisplayGroup list) (outputGroups: DisplayGroup list) side groupId =
+        groupById inputGroups outputGroups side groupId
+        |> Option.exists (fun group -> group.GroupingValues |> List.isEmpty |> not)
+
+    let private isConnectedToExpanded
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        connections
+        side
+        groupId
+        overlayState
+        =
+        isGroupedCard inputGroups outputGroups side groupId
+        && (connections
+            |> List.exists (fun connection ->
+                match side with
+                | ProvenanceSide.Input ->
+                    connection.SourceGroupId = groupId
+                    && ConnectorOverlayState.isGroupExpanded
+                        ProvenanceSide.Output
+                        connection.TargetGroupId
+                        overlayState
+                | ProvenanceSide.Output ->
+                    connection.TargetGroupId = groupId
+                    && ConnectorOverlayState.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId overlayState
+            ))
+
+    let private isGroupExpanded
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        connections
+        side
+        groupId
+        overlayState
+        =
         ConnectorOverlayState.isGroupExpanded side groupId overlayState
-        || isManuallyResolving layerId side groupId overlayState
-        || isConnectedToExpanded connections side groupId overlayState
+        || isConnectedToExpanded inputGroups outputGroups connections side groupId overlayState
 
-    let groupConnections context layerId connections overlayState =
+    let groupConnections
+        context
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        connections
+        overlayState
+        =
         connections
         // Expanded endpoints swap the aggregate group connector for the
         // member-level connectors, so the group line disappears instead of
         // doubling up underneath them.
         |> List.filter (fun connection ->
-            not (isGroupExpanded layerId connections ProvenanceSide.Input connection.SourceGroupId overlayState)
-            && not (isGroupExpanded layerId connections ProvenanceSide.Output connection.TargetGroupId overlayState)
+            not (
+                isGroupExpanded
+                    inputGroups
+                    outputGroups
+                    connections
+                    ProvenanceSide.Input
+                    connection.SourceGroupId
+                    overlayState
+            )
+            && not (
+                isGroupExpanded
+                    inputGroups
+                    outputGroups
+                    connections
+                    ProvenanceSide.Output
+                    connection.TargetGroupId
+                    overlayState
+            )
         )
         |> List.choose (fun connection ->
             ConnectorMeasure.pathBetweenHandles
@@ -239,14 +280,33 @@ module private ConnectorPaths =
             )
         )
 
-    let memberConnections context layerId (model: ProvenanceModel) connections overlayState =
+    let memberConnections
+        context
+        (model: ProvenanceModel)
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        connections
+        overlayState
+        =
         connections
         |> List.collect (fun displayConnection ->
             let inputExpanded =
-                isGroupExpanded layerId connections ProvenanceSide.Input displayConnection.SourceGroupId overlayState
+                isGroupExpanded
+                    inputGroups
+                    outputGroups
+                    connections
+                    ProvenanceSide.Input
+                    displayConnection.SourceGroupId
+                    overlayState
 
             let outputExpanded =
-                isGroupExpanded layerId connections ProvenanceSide.Output displayConnection.TargetGroupId overlayState
+                isGroupExpanded
+                    inputGroups
+                    outputGroups
+                    connections
+                    ProvenanceSide.Output
+                    displayConnection.TargetGroupId
+                    overlayState
 
             if not inputExpanded && not outputExpanded then
                 []
@@ -494,8 +554,8 @@ module private ConnectorPaths =
                     colorByHeader
                     overlayState
                     showPropertyHeaderConnectors
-            yield! groupConnections context layerId connections overlayState
-            yield! memberConnections context layerId model connections overlayState
+            yield! groupConnections context inputGroups outputGroups connections overlayState
+            yield! memberConnections context model inputGroups outputGroups connections overlayState
         ]
 
 module private ConnectorSvg =
@@ -789,7 +849,6 @@ type ConnectorOverlay =
                 box inputRailProjection
                 box outputRailProjection
                 box overlayState.ExpandedGroup
-                box overlayState.ManualResolutionPairs
                 box overlayState.ExpandedProperties
                 box showPropertyHeaderConnectors
             |]

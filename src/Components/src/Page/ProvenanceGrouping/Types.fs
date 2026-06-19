@@ -91,12 +91,6 @@ type PendingMemberResolution = {
     OutputMemberCount: int
 }
 
-type ManualResolutionPair = {
-    LayerId: ProvenanceLayerId
-    InputGroupId: string
-    OutputGroupId: string
-}
-
 type ProvenanceColor = string
 
 type PropertyColorSettings = {
@@ -160,7 +154,6 @@ type UiState = {
     PendingAssignmentBatch: PendingAssignmentBatch option
     PanelRatios: Map<ProvenanceLayerId, PanelRatios>
     PendingMemberResolution: PendingMemberResolution option
-    ManualResolutionPairs: ManualResolutionPair list
     SelectedInputs: Set<ProvenanceLayerId * string>
     SelectedOutputs: Set<ProvenanceLayerId * string>
     Detail: ProvenanceDetail option
