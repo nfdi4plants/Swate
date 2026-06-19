@@ -840,6 +840,7 @@ type ProvenanceGrouping =
                     box layer.Id
                     box layer.Model
                     box uiState.PropertyRailPlacements
+                    box uiState.PropertyRailOrders
                     box uiState.ExpandedProperties
                     box uiState.PaletteValues
                     box uiState.PropertyColors
@@ -862,6 +863,7 @@ type ProvenanceGrouping =
                     box layer.Id
                     box layer.Model
                     box uiState.PropertyRailPlacements
+                    box uiState.PropertyRailOrders
                     box uiState.ExpandedProperties
                     box uiState.PaletteValues
                     box uiState.PropertyColors
@@ -877,6 +879,23 @@ type ProvenanceGrouping =
         let commitUiState next =
             latestUiState.current <- next
             setUiState next
+
+        React.useEffect (
+            (fun () ->
+                let next =
+                    latestUiState.current
+                    |> State.RailOrder.ensure layer.Id ProvenanceSide.Input inputRailProjection.Headers
+                    |> State.RailOrder.ensure layer.Id ProvenanceSide.Output outputRailProjection.Headers
+
+                if next <> latestUiState.current then
+                    commitUiState next
+            ),
+            [|
+                box layer.Id
+                box inputRailProjection.Headers
+                box outputRailProjection.Headers
+            |]
+        )
 
         let commitPanelRatio side clientX =
             match surfaceRef.current with
@@ -996,6 +1015,27 @@ type ProvenanceGrouping =
                 | None -> State.PropertyColors.clearLayerColor layerId
 
             applyUiState update
+
+        let setPropertySort sort =
+            let sortedInputHeaders =
+                PropertyProjection.sortHeaders
+                    sort
+                    inputRailProjection.StatsByHeader
+                    inputRailProjection.ConnectionCountByHeader
+                    inputRailProjection.Headers
+
+            let sortedOutputHeaders =
+                PropertyProjection.sortHeaders
+                    sort
+                    outputRailProjection.StatsByHeader
+                    outputRailProjection.ConnectionCountByHeader
+                    outputRailProjection.Headers
+
+            applyUiState (
+                State.Filters.setPropertySort sort
+                >> State.RailOrder.reorderVisible layer.Id ProvenanceSide.Input sortedInputHeaders
+                >> State.RailOrder.reorderVisible layer.Id ProvenanceSide.Output sortedOutputHeaders
+            )
 
         let confirmBatch (pending: PendingAssignmentBatch) =
             EditorActions.applyAssignmentBatch session publish pending.Batch
@@ -1489,7 +1529,7 @@ type ProvenanceGrouping =
                             Controls.FilterToolbar(
                                 uiState.Filters,
                                 (fun text -> applyUiState (State.Filters.setSearch text)),
-                                (fun sort -> applyUiState (State.Filters.setPropertySort sort)),
+                                setPropertySort,
                                 (fun sort -> applyUiState (State.Filters.setGroupSort sort)),
                                 (fun filter -> applyUiState (State.Filters.setValueCountFilter filter)),
                                 (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),

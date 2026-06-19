@@ -154,6 +154,7 @@ type PropertyCountBadge =
 type UiState = {
     SideStates: Map<ProvenanceLayerSideId, SideViewState>
     PropertyRailPlacements: Map<ProvenanceLayerId * GroupingKey, ProvenanceSide>
+    PropertyRailOrders: Map<ProvenanceLayerId * ProvenanceSide, ProvenancePropertyHeader list>
     ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
     PaletteValues: Map<ProvenanceLayerId * ProvenanceSide, ProvenancePropertyValue list>
     PendingAssignmentBatch: PendingAssignmentBatch option

@@ -322,6 +322,7 @@ module PropertyRails =
         ExpandedHeaders: Set<ProvenancePropertyHeader>
         CanSwitchHeaders: Set<ProvenancePropertyHeader>
         StatsByHeader: Map<ProvenancePropertyHeader, PropertyStats>
+        ConnectionCountByHeader: Map<ProvenancePropertyHeader, int>
         BadgeByHeader: Map<ProvenancePropertyHeader, PropertyCountBadge>
         ColorByHeader: Map<ProvenancePropertyHeader, ProvenanceColor option>
         OriginByHeader: Map<ProvenancePropertyHeader, Set<PropertyOrigin>>
@@ -386,6 +387,10 @@ module PropertyRails =
     let private hasPaletteHeaderForSide layerId side header uiState =
         State.Palette.headersForSide layerId side uiState |> List.contains header
 
+    let private hasPaletteHeader layerId header uiState =
+        hasPaletteHeaderForSide layerId ProvenanceSide.Input header uiState
+        || hasPaletteHeaderForSide layerId ProvenanceSide.Output header uiState
+
     let private defaultRailSide header model =
         if hasHeaderForSide ProvenanceSide.Output header model then
             Some ProvenanceSide.Output
@@ -420,8 +425,8 @@ module PropertyRails =
             defaultRailSide header model
 
     let private isValidRailSide layerId side header model uiState =
-        hasHeaderForSide side header model
-        || hasPaletteHeaderForSide layerId side header uiState
+        headersForModel model |> List.contains header
+        || hasPaletteHeader layerId header uiState
 
     let private propertyRailHeadersForSideUsing defaultSideForHeader layerId side model uiState =
         let paletteHeaders = State.Palette.headersForSide layerId side uiState
@@ -501,6 +506,7 @@ module PropertyRails =
             ExpandedHeaders = expandedHeaders
             CanSwitchHeaders = canSwitchHeaders
             StatsByHeader = Map.empty
+            ConnectionCountByHeader = Map.empty
             BadgeByHeader = Map.empty
             ColorByHeader = Map.empty
             OriginByHeader = Map.empty
@@ -653,6 +659,22 @@ module PropertyProjection =
                 | _ -> 0
         )
 
+    let originForProjectedValue
+        (layerId: ProvenanceLayerId)
+        (side: ProvenanceSide)
+        (session: ProvenanceSession)
+        (uiState: UiState)
+        (propertyValue: ProvenancePropertyValue)
+        =
+        let isPaletteValue =
+            State.Palette.valuesForSide layerId side uiState
+            |> List.exists (fun value -> value.Id = propertyValue.Id)
+
+        if isPaletteValue then
+            Some(PropertyOrigin.Current(layerId, side))
+        else
+            Session.propertyValueOriginInSession layerId side propertyValue.Id session
+
     let sortHeaders
         (sort: PropertySort)
         (statsByHeader: Map<ProvenancePropertyHeader, PropertyStats>)
@@ -728,7 +750,7 @@ module PropertyProjection =
 
                 let origins =
                     values
-                    |> List.choose (fun pv -> Session.propertyValueOriginInSession layerId side pv.Id session)
+                    |> List.choose (originForProjectedValue layerId side session uiState)
                     |> Set.ofList
 
                 header, origins
@@ -762,8 +784,13 @@ module PropertyProjection =
                 && originFilterMatches filters.OriginFilter origins
             )
 
-        let sorted =
+        let defaultSorted =
             sortHeaders filters.PropertySort statsByHeader connectionCountsByHeader filtered
+
+        let sorted =
+            match State.RailOrder.tryGet layerId side uiState with
+            | Some order -> State.RailOrder.apply order defaultSorted
+            | None -> defaultSorted
 
         let expandedHeaders =
             sorted
@@ -779,6 +806,7 @@ module PropertyProjection =
             Headers = sorted
             ValuesByHeader = sorted |> List.map (fun header -> header, valuesByHeader.[header]) |> Map.ofList
             StatsByHeader = statsByHeader
+            ConnectionCountByHeader = connectionCountsByHeader
             BadgeByHeader = badgeByHeader
             ColorByHeader = sorted |> List.map (fun header -> header, colorByHeader.[header]) |> Map.ofList
             OriginByHeader = originByHeader

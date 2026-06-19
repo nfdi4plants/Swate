@@ -318,6 +318,51 @@ export const SortsPropertiesByNameAndConnectionCount: Story = {
   },
 };
 
+export const AddedRailPropertiesAreCurrentAndPinnedToTheirSide: Story = {
+  render: () => <Harness inputOnly />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
+    const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
+
+    const source = await addRailProperty(canvas, 'Input', 'Treatment', 'Drought');
+    expect(inputRail.getByTestId('provenance-property-Input-Treatment')).toBeInTheDocument();
+    expect(within(inputRail.getByTestId('provenance-property-Input-Treatment')).getByTitle('Current')).toBeInTheDocument();
+    expect(outputRail.queryByTestId('provenance-property-Output-Treatment')).not.toBeInTheDocument();
+
+    await userEvent.click(within(canvas.getByTestId('provenance-filter-toolbar')).getByRole('button', { name: /^Show current properties$/i }));
+    await waitFor(() => expect(inputRail.getByTestId('provenance-property-Input-Treatment')).toBeInTheDocument());
+    expect(outputRail.queryByTestId('provenance-property-Output-Treatment')).not.toBeInTheDocument();
+
+    const target = canvas.getByText('Input Only A').closest('article')!;
+    await dragByPointer(source, target);
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue'),
+    );
+  },
+};
+
+export const LayerFocusDoesNotResortInitializedRails: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const initialOutputOrder = propertyOrder(canvas, 'Output').slice(0, 4);
+
+    await selectGroup(canvas.getByText('Output A').closest('article')!);
+    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    await waitFor(() => expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary'));
+
+    const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Connection Count$/i }));
+
+    await userEvent.click(canvas.getByTestId('provenance-layer-layer-1'));
+    await waitFor(() => expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveClass('swt:btn-primary'));
+    expect(propertyOrder(canvas, 'Output').slice(0, 4)).toEqual(initialOutputOrder);
+  },
+};
+
 export const PropertyRailExpandsValuesAndAddControls: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

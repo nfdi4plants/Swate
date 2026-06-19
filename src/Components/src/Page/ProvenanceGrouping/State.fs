@@ -257,6 +257,10 @@ module Sides =
             state.PropertyRailPlacements
             |> Map.filter (fun (layerId, _) _ -> currentLayerIds.Contains layerId)
 
+        let propertyRailOrders =
+            state.PropertyRailOrders
+            |> Map.filter (fun (layerId, _) _ -> currentLayerIds.Contains layerId)
+
         let panelRatios =
             state.PanelRatios
             |> Map.filter (fun layerId _ -> currentLayerIds.Contains layerId)
@@ -282,6 +286,7 @@ module Sides =
         if
             sideStates = state.SideStates
             && propertyRailPlacements = state.PropertyRailPlacements
+            && propertyRailOrders = state.PropertyRailOrders
             && panelRatios = state.PanelRatios
             && expandedProperties = state.ExpandedProperties
             && paletteValues = state.PaletteValues
@@ -295,6 +300,7 @@ module Sides =
                 state with
                     SideStates = sideStates
                     PropertyRailPlacements = propertyRailPlacements
+                    PropertyRailOrders = propertyRailOrders
                     PanelRatios = panelRatios
                     ExpandedProperties = expandedProperties
                     PaletteValues = paletteValues
@@ -311,6 +317,70 @@ module Sides =
             state with
                 SideStates = state.SideStates |> Map.add sideId next
         }
+
+/// Stores visual rail order separately from filtering and writeback state.
+module RailOrder =
+
+    let private key layerId side = layerId, side
+
+    let private distinctHeaders headers = headers |> List.distinct
+
+    let tryGet layerId side state =
+        state.PropertyRailOrders |> Map.tryFind (key layerId side)
+
+    let get layerId side state =
+        tryGet layerId side state |> Option.defaultValue []
+
+    let apply (order: ProvenancePropertyHeader list) (headers: ProvenancePropertyHeader list) =
+        let headerSet = headers |> Set.ofList
+        let ordered = order |> List.filter (fun header -> headerSet.Contains header)
+        let orderedSet = ordered |> Set.ofList
+
+        let appended =
+            headers |> List.filter (fun header -> not (orderedSet.Contains header))
+
+        ordered @ appended
+
+    let set layerId side headers state =
+        let next = distinctHeaders headers
+
+        {
+            state with
+                PropertyRailOrders = state.PropertyRailOrders |> Map.add (key layerId side) next
+        }
+
+    let ensure layerId side headers state =
+        let next =
+            match tryGet layerId side state with
+            | Some current -> apply current headers
+            | None -> distinctHeaders headers
+
+        if tryGet layerId side state = Some next then
+            state
+        else
+            set layerId side next state
+
+    let reorderVisible layerId side sortedVisibleHeaders state =
+        let visibleSet = sortedVisibleHeaders |> Set.ofList
+
+        let retainedHidden =
+            get layerId side state
+            |> List.filter (fun header -> not (visibleSet.Contains header))
+
+        set layerId side (sortedVisibleHeaders @ retainedHidden) state
+
+    let removeHeader layerId side header state =
+        let next = get layerId side state |> List.filter ((<>) header)
+
+        set layerId side next state
+
+    let appendHeader layerId side header state =
+        let next =
+            get layerId side state
+            |> List.filter ((<>) header)
+            |> fun headers -> headers @ [ header ]
+
+        set layerId side next state
 
 /// Tracks expanded property value panels on the side rails.
 module PropertyExpansion =
@@ -391,9 +461,11 @@ module Palette =
         {
             state with
                 PaletteValues = state.PaletteValues |> Map.add key nextValues
+                PropertyRailPlacements = state.PropertyRailPlacements |> Map.add (layerId, Keys.groupingKey header) side
                 ExpandedProperties = state.ExpandedProperties |> Set.add (Keys.propertySlot layerId side header)
                 Error = None
         }
+        |> RailOrder.appendHeader layerId side header
 
 /// Manages batch assignment confirmation state for dropped property values.
 module AssignmentBatch =
@@ -494,6 +566,11 @@ module GroupingAssignments =
     let move layerId sourceSideId targetSideId targetSide header state =
         let key = Keys.groupingKey header
 
+        let sourceSide =
+            match targetSide with
+            | ProvenanceSide.Input -> ProvenanceSide.Output
+            | ProvenanceSide.Output -> ProvenanceSide.Input
+
         let targetAssignment: GroupingAssignment = {
             Key = key
             Scope = scopeForSide targetSide
@@ -521,6 +598,8 @@ module GroupingAssignments =
             withTarget with
                 PropertyRailPlacements = withTarget.PropertyRailPlacements |> Map.add (layerId, key) targetSide
         }
+        |> RailOrder.removeHeader layerId sourceSide header
+        |> RailOrder.appendHeader layerId targetSide header
 
 /// Tracks selected input/output groups for layer creation.
 module Selection =
@@ -590,6 +669,7 @@ let init (session: ProvenanceSession) = {
         )
         |> Map.ofList
     PropertyRailPlacements = Map.empty
+    PropertyRailOrders = Map.empty
     ExpandedProperties = Set.empty
     PaletteValues = Map.empty
     PendingAssignmentBatch = None
