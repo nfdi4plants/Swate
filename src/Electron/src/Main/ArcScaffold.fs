@@ -7,7 +7,6 @@ module ArcScaffold =
     let defaultGitignoreContent =
         ("""# ARC local/generated artifacts
 /arc-validate-results.xml
-/.cwl/
 
 # OS-generated files
 .DS_Store
