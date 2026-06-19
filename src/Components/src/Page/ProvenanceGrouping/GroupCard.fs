@@ -4,7 +4,6 @@ open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
-open Swate.Components.Primitive.Buttons
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
@@ -130,6 +129,20 @@ module private TabText =
         if trimmed.Length = 0 then "", ""
         elif trimmed.Length = 1 then trimmed, ""
         else trimmed.Substring(0, 1), trimmed.Substring(1)
+
+module private SelectionSurface =
+
+    [<Emit("$0.closest($1)")>]
+    let private closest (_element: Browser.Types.Element) (_selector: string) : Browser.Types.Element = jsNative
+
+    let shouldSelect (event: Browser.Types.MouseEvent) =
+        let targetObj: obj = box event.target
+
+        if isNull targetObj then
+            false
+        else
+            let target = unbox<Browser.Types.Element> targetObj
+            isNull (closest target "button,[role='button'],a,input,select,textarea")
 
 type private OrganizerTabMode =
     | Responsive
@@ -375,6 +388,10 @@ type GroupCard =
             | ProvenanceSide.Input -> "swt:left-full swt:ml-2"
             | ProvenanceSide.Output -> "swt:right-full swt:mr-2"
 
+        let handleSelectionClick (event: Browser.Types.MouseEvent) =
+            if SelectionSurface.shouldSelect event then
+                onSelect ()
+
         Html.article [
             match key with
             | Some key -> prop.key key
@@ -421,21 +438,15 @@ type GroupCard =
                         ]
                     | _ -> Html.none
 
-                let selectButton =
-                    Buttons.QuickAccessButton(
-                        Html.i [
-                            prop.className "swt:iconify swt:fluent--checkmark-circle-20-regular swt:size-4"
-                        ],
-                        "Select group",
-                        (fun _ -> onSelect ())
-                    )
-
                 match tabs with
                 | [] ->
                     // A card without grouping values is always a single loaded endpoint,
                     // so the type line sits above its name to mirror the expanded member rows.
                     Html.div [
-                        prop.className "swt:flex swt:items-start swt:gap-2"
+                        prop.className "swt:flex swt:cursor-pointer swt:items-start swt:gap-2"
+                        prop.onClick handleSelectionClick
+                        if defaultArg debug false then
+                            prop.testId $"provenance-group-select-surface-{side}-{group.Id}"
                         prop.children [
                             Html.div [
                                 prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5"
@@ -451,7 +462,6 @@ type GroupCard =
                                 ]
                             ]
                             connectionBadge
-                            selectButton
                         ]
                     ]
                 | tabs ->
@@ -501,7 +511,10 @@ type GroupCard =
                     |]
 
                     Html.div [
-                        prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
+                        prop.className "swt:flex swt:min-w-0 swt:cursor-pointer swt:flex-col swt:gap-2"
+                        prop.onClick handleSelectionClick
+                        if defaultArg debug false then
+                            prop.testId $"provenance-group-select-surface-{side}-{group.Id}"
                         prop.children [
                             Html.div [
                                 prop.className [
@@ -595,7 +608,6 @@ type GroupCard =
                                         ]
                                     ]
                                     connectionBadge
-                                    selectButton
                                 ]
                             ]
                         ]

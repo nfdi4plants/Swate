@@ -211,6 +211,20 @@ export const ShowsFileTypeForDataEndpoints: Story = {
   },
 };
 
+export const GroupCardsSelectFromCardSurface: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputA = canvas.getByText('Output A').closest('article')!;
+
+    expect(within(outputA).queryByRole('button', { name: 'Select group' })).not.toBeInTheDocument();
+
+    const selectionSurface = outputA.querySelector<HTMLElement>('[data-testid^="provenance-group-select-surface-"]')!;
+    await userEvent.click(selectionSurface);
+    await waitFor(() => expect(outputA).toHaveClass('swt:border-primary'));
+  },
+};
+
 export const GroupsBothSidesFromOutputProperty: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -1182,7 +1196,8 @@ async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' 
 
 async function selectGroup(groupCard: HTMLElement) {
   for (let attempt = 0; attempt < 3 && !groupCard.classList.contains('swt:border-primary'); attempt += 1) {
-    await userEvent.click(within(groupCard).getByRole('button', { name: 'Select group' }));
+    const selectionSurface = groupCard.querySelector<HTMLElement>('[data-testid^="provenance-group-select-surface-"]');
+    await userEvent.click(selectionSurface ?? groupCard);
     await waitFor(() => expect(groupCard).toHaveClass('swt:border-primary'), { timeout: 1000 }).catch(() => undefined);
   }
 
