@@ -30,6 +30,45 @@ module private SideLabels =
         | ProvenanceSide.Input -> "input"
         | ProvenanceSide.Output -> "output"
 
+module private ColorPicker =
+
+    let fallbackColor =
+        State.PropertyColors.palette |> Array.tryHead |> Option.defaultValue "#2563eb"
+
+    let currentOrFallback color =
+        match color with
+        | Some c when c <> "" -> c
+        | _ -> fallbackColor
+
+    let content ariaLabel (draftColor: string) (setDraftColor: string -> unit) onSetColor =
+        Html.div [
+            prop.className "swt:flex swt:items-center swt:gap-2 swt:p-2"
+            prop.children [
+                Html.input [
+                    prop.custom ("type", "color")
+                    prop.className "swt:h-8 swt:w-10 swt:cursor-pointer swt:rounded swt:border swt:border-base-300"
+                    prop.value draftColor
+                    prop.ariaLabel ariaLabel
+                    prop.onChange (fun (color: string) -> setDraftColor color)
+                ]
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-xs swt:btn-primary swt:min-h-0 swt:py-0"
+                    prop.text "Select"
+                    prop.onClick (fun _ -> onSetColor (Some draftColor))
+                ]
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:min-h-0 swt:py-0"
+                    prop.text "Clear"
+                    prop.onClick (fun _ ->
+                        setDraftColor fallbackColor
+                        onSetColor None
+                    )
+                ]
+            ]
+        ]
+
 /// Converts between draft form state and typed provenance values.
 module private ValueDrafts =
 
@@ -172,7 +211,8 @@ type Controls =
             onSelect: ProvenanceLayerId -> unit,
             onAddLayer: unit -> unit,
             ?debug: bool,
-            ?layerColors: Map<ProvenanceLayerId, ProvenanceColor>
+            ?layerColors: Map<ProvenanceLayerId, ProvenanceColor>,
+            ?onSetLayerColor: ProvenanceLayerId -> ProvenanceColor option -> unit
         ) =
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
@@ -183,29 +223,52 @@ type Controls =
                     let layerColor =
                         layerColors |> Option.bind (fun colors -> colors |> Map.tryFind layer.Id)
 
-                    Html.button [
-                        prop.title $"View provenance layer {layer.Label}"
-                        prop.className [
-                            "swt:btn swt:btn-sm"
-                            if layerId = session.ActiveLayerId then
-                                "swt:btn-primary"
-                            else
-                                "swt:btn-outline"
+                    let layerButtonClasses = [
+                        "swt:btn swt:btn-sm swt:join-item"
+                        if layerId = session.ActiveLayerId then
+                            "swt:btn-primary"
+                        else
+                            "swt:btn-outline"
+                    ]
+
+                    let swatchButtonClass =
+                        [
+                            yield! layerButtonClasses
+                            "swt:min-h-8 swt:w-8 swt:px-0"
                         ]
-                        prop.ariaLabel $"View provenance layer {layer.Label}"
-                        if defaultArg debug false then
-                            prop.testId $"provenance-layer-{layerId}"
-                            prop.custom ("data-provenance-layer-color", layerColor |> Option.defaultValue "")
-                        prop.onClick (fun _ -> onSelect layerId)
+                        |> String.concat " "
+
+                    Html.div [
+                        prop.className "swt:join"
                         prop.children [
-                            match layerColor with
-                            | Some color when color <> "" ->
+                            match onSetLayerColor with
+                            | Some setLayerColor ->
+                                Controls.LayerColorButton(
+                                    layer.Id,
+                                    layerColor,
+                                    setLayerColor layer.Id,
+                                    triggerClassName = swatchButtonClass
+                                )
+                            | None ->
                                 Html.span [
-                                    prop.className "swt:size-3 swt:shrink-0 swt:rounded"
-                                    prop.style [ style.backgroundColor color ]
+                                    prop.className [
+                                        yield! layerButtonClasses
+                                        "swt:min-h-8 swt:w-8 swt:px-0"
+                                    ]
+                                    match layerColor with
+                                    | Some color when color <> "" -> prop.style [ style.backgroundColor color ]
+                                    | _ -> ()
                                 ]
-                            | _ -> Html.none
-                            Html.span layer.Label
+                            Html.button [
+                                prop.title $"View provenance layer {layer.Label}"
+                                prop.className layerButtonClasses
+                                prop.ariaLabel $"View provenance layer {layer.Label}"
+                                if defaultArg debug false then
+                                    prop.testId $"provenance-layer-{layerId}"
+                                    prop.custom ("data-provenance-layer-color", layerColor |> Option.defaultValue "")
+                                prop.onClick (fun _ -> onSelect layerId)
+                                prop.children [ Html.span layer.Label ]
+                            ]
                         ]
                     ]
                 Html.button [
@@ -226,40 +289,33 @@ type Controls =
 
     [<ReactComponent>]
     static member LayerColorButton
-        (layerId: ProvenanceLayerId, currentColor: ProvenanceColor option, onSetColor: ProvenanceColor option -> unit)
-        =
+        (
+            layerId: ProvenanceLayerId,
+            currentColor: ProvenanceColor option,
+            onSetColor: ProvenanceColor option -> unit,
+            ?triggerClassName: string
+        ) : ReactElement =
+        let draftColor, setDraftColor =
+            React.useState (ColorPicker.currentOrFallback currentColor)
+
+        React.useEffect ((fun () -> setDraftColor (ColorPicker.currentOrFallback currentColor)), [| box currentColor |])
+
+        let triggerClassName =
+            defaultArg
+                triggerClassName
+                "swt:size-4 swt:shrink-0 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer swt:align-middle"
+
         Popover.Simple(
             trigger =
                 Html.button [
                     prop.type'.button
-                    prop.className
-                        "swt:size-4 swt:shrink-0 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer swt:align-middle"
+                    prop.className triggerClassName
                     match currentColor with
                     | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
                     | _ -> ()
                     prop.ariaLabel $"Set color for layer {layerId}"
                 ],
-            content =
-                Html.div [
-                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:p-1"
-                    prop.children [
-                        for color in State.PropertyColors.palette do
-                            Html.button [
-                                prop.type'.button
-                                prop.className
-                                    "swt:size-6 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer"
-                                prop.style [ style.backgroundColor color ]
-                                prop.ariaLabel $"Set layer color {color}"
-                                prop.onClick (fun _ -> onSetColor (Some color))
-                            ]
-                        Html.button [
-                            prop.type'.button
-                            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:min-h-0 swt:py-0"
-                            prop.text "None"
-                            prop.onClick (fun _ -> onSetColor None)
-                        ]
-                    ]
-                ]
+            content = ColorPicker.content $"Choose color for layer {layerId}" draftColor setDraftColor onSetColor
         )
 
     [<ReactComponent>]
@@ -549,7 +605,7 @@ type Controls =
 
         let colorButton =
             match onSetColor with
-            | Some setColor -> Controls.PropertyColorButton(header, setColor)
+            | Some setColor -> Controls.PropertyColorButton(header, color, setColor)
             | None -> Html.none
 
         // The secondary controls leave the layout entirely until their row is
@@ -1433,36 +1489,34 @@ type Controls =
         ]
 
     [<ReactComponent>]
-    static member PropertyColorButton(header: ProvenancePropertyHeader, onSetColor: ProvenanceColor option -> unit) =
+    static member PropertyColorButton
+        (
+            header: ProvenancePropertyHeader,
+            currentColor: ProvenanceColor option,
+            onSetColor: ProvenanceColor option -> unit
+        ) =
+        let draftColor, setDraftColor =
+            React.useState (ColorPicker.currentOrFallback currentColor)
+
+        React.useEffect ((fun () -> setDraftColor (ColorPicker.currentOrFallback currentColor)), [| box currentColor |])
+
         Popover.Simple(
             trigger =
                 Html.button [
                     prop.type'.button
                     prop.className
                         "swt:size-5 swt:shrink-0 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer swt:align-middle"
+                    match currentColor with
+                    | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
+                    | _ -> ()
                     prop.ariaLabel $"Set color for property {header.Category.Name}"
                 ],
             content =
-                Html.div [
-                    prop.className "swt:flex swt:flex-wrap swt:gap-1 swt:p-1"
-                    prop.children [
-                        for color in State.PropertyColors.palette do
-                            Html.button [
-                                prop.type'.button
-                                prop.className
-                                    "swt:size-6 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer"
-                                prop.style [ style.backgroundColor color ]
-                                prop.ariaLabel $"Set property color {color}"
-                                prop.onClick (fun _ -> onSetColor (Some color))
-                            ]
-                        Html.button [
-                            prop.type'.button
-                            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:min-h-0 swt:py-0"
-                            prop.text "None"
-                            prop.onClick (fun _ -> onSetColor None)
-                        ]
-                    ]
-                ]
+                ColorPicker.content
+                    $"Choose color for property {header.Category.Name}"
+                    draftColor
+                    setDraftColor
+                    onSetColor
         )
 
     [<ReactComponent>]

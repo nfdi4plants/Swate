@@ -1402,21 +1402,9 @@ type ProvenanceGrouping =
                                                 publish
                                         ),
                                         layerColors = uiState.PropertyColors.LayerColors,
+                                        onSetLayerColor = setLayerColor,
                                         debug = debug
                                     )
-                                    Html.div [
-                                        prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-1"
-                                        prop.children [
-                                            for layerId in session.LayerOrder do
-                                                let layer = Session.layerById layerId session
-
-                                                Controls.LayerColorButton(
-                                                    layer.Id,
-                                                    uiState.PropertyColors.LayerColors |> Map.tryFind layer.Id,
-                                                    setLayerColor layer.Id
-                                                )
-                                        ]
-                                    ]
                                     Html.div [
                                         prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
                                         prop.children [
