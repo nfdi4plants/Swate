@@ -60,10 +60,10 @@ module RemarkImport =
 
 type ReactElements =
   [<ReactComponent(import="Document", from="react-pdf")>]
-  static member Document (file: string, onLoadSuccess: {|numPages: int|} -> unit, children: ReactElement list, ?externalLinkTarget: string) = React.imported()
+  static member Document (file: string, onLoadSuccess: {|numPages: int|} -> unit, children: ReactElement list, ?externalLinkTarget: string) = React.Imported()
 
   [<ReactComponent(import="Page", from="react-pdf")>]
-  static member Page (pageNumber: int, width: int, customTextRenderer:'c -> string, ?key: string) = React.imported()
+  static member Page (pageNumber: int, width: int, customTextRenderer:'c -> string, ?key: string) = React.Imported()
 
 module private FileReaderHelper =
   open Fable.Core
@@ -115,7 +115,7 @@ module private FileReaderHelper =
     let reader = newFileReader()
     reader.onload <- fun e ->
       let text = reader.result |> unbox<string>
-      let fileEnding = file.name.Split(".").[1]
+      let fileEnding = file.name.Split('.').[1]
       if fileEnding = "md" then 
         let prom = processMarkdown text
         prom.``then``(fun result ->
