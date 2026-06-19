@@ -85,13 +85,13 @@ type Builder =
 
         let placeholder =
             Html.div [
-                prop.className "flex justify-center items-center w-full p-10"
+                prop.className "swt:flex swt:justify-center swt:items-center swt:w-full swt:p-10"
                 prop.children [
                     Html.div [
                         prop.className
-                            "p-2 md:p-5 lg:p-10 flex justify-center items-center flex-col bg-base-200/80 shadow-lg rounded-lg max-w-2xl"
+                            "swt:p-2 swt:md:p-5 swt:lg:p-10 swt:flex swt:justify-center swt:items-center swt:flex-col swt:bg-base-200/80 swt:shadow-lg swt:rounded-lg swt:max-w-2xl"
                         prop.children [
-                            Html.h1 [ prop.className "my-2"; prop.text "Select file here:" ]
+                            Html.h1 [ prop.className "swt:my-2"; prop.text "Select file here:" ]
 
                             Html.div [
                                 FileUpload.UploadDisplay(filehtml, setFilehtml, setState, setFileName, setLocalFileName)
@@ -103,7 +103,7 @@ type Builder =
 
         let paper (width: string) (display: ReactElement) =
             Html.div [
-                prop.className "overflow-y-hidden h-full flex flex-row gap-2 w-full relative p-2"
+                prop.className "swt:overflow-y-hidden swt:h-full swt:flex swt:flex-row swt:gap-2 swt:w-full swt:relative swt:p-2"
                 prop.children [
                     match modalState.isActive with
                     | true ->
@@ -138,16 +138,16 @@ type Builder =
                                 ()
                         )
                         prop.children [
-                            Html.div [ prop.text fileName; prop.className "p-2" ]
+                            Html.div [ prop.text fileName; prop.className "swt:p-2" ]
                             display
                         ]
                     ]
                     Html.div [
-                        prop.className "w-1/3"
+                        prop.className "swt:w-1/3"
                         prop.children [
                             Html.div [
                                 prop.text "Annotations"
-                                prop.className "p-2"
+                                prop.className "swt:p-2"
                                 prop.style [ style.width.inheritFromParent ]
                             ]
                         // for a in 0 .. annoState.Length - 1 do
@@ -160,9 +160,9 @@ type Builder =
         React.Fragment [
             match filehtml with
             | Unset -> ()
-            | _ -> ActionB.Main(annoState, setState, del, fileName, highlight, setHighlight)
+            | _ -> ActionBar.Main(annoState, setState, del, fileName, highlight, setHighlight)
             Html.div [
-                prop.className "flex flex-row p-2"
+                prop.className "swt:flex swt:flex-row swt:p-2"
                 prop.id "main-parent"
                 prop.onClick (fun e -> modalContext.setter initialModal)
                 prop.children [
@@ -170,11 +170,11 @@ type Builder =
                     match filehtml with
                     | Unset -> placeholder
                     | Docx fileString ->
-                        paper "w-2/3" (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
+                        paper "swt:w-2/3" (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
                     | PDF fileString ->
                         paper "" (FileUpload.DisplayPDF fileString setNumPages numPages elementID highlight)
                     | Txt fileString ->
-                        paper "w-2/3" (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
+                        paper "swt:w-2/3" (FileUpload.DisplayHtml(fileString, highlight, elementID, isLocalStorageClear))
 
                 ]
             ]

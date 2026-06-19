@@ -167,13 +167,16 @@ type PaperWithMarker =
         Html.div [
             prop.className "min-w-0"
             prop.children [
-                Daisy.modal.dialog [
+                Html.dialog [
                     prop.className [
+                        "swt:modal"
                         if APIwarningModalState = true && hasClosed = false then
-                            "modal-open"
+                            "swt:modal-open"
                     ]
                     prop.children [
-                        Daisy.modalBox.div [
+                        Html.div [
+                            prop.className "swt:modal-box"
+                            prop.children [
                             Html.div [
                                 Html.p "Text highlighting is not compatible with your browser."
                                 Html.a [
@@ -181,18 +184,18 @@ type PaperWithMarker =
                                     prop.href
                                         "https://developer.mozilla.org/en-US/docs/Web/API/CSS_Custom_Highlight_API#browser_compatibility"
                                     prop.target.blank
-                                    prop.className "underline text-blue-400"
+                                    prop.className "swt:underline swt:text-info"
                                 ]
                             ]
                             Html.div [
-                                prop.className "flex items-center mt-5"
+                                prop.className "swt:flex swt:items-center swt:mt-5"
                                 prop.children [
                                     Html.p "Don't show this again"
-                                    Daisy.checkbox [
-                                        checkbox.sm
+                                    Html.input [
                                         prop.id "warningModal"
+                                        prop.type'.checkbox
                                         // prop.checked hasClosed
-                                        prop.className "ml-2"
+                                        prop.className "swt:checkbox swt:checkbox-sm swt:ml-2"
                                         prop.onClick (fun _ ->
                                             setWarningFlag (not warningFlag)
                                             setLocalFile "warningModal" warningFlag
@@ -200,10 +203,11 @@ type PaperWithMarker =
                                     ]
                                 ]
                             ]
-                            Daisy.button.button [
-                                prop.className "mt-5"
+                            Html.button [
+                                prop.className "swt:btn swt:mt-5"
                                 prop.text "Got it"
                                 prop.onClick (fun _ -> setHasClosed (not hasClosed))
+                            ]
                             ]
                         ]
                     ]
@@ -216,7 +220,7 @@ type PaperWithMarker =
                     //    style.custom ("word-wrap", "break-word")
                     //]
                     prop.className
-                        "prose p-2 rounded-lg max-w-full bg-base-300 min-w-0 [&_pre]:min-w-0 box-border [&_pre]:box-border [&_code]:box-border [&_pre]:whitespace-pre-wrap [&_code]:whitespace-pre-wrap [&_pre]:break-words [&_code]:break-words"
+                        "swt:prose swt:p-2 swt:rounded-lg swt:max-w-full swt:bg-base-300 swt:min-w-0 swt:[&_pre]:min-w-0 swt:box-border swt:[&_pre]:box-border swt:[&_code]:box-border swt:[&_pre]:whitespace-pre-wrap swt:[&_code]:whitespace-pre-wrap swt:[&_pre]:break-words swt:[&_code]:break-words"
                     prop.id elementID
                     prop.ref ref
                 ]
