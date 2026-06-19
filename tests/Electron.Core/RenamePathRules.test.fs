@@ -47,10 +47,23 @@ Vitest.describe (
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/dataset").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/protocols").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "studies/StudyA/resources").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "workflows/WorkflowA/protocols").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "runs/RunA/dataset").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/dataset/raw.txt").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "test.fsx").toBe (true)
+        )
+
+        Vitest.test (
+            "native structural child matching is case-insensitive",
+            fun () ->
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/DataSet").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies/StudyA/Protocols").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "studies/StudyA/Resources").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "workflows/WorkflowA/Protocols").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "runs/RunA/DataSet").toBe (true)
         )
 
         Vitest.test (
@@ -59,7 +72,10 @@ Vitest.describe (
                 let allowedTargets = [
                     "assays/AssayA/protocols/protocol.md"
                     "assays/AssayA/dataset/raw.txt"
-                    "studies/StudyA/resources"
+                    "assays/AssayA/protocol"
+                    "studies/StudyA/dataset"
+                    "workflows/WorkflowA/protocols"
+                    "runs/RunA/dataset"
                     "workflows/WorkflowA/scripts/workflow.cwl"
                     "runs/RunA/data.txt"
                     "test.fsx"
@@ -76,8 +92,9 @@ Vitest.describe (
                     "assays"
                     "assays/AssayA"
                     "assays/AssayA/dataset"
-                    "assays/AssayA/protocol"
                     "assays/AssayA/protocols"
+                    "studies/StudyA/protocols"
+                    "studies/StudyA/resources"
                     "assays/AssayA/isa.assay.xlsx"
                     "assays/AssayA/isa.datamap.xlsx"
                     "assays/AssayA/.gitattributes"

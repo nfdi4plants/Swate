@@ -157,15 +157,53 @@ let tests =
 
             Expect.isFalse
                 (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/dataset")
-                "Structural dataset folders should remain non-deletable."
+                "Assay dataset folders should remain non-deletable."
 
             Expect.isFalse
-                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/Protocols")
-                "Structural protocol folders should remain non-deletable."
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/protocols")
+                "Study protocol folders should remain non-deletable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/resources")
+                "Study resource folders should remain non-deletable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isDeletePathAllowed "workflows/MyWorkflow/protocols")
+                "Workflow protocols folders are not native structural children and should remain deletable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isDeletePathAllowed "runs/MyRun/dataset")
+                "Run dataset folders are not native structural children and should remain deletable."
 
             Expect.isTrue
                 (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/dataset/raw.bin")
                 "Files below structural dataset folders should remain deletable."
+
+        testCase "native structural child folder matching is case-insensitive"
+        <| fun _ ->
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/DataSet")
+                "Assay dataset folders should stay protected with non-canonical casing."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isRenamePathAllowed "assays/MyAssay/DataSet")
+                "Assay dataset folders should stay non-renameable with non-canonical casing."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/Protocols")
+                "Study protocol folders should stay protected with non-canonical casing."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/Resources")
+                "Study resource folders should stay non-renameable with non-canonical casing."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "workflows/MyWorkflow/Protocols")
+                "Workflow protocols folders should remain generic even with non-canonical casing."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isDeletePathAllowed "runs/MyRun/DataSet")
+                "Run dataset folders should remain generic even with non-canonical casing."
 
         testCase "buildFallbackUnlinkPaths maps entity folder to canonical files"
         <| fun _ ->
@@ -225,16 +263,32 @@ let tests =
                 "Safe generic descendants should be renameable."
 
             Expect.isFalse
-                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/dataset")
-                "Structural dataset folders should not be renameable."
+                (ArcEntityPathRules.isRenamePathAllowed "assays/MyAssay/dataset")
+                "Assay dataset folders should not be renameable."
 
             Expect.isFalse
                 (ArcEntityPathRules.isRenamePathAllowed "assays/MyAssay/protocols")
-                "Structural protocol folders should not be renameable."
+                "Assay protocol folders should not be renameable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/resources")
+                "Study resource folders should not be renameable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/dataset")
+                "Study dataset folders are not native structural children and should remain renameable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "workflows/MyWorkflow/protocols")
+                "Workflow protocols folders are not native structural children and should remain renameable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "runs/MyRun/dataset")
+                "Run dataset folders are not native structural children and should remain renameable."
 
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/dataset/raw.tsv")
-                "Files below structural dataset folders should remain renameable."
+                "Files below generic dataset folders should remain renameable."
 
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md")

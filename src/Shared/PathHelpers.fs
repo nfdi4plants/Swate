@@ -156,7 +156,6 @@ module ArcEntityPathRules =
 
     let private protectedDeleteTargetNames = [ ".gitattributes"; ".gitkeep"; "readme.md" ]
     let private protectedRenameRootFolderNames = [ "notes" ]
-    let private protectedEntityChildFolderNames = [ "dataset"; "protocol"; "protocols" ]
     let private disallowedGenericPathSegments = [ ".git" ]
 
     let private normalizeRelativePath (path: string) =
@@ -179,6 +178,19 @@ module ArcEntityPathRules =
         | AddZone.Workflows -> ARCtrl.ArcPathHelper.WorkflowFileName
         | AddZone.Runs -> ARCtrl.ArcPathHelper.RunFileName
 
+    let private nativeEntityChildFolderNames =
+        function
+        | AddZone.Studies -> [
+            ARCtrl.ArcPathHelper.StudiesProtocolsFolderName
+            ARCtrl.ArcPathHelper.StudiesResourcesFolderName
+          ]
+        | AddZone.Assays -> [
+            ARCtrl.ArcPathHelper.AssayDatasetFolderName
+            ARCtrl.ArcPathHelper.AssayProtocolsFolderName
+          ]
+        | AddZone.Workflows
+        | AddZone.Runs -> []
+
     let private tryParseZone (segment: string) =
         if PathHelpers.pathsEqual segment ARCtrl.ArcPathHelper.StudiesFolderName then
             Some AddZone.Studies
@@ -197,11 +209,11 @@ module ArcEntityPathRules =
         function
         | [| zoneSegment |] when isAddZoneSegment zoneSegment -> StructuralArcPath.AddZoneRoot
         | [| zoneSegment; _ |] when isAddZoneSegment zoneSegment -> StructuralArcPath.EntityFolder
-        | [| zoneSegment; _; childFolderName |] when
-            isAddZoneSegment zoneSegment
-            && PathHelpers.pathMatchesAny protectedEntityChildFolderNames childFolderName
-            ->
-            StructuralArcPath.ProtectedEntityChildFolder
+        | [| zoneSegment; _; childFolderName |] ->
+            match tryParseZone zoneSegment with
+            | Some zone when PathHelpers.pathMatchesAny (nativeEntityChildFolderNames zone) childFolderName ->
+                StructuralArcPath.ProtectedEntityChildFolder
+            | _ -> StructuralArcPath.OtherPath
         | _ -> StructuralArcPath.OtherPath
 
     let private blocksGenericFileSystemTarget =

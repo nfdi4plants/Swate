@@ -65,13 +65,41 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "tryBuildRenameDraft rejects protected structural entity child folders",
+            "tryBuildRenameDraft rejects native structural entity child folders",
             fun () ->
-                let item = createFolderItem "dataset" "assays/AssayA/dataset"
+                let protectedChildFolderPaths = [
+                    "assays/AssayA/dataset"
+                    "assays/AssayA/protocols"
+                    "studies/StudyA/protocols"
+                    "studies/StudyA/resources"
+                ]
 
-                match tryBuildRenameDraft item with
-                | Ok _ -> failwith "Expected structural dataset folders to be non-renameable."
-                | Error _ -> ()
+                protectedChildFolderPaths
+                |> List.iter (fun path ->
+                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
+
+                    match tryBuildRenameDraft item with
+                    | Ok _ -> failwith $"Expected native structural child folder '{path}' to be non-renameable."
+                    | Error _ -> ()
+                )
+        )
+
+        Vitest.test (
+            "tryBuildRenameDraft allows non-native structural-looking child folders",
+            fun () ->
+                let renameableChildFolderPaths = [
+                    "workflows/WorkflowA/protocols"
+                    "runs/RunA/dataset"
+                ]
+
+                renameableChildFolderPaths
+                |> List.iter (fun path ->
+                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
+
+                    match tryBuildRenameDraft item with
+                    | Ok draft -> Vitest.expect(draft.SourcePath).toBe (path)
+                    | Error error -> failwith error
+                )
         )
 
         Vitest.test (
@@ -205,19 +233,34 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "rename context menu item is hidden for protected structural entity child folders",
+            "rename context menu item is hidden for native structural entity child folders",
             fun () ->
                 let protectedChildFolderPaths = [
                     "assays/AssayA/dataset"
-                    "studies/StudyA/protocol"
-                    "workflows/WorkflowA/protocols"
-                    "runs/RunA/Dataset"
+                    "assays/AssayA/protocols"
+                    "studies/StudyA/protocols"
+                    "studies/StudyA/resources"
                 ]
 
                 protectedChildFolderPaths
                 |> List.iter (fun path ->
                     let item = createFolderItem (PathHelpers.getNameFromPath path) path
                     expectRenameMenuVisibility 0 item
+                )
+        )
+
+        Vitest.test (
+            "rename context menu item is shown for non-native structural-looking child folders",
+            fun () ->
+                let renameableChildFolderPaths = [
+                    "workflows/WorkflowA/protocols"
+                    "runs/RunA/dataset"
+                ]
+
+                renameableChildFolderPaths
+                |> List.iter (fun path ->
+                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
+                    expectRenameMenuVisibility 1 item
                 )
         )
 

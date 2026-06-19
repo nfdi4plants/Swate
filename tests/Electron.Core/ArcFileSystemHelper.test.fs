@@ -5,6 +5,7 @@ open Fable.Core
 open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.IPC.FileSystemIO
+open ARCtrl
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
@@ -19,6 +20,14 @@ let private withAssayArc =
         "swate-generic-fs-"
         "GenericFileSystemArc"
         (fun arc -> arc.InitAssay("AssayA") |> ignore)
+
+let private withWorkflowAndRunArc =
+    TestHelpers.withTempArcWith
+        "swate-generic-fs-"
+        "GenericFileSystemArc"
+        (fun arc ->
+            arc.AddWorkflow(ArcWorkflow("WorkflowA"))
+            arc.AddRun(ArcRun("RunA")))
 
 let private renameRequest relativePath newName = {
     relativePath = relativePath
@@ -193,6 +202,23 @@ Vitest.describe (
 
                     do! deleteItemOrFail arcPath createdPath
                     do! expectRelativePathExists arcPath createdPath false
+                })
+        )
+
+        Vitest.test (
+            "renames and deletes non-native structural-looking child folders",
+            fun () ->
+                withWorkflowAndRunArc (fun arcPath -> promise {
+                    do! createRelativeDirectoryAsync arcPath "workflows/WorkflowA/protocols"
+                    do! createRelativeDirectoryAsync arcPath "runs/RunA/dataset"
+
+                    do! renameItemOrFail arcPath (renameRequest "workflows/WorkflowA/protocols" "workflow-protocols")
+
+                    do! expectRelativePathExists arcPath "workflows/WorkflowA/protocols" false
+                    do! expectRelativePathExists arcPath "workflows/WorkflowA/workflow-protocols" true
+
+                    do! deleteItemOrFail arcPath "runs/RunA/dataset"
+                    do! expectRelativePathExists arcPath "runs/RunA/dataset" false
                 })
         )
 
