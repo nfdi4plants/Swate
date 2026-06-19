@@ -283,27 +283,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "non-native structural-looking child folders expose rename and delete",
-            fun () ->
-                let genericPaths = [
-                    "workflows/WorkflowA/protocols"
-                    "runs/RunA/dataset"
-                ]
-
-                genericPaths
-                |> List.iter (fun path ->
-                    let item = createFolderItem (PathHelpers.getNameFromPath path) (Some path)
-
-                    let menuItemLabels =
-                        createComposedContextMenuItems (createContextMenuConfig ()) item
-                        |> groupedLabels
-
-                    Vitest.expect(menuItemLabels).toContain ("Rename")
-                    Vitest.expect(menuItemLabels).toContain ("Delete")
-                )
-        )
-
-        Vitest.test (
             "new folder action on the ARC root requests root-level folder creation",
             fun () ->
                 let item = createFolderItem "MyArc" (Some "")

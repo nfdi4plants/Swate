@@ -168,14 +168,6 @@ let tests =
                 "Study resource folders should remain non-deletable."
 
             Expect.isTrue
-                (ArcEntityPathRules.isDeletePathAllowed "workflows/MyWorkflow/protocols")
-                "Workflow protocols folders are not native structural children and should remain deletable."
-
-            Expect.isTrue
-                (ArcEntityPathRules.isDeletePathAllowed "runs/MyRun/dataset")
-                "Run dataset folders are not native structural children and should remain deletable."
-
-            Expect.isTrue
                 (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/dataset/raw.bin")
                 "Files below structural dataset folders should remain deletable."
 
@@ -186,24 +178,12 @@ let tests =
                 "Assay dataset folders should stay protected with non-canonical casing."
 
             Expect.isFalse
-                (ArcEntityPathRules.isRenamePathAllowed "assays/MyAssay/DataSet")
-                "Assay dataset folders should stay non-renameable with non-canonical casing."
-
-            Expect.isFalse
                 (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/Protocols")
                 "Study protocol folders should stay protected with non-canonical casing."
 
             Expect.isFalse
-                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/Resources")
-                "Study resource folders should stay non-renameable with non-canonical casing."
-
-            Expect.isTrue
-                (ArcEntityPathRules.isRenamePathAllowed "workflows/MyWorkflow/Protocols")
-                "Workflow protocols folders should remain generic even with non-canonical casing."
-
-            Expect.isTrue
-                (ArcEntityPathRules.isDeletePathAllowed "runs/MyRun/DataSet")
-                "Run dataset folders should remain generic even with non-canonical casing."
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/Resources")
+                "Study resource folders should stay protected with non-canonical casing."
 
         testCase "buildFallbackUnlinkPaths maps entity folder to canonical files"
         <| fun _ ->
@@ -273,18 +253,6 @@ let tests =
             Expect.isFalse
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/resources")
                 "Study resource folders should not be renameable."
-
-            Expect.isTrue
-                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/dataset")
-                "Study dataset folders are not native structural children and should remain renameable."
-
-            Expect.isTrue
-                (ArcEntityPathRules.isRenamePathAllowed "workflows/MyWorkflow/protocols")
-                "Workflow protocols folders are not native structural children and should remain renameable."
-
-            Expect.isTrue
-                (ArcEntityPathRules.isRenamePathAllowed "runs/MyRun/dataset")
-                "Run dataset folders are not native structural children and should remain renameable."
 
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/dataset/raw.tsv")

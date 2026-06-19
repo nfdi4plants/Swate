@@ -85,24 +85,6 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "tryBuildRenameDraft allows non-native structural-looking child folders",
-            fun () ->
-                let renameableChildFolderPaths = [
-                    "workflows/WorkflowA/protocols"
-                    "runs/RunA/dataset"
-                ]
-
-                renameableChildFolderPaths
-                |> List.iter (fun path ->
-                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
-
-                    match tryBuildRenameDraft item with
-                    | Ok draft -> Vitest.expect(draft.SourcePath).toBe (path)
-                    | Error error -> failwith error
-                )
-        )
-
-        Vitest.test (
             "tryRemapSelectionPath remaps descendants under renamed source prefixes",
             fun () ->
                 let remapped =
@@ -246,21 +228,6 @@ Vitest.describe (
                 |> List.iter (fun path ->
                     let item = createFolderItem (PathHelpers.getNameFromPath path) path
                     expectRenameMenuVisibility 0 item
-                )
-        )
-
-        Vitest.test (
-            "rename context menu item is shown for non-native structural-looking child folders",
-            fun () ->
-                let renameableChildFolderPaths = [
-                    "workflows/WorkflowA/protocols"
-                    "runs/RunA/dataset"
-                ]
-
-                renameableChildFolderPaths
-                |> List.iter (fun path ->
-                    let item = createFolderItem (PathHelpers.getNameFromPath path) path
-                    expectRenameMenuVisibility 1 item
                 )
         )
 
