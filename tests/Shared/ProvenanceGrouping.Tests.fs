@@ -1676,6 +1676,70 @@ let sessionTests =
                     "The active layer input should receive the new property value."
             | other -> failwithf "Expected one active-layer property-add patch, got %A" other
 
+        testCase "active layer property additions on carried inputs survive focus refresh"
+        <| fun _ ->
+            let layered =
+                Session.init (sampleModel ())
+                |> Session.addLayer {
+                    SelectedSets = [ ProvenanceSide.Output, "output-d" ]
+                }
+                |> function
+                    | Ok(next, _) -> next
+                    | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let projectedId =
+                (Session.activeLayer layered).Model.InputSets
+                |> Map.toList
+                |> List.exactlyOne
+                |> fst
+
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
+
+            let command = {
+                Target = ProvenancePropertyTarget.InputSets [ projectedId ]
+                CopiedFrom = None
+                Header = treatment
+                Value = ProvenanceValue.Text "Drought"
+                Unit = None
+            }
+
+            let added =
+                match Session.createCurrentLoadedPropertyValue command layered with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected createCurrentLoadedPropertyValue error: %A" error
+
+            let hasTreatment session =
+                let layer2 = Session.layerById "layer-2" session
+                let carriedInput = layer2.Model.InputSets.[projectedId]
+
+                ProvenanceSet.effectivePropertyValueIds carriedInput
+                |> List.choose (fun id -> layer2.Model.PropertyValues.TryFind id)
+                |> List.exists (fun value -> value.Header = treatment)
+
+            Expect.isTrue (hasTreatment added) "Sanity: active layer input should receive the local property addition."
+
+            let visitedLayer1 =
+                match Session.selectLayer "layer-1" added with
+                | Ok(next, patches) ->
+                    Expect.isEmpty patches "Focus refresh should not emit writeback patches."
+                    next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            Expect.isTrue
+                (hasTreatment visitedLayer1)
+                "Local additions on a carried downstream input should not be dropped when focusing upstream."
+
+            let visitedLayer2 =
+                match Session.selectLayer "layer-2" visitedLayer1 with
+                | Ok(next, patches) ->
+                    Expect.isEmpty patches "Focus refresh should not emit writeback patches."
+                    next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            Expect.isTrue
+                (hasTreatment visitedLayer2)
+                "Local additions on a carried downstream input should remain after returning to that layer."
+
         testCase "updating multiple property values uses the edit path for every value"
         <| fun _ ->
             let session = Session.init (validModel ())

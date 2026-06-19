@@ -322,6 +322,13 @@ module Session =
         ProvenanceSet.effectivePropertyValueIds set
         |> List.choose (fun id -> model.PropertyValues.TryFind id |> Option.map (fun value -> id, value))
 
+    let private localOwnPropertyValueIds sourceLayer targetSet =
+        let sourcePropertyValueIds =
+            sourceLayer.Model.PropertyValues |> Map.toList |> List.map fst |> Set.ofList
+
+        targetSet.PropertyValueIds
+        |> List.filter (fun propertyValueId -> not (sourcePropertyValueIds.Contains propertyValueId))
+
     let private copySetData sourceRef targetRef session =
         let sourceLayer = layerAtRef sourceRef session
         let targetLayer = layerAtRef targetRef session
@@ -336,7 +343,12 @@ module Session =
 
             {
                 targetSet with
-                    PropertyValueIds = sourceSet.PropertyValueIds
+                    PropertyValueIds =
+                        [
+                            yield! sourceSet.PropertyValueIds
+                            yield! localOwnPropertyValueIds sourceLayer targetSet
+                        ]
+                        |> List.distinct
                     InheritedPropertyValueIds = inheritedPropertyValueIds
             }
 
