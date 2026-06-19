@@ -39,6 +39,9 @@ Vitest.describe (
 
                         let! reloadedArc = loadArcAsync arcPath
                         Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe (true)
+                        let reloadedAssay = reloadedArc.GetAssay("NewAssay")
+                        Vitest.expect(reloadedAssay.Tables.Count).toBe (1)
+                        Vitest.expect(reloadedAssay.Tables.[0].Name).toBe ("NewAssay Table")
                     })
         )
 
@@ -69,6 +72,9 @@ Vitest.describe (
 
                         let! reloadedArc = loadArcAsync arcPath
                         Vitest.expect(reloadedArc.ContainsAssay("New Assay")).toBe (true)
+                        let reloadedAssay = reloadedArc.GetAssay("New Assay")
+                        Vitest.expect(reloadedAssay.Tables.Count).toBe (1)
+                        Vitest.expect(reloadedAssay.Tables.[0].Name).toBe ("New Assay Table")
                         Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
                         Vitest.expect(vault.arc.Value.hasInMemoryChanges ()).toBe (false)
                         Vitest.expect(vault.isBusyWriting).toBe (false)
@@ -114,6 +120,9 @@ Vitest.describe (
 
                         let! reloadedArc = loadArcAsync arcPath
                         Vitest.expect(reloadedArc.ContainsStudy("NewStudy")).toBe (true)
+                        let reloadedStudy = reloadedArc.GetStudy("NewStudy")
+                        Vitest.expect(reloadedStudy.Tables.Count).toBe (1)
+                        Vitest.expect(reloadedStudy.Tables.[0].Name).toBe ("NewStudy Table")
                     })
         )
 
@@ -132,6 +141,9 @@ Vitest.describe (
 
                         let! reloadedArc = loadArcAsync arcPath
                         Vitest.expect(reloadedArc.ContainsRun("NewRun")).toBe (true)
+                        let reloadedRun = reloadedArc.GetRun("NewRun")
+                        Vitest.expect(reloadedRun.Tables.Count).toBe (1)
+                        Vitest.expect(reloadedRun.Tables.[0].Name).toBe ("NewRun Table")
                     })
         )
 

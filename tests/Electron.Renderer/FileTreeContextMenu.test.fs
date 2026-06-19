@@ -67,6 +67,32 @@ Vitest.describe (
     "FileTreeContextMenu",
     fun () ->
         Vitest.test (
+            "ARC create drafts include a starter annotation table when supported",
+            fun () ->
+                let tableCapableKinds = [|
+                    ArcExplorerNodeKind.Study
+                    ArcExplorerNodeKind.Assay
+                    ArcExplorerNodeKind.Run
+                |]
+
+                for kind in tableCapableKinds do
+                    let identifier = $"Default {ArcExplorerNodeKind.label kind}"
+
+                    match tryCreateArcFile kind identifier with
+                    | Ok arcFile ->
+                        let tables = arcFile.Tables()
+                        Vitest.expect(tables.Count).toBe (1)
+                        Vitest.expect(tables.[0].Name).toBe ($"{identifier} Table")
+                        Vitest.expect(tables.[0].TryGetInputColumn().IsSome).toBe (true)
+                        Vitest.expect(tables.[0].RowCount).toBe (1)
+                    | Error error -> failwith error
+
+                match tryCreateArcFile ArcExplorerNodeKind.Workflow "Default Workflow" with
+                | Ok arcFile -> Vitest.expect(arcFile.Tables().Count).toBe (0)
+                | Error error -> failwith error
+        )
+
+        Vitest.test (
             "folder path actions reveal the folder location only",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")

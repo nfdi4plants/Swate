@@ -155,6 +155,37 @@ module ARCtrlHelper =
             | ArcFiles.Run _ -> true
             | _ -> false
 
+        member this.EnsureDefaultAnnotationTable() =
+            let defaultTableName (identifier: string) =
+                let normalizedIdentifier =
+                    if String.IsNullOrWhiteSpace identifier then
+                        "New"
+                    else
+                        identifier.Trim()
+
+                $"{normalizedIdentifier} Table"
+
+            let ensureStarterColumn (table: ArcTable) =
+                if table.ColumnCount = 0 then
+                    table.AddColumn(CompositeHeader.Input IOType.Source, ResizeArray([ CompositeCell.emptyFreeText ]))
+
+            let ensureDefaultTable (arcTables: ArcTables) identifier =
+                let table =
+                    if arcTables.TableCount = 0 then
+                        arcTables.InitTable(defaultTableName identifier)
+                    else
+                        arcTables.[0]
+
+                ensureStarterColumn table
+
+            match this with
+            | ArcFiles.Study(study, _) -> ensureDefaultTable study study.Identifier
+            | ArcFiles.Assay assay -> ensureDefaultTable assay assay.Identifier
+            | ArcFiles.Run run -> ensureDefaultTable run run.Identifier
+            | _ -> ()
+
+            this
+
         member this.TryGetActiveTable(activeTableIndex: int option) =
             match activeTableIndex with
             | Some tableIndex when tableIndex >= 0 && tableIndex < this.Tables().Count ->

@@ -3,8 +3,10 @@ namespace Main.ARCtrlExtensions
 open System
 open ARCtrl
 open ARCtrl.Contract
-open Main.Bindings.Filesystem
 open Main.Bindings.Path
+open Main.Bindings.Filesystem
+open Main.ArcMerge.ArcFileDefaults
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 
 [<AutoOpen>]
@@ -52,22 +54,22 @@ module ArcLoadExtensions =
         {
             CollectionFolder = "assays"
             FileName = "isa.assay.xlsx"
-            CreateContracts = fun identifier -> (ArcAssay.init identifier).ToCreateContract(false)
+            CreateContracts = createDefaultEntityContracts ArcFilesDiscriminate.Assay false
         }
         {
             CollectionFolder = "studies"
             FileName = "isa.study.xlsx"
-            CreateContracts = fun identifier -> (ArcStudy.init identifier).ToCreateContract(false)
+            CreateContracts = createDefaultEntityContracts ArcFilesDiscriminate.Study false
         }
         {
             CollectionFolder = "workflows"
             FileName = "isa.workflow.xlsx"
-            CreateContracts = fun identifier -> (ArcWorkflow.init identifier).ToCreateContract(false)
+            CreateContracts = createDefaultEntityContracts ArcFilesDiscriminate.Workflow false
         }
         {
             CollectionFolder = "runs"
             FileName = "isa.run.xlsx"
-            CreateContracts = fun identifier -> (ArcRun.init identifier).ToCreateContract(false)
+            CreateContracts = createDefaultEntityContracts ArcFilesDiscriminate.Run false
         }
     |]
 

@@ -39,6 +39,9 @@ module ArcAddExtensions =
         | ArcFiles.Assay assay ->
             let assayCopy = assay.Copy()
 
+            ArcFiles.Assay assayCopy
+            |> fun arcFile -> arcFile.EnsureDefaultAnnotationTable() |> ignore
+
             prepareEntityAddContracts
                 sourceArc
                 "assay"
@@ -50,6 +53,9 @@ module ArcAddExtensions =
         | ArcFiles.Study(study, _) ->
             let studyCopy = study.Copy()
 
+            ArcFiles.Study(studyCopy, [])
+            |> fun arcFile -> arcFile.EnsureDefaultAnnotationTable() |> ignore
+
             prepareEntityAddContracts
                 sourceArc
                 "study"
@@ -60,6 +66,9 @@ module ArcAddExtensions =
                 includeUpdateContractsFlag
         | ArcFiles.Run run ->
             let runCopy = run.Copy()
+
+            ArcFiles.Run runCopy
+            |> fun arcFile -> arcFile.EnsureDefaultAnnotationTable() |> ignore
 
             prepareEntityAddContracts
                 sourceArc
