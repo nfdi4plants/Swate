@@ -31,7 +31,7 @@ type FileTreeAssignNoteModal =
         let selectedValue =
             selectedNote |> Option.map _.SourceFolderPath |> Option.defaultValue ""
 
-        let setIsOpen isOpen =
+        let setClose isOpen =
             if not isOpen then
                 close ()
 
@@ -81,7 +81,7 @@ type FileTreeAssignNoteModal =
 
         BaseModal.Modal(
             isOpen = isOpen,
-            setIsOpen = setIsOpen,
+            setIsOpen = setClose,
             header = Html.text "Assign Note",
             description = Html.text $"Assign a note to '{displayName}'.",
             children =
