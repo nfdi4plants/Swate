@@ -258,6 +258,31 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "native structural entity child folders do not expose rename or delete",
+            fun () ->
+                let protectedPaths = [
+                    "assays/AssayA/dataset"
+                    "assays/AssayA/protocols"
+                    "studies/StudyA/protocols"
+                    "studies/StudyA/resources"
+                ]
+
+                protectedPaths
+                |> List.iter (fun path ->
+                    let item = createFolderItem (PathHelpers.getNameFromPath path) (Some path)
+
+                    let menuItemLabels =
+                        createComposedContextMenuItems (createContextMenuConfig ()) item
+                        |> groupedLabels
+
+                    Vitest.expect(menuItemLabels).toContain ("New File")
+                    Vitest.expect(menuItemLabels).toContain ("New Folder")
+                    Vitest.expect(menuItemLabels).not.toContain ("Rename")
+                    Vitest.expect(menuItemLabels).not.toContain ("Delete")
+                )
+        )
+
+        Vitest.test (
             "new folder action on the ARC root requests root-level folder creation",
             fun () ->
                 let item = createFolderItem "MyArc" (Some "")
