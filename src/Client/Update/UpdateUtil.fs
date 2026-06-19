@@ -64,14 +64,14 @@ module JsonImportHelper =
                     let deselectedColumnIndices =
                         getDeselectedTableColumnIndices deselectedColumns importTable.Index
 
-                    let sourceTable = arcTables.[importTable.Index]
+                    let sourceTable = arcTables.[importTable.Index] |> Table.normalizeCells
                     let appliedTable = ArcTable.init (sourceTable.Name)
 
                     let finalTable =
                         Table.selectiveTablePrepare appliedTable sourceTable deselectedColumnIndices
 
                     appliedTable.Join(finalTable, joinOptions = state.ImportType)
-                    appliedTable
+                    Table.normalizeCells appliedTable
         ]
         |> ResizeArray
 
@@ -175,23 +175,12 @@ module JsonImportHelper =
                         let preparedTemplate = Table.distinctByHeader tempTable table
                         tempTable.Join(preparedTemplate, joinOptions = importConfig.ImportType)
 
-                    existingTables.[i] <- tempTable
+                    existingTables.[i] <- Table.normalizeCells tempTable
                 | _ -> ()
 
             let addTables =
-                let selectedColumnTables =
-                    createUpdatedTables importTables importConfig deselectedColumns (Some true)
-                    |> Array.ofSeq
-                    |> Array.rev
-
-                selectedColumnTables
-                |> Seq.map (fun table -> // update tables based on joinOptions
-                    let nTable = ArcTable.init (table.Name)
-                    nTable.Join(table, joinOptions = importConfig.ImportType)
-                    nTable
-                )
-                |> Seq.rev // https://github.com/nfdi4plants/Swate/issues/577
-                |> Seq.iter (fun table -> existingTables.Add table)
+                createUpdatedTables importTables importConfig deselectedColumns (Some true)
+                |> Seq.iter (fun table -> existingTables.Add(Table.normalizeCells table))
 
             existing
         | None -> //

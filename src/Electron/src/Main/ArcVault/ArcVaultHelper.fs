@@ -1,15 +1,16 @@
 module Main.ArcVaultHelper
 
+open System
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
 open ARCtrl
 open Fable.Electron
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
-open Main.ARCtrlExtensions
 open Main.Bindings
+open Main.ARCtrlExtensions
 open Node.Api
 open Swate.Electron.Shared.RenamePathRules
 

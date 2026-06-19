@@ -1,5 +1,40 @@
 module ARCtrl.Table
 
+let private isNull value = obj.ReferenceEquals(box value, null)
+
+let private ifNull fallback value = if isNull value then fallback else value
+
+let tryNormalizeCell (cell: CompositeCell) =
+    if isNull cell then
+        None
+    else
+        match cell with
+        | CompositeCell.FreeText text -> CompositeCell.FreeText(ifNull "" text)
+        | CompositeCell.Term ontologyAnnotation -> CompositeCell.Term(ifNull (OntologyAnnotation()) ontologyAnnotation)
+        | CompositeCell.Unitized(value, ontologyAnnotation) ->
+            CompositeCell.Unitized(ifNull "" value, ifNull (OntologyAnnotation()) ontologyAnnotation)
+        | CompositeCell.Data data -> CompositeCell.Data(ifNull (Data()) data)
+        |> Some
+
+let normalizeCells (table: ArcTable) =
+    let normalizedTable = ArcTable.init table.Name
+
+    for columnIndex in 0 .. table.Headers.Count - 1 do
+        let header = table.Headers.[columnIndex]
+
+        let cells =
+            [
+                for rowIndex in 0 .. table.RowCount - 1 do
+                    table.TryGetCellAt(columnIndex, rowIndex)
+                    |> Option.bind tryNormalizeCell
+            ]
+
+        let emptyCell = cells |> List.tryPick id |> ArcTableAux.getEmptyCellForHeader header
+
+        normalizedTable.AddColumn(header, cells |> List.map (Option.defaultValue emptyCell) |> ResizeArray)
+
+    normalizedTable
+
 /// <summary>
 /// This functions returns a **copy** of `toJoinTable` without any column already in `activeTable`.
 /// </summary>

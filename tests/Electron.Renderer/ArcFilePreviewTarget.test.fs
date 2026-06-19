@@ -5,8 +5,10 @@ open Fable.Core
 open ARCtrl
 open Renderer.Components.MainContent.ArcFilePreviewTargetHelper
 open Swate.Components.Composite.Widgets.JsonImport.Types
+open Swate.Components.Composite.Template.Types
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Shared
+open Swate.Electron.Shared.FileIOHelper
 
 
 let private createAssayArcFile (tableNames: string[]) =
@@ -47,6 +49,33 @@ let private jsonImportRequest importedFile = {
     JsonFormat = JsonExportFormat.ARCtrl
 }
 
+let private createUnitizedTemplateTable () =
+    let table = ArcTable.init "Unit Template"
+    let componentAnnotation = OntologyAnnotation.create ("temperature")
+    let unitAnnotation = OntologyAnnotation.create ("degree Celsius", "UO", "UO:0000027")
+    let cells = ResizeArray [ CompositeCell.Unitized("42", unitAnnotation) ]
+    table.AddColumn(CompositeHeader.Component componentAnnotation, cells)
+    table
+
+let private createUnitizedTemplateTableWithNullUnit () =
+    let table = ArcTable.init "Unit Template"
+    let componentAnnotation = OntologyAnnotation.create ("temperature")
+    let unitAnnotation = Unchecked.defaultof<OntologyAnnotation>
+    let cells = ResizeArray [ CompositeCell.Unitized("42", unitAnnotation) ]
+    table.AddColumn(CompositeHeader.Component componentAnnotation, cells)
+    table
+
+let private createMixedUnitTemplateTable () =
+    let table = ArcTable.init "Mixed Unit Template"
+    let componentAnnotation = OntologyAnnotation.create ("temperature")
+    let parameterAnnotation = OntologyAnnotation.create ("incubation time")
+    let unitAnnotation = OntologyAnnotation.create ("degree Celsius", "UO", "UO:0000027")
+    let unitCells = ResizeArray [ CompositeCell.Unitized("42", unitAnnotation) ]
+    let termCells = ResizeArray [ CompositeCell.Term(OntologyAnnotation.create "overnight") ]
+    table.AddColumn(CompositeHeader.Component componentAnnotation, unitCells)
+    table.AddColumn(CompositeHeader.Parameter parameterAnnotation, termCells)
+    table
+
 Vitest.describe (
     "ArcFilePreviewTarget table deletion",
     fun () ->
@@ -74,6 +103,105 @@ Vitest.describe (
                 expectMetadataPreserved assay
                 Vitest.expect(publishedArcFile.IsSome).toBe (true)
                 expectMetadataView activeView
+        )
+)
+
+Vitest.describe (
+    "ArcFilePreviewTarget template import",
+    fun () ->
+        Vitest.test (
+            "unit template imports survive FileContentDTO JSON round trip",
+            fun () ->
+                let currentArcFile, _ = createAssayArcFile [| "Existing" |]
+                let importTables = ResizeArray [ createUnitizedTemplateTable () ]
+
+                let importConfig = {
+                    SelectiveImportConfig.init () with
+                        ImportType = TableJoinOptions.WithUnit
+                        ImportTables = [ { Index = 0; FullImport = true } ]
+                }
+
+                let updatedArcFile =
+                    Swate.Components.Composite.Template.Helper.updateTables
+                        importTables
+                        importConfig
+                        (Some 0)
+                        (Some currentArcFile)
+
+                match FileContentDTO.fromArcFile updatedArcFile with
+                | None -> failwith "Expected updated assay to serialize to a FileContentDTO."
+                | Some dto ->
+                    match FileContentDTO.toArcFile dto with
+                    | Some(ArcFiles.Assay assay) ->
+                        Vitest.expect(assay.Tables.Count).toBe (2)
+                        Vitest.expect(assay.Tables.[1].Name).toBe ("Unit Template")
+                    | Some _ -> failwith "Expected FileContentDTO to decode back to an assay."
+                    | None -> failwith "Expected FileContentDTO JSON content to decode."
+        )
+
+        Vitest.test (
+            "unit template import normalizes null unit annotations before in-memory JSON update",
+            fun () ->
+                let currentArcFile, _ = createAssayArcFile [| "Existing" |]
+                let importTables = ResizeArray [ createUnitizedTemplateTableWithNullUnit () ]
+
+                let importConfig = {
+                    SelectiveImportConfig.init () with
+                        ImportType = TableJoinOptions.WithUnit
+                        ImportTables = [ { Index = 0; FullImport = true } ]
+                }
+
+                let updatedArcFile =
+                    Swate.Components.Composite.Template.Helper.updateTables
+                        importTables
+                        importConfig
+                        (Some 0)
+                        (Some currentArcFile)
+
+                match FileContentDTO.fromArcFile updatedArcFile with
+                | None -> failwith "Expected updated assay to serialize to a FileContentDTO."
+                | Some dto ->
+                    match FileContentDTO.toArcFile dto with
+                    | Some(ArcFiles.Assay assay) ->
+                        Vitest.expect(assay.Tables.Count).toBe (2)
+
+                        match assay.Tables.[1].Columns.[0].Cells.[0] with
+                        | CompositeCell.Unitized(_, unitAnnotation) ->
+                            Vitest.expect(obj.ReferenceEquals(unitAnnotation, null)).toBe (false)
+                        | _ -> failwith "Expected imported unit column cell to remain unitized."
+                    | Some _ -> failwith "Expected FileContentDTO to decode back to an assay."
+                    | None -> failwith "Expected FileContentDTO JSON content to decode."
+        )
+
+        Vitest.test (
+            "unit template import normalizes non-unit columns before in-memory JSON update",
+            fun () ->
+                let currentArcFile, _ = createAssayArcFile [| "Existing" |]
+                let importTables = ResizeArray [ createMixedUnitTemplateTable () ]
+
+                let importConfig = {
+                    SelectiveImportConfig.init () with
+                        ImportType = TableJoinOptions.WithUnit
+                        ImportTables = [ { Index = 0; FullImport = true } ]
+                }
+
+                let updatedArcFile =
+                    Swate.Components.Composite.Template.Helper.updateTables
+                        importTables
+                        importConfig
+                        (Some 0)
+                        (Some currentArcFile)
+
+                match FileContentDTO.fromArcFile updatedArcFile with
+                | None -> failwith "Expected updated assay to serialize to a FileContentDTO."
+                | Some dto ->
+                    match FileContentDTO.toArcFile dto with
+                    | Some(ArcFiles.Assay assay) ->
+                        let importedTable = assay.Tables.[1]
+                        Vitest.expect(importedTable.Columns.Count).toBe (2)
+                        Vitest.expect(obj.ReferenceEquals(importedTable.Columns.[1].Cells.[0], null)).toBe (false)
+                    | Some _ -> failwith "Expected FileContentDTO to decode back to an assay."
+                    | None -> failwith "Expected FileContentDTO JSON content to decode."
         )
 )
 

@@ -17,28 +17,11 @@ let private tryTrimmed (value: string) =
     else
         Some(value.Trim())
 
-let private isNullCell (cell: CompositeCell) = obj.ReferenceEquals(cell, null)
-
-let private normalizeNullCells (table: ArcTable) =
-    let normalizedTable = ArcTable.init table.Name
-
-    for column in table.Columns do
-        let firstNonNullCell = column.Cells |> Seq.tryFind (isNullCell >> not)
-        let emptyCell = ArcTableAux.getEmptyCellForHeader column.Header firstNonNullCell
-
-        let normalizedCells =
-            column.Cells
-            |> Seq.map (fun cell -> if isNullCell cell then emptyCell else cell)
-            |> ResizeArray
-
-        normalizedTable.AddColumn(column.Header, normalizedCells)
-
-    normalizedTable
-
 let compositeCellPreviewValues (cell: CompositeCell) =
-    if isNullCell cell then
+    match Table.tryNormalizeCell cell with
+    | None ->
         [||]
-    else
+    | Some cell ->
         match cell with
         | CompositeCell.FreeText text -> [| text |]
         | CompositeCell.Term ontologyAnnotation -> [|
@@ -108,14 +91,14 @@ let createUpdatedTables
                 let deselectedColumnIndices =
                     getDeselectedTableColumnIndices deselectedColumns importTable.Index
 
-                let sourceTable = arcTables.[importTable.Index] |> normalizeNullCells
+                let sourceTable = arcTables.[importTable.Index] |> Table.normalizeCells
                 let appliedTable = ArcTable.init sourceTable.Name
 
                 let finalTable =
                     Table.selectiveTablePrepare appliedTable sourceTable deselectedColumnIndices
 
                 appliedTable.Join(finalTable, joinOptions = state.ImportType)
-                appliedTable
+                Table.normalizeCells appliedTable
     ]
     |> ResizeArray
 
@@ -168,22 +151,11 @@ let updateTables
                 let preparedTemplate = Table.distinctByHeader tempTable table
                 tempTable.Join(preparedTemplate, joinOptions = importConfig.ImportType)
 
-            existingTables.[tableIndex] <- tempTable
+            existingTables.[tableIndex] <- Table.normalizeCells tempTable
         | _ -> ()
 
-        let selectedColumnTables =
-            createUpdatedTables importTables importConfig deselectedColumns (Some true)
-            |> Array.ofSeq
-            |> Array.rev
-
-        selectedColumnTables
-        |> Seq.map (fun table ->
-            let nextTable = ArcTable.init table.Name
-            nextTable.Join(table, joinOptions = importConfig.ImportType)
-            nextTable
-        )
-        |> Seq.rev
-        |> Seq.iter existingTables.Add
+        createUpdatedTables importTables importConfig deselectedColumns (Some true)
+        |> Seq.iter (fun table -> existingTables.Add(Table.normalizeCells table))
 
         existing
     | None -> failwith "Error! Can only append information if metadata sheet exists!"

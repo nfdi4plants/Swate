@@ -572,7 +572,7 @@ module UpdateHandler =
             let! result = tryGetActiveExcelTable context
 
             for tableIndex in 0 .. tablesToAdd.Length - 1 do
-                let tableToAdd = tablesToAdd.[tableIndex]
+                let tableToAdd = tablesToAdd.[tableIndex] |> Table.normalizeCells
 
                 let deselectedColumnIndices =
                     getDeselectedTableColumnIndices deselectedColumnsCollection tableIndex
@@ -585,7 +585,7 @@ module UpdateHandler =
                         Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
 
                     originTable.Join(endTable, ?joinOptions = options)
-                    originTable
+                    Table.normalizeCells originTable
 
                 let! activeWorksheet =
                     if tableIndex = 0 && result.IsNone then
@@ -634,6 +634,7 @@ module UpdateHandler =
         (context: RequestContext)
         =
         promise {
+            let tableToAdd = Table.normalizeCells tableToAdd
             let! originTableRes = ArcTable.fromExcelTable (table, context)
 
             match originTableRes with
@@ -641,6 +642,7 @@ module UpdateHandler =
             | Result.Ok originTable ->
                 let finalTable =
                     Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
+                    |> Table.normalizeCells
 
                 let selectedRange = context.workbook.getSelectedRange ()
                 let tableStartIndex = table.getRange ()
@@ -1215,17 +1217,18 @@ module UpdateHandler =
                 (options: TableJoinOptions option)
                 i
                 =
-                let tableToAdd = tablesToAdd.[i]
+                let tableToAdd = tablesToAdd.[i] |> Table.normalizeCells
                 let deselectedColumnIndices = getDeselectedTableColumnIndices deselectedColumns i
 
                 let refinedTableToAdd =
                     let temp = Table.distinctByHeader originTable tableToAdd
                     Table.selectiveTablePrepare originTable temp deselectedColumnIndices
+                    |> Table.normalizeCells
 
                 let newTable =
                     if i > 0 then
                         originTable.Join(refinedTableToAdd, ?joinOptions = options, forceReplace = true)
-                        originTable
+                        Table.normalizeCells originTable
                     else
                         refinedTableToAdd
 
@@ -1239,8 +1242,10 @@ module UpdateHandler =
 
             let finalTable =
                 Table.selectiveTablePrepare originTable processedJoinTable List.empty
+                |> Table.normalizeCells
 
             originTable.Join(finalTable, targetIndex, ?joinOptions = options, forceReplace = true)
+            let originTable = Table.normalizeCells originTable
 
             do! joinArcTablesInExcel excelTable originTable None context
 
