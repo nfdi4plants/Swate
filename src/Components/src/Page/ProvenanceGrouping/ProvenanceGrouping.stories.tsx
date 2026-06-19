@@ -842,13 +842,25 @@ export const RemovesExpandedMemberConnectionFromContextMenu: Story = {
     });
 
     const removedKey = connector.getAttribute('data-provenance-connection-key');
-    fireEvent.contextMenu(connector, { clientX: 360, clientY: 280, bubbles: true });
+    await userEvent.click(connector);
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-connection-details')).toBeInTheDocument();
+      expect(within(grouped).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
+    });
+
+    const selectedConnector = canvas
+      .getAllByTestId('provenance-member-connection')
+      .find((path) => path.getAttribute('data-provenance-connection-key') === removedKey);
+    expect(selectedConnector).toBeTruthy();
+    fireEvent.contextMenu(selectedConnector!, { clientX: 360, clientY: 280, bubbles: true });
     const menu = await screen.findByTestId('context_menu');
     await userEvent.click(within(menu).getByRole('button', { name: /delete/i }));
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('RemoveLoadedConnection');
       expect(connectionKeys(canvas.queryAllByTestId('provenance-member-connection'))).not.toContain(removedKey);
+      expect(within(grouped).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
     });
   },
 };

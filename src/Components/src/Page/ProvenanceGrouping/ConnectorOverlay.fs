@@ -32,18 +32,13 @@ type ConnectorOverlayState = {
 module ConnectorOverlayState =
 
     let fromUiState (uiState: UiState) =
-        let expandedGroup =
-            match uiState.Detail with
-            | Some(ProvenanceDetail.Group(side, groupId)) -> Some(side, groupId)
-            | _ -> None
-
         let selectedConnectionId =
             match uiState.Detail with
             | Some(ProvenanceDetail.Connection connectionId) -> Some connectionId
             | _ -> None
 
         {
-            ExpandedGroup = expandedGroup
+            ExpandedGroup = uiState.ExpandedGroup
             SelectedConnectionId = selectedConnectionId
             ExpandedProperties = uiState.ExpandedProperties
         }

@@ -156,6 +156,7 @@ type UiState = {
     PendingMemberResolution: PendingMemberResolution option
     SelectedInputs: Set<ProvenanceLayerId * string>
     SelectedOutputs: Set<ProvenanceLayerId * string>
+    ExpandedGroup: (ProvenanceSide * string) option
     Detail: ProvenanceDetail option
     Error: string option
     PropertyColors: PropertyColorSettings

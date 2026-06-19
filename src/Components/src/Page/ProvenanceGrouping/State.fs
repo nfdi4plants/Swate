@@ -66,18 +66,19 @@ module MemberResolution =
     }
 
     let chooseManual (pending: PendingMemberResolution) state =
-        let detail =
+        let expandedGroup =
             if pending.OutputMemberCount > 1 then
-                Some(ProvenanceDetail.Group(ProvenanceSide.Output, pending.OutputGroupId))
+                Some(ProvenanceSide.Output, pending.OutputGroupId)
             elif pending.InputMemberCount > 1 then
-                Some(ProvenanceDetail.Group(ProvenanceSide.Input, pending.InputGroupId))
+                Some(ProvenanceSide.Input, pending.InputGroupId)
             else
                 None
 
         {
             state with
                 PendingMemberResolution = None
-                Detail = detail
+                ExpandedGroup = expandedGroup
+                Detail = None
         }
 
 module PropertyColors =
@@ -620,16 +621,20 @@ module Selection =
 module Detail =
 
     let isGroupExpanded side groupId state =
-        state.Detail = Some(ProvenanceDetail.Group(side, groupId))
+        state.ExpandedGroup = Some(side, groupId)
 
     let toggleGroup side groupId state =
         let next =
             if isGroupExpanded side groupId state then
                 None
             else
-                Some(ProvenanceDetail.Group(side, groupId))
+                Some(side, groupId)
 
-        { state with Detail = next }
+        {
+            state with
+                ExpandedGroup = next
+                Detail = None
+        }
 
     let showConnection connectionId state = {
         state with
@@ -658,6 +663,7 @@ let init (session: ProvenanceSession) = {
     PendingMemberResolution = None
     SelectedInputs = Set.empty
     SelectedOutputs = Set.empty
+    ExpandedGroup = None
     Detail = None
     Error = None
     PropertyColors = PropertyColors.empty
