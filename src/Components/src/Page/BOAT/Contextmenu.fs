@@ -18,7 +18,7 @@ module private Helper =
     let button (name:string, resetter: unit -> unit, state, func: unit -> unit, props) =
         Html.li [
             Html.div [
-                prop.className "hover:bg-[#a7d9ec] justify-between text-sm text-black select-none p-2"
+                prop.className "swt:hover:bg-[#a7d9ec] swt:justify-between swt:text-sm swt:text-black swt:select-none swt:p-2"
                 prop.onMouseDown (fun e -> 
                     func()
                     resetter()
@@ -32,7 +32,7 @@ module private Helper =
         ]
     let divider = 
         Html.div [ 
-            prop.className "border border-slate-400"
+            prop.className "swt:border swt:border-slate-400"
             prop.style 
                 [style.margin(2,0); style.width (length.perc 80); style.margin length.auto; style.margin (length.rem 0)]  
         ]  
@@ -238,7 +238,7 @@ module Contextmenu =
         /// This element will remove the contextmenu when clicking anywhere else
         let buttonList = [
             Html.div [ 
-                prop.className "text-gray-500 text-sm p-1"
+                prop.className "swt:text-gray-500 swt:text-sm swt:p-1"
                 prop.text "Add new annotation as .."
             ]
             button ("Key", resetter, state, addAnnotationKeyNew(state, setState, elementID, highlight, setHighlight), [])
@@ -246,7 +246,7 @@ module Contextmenu =
             button ("Value", resetter,state, addAnnotationValueNew(state, setState,elementID, highlight, setHighlight), [])
             divider
             Html.div [ 
-                prop.className "text-gray-500 text-sm p-1"
+                prop.className "swt:text-gray-500 swt:text-sm swt:p-1"
                 prop.text "Add to last annotation as .."
             ]
             button ("Key", resetter,state, addToLastAnnoAsKey(state, setState, highlight, setHighlight),  [])
@@ -256,7 +256,7 @@ module Contextmenu =
         Html.div [
             prop.tabIndex 0
             preventDefault
-            prop.className "bg-[#cae8f4] border-slate-400 border-solid border"
+            prop.className "swt:bg-[#cae8f4] swt:border-slate-400 swt:border-solid swt:border"
             prop.style [
                 style.backgroundColor " "
                 style.position.absolute

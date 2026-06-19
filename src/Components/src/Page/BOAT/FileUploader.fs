@@ -180,7 +180,7 @@ module Lists =
 type FileUpload =
     static member DisplayHtml(htmlString: string, highList: Highlight, elementID: string, isLocalStorageClear) = 
       Html.div [
-        prop.className "flex justify-end"
+        prop.className "swt:flex swt:justify-end"
         prop.children [
           PaperWithMarker.Main(htmlString, Lists.keyList highList, Lists.termList highList, Lists.valueList highList, elementID, isLocalStorageClear)
         ]
@@ -243,7 +243,7 @@ type FileUpload =
     static member private FileInput setState setFilehtml setLocalFile setFileName setLocalFileName=
       let ref = React.useInputRef()
       Html.input [
-        prop.className "file-input join-item"
+        prop.className "swt:file-input swt:join-item"
         prop.ref ref
         prop.type'.file
         prop.accept ".docx, .pdf, .txt, .md"
@@ -267,7 +267,7 @@ type FileUpload =
 
     static member private RemoveUploadedFileButton (setFilehtml, setLocalFile, setState, setFileName, setLocalFileName) =
       Html.button [
-        prop.className "btn btn-error btn-block"
+        prop.className "swt:btn swt:btn-error swt:btn-block"
         prop.onClick (fun e -> 
           setFilehtml Unset
           setLocalFile "file" Unset
@@ -280,7 +280,7 @@ type FileUpload =
         prop.children [
           Html.span [
             Html.i [
-              prop.className "fa-solid fa-trash-can"
+              prop.className "swt:fa-solid swt:fa-trash-can"
             ]
           ]
         ]
@@ -299,7 +299,7 @@ type FileUpload =
             Browser.WebStorage.localStorage.setItem(id, JSONString)
 
         Html.div [
-          prop.className "flex flex-col gap-2"
+          prop.className "swt:flex swt:flex-col swt:gap-2"
           prop.children [
             Html.div [
               
@@ -307,7 +307,7 @@ type FileUpload =
                 // FileUpload.FileTypeSelect setUploadFileType
                 FileUpload.FileInput setState setFilehtml setLocalFile setFileName setLocalFileName
                 Html.h1 [
-                  prop.className "mt-2 text-gray-600"
+                  prop.className "swt:mt-2 swt:text-gray-600"
                   prop.text "compatible filetypes: .pdf | .docx | .md | .txt"
                 ]
               ]

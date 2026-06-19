@@ -69,45 +69,40 @@ type View =
 
         let currentpage, setpage = React.useState (Types.Page.Builder)
 
-
-
         React.StrictMode [
-            React.contextProvider (
-                Contexts.ModalContext.createModalContext,
+            Contexts.ModalContext.createModalContext.Provider(
                 myModalContext,
-                React.fragment [ //makes the context accesable for the whole project
+                React.Fragment [
                     Html.div [
                         prop.id "mainView"
-                        prop.className "flex min-h-screen flex-col bg-accent text-accent-content"
+                        prop.className "swt:flex swt:min-h-screen swt:flex-col swt:bg-accent swt:text-accent-content"
                         prop.children [
-                            Components.Navbar.Main(setpage, currentpage, AnnotationState, setState, fileNamewithoutType)
+                            // Components.Navbar.Main(setpage, currentpage, AnnotationState, setState, fileNamewithoutType)
                             Html.div [
                                 prop.testId "contentView"
-                                prop.className "grow"
+                                prop.className "swt:grow"
                                 prop.children [
-                                    match currentpage with
-                                    | Types.Page.Builder ->
-                                        Components.Builder.Main(
-                                            AnnotationState,
-                                            setState,
-                                            isLocalStorageClear,
-                                            elementID,
-                                            modalState,
-                                            fileName,
-                                            setFileName,
-                                            setLocalFileName
+                                    // match currentpage with
+                                    // | Types.Page.Builder ->
+                                    Builder.Main(
+                                        AnnotationState,
+                                        setState,
+                                        isLocalStorageClear,
+                                        elementID,
+                                        modalState,
+                                        fileName,
+                                        setFileName,
+                                        setLocalFileName
 
                                         )
-                                    | Types.Page.Contact -> Components.Contact.Main()
-                                    | Types.Page.Help -> Components.Help.Main()
+                                    // | Types.Page.Contact -> Components.Contact.Main()
+                                    // | Types.Page.Help -> Components.Help.Main()
                                 ]
                             ]
-                            Components.Footer.Main
-
+                            // Components.Footer.Main
                         ]
                     ]
                 ]
             )
-
 
         ]

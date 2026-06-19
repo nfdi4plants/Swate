@@ -165,48 +165,50 @@ type PaperWithMarker =
         )
 
         Html.div [
-            prop.className "min-w-0"
+            prop.className "swt:min-w-0"
             prop.children [
-                Daisy.modal.dialog [
-                    prop.className [
-                        if APIwarningModalState = true && hasClosed = false then
-                            "modal-open"
-                    ]
-                    prop.children [
-                        Daisy.modalBox.div [
-                            Html.div [
-                                Html.p "Text highlighting is not compatible with your browser."
-                                Html.a [
-                                    prop.text "View compatible browsers"
-                                    prop.href
-                                        "https://developer.mozilla.org/en-US/docs/Web/API/CSS_Custom_Highlight_API#browser_compatibility"
-                                    prop.target.blank
-                                    prop.className "underline text-blue-400"
-                                ]
-                            ]
-                            Html.div [
-                                prop.className "flex items-center mt-5"
-                                prop.children [
-                                    Html.p "Don't show this again"
-                                    Daisy.checkbox [
-                                        checkbox.sm
-                                        prop.id "warningModal"
-                                        // prop.checked hasClosed
-                                        prop.className "ml-2"
-                                        prop.onClick (fun _ ->
-                                            setWarningFlag (not warningFlag)
-                                            setLocalFile "warningModal" warningFlag
-                                        )
+                React.Fragment [
+                    if APIwarningModalState && not hasClosed then
+                        Html.div [
+                            prop.className "swt:modal swt:modal-open"
+                            prop.children [
+                                Html.div [
+                                    prop.className "swt:modal-box"
+                                    prop.children [
+                                        Html.div [
+                                            Html.p "Text highlighting is not compatible with your browser."
+                                            Html.a [
+                                                prop.text "View compatible browsers"
+                                                prop.href
+                                                    "https://developer.mozilla.org/en-US/docs/Web/API/CSS_Custom_Highlight_API#browser_compatibility"
+                                                prop.target.blank
+                                                prop.className "swt:underline swt:text-blue-400"
+                                            ]
+                                        ]
+                                        Html.div [
+                                            prop.className "swt:flex swt:items-center swt:mt-5"
+                                            prop.children [
+                                                Html.p "Don't show this again"
+                                                Html.input [
+                                                    prop.type'.checkbox
+                                                    prop.id "warningModal"
+                                                    prop.className "swt:checkbox swt:checkbox-sm swt:ml-2"
+                                                    prop.onClick (fun _ ->
+                                                        setWarningFlag (not warningFlag)
+                                                        setLocalFile "warningModal" warningFlag
+                                                    )
+                                                ]
+                                            ]
+                                        ]
+                                        Html.button [
+                                            prop.className "swt:btn swt:mt-5"
+                                            prop.text "Got it"
+                                            prop.onClick (fun _ -> setHasClosed (not hasClosed))
+                                        ]
                                     ]
                                 ]
                             ]
-                            Daisy.button.button [
-                                prop.className "mt-5"
-                                prop.text "Got it"
-                                prop.onClick (fun _ -> setHasClosed (not hasClosed))
-                            ]
                         ]
-                    ]
                 ]
                 Html.div [
                     prop.custom ("data-theme", "light")
@@ -216,7 +218,7 @@ type PaperWithMarker =
                     //    style.custom ("word-wrap", "break-word")
                     //]
                     prop.className
-                        "prose p-2 rounded-lg max-w-full bg-base-300 min-w-0 [&_pre]:min-w-0 box-border [&_pre]:box-border [&_code]:box-border [&_pre]:whitespace-pre-wrap [&_code]:whitespace-pre-wrap [&_pre]:break-words [&_code]:break-words"
+                        "swt:prose swt:p-2 swt:rounded-lg swt:max-w-full swt:bg-base-300 swt:min-w-0 swt:[&_pre]:min-w-0 swt:box-border swt:[&_pre]:box-border swt:[&_code]:box-border swt:[&_pre]:whitespace-pre-wrap swt:[&_code]:whitespace-pre-wrap swt:[&_pre]:break-words swt:[&_code]:break-words"
                     prop.id elementID
                     prop.ref ref
                 ]
