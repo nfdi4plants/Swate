@@ -563,7 +563,8 @@ type GroupCard =
                                         prop.ariaLabel "Show members"
                                         prop.title "Show members"
                                         prop.onClick (fun _ -> onExpand ())
-                                        prop.className "swt:group swt:relative swt:min-w-0 swt:grow swt:cursor-pointer"
+                                        prop.className
+                                            "swt:group swt:relative swt:w-fit swt:max-w-full swt:cursor-pointer"
                                         prop.children [
                                             Html.span [
                                                 prop.ariaHidden true
