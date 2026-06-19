@@ -171,8 +171,13 @@ module FileTreeAssignNoteHelper =
         )
         |> PathHelpers.normalizeCanonicalRelativePath
 
-    let private buildAssignedAssetFolderPath (target: ExistingTargetRef) (note: AssignableNoteRef) destination =
-        let folderPath =
+    let buildAssignedAssetTargetPath
+        (target: ExistingTargetRef)
+        (note: AssignableNoteRef)
+        (asset: AssignableNoteAssetRef)
+        destination
+        =
+        let assetFolderPath =
             match destination with
             | AssignNoteAssetDestination.Protocol -> buildAssignedNoteFolderPath target note.NoteFolderName
             | AssignNoteAssetDestination.Dataset ->
@@ -188,16 +193,8 @@ module FileTreeAssignNoteHelper =
                     note.NoteFolderName
                 |]
 
-        folderPath |> PathHelpers.normalizeCanonicalRelativePath
-
-    let buildAssignedAssetTargetPath
-        (target: ExistingTargetRef)
-        (note: AssignableNoteRef)
-        (asset: AssignableNoteAssetRef)
-        destination
-        =
         combineRelativePaths [|
-            buildAssignedAssetFolderPath target note destination
+            assetFolderPath
             NoteConversion.noteAssetsFolderName
             asset.RelativeAssetPath
         |]

@@ -27,6 +27,24 @@ module private FileTreeHelper =
         | RenameDialog of ArcRenameDraft
         | DeleteDialog of FileItem
 
+    type AssignNoteDialogState = {
+        Target: ExistingTargetRef option
+        AvailableNotes: ResizeArray<AssignableNoteRef>
+        AvailableAssets: ResizeArray<AssignableNoteAssetRef>
+    }
+
+    let createAssignNoteDialogState activeDialog fileEntries selectedNote =
+        let target =
+            match activeDialog with
+            | Some(AssignNoteDialog target) -> Some target
+            | _ -> None
+
+        {
+            Target = target
+            AvailableNotes = FileTreeAssignNoteHelper.createAssignableNoteOptions fileEntries
+            AvailableAssets = FileTreeAssignNoteHelper.createAssignableNoteAssetOptions fileEntries selectedNote
+        }
+
     let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
         match FileContentDTO.fromArcFile arcFile with
         | None -> return Error(exn "Saving this file type is not supported in Electron yet.")
@@ -311,25 +329,11 @@ type FileTree =
             | Some(DeleteDialog item) -> None, None, None, Some item
             | None -> None, None, None, None
 
-        let activeAssignNoteTarget =
-            match activeDialog with
-            | Some(AssignNoteDialog target) -> Some target
-            | _ -> None
-
-        let availableAssignableNotes =
+        let assignNoteDialogState =
             React.useMemo (
-                (fun _ -> FileTreeAssignNoteHelper.createAssignableNoteOptions fileStateCtx.state.FileTree),
-                [| box fileStateCtx.state.FileTree |]
-            )
-
-        let availableAssignableNoteAssets =
-            React.useMemo (
-                (fun _ ->
-                    FileTreeAssignNoteHelper.createAssignableNoteAssetOptions
-                        fileStateCtx.state.FileTree
-                        selectedAssignableNote
-                ),
+                (fun _ -> createAssignNoteDialogState activeDialog fileStateCtx.state.FileTree selectedAssignableNote),
                 [|
+                    box activeDialog
                     box fileStateCtx.state.FileTree
                     box selectedAssignableNote
                 |]
@@ -497,29 +501,27 @@ type FileTree =
                     }
                     newName
 
-        let assignNoteMoveConfig: FileTreeAssignNoteHelper.AssignNoteMoveConfig = {
-            selectedTreePath = fileStateCtx.state.Selection.TreePath
-            pageState = pageStateCtx.state
-            closeDialog = closeDialog
-            setIsAssigning = setIsDialogBusy
-            setSelection = fileStateCtx.setSelection
-            refreshGitStatus = gitStateCtx.refresh
-            reloadPreviewByPath = reloadPreviewByPath
-            movePath = Api.ipcArcVaultApi.movePath
-            enqueueError = errorModal.enqueue
-        }
-
         let confirmAssignNote () =
             if not isDialogBusy then
-                match activeAssignNoteTarget, selectedAssignableNote with
+                match assignNoteDialogState.Target, selectedAssignableNote with
                 | None, _ -> closeDialog ()
                 | _, None -> FileTreeAssignNoteHelper.enqueueAssignNoteError errorModal.enqueue "Select a note."
                 | Some target, Some note ->
                     FileTreeAssignNoteHelper.assignNoteToTarget
-                        assignNoteMoveConfig
+                        {
+                            selectedTreePath = fileStateCtx.state.Selection.TreePath
+                            pageState = pageStateCtx.state
+                            closeDialog = closeDialog
+                            setIsAssigning = setIsDialogBusy
+                            setSelection = fileStateCtx.setSelection
+                            refreshGitStatus = gitStateCtx.refresh
+                            reloadPreviewByPath = reloadPreviewByPath
+                            movePath = Api.ipcArcVaultApi.movePath
+                            enqueueError = errorModal.enqueue
+                        }
                         target
                         note
-                        (availableAssignableNoteAssets |> Seq.toList)
+                        (assignNoteDialogState.AvailableAssets |> Seq.toList)
                         selectedAssetDestinations
 
         let createModalKind =
@@ -570,12 +572,12 @@ type FileTree =
 
         let assignNoteModal =
             FileTreeAssignNoteModal.Main(
-                isOpen = activeAssignNoteTarget.IsSome,
-                itemName = (activeAssignNoteTarget |> Option.map _.Name),
+                isOpen = assignNoteDialogState.Target.IsSome,
+                itemName = (assignNoteDialogState.Target |> Option.map _.Name),
                 selectedNote = selectedAssignableNote,
                 setSelectedNote = selectAssignableNote,
-                availableNotes = availableAssignableNotes,
-                availableAssets = availableAssignableNoteAssets,
+                availableNotes = assignNoteDialogState.AvailableNotes,
+                availableAssets = assignNoteDialogState.AvailableAssets,
                 assetDestinations = selectedAssetDestinations,
                 setAssetDestination = setAssetDestination,
                 close = closeDialog,
