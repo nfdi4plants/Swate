@@ -331,7 +331,7 @@ type Controls =
         Html.button [
             prop.title $"Move {header.Category.Name} grouping from {sideName}"
             prop.type'.button
-            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:btn-outline swt:z-10"
+            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:btn-outline swt:z-10 swt:bg-base-100/90"
             prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
             if defaultArg debug false then
                 prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
@@ -434,6 +434,8 @@ type Controls =
                         "swt:btn-primary"
                     else
                         "swt:btn-outline"
+                    if not sideSelected then
+                        "swt:bg-base-100/90"
                     if canSwitch then
                         yield! Styles.draggableButtonClasses draggable.isDragging
 
@@ -517,7 +519,7 @@ type Controls =
             Html.button [
                 prop.type'.button
                 prop.className [
-                    "swt:btn swt:btn-xs swt:btn-square swt:z-10 swt:btn-outline"
+                    "swt:btn swt:btn-xs swt:btn-square swt:z-10 swt:btn-outline swt:bg-base-100/90"
 
                     match side with
                     | ProvenanceSide.Input -> " swt:rounded-r-none swt:border-r-0"
@@ -572,6 +574,8 @@ type Controls =
                         "swt:btn-primary"
                     else
                         "swt:btn-outline"
+                    if not bothSelected then
+                        "swt:bg-base-100/90"
                 ]
                 if defaultArg debug false then
                     prop.testId $"provenance-property-both-{side}-{header.Category.Name}"
@@ -592,7 +596,7 @@ type Controls =
                     prop.type'.button
                     prop.disabled true
                     prop.className
-                        "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:z-10 swt:btn-outline swt:border-white"
+                        "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:z-10 swt:btn-outline swt:border-white swt:bg-base-100/90"
                     prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
                     if defaultArg debug false then
                         prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
@@ -1505,7 +1509,7 @@ type Controls =
                 Html.button [
                     prop.type'.button
                     prop.className
-                        "swt:size-5 swt:shrink-0 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer swt:align-middle"
+                        "swt:btn swt:btn-xs swt:btn-square swt:z-10 swt:btn-outline swt:shrink-0 swt:bg-base-100/90"
                     match currentColor with
                     | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
                     | _ -> ()
@@ -1516,7 +1520,8 @@ type Controls =
                     $"Choose color for property {header.Category.Name}"
                     draftColor
                     setDraftColor
-                    onSetColor
+                    onSetColor,
+            triggerClassName = "swt:relative swt:z-10 swt:shrink-0"
         )
 
     [<ReactComponent>]
