@@ -298,6 +298,70 @@ const CopyPathResolverFileExplorer = () => {
   );
 };
 
+const veryLongFolderName =
+  "Assay folder with an exceptionally long generated identifier that should be clipped before row controls";
+
+const veryLongFileName =
+  "measurement-export-with-an-exceptionally-long-generated-name-that-should-not-hide-controls.tsv";
+
+const TruncatedOverflowFileExplorer = () => {
+  const items = React.useMemo(() => {
+    const childFile = createStableFile("child.txt", "assays/long-folder/child.txt", "truncate-child");
+    const longFolder = createStableFolder(
+      veryLongFolderName,
+      "assays/long-folder",
+      "truncate-folder",
+      [childFile],
+    );
+    const longFile = createStableFile(veryLongFileName, "assays/long-file.tsv", "truncate-file");
+
+    return ofArray([longFolder, longFile]);
+  }, []);
+
+  const rowAction = React.useCallback(
+    (item: FileItem) =>
+      ofArray([
+        new ContextMenuItem(
+          "Mark",
+          "swt:fluent--star-24-regular",
+          () => {
+            void item;
+          },
+          undefined,
+        ),
+      ]),
+    [],
+  );
+
+  const statusAction = React.useCallback(
+    (item: FileItem) =>
+      new ContextMenuItem(
+        "Status",
+        "swt:fluent--info-24-regular",
+        () => {
+          void item;
+        },
+        undefined,
+      ),
+    [],
+  );
+
+  return (
+    <div
+      data-testid="truncated-file-explorer-viewport"
+      className="swt:p-2"
+      style={{ width: 280, overflow: "hidden" }}
+    >
+      <FileExplorer
+        initialItems={items}
+        getItemActions={rowAction}
+        getItemStatusAction={statusAction}
+        truncateOverflowingItemNames={true}
+      />
+    </div>
+  );
+};
+
 const installClipboardMock = () => {
   const writeText = fn(async () => undefined);
   Object.defineProperty(navigator, "clipboard", {
@@ -330,6 +394,26 @@ const expectContextMenuCopy = async (
   await userEvent.click(await screen.findByText(menuLabel));
 
   await waitFor(() => expect(writeText).toHaveBeenCalledWith(expectedText));
+};
+
+const expectLongNameControlsToStayVisible = async (canvasElement: HTMLElement, itemName: string) => {
+  const canvas = within(canvasElement);
+  const viewport = await canvas.findByTestId("truncated-file-explorer-viewport");
+  const label = await canvas.findByText(itemName);
+  const markButton = await canvas.findByRole("button", { name: `Mark ${itemName}` });
+  const statusButton = await canvas.findByRole("button", { name: `Status ${itemName}` });
+
+  await waitFor(() => {
+    const viewportRect = viewport.getBoundingClientRect();
+    const labelRect = label.getBoundingClientRect();
+    const markRect = markButton.getBoundingClientRect();
+    const statusRect = statusButton.getBoundingClientRect();
+
+    expect(markRect.right).toBeLessThanOrEqual(viewportRect.right + 1);
+    expect(statusRect.right).toBeLessThanOrEqual(viewportRect.right + 1);
+    expect(labelRect.right).toBeLessThanOrEqual(markRect.left + 1);
+    expect(label.clientWidth).toBeLessThan(label.scrollWidth);
+  });
 };
 
 const meta: Meta<typeof FileExplorerExample> = {
@@ -391,6 +475,11 @@ export const SelectingLazyDirectoryMaterializesChildren: StoryObj<typeof LazyLoa
 
     await waitFor(() => expect(canvas.getByText("Lazy Child.txt")).toBeInTheDocument());
     await expect(canvas.getByRole("button", { name: "Collapse Lazy Folder" })).toBeInTheDocument();
+
+    await userEvent.click(await canvas.findByText("Lazy Folder"));
+
+    await waitFor(() => expect(canvas.queryByText("Lazy Child.txt")).toBeNull());
+    await expect(canvas.getByRole("button", { name: "Expand Lazy Folder" })).toBeInTheDocument();
   },
 };
 
@@ -631,5 +720,14 @@ export const CopyRelativePathUsesProvidedResolver: StoryObj<typeof CopyPathResol
 
   play: async ({ canvasElement }) => {
     await expectContextMenuCopy(canvasElement, "Absolute File", "Copy Relative Path", "studies/A/file.txt");
+  },
+};
+
+export const LongNamesKeepInlineControlsVisible: StoryObj<typeof TruncatedOverflowFileExplorer> = {
+  render: () => <TruncatedOverflowFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    await expectLongNameControlsToStayVisible(canvasElement, veryLongFolderName);
+    await expectLongNameControlsToStayVisible(canvasElement, veryLongFileName);
   },
 };

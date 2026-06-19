@@ -1,19 +1,18 @@
 namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
-open Renderer.Components.Helper
 open Renderer.Components.FileExplorerDeleteHelper
+open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
-open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
 open Feliz
 open Fable.Core
 open ARCtrl
-open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Types
 open Helper
 open FileTreeMaterialization
@@ -510,7 +509,8 @@ type FileTree =
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             includeDefaultContextMenuItems = false,
-                            delegateHorizontalScrollToParent = true
+                            delegateHorizontalScrollToParent = true,
+                            truncateOverflowingItemNames = true
                         )
                     ]
                 ]
