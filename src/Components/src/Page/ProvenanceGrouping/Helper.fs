@@ -688,26 +688,12 @@ module PropertyProjection =
 
         let badgeByHeader = statsByHeader |> Map.map (fun _ stats -> badgeForStats stats)
 
-        let stableSourceColor (source: PropertyValueSourceInfo) =
-            let key =
-                [
-                    source.TableName |> Option.defaultValue ""
-                    source.ProcessName |> Option.defaultValue ""
-                    yield! source.InputNames
-                    yield! source.OutputNames
-                ]
-                |> String.concat "|"
-
-            let index = (hash key |> abs) % State.PropertyColors.palette.Length
-            State.PropertyColors.palette.[index]
-
         let resolvedColorForHeader header origins =
             match uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header } with
             | Some color -> Some color
             | None ->
                 match origins |> Set.toList with
                 | [ PropertyOrigin.UpstreamLayer layerId ] -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
-                | [ PropertyOrigin.PreviousContext source ] -> Some(stableSourceColor source)
                 | _ -> None
 
         let colorByHeader =

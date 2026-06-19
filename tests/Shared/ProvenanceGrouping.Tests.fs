@@ -2558,6 +2558,28 @@ let uiStateTests =
 
             Expect.isEmpty emptyProjection.Headers "Search should remove non-matching property headers."
 
+        testCase "attached previous context does not receive an automatic property color"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let layer = Session.activeLayer session
+            let state = State.init session
+
+            let previousTreatment =
+                propertyHeader FixtureKinds.characteristicProperty "Previous Treatment"
+
+            let projection =
+                PropertyProjection.railProjectionWithFilters session layer.Id ProvenanceSide.Input layer.Model state
+
+            Expect.contains
+                projection.Headers
+                previousTreatment
+                "Attached previous context should still appear in the property rail."
+
+            Expect.equal
+                projection.ColorByHeader.[previousTreatment]
+                None
+                "Attached previous context should not receive an automatic source color."
+
         testCase "current input properties default to output rail when connected to outputs"
         <| fun _ ->
             let session = Session.init (sampleModel ())
