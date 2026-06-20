@@ -2,6 +2,7 @@ namespace Components
 
 open Fable.Core
 open Feliz
+open Types
 
 
 [<AutoOpen>]
@@ -32,7 +33,7 @@ type ActionBar =
                         Html.form [
                             prop.method "dialog"
                             prop.children [
-                                Daisy.button.button [
+                                Html.button [
                                     prop.className
                                         "swt:btn swt:btn-sm swt:btn-circle swt:absolute swt:right-2 swt:top-2 swt:z-50 swt:h-5 swt:w-5"
                                     prop.text "✕"
@@ -45,7 +46,7 @@ type ActionBar =
                             prop.children [
                                 match annoState = [] && isActive = true with
                                 | true -> Html.h1 [ prop.text "No annotations to display." ]
-                                | false -> PreviewTable.table (annoState, setAnnoState, highlight, setHighlight)
+                                | false -> ()
                             ]
                         ]
                     ]
@@ -93,7 +94,7 @@ type ActionBar =
         let showAnnotationModal, setShowAnnotationModal = React.useState (false)
         let resultsIsEmpty = List.isEmpty annoState
 
-        React.fragment [
+        React.Fragment [
             ReactDOM.createPortal (
                 ActionBar.AnnotationModal(
                     showAnnotationModal,
@@ -125,24 +126,28 @@ type ActionBar =
                         ]
                         prop.dataTip "Download"
                         prop.children [
-                            Daisy.dropdown [
+                            Html.div [
+                                prop.className "swt:dropdown"
+                                prop.children [
                                 Html.button [
                                     prop.className [ "swt:btn swt:btn-sm swt:btn-square"; "swt:btn-primary" ]
                                     prop.disabled resultsIsEmpty
                                     prop.children [ Html.i [ prop.className "swt:fa-solid swt:fa-download" ] ]
                                 ]
                                 if not resultsIsEmpty then
-                                    Daisy.dropdownContent [
+                                    Html.div [
+                                        prop.className "swt:dropdown-content"
                                         prop.className
-                                            "swt:p-2 swt:shadow swt:menu swt:bg-base-100 swt:rounded-box swt:w-52"
+                                            "swt:p-2 swt:shadow swt:menu swt:bg-base-100 swt:rounded-box swt:w-52 "
                                         prop.tabIndex 0
                                         prop.children [
                                             Html.li [
                                                 Html.a [
                                                     prop.text "as .xlsx"
                                                     prop.onClick (fun _ ->
-                                                        DownloadParser.downloadXlsxProm (fileName, annoState)
-                                                        |> Promise.start
+                                                        // DownloadParser.downloadXlsxProm (fileName, annoState)
+                                                        // |> Promise.start
+                                                        ()
                                                     )
                                                 ]
                                             ]
@@ -150,13 +155,15 @@ type ActionBar =
                                                 Html.a [
                                                     prop.text "as .json"
                                                     prop.onClick (fun _ ->
-                                                        DownloadParser.downloadJsonProm (fileName, annoState)
-                                                        |> Promise.start
+                                                        // DownloadParser.downloadJsonProm (fileName, annoState)
+                                                        // |> Promise.start
+                                                        ()
                                                     )
                                                 ]
                                             ]
                                         ]
                                     ]
+                                ]
                             ]
                         ]
                     ]
@@ -164,40 +171,43 @@ type ActionBar =
                         prop.className [ "swt:tooltip swt:tooltip-left swt:ml-auto" ]
                         prop.dataTip "Delete"
                         prop.children [
-                            Daisy.dropdown [
-                                dropdown.end'
+                            Html.div [
+                                prop.className "swt:dropdown"
                                 prop.children [
 
                                     Html.button [
                                         prop.className [ "swt:btn swt:btn-sm swt:btn-square"; "swt:btn-error" ]
                                         prop.children [ Html.i [ prop.className "swt:fa-solid swt:fa-trash" ] ]
                                     ]
-
-                                    Daisy.dropdownContent [
-                                        prop.className
-                                            "swt:p-2 swt:shadow swt:menu swt:bg-base-100 swt:rounded-box swt:w-52"
-                                        prop.tabIndex 0
+                                    Html.div [
+                                        prop.className "swt:dropdown-content"
                                         prop.children [
-                                            Html.li [
-                                                Html.a [
-                                                    prop.text "delete all annotations"
-                                                    prop.onClick (fun _ ->
-                                                        setAnnoState []
-
-                                                        setHighlight {
-                                                            Keys = Map.empty
-                                                            Terms = Map.empty
-                                                            Values = Map.empty
-                                                        }
-                                                    )
-                                                    if annoState = [] then
-                                                        prop.className "swt:cursor-not-allowed"
-                                                ]
-                                            ]
-                                            Html.li [
-                                                Html.a [
-                                                    prop.text "delete document"
-                                                    prop.onClick (fun _ -> del ())
+                                            Html.div [
+                                                prop.className
+                                                    "swt:p-2 swt:shadow swt:menu swt:bg-base-100 swt:rounded-box swt:w-52"
+                                                prop.tabIndex 0
+                                                prop.children [
+                                                    Html.li [
+                                                        Html.a [
+                                                            prop.text "delete all annotations"
+                                                            prop.onClick (fun _ ->
+                                                                setAnnoState []
+                                                                setHighlight {
+                                                                    Keys = Map.empty
+                                                                    Terms = Map.empty
+                                                                    Values = Map.empty
+                                                                }
+                                                            )
+                                                            if annoState = [] then
+                                                                prop.className "swt:cursor-not-allowed"
+                                                        ]
+                                                    ]
+                                                    Html.li [
+                                                        Html.a [
+                                                            prop.text "delete document"
+                                                            prop.onClick (fun _ -> del ())
+                                                        ]
+                                                    ]
                                                 ]
                                             ]
                                         ]
