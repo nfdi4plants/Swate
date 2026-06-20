@@ -8,7 +8,7 @@ open Swate.Components.Page.Metadata.FormComponents
 module AssaySection =
 
     [<ReactComponent>]
-    let Main(draft: LandingDraft, setDraft: LandingDraft -> unit) =
+    let Main (draft: LandingDraft, setDraft: LandingDraft -> unit) =
         Html.div [
             prop.className "swt:space-y-3"
             prop.children [
@@ -24,9 +24,13 @@ module AssaySection =
                 )
                 OntologyAnnotationInput.OntologyAnnotationInput(
                     draft.TechnologyPlatform,
-                    (fun value -> setDraft { draft with TechnologyPlatform = value }),
+                    (fun value ->
+                        setDraft {
+                            draft with
+                                TechnologyPlatform = value
+                        }
+                    ),
                     label = "Technology Platform"
                 )
             ]
         ]
-

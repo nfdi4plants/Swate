@@ -519,4 +519,3 @@ type ArcFileFooterTabs =
                 ]
             ]
         ]
-

@@ -41,36 +41,20 @@ type ReactMDEditor =
     static member commands: obj = jsNative
 
     [<Import("handleKeyDown", "@uiw/react-md-editor")>]
-    static member handleKeyDown
-        (
-            e: KeyboardEvent,
-            ?tabSize: int,
-            ?defaultTabEnable: bool
-        ) : unit =
-        jsNative
+    static member handleKeyDown(e: KeyboardEvent, ?tabSize: int, ?defaultTabEnable: bool) : unit = jsNative
 
     [<Import("shortcuts", "@uiw/react-md-editor")>]
-    static member shortcuts
-        (
-            e: KeyboardEvent,
-            commands: ICommand[],
-            orchestrator: TextAreaCommandOrchestrator
-        ) : unit =
+    static member shortcuts(e: KeyboardEvent, commands: ICommand[], orchestrator: TextAreaCommandOrchestrator) : unit =
         jsNative
 
     [<Import("getCodeString", "rehype-rewrite")>]
-    static member getCodeString (children: obj) : string = jsNative
+    static member getCodeString(children: obj) : string = jsNative
 
     [<ImportDefault("rehype-sanitize")>]
     static member rehypeSanitize: obj = jsNative
 
     [<ReactComponent("default", "@uiw/react-markdown-preview")>]
     static member MarkdownPreview
-        (
-            source: string,
-            ?className: string,
-            ?components: obj,
-            ?rehypePlugins: obj[],
-            ?wrapperElement: obj
-        ) =
+        (source: string, ?className: string, ?components: obj, ?rehypePlugins: obj[], ?wrapperElement: obj)
+        =
         React.Imported()

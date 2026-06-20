@@ -4,6 +4,7 @@ open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
 
+module FileExplorerGitLfsHelper = Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper
 
 type FileTreeNodeLfsState = {
     IsLFS: bool option
@@ -46,41 +47,40 @@ let private createErrorReporter
     (title: string)
     =
     function
-    | Some msg -> enqueueErrorModal (ErrorModalRequest.create(msg, title = title, ?scopeId = arcScopeId))
+    | Some msg -> enqueueErrorModal (ErrorModalRequest.create (msg, title = title, ?scopeId = arcScopeId))
     | None -> ()
 
 let private createLfsAction title action enqueueErrorModal arcScopeId runAction =
     action (createErrorReporter enqueueErrorModal arcScopeId title) runAction
 
 let createToggleLfsMark enqueueErrorModal arcScopeId runToggle =
-    createLfsAction "Git LFS update failed" Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark enqueueErrorModal arcScopeId runToggle
+    createLfsAction
+        "Git LFS update failed"
+        FileExplorerGitLfsHelper.toggleLfsMark
+        enqueueErrorModal
+        arcScopeId
+        runToggle
 
 let createFreeLocalLfsCopy enqueueErrorModal arcScopeId runCleanup =
-    createLfsAction "Git LFS cleanup failed" Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.freeLocalLfsCopy enqueueErrorModal arcScopeId runCleanup
+    createLfsAction
+        "Git LFS cleanup failed"
+        FileExplorerGitLfsHelper.freeLocalLfsCopy
+        enqueueErrorModal
+        arcScopeId
+        runCleanup
 
 let createDownloadLfsFile enqueueErrorModal arcScopeId runDownload =
-    createLfsAction "Git LFS download failed" Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.downloadLfsFile enqueueErrorModal arcScopeId runDownload
+    createLfsAction
+        "Git LFS download failed"
+        FileExplorerGitLfsHelper.downloadLfsFile
+        enqueueErrorModal
+        arcScopeId
+        runDownload
 
-let createContextMenuItems enqueueErrorModal arcScopeId baseItems =
-    let toggleLfsMark =
-        createToggleLfsMark enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runToggleLfsMark
-
-    let downloadLfsFile =
-        createDownloadLfsFile enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runDownloadLfsFile
-
-    let freeLocalLfsCopy =
-        createFreeLocalLfsCopy enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runFreeLocalLfsCopy
-
-    fun item ->
-        baseItems item
-        @ Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItemsWithDownload item toggleLfsMark (Some downloadLfsFile) (Some freeLocalLfsCopy)
-
-let createLfsPillAction enqueueErrorModal arcScopeId =
-    let downloadLfsFile =
-        createDownloadLfsFile enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runDownloadLfsFile
+let createLfsPillAction enqueueErrorModal arcScopeId runDownload runCleanup =
+    let downloadLfsFile = createDownloadLfsFile enqueueErrorModal arcScopeId runDownload
 
     let freeLocalLfsCopy =
-        createFreeLocalLfsCopy enqueueErrorModal arcScopeId Renderer.Components.ARCHelper.runFreeLocalLfsCopy
+        createFreeLocalLfsCopy enqueueErrorModal arcScopeId runCleanup
 
-    fun item ->
-        Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.lfsPillAction item (Some downloadLfsFile) (Some freeLocalLfsCopy)
+    fun item -> FileExplorerGitLfsHelper.lfsPillAction item (Some downloadLfsFile) (Some freeLocalLfsCopy)

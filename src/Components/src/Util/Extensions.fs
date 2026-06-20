@@ -3,6 +3,7 @@ namespace Swate.Components
 open Feliz
 open ARCtrl
 open Fable.Core
+
 type style =
     static member resolveStyle(style: U2<string, string[]>) =
         match style with

@@ -1,8 +1,8 @@
 module Renderer.Components.FileExplorerDeleteHelper
 
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Renderer.Types
 
 [<RequireQualifiedAccess>]
 module FileExplorerDeleteHelper =
@@ -18,36 +18,69 @@ module FileExplorerDeleteHelper =
         |> Option.map PathHelpers.normalizePath
         |> Option.exists (fun selectedPath -> containsPath paths selectedPath |> not)
 
-    let shouldResetPageStateAfterSelectionRemoval (pageState: Renderer.Types.PageState option) =
-        match pageState with
-        | Some(Renderer.Types.PageState.ArcFilePage _)
-        | Some(Renderer.Types.PageState.TextPage _)
-        | Some Renderer.Types.PageState.UnknownPage
-        | Some(Renderer.Types.PageState.ErrorPage _) -> true
+    let private resetsWhenSelectionIsRemoved =
+        function
+        | PageState.ArcFilePage _
+        | PageState.MarkdownPage _
+        | PageState.TextPage _
+        | PageState.UnknownPage
+        | PageState.ErrorPage _ -> true
         | _ -> false
 
-    let private shouldReloadPageStateAfterSelectedFileUpdate (pageState: Renderer.Types.PageState option) =
-        match pageState with
-        | Some(Renderer.Types.PageState.TextPage _)
-        | Some Renderer.Types.PageState.UnknownPage
-        | Some(Renderer.Types.PageState.ErrorPage _) -> true
+    let shouldResetPageStateAfterSelectionRemoval (pageState: PageState option) =
+        pageState |> Option.exists resetsWhenSelectionIsRemoved
+
+    let private reloadsWhenSelectedFileChanges =
+        function
+        | PageState.MarkdownPage _
+        | PageState.TextPage _
+        | PageState.UnknownPage
+        | PageState.ErrorPage _ -> true
         | _ -> false
+
+    let private isCheckedOutLfsFile (entry: FileEntry) =
+        entry.lfs |> Option.exists (fun lfsInfo -> lfsInfo.checkout)
+
+    let private isPointerLfsFile (entry: FileEntry) =
+        entry.lfs |> Option.exists (fun lfsInfo -> not lfsInfo.checkout)
+
+    let private shouldReloadSelectedFile pageState entry =
+        if isPointerLfsFile entry then
+            false
+        else
+            match pageState with
+            | Some state -> reloadsWhenSelectedFileChanges state
+            | None -> isCheckedOutLfsFile entry
+
+    let private tryFindSelectedFileEntry (fileTree: FileEntry[]) (selectionPath: string option) =
+        selectionPath
+        |> Option.map PathHelpers.normalizePath
+        |> Option.bind (fun selectedPath ->
+            fileTree
+            |> Array.tryFind (fun entry ->
+                not entry.isDirectory
+                && PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) selectedPath
+            )
+        )
+
+    let shouldClearPageStateForLfsPointerSelection
+        (fileTree: FileEntry[])
+        (selectionPath: string option)
+        (pageState: PageState option)
+        =
+        pageState |> Option.exists resetsWhenSelectionIsRemoved
+        && (tryFindSelectedFileEntry fileTree selectionPath
+            |> Option.exists isPointerLfsFile)
 
     let tryGetReloadableSelectedFilePath
         (fileTree: FileEntry[])
         (selectionPath: string option)
-        (pageState: Renderer.Types.PageState option)
+        (pageState: PageState option)
         =
-        if shouldReloadPageStateAfterSelectedFileUpdate pageState |> not then
-            None
-        else
-            selectionPath
-            |> Option.map PathHelpers.normalizePath
-            |> Option.bind (fun selectedPath ->
-                fileTree
-                |> Array.tryFind (fun entry ->
-                    not entry.isDirectory
-                    && PathHelpers.pathsEqual (PathHelpers.normalizePath entry.path) selectedPath
-                )
-                |> Option.map (fun entry -> PathHelpers.normalizePath entry.path)
-            )
+        tryFindSelectedFileEntry fileTree selectionPath
+        |> Option.bind (fun entry ->
+            if shouldReloadSelectedFile pageState entry then
+                Some(PathHelpers.normalizePath entry.path)
+            else
+                None
+        )

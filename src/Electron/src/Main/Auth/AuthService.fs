@@ -21,11 +21,69 @@ let shouldSkipRevalidation (lastStartedAtUtc: DateTime option) (now: DateTime) =
     lastStartedAtUtc
     |> Option.exists (fun lastStart -> (now - lastStart) < revalidationCooldown)
 
-let nextTokenInvalidState (currentTokenInvalid: bool) (failureKind: AuthFailureKind) =
+let nextTokenStatusState (currentTokenStatus: TokenStatus) (failureKind: AuthFailureKind) =
     match failureKind with
     | AuthFailureKind.Unauthorized
-    | AuthFailureKind.Forbidden -> true
-    | _ -> currentTokenInvalid
+    | AuthFailureKind.Forbidden -> TokenStatus.Invalid
+    | _ -> currentTokenStatus
+
+let private tryParseIsoDateTime (raw: string option) : DateTime option =
+    match raw with
+    | Some value ->
+        let mutable parsed = DateTime.MinValue
+
+        if DateTime.TryParse(value, &parsed) then
+            Some parsed
+        else
+            None
+    | None -> None
+
+let private tryParseIsoDate (raw: string option) : DateTime option =
+    match raw with
+    | Some value ->
+        let mutable parsed = DateTime.MinValue
+
+        if DateTime.TryParse(value, &parsed) then
+            Some parsed.Date
+        else
+            None
+    | None -> None
+
+let private normalizeExpiresOnValue (expiresOn: DateTime option) : string option =
+    expiresOn |> Option.map (fun dt -> dt.ToString("yyyy-MM-dd"))
+
+let evaluateTokenStatus
+    (nowUtc: DateTime)
+    (createdAtRaw: string option)
+    (expiresAtRaw: string option)
+    (isActive: bool)
+    (isRevoked: bool)
+    : TokenStatus * string option =
+    let expiresOn = expiresAtRaw |> tryParseIsoDate
+    let expiresOnValue = normalizeExpiresOnValue expiresOn
+
+    if isRevoked || not isActive then
+        TokenStatus.Invalid, expiresOnValue
+    else
+        match expiresOn with
+        | Some expiresAt when nowUtc.Date > expiresAt.Date -> TokenStatus.Invalid, expiresOnValue
+        | Some expiresAt ->
+            let startedAt = createdAtRaw |> tryParseIsoDateTime
+
+            let startedWithOneMonthOrLonger =
+                startedAt
+                |> Option.exists (fun createdAt ->
+                    let totalLifetime = expiresAt.Date - createdAt.Date
+                    totalLifetime >= TimeSpan.FromDays 30.0
+                )
+
+            let remainingLifetime = expiresAt.Date - nowUtc.Date
+
+            if startedWithOneMonthOrLonger && remainingLifetime <= TimeSpan.FromDays 14.0 then
+                TokenStatus.Expiring, expiresOnValue
+            else
+                TokenStatus.Ok, expiresOnValue
+        | None -> TokenStatus.Ok, None
 
 /// Normalize and validate a GitLab base URL. HTTPS only.
 let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
@@ -55,48 +113,49 @@ let private normalizeBaseUrl (baseUrl: string) : Result<string, AuthFailure> =
 //   2. If no match, search all accounts for a host match.
 //   3. If still no match, return None.
 
-/// Map of accountId → account state (summary + PAT).
+/// Map of localSwateAccountId → account state (summary + PAT).
 let mutable private accounts: Map<string, AccountState> = Map.empty
 
-/// Currently active account ID.
-let mutable private activeAccountId: string option = None
+/// Currently active local account key.
+let mutable private activeLocalSwateAccountId: string option = None
 
 let private getActiveAccountState () =
-    activeAccountId |> Option.bind (fun id -> accounts |> Map.tryFind id)
+    activeLocalSwateAccountId |> Option.bind (fun id -> accounts |> Map.tryFind id)
 
 let private persistActiveSelection () =
-    SecureAuthStore.setActiveAccountId activeAccountId
+    SecureAuthStore.setActiveLocalSwateAccountId activeLocalSwateAccountId
 
-let private invalidateRevalidationWindow () =
-    lastRevalidationStartedAtUtc <- None
+let private invalidateRevalidationWindow () = lastRevalidationStartedAtUtc <- None
 
 let private reconcileActiveAccountInvariant () =
     let nextActive =
         if accounts.IsEmpty then
             None
         else
-            match activeAccountId with
+            match activeLocalSwateAccountId with
             | Some id when accounts |> Map.containsKey id -> Some id
             | _ -> accounts |> Map.tryPick (fun id _ -> Some id)
 
-    if activeAccountId <> nextActive then
-        activeAccountId <- nextActive
+    if activeLocalSwateAccountId <> nextActive then
+        activeLocalSwateAccountId <- nextActive
         persistActiveSelection ()
 
-let private toMetadata (accountId: string) (summary: AccountSummary) : SecureAuthStore.AuthMetadata = {
-    AccountId = accountId
+let private toMetadata (localSwateAccountId: string) (summary: AccountSummary) : SecureAuthStore.AuthMetadata = {
+    LocalSwateAccountId = localSwateAccountId
+    Id = summary.User.Id
     Name = summary.User.Name
     Email = summary.User.Email
     AvatarUrl = summary.User.AvatarUrl
     TargetDataHub = summary.User.TargetDataHub
     DateAdded = summary.DateAdded
-    TokenInvalid = summary.TokenInvalid
+    TokenStatus = summary.TokenStatus
+    TokenExpiresOn = summary.TokenExpiresOn
 }
 
-let private persistAccountState (accountId: string) (accountState: AccountState) : unit =
+let private persistAccountState (localSwateAccountId: string) (accountState: AccountState) : unit =
     let storeResult =
         SecureAuthStore.store {
-            Metadata = toMetadata accountId accountState.Summary
+            Metadata = toMetadata localSwateAccountId accountState.Summary
             Token = accountState.Token
         }
 
@@ -110,7 +169,7 @@ let private getAuthStateDto () : AuthStateDto = {
 }
 
 let private canUseToken (accountState: AccountState) =
-    not accountState.Summary.TokenInvalid
+    accountState.Summary.TokenStatus <> TokenStatus.Invalid
 
 /// Try to get token for a given host (used by GitTokenProvider).
 /// Policy: active account first, then any account matching the host.
@@ -119,8 +178,7 @@ let tryGetTokenForHost (host: string) : string option =
     match getActiveAccountState () with
     | Some accountState when
         canUseToken accountState
-        &&
-        String.Equals(
+        && String.Equals(
             SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
             host,
             StringComparison.OrdinalIgnoreCase
@@ -133,8 +191,7 @@ let tryGetTokenForHost (host: string) : string option =
         |> Map.tryPick (fun _ accountState ->
             if
                 canUseToken accountState
-                &&
-                String.Equals(
+                && String.Equals(
                     SecureAuthStore.extractHost accountState.Summary.User.TargetDataHub,
                     host,
                     StringComparison.OrdinalIgnoreCase
@@ -148,6 +205,30 @@ let tryGetTokenForHost (host: string) : string option =
 let private refreshTokenProvider () =
     Main.Git.GitTokenProvider.setTokenProvider {
         TryGetAccessToken = fun host -> promise { return tryGetTokenForHost host }
+    }
+
+    Main.Git.GitTokenProvider.RemoteProvisioning.setProvider {
+        CreateProject =
+            fun projectName -> promise {
+                match
+                    getActiveAccountState ()
+                    |> Option.filter canUseToken
+                    |> Option.map (fun accountState -> accountState.Summary.User, accountState.Token)
+                with
+                | None ->
+                    return
+                        Error "No usable DataHub account is signed in. Sign in before publishing this local repository."
+                | Some(user, token) when String.IsNullOrWhiteSpace user.TargetDataHub ->
+                    return Error "The active DataHub account has no DataHub endpoint configured."
+                | Some(user, token) ->
+                    let! projectResult =
+                        Swate.Components.Api.GitLabApi.GitLabApi.CreateProject(user.TargetDataHub, token, projectName)
+
+                    return
+                        projectResult
+                        |> Result.map _.http_url_to_repo
+                        |> Result.mapError _.GitLabErrorToString
+            }
     }
 
 /// Get the current in-memory auth state for the active account.
@@ -222,35 +303,58 @@ let signIn (request: AuthSignInRequest) : JS.Promise<AuthResult> = promise {
             match verifyResult with
             | Error failure -> return toAuthResult (Error failure)
             | Ok user ->
-                let dateAdded =
-                    accounts
-                    |> Map.tryFind user.AccountId
-                    |> Option.map (fun accountState -> accountState.Summary.DateAdded)
-                    |> Option.defaultValue (Swate.Components.DateTimeExtensions.getUtcNowISO ())
+                let! tokenInfoResult = GitLabApi.getCurrentPersonalAccessToken baseUrl request.PersonalAccessToken
 
-                let accountState = {
-                    Summary = {
-                        User = user
-                        DateAdded = dateAdded
-                        TokenInvalid = false
-                    }
-                    Token = request.PersonalAccessToken
-                }
+                match tokenInfoResult with
+                | Error failure -> return toAuthResult (Error failure)
+                | Ok tokenInfo ->
+                    let tokenStatus, tokenExpiresOn =
+                        evaluateTokenStatus
+                            DateTime.UtcNow
+                            tokenInfo.created_at
+                            tokenInfo.expires_at
+                            tokenInfo.active
+                            tokenInfo.revoked
 
-                persistAccountState user.AccountId accountState
+                    if tokenStatus = TokenStatus.Invalid then
+                        return
+                            toAuthResult (
+                                Error {
+                                    Kind = AuthFailureKind.Unauthorized
+                                    Message = "Personal Access Token is invalid or expired."
+                                }
+                            )
+                    else
+                        let dateAdded =
+                            accounts
+                            |> Map.tryFind user.LocalSwateAccountId
+                            |> Option.map (fun accountState -> accountState.Summary.DateAdded)
+                            |> Option.defaultValue (Swate.Components.DateTimeExtensions.getUtcNowISO ())
 
-                accounts <- accounts |> Map.add user.AccountId accountState
-                activeAccountId <- Some user.AccountId
-                persistActiveSelection ()
-                invalidateRevalidationWindow ()
-                refreshTokenProvider ()
-                let authStateDto = getState ()
-                return toAuthResult (Ok authStateDto)
+                        let accountState = {
+                            Summary = {
+                                User = user
+                                DateAdded = dateAdded
+                                TokenStatus = tokenStatus
+                                TokenExpiresOn = tokenExpiresOn
+                            }
+                            Token = request.PersonalAccessToken
+                        }
+
+                        persistAccountState user.LocalSwateAccountId accountState
+
+                        accounts <- accounts |> Map.add user.LocalSwateAccountId accountState
+                        activeLocalSwateAccountId <- Some user.LocalSwateAccountId
+                        persistActiveSelection ()
+                        invalidateRevalidationWindow ()
+                        refreshTokenProvider ()
+                        let authStateDto = getState ()
+                        return toAuthResult (Ok authStateDto)
 }
 
 /// Sign out: remove active account from memory and disk, pick next or clear.
 let signOut () : unit =
-    match activeAccountId with
+    match activeLocalSwateAccountId with
     | Some id ->
         SecureAuthStore.remove id
         accounts <- accounts |> Map.remove id
@@ -260,10 +364,10 @@ let signOut () : unit =
     | None -> ()
 
 /// Set a different account as active.
-let setActiveAccount (accountId: string) : AuthStateDto =
-    match accounts |> Map.tryFind accountId with
+let setActiveAccount (localSwateAccountId: string) : AuthStateDto =
+    match accounts |> Map.tryFind localSwateAccountId with
     | Some _ ->
-        activeAccountId <- Some accountId
+        activeLocalSwateAccountId <- Some localSwateAccountId
         persistActiveSelection ()
         invalidateRevalidationWindow ()
         refreshTokenProvider ()
@@ -271,16 +375,65 @@ let setActiveAccount (accountId: string) : AuthStateDto =
 
     getState ()
 
-/// Remove a specific account (by ID). If it was active, switch to next or clear.
-let removeAccount (accountId: string) : unit =
-    SecureAuthStore.remove accountId
-    accounts <- accounts |> Map.remove accountId
+/// Remove a specific account (by local key). If it was active, switch to next or clear.
+let removeAccount (localSwateAccountId: string) : unit =
+    SecureAuthStore.remove localSwateAccountId
+    accounts <- accounts |> Map.remove localSwateAccountId
 
     reconcileActiveAccountInvariant ()
     invalidateRevalidationWindow ()
     refreshTokenProvider ()
 
-/// Revalidate all stored accounts and mark invalid tokens without removing accounts.
+/// Rotate PAT for a specific account and replace the stored token.
+let rotatePersonalAccessToken (localSwateAccountId: string) : JS.Promise<Result<AuthStateDto, AuthFailure>> = promise {
+    match accounts |> Map.tryFind localSwateAccountId with
+    | None ->
+        return
+            Error {
+                Kind = AuthFailureKind.EndpointInvalid
+                Message = "The selected account no longer exists."
+            }
+    | Some accountState ->
+        let baseUrl = accountState.Summary.User.TargetDataHub
+        let! rotateResult = GitLabApi.rotateCurrentPersonalAccessToken baseUrl accountState.Token
+
+        match rotateResult with
+        | Error failure -> return Error failure
+        | Ok rotatedToken ->
+            let tokenStatus, tokenExpiresOn =
+                evaluateTokenStatus
+                    DateTime.UtcNow
+                    rotatedToken.created_at
+                    rotatedToken.expires_at
+                    rotatedToken.active
+                    rotatedToken.revoked
+
+            if tokenStatus = TokenStatus.Invalid then
+                return
+                    Error {
+                        Kind = AuthFailureKind.Unauthorized
+                        Message = "Refreshed Personal Access Token is invalid or expired."
+                    }
+            else
+                let updatedAccountState = {
+                    accountState with
+                        Summary = {
+                            accountState.Summary with
+                                TokenStatus = tokenStatus
+                                TokenExpiresOn = tokenExpiresOn
+                        }
+                        Token = rotatedToken.token
+                }
+
+                accounts <- accounts |> Map.add localSwateAccountId updatedAccountState
+                persistAccountState localSwateAccountId updatedAccountState
+                invalidateRevalidationWindow ()
+                refreshTokenProvider ()
+
+                return Ok(getState ())
+}
+
+/// Revalidate all stored accounts and update token status without removing accounts.
 /// The boolean indicates whether a network-backed revalidation actually ran.
 let revalidate () : JS.Promise<AuthResult * bool> = promise {
     if accounts.IsEmpty then
@@ -314,47 +467,78 @@ let revalidate () : JS.Promise<AuthResult * bool> = promise {
             let mutable nextAccounts = accounts
             let mutable firstFailure: AuthFailure option = None
 
-            for accountId, accountState in accounts |> Map.toArray do
+            for localSwateAccountId, accountState in accounts |> Map.toArray do
                 let currentUser = accountState.Summary.User
-                let! verifyResult = GitLabApi.verifyToken currentUser.TargetDataHub accountState.Token
 
-                match verifyResult with
-                | Ok verifiedUser ->
-                    // Keep the persisted account id stable to avoid file renames on profile changes.
-                    let stableUser = {
-                        verifiedUser with
-                            AccountId = accountId
-                    }
+                let! tokenInfoResult =
+                    GitLabApi.getCurrentPersonalAccessToken currentUser.TargetDataHub accountState.Token
 
-                    let updatedAccountState = {
-                        accountState with
-                            Summary = {
-                                accountState.Summary with
-                                    User = stableUser
-                                    TokenInvalid = false
-                            }
-                    }
+                match tokenInfoResult with
+                | Ok tokenInfo ->
+                    let tokenStatus, tokenExpiresOn =
+                        evaluateTokenStatus
+                            now
+                            tokenInfo.created_at
+                            tokenInfo.expires_at
+                            tokenInfo.active
+                            tokenInfo.revoked
 
-                    nextAccounts <- nextAccounts |> Map.add accountId updatedAccountState
-                    persistAccountState accountId updatedAccountState
+                    let! verifyResult = GitLabApi.verifyToken currentUser.TargetDataHub accountState.Token
+
+                    match verifyResult with
+                    | Ok verifiedUser ->
+                        // Keep the persisted local key stable to avoid file renames on profile changes.
+                        let stableUser = {
+                            verifiedUser with
+                                LocalSwateAccountId = localSwateAccountId
+                        }
+
+                        let updatedAccountState = {
+                            accountState with
+                                Summary = {
+                                    accountState.Summary with
+                                        User = stableUser
+                                        TokenStatus = tokenStatus
+                                        TokenExpiresOn = tokenExpiresOn
+                                }
+                        }
+
+                        nextAccounts <- nextAccounts |> Map.add localSwateAccountId updatedAccountState
+                        persistAccountState localSwateAccountId updatedAccountState
+
+                    | Error failure ->
+                        if firstFailure.IsNone then
+                            firstFailure <- Some failure
+
+                        let updatedAccountState = {
+                            accountState with
+                                Summary = {
+                                    accountState.Summary with
+                                        TokenStatus = tokenStatus
+                                        TokenExpiresOn = tokenExpiresOn
+                                }
+                        }
+
+                        nextAccounts <- nextAccounts |> Map.add localSwateAccountId updatedAccountState
+                        persistAccountState localSwateAccountId updatedAccountState
 
                 | Error failure ->
                     if firstFailure.IsNone then
                         firstFailure <- Some failure
 
-                    let tokenInvalid =
-                        nextTokenInvalidState accountState.Summary.TokenInvalid failure.Kind
+                    let nextTokenStatus =
+                        nextTokenStatusState accountState.Summary.TokenStatus failure.Kind
 
                     let updatedAccountState = {
                         accountState with
                             Summary = {
                                 accountState.Summary with
-                                    TokenInvalid = tokenInvalid
+                                    TokenStatus = nextTokenStatus
                             }
                     }
 
-                    nextAccounts <- nextAccounts |> Map.add accountId updatedAccountState
-                    persistAccountState accountId updatedAccountState
+                    nextAccounts <- nextAccounts |> Map.add localSwateAccountId updatedAccountState
+                    persistAccountState localSwateAccountId updatedAccountState
 
             accounts <- nextAccounts
             reconcileActiveAccountInvariant ()
@@ -389,7 +573,8 @@ let tryRestoreFromStorage () : unit =
 
     for credential in stored do
         let user: AuthUserDto = {
-            AccountId = credential.Metadata.AccountId
+            Id = credential.Metadata.Id
+            LocalSwateAccountId = credential.Metadata.LocalSwateAccountId
             Name = credential.Metadata.Name
             Email = credential.Metadata.Email
             AvatarUrl = credential.Metadata.AvatarUrl
@@ -400,15 +585,16 @@ let tryRestoreFromStorage () : unit =
             Summary = {
                 User = user
                 DateAdded = credential.Metadata.DateAdded
-                TokenInvalid = credential.Metadata.TokenInvalid
+                TokenStatus = credential.Metadata.TokenStatus
+                TokenExpiresOn = credential.Metadata.TokenExpiresOn
             }
             Token = credential.Token
         }
 
-        accounts <- accounts |> Map.add user.AccountId accountState
+        accounts <- accounts |> Map.add user.LocalSwateAccountId accountState
 
     // Restore persisted active account selection
-    activeAccountId <- SecureAuthStore.getActiveAccountId ()
+    activeLocalSwateAccountId <- SecureAuthStore.getActiveLocalSwateAccountId ()
 
     reconcileActiveAccountInvariant ()
 

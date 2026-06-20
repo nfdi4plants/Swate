@@ -130,7 +130,7 @@ type Buttons =
 
         Html.button [
             prop.className [
-                "swt:btn swt:btn-ghost swt:btn-square swt:btn-transparent swt:bg-transparent swt:border-none swt:shadow-none"
+                "swt:btn swt:btn-sm swt:btn-neutral swt:btn-square"
 
                 match color with
                 | Some DaisyuiColors.Primary -> "swt:hover:text-primary!"

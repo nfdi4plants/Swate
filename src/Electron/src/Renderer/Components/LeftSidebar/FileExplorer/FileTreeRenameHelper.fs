@@ -6,8 +6,7 @@ open Swate.Electron.Shared.FileIOHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 
 let private normalizeRelativePath (path: string) =
-    path
-    |> PathHelpers.normalizeCanonicalRelativePath
+    path |> PathHelpers.normalizeCanonicalRelativePath
 
 let canRenameItem (item: FileItem) =
     item.Path
@@ -17,8 +16,7 @@ let canRenameItem (item: FileItem) =
 let tryBuildRenameDraft (item: FileItem) : Result<ArcRenameDraft, string> =
 
     let tryGetRelativePath (item: FileItem) : string option =
-        item.Path
-        |> Option.map PathHelpers.normalizeCanonicalRelativePath
+        item.Path |> Option.map PathHelpers.normalizeCanonicalRelativePath
 
     match tryGetRelativePath item with
     | None -> Error "Could not resolve the selected item path for rename."
@@ -45,7 +43,10 @@ let tryRemapSelectionPath (sourcePath: string) (targetPath: string) (selectedPat
     selectedPath
     |> Option.map normalizeRelativePath
     |> Option.bind (fun normalizedSelectedPath ->
-        if PathHelpers.isSameOrDescendantPath normalizedSelectedPath normalizedSourcePath |> not then
+        if
+            PathHelpers.isSameOrDescendantPath normalizedSelectedPath normalizedSourcePath
+            |> not
+        then
             None
         else
             let selectedSegments = getNonEmptyPathParts normalizedSelectedPath
@@ -57,19 +58,13 @@ let tryRemapSelectionPath (sourcePath: string) (targetPath: string) (selectedPat
             else
                 let samePrefix =
                     sourceSegments
-                    |> Array.mapi (fun index segment ->
-                        PathHelpers.pathsEqual segment selectedSegments.[index]
-                    )
+                    |> Array.mapi (fun index segment -> PathHelpers.pathsEqual segment selectedSegments.[index])
                     |> Array.forall id
 
                 if samePrefix |> not then
                     None
                 else
-                    let suffixSegments =
-                        selectedSegments
-                        |> Array.skip sourceSegments.Length
+                    let suffixSegments = selectedSegments |> Array.skip sourceSegments.Length
 
-                    Array.append targetSegments suffixSegments
-                    |> String.concat "/"
-                    |> Some
+                    Array.append targetSegments suffixSegments |> String.concat "/" |> Some
     )

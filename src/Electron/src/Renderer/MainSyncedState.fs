@@ -63,7 +63,8 @@ let useMainSyncedState<'T> (config: MainSyncedStateConfig<'T>) : MainSyncedState
                         elif componentIsActive && requestIsCurrent then
                             setIsLoading false
                 }
-                |> Promise.start),
+                |> Promise.start
+            ),
             config.dependencies
         )
 
@@ -84,7 +85,8 @@ let useMainSyncedState<'T> (config: MainSyncedStateConfig<'T>) : MainSyncedState
 
             fun () ->
                 activeTokenRef.current <- activeTokenRef.current + 1
-                dispose ()),
+                dispose ()
+        ),
         config.dependencies
     )
 

@@ -17,8 +17,7 @@ module private GraphObjectExplorerHelper =
         |> Option.defaultValue (GraphExplorerNodeKind.ofArcExplorerNodeKind node.kind)
 
     let private graphKindLabelForNode (nodeMetaById: Map<string, GraphNodeMeta>) (node: ArcExplorerNode) =
-        graphKindForNode nodeMetaById node
-        |> GraphExplorerNodeKind.label
+        graphKindForNode nodeMetaById node |> GraphExplorerNodeKind.label
 
     let private roleLabelForNode (nodeMetaById: Map<string, GraphNodeMeta>) (node: ArcExplorerNode) =
         nodeMetaById
@@ -26,15 +25,13 @@ module private GraphObjectExplorerHelper =
         |> Option.map _.RoleLabel
         |> Option.defaultValue (if node.isReference then "Reference" else "Canonical")
 
-    let selectedSubtitle
-        (selection: ResolvedSelection option)
-        (nodeMetaById: Map<string, GraphNodeMeta>)
-        =
+    let selectedSubtitle (selection: ResolvedSelection option) (nodeMetaById: Map<string, GraphNodeMeta>) =
         selection
         |> Option.map (fun selection ->
             let kindLabel = graphKindLabelForNode nodeMetaById selection.Node
             let role = roleLabelForNode nodeMetaById selection.Node
-            $"{kindLabel} | {role}")
+            $"{kindLabel} | {role}"
+        )
         |> Option.defaultValue "Selection"
 
     let searchableItems
@@ -43,10 +40,7 @@ module private GraphObjectExplorerHelper =
         (nodeMetaById: Map<string, GraphNodeMeta>)
         =
         let itemsById =
-            items
-            |> flattenFileItems
-            |> List.map (fun item -> item.Id, item)
-            |> Map.ofList
+            items |> flattenFileItems |> List.map (fun item -> item.Id, item) |> Map.ofList
 
         nodes
         |> flattenNodesWithAncestors
@@ -66,7 +60,8 @@ module private GraphObjectExplorerHelper =
                     let lineagePart =
                         ancestors
                         |> List.filter (fun ancestor ->
-                            graphKindForNode nodeMetaById ancestor <> GraphExplorerNodeKind.Arc)
+                            graphKindForNode nodeMetaById ancestor <> GraphExplorerNodeKind.Arc
+                        )
                         |> List.map _.name
                         |> function
                             | [] -> None
@@ -82,7 +77,9 @@ module private GraphObjectExplorerHelper =
                         yield! node.path |> Option.toList
                     ]
 
-                    node.name, Some(String.concat " | " subtitleParts), item))
+                    node.name, Some(String.concat " | " subtitleParts), item
+                )
+        )
         |> List.sortBy (fun (name, _, _) -> name.ToLowerInvariant())
         |> List.toArray
 
@@ -99,10 +96,14 @@ type GraphObjectExplorer =
     [<ReactComponent>]
     static member Entry() =
 
-        let graphObjects = React.useMemo ((fun () -> GraphObjectFixture.fakeGraphObjects ()), [||])
+        let graphObjects =
+            React.useMemo ((fun () -> GraphObjectFixture.fakeGraphObjects ()), [||])
 
         let nodes, nodeMetaById =
-            React.useMemo ((fun () -> GraphExplorerNodes.toArcExplorerNodesWithMetaFromArcObjects graphObjects), [| box graphObjects |])
+            React.useMemo (
+                (fun () -> GraphExplorerNodes.toArcExplorerNodesWithMetaFromArcObjects graphObjects),
+                [| box graphObjects |]
+            )
 
         let selection, setSelection = React.useState ArcSelection.empty
 
@@ -122,10 +123,7 @@ type GraphObjectExplorer =
             KindFilter.selectedLabels KindFilter.graphObjectExplorerOptions selectedKindIndices
 
         let selectedNodeIdInTree =
-            React.useMemo (
-                (fun () -> ARCExplorer.getSelectedItemId nodes selection),
-                [| box nodes; box selection |]
-            )
+            React.useMemo ((fun () -> ARCExplorer.getSelectedItemId nodes selection), [| box nodes; box selection |])
 
         let filteredNodes =
             React.useMemo (
@@ -134,8 +132,14 @@ type GraphObjectExplorer =
                         visibleSemanticKinds
                         nodes
                         nodeMetaById
-                        selectedNodeIdInTree),
-                [| box visibleSemanticKinds; box nodes; box nodeMetaById; box selectedNodeIdInTree |]
+                        selectedNodeIdInTree
+                ),
+                [|
+                    box visibleSemanticKinds
+                    box nodes
+                    box nodeMetaById
+                    box selectedNodeIdInTree
+                |]
             )
 
         let defaultArcKindIndices =
@@ -145,11 +149,7 @@ type GraphObjectExplorer =
             )
 
         let viewModel =
-            create
-                filteredNodes
-                selection
-                KindFilter.arcObjectExplorerOptions
-                defaultArcKindIndices
+            create filteredNodes selection KindFilter.arcObjectExplorerOptions defaultArcKindIndices
 
         let explorerPaneItems =
             React.useMemo (
@@ -160,11 +160,13 @@ type GraphObjectExplorer =
         let searchItems =
             React.useMemo (
                 (fun () ->
-                    GraphObjectExplorerHelper.searchableItems
-                        viewModel.FilteredTree
-                        explorerPaneItems
-                        nodeMetaById),
-                [| box viewModel.FilteredTree; box explorerPaneItems; box nodeMetaById |]
+                    GraphObjectExplorerHelper.searchableItems viewModel.FilteredTree explorerPaneItems nodeMetaById
+                ),
+                [|
+                    box viewModel.FilteredTree
+                    box explorerPaneItems
+                    box nodeMetaById
+                |]
             )
 
         let selectedSubtitleText =
@@ -178,7 +180,8 @@ type GraphObjectExplorer =
                 (fun () ->
                     explorerPaneItems
                     |> GraphObjectExplorerTreeData.flattenNestedChildrenOnParentLevel
-                    |> GraphObjectFixture.collapseExplorerItems),
+                    |> GraphObjectFixture.collapseExplorerItems
+                ),
                 [| box explorerPaneItems |]
             )
 
@@ -190,7 +193,8 @@ type GraphObjectExplorer =
                 searchItems,
                 (fun item ->
                     if item.Selectable then
-                        setExplorerSelection item.Id item.Path),
+                        setExplorerSelection item.Id item.Path
+                ),
                 placeholder = "Search graph objects..."
             )
 
@@ -201,9 +205,9 @@ type GraphObjectExplorer =
                 onItemClick =
                     (fun item ->
                         if item.Selectable then
-                            setExplorerSelection item.Id item.Path),
-                showBreadcrumbs = false,
-                useDirectoryChevronToggle = true
+                            setExplorerSelection item.Id item.Path
+                    ),
+                directoryChevronToggleOnly = true
             )
 
         let explorerPane =
@@ -217,7 +221,8 @@ type GraphObjectExplorer =
                 onItemClick =
                     (fun item ->
                         if item.Selectable then
-                            setExplorerSelection item.Id item.Path)
+                            setExplorerSelection item.Id item.Path
+                    )
             )
 
         let detailsPane =
@@ -228,7 +233,8 @@ type GraphObjectExplorer =
                 (fun nodeId ->
                     match ARCExplorer.tryFindNodeById nodeId nodes with
                     | Some node -> setExplorerSelection node.id node.path
-                    | None -> setSelection (ArcSelection.forExplorerNode nodeId None))
+                    | None -> setSelection (ArcSelection.forExplorerNode nodeId None)
+                )
             )
 
         Html.div [
@@ -251,4 +257,3 @@ type GraphObjectExplorer =
 
             ]
         ]
-

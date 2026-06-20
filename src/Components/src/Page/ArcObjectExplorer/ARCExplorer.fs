@@ -18,56 +18,46 @@ module ARCExplorer =
 
     let appearanceForNodeKind =
         function
-        | ArcExplorerNodeKind.Arc ->
-            {
-                Icon = FileItemIcon.Folder
-                IconTone = Some FileItemIconTone.BaseMuted
-            }
-        | ArcExplorerNodeKind.Group ->
-            {
-                Icon = FileItemIcon.Folder
-                IconTone = Some FileItemIconTone.BaseSubtle
-            }
-        | ArcExplorerNodeKind.Table ->
-            {
-                Icon = FileItemIcon.Table
-                IconTone = Some FileItemIconTone.Info
-            }
-        | ArcExplorerNodeKind.DataMap ->
-            {
-                Icon = FileItemIcon.Database
-                IconTone = Some FileItemIconTone.Accent
-            }
-        | ArcExplorerNodeKind.Sample ->
-            {
-                Icon = FileItemIcon.Tag
-                IconTone = Some FileItemIconTone.BaseMuted
-            }
-        | ArcExplorerNodeKind.Note ->
-            {
-                Icon = FileItemIcon.Document
-                IconTone = Some FileItemIconTone.Error
-            }
-        | ArcExplorerNodeKind.Study ->
-            {
-                Icon = FileItemIcon.Document
-                IconTone = Some FileItemIconTone.Secondary
-            }
-        | ArcExplorerNodeKind.Assay ->
-            {
-                Icon = FileItemIcon.Document
-                IconTone = Some FileItemIconTone.Success
-            }
-        | ArcExplorerNodeKind.Workflow ->
-            {
-                Icon = FileItemIcon.Document
-                IconTone = Some FileItemIconTone.Primary
-            }
-        | ArcExplorerNodeKind.Run ->
-            {
-                Icon = FileItemIcon.Document
-                IconTone = Some FileItemIconTone.Warning
-            }
+        | ArcExplorerNodeKind.Arc -> {
+            Icon = FileItemIcon.Folder
+            IconTone = Some FileItemIconTone.BaseMuted
+          }
+        | ArcExplorerNodeKind.Group -> {
+            Icon = FileItemIcon.Folder
+            IconTone = Some FileItemIconTone.BaseSubtle
+          }
+        | ArcExplorerNodeKind.Table -> {
+            Icon = FileItemIcon.Table
+            IconTone = Some FileItemIconTone.Info
+          }
+        | ArcExplorerNodeKind.DataMap -> {
+            Icon = FileItemIcon.Database
+            IconTone = Some FileItemIconTone.Accent
+          }
+        | ArcExplorerNodeKind.Sample -> {
+            Icon = FileItemIcon.Tag
+            IconTone = Some FileItemIconTone.BaseMuted
+          }
+        | ArcExplorerNodeKind.Note -> {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Error
+          }
+        | ArcExplorerNodeKind.Study -> {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Secondary
+          }
+        | ArcExplorerNodeKind.Assay -> {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Success
+          }
+        | ArcExplorerNodeKind.Workflow -> {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Primary
+          }
+        | ArcExplorerNodeKind.Run -> {
+            Icon = FileItemIcon.Document
+            IconTone = Some FileItemIconTone.Warning
+          }
 
     let private fileItemForNode
         (createItem: string -> string option -> FileItemIcon -> FileItem)
@@ -112,7 +102,8 @@ module ARCExplorer =
                     | Some nodePath when normalizePath nodePath = normalizedTargetPath -> [ node ]
                     | _ -> []
 
-                currentMatch @ collectMatches node.children)
+                currentMatch @ collectMatches node.children
+            )
 
         let matches = collectMatches nodes
 
@@ -127,44 +118,39 @@ module ARCExplorer =
             if node.id = nodeId then
                 Some node
             else
-                tryFindNodeById nodeId node.children)
+                tryFindNodeById nodeId node.children
+        )
 
     let toFileItems (nodes: ArcExplorerNode list) = nodes |> List.map toFileItem
 
     let getSelectedItemId (nodes: ArcExplorerNode list) (selection: ArcSelection) =
         selection.ExplorerNodeId
         |> Option.bind (fun nodeId -> tryFindNodeById nodeId nodes |> Option.map _.id)
-        |> Option.orElseWith (fun () ->
-            selection.TreePath |> Option.bind (fun path -> tryFindNodeIdByPath path nodes))
+        |> Option.orElseWith (fun () -> selection.TreePath |> Option.bind (fun path -> tryFindNodeIdByPath path nodes))
 
-    let createOpenPreviewHandler
-        (setSelection: ArcSelection -> unit)
-        (services: ARCExplorerServices)
-        (item: FileItem)
-        =
-        promise {
-            match item.Path with
-            | None ->
-                setSelection (ArcSelection.forExplorerNode item.Id None)
-                services.setStatusMessage None
-            | Some path ->
-                let selectedPath = normalizePath path
-                let viewPath = PathHelpers.resolveArcViewPath path
+    let createOpenPreviewHandler (setSelection: ArcSelection -> unit) (services: ARCExplorerServices) (item: FileItem) = promise {
+        match item.Path with
+        | None ->
+            setSelection (ArcSelection.forExplorerNode item.Id None)
+            services.setStatusMessage None
+        | Some path ->
+            let selectedPath = normalizePath path
+            let viewPath = PathHelpers.resolveArcViewPath path
 
-                if viewPath <> selectedPath then
-                    console.log ($"[Renderer] Redirecting Datamap click to file: {viewPath}")
-                else
-                    console.log ($"[Renderer] Opening file: {viewPath}")
+            if viewPath <> selectedPath then
+                console.log ($"[Renderer] Redirecting Datamap click to file: {viewPath}")
+            else
+                console.log ($"[Renderer] Opening file: {viewPath}")
 
-                setSelection (ArcSelection.forExplorerNode item.Id (Some selectedPath))
-                let! result = services.openView viewPath
+            setSelection (ArcSelection.forExplorerNode item.Id (Some selectedPath))
+            let! result = services.openView viewPath
 
-                match result with
-                | Ok () -> ()
-                | Error errorMessage ->
-                    console.log ($"[Renderer] Error: {errorMessage}")
-                    services.setStatusMessage (Some $"Could not open view for '{item.Name}': {errorMessage}")
-        }
+            match result with
+            | Ok() -> ()
+            | Error errorMessage ->
+                console.log ($"[Renderer] Error: {errorMessage}")
+                services.setStatusMessage (Some $"Could not open view for '{item.Name}': {errorMessage}")
+    }
 
     [<ReactComponent>]
     let CreateArcExplorer
@@ -177,27 +163,27 @@ module ARCExplorer =
         let selectedItemId = getSelectedItemId nodes selection
 
         let toggleLfsMark =
-            Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark services.setStatusMessage (services.runToggleLfsMark rootRepoPath)
+            Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.toggleLfsMark
+                services.setStatusMessage
+                (services.runToggleLfsMark rootRepoPath)
 
         let contextMenuItems (item: FileItem) =
-            Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark None
+            Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems item toggleLfsMark None None
 
-        let openView item = promise { createOpenPreviewHandler setSelection services item |> Promise.start } |> Promise.start
+        let openView item =
+            promise { createOpenPreviewHandler setSelection services item |> Promise.start }
+            |> Promise.start
 
         if List.isEmpty nodes then
             Html.none
         else
             let items = toFileItems nodes
 
-            (
-                Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
-                    initialItems = items,
-                    onItemClick = openView,
-                    onContextMenu = contextMenuItems,
-                    ?selectedItemId = Some selectedItemId,
-                    showBreadcrumbs = false,
-                    directoryInteractionMode = DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick,
-                    useDirectoryChevronToggle = true
-                )
-            )
-
+            (Swate.Components.Page.FileExplorer.FileExplorer.FileExplorer(
+                initialItems = items,
+                onItemClick = openView,
+                onContextMenu = contextMenuItems,
+                ?selectedItemId = Some selectedItemId,
+                directoryInteractionMode = DirectoryInteractionMode.ToggleOnSingleClickSelectOnDoubleClick,
+                directoryChevronToggleOnly = true
+            ))

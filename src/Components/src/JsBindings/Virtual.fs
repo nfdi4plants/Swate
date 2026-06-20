@@ -13,8 +13,7 @@ module Virtual =
     let ImportPath = "@tanstack/react-virtual"
 
     [<ImportMember(ImportPath)>]
-    type Range =
-        interface end
+    type Range = interface end
 
     [<ImportMember(ImportPath)>]
     type VirtualItem =
@@ -37,12 +36,23 @@ module Virtual =
         | Smooth
 
     [<ImportMember(ImportPath)>]
-    type Virtualizer<'A,'B> =
-        member this.getVirtualItems() : VirtualItem [] = jsNative
-        member this.getVirtualIndexes(): int [] = jsNative
+    type Virtualizer<'A, 'B> =
+        member this.getVirtualItems() : VirtualItem[] = jsNative
+        member this.getVirtualIndexes() : int[] = jsNative
         member this.getTotalSize() : int = jsNative
-        member this.scrollToIndex (index: int, ?options: {|align: AlignOption option; behavior: ScrollBehavior option|}) : unit = jsNative
-        member this.scrollRect: {|height: int; width: int|} = jsNative
+
+        member this.scrollToIndex
+            (
+                index: int,
+                ?options:
+                    {|
+                        align: AlignOption option
+                        behavior: ScrollBehavior option
+                    |}
+            ) : unit =
+            jsNative
+
+        member this.scrollRect: {| height: int; width: int |} = jsNative
         member this.scrollOffset: int = jsNative
         member this.measureElement: VirtualMeasureElementRef = jsNative
 
@@ -50,7 +60,7 @@ module Virtual =
 type Virtual =
 
     [<ImportMember(Virtual.ImportPath)>]
-    static member defaultRangeExtractor(range: Virtual.Range) : int [] = jsNative
+    static member defaultRangeExtractor(range: Virtual.Range) : int[] = jsNative
 
     [<ImportMember(Virtual.ImportPath)>]
     [<NamedParamsAttribute>]
@@ -65,12 +75,13 @@ type Virtual =
             ?scrollPaddingStart: float,
             ?scrollPaddingEnd: float,
             ?overscan: int,
-            ?rangeExtractor: Virtual.Range -> int [],
+            ?rangeExtractor: Virtual.Range -> int[],
             ?debug: bool,
-            ?onChange: (Virtual.Virtualizer<_,_> * bool) -> unit,
+            ?onChange: (Virtual.Virtualizer<_, _> * bool) -> unit,
             ?horizontal: bool,
             ?paddingStart: int,
             ?paddingEnd: int,
             ?gap: int,
             ?lanes: int
-        ) : Virtual.Virtualizer<obj, obj> = jsNative
+        ) : Virtual.Virtualizer<obj, obj> =
+        jsNative

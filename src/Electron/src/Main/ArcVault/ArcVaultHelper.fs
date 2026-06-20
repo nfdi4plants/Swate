@@ -6,16 +6,17 @@ open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
-open ARCtrl.Contract
 open Fable.Electron
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
-open Main.ArcMerge
+open Main.ARCtrlExtensions
 open Main.Bindings
 open Node.Api
+open Swate.Electron.Shared.RenamePathRules
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
+let private pathDynamic: obj = importAll "path"
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
@@ -64,31 +65,6 @@ let private setDataMapByParentInfo (arc: ARC) (dmpi: DatamapParentInfo) (dm: Dat
             Ok()
     with e ->
         Error(exn $"Failed to set datamap on ARC: {e.Message}")
-
-let private baselineDataMapStaticHash (dataMap: DataMap option) =
-    dataMap |> Option.iter (fun dm -> dm.StaticHash <- cleanDataMapStaticHash dm)
-
-/// Sets the current loaded ARC state as the clean in-memory baseline.
-let baselineArcStaticHashes (arc: ARC) : unit =
-    arc.License |> Option.iter (fun license -> license.StaticHash <- license.GetHashCode())
-
-    for study in arc.Studies do
-        study.StaticHash <- study.GetLightHashCode()
-        baselineDataMapStaticHash study.DataMap
-
-    for assay in arc.Assays do
-        assay.StaticHash <- assay.GetLightHashCode()
-        baselineDataMapStaticHash assay.DataMap
-
-    for workflow in arc.Workflows do
-        workflow.StaticHash <- workflow.GetLightHashCode()
-        baselineDataMapStaticHash workflow.DataMap
-
-    for run in arc.Runs do
-        run.StaticHash <- run.GetLightHashCode()
-        baselineDataMapStaticHash run.DataMap
-
-    arc.StaticHash <- arc.GetLightHashCode()
 
 /// Replaces the just-added ARC entity with the disk round-tripped version.
 /// This keeps lossy serialization details from becoming immediate unsaved changes.
@@ -188,138 +164,146 @@ let swatelogfn id fmt =
 let swatefailfn id fmt =
     Printf.kprintf (fun s -> failwith ("[Swate-" + string id + "] " + s)) fmt
 
-type private CanonicalArcFileRepairSpec = {
-    CollectionFolder: string
-    FileName: string
-    CreateContracts: string -> Contract[]
+type OpenArcRootRenamePlan = {
+    SourcePath: string
+    TargetPath: string
+    NewName: string
 }
 
-let private canonicalArcFileRepairSpecs = [|
-    {
-        CollectionFolder = "assays"
-        FileName = "isa.assay.xlsx"
-        CreateContracts = fun identifier -> (ArcAssay.init identifier).ToCreateContract(false)
-    }
-    {
-        CollectionFolder = "studies"
-        FileName = "isa.study.xlsx"
-        CreateContracts = fun identifier -> (ArcStudy.init identifier).ToCreateContract(false)
-    }
-    {
-        CollectionFolder = "workflows"
-        FileName = "isa.workflow.xlsx"
-        CreateContracts = fun identifier -> (ArcWorkflow.init identifier).ToCreateContract(false)
-    }
-    {
-        CollectionFolder = "runs"
-        FileName = "isa.run.xlsx"
-        CreateContracts = fun identifier -> (ArcRun.init identifier).ToCreateContract(false)
-    }
-|]
+let private resolveAbsolutePath (pathValue: string) =
+    pathDynamic?resolve (pathValue) |> unbox<string> |> PathHelpers.normalizePath
 
-let private isZeroByteZipReadError (errors: string[]) =
-    errors
-    |> Array.exists (fun error ->
-        let normalizedError = error.ToLowerInvariant()
-        normalizedError.Contains("error reading contract")
-        && normalizedError.Contains("data length = 0")
-    )
-
-let private tryReadDirectoryAsync (directoryPath: string) = promise {
+let private tryGetNodeErrorCode (error: exn) : string option =
     try
-        let! entries = fsPromisesDynamic?readdir (directoryPath) |> unbox<JS.Promise<string[]>>
-        return entries
+        error?code |> unbox<string> |> Option.ofObj
     with _ ->
-        return [||]
+        None
+
+let private pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
+    let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
+
+    if fileExists then
+        return true
+    else
+        return! ARCtrl.FileSystemHelper.directoryExistsAsync absolutePath
 }
 
-let private tryGetFileSizeAsync (filePath: string) = promise {
-    try
-        let! stats = fsPromisesDynamic?stat (filePath) |> unbox<JS.Promise<obj>>
-        return Some(stats?size |> unbox<float>)
-    with _ ->
-        return None
-}
+let private renameWithRetriesAsync
+    (sourceAbsolutePath: string)
+    (targetAbsolutePath: string)
+    : JS.Promise<Result<unit, exn>> =
+    let retryDelaysMs = [| 0; 75; 200; 500 |]
 
-let private repairZeroByteCanonicalArcFile
-    (windowId: int)
-    (arcPath: string)
-    (spec: CanonicalArcFileRepairSpec)
-    (identifier: string)
-    =
-    promise {
-        let relativePath =
-            ARCtrl.ArcPathHelper.combineMany [|
-                spec.CollectionFolder
-                identifier
-                spec.FileName
-            |]
+    let isTransientRenameError =
+        function
+        | Some "EPERM"
+        | Some "EACCES"
+        | Some "EBUSY" -> true
+        | _ -> false
 
-        let absolutePath = path.join (arcPath, spec.CollectionFolder, identifier, spec.FileName)
-        let! fileSize = tryGetFileSizeAsync absolutePath
+    let rec attempt (attemptIndex: int) = promise {
+        if attemptIndex > 0 then
+            do! Promise.sleep retryDelaysMs.[attemptIndex]
 
-        match fileSize with
-        | Some size when size = 0.0 ->
-            swatelogfn windowId "Repairing zero-byte ARC workbook: %s" relativePath
-            let! repairResult = fullFillContractBatchAsync arcPath (spec.CreateContracts identifier)
+        try
+            let! _ =
+                fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath)
+                |> unbox<JS.Promise<obj>>
 
-            match repairResult with
-            | Ok _ -> return true
-            | Error errors ->
-                swatelogfn
-                    windowId
-                    "Unable to repair zero-byte ARC workbook '%s': %s"
-                    relativePath
-                    (PathHelpers.formatContractErrors errors)
+            return Ok()
+        with renameError ->
+            let errorCode = tryGetNodeErrorCode renameError
 
-                return false
-        | _ -> return false
+            if attemptIndex < retryDelaysMs.Length - 1 && isTransientRenameError errorCode then
+                return! attempt (attemptIndex + 1)
+            else
+                return Error renameError
     }
 
-let private repairZeroByteCanonicalArcFiles (windowId: int) (arcPath: string) = promise {
-    let mutable repairedAny = false
+    attempt 0
 
-    for spec in canonicalArcFileRepairSpecs do
-        let collectionPath = path.join (arcPath, spec.CollectionFolder)
-        let! identifiers = tryReadDirectoryAsync collectionPath
+let private mapArcRootRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
+    match tryGetNodeErrorCode renameError with
+    | Some "EPERM"
+    | Some "EACCES" ->
+        exn
+            $"Cannot rename '{sourcePath}' to '{targetPath}'. Windows reported a permission or file-lock conflict. If the destination already exists, choose a different name and close apps that may be using these paths."
+    | Some "ENOTEMPTY"
+    | Some "EEXIST" -> exn $"Cannot rename '{sourcePath}' to '{targetPath}' because the destination already exists."
+    | Some "ENOENT" -> exn $"Cannot rename '{sourcePath}' because the source path no longer exists on disk."
+    | _ -> renameError
 
-        for identifier in identifiers do
-            let! repaired = repairZeroByteCanonicalArcFile windowId arcPath spec identifier
-            repairedAny <- repairedAny || repaired
+let tryBuildOpenArcRootRenamePlan arcPath newName : Result<OpenArcRootRenamePlan, exn> =
+    let candidateName = newName |> Option.ofObj |> Option.defaultValue String.Empty
 
-    return repairedAny
-}
-
-/// Loads an ARC, repairing empty canonical workbooks that can be left behind by interrupted creates.
-let tryLoadArcWithZeroByteRepair (windowId: int) (arcPath: string) = promise {
-    let! loadResult = ARC.tryLoadAsync arcPath
-
-    match loadResult with
-    | Ok arc ->
-        baselineArcStaticHashes arc
-        return Ok arc
-    | Error errors when isZeroByteZipReadError errors ->
-        let! repairedAny = repairZeroByteCanonicalArcFiles windowId arcPath
-
-        if repairedAny then
-            let! retryLoadResult = ARC.tryLoadAsync arcPath
-
-            match retryLoadResult with
-            | Ok arc ->
-                baselineArcStaticHashes arc
-                return Ok arc
-            | Error errors -> return Error errors
+    match validateRenameName candidateName with
+    | Error validationError -> Error(exn validationError)
+    | Ok normalizedName ->
+        if
+            (pathDynamic?isAbsolute (normalizedName) |> unbox<bool>)
+            || PathHelpers.containsPathTraversalSegments normalizedName
+        then
+            Error(exn "ARC folder name must be a single folder name without path separators or traversal segments.")
         else
-            return Error errors
-    | Error errors -> return Error errors
+            let sourcePath = resolveAbsolutePath arcPath
+            let parentPath = pathDynamic?dirname (sourcePath) |> unbox<string>
+
+            let targetPath =
+                pathDynamic?resolve (parentPath, normalizedName)
+                |> unbox<string>
+                |> PathHelpers.normalizePath
+
+            if
+                String.Equals(
+                    PathHelpers.normalizePathForFsComparison sourcePath,
+                    PathHelpers.normalizePathForFsComparison targetPath,
+                    StringComparison.Ordinal
+                )
+            then
+                Error(exn "New ARC folder name must be different from the current folder name.")
+            else
+                Ok {
+                    SourcePath = sourcePath
+                    TargetPath = targetPath
+                    NewName = normalizedName
+                }
+
+let renameOpenArcRootDirectoryOnDisk arcPath newName : JS.Promise<Result<string, exn>> = promise {
+    match tryBuildOpenArcRootRenamePlan arcPath newName with
+    | Error validationError -> return Error validationError
+    | Ok plan ->
+        let! sourceExists = ARCtrl.FileSystemHelper.directoryExistsAsync plan.SourcePath
+
+        if not sourceExists then
+            return Error(exn $"Cannot rename '{plan.SourcePath}' because the source path no longer exists on disk.")
+        else
+            let! targetExists = pathExistsAsync plan.TargetPath
+
+            if targetExists then
+                return
+                    Error(
+                        exn
+                            $"Cannot rename '{plan.SourcePath}' to '{plan.TargetPath}' because the destination already exists."
+                    )
+            else
+                let! renameResult = renameWithRetriesAsync plan.SourcePath plan.TargetPath
+
+                match renameResult with
+                | Ok() -> return Ok plan.TargetPath
+                | Error renameError ->
+                    return Error(mapArcRootRenameDiskError plan.SourcePath plan.TargetPath renameError)
 }
 
 let createWindow () = promise {
     printfn "[Swate] Creating new window"
     let screenSize = screen.getPrimaryDisplay().workAreaSize
 
+    let windowIconPath = Helper.Assets.getIcon ()
+
     let mainWindowOptions =
         BrowserWindowConstructorOptions(
+            title = "Swate",
+            icon = (windowIconPath |> U2.Case2),
             width = int screenSize.width,
             height = int screenSize.height,
             webPreferences = WebPreferences(preload = path.join (__dirname, "preload.fs.js"))
@@ -332,6 +316,21 @@ let createWindow () = promise {
     else
         window.webContents.openDevTools Enums.WebContents.OpenDevTools.Options.Mode.Right
         do! window.loadURL MAIN_WINDOW_VITE_DEV_SERVER_URL
+
+    // Prevent links from opening new Electron windows
+    window.webContents.setWindowOpenHandler (fun details ->
+        Fable.Electron.Main.shell.openExternal details.url |> Promise.start
+        WindowOpenHandlerResponse(Enums.Types.WindowOpenHandlerResponse.Action.Deny)
+    )
+
+    // Prevent navigation inside current Electron window
+    window.webContents.onWillNavigate (fun event url _ _ _ _ ->
+        let currentUrl = window.webContents.getURL ()
+
+        if url <> currentUrl then
+            event.preventDefault ()
+            Fable.Electron.Main.shell.openExternal url |> Promise.start
+    )
 
     return window
 }
@@ -346,24 +345,15 @@ let createFileWatcher (path: string) (usePolling: bool option) =
 
     let ignoreFn =
         fun (path: string) ->
-            let normalizedPath = path.Replace("\\", "/")
-
-            let segments =
-                normalizedPath.Trim('/').Split('/', System.StringSplitOptions.RemoveEmptyEntries)
-
+            let normalizedPath = PathHelpers.normalizeSeparators path
             let tempXlsxPattern = """\.~\$.*\.xlsx$"""
 
-            // skip temporary Excel files (created when editing an xlsx file)
-            if System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern) then
-                true
-            // skip git folder itself (and its contents) to avoid expensive scans
-            elif segments |> Array.exists (fun segment -> segment = ".git") then
-                true
-            else
-                false
+            System.Text.RegularExpressions.Regex.IsMatch(normalizedPath, tempXlsxPattern)
+            || isGitMetadataPath normalizedPath
 
     // Native Windows file events can keep handles that block app-initiated folder renames.
-    let usePolling = defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
+    let usePolling =
+        defaultArg usePolling (shouldUsePollingByDefault (currentNodePlatform ()))
 
     let watcherOptions =
         if usePolling then
@@ -377,12 +367,7 @@ let createFileWatcher (path: string) (usePolling: bool option) =
                 binaryInterval = 400
             )
         else
-            Chokidar.WatchOptions(
-                cwd = path,
-                awaitWriteFinish = true,
-                ignored = !^ignoreFn,
-                ignoreInitial = true
-            )
+            Chokidar.WatchOptions(cwd = path, awaitWriteFinish = true, ignored = !^ignoreFn, ignoreInitial = true)
 
     let watcher = Chokidar.Chokidar.watch (path, watcherOptions)
 

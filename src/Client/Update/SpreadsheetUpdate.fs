@@ -3,15 +3,11 @@ namespace Update
 open Messages
 open Elmish
 open Spreadsheet
-open LocalHistory
 open Model
-open Swate.Components
 open Swate.Components.Shared
-open Fable.Remoting.Client
 open FsSpreadsheet.Js
 open ARCtrl
 open ARCtrl.Spreadsheet
-open ARCtrl.Json
 
 module Spreadsheet =
 
@@ -92,16 +88,16 @@ module Spreadsheet =
 
                 nextState, model, Cmd.none
             | UpdateArcFile arcFile ->
-                let nextState =
-                    {
-                        state with
-                            ArcFile = Some arcFile
-                            ActiveView = ActiveView.Forward(arcFile, state.ActiveView)
-                    }
+                let nextState = {
+                    state with
+                        ArcFile = Some arcFile
+                        ActiveView = ActiveView.Forward(arcFile, state.ActiveView)
+                }
 
                 nextState, model, Cmd.none
             | InitFromArcFile arcFile ->
-                let nextState = Spreadsheet.Model.init (arcFile, ActiveView.Forward(arcFile, ActiveView.Metadata))
+                let nextState =
+                    Spreadsheet.Model.init (arcFile, ActiveView.Forward(arcFile, ActiveView.Metadata))
 
                 nextState, model, Cmd.none
             | InsertOntologyAnnotation(range, oa) ->

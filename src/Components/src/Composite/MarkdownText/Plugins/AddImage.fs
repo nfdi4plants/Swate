@@ -14,7 +14,12 @@ module AddImage =
     let private toMarkdownImageLink ((file: MarkdownPromptFile), (path: string)) =
         let fallbackPath = if String.IsNullOrWhiteSpace path then file.Name else path
         let normalizedPath = fallbackPath.Replace("\\", "/")
-        let altText = if String.IsNullOrWhiteSpace file.Name then "image" else file.Name
+
+        let altText =
+            if String.IsNullOrWhiteSpace file.Name then
+                "image"
+            else
+                file.Name
 
         $"![{altText}]({normalizedPath})"
 
@@ -60,14 +65,13 @@ module AddImage =
         Accept = Some "image/*"
         AllowMultiple = Some true
         ApplyFiles =
-            Some(
-                fun source selectionStart selectionEnd filesWithPaths ->
-                    let links = filesWithPaths |> List.map toMarkdownImageLink
+            Some(fun source selectionStart selectionEnd filesWithPaths ->
+                let links = filesWithPaths |> List.map toMarkdownImageLink
 
-                    if List.isEmpty links then
-                        source, (selectionStart, selectionEnd)
-                    else
-                        insertAtSelection source selectionStart selectionEnd links
+                if List.isEmpty links then
+                    source, (selectionStart, selectionEnd)
+                else
+                    insertAtSelection source selectionStart selectionEnd links
             )
     }
 
@@ -77,4 +81,3 @@ module AddImage =
         Enabled = true
         Prompt = Some prompt
     }
-

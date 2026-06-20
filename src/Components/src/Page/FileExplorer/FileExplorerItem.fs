@@ -37,23 +37,22 @@ type FileExplorerItem =
                 ev.stopPropagation ()
 
                 if not disabled then
-                    onClick()
+                    onClick ()
             )
             prop.children [
-                Html.i [
-                    prop.className $"swt:iconify {icon} swt:size-4"
-                ]
+                Html.i [ prop.className $"swt:iconify {icon} swt:size-4" ]
             ]
         ]
 
     [<ReactComponent>]
-    static member private ItemActionButton (item: FileItem, action: ContextMenuItem) =
+    static member private ItemActionButton(item: FileItem, action: ContextMenuItem) =
         let label = $"{action.Label} {item.Name}"
 
         FileExplorerItem.RowActionButton(
             label,
             action.Icon,
             action.OnClick,
+            ?className = action.ClassName,
             ?disabled = action.Disabled,
             buttonKey = $"{item.Id}-{action.Label}"
         )
@@ -86,17 +85,14 @@ type FileExplorerItem =
             Html.none
 
     [<ReactComponent>]
-    static member private LFSStatusPill (item: FileItem, ?statusAction: ContextMenuItem) =
+    static member private LFSStatusPill(item: FileItem, ?statusAction: ContextMenuItem) =
         let isPointer = item.IsLFSPointer = Some true
-        let isDownloaded = item.Downloaded = Some true && not isPointer
+        let isDownloaded = Helper.hasLocalLfsCopy item
 
         let statusText =
-            if isDownloaded then
-                "LFS Downloaded"
-            elif isPointer then
-                "LFS Pointer"
-            else
-                "LFS Not Downloaded"
+            if isDownloaded then "LFS Downloaded"
+            elif isPointer then "LFS Pointer"
+            else "LFS Not Downloaded"
 
         let statusAccessibilityText =
             item.SizeFormatted
@@ -113,11 +109,11 @@ type FileExplorerItem =
             | Some action -> $"{action.Label} {item.Name}. {statusAccessibilityText}"
             | None -> statusAccessibilityText
 
-        let statusClassName =
+        let statusClassNames =
             if isDownloaded then
-                "swt:badge-success"
+                [ "swt:badge-success" ]
             else
-                "swt:bg-info swt:text-info-content"
+                [ "swt:bg-info"; "swt:text-info-content" ]
 
         let statusIconClassName =
             if isDownloaded then
@@ -125,11 +121,11 @@ type FileExplorerItem =
             else
                 "swt:fluent--cloud-arrow-down-24-regular"
 
-        let statusShapeClass =
+        let statusShapeClasses =
             if item.SizeFormatted.IsSome then
-                "swt:rounded-none swt:border-0"
+                [ "swt:rounded-none"; "swt:border-0" ]
             else
-                "swt:rounded-full"
+                [ "swt:rounded-full" ]
 
         let segmentCursorClass =
             match statusAction, isActionDisabled with
@@ -139,48 +135,54 @@ type FileExplorerItem =
 
         let statusBadge =
             Html.span [
-                prop.className
-                    $"swt:badge swt:badge-sm swt:gap-0.5 {segmentCursorClass} {statusClassName} {statusShapeClass}"
+                prop.className [
+                    "swt:badge"
+                    "swt:badge-sm"
+                    "swt:gap-0.5"
+                    segmentCursorClass
+                    yield! statusClassNames
+                    yield! statusShapeClasses
+                ]
                 prop.custom (
                     "data-lfs-download-status",
-                    if isDownloaded then
-                        "downloaded"
-                    elif isPointer then
-                        "pointer"
-                    else
-                        "not-downloaded"
+                    if isDownloaded then "downloaded"
+                    elif isPointer then "pointer"
+                    else "not-downloaded"
                 )
                 prop.children [
                     Html.i [
                         prop.className $"swt:iconify {statusIconClassName} swt:size-3"
                     ]
-                    Html.span [
-                        prop.text "LFS"
-                    ]
+                    Html.span [ prop.text "LFS" ]
                 ]
             ]
 
-        let badgeSegments =
-            [
-                statusBadge
+        let badgeSegments = [
+            statusBadge
 
-                match item.SizeFormatted with
-                | Some size ->
-                    Html.span [
-                        prop.className
-                            $"swt:badge swt:badge-sm swt:rounded-none swt:border-0 {segmentCursorClass} swt:bg-base-200 swt:text-base-content"
-                        prop.text size
+            match item.SizeFormatted with
+            | Some size ->
+                Html.span [
+                    prop.className [
+                        "swt:badge"
+                        "swt:badge-sm"
+                        "swt:rounded-none"
+                        "swt:border-0"
+                        segmentCursorClass
+                        "swt:bg-base-200"
+                        "swt:text-base-content"
                     ]
-                | None -> ()
-            ]
+                    prop.text size
+                ]
+            | None -> ()
+        ]
 
-        let commonProps (className: string list) =
-            [
-                prop.className className
-                prop.ariaLabel pillAccessibilityText
-                prop.title pillAccessibilityText
-                prop.children badgeSegments
-            ]
+        let commonProps (className: string list) = [
+            prop.className className
+            prop.ariaLabel pillAccessibilityText
+            prop.title pillAccessibilityText
+            prop.children badgeSegments
+        ]
 
         let stopPillClick (e: Browser.Types.MouseEvent) =
             e.preventDefault ()
@@ -210,10 +212,20 @@ type FileExplorerItem =
         | None ->
             Html.span [
                 yield!
-                    commonProps
-                        [ "swt:inline-flex swt:overflow-hidden swt:rounded-full swt:border swt:border-base-300" ]
+                    commonProps [
+                        "swt:inline-flex swt:overflow-hidden swt:rounded-full swt:border swt:border-base-300"
+                    ]
                 prop.onClick stopPillClick
             ]
+
+    [<ReactComponent>]
+    static member private StatusControl(item: FileItem, statusAction: ContextMenuItem option) =
+        if Helper.isLfs item then
+            FileExplorerItem.LFSStatusPill(item, ?statusAction = statusAction)
+        else
+            statusAction
+            |> Option.map (fun action -> FileExplorerItem.ItemActionButton(item, action))
+            |> Option.defaultValue Html.none
 
     [<ReactComponent>]
     static member DirectoryRow
@@ -222,7 +234,7 @@ type FileExplorerItem =
             rowHighlightClass: string,
             selectedNameClass: string,
             isExpanded: bool,
-            useDirectoryChevronToggle: bool,
+            directoryChevronToggleOnly: bool,
             canExpandDirectory: bool,
             getItemIconClass: FileItem -> string option,
             onDirectorySelect: Browser.Types.MouseEvent -> unit,
@@ -241,6 +253,7 @@ type FileExplorerItem =
         let canCreateFromDirectory = canCreateItem item && onCreateItem.IsSome
         let hasItemActions = itemActions |> List.isEmpty |> not
         let canDeleteFromDirectory = canDeleteItem item && onDeleteItem.IsSome
+        let hasStatusControl = Helper.isLfs item || statusAction.IsSome
 
         let directoryToggleIconClass =
             if isExpanded then
@@ -248,116 +261,96 @@ type FileExplorerItem =
             else
                 "swt:iconify swt:fluent--caret-right-24-filled swt:size-4 swt:shrink-0"
 
-        let rowChildren =
-            [
-                Html.div [
-                    prop.custom ("data-file-item-id", item.Id)
-                    prop.className [
-                        "swt:group swt:w-full swt:px-2 swt:py-1 swt:cursor-default"
-                        rowHighlightClass
-                    ]
-                    prop.style [
-                        style.display.flex
-                        style.width (length.percent 100)
-                    ]
+        let rowChildren = [
+            Html.div [
+                prop.custom ("data-file-item-id", item.Id)
+                prop.className [
+                    "swt:group swt:w-full swt:px-2 swt:py-1 swt:cursor-default"
+                    rowHighlightClass
+                ]
+                prop.style [ style.display.flex; style.width (length.percent 100) ]
 
-                    if not useDirectoryChevronToggle then
-                        prop.onClick onDirectorySelect
+                if not directoryChevronToggleOnly then
+                    prop.onClick onDirectorySelect
 
-                    prop.children [
-                        Html.div [
-                            prop.className "swt:flex swt:w-full swt:items-center swt:gap-2"
-                            prop.children [
-                                Html.button [
-                                    prop.type'.button
-                                    prop.className
-                                        "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:bg-transparent swt:border-0 swt:p-0 swt:text-left swt:cursor-default"
-                                    prop.onClick onDirectorySelect
-                                    prop.children [
-                                        Html.i [
-                                            prop.className (
-                                                Swate.Components.Page.FileExplorer.Helper.iconClassName
-                                                    [ "swt:iconify"; "swt:shrink-0" ]
-                                                    item
-                                                    getItemIconClass
-                                            )
+                prop.children [
+                    Html.div [
+                        prop.className "swt:flex swt:w-full swt:min-w-0 swt:items-center swt:gap-2"
+                        prop.children [
+                            Html.button [
+                                prop.type'.button
+                                prop.className
+                                    "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2 swt:bg-transparent swt:border-0 swt:p-0 swt:text-left swt:cursor-default"
+                                prop.onClick onDirectorySelect
+                                prop.children [
+                                    Html.i [
+                                        prop.className (
+                                            Swate.Components.Page.FileExplorer.Helper.iconClassName
+                                                [ "swt:iconify"; "swt:shrink-0" ]
+                                                item
+                                                getItemIconClass
+                                        )
+                                    ]
+                                    Html.span [
+                                        prop.className [
+                                            "swt:min-w-0"
+                                            "swt:flex-1"
+                                            "swt:truncate"
+                                            selectedNameClass
                                         ]
-                                        Html.span [
-                                            prop.className [
-                                                "swt:truncate"
-                                                selectedNameClass
-                                            ]
-                                            prop.text item.Name
-                                        ]
+                                        prop.text item.Name
                                     ]
                                 ]
-
-                                if item.IsLFS = Some true
-                                   || statusAction.IsSome
-                                   || canExpandDirectory
-                                   || canCreateFromDirectory
-                                   || hasItemActions
-                                   || canDeleteFromDirectory then
-                                    Html.div [
-                                        prop.className "swt:ml-auto swt:shrink-0 swt:flex swt:items-center swt:gap-2"
-                                        prop.children [
-                                            FileExplorerItem.CreateItemButton (
-                                                item,
-                                                onCreateItem,
-                                                canCreateItem
-                                            )
-
-                                            yield!
-                                                itemActions
-                                                |> List.map (fun action -> FileExplorerItem.ItemActionButton(item, action))
-
-                                            FileExplorerItem.DeleteItemButton (
-                                                item,
-                                                onDeleteItem,
-                                                canDeleteItem
-                                            )
-
-                                            if item.IsLFS = Some true then
-                                                Html.div [
-                                                    prop.className "swt:flex swt:items-center"
-                                                    prop.children [
-                                                        FileExplorerItem.LFSStatusPill(item, ?statusAction = statusAction)
-                                                    ]
-                                                ]
-                                            elif statusAction.IsSome then
-                                                statusAction
-                                                |> Option.map (fun action -> FileExplorerItem.ItemActionButton(item, action))
-                                                |> Option.defaultValue Html.none
-
-                                            if canExpandDirectory then
-                                                Html.button [
-                                                    prop.type'.button
-                                                    prop.className [
-                                                        "swt:flex swt:min-h-0 swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border-0 swt:bg-transparent swt:p-0 swt:cursor-pointer"
-                                                        rowHighlightClass
-                                                    ]
-                                                    prop.ariaLabel (
-                                                        if isExpanded then
-                                                            $"Collapse {item.Name}"
-                                                        else
-                                                            $"Expand {item.Name}"
-                                                    )
-                                                    prop.onClick onDirectoryArrowToggle
-                                                    prop.children [
-                                                        Html.i [ prop.className directoryToggleIconClass ]
-                                                    ]
-                                                ]
-                                        ]
-                                    ]
                             ]
+
+                            if
+                                hasStatusControl
+                                || canExpandDirectory
+                                || canCreateFromDirectory
+                                || hasItemActions
+                                || canDeleteFromDirectory
+                            then
+                                Html.div [
+                                    prop.className "swt:ml-auto swt:shrink-0 swt:flex swt:items-center swt:gap-2"
+                                    prop.children [
+                                        FileExplorerItem.CreateItemButton(item, onCreateItem, canCreateItem)
+
+                                        yield!
+                                            itemActions
+                                            |> List.map (fun action -> FileExplorerItem.ItemActionButton(item, action))
+
+                                        FileExplorerItem.DeleteItemButton(item, onDeleteItem, canDeleteItem)
+
+                                        if hasStatusControl then
+                                            FileExplorerItem.StatusControl(item, statusAction)
+
+                                        if canExpandDirectory then
+                                            Html.button [
+                                                prop.type'.button
+                                                prop.className [
+                                                    "swt:flex swt:min-h-0 swt:h-5 swt:w-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded swt:border-0 swt:bg-transparent swt:p-0 swt:cursor-pointer"
+                                                    rowHighlightClass
+                                                ]
+                                                prop.ariaLabel (
+                                                    if isExpanded then
+                                                        $"Collapse {item.Name}"
+                                                    else
+                                                        $"Expand {item.Name}"
+                                                )
+                                                prop.onClick onDirectoryArrowToggle
+                                                prop.children [ Html.i [ prop.className directoryToggleIconClass ] ]
+                                            ]
+                                    ]
+                                ]
                         ]
                     ]
                 ]
-
-                match children with
-                | Some childTree -> childTree
-                | None -> Html.none
             ]
+
+            match children with
+            | Some childTree -> childTree
+            | None -> Html.none
+        ]
 
         Html.li [
             prop.key item.Id
@@ -383,6 +376,7 @@ type FileExplorerItem =
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let hasItemActions = itemActions |> List.isEmpty |> not
         let canDeleteFromFile = canDeleteItem item && onDeleteItem.IsSome
+        let hasStatusControl = Helper.isLfs item || statusAction.IsSome
 
         Html.li [
             prop.key item.Id
@@ -391,7 +385,7 @@ type FileExplorerItem =
                 Html.div [
                     prop.custom ("data-file-item-id", item.Id)
                     prop.className [
-                        "swt:group swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between swt:cursor-default"
+                        "swt:group swt:px-2 swt:py-1 swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:cursor-default"
                         rowHighlightClass
                     ]
                     prop.children [
@@ -405,38 +399,35 @@ type FileExplorerItem =
                                 Html.i [
                                     prop.className (
                                         Swate.Components.Page.FileExplorer.Helper.iconClassName
-                                            [ "swt:iconify" ]
+                                            [ "swt:iconify"; "swt:shrink-0" ]
                                             item
                                             getItemIconClass
                                     )
                                 ]
                                 Html.span [
-                                    prop.className selectedNameClass
+                                    prop.className [
+                                        "swt:min-w-0"
+                                        "swt:flex-1"
+                                        "swt:truncate"
+                                        selectedNameClass
+                                    ]
                                     prop.text item.Name
                                 ]
                             ]
                         ]
 
-                        if item.IsLFS = Some true || statusAction.IsSome || hasItemActions || canDeleteFromFile then
+                        if hasStatusControl || hasItemActions || canDeleteFromFile then
                             Html.div [
-                                prop.className "swt:flex swt:items-center swt:gap-2"
+                                prop.className "swt:ml-auto swt:flex swt:shrink-0 swt:items-center swt:gap-2"
                                 prop.children [
                                     yield!
                                         itemActions
                                         |> List.map (fun action -> FileExplorerItem.ItemActionButton(item, action))
 
-                                    FileExplorerItem.DeleteItemButton (
-                                        item,
-                                        onDeleteItem,
-                                        canDeleteItem
-                                    )
+                                    FileExplorerItem.DeleteItemButton(item, onDeleteItem, canDeleteItem)
 
-                                    if item.IsLFS = Some true then
-                                        FileExplorerItem.LFSStatusPill(item, ?statusAction = statusAction)
-                                    elif statusAction.IsSome then
-                                        statusAction
-                                        |> Option.map (fun action -> FileExplorerItem.ItemActionButton(item, action))
-                                        |> Option.defaultValue Html.none
+                                    if hasStatusControl then
+                                        FileExplorerItem.StatusControl(item, statusAction)
                                 ]
                             ]
                     ]

@@ -9,45 +9,49 @@ let private expectSome value errorMessage =
     | Some value -> value
     | None -> failwith errorMessage
 
-Vitest.describe("JsonDTOUnwrapper", fun () ->
-    Vitest.test("returns Some/Ok for ARCtrlJsonObject DTO", fun () ->
-        let dto =
-            ARCtrlJsonObject.init(
-                "{\"id\":\"arc-1\"}",
-                ARCObjects.Arc,
-                JsonExportFormat.ARCtrl
-            )
+Vitest.describe (
+    "JsonDTOUnwrapper",
+    fun () ->
+        Vitest.test (
+            "returns Some/Ok for ARCtrlJsonObject DTO",
+            fun () ->
+                let dto =
+                    ARCtrlJsonObject.init ("{\"id\":\"arc-1\"}", ARCObjects.Arc, JsonExportFormat.ARCtrl)
 
-        let wrapped = JsonDTOs.ARCtrlJsonObject dto
+                let wrapped = JsonDTOs.ARCtrlJsonObject dto
 
-        let unwrappedOption = JsonDTOUnwrapper.tryUnwrap wrapped |> expectSome <| "Expected DTO to unwrap."
-        let unwrappedResult = JsonDTOUnwrapper.unwrap wrapped
+                let unwrappedOption =
+                    JsonDTOUnwrapper.tryUnwrap wrapped |> expectSome <| "Expected DTO to unwrap."
 
-        Vitest.expect(unwrappedOption.Json).toBe(dto.Json)
-        Vitest.expect(unwrappedOption.JsonObject).toEqual(dto.JsonObject)
+                let unwrappedResult = JsonDTOUnwrapper.unwrap wrapped
 
-        match unwrappedResult with
-        | Ok value ->
-            Vitest.expect(value.JsonType).toEqual(JsonExportFormat.ARCtrl)
-            Vitest.expect(value.JsonObject).toEqual(dto.JsonObject)
-        | Error message ->
-            failwith $"Expected Ok result but got Error: {message}"
-    )
+                Vitest.expect(unwrappedOption.Json).toBe (dto.Json)
+                Vitest.expect(unwrappedOption.JsonObject).toEqual (dto.JsonObject)
 
-    Vitest.test("returns None/Error and does not throw for ARCtrlContract", fun () ->
-        let optionResult = JsonDTOUnwrapper.tryUnwrap JsonDTOs.ARCtrlContract
-        let resultResult =
-            try
-                JsonDTOUnwrapper.unwrap JsonDTOs.ARCtrlContract
-            with exn ->
-                failwith $"Expected non-throwing unwrap, but got exception: {exn.Message}"
+                match unwrappedResult with
+                | Ok value ->
+                    Vitest.expect(value.JsonType).toEqual (JsonExportFormat.ARCtrl)
+                    Vitest.expect(value.JsonObject).toEqual (dto.JsonObject)
+                | Error message -> failwith $"Expected Ok result but got Error: {message}"
+        )
 
-        Vitest.expect(optionResult.IsNone).toBe(true)
+        Vitest.test (
+            "returns None/Error and does not throw for ARCtrlContract",
+            fun () ->
+                let optionResult = JsonDTOUnwrapper.tryUnwrap JsonDTOs.ARCtrlContract
 
-        match resultResult with
-        | Ok _ -> failwith "Expected Error for ARCtrlContract unwrap."
-        | Error message ->
-            Vitest.expect(message.Length > 0).toBe(true)
-            Vitest.expect(message.Contains("ARCtrlContract")).toBe(true)
-    )
+                let resultResult =
+                    try
+                        JsonDTOUnwrapper.unwrap JsonDTOs.ARCtrlContract
+                    with exn ->
+                        failwith $"Expected non-throwing unwrap, but got exception: {exn.Message}"
+
+                Vitest.expect(optionResult.IsNone).toBe (true)
+
+                match resultResult with
+                | Ok _ -> failwith "Expected Error for ARCtrlContract unwrap."
+                | Error message ->
+                    Vitest.expect(message.Length > 0).toBe (true)
+                    Vitest.expect(message.Contains("ARCtrlContract")).toBe (true)
+        )
 )

@@ -17,10 +17,7 @@ type private GraphDetailRow = {
 
 module private GraphObjectDetailsHelper =
 
-    let toRows
-        (valueFactory: string -> GraphDetailValue)
-        (rows: (string * string) list)
-        =
+    let toRows (valueFactory: string -> GraphDetailValue) (rows: (string * string) list) =
         rows
         |> List.map (fun (label, value) -> {
             Label = label
@@ -30,41 +27,35 @@ module private GraphObjectDetailsHelper =
     let valueText (value: GraphDetailValue) =
         match value with
         | GraphDetailValue.Text text
-        | GraphDetailValue.Code text ->
-            text
+        | GraphDetailValue.Code text -> text
 
-    let resolveSelectionKind
-        (selectedNode: ArcExplorerNode)
-        (selectedMeta: GraphNodeMeta option)
-        =
+    let resolveSelectionKind (selectedNode: ArcExplorerNode) (selectedMeta: GraphNodeMeta option) =
         selectedMeta
         |> Option.map _.GraphKind
         |> Option.map GraphExplorerNodeKind.label
-        |> Option.defaultValue (GraphExplorerNodeKind.label (GraphExplorerNodeKind.ofArcExplorerNodeKind selectedNode.kind))
+        |> Option.defaultValue (
+            GraphExplorerNodeKind.label (GraphExplorerNodeKind.ofArcExplorerNodeKind selectedNode.kind)
+        )
 
-    let resolveSelectionRole
-        (selectedNode: ArcExplorerNode)
-        (selectedMeta: GraphNodeMeta option)
-        =
+    let resolveSelectionRole (selectedNode: ArcExplorerNode) (selectedMeta: GraphNodeMeta option) =
         selectedMeta
         |> Option.map _.RoleLabel
-        |> Option.defaultValue (if selectedNode.isReference then "Reference" else "Canonical")
+        |> Option.defaultValue (
+            if selectedNode.isReference then
+                "Reference"
+            else
+                "Canonical"
+        )
 
-    let buildSelectionRows
-        (selectedNode: ArcExplorerNode)
-        (selectionKind: string)
-        (selectionRole: string)
-        =
-        [
-            "Type", selectionKind
-            "Role", selectionRole
-            "Path", (selectedNode.path |> Option.defaultValue "Virtual")
-            "Children", (string selectedNode.children.Length)
-        ]
+    let buildSelectionRows (selectedNode: ArcExplorerNode) (selectionKind: string) (selectionRole: string) = [
+        "Type", selectionKind
+        "Role", selectionRole
+        "Path", (selectedNode.path |> Option.defaultValue "Virtual")
+        "Children", (string selectedNode.children.Length)
+    ]
 
     let selectableRelatives (nodes: ArcExplorerNode list) =
-        nodes
-        |> List.filter (fun node -> node.isSelectable)
+        nodes |> List.filter (fun node -> node.isSelectable)
 
 [<Erase; Mangle(false)>]
 type GraphObjectDetails =
@@ -98,7 +89,8 @@ type GraphObjectDetails =
                                 prop.key $"{rowIndex}:{row.Label}:{valueKey}"
                                 prop.children [
                                     Html.th [
-                                        prop.className "swt:w-40 swt:align-top swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
+                                        prop.className
+                                            "swt:w-40 swt:align-top swt:text-xs swt:uppercase swt:tracking-wide swt:opacity-60"
                                         prop.text row.Label
                                     ]
                                     Html.td [
@@ -112,14 +104,9 @@ type GraphObjectDetails =
         ]
 
     [<ReactComponent>]
-    static member private RelationSection(
-        title: string,
-        items: ArcExplorerNode list,
-        onSelectNodeId: string -> unit
-    ) =
+    static member private RelationSection(title: string, items: ArcExplorerNode list, onSelectNodeId: string -> unit) =
         match items with
-        | [] ->
-            Html.none
+        | [] -> Html.none
         | items ->
             ArcObjectDetailsLayout.Section(
                 title,
@@ -132,52 +119,41 @@ type GraphObjectDetails =
                                 Html.button [
                                     prop.key item.id
                                     prop.type'.button
-                                    prop.className
-                                        "swt:btn swt:btn-sm swt:btn-outline swt:normal-case"
+                                    prop.className "swt:btn swt:btn-sm swt:btn-outline swt:normal-case"
                                     prop.text item.name
                                     prop.onClick (fun _ -> onSelectNodeId item.id)
-                                ])
+                                ]
+                            )
                         )
                     ]
                 ]
             )
 
     [<ReactComponent>]
-    static member GraphObjectDetails(
-        selectedNode: ArcExplorerNode option,
-        selectedAncestors: ArcExplorerNode list,
-        nodeMetaById: Map<string, GraphNodeMeta>,
-        onSelectNodeId: string -> unit
-    ) =
+    static member GraphObjectDetails
+        (
+            selectedNode: ArcExplorerNode option,
+            selectedAncestors: ArcExplorerNode list,
+            nodeMetaById: Map<string, GraphNodeMeta>,
+            onSelectNodeId: string -> unit
+        ) =
         match selectedNode with
-        | None ->
-            ArcObjectDetailsLayout.EmptyState("Select a graph object to inspect details.")
+        | None -> ArcObjectDetailsLayout.EmptyState("Select a graph object to inspect details.")
         | Some selectedNode ->
             let selectedMeta = nodeMetaById |> Map.tryFind selectedNode.id
 
             let selectionKind =
-                GraphObjectDetailsHelper.resolveSelectionKind
-                    selectedNode
-                    selectedMeta
+                GraphObjectDetailsHelper.resolveSelectionKind selectedNode selectedMeta
 
             let selectionRole =
-                GraphObjectDetailsHelper.resolveSelectionRole
-                    selectedNode
-                    selectedMeta
+                GraphObjectDetailsHelper.resolveSelectionRole selectedNode selectedMeta
 
             let selectionRows =
-                GraphObjectDetailsHelper.buildSelectionRows
-                    selectedNode
-                    selectionKind
-                    selectionRole
+                GraphObjectDetailsHelper.buildSelectionRows selectedNode selectionKind selectionRole
 
-            let ancestorItems =
-                GraphObjectDetailsHelper.selectableRelatives
-                    selectedAncestors
+            let ancestorItems = GraphObjectDetailsHelper.selectableRelatives selectedAncestors
 
-            let childItems =
-                GraphObjectDetailsHelper.selectableRelatives
-                    selectedNode.children
+            let childItems = GraphObjectDetailsHelper.selectableRelatives selectedNode.children
 
             let metadataSectionContent =
                 match selectedMeta with
@@ -198,16 +174,14 @@ type GraphObjectDetails =
                                 prop.className "swt:text-sm swt:opacity-80"
                                 prop.text description
                             ]
-                        | None ->
-                            Html.none
+                        | None -> Html.none
                     ]
-                | None ->
-                    [
-                        Html.p [
-                            prop.className "swt:text-sm swt:opacity-70"
-                            prop.text "No metadata was registered for this graph node."
-                        ]
+                | None -> [
+                    Html.p [
+                        prop.className "swt:text-sm swt:opacity-70"
+                        prop.text "No metadata was registered for this graph node."
                     ]
+                  ]
 
             let caseExamplesSection =
                 selectedMeta
@@ -216,9 +190,12 @@ type GraphObjectDetails =
                     ArcObjectDetailsLayout.Section(
                         "Case Examples",
                         [
-                            GraphObjectDetails.DetailsTable(meta.CaseExamples |> GraphObjectDetailsHelper.toRows GraphDetailValue.Code)
+                            GraphObjectDetails.DetailsTable(
+                                meta.CaseExamples |> GraphObjectDetailsHelper.toRows GraphDetailValue.Code
+                            )
                         ]
-                    ))
+                    )
+                )
                 |> Option.defaultValue Html.none
 
             Html.div [
@@ -231,24 +208,14 @@ type GraphObjectDetails =
                                 prop.className "swt:text-base swt:font-semibold swt:break-words"
                                 prop.text selectedNode.name
                             ]
-                            GraphObjectDetails.DetailsTable(selectionRows |> GraphObjectDetailsHelper.toRows GraphDetailValue.Text)
+                            GraphObjectDetails.DetailsTable(
+                                selectionRows |> GraphObjectDetailsHelper.toRows GraphDetailValue.Text
+                            )
                         ]
                     )
-                    GraphObjectDetails.RelationSection(
-                        "Ancestors",
-                        ancestorItems,
-                        onSelectNodeId
-                    )
-                    GraphObjectDetails.RelationSection(
-                        "Children",
-                        childItems,
-                        onSelectNodeId
-                    )
-                    ArcObjectDetailsLayout.Section(
-                        "Metadata",
-                        metadataSectionContent
-                    )
+                    GraphObjectDetails.RelationSection("Ancestors", ancestorItems, onSelectNodeId)
+                    GraphObjectDetails.RelationSection("Children", childItems, onSelectNodeId)
+                    ArcObjectDetailsLayout.Section("Metadata", metadataSectionContent)
                     caseExamplesSection
                 ]
             ]
-

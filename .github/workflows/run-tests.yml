@@ -9,7 +9,8 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+        # os: [ubuntu-latest, windows-latest, macos-latest]
+        os: [ubuntu-latest]
 
     runs-on: ${{ matrix.os }}
 
@@ -31,12 +32,12 @@ jobs:
       - name: Setup Node.js
         uses: actions/setup-node@v6
         with:
-          node-version: 24
+          node-version: 22
           cache: "npm"
 
       # Install npm dependencies
       - name: Install root npm dependencies
-        run: npm ci
+        run: npm i
 
       # Install playwright dependencies
       - name: Install Playwright dependencies

@@ -8,9 +8,18 @@ open Swate.Components.Page.FileExplorer.Types
 
 
 let private groupItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Group
-let private materialItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Material
+
+let private materialItemType =
+    GraphExplorerNodeKind.label GraphExplorerNodeKind.Material
+
 let private dataItemType = GraphExplorerNodeKind.label GraphExplorerNodeKind.Data
-let private descendantSummaryGroupKeys = Set.ofList [ "additional-properties"; "parameter-value"; "formal-parameters" ]
+
+let private descendantSummaryGroupKeys =
+    Set.ofList [
+        "additional-properties"
+        "parameter-value"
+        "formal-parameters"
+    ]
 
 type private DescendantSummarySeed = {
     RuleKey: string
@@ -77,9 +86,7 @@ let rec private collectSummarySeeds (item: FileItem) =
             if descendantSummaryGroupKeys.Contains ruleKey then
                 let memberNodeIds =
                     children
-                    |> List.filter (fun child ->
-                        child.ItemType <> groupItemType
-                        && child.ItemType <> "empty")
+                    |> List.filter (fun child -> child.ItemType <> groupItemType && child.ItemType <> "empty")
                     |> List.map _.Id
 
                 if List.isEmpty memberNodeIds then
@@ -100,36 +107,35 @@ let rec private collectSummarySeeds (item: FileItem) =
 
 let private summaryRulesFromOriginalDescendants (item: FileItem) =
     let seeds =
-        item.Children
-        |> Option.defaultValue []
-        |> List.collect collectSummarySeeds
+        item.Children |> Option.defaultValue [] |> List.collect collectSummarySeeds
 
     let rulesByKey, orderedKeys =
         seeds
-        |> List.fold (fun (rulesByKey, orderedKeys) seed ->
-            match Map.tryFind seed.RuleKey rulesByKey with
-            | Some existing ->
-                let updatedRule =
-                    {
+        |> List.fold
+            (fun (rulesByKey, orderedKeys) seed ->
+                match Map.tryFind seed.RuleKey rulesByKey with
+                | Some existing ->
+                    let updatedRule = {
                         existing with
                             GroupNodeIds = Set.add seed.GroupNodeId existing.GroupNodeIds
                             MemberNodeIds = Set.union existing.MemberNodeIds (Set.ofList seed.MemberNodeIds)
                     }
 
-                Map.add seed.RuleKey updatedRule rulesByKey, orderedKeys
-            | None ->
-                let newRule = {
-                    RuleKey = seed.RuleKey
-                    SummaryName = seed.SummaryName
-                    SummaryGroupIdSuffix = $"group:flattened-{seed.RuleKey}"
-                    GroupNodeIds = Set.singleton seed.GroupNodeId
-                    MemberNodeIds = Set.ofList seed.MemberNodeIds
-                }
+                    Map.add seed.RuleKey updatedRule rulesByKey, orderedKeys
+                | None ->
+                    let newRule = {
+                        RuleKey = seed.RuleKey
+                        SummaryName = seed.SummaryName
+                        SummaryGroupIdSuffix = $"group:flattened-{seed.RuleKey}"
+                        GroupNodeIds = Set.singleton seed.GroupNodeId
+                        MemberNodeIds = Set.ofList seed.MemberNodeIds
+                    }
 
-                Map.add seed.RuleKey newRule rulesByKey, orderedKeys @ [ seed.RuleKey ]) (Map.empty, [])
+                    Map.add seed.RuleKey newRule rulesByKey, orderedKeys @ [ seed.RuleKey ]
+            )
+            (Map.empty, [])
 
-    orderedKeys
-    |> List.choose (fun key -> Map.tryFind key rulesByKey)
+    orderedKeys |> List.choose (fun key -> Map.tryFind key rulesByKey)
 
 let private createSummaryFolder (parentItem: FileItem) (rule: DescendantSummaryRule) (children: FileItem list) =
     let groupAppearance = ARCExplorer.appearanceForNodeKind ArcExplorerNodeKind.Group
@@ -155,10 +161,13 @@ let private createSummaryFolder (parentItem: FileItem) (rule: DescendantSummaryR
         Path = None
     }
 
-let private summarizeDescendantBranches (parentItem: FileItem) (rule: DescendantSummaryRule) (descendants: FileItem list) =
+let private summarizeDescendantBranches
+    (parentItem: FileItem)
+    (rule: DescendantSummaryRule)
+    (descendants: FileItem list)
+    =
     let summarizedLeaves =
-        descendants
-        |> List.filter (fun item -> Set.contains item.Id rule.MemberNodeIds)
+        descendants |> List.filter (fun item -> Set.contains item.Id rule.MemberNodeIds)
 
     if List.isEmpty summarizedLeaves then
         descendants
@@ -168,13 +177,10 @@ let private summarizeDescendantBranches (parentItem: FileItem) (rule: Descendant
             || Set.contains item.Id rule.MemberNodeIds
 
         let firstBranchNodeIndex =
-            descendants
-            |> List.tryFindIndex isRuleBranchOrMember
-            |> Option.defaultValue 0
+            descendants |> List.tryFindIndex isRuleBranchOrMember |> Option.defaultValue 0
 
         let descendantsWithoutBranchNodes =
-            descendants
-            |> List.filter (isRuleBranchOrMember >> not)
+            descendants |> List.filter (isRuleBranchOrMember >> not)
 
         let insertionIndex =
             descendants
@@ -184,13 +190,9 @@ let private summarizeDescendantBranches (parentItem: FileItem) (rule: Descendant
 
         let summaryFolder = createSummaryFolder parentItem rule summarizedLeaves
 
-        let beforeSummaryFolder =
-            descendantsWithoutBranchNodes
-            |> List.take insertionIndex
+        let beforeSummaryFolder = descendantsWithoutBranchNodes |> List.take insertionIndex
 
-        let afterSummaryFolder =
-            descendantsWithoutBranchNodes
-            |> List.skip insertionIndex
+        let afterSummaryFolder = descendantsWithoutBranchNodes |> List.skip insertionIndex
 
         beforeSummaryFolder @ [ summaryFolder ] @ afterSummaryFolder
 
@@ -198,20 +200,14 @@ let rec private flattenItem (item: FileItem) : FileItem * FileItem list =
     let children, descendantsForAncestors =
         match item.Children with
         | Some children ->
-            let flattenedChildren =
-                children
-                |> List.map flattenItem
+            let flattenedChildren = children |> List.map flattenItem
 
             let descendantsForParent =
-                let directChildren =
-                    flattenedChildren
-                    |> List.map fst
+                let directChildren = flattenedChildren |> List.map fst
 
                 let nestedDescendants =
                     flattenedChildren
-                    |> List.collect (fun (_, descendants) ->
-                        descendants
-                        |> List.skip 1)
+                    |> List.collect (fun (_, descendants) -> descendants |> List.skip 1)
 
                 directChildren @ nestedDescendants
                 |> List.filter (fun descendant -> descendant.ItemType <> "empty")
@@ -219,26 +215,20 @@ let rec private flattenItem (item: FileItem) : FileItem * FileItem list =
             let descendantsForCurrentItem =
                 (descendantsForParent, summaryRulesFromOriginalDescendants item)
                 ||> List.fold (fun currentDescendants summaryRule ->
-                    summarizeDescendantBranches item summaryRule currentDescendants)
+                    summarizeDescendantBranches item summaryRule currentDescendants
+                )
 
             Some descendantsForCurrentItem, descendantsForParent
-        | None ->
-            None, []
+        | None -> None, []
 
-    let flattenedItem =
-        {
-            item with
-                Children = children
-        }
+    let flattenedItem = { item with Children = children }
 
     flattenedItem, flattenedItem :: descendantsForAncestors
 
-let private siblingNameKey (name: string) =
-    name.Trim().ToLowerInvariant()
+let private siblingNameKey (name: string) = name.Trim().ToLowerInvariant()
 
 let private isMergeableGroupFolder (item: FileItem) =
-    item.ItemType = groupItemType
-    && item.IsDirectory
+    item.ItemType = groupItemType && item.IsDirectory
 
 let rec private normalizeSiblingLevelOnly (children: FileItem list) =
     children
@@ -269,7 +259,8 @@ and private mergeSameNameGroupsOnSiblingLevel (children: FileItem list) =
                 tail
                 |> List.partition (fun sibling ->
                     isMergeableGroupFolder sibling
-                    && String.Equals(sibling.Name, current.Name, StringComparison.OrdinalIgnoreCase))
+                    && String.Equals(sibling.Name, current.Name, StringComparison.OrdinalIgnoreCase)
+                )
 
             let groupedNodes = current :: sameNameGroups
 
@@ -280,16 +271,13 @@ and private mergeSameNameGroupsOnSiblingLevel (children: FileItem list) =
                     current
 
             loop (mergedNode :: acc) nonMatchingGroups
-        | current :: tail ->
-            loop (current :: acc) tail
+        | current :: tail -> loop (current :: acc) tail
 
     loop [] children
 
 and private collectNodeIds (item: FileItem) =
     let childrenIds =
-        item.Children
-        |> Option.defaultValue []
-        |> List.collect collectNodeIds
+        item.Children |> Option.defaultValue [] |> List.collect collectNodeIds
 
     item.Id :: childrenIds
 
@@ -297,16 +285,14 @@ and private hideRepresentedNonGroupSiblings (siblings: FileItem list) =
     let representedIdsInsideGroups =
         siblings
         |> List.filter isMergeableGroupFolder
-        |> List.collect (fun folder ->
-            folder.Children
-            |> Option.defaultValue []
-            |> List.collect collectNodeIds)
+        |> List.collect (fun folder -> folder.Children |> Option.defaultValue [] |> List.collect collectNodeIds)
         |> Set.ofList
 
     siblings
     |> List.filter (fun sibling ->
         isMergeableGroupFolder sibling
-        || representedIdsInsideGroups.Contains sibling.Id |> not)
+        || representedIdsInsideGroups.Contains sibling.Id |> not
+    )
 
 and private tryGetTargetFolderNameForLeafLikeNode (item: FileItem) =
     let idContains (marker: string) =
@@ -332,37 +318,33 @@ and private rehomeLeafLikeNodesIntoMatchingFolders (siblings: FileItem list) =
             if isMergeableGroupFolder item then
                 Some(siblingNameKey item.Name, item)
             else
-                None)
+                None
+        )
         |> Map.ofList
 
     let movedByFolderId, movedNodeIds =
         siblings
-        |> List.fold (fun (moves, movedIds) item ->
-            if isMergeableGroupFolder item then
-                moves, movedIds
-            else
-                match tryGetTargetFolderNameForLeafLikeNode item with
-                | Some folderName ->
-                    match foldersByName |> Map.tryFind (siblingNameKey folderName) with
-                    | Some folder ->
-                        let movedNodesForFolder =
-                            moves
-                            |> Map.tryFind folder.Id
-                            |> Option.defaultValue []
+        |> List.fold
+            (fun (moves, movedIds) item ->
+                if isMergeableGroupFolder item then
+                    moves, movedIds
+                else
+                    match tryGetTargetFolderNameForLeafLikeNode item with
+                    | Some folderName ->
+                        match foldersByName |> Map.tryFind (siblingNameKey folderName) with
+                        | Some folder ->
+                            let movedNodesForFolder = moves |> Map.tryFind folder.Id |> Option.defaultValue []
 
-                        let updatedMoves =
-                            moves
-                            |> Map.add folder.Id (movedNodesForFolder @ [ item ])
+                            let updatedMoves = moves |> Map.add folder.Id (movedNodesForFolder @ [ item ])
 
-                        updatedMoves, movedIds |> Set.add item.Id
-                    | None ->
-                        moves, movedIds
-                | None ->
-                    moves, movedIds) (Map.empty, Set.empty)
+                            updatedMoves, movedIds |> Set.add item.Id
+                        | None -> moves, movedIds
+                    | None -> moves, movedIds
+            )
+            (Map.empty, Set.empty)
 
     let siblingsWithoutMovedNodes =
-        siblings
-        |> List.filter (fun item -> movedNodeIds.Contains item.Id |> not)
+        siblings |> List.filter (fun item -> movedNodeIds.Contains item.Id |> not)
 
     siblingsWithoutMovedNodes
     |> List.map (fun item ->
@@ -370,25 +352,24 @@ and private rehomeLeafLikeNodesIntoMatchingFolders (siblings: FileItem list) =
         | Some movedNodes ->
             let existingChildren = item.Children |> Option.defaultValue []
             let mergedChildren = (existingChildren @ movedNodes) |> List.distinctBy _.Id
-            { item with Children = Some mergedChildren }
-        | None ->
-            item)
+
+            {
+                item with
+                    Children = Some mergedChildren
+            }
+        | None -> item
+    )
 
 let rec private normalizeTreeForGraphView (item: FileItem) =
     let normalizedChildren =
         item.Children
-        |> Option.map (fun children ->
-            children
-            |> List.map normalizeTreeForGraphView
-            |> normalizeSiblingLevelOnly)
+        |> Option.map (fun children -> children |> List.map normalizeTreeForGraphView |> normalizeSiblingLevelOnly)
 
-    { item with Children = normalizedChildren }
+    {
+        item with
+            Children = normalizedChildren
+    }
 
 let flattenNestedChildrenOnParentLevel (items: FileItem list) =
     items
-    |> List.map (fun item ->
-        item
-        |> flattenItem
-        |> fst
-        |> normalizeTreeForGraphView)
-
+    |> List.map (fun item -> item |> flattenItem |> fst |> normalizeTreeForGraphView)

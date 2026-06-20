@@ -8,11 +8,14 @@ module Validation =
 
     let toOptionalString (value: string) =
         let trimmed = value.Trim()
-        if String.IsNullOrWhiteSpace trimmed then None else Some trimmed
+
+        if String.IsNullOrWhiteSpace trimmed then
+            None
+        else
+            Some trimmed
 
     let isRequiredDataValid (draft: NotesDraft) =
-        not (String.IsNullOrWhiteSpace draft.Title)
-        && draft.DateCreated.IsSome
+        not (String.IsNullOrWhiteSpace draft.Title) && draft.DateCreated.IsSome
 
     let tryParseDateCreated (dateText: string) =
         let trimmed = dateText.Trim()
@@ -21,7 +24,9 @@ module Validation =
             None
         else
             let dateOnly = Regex.Match(trimmed, @"^(\d{4})-(\d{2})-(\d{2})$")
-            let dateTimeLocal = Regex.Match(trimmed, @"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$")
+
+            let dateTimeLocal =
+                Regex.Match(trimmed, @"^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})$")
 
             if dateOnly.Success then
                 try

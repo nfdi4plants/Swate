@@ -10,6 +10,8 @@ type WidgetType =
     | Template
     | FilePicker
     | DataAnnotator
+    | JsonImport
+    | JsonExport
     | Playground
 
 type WidgetDefinition = {|
@@ -25,18 +27,18 @@ type WidgetControllerContext = {
     toggleWidget: WidgetType -> unit
     focusWidget: WidgetType -> unit
 } with
-    static member init () : WidgetControllerContext = {
+
+    static member init() : WidgetControllerContext = {
         activeWidgets = []
         isActive = fun _ -> false
         openWidget = fun _ -> ()
         closeWidget = fun _ -> ()
         toggleWidget = fun _ -> ()
         focusWidget = fun _ -> ()
-}
+    }
 
 let WidgetControllerCtx =
     React.createContext<WidgetControllerContext> (WidgetControllerContext.init ())
 
 [<Hook>]
 let useWidgetControllerCtx () = React.useContext WidgetControllerCtx
-

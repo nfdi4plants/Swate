@@ -1,6 +1,9 @@
 [<AutoOpen>]
 module Swate.Components.Primitive.Types
 
+open Fable.Core
+
+[<StringEnum>]
 [<RequireQualifiedAccess>]
 type DaisyuiSize =
     | XS
@@ -9,6 +12,7 @@ type DaisyuiSize =
     | LG
     | XL
 
+[<StringEnum>]
 [<RequireQualifiedAccess>]
 type DaisyuiColors =
     | Primary
@@ -19,10 +23,10 @@ type DaisyuiColors =
     | Warning
     | Error
 
+[<StringEnum>]
 [<RequireQualifiedAccess>]
 type DaisyuiTooltipPosition =
     | Top
     | Right
     | Bottom
     | Left
-

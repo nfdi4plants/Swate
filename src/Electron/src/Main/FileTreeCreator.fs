@@ -3,17 +3,15 @@ module Main.FileTreeCreator
 
 open System
 open System.Collections.Generic
-open Fable.Core.JsInterop
+open Main.Bindings.Filesystem
+open Main.Bindings.Path
 open Main.Git.GitLfsService
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 
-let fs: obj = importAll "fs"
-let pathMod: obj = importAll "path"
-
 let normalizeRootPath (path: string) =
-    pathMod?resolve (path) |> unbox<string> |> PathHelpers.normalizePath
+    resolve [| path |] |> PathHelpers.normalizePath
 
 let private shouldIgnoreDirName (name: string) = name = ".git"
 
@@ -35,11 +33,10 @@ let private withFileEntryLfsMetadata
         | Some relativePath ->
             let normalizedRelativePath = PathHelpers.normalizeSeparators relativePath
 
-            match lfsFilesByRelativePath.TryGetValue(normalizedRelativePath) with
-            | true, lfsInfo -> { entry with lfs = Some lfsInfo }
-            | _ -> { entry with lfs = None }
-        | None ->
-            { entry with lfs = None }
+            match tryFindLsFileInfoByRelativePath lfsFilesByRelativePath normalizedRelativePath with
+            | Some lfsInfo -> { entry with lfs = Some lfsInfo }
+            | None -> { entry with lfs = None }
+        | None -> { entry with lfs = None }
 
 /// Enriches file entries with Git LFS metadata from `git lfs ls-files -j`.
 let private withFileEntriesLfsMetadata
@@ -63,7 +60,10 @@ let toRendererFileTree (repoRoot: string) (entries: seq<FileEntry>) : Dictionary
     rendererFileTree
 
 /// Remove a path and all descendants from a file tree dictionary using normalized ancestor checks.
-let removePathAndDescendants (targetPath: string) (fileTree: Dictionary<string, FileEntry>) : Dictionary<string, FileEntry> =
+let removePathAndDescendants
+    (targetPath: string)
+    (fileTree: Dictionary<string, FileEntry>)
+    : Dictionary<string, FileEntry> =
     let normalizedTargetPath = PathHelpers.normalizePath targetPath
     let nextTree = Dictionary<string, FileEntry>(fileTree)
 
@@ -85,8 +85,8 @@ let upsertFileEntry (entry: FileEntry) (fileTree: Dictionary<string, FileEntry>)
     nextTree
 
 let getFileEntry (path: string) = promise {
-    let! stats = fs?promises?stat (path)
-    return FileEntry.create (pathMod?basename (path), path, stats?isDirectory (), None)
+    let! stats = statAsync path
+    return FileEntry.create (basename path, path, stats.isDirectory (), None)
 }
 
 let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
@@ -104,10 +104,10 @@ let getFileEntryWithLfsMetadata (repoRoot: string) (path: string) = promise {
 let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise {
     let repoRoot = normalizeRootPath path
 
-    let! rootStats = fs?promises?stat (repoRoot)
-    let rootIsDir = rootStats?isDirectory () |> unbox<bool>
+    let! rootStats = statAsync repoRoot
+    let rootIsDir = rootStats.isDirectory ()
 
-    let rootName = pathMod?basename (repoRoot) |> unbox<string>
+    let rootName = basename repoRoot
     let rootEntry = FileEntry.create (rootName, repoRoot, rootIsDir, None)
 
     if not rootIsDir then
@@ -123,22 +123,20 @@ let getFileEntries (path: string) : Fable.Core.JS.Promise<FileEntry[]> = promise
             let currentDir = stack.[stack.Count - 1]
             stack.RemoveAt(stack.Count - 1)
 
-            let! dirents =
-                fs?promises?readdir (currentDir, createObj [ "withFileTypes" ==> true ])
-                |> unbox<Fable.Core.JS.Promise<obj[]>>
+            let! dirents = readdirWithTypesAsync currentDir (ReaddirOptions(withFileTypes = true))
 
             dirents
             |> Array.iter (fun dirent ->
-                let name = dirent?name |> unbox<string>
-                let isDir = dirent?isDirectory () |> unbox<bool>
+                let name = dirent.name
+                let isDir = dirent.isDirectory ()
 
                 if isDir then
                     if not (shouldIgnoreDirName name) then
-                        let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> PathHelpers.normalizeSeparators
+                        let fullPath = join [| currentDir; name |] |> PathHelpers.normalizeSeparators
                         entries.Add(FileEntry.create (name, fullPath, true, None))
                         stack.Add(fullPath)
                 else
-                    let fullPath = pathMod?join (currentDir, name) |> unbox<string> |> PathHelpers.normalizeSeparators
+                    let fullPath = join [| currentDir; name |] |> PathHelpers.normalizeSeparators
 
                     if not (shouldIgnorePath fullPath) then
                         entries.Add(FileEntry.create (name, fullPath, false, None))

@@ -45,8 +45,7 @@ type DataMap with
             |> Option.defaultValue (OntologyAnnotation())
             |> CompositeCell.Term
         | DataMapIndices.Unit -> r.Unit |> Option.defaultValue (OntologyAnnotation()) |> CompositeCell.Term
-        | DataMapIndices.ObjectType ->
-            r.ObjectType |> Option.defaultValue (OntologyAnnotation()) |> CompositeCell.Term
+        | DataMapIndices.ObjectType -> r.ObjectType |> Option.defaultValue (OntologyAnnotation()) |> CompositeCell.Term
         | i -> failwithf "Invalid column index for DataMap: %i" i
 
 
@@ -95,6 +94,7 @@ type DataMap with
         | DataMapIndices.Unit -> r.Unit <- None
         | DataMapIndices.ObjectType -> r.ObjectType <- None
         | i -> failwithf "Invalid column index for DataMap: %i" i
+
     member this.GetHeader(columnIndex: int) = DataMap.getHeader (columnIndex)
 
     static member ColumnCount = 7

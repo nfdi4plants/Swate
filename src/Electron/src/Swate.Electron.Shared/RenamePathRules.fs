@@ -4,8 +4,7 @@ open System
 open Swate.Components.Shared
 
 let private normalizeRelativePath (path: string) =
-    path
-    |> PathHelpers.normalizeCanonicalRelativePath
+    path |> PathHelpers.normalizeCanonicalRelativePath
 
 let validateRenameName (newName: string) =
     let normalizedNewName = newName.Trim()
@@ -47,6 +46,31 @@ let tryBuildRenameTargetPath (sourcePath: string) (newName: string) =
             else
                 Ok targetPath
 
+let tryBuildGenericFileSystemChildPath (parentPath: string) (name: string) =
+    let normalizedParentPath = normalizeRelativePath parentPath
+
+    let parentIsAllowed =
+        String.IsNullOrWhiteSpace normalizedParentPath
+        || ArcEntityPathRules.isGenericFileSystemParentAllowed normalizedParentPath
+
+    if parentIsAllowed |> not then
+        Error "Generic file and folder creation is only allowed inside safe ARC directories."
+    else
+        match validateRenameName name with
+        | Error validationError -> Error validationError
+        | Ok normalizedName ->
+            let targetPath =
+                if String.IsNullOrWhiteSpace normalizedParentPath then
+                    normalizedName
+                else
+                    $"{normalizedParentPath}/{normalizedName}"
+
+            if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath then
+                Ok targetPath
+            else
+                Error
+                    "Generic file and folder targets must stay inside the ARC and must not target canonical ARC files."
+
 let tryBuildGenericFileSystemRenameTargetPath (sourcePath: string) (newName: string) =
     let normalizedSourcePath = normalizeRelativePath sourcePath
 
@@ -59,4 +83,5 @@ let tryBuildGenericFileSystemRenameTargetPath (sourcePath: string) (newName: str
             if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath then
                 Ok targetPath
             else
-                Error "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."
+                Error
+                    "Generic file and folder rename targets must stay inside the ARC and must not target canonical ARC files."

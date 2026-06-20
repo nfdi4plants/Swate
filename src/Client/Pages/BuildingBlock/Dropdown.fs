@@ -70,7 +70,10 @@ module private DropdownElements =
             prop.children [
                 Html.div [
                     prop.className "swt:flex swt:flex-row swt:justify-between"
-                    prop.children [ Html.span subpage.toString; Swate.Components.Primitive.Icons.ArrowRight() ]
+                    prop.children [
+                        Html.span subpage.toString
+                        Swate.Components.Primitive.Icons.ArrowRight()
+                    ]
                 ]
             ]
         ]

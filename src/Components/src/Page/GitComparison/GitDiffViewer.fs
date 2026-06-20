@@ -23,25 +23,42 @@ type GitDiffViewer =
                     let metadata = GitTextComparisonCore.Metadata.extractDiffMetadata wordDiffText
 
                     let previousHeaderLabel =
-                        GitTextComparisonCore.Metadata.resolveHeaderLabel "Previous version" previousTitle metadata.PreviousPath
+                        GitTextComparisonCore.Metadata.resolveHeaderLabel
+                            "Previous version"
+                            previousTitle
+                            metadata.PreviousPath
 
                     let currentHeaderLabel =
-                        GitTextComparisonCore.Metadata.resolveHeaderLabel "Current version" currentTitle metadata.CurrentPath
+                        GitTextComparisonCore.Metadata.resolveHeaderLabel
+                            "Current version"
+                            currentTitle
+                            metadata.CurrentPath
 
                     let rows =
-                        GitTextComparisonCore.WordDiff.buildRowsFromWordDiff wordDiffText previousContent currentContent
+                        GitTextComparisonCore.WordDiff.buildRowsFromWordDiff
+                            wordDiffText
+                            previousContent
+                            currentContent
                         |> List.toArray
 
-                    let previousLineCount = (GitTextComparisonCore.Text.splitContentToLines previousContent).Length
-                    let currentLineCount = (GitTextComparisonCore.Text.splitContentToLines currentContent).Length
+                    let previousLineCount =
+                        (GitTextComparisonCore.Text.splitContentToLines previousContent).Length
+
+                    let currentLineCount =
+                        (GitTextComparisonCore.Text.splitContentToLines currentContent).Length
 
                     previousHeaderLabel, currentHeaderLabel, rows, previousLineCount, currentLineCount
                 ),
-                [| box wordDiffText; box previousContent; box currentContent; box previousTitle; box currentTitle |]
+                [|
+                    box wordDiffText
+                    box previousContent
+                    box currentContent
+                    box previousTitle
+                    box currentTitle
+                |]
             )
 
-        let rootTestId =
-            testIdPrefix |> Option.map (fun prefix -> prefix + "-root")
+        let rootTestId = testIdPrefix |> Option.map (fun prefix -> prefix + "-root")
 
         let previousHeaderTestId =
             testIdPrefix |> Option.map (fun prefix -> prefix + "-previous-header")

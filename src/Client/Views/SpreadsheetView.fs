@@ -9,7 +9,10 @@ open Model
 open ARCtrl
 
 let private WidgetOrderContainer bringWidgetToFront (widget) =
-    Html.div [ prop.onClick bringWidgetToFront; prop.children [ widget ] ]
+    Html.div [
+        prop.onClick bringWidgetToFront
+        prop.children [ widget ]
+    ]
 
 let private ModalDisplay (widgets: Widget list, displayWidget: Widget -> ReactElement) =
 

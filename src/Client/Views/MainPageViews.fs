@@ -106,14 +106,20 @@ type MainPageView =
         | _ ->
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:items-center"
-                prop.children [ Html.h1 [ prop.text "404"; prop.className "swt:text-4xl" ] ]
+                prop.children [
+                    Html.h1 [ prop.text "404"; prop.className "swt:text-4xl" ]
+                ]
             ]
 
     static member Main(model: Model.Model, dispatch) =
         Html.div [
             prop.className "swt:drawer swt:md:drawer-open"
             prop.children [
-                Html.input [ prop.id DrawerId; prop.type'.checkbox; prop.className "swt:drawer-toggle" ]
+                Html.input [
+                    prop.id DrawerId
+                    prop.type'.checkbox
+                    prop.className "swt:drawer-toggle"
+                ]
                 Html.div [
                     prop.className "swt:drawer-content swt:flex swt:flex-col swt:items-center swt:overflow-y-auto"
                     prop.children [

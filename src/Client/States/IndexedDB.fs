@@ -27,7 +27,8 @@ let createDatabase (dbName: string) version tableKey = promise {
                         let _ = resultDb?createObjectStore (tableKey)
                         resolve (request?result)
                     else
-                        resolve (request?result))
+                        resolve (request?result)
+        )
         |> Async.StartAsPromise
 
     return db
@@ -56,7 +57,8 @@ let rec openDatabase (dbName: string) (tableKey: string) = promise {
                     else
                         resolve (Some request?result)
 
-            request?onerror <- fun _ -> reject (new Exception(request?error?message)))
+            request?onerror <- fun _ -> reject (new Exception(request?error?message))
+        )
         |> Async.StartAsPromise
 
     match db with
@@ -90,7 +92,8 @@ let clearTable db (tableKey: string) = promise {
         do!
             Async.FromContinuations(fun (resolve, reject, _) ->
                 storeRequest?onsuccess <- fun _ -> resolve (storeRequest?result)
-                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message)))
+                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message))
+            )
             |> Async.StartAsPromise
 }
 
@@ -117,7 +120,8 @@ let addItem db (tableKey: string) (item: obj) (key: string) = promise {
         do!
             Async.FromContinuations(fun (resolve, reject, _) ->
                 storeRequest?onsuccess <- fun _ -> resolve (storeRequest?result)
-                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message)))
+                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message))
+            )
             |> Async.StartAsPromise
 }
 
@@ -136,7 +140,8 @@ let deleteItem db (tableKey: string) (key: string) = promise {
         do!
             Async.FromContinuations(fun (resolve, reject, _) ->
                 storeRequest?onsuccess <- fun _ -> resolve (storeRequest?result)
-                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message)))
+                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message))
+            )
             |> Async.StartAsPromise
 }
 
@@ -155,7 +160,8 @@ let updateItem db (tableKey: string) (item: obj) (key: string) = promise {
         do!
             Async.FromContinuations(fun (resolve, reject, _) ->
                 storeRequest?onsuccess <- fun _ -> resolve (storeRequest?result)
-                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message)))
+                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message))
+            )
             |> Async.StartAsPromise
 }
 
@@ -174,7 +180,8 @@ let tryGetItem (db: obj) (tableKey: string) (key: string) = promise {
         let! item =
             Async.FromContinuations(fun (resolve, reject, _) ->
                 storeRequest?onsuccess <- fun _ -> resolve (storeRequest?result)
-                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message)))
+                storeRequest?onerror <- fun _ -> reject (new Exception(storeRequest?error?message))
+            )
             |> Async.StartAsPromise
 
         if isNullOrUndefined item then
@@ -206,7 +213,8 @@ let getAllItems (db: obj) (tableKey: string) = promise {
                 storeRequest?onsuccess <- fun _ -> resolve (storeRequest?result)
 
                 storeRequest?onerror <-
-                    fun _ -> reject (new Exception(storeRequest?error?message "Failed to open database")))
+                    fun _ -> reject (new Exception(storeRequest?error?message "Failed to open database"))
+            )
             |> Async.StartAsPromise
 
         if isNullOrUndefined item then

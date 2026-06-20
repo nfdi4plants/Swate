@@ -7,13 +7,7 @@ module Actions =
 
     [<ReactComponent>]
     let Main
-        (
-            isSubmitting: bool,
-            showExistingTargetSelector: bool,
-            onToggleExistingTargetSelector: unit -> unit,
-            onCreateNew: unit -> unit,
-            error: string option
-        ) =
+        (isSubmitting: bool, onOpenExistingTargetSelector: unit -> unit, onCreateNew: unit -> unit, error: string option) =
         Html.div [
             prop.className "swt:space-y-2"
             prop.children [
@@ -28,13 +22,8 @@ module Actions =
                                     "swt:btn-disabled"
                             ]
                             prop.disabled isSubmitting
-                            prop.onClick (fun _ -> onToggleExistingTargetSelector ())
-                            prop.text (
-                                if showExistingTargetSelector then
-                                    "Close existing Assay/Study"
-                                else
-                                    "Add to existing Assay/Study"
-                            )
+                            prop.onClick (fun _ -> onOpenExistingTargetSelector ())
+                            prop.text "Add to existing Assay/Study"
                         ]
                         Html.button [
                             prop.testId "notes-create-new-button"

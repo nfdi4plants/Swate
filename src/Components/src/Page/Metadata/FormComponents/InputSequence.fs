@@ -145,7 +145,7 @@ type InputSequence =
                 Html.div [
                     prop.className "swt:flex swt:justify-center swt:w-full swt:mt-2"
                     prop.children [
-                        Helpers.addButton(fun _ ->
+                        Helpers.addButton (fun _ ->
                             inputs.Add(constructor ())
                             validateSetter inputs
                         )

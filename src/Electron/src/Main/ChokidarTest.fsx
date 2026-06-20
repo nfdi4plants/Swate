@@ -1,4 +1,3 @@
-
 #r "nuget: Fable.Core"
 
 open Fable.Core
@@ -51,10 +50,10 @@ type IWatcher =
 type Chokidar =
 
     [<Import("watch", "chokidar")>]
-    static member watch (paths: string, options: WatchOptions) : IWatcher = jsNative
+    static member watch(paths: string, options: WatchOptions) : IWatcher = jsNative
 
     [<Import("watch", "chokidar")>]
-    static member watch (paths: string[], options: WatchOptions) : IWatcher = jsNative
+    static member watch(paths: string[], options: WatchOptions) : IWatcher = jsNative
 
     [<Import("watch", "chokidar")>]
     [<ParamObjectAttribute(1)>]

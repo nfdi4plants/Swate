@@ -14,11 +14,7 @@ let server =
             Expect.equal result expectedResult "Result should be ok"
     ]
 
-let all =
-    testList "All" [
-        Tests.shared
-        server
-    ]
+let all = testList "All" [ Tests.shared; server ]
 
 [<EntryPoint>]
 let main _ = runTestsWithCLIArgs [] [||] all

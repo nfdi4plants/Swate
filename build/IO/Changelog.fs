@@ -99,7 +99,7 @@ let tryFindLastVersion (content: string) =
                     Date = date
                     Body = body
                 }
-                }
+              }
             | None -> apply rest
 
     apply lines

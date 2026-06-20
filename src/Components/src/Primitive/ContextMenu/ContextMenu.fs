@@ -147,7 +147,9 @@ type ContextMenu =
 
                                         listContentRef.current.AddRange(
                                             children
-                                            |> List.map (fun child -> child.kbdbutton |> Option.map (fun kbd -> kbd.label))
+                                            |> List.map (fun child ->
+                                                child.kbdbutton |> Option.map (fun kbd -> kbd.label)
+                                            )
                                         )
 
                                         let rect: ClientRect =
@@ -171,6 +173,7 @@ type ContextMenu =
                                         myClearTimeout ()
 
                                         allowMouseUpCloseRef.current <- false
+
                                         timeout.current <-
                                             Some(JS.setTimeout (fun _ -> allowMouseUpCloseRef.current <- true) 300)
 
@@ -222,7 +225,7 @@ type ContextMenu =
                                         |> Fable.Core.JS.Constructors.Object.entries do
                                         prop.custom (key, v)
                                     prop.className
-                                        "swt:grid swt:grid-cols-[auto_1fr_auto] swt:bg-base-100 swt:border-2 swt:border-base-300 swt:w-56 swt:rounded-md swt:focus:outline-hidden"
+                                        "swt:grid swt:grid-cols-[auto_1fr_auto] swt:bg-base-100 swt:border-2 swt:border-base-300 swt:min-w-56 swt:rounded-md swt:focus:outline-hidden"
                                     prop.children [
                                         for index in 0 .. children.Length - 1 do
                                             let child = children.[index]

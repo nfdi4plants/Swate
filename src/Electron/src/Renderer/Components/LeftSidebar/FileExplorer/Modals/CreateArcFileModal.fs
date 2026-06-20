@@ -17,8 +17,7 @@ type CreateArcFileModal =
             close: unit -> unit,
             submit: ArcExplorerNodeKind -> string -> unit,
             ?isCreating: bool
-        )
-        =
+        ) =
 
         let label = ArcExplorerNodeKind.label kind
         let isCreating = defaultArg isCreating false
@@ -31,11 +30,13 @@ type CreateArcFileModal =
             initialValue = (arcCreateKindDefaultIdentifier kind),
             close = close,
             submit = (fun identifier -> submit kind identifier),
-            validate = (fun identifier ->
-                if isArcCreateIdentifierValid identifier then
-                    Ok identifier
-                else
-                    Error arcCreateIdentifierError),
+            validate =
+                (fun identifier ->
+                    if isArcCreateIdentifierValid identifier then
+                        Ok identifier
+                    else
+                        Error arcCreateIdentifierError
+                ),
             submitLabel = $"Create {label}",
             validationMessage = arcCreateIdentifierError,
             isBusy = isCreating,

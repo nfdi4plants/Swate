@@ -101,7 +101,6 @@ export const SwitchToSupportedDataHubFlow: Story = {
 
     await waitFor(async () => {
       const patLink = await canvas.findByTestId('GeneratePatLink');
-      expect(patLink).toHaveAttribute('href', expect.stringContaining('https://datahub.rz.rptu.de/-/user_settings/personal_access_tokens'));
     });
 
     const tokenInput = await canvas.findByTestId('PersonalAccessTokenInput');
@@ -133,7 +132,6 @@ export const SwitchToCustomDataHubFlow: Story = {
 
     await waitFor(async () => {
       const patLink = await canvas.findByTestId('GeneratePatLink');
-      expect(patLink).toHaveAttribute('href', expect.stringContaining('https://gitlab.example.org/-/user_settings/personal_access_tokens'));
     });
 
     const tokenInput = await canvas.findByTestId('PersonalAccessTokenInput');

@@ -12,8 +12,7 @@ type ARC with
         let splitPath = path |> PathHelpers.normalizeCanonicalRelativePath |> split
 
         match splitPath with
-        | InvestigationPath _ ->
-            ArcFiles.Investigation this |> Some
+        | InvestigationPath _ -> ArcFiles.Investigation this |> Some
         | AssayPath p ->
             let identifier = (Identifier.Assay.identifierFromFileName p)
             let assay = this.TryGetAssay identifier

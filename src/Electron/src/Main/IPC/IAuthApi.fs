@@ -68,19 +68,33 @@ let api: IAuthApi = {
             with _ ->
                 return Error(exn "Failed to list accounts.")
         }
-    setActiveAccount =
-        fun (accountId: string) -> promise {
+    rotatePersonalAccessToken =
+        fun (localSwateAccountId: string) -> promise {
             try
-                let state = AuthService.setActiveAccount accountId
+                let! result = AuthService.rotatePersonalAccessToken localSwateAccountId
+
+                return
+                    match result with
+                    | Ok state ->
+                        broadcastAccountsUpdate ()
+                        Ok state
+                    | Error failure -> Error(exn failure.Message)
+            with _ ->
+                return Error(exn "Failed to rotate personal access token.")
+        }
+    setActiveAccount =
+        fun (localSwateAccountId: string) -> promise {
+            try
+                let state = AuthService.setActiveAccount localSwateAccountId
                 broadcastAccountsUpdate ()
                 return Ok state
             with _ ->
                 return Error(exn "Failed to switch active account.")
         }
     removeAccount =
-        fun (accountId: string) -> promise {
+        fun (localSwateAccountId: string) -> promise {
             try
-                AuthService.removeAccount accountId
+                AuthService.removeAccount localSwateAccountId
                 broadcastAccountsUpdate ()
                 return Ok()
             with _ ->

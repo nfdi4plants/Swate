@@ -19,8 +19,7 @@ type Model = {
     Selection: ResolvedSelection option
 }
 
-let nodeKindLabel =
-    ArcExplorerNodeKind.label
+let nodeKindLabel = ArcExplorerNodeKind.label
 
 let private inferredProcessRoleLabel (node: ArcExplorerNode) =
     let hasIdMarker (marker: string) =
@@ -41,16 +40,12 @@ let private nodeRoleLabel (node: ArcExplorerNode) =
     inferredProcessRoleLabel node
     |> Option.defaultValue (if node.isReference then "Reference" else "Canonical")
 
-let selectedItemId (model: Model) : string option =
-    model.Selection |> Option.map _.ItemId
+let selectedItemId (model: Model) : string option = model.Selection |> Option.map _.ItemId
 
-let selectedNode (model: Model) : ArcExplorerNode option =
-    model.Selection |> Option.map _.Node
+let selectedNode (model: Model) : ArcExplorerNode option = model.Selection |> Option.map _.Node
 
 let selectedAncestors (model: Model) : ArcExplorerNode list =
-    model.Selection
-    |> Option.map _.Ancestors
-    |> Option.defaultValue []
+    model.Selection |> Option.map _.Ancestors |> Option.defaultValue []
 
 let selectedTitle (model: Model) : string =
     model.Selection
@@ -61,7 +56,8 @@ let selectedSubtitle (model: Model) : string =
     model.Selection
     |> Option.map (fun selection ->
         let role = nodeRoleLabel selection.Node
-        $"{nodeKindLabel selection.Node.kind} | {role}")
+        $"{nodeKindLabel selection.Node.kind} | {role}"
+    )
     |> Option.defaultValue "Selection"
 
 let filterTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) =
@@ -73,15 +69,24 @@ let filterTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) 
 
         match node.kind with
         | ArcExplorerNodeKind.Arc ->
-            Some { node with children = filteredChildren }
+            Some {
+                node with
+                    children = filteredChildren
+            }
         | ArcExplorerNodeKind.Group ->
             if hasVisibleChildren then
-                Some { node with children = filteredChildren }
+                Some {
+                    node with
+                        children = filteredChildren
+                }
             else
                 None
         | _ ->
             if isVisibleKind || hasVisibleChildren then
-                Some { node with children = filteredChildren }
+                Some {
+                    node with
+                        children = filteredChildren
+                }
             else
                 None
 
@@ -90,8 +95,7 @@ let filterTreeByKinds (visibleKinds: Set<string>) (nodes: ArcExplorerNode list) 
 let flattenFileItems (items: FileItem list) =
     let rec loop (items: FileItem list) =
         items
-        |> List.collect (fun item ->
-            item :: (item.Children |> Option.defaultValue [] |> loop))
+        |> List.collect (fun item -> item :: (item.Children |> Option.defaultValue [] |> loop))
 
     loop items
 
@@ -100,16 +104,14 @@ let flattenNodesWithAncestors (nodes: ArcExplorerNode list) =
         nodes
         |> List.collect (fun node ->
             let orderedAncestors = List.rev ancestors
-            (node, orderedAncestors) :: loop (node :: ancestors) node.children)
+            (node, orderedAncestors) :: loop (node :: ancestors) node.children
+        )
 
     loop [] nodes
 
 let searchableItems (nodes: ArcExplorerNode list) (items: FileItem list) =
     let itemsById =
-        items
-        |> flattenFileItems
-        |> List.map (fun item -> item.Id, item)
-        |> Map.ofList
+        items |> flattenFileItems |> List.map (fun item -> item.Id, item) |> Map.ofList
 
     nodes
     |> flattenNodesWithAncestors
@@ -142,7 +144,9 @@ let searchableItems (nodes: ArcExplorerNode list) (items: FileItem list) =
                     yield! node.path |> Option.toList
                 ]
 
-                node.name, Some(String.concat " | " subtitleParts), item))
+                node.name, Some(String.concat " | " subtitleParts), item
+            )
+    )
     |> List.sortBy (fun (name, _, _) -> name.ToLowerInvariant())
     |> List.toArray
 
@@ -153,7 +157,8 @@ let tryGetNodeLineageById (nodeId: string) (nodes: ArcExplorerNode list) =
             if node.id = nodeId then
                 Some(node, List.rev ancestors)
             else
-                loop (node :: ancestors) node.children)
+                loop (node :: ancestors) node.children
+        )
 
     loop [] nodes
 
@@ -178,7 +183,8 @@ let create
                 ItemId = nodeId
                 Node = node
                 Ancestors = ancestors
-            }))
+            })
+        )
 
     {
         VisibleKinds = visibleKinds
@@ -187,4 +193,3 @@ let create
         SearchItems = searchItems
         Selection = resolvedSelection
     }
-

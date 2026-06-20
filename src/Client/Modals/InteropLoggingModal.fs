@@ -19,10 +19,16 @@ type InteropLogging =
             prop.className "swt:modal swt:modal-open"
             prop.children [
                 //Daisy.modalBackdrop [ prop.onClick closeMsg ]
-                Html.div [ prop.className "swt:modal-backdrop"; prop.onClick closeMsg ]
+                Html.div [
+                    prop.className "swt:modal-backdrop"
+                    prop.onClick closeMsg
+                ]
                 //Daisy.modalBox.div [
                 Html.div [
-                    prop.style [ style.width (length.percent 80); style.maxHeight (length.percent 80) ]
+                    prop.style [
+                        style.width (length.percent 80)
+                        style.maxHeight (length.percent 80)
+                    ]
                     prop.className "swt:modal-box swt:flex flex-col swt:gap-4"
                     prop.children [
                         Html.div [

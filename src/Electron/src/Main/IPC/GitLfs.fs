@@ -17,34 +17,28 @@ let private createProgressReporter (window: BrowserWindow) (requestId: string) =
         |> Remoting.withWindow window
         |> Remoting.buildProxySender<IGitLfsProgressRendererApi>
 
-    fun msg ->
-        rendererApi.gitLfsProgressUpdate {
-            RequestId = requestId
-            Message = msg
-        }
+    fun msg -> rendererApi.gitLfsProgressUpdate { RequestId = requestId; Message = msg }
 
-let runChannel (window: BrowserWindow) (request: GitLfsRequest) =
-    promise {
-        cancellations.[request.RequestId] <- false
+let runChannel (window: BrowserWindow) (request: GitLfsRequest) = promise {
+    cancellations.[request.RequestId] <- false
 
-        try
-            let onProgress = createProgressReporter window request.RequestId
+    try
+        let onProgress = createProgressReporter window request.RequestId
 
-            let cancelCheck () =
-                match cancellations.TryGetValue(request.RequestId) with
-                | true, value -> value
-                | _ -> false
+        let cancelCheck () =
+            match cancellations.TryGetValue(request.RequestId) with
+            | true, value -> value
+            | _ -> false
 
-            let! result = run request onProgress cancelCheck
-            return result
-        finally
-            cancellations.Remove(request.RequestId) |> ignore
-    }
+        let! result = run request onProgress cancelCheck
+        return result
+    finally
+        cancellations.Remove(request.RequestId) |> ignore
+}
 
-let cancelChannel (requestId: string) =
-    promise {
-        if cancellations.ContainsKey requestId then
-            cancellations.[requestId] <- true
+let cancelChannel (requestId: string) = promise {
+    if cancellations.ContainsKey requestId then
+        cancellations.[requestId] <- true
 
-        return Ok "Cancellation requested"
-    }
+    return Ok "Cancellation requested"
+}

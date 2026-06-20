@@ -27,10 +27,7 @@ type Generic =
                         Html.div [
                             prop.children [
                                 if title.IsSome then
-                                    Html.h1 [
-                                        prop.className "swt:mt-0"
-                                        prop.text title.Value
-                                    ]
+                                    Html.h1 [ prop.className "swt:mt-0"; prop.text title.Value ]
                                 if description.IsSome then
                                     Html.p [
                                         prop.className "swt:text-sm swt:text-base-content/80"
@@ -80,7 +77,10 @@ type Generic =
     static member CollapseTitle(title: string, subtitle: string, ?count: string) =
         React.Fragment [
             Html.div [
-                Html.h5 [ prop.className "swt:text-md swt:font-semibold"; prop.text title ]
+                Html.h5 [
+                    prop.className "swt:text-md swt:font-semibold"
+                    prop.text title
+                ]
                 Html.div [
                     prop.className "not-prose swt:text-xs swt:text-base-content/70"
                     prop.children [ Html.span [ prop.text subtitle ] ]

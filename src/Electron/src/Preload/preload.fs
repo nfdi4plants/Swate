@@ -14,6 +14,7 @@ Remoting.createIpc () |> Remoting.buildBridge<IRecentArcsRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IAuthAccountsRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IFileTreeRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IGitProgressRendererApi>
+Remoting.createIpc () |> Remoting.buildBridge<IGitRepositoryRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IGitLfsProgressRendererApi>
 Remoting.createIpc () |> Remoting.buildBridge<IHasUnsavedArcChangesRendererApi>
 

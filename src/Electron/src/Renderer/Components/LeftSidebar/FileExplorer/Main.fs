@@ -109,15 +109,12 @@ type Main =
         let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let errorModalCtx = useErrorModalCtx ()
+        let arcNameContextMenuRef = React.useElementRef ()
 
         let copyArcPathToClipboard =
             copyArcPathToClipboard (fun ex ->
                 errorModalCtx.enqueue (
-                    ErrorModalRequest.create (
-                        $"Failed to copy path: {ex.Message}",
-                        title = "Copy path failed",
-                        ?scopeId = appStateCtx
-                    )
+                    ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
                 )
             )
             >> Promise.start
@@ -125,11 +122,7 @@ type Main =
         let openArcFolderInFileExplorer =
             openArcFolderInFileExplorer (fun ex ->
                 errorModalCtx.enqueue (
-                    ErrorModalRequest.create (
-                        $"Failed to open folder: {ex.Message}",
-                        title = "Open folder failed",
-                        ?scopeId = appStateCtx
-                    )
+                    ErrorModalRequest.create ($"Failed to open folder: {ex.Message}", title = "Open folder failed")
                 )
             )
             >> Promise.start
@@ -161,21 +154,35 @@ type Main =
                                         "Note Search",
                                         fun _ -> pageStateCtx.setState (Some Renderer.Types.PageState.NotesSearchPage)
                                     )
+                                // Placeholder for provenance grouping page, which is not ready yet. We want to have this in the action bar for easy access since it's a key feature, but we don't want it to be visible until it's ready, hence the commented out button for now. Once the page is ready, we can uncomment this and remove the fallback in the main content area.
+                                // ButtonInfo.create (
+                                //     "swt:fluent--text-paragraph-24-regular swt:size-5",
+                                //     "Provenance Grouping",
+                                //     fun _ ->
+                                //         pageStateCtx.setState (Some Renderer.Types.PageState.ProvenanceGroupingPage)
+                                // )
                                 |],
-                                2
+                                3
                             )
                         ]
                     ]
-                    Swate.Components.Composite.ArcVaultActions.ArcVaultActions.ArcVaultActions(
-                        path,
-                        copyArcPathToClipboard,
-                        openArcFolderInFileExplorer
-                    )
+                    Html.div [
+                        prop.ref arcNameContextMenuRef
+                        prop.children [
+                            Swate.Components.Composite.ArcVaultActions.ArcVaultActions.ArcVaultActions(
+                                path,
+                                copyArcPathToClipboard,
+                                openArcFolderInFileExplorer
+                            )
+                        ]
+                    ]
                     Html.div [
                         prop.testId "left-sidebar-file-explorer-tree"
                         prop.className
                             "swt:flex-1 swt:min-h-0 swt:overflow-y-auto swt:overflow-x-auto swt:[scrollbar-gutter:stable]"
-                        prop.children [ FileTree.FileTree() ]
+                        prop.children [
+                            FileTree.FileTree(rootContextMenuRef = arcNameContextMenuRef)
+                        ]
                     ]
                 ]
             ]

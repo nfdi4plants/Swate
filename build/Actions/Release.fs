@@ -11,7 +11,10 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
     try
         run
             "npm"
-            [ "view"; $"{ProjectInfo.componentsPackageName}@{version.Version.ToString()}" ]
+            [
+                "view"
+                $"{ProjectInfo.componentsPackageName}@{version.Version.ToString()}"
+            ]
             ProjectPaths.componentsPath
 
         printGreenfn
@@ -25,7 +28,14 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
         let build = run "npm" [ "run"; "build" ] ProjectPaths.componentsPath
 
         let setConfig =
-            run "npm" [ "config"; "set"; $"//registry.npmjs.org/:_authToken={key}" ] ProjectPaths.componentsPath
+            run
+                "npm"
+                [
+                    "config"
+                    "set"
+                    $"//registry.npmjs.org/:_authToken={key}"
+                ]
+                ProjectPaths.componentsPath
 
         let cssFilePath = @"src/Components/dist/swate-components.css"
 
@@ -100,7 +110,17 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
     let imageName = "ghcr.io/nfdi4plants/swate"
 
     let login =
-        run "docker" [ "login"; "--username"; username; "--password"; key; dockerRegistryTarget ] ""
+        run
+            "docker"
+            [
+                "login"
+                "--username"
+                username
+                "--password"
+                key
+                dockerRegistryTarget
+            ]
+            ""
 
     let isPrerelease = version.Version.IsPrerelease
 

@@ -28,10 +28,7 @@ type GitLfsResult = {
     Error: string
 }
 
-type GitLfsProgressDto = {
-    RequestId: string
-    Message: string
-}
+type GitLfsProgressDto = { RequestId: string; Message: string }
 
 [<RequireQualifiedAccess>]
 type GitFailureKind =
@@ -41,6 +38,7 @@ type GitFailureKind =
     | Timeout
     | Canceled
     | LfsInstallRequired
+    | RemoteProjectAlreadyExists
     | Unknown
 
 [<StringEnum(CaseRules.None)>]
@@ -75,10 +73,7 @@ type GitMergeConflictViewDataDto = {
     MergeConflictContent: string
 }
 
-type GitUnsupportedContentDto = {
-    Path: string
-    Reason: string option
-}
+type GitUnsupportedContentDto = { Path: string; Reason: string option }
 
 [<RequireQualifiedAccess>]
 type GitPageLoadResultDto<'T> =
@@ -117,6 +112,7 @@ type GitProgressDto = {
     Progress: float option
     Processed: float option
     Total: float option
+    Output: string option
 }
 
 type GitRemoteOperationRequest = {
@@ -149,9 +145,7 @@ type GitCloneRepositoryRequest = {
 
 type GitPathspecRequest = { Pathspecs: string[] }
 
-type GitLfsDownloadFileRequest = { Path: string }
-
-type GitLfsFreeLocalCopyRequest = { Path: string }
+type GitLfsFileRequest = { Path: string }
 
 type GitCommitRequest = { Message: string }
 

@@ -166,4 +166,3 @@ let updateTables
 
         existing
     | None -> failwith "Error! Can only append information if metadata sheet exists!"
-

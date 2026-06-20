@@ -15,11 +15,11 @@ module StudySection =
         ]
 
     [<ReactComponent>]
-    let Main(draft: LandingDraft, setDraft: LandingDraft -> unit) =
+    let Main (draft: LandingDraft, setDraft: LandingDraft -> unit) =
         Html.div [
             prop.className "swt:space-y-3"
             prop.children [
-                BoxedHelperContent (
+                BoxedHelperContent(
                     PublicationsInput.PublicationsInput(
                         draft.Publications,
                         (fun pubs -> setDraft { draft with Publications = pubs }),
@@ -33,16 +33,25 @@ module StudySection =
                 )
                 DateTimeInput.DateTimeInput(
                     draft.PublicReleaseDate,
-                    (fun dateText -> setDraft { draft with PublicReleaseDate = dateText }),
+                    (fun dateText ->
+                        setDraft {
+                            draft with
+                                PublicReleaseDate = dateText
+                        }
+                    ),
                     label = "Public Release Date"
                 )
-                BoxedHelperContent (
+                BoxedHelperContent(
                     OntologyAnnotationInput.OntologyAnnotationsInput(
                         draft.StudyDesignDescriptors,
-                        (fun descriptors -> setDraft { draft with StudyDesignDescriptors = descriptors }),
+                        (fun descriptors ->
+                            setDraft {
+                                draft with
+                                    StudyDesignDescriptors = descriptors
+                            }
+                        ),
                         label = "Study Design Descriptors"
                     )
                 )
             ]
         ]
-

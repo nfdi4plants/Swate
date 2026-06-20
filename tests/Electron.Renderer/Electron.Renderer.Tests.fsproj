@@ -5,7 +5,13 @@
   <ItemGroup>
     <Compile Include="IpcReceiverDisposable.test.fs" />
     <Compile Include="MainSyncedState.test.fs" />
+    <Compile Include="ArcFilePreviewTarget.test.fs" />
+    <Compile Include="JsonImportWidget.test.fs" />
     <Compile Include="FileStateContextReload.test.fs" />
+    <Compile Include="FileSystemHelper.test.fs" />
+    <Compile Include="FileTreeFileTargetWorkflow.test.fs" />
+    <Compile Include="FileTreeMaterialization.test.fs" />
+    <Compile Include="FileTreeContextMenu.test.fs" />
     <Compile Include="FileTreeRenameWorkflow.test.fs" />
     <Compile Include="GitWorkflow.test.fs" />
     <Compile Include="NoteSearchInterop.test.fs" />
