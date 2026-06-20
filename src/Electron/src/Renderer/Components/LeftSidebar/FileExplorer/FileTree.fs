@@ -171,7 +171,7 @@ type FileTree =
                     let selectedPath = PathHelpers.normalizePath path
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    if lfsDownloadRequired item then
+                    if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
                         skipNextFileTreeReloadPathRef.current <- Some selectedPath
                         console.log ($"[Renderer] Downloading Git LFS content for '{selectedPath}' before preview.")
 

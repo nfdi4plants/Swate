@@ -59,36 +59,6 @@ type FileExplorerItem =
         )
 
     [<ReactComponent>]
-    static member private StatusActionButton (item: FileItem, action: ContextMenuItem) =
-        let label = $"{action.Label} {item.Name}"
-
-        Html.button [
-            prop.type'.button
-            prop.className [
-                "swt:badge swt:badge-sm swt:gap-1 swt:border swt:border-base-300 swt:bg-base-100 swt:text-base-content swt:transition-colors"
-
-                match action.Disabled with
-                | Some true -> "swt:cursor-not-allowed swt:opacity-70"
-                | _ ->
-                    "swt:cursor-pointer swt:hover:border-primary swt:focus-visible:outline swt:focus-visible:outline-2 swt:focus-visible:outline-offset-2 swt:focus-visible:outline-primary"
-            ]
-            prop.disabled (defaultArg action.Disabled false)
-            prop.ariaLabel label
-            prop.title label
-            prop.onClick (fun ev ->
-                ev.preventDefault ()
-                ev.stopPropagation ()
-
-                if action.Disabled <> Some true then
-                    action.OnClick()
-            )
-            prop.children [
-                Html.i [ prop.className $"swt:iconify {action.Icon} swt:size-3" ]
-                Html.span [ prop.text action.Label ]
-            ]
-        ]
-
-    [<ReactComponent>]
     static member private CreateItemButton
         (item: FileItem, onCreateItem: (FileItem -> unit) option, canCreateItem: FileItem -> bool)
         =
@@ -271,7 +241,6 @@ type FileExplorerItem =
         let canCreateFromDirectory = canCreateItem item && onCreateItem.IsSome
         let hasItemActions = itemActions |> List.isEmpty |> not
         let canDeleteFromDirectory = canDeleteItem item && onDeleteItem.IsSome
-        let hasStatusAction = statusAction.IsSome
 
         let directoryToggleIconClass =
             if isExpanded then
@@ -324,7 +293,7 @@ type FileExplorerItem =
                                 ]
 
                                 if item.IsLFS = Some true
-                                   || hasStatusAction
+                                   || statusAction.IsSome
                                    || canExpandDirectory
                                    || canCreateFromDirectory
                                    || hasItemActions
@@ -355,9 +324,9 @@ type FileExplorerItem =
                                                         FileExplorerItem.LFSStatusPill(item, ?statusAction = statusAction)
                                                     ]
                                                 ]
-                                            elif hasStatusAction then
+                                            elif statusAction.IsSome then
                                                 statusAction
-                                                |> Option.map (fun action -> FileExplorerItem.StatusActionButton(item, action))
+                                                |> Option.map (fun action -> FileExplorerItem.ItemActionButton(item, action))
                                                 |> Option.defaultValue Html.none
 
                                             if canExpandDirectory then
@@ -414,7 +383,6 @@ type FileExplorerItem =
         let canDeleteItem = defaultArg canDeleteItem (fun (_: FileItem) -> false)
         let hasItemActions = itemActions |> List.isEmpty |> not
         let canDeleteFromFile = canDeleteItem item && onDeleteItem.IsSome
-        let hasStatusAction = statusAction.IsSome
 
         Html.li [
             prop.key item.Id
@@ -449,7 +417,7 @@ type FileExplorerItem =
                             ]
                         ]
 
-                        if item.IsLFS = Some true || hasStatusAction || hasItemActions || canDeleteFromFile then
+                        if item.IsLFS = Some true || statusAction.IsSome || hasItemActions || canDeleteFromFile then
                             Html.div [
                                 prop.className "swt:flex swt:items-center swt:gap-2"
                                 prop.children [
@@ -465,9 +433,9 @@ type FileExplorerItem =
 
                                     if item.IsLFS = Some true then
                                         FileExplorerItem.LFSStatusPill(item, ?statusAction = statusAction)
-                                    elif hasStatusAction then
+                                    elif statusAction.IsSome then
                                         statusAction
-                                        |> Option.map (fun action -> FileExplorerItem.StatusActionButton(item, action))
+                                        |> Option.map (fun action -> FileExplorerItem.ItemActionButton(item, action))
                                         |> Option.defaultValue Html.none
                                 ]
                             ]

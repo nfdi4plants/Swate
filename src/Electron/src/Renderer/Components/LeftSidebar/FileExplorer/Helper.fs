@@ -112,9 +112,6 @@ let canDeleteItem (item: FileItem) =
     |> Option.map PathHelpers.normalizeCanonicalRelativePath
     |> Option.exists ArcEntityPathRules.isDeletePathAllowed
 
-let lfsDownloadRequired (item: FileItem) =
-    Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item
-
 let rec private collectSelectedDirectoryPathChain
     (selectedTreeItemPath: string option)
     (node: FileTreeNode)
