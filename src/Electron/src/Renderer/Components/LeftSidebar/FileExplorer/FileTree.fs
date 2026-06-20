@@ -163,8 +163,7 @@ type FileTree =
                         pageStateCtx.setState None
                         console.log ($"[Renderer] Downloading Git LFS content for '{selectedPath}' before preview.")
 
-                        let! downloadResult =
-                            Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile selectedPath
+                        let! downloadResult = Renderer.Components.Helper.GitLfsHelper.runDownloadLfsFile selectedPath
 
                         match downloadResult with
                         | Error errorMessage ->
@@ -175,7 +174,7 @@ type FileTree =
 
                             console.log ($"[Renderer] Error: {fullErrorMessage}")
                             pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
-                        | Ok () -> do! openSelectedPreview item.Name selectedPath
+                        | Ok() -> do! openSelectedPreview item.Name selectedPath
                     else
                         do! openSelectedPreview item.Name selectedPath
             }
