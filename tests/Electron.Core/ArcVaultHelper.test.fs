@@ -164,7 +164,10 @@ Vitest.describe (
                     ignore
                     (fun arcPath -> promise {
                         let rootNotesFolder = join [| arcPath; "notes"; "27_04_2026" |]
-                        let studyNotesFolder = join [| arcPath; "notes"; "studies"; "Study 1"; "27_04_2026" |]
+
+                        let studyNotesFolder =
+                            join [| arcPath; "notes"; "studies"; "Study 1"; "27_04_2026" |]
+
                         let rootNotePath = join [| rootNotesFolder; "root_note.md" |]
                         let studyNotePath = join [| studyNotesFolder; "study_note.md" |]
 

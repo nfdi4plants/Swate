@@ -45,7 +45,8 @@ let tryBuildMoveToExistingTargetPlan
     match selectedPath |> Option.map PathHelpers.normalizePath with
     | None -> Error "No note file is selected."
     | Some sourcePath when not (isAssignableMarkdownPath sourcePath) ->
-        Error "Only markdown note or protocol files inside notes, studies, or assays can be added to an existing Study or Assay."
+        Error
+            "Only markdown note or protocol files inside notes, studies, or assays can be added to an existing Study or Assay."
     | Some sourcePath ->
         match tryResolveTargetPath markdown targetRef with
         | Error errorMessage -> Error errorMessage

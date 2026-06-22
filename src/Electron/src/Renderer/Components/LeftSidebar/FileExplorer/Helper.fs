@@ -146,8 +146,7 @@ let createUntitledRootNotePath (dateCreated: DateTime) (existingPaths: string se
         let candidate = $"notes/{dateFolder}/untitled-note{suffix}.md"
 
         let alreadyExists =
-            existingPaths
-            |> Seq.exists (fun path -> PathHelpers.pathsEqual path candidate)
+            existingPaths |> Seq.exists (fun path -> PathHelpers.pathsEqual path candidate)
 
         if alreadyExists then loop (index + 1) else candidate
 
@@ -166,12 +165,7 @@ let createUntitledRootNoteRequest (dateCreated: DateTime) (existingPaths: string
     FileContentDTO.create FileContentType.Markdown (NoteConversion.formatMarkdown draft) path
 
 let rootNoteActionContextMenuItems (onAddNote: FileItem -> unit) (item: FileItem) =
-    ContextMenuItem.whenItem
-        isRootNotesFolder
-        "Create new item in"
-        "swt:fluent--note-add-24-regular"
-        onAddNote
-        item
+    ContextMenuItem.whenItem isRootNotesFolder "Create new item in" "swt:fluent--note-add-24-regular" onAddNote item
 
 let fileSystemCreateKinds = [ FileSystemItemKind.File; FileSystemItemKind.Folder ]
 

@@ -2,7 +2,8 @@ module ARCtrl.Table
 
 let private isNull value = obj.ReferenceEquals(box value, null)
 
-let private ifNull fallback value = if isNull value then fallback else value
+let private ifNull fallback value =
+    if isNull value then fallback else value
 
 let tryNormalizeCell (cell: CompositeCell) =
     if isNull cell then
@@ -22,12 +23,10 @@ let normalizeCells (table: ArcTable) =
     for columnIndex in 0 .. table.Headers.Count - 1 do
         let header = table.Headers.[columnIndex]
 
-        let cells =
-            [
-                for rowIndex in 0 .. table.RowCount - 1 do
-                    table.TryGetCellAt(columnIndex, rowIndex)
-                    |> Option.bind tryNormalizeCell
-            ]
+        let cells = [
+            for rowIndex in 0 .. table.RowCount - 1 do
+                table.TryGetCellAt(columnIndex, rowIndex) |> Option.bind tryNormalizeCell
+        ]
 
         let emptyCell = cells |> List.tryPick id |> ArcTableAux.getEmptyCellForHeader header
 

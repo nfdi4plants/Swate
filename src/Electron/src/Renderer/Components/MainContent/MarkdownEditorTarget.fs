@@ -20,7 +20,10 @@ let MarkdownEditorTarget (content: string) =
     let lastSavedContent, setLastSavedContent = React.useState content
     let isSaving, setIsSaving = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
-    let selectedExistingTarget, setSelectedExistingTarget = React.useState (None: ExistingTargetRef option)
+
+    let selectedExistingTarget, setSelectedExistingTarget =
+        React.useState (None: ExistingTargetRef option)
+
     let isMovingToExistingTarget, setIsMovingToExistingTarget = React.useState false
     let moveError, setMoveError = React.useState (None: string option)
 
@@ -85,8 +88,7 @@ let MarkdownEditorTarget (content: string) =
                 match deleteResult with
                 | Error exn ->
                     setMoveError (
-                        Some
-                            $"Moved note to '{plan.TargetPath}', but failed to delete the original note: {exn.Message}"
+                        Some $"Moved note to '{plan.TargetPath}', but failed to delete the original note: {exn.Message}"
                     )
                 | Ok() ->
                     fileStateCtx.setSelection (ArcSelection.forTreePath (Some plan.TargetPath))

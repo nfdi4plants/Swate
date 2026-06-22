@@ -82,9 +82,7 @@ Vitest.describe (
                         (Some "notes/15_06_2026/untitled-note.md")
                         content
                         (target NotesTargetKind.Study "StudyA")
-                        [
-                            "studies/StudyA/protocols/Sampling_protocol.md"
-                        ]
+                        [ "studies/StudyA/protocols/Sampling_protocol.md" ]
                     |> expectConflictPlan
 
                 Vitest.expect(plan.TargetPath).toBe ("studies/StudyA/protocols/Sampling_protocol.md")
@@ -96,9 +94,7 @@ Vitest.describe (
             fun () ->
                 let exists =
                     PathHelpers.pathExistsInSnapshot
-                        [
-                            "studies\\StudyA\\protocols\\Sampling_protocol.md"
-                        ]
+                        [ "studies\\StudyA\\protocols\\Sampling_protocol.md" ]
                         "studies/studya/protocols/sampling_protocol.md"
 
                 Vitest.expect(exists).toBe (true)

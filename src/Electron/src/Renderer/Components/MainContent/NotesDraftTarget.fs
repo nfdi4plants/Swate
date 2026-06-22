@@ -53,7 +53,8 @@ let NotesDraftTarget () =
                     let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
                     pageStateCtx.setState (Some pageState)
                 | Result.Error _ ->
-                    let fallbackData = FileContentDTO.create requestFileType payload.Intent.Content request.path
+                    let fallbackData =
+                        FileContentDTO.create requestFileType payload.Intent.Content request.path
 
                     let pageState = Renderer.Types.PageState.fromFileContentDTO fallbackData
                     pageStateCtx.setState (Some pageState)
@@ -70,7 +71,8 @@ let NotesDraftTarget () =
             let request: FileContentDTO =
                 FileContentDTO.create requestFileType payload.Intent.Content targetPath
 
-            let submit () = submitRequest payload requestFileType request
+            let submit () =
+                submitRequest payload requestFileType request
 
             promise {
                 setSubmitState true None

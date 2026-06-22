@@ -1222,6 +1222,7 @@ module UpdateHandler =
 
                 let refinedTableToAdd =
                     let temp = Table.distinctByHeader originTable tableToAdd
+
                     Table.selectiveTablePrepare originTable temp deselectedColumnIndices
                     |> Table.normalizeCells
 

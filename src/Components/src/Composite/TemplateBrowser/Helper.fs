@@ -19,8 +19,7 @@ let private tryTrimmed (value: string) =
 
 let compositeCellPreviewValues (cell: CompositeCell) =
     match Table.tryNormalizeCell cell with
-    | None ->
-        [||]
+    | None -> [||]
     | Some cell ->
         match cell with
         | CompositeCell.FreeText text -> [| text |]

@@ -527,7 +527,7 @@ type TextInputWithMarkdown =
                                                         ]
                                                         // if (defaultMode = PreviewMode.Edit) then
                                                         //     prop.style [ style.height height ]
-                                                    
+
                                                         prop.style [ style.height height ]
                                                         prop.disabled disabled
                                                         prop.readOnly disabled

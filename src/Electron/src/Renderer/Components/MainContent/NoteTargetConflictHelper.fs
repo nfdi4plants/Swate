@@ -12,7 +12,11 @@ let targetExistsOnDisk (targetPath: string) = promise {
     | Error _ -> return false
 }
 
-let showOverwriteConflictModal (errorModalCtx: ErrorModalActionsContext) (targetPath: string) (overwrite: unit -> unit) =
+let showOverwriteConflictModal
+    (errorModalCtx: ErrorModalActionsContext)
+    (targetPath: string)
+    (overwrite: unit -> unit)
+    =
     let modalId = Guid.NewGuid().ToString()
 
     errorModalCtx.enqueue (
@@ -25,7 +29,8 @@ let showOverwriteConflictModal (errorModalCtx: ErrorModalActionsContext) (target
                     "Overwrite target",
                     (fun () ->
                         errorModalCtx.dismissById modalId
-                        overwrite ()),
+                        overwrite ()
+                    ),
                     iconClassName = "swt:fluent--document-arrow-right-24-regular",
                     style = ErrorModalActionStyle.Error
                 )

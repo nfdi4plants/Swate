@@ -52,7 +52,10 @@ let private jsonImportRequest importedFile = {
 let private createUnitizedTemplateTable () =
     let table = ArcTable.init "Unit Template"
     let componentAnnotation = OntologyAnnotation.create ("temperature")
-    let unitAnnotation = OntologyAnnotation.create ("degree Celsius", "UO", "UO:0000027")
+
+    let unitAnnotation =
+        OntologyAnnotation.create ("degree Celsius", "UO", "UO:0000027")
+
     let cells = ResizeArray [ CompositeCell.Unitized("42", unitAnnotation) ]
     table.AddColumn(CompositeHeader.Component componentAnnotation, cells)
     table
@@ -69,9 +72,17 @@ let private createMixedUnitTemplateTable () =
     let table = ArcTable.init "Mixed Unit Template"
     let componentAnnotation = OntologyAnnotation.create ("temperature")
     let parameterAnnotation = OntologyAnnotation.create ("incubation time")
-    let unitAnnotation = OntologyAnnotation.create ("degree Celsius", "UO", "UO:0000027")
+
+    let unitAnnotation =
+        OntologyAnnotation.create ("degree Celsius", "UO", "UO:0000027")
+
     let unitCells = ResizeArray [ CompositeCell.Unitized("42", unitAnnotation) ]
-    let termCells = ResizeArray [ CompositeCell.Term(OntologyAnnotation.create "overnight") ]
+
+    let termCells =
+        ResizeArray [
+            CompositeCell.Term(OntologyAnnotation.create "overnight")
+        ]
+
     table.AddColumn(CompositeHeader.Component componentAnnotation, unitCells)
     table.AddColumn(CompositeHeader.Parameter parameterAnnotation, termCells)
     table
