@@ -220,6 +220,12 @@ module ArcFileSystemHelper =
         Overwrite: bool
     }
 
+    type GenericCopyPlan = {
+        SourcePath: string
+        TargetPath: string
+        Overwrite: bool
+    }
+
     let private resolveArcRelativePathPair arcPath firstRelativePath secondRelativePath =
         match
             tryResolveArcRelativePath arcPath firstRelativePath, tryResolveArcRelativePath arcPath secondRelativePath
@@ -269,6 +275,26 @@ module ArcFileSystemHelper =
         match! renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath with
         | Ok() -> return Ok()
         | Error renameError -> return Error(mapRenameDiskError sourcePath targetPath renameError)
+    }
+
+    let private copyResolvedPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
+        let targetParentAbsolutePath =
+            pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+
+        try
+            do! mkdirAsync targetParentAbsolutePath
+
+            let! _ =
+                fsPromisesDynamic?cp (
+                    sourceAbsolutePath,
+                    targetAbsolutePath,
+                    createObj [ "recursive" ==> true; "force" ==> false ]
+                )
+                |> unbox<JS.Promise<obj>>
+
+            return Ok()
+        with copyError ->
+            return Error(exn $"Cannot copy '{sourcePath}' to '{targetPath}': {copyError.Message}")
     }
 
     ///WIP must be simplified in future pr
@@ -481,6 +507,29 @@ module ArcFileSystemHelper =
                 Overwrite = request.overwrite
             }
 
+    let tryBuildGenericCopyPlan (request: CopyPathRequest) : Result<GenericCopyPlan, exn> =
+        let sourcePath =
+            ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
+                "Generic filesystem copy is only supported for safe non-entity source paths."
+                request.sourceRelativePath
+
+        let targetPath =
+            ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
+                "Generic filesystem copy targets must stay inside safe non-entity ARC paths."
+                request.targetRelativePath
+
+        match sourcePath, targetPath with
+        | Error validationError, _
+        | _, Error validationError -> Error(exn validationError)
+        | Ok sourcePath, Ok targetPath when PathHelpers.pathsEqual sourcePath targetPath ->
+            Error(exn "Copy target is identical to the current path.")
+        | Ok sourcePath, Ok targetPath ->
+            Ok {
+                SourcePath = sourcePath
+                TargetPath = targetPath
+                Overwrite = request.overwrite
+            }
+
     let moveGenericFileSystemItemOnDisk (arcPath: string) (request: MovePathRequest) : JS.Promise<Result<unit, exn>> = promise {
         match tryBuildGenericMovePlan request with
         | Error validationError -> return Error validationError
@@ -538,6 +587,49 @@ module ArcFileSystemHelper =
                                     sourceAbsolutePath
                                     targetAbsolutePath
                         | false, _ -> return! moveToTargetAsync ()
+    }
+
+    let copyGenericFileSystemItemOnDisk (arcPath: string) (request: CopyPathRequest) : JS.Promise<Result<unit, exn>> = promise {
+        match tryBuildGenericCopyPlan request with
+        | Error validationError -> return Error validationError
+        | Ok genericCopyPlan ->
+            match resolveArcRelativePathPair arcPath genericCopyPlan.SourcePath genericCopyPlan.TargetPath with
+            | Error pathError -> return Error pathError
+            | Ok(sourceAbsolutePath, targetAbsolutePath) ->
+                let! sourceExists = pathExistsAsync sourceAbsolutePath
+
+                if sourceExists |> not then
+                    return Error(exn $"Cannot copy '{genericCopyPlan.SourcePath}' because it does not exist.")
+                else
+                    let! sourceIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync sourceAbsolutePath
+
+                    if
+                        sourceIsDirectory
+                        && PathHelpers.isSameOrDescendantPath genericCopyPlan.TargetPath genericCopyPlan.SourcePath
+                    then
+                        return Error(exn "Copy target must not be inside the source path.")
+                    else
+                        let copyToTargetAsync () =
+                            copyResolvedPathOnDisk
+                                genericCopyPlan.SourcePath
+                                genericCopyPlan.TargetPath
+                                sourceAbsolutePath
+                                targetAbsolutePath
+
+                        let! targetExists = pathExistsAsync targetAbsolutePath
+
+                        match targetExists, genericCopyPlan.Overwrite with
+                        | true, false ->
+                            return
+                                Error(
+                                    exn
+                                        $"Cannot copy '{genericCopyPlan.SourcePath}' to '{genericCopyPlan.TargetPath}' because the destination already exists."
+                                )
+                        | true, true ->
+                            match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
+                            | Error removeError -> return Error removeError
+                            | Ok() -> return! copyToTargetAsync ()
+                        | false, _ -> return! copyToTargetAsync ()
     }
 
     let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {

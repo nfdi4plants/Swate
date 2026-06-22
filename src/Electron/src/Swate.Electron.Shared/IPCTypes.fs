@@ -67,6 +67,7 @@ type IArcVaultsApi = {
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
+    copyPath: CopyPathRequest -> JS.Promise<Result<unit, exn>>
     renameOpenArcRoot: string -> JS.Promise<Result<string, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>

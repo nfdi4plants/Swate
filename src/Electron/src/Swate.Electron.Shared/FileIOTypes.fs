@@ -93,6 +93,12 @@ type MovePathRequest = {
     overwrite: bool
 }
 
+type CopyPathRequest = {
+    sourceRelativePath: string
+    targetRelativePath: string
+    overwrite: bool
+}
+
 [<RequireQualifiedAccess>]
 type FileSystemItemKind =
     | File

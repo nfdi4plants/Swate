@@ -509,13 +509,10 @@ type FileTree =
                 | Some target, Some note ->
                     FileTreeAssignNoteHelper.assignNoteToTarget
                         {
-                            selectedTreePath = fileStateCtx.state.Selection.TreePath
-                            pageState = pageStateCtx.state
                             closeDialog = closeDialog
                             setIsAssigning = setIsDialogBusy
-                            setSelection = fileStateCtx.setSelection
                             refreshGitStatus = gitStateCtx.refresh
-                            reloadPreviewByPath = reloadPreviewByPath
+                            copyPath = Api.ipcArcVaultApi.copyPath
                             movePath = Api.ipcArcVaultApi.movePath
                             enqueueError = errorModal.enqueue
                         }

@@ -26,13 +26,19 @@ let private renameRequest relativePath newName = {
     newName = newName
 }
 
-let private moveRequest sourcePath targetPath overwrite = {
+let private moveRequest sourcePath targetPath overwrite : MovePathRequest = {
     sourceRelativePath = sourcePath
     targetRelativePath = targetPath
     overwrite = overwrite
 }
 
-let private copyRequest sourceAbsolutePath targetRelativePath overwrite = {
+let private copyPathRequest sourcePath targetPath overwrite : CopyPathRequest = {
+    sourceRelativePath = sourcePath
+    targetRelativePath = targetPath
+    overwrite = overwrite
+}
+
+let private copyRequest sourceAbsolutePath targetRelativePath overwrite : CopyExternalFileRequest = {
     sourceAbsolutePath = sourceAbsolutePath
     targetRelativePath = targetRelativePath
     overwrite = overwrite
@@ -63,8 +69,14 @@ let private createItemOrFail arcPath request = promise {
     | Ok createdPath -> return createdPath
 }
 
-let private moveItemOrFail arcPath request = promise {
+let private moveItemOrFail arcPath (request: MovePathRequest) = promise {
     match! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk arcPath request with
+    | Error error -> return failwith error.Message
+    | Ok() -> return ()
+}
+
+let private copyItemOrFail arcPath (request: CopyPathRequest) = promise {
+    match! ArcFileSystemHelper.copyGenericFileSystemItemOnDisk arcPath request with
     | Error error -> return failwith error.Message
     | Ok() -> return ()
 }
@@ -262,6 +274,44 @@ Vitest.describe (
                     do! moveItemOrFail arcPath (moveRequest secondSourceFolder targetFolder true)
                     do! expectRelativePathExists arcPath secondSourceFolder false
                     do! expectRelativePathExists arcPath $"{targetFolder}/Field_observations.md" true
+                })
+        )
+
+        Vitest.test (
+            "copies generic note folders with nested assets while keeping the source",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    let sourceFolder = "notes/2026-06-15/Field_observations"
+                    let targetFolder = "assays/AssayA/protocols/Field_observations"
+
+                    do! createRelativeDirectoryAsync arcPath $"{sourceFolder}/assets"
+                    do! writeRelativeFileAsync arcPath $"{sourceFolder}/Field_observations.md" "source"
+                    do! writeRelativeFileAsync arcPath $"{sourceFolder}/assets/image.txt" "asset"
+
+                    do! copyItemOrFail arcPath (copyPathRequest sourceFolder targetFolder false)
+
+                    do! expectRelativePathExists arcPath sourceFolder true
+                    do! expectRelativePathExists arcPath $"{sourceFolder}/Field_observations.md" true
+                    do! expectRelativePathExists arcPath $"{targetFolder}/Field_observations.md" true
+                    do! expectRelativePathExists arcPath $"{targetFolder}/assets/image.txt" true
+
+                    match!
+                        ArcFileSystemHelper.copyGenericFileSystemItemOnDisk
+                            arcPath
+                            (copyPathRequest sourceFolder targetFolder false)
+                    with
+                    | Ok() -> failwith "Expected copy without overwrite to reject an existing target."
+                    | Error error -> Vitest.expect(error.Message).toContain ("destination already exists")
+
+                    do! writeRelativeFileAsync arcPath $"{sourceFolder}/Field_observations.md" "replacement"
+                    do! writeRelativeFileAsync arcPath $"{targetFolder}/stale.txt" "stale"
+
+                    do! copyItemOrFail arcPath (copyPathRequest sourceFolder targetFolder true)
+
+                    let! copiedContent = readRelativeFileAsync arcPath $"{targetFolder}/Field_observations.md"
+                    Vitest.expect(copiedContent).toBe ("replacement")
+                    do! expectRelativePathExists arcPath $"{targetFolder}/stale.txt" false
+                    do! expectRelativePathExists arcPath sourceFolder true
                 })
         )
 

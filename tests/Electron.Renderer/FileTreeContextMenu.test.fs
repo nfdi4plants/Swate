@@ -482,7 +482,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "assignNoteToTarget moves selected assets to their selected destinations",
+            "assignNoteToTarget copies the note and moves selected assets within the assigned copy",
             fun () -> promise {
                 let target = {
                     Name = "AssayA"
@@ -491,17 +491,19 @@ Vitest.describe (
 
                 let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
 
+                let copyRequests = ResizeArray<CopyPathRequest>()
                 let moveRequests = ResizeArray<MovePathRequest>()
                 let mutable closed = false
 
-                let config: AssignNoteMoveConfig = {
-                    selectedTreePath = None
-                    pageState = None
+                let config: AssignNoteConfig = {
                     closeDialog = fun () -> closed <- true
                     setIsAssigning = ignore
-                    setSelection = ignore
                     refreshGitStatus = ignore
-                    reloadPreviewByPath = fun _ -> promise { return Ok() }
+                    copyPath =
+                        fun request -> promise {
+                            copyRequests.Add request
+                            return Ok()
+                        }
                     movePath =
                         fun request -> promise {
                             moveRequests.Add request
@@ -529,25 +531,25 @@ Vitest.describe (
                     |> Map.ofList
 
                 assignNoteToTarget config target note assets selectedDestinations
-                do! waitUntil ((fun () -> closed && moveRequests.Count = 3), 50)
+                do! waitUntil ((fun () -> closed && copyRequests.Count = 1 && moveRequests.Count = 2), 50)
 
-                Vitest.expect(moveRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
-                Vitest.expect(moveRequests.[0].targetRelativePath).toBe ("assays/AssayA/protocols/Sampling_protocol")
+                Vitest.expect(copyRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
+                Vitest.expect(copyRequests.[0].targetRelativePath).toBe ("assays/AssayA/protocols/Sampling_protocol")
 
                 Vitest
-                    .expect(moveRequests.[1].sourceRelativePath)
+                    .expect(moveRequests.[0].sourceRelativePath)
                     .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/data.csv")
 
                 Vitest
-                    .expect(moveRequests.[1].targetRelativePath)
+                    .expect(moveRequests.[0].targetRelativePath)
                     .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
 
                 Vitest
-                    .expect(moveRequests.[2].sourceRelativePath)
+                    .expect(moveRequests.[1].sourceRelativePath)
                     .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/nested/reference.pdf")
 
                 Vitest
-                    .expect(moveRequests.[2].targetRelativePath)
+                    .expect(moveRequests.[1].targetRelativePath)
                     .toBe ("assays/AssayA/resources/Sampling_protocol/assets/nested/reference.pdf")
             }
         )

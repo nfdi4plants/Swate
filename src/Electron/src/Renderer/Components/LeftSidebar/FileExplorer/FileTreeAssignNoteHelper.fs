@@ -9,18 +9,14 @@ open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
-open Renderer.Components.LeftSidebar.FileExplorer.FileTreeRenameHelper
 
 module FileTreeAssignNoteHelper =
 
-    type AssignNoteMoveConfig = {
-        selectedTreePath: string option
-        pageState: Renderer.Types.PageState option
+    type AssignNoteConfig = {
         closeDialog: unit -> unit
         setIsAssigning: bool -> unit
-        setSelection: ArcSelection -> unit
         refreshGitStatus: unit -> unit
-        reloadPreviewByPath: string -> JS.Promise<Result<unit, string>>
+        copyPath: CopyPathRequest -> JS.Promise<Result<unit, exn>>
         movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
         enqueueError: ErrorModalRequest -> unit
     }
@@ -199,23 +195,6 @@ module FileTreeAssignNoteHelper =
             asset.RelativeAssetPath
         |]
 
-    let private reloadAssignedNotePreviewIfNeeded config path = promise {
-        match config.pageState with
-        | Some(Renderer.Types.PageState.MarkdownPage _)
-        | Some(Renderer.Types.PageState.TextPage _)
-        | Some Renderer.Types.PageState.UnknownPage
-        | Some(Renderer.Types.PageState.ErrorPage _) ->
-            let! reloadResult = config.reloadPreviewByPath path
-
-            match reloadResult with
-            | Ok() -> ()
-            | Error reloadError ->
-                enqueueAssignNoteError
-                    config.enqueueError
-                    $"Assigned note, but could not refresh the open preview: {reloadError}"
-        | _ -> ()
-    }
-
     let private moveAssignedAssets config target note targetFolderPath assets assetDestinations =
         let rec moveNext assets = promise {
             match assets with
@@ -249,7 +228,7 @@ module FileTreeAssignNoteHelper =
         moveNext assets
 
     let assignNoteToTarget
-        (config: AssignNoteMoveConfig)
+        (config: AssignNoteConfig)
         (target: ExistingTargetRef)
         (note: AssignableNoteRef)
         (assets: AssignableNoteAssetRef list)
@@ -263,29 +242,19 @@ module FileTreeAssignNoteHelper =
             config.setIsAssigning true
 
             promise {
-                let! moveResult =
-                    config.movePath {
+                let! copyResult =
+                    config.copyPath {
                         sourceRelativePath = note.SourceFolderPath
                         targetRelativePath = targetFolderPath
                         overwrite = false
                     }
 
-                match moveResult with
-                | Error moveError -> enqueueAssignNoteError config.enqueueError moveError.Message
+                match copyResult with
+                | Error copyError -> enqueueAssignNoteError config.enqueueError copyError.Message
                 | Ok() ->
                     match! moveAssignedAssets config target note targetFolderPath assets assetDestinations with
                     | Error assetMoveError -> enqueueAssignNoteError config.enqueueError assetMoveError.Message
                     | Ok() ->
-                        let remappedSelectionPath =
-                            tryRemapSelectionPath note.SourceFolderPath targetFolderPath config.selectedTreePath
-
-                        remappedSelectionPath
-                        |> Option.iter (fun path -> config.setSelection (ArcSelection.forTreePath (Some path)))
-
-                        match remappedSelectionPath with
-                        | Some path -> do! reloadAssignedNotePreviewIfNeeded config path
-                        | None -> ()
-
                         config.refreshGitStatus ()
                         config.closeDialog ()
             }
