@@ -104,7 +104,27 @@ Body
         )
 
         Vitest.test (
-            "mkExistingTargetRelativePath targets the selected entity protocols folder",
+            "formatMarkdown rejects drafts without titles",
+            fun () ->
+                let draft = {
+                    NotesDraft.init with
+                        Title = "   "
+                        DateCreated = Some(DateTime(2026, 4, 27))
+                }
+
+                let mutable didThrow = false
+
+                try
+                    NoteConversion.formatMarkdown draft |> ignore
+                with ex ->
+                    didThrow <- true
+                    Vitest.expect(ex.Message.Contains("Note title is required.")).toBe (true)
+
+                Vitest.expect(didThrow).toBe (true)
+        )
+
+        Vitest.test (
+            "note path helpers use dated note folders and protocol folders",
             fun () ->
                 let studyTarget: ExistingTargetRef = {
                     Kind = NotesTargetKind.Study
@@ -117,21 +137,15 @@ Body
                 }
 
                 Vitest
-                    .expect(
-                        NoteConversion.mkExistingTargetRelativePath
-                            studyTarget
-                            (DateTime(2026, 6, 15))
-                            "Sampling_protocol"
-                    )
-                    .toEqual (Some "studies/StudyA/protocols/Sampling_protocol.md")
+                    .expect(NoteConversion.mkExistingTargetRelativePath studyTarget "Sampling_protocol")
+                    .toEqual (Some "studies/StudyA/protocols/Sampling_protocol/Sampling_protocol.md")
 
                 Vitest
-                    .expect(
-                        NoteConversion.mkExistingTargetRelativePath
-                            assayTarget
-                            (DateTime(2026, 6, 15))
-                            "Extraction_protocol"
-                    )
-                    .toEqual (Some "assays/AssayA/protocols/Extraction_protocol.md")
+                    .expect(NoteConversion.mkExistingTargetRelativePath assayTarget "Extraction_protocol")
+                    .toEqual (Some "assays/AssayA/protocols/Extraction_protocol/Extraction_protocol.md")
+
+                Vitest
+                    .expect(NoteConversion.mkNewRootNoteRelativePath (DateTime(2026, 6, 15)) "Sampling_protocol")
+                    .toEqual (Some "notes/2026-06-15/Sampling_protocol/Sampling_protocol.md")
         )
 )

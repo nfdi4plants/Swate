@@ -33,6 +33,8 @@
     <Compile Include="ArcFileSystemHelper.test.fs" />
     <Compile Include="RenamePathRules.test.fs" />
     <Compile Include="GitValidation.test.fs" />
+    <Compile Include="ProvenanceGroupingReader.test.fs" />
+    <Compile Include="ProvenanceGroupingState.test.fs" />
     <Compile Include="SecureAuthStore.test.fs" />
   </ItemGroup>
   <ItemGroup>

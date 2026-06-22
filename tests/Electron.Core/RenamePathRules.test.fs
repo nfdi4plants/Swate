@@ -45,9 +45,21 @@ Vitest.describe (
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/isa.assay.xlsx").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/notes/custom.txt").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/dataset").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/protocols").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "studies/StudyA/resources").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "assays/OldAssay/dataset/raw.txt").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes").toBe (false)
-                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/15_06_2026/foo.md").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "test.fsx").toBe (true)
+        )
+
+        Vitest.test (
+            "native structural child matching is case-insensitive",
+            fun () ->
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "assays/OldAssay/DataSet").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies/StudyA/Protocols").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies/StudyA/Resources").toBe (false)
         )
 
         Vitest.test (
@@ -55,7 +67,8 @@ Vitest.describe (
             fun () ->
                 let allowedTargets = [
                     "assays/AssayA/protocols/protocol.md"
-                    "studies/StudyA/resources"
+                    "assays/AssayA/dataset/raw.txt"
+                    "assays/AssayA/protocol"
                     "workflows/WorkflowA/scripts/workflow.cwl"
                     "runs/RunA/data.txt"
                     "test.fsx"
@@ -71,8 +84,13 @@ Vitest.describe (
                     ""
                     "assays"
                     "assays/AssayA"
+                    "assays/AssayA/dataset"
+                    "assays/AssayA/protocols"
+                    "studies/StudyA/protocols"
+                    "studies/StudyA/resources"
                     "assays/AssayA/isa.assay.xlsx"
                     "assays/AssayA/isa.datamap.xlsx"
+                    "assays/AssayA/.gitattributes"
                     "assays/AssayA/readme.md"
                     "assays/AssayA/.git/config"
                     "../assays/AssayA/custom.txt"
@@ -83,6 +101,16 @@ Vitest.describe (
                 |> List.iter (fun path ->
                     Vitest.expect(ArcEntityPathRules.isGenericFileSystemTargetAllowed path).toBe (false)
                 )
+        )
+
+        Vitest.test (
+            "protected entity child folders can still be used as generic filesystem parents",
+            fun () ->
+                Vitest.expect(ArcEntityPathRules.isGenericFileSystemParentAllowed "assays/AssayA/dataset").toBe (true)
+
+                Vitest
+                    .expect(ArcEntityPathRules.isGenericFileSystemParentAllowed "studies/StudyA/protocols")
+                    .toBe (true)
         )
 
         Vitest.test (
@@ -103,6 +131,7 @@ Vitest.describe (
                     "runs"
                     "isa.investigation.xlsx"
                     ".git"
+                    ".gitattributes"
                     ".gitkeep"
                     "readme.md"
                     "../escape"

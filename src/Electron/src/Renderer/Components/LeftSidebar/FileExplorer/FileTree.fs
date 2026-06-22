@@ -2,17 +2,17 @@ namespace Renderer.Components.LeftSidebar.FileExplorer
 
 open Renderer.Components.Helper.ArcViewHelper
 open Renderer.Components.FileExplorerDeleteHelper
+open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
-open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
 open Feliz
 open Fable.Core
 open ARCtrl
-open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Types
 open Helper
 open FileTreeMaterialization
@@ -259,9 +259,6 @@ type FileTree =
         let applyCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create ARC file"))
 
-        let applyAddNoteError errorMessage =
-            errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not add note"))
-
         let applyFileSystemCreateError errorMessage =
             errorModal.enqueue (ErrorModalRequest.create (errorMessage, title = "Could not create file or folder"))
 
@@ -275,7 +272,7 @@ type FileTree =
             | Error errorMessage -> return Error errorMessage
         }
 
-        let activeCreateKind, activeFileSystemCreateDraft, activeRenameDraft, activeDeleteItem =
+        let (activeCreateKind, activeFileSystemCreateDraft, activeRenameDraft, activeDeleteItem) =
             match activeDialog with
             | Some(CreateDialog kind) -> Some kind, None, None, None
             | Some(FileSystemCreateDialog draft) -> None, Some draft, None, None
@@ -323,31 +320,6 @@ type FileTree =
                         applyCreateError exn.Message
                     )
                     |> Promise.start
-
-        let addRootNote (_item: FileItem) =
-            if not isDialogBusy then
-                setIsDialogBusy true
-
-                let existingPaths = fileStateCtx.state.FileTree |> Array.map _.path
-
-                let request = createUntitledRootNoteRequest System.DateTime.Today existingPaths
-                let selectedPath = PathHelpers.normalizePath request.path
-
-                promise {
-                    let! writeResult = Api.ipcArcVaultApi.writeFile request
-
-                    match writeResult with
-                    | Error exn -> applyAddNoteError exn.Message
-                    | Ok() ->
-                        fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-
-                        match! reloadPreviewByPath selectedPath with
-                        | Ok() -> ()
-                        | Error _ -> pageStateCtx.setState (Some(Renderer.Types.PageState.fromFileContentDTO request))
-                }
-                |> Promise.catch (fun exn -> applyAddNoteError exn.Message)
-                |> Promise.map (fun _ -> setIsDialogBusy false)
-                |> Promise.start
 
         let createFileSystemItem (name: string) =
             if not isDialogBusy then
@@ -398,7 +370,13 @@ type FileTree =
             FileTreeContextMenu.renameContextMenuItems requestRenameItem
 
         let itemActions item = [
-            yield! rootNoteActionContextMenuItems addRootNote item
+            yield!
+                rootFolderContextMenuItems
+                    "notes"
+                    "Create new item in"
+                    "swt:fluent--note-add-24-regular"
+                    (fun () -> openCreateModal ArcExplorerNodeKind.Note)
+                    item
             yield! renameContextMenuItems item
         ]
 
@@ -531,7 +509,8 @@ type FileTree =
                             onDeleteItem = requestDeleteItem,
                             selectedItemId = fileStateCtx.state.Selection.TreePath,
                             includeDefaultContextMenuItems = false,
-                            delegateHorizontalScrollToParent = true
+                            delegateHorizontalScrollToParent = true,
+                            truncateOverflowingItemNames = true
                         )
                     ]
                 ]

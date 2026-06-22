@@ -1,19 +1,19 @@
 module Main.ArcVaultHelper
 
+
 open System
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
+open Swate.Electron.Shared.FileIOTypes
 open ARCtrl
 open Fable.Electron
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
-open Main.Bindings
 open Main.ARCtrlExtensions
+open Main.Bindings
 open Node.Api
 open Swate.Electron.Shared.RenamePathRules
-
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
 let private pathDynamic: obj = importAll "path"

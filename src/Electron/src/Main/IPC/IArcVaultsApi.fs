@@ -17,6 +17,7 @@ open Node.Api
 open Main
 open Main.IPC.Delete
 open Main.IPC.Rename
+open Swate.Electron.Shared.DTOs.ProvenanceGroupingDto
 open Main.IPC.FileSystemIO
 
 
@@ -384,6 +385,17 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    pathExists =
+        fun (relativePath: string) ->
+            runLoadedArcPathAction
+                event
+                (fun arcPath -> promise {
+                    match tryResolveArcRelativePath arcPath relativePath with
+                    | Error pathError -> return Error pathError
+                    | Ok absolutePath ->
+                        let! exists = pathExistsAsync absolutePath
+                        return Ok exists
+                })
     readNotes =
         fun () -> promise {
             try
@@ -403,6 +415,30 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                         let! notes = Main.NoteSearchReader.readNotes arcPath fileEntries
                         return Ok(notes |> Array.map NoteSearchNoteDto.ofNote)
+            with e ->
+                return Error e
+        }
+    listProvenanceTables =
+        fun () -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return Ok(Main.Provenance.ProvenanceGroupingReader.listTables vault.arc.Value)
+                        })
+            with e ->
+                return Error e
+        }
+    loadProvenanceTable =
+        fun (selection: ProvenanceTableSelectionDto) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return Ok(Main.Provenance.ProvenanceGroupingReader.loadTable selection vault.arc.Value)
+                        })
             with e ->
                 return Error e
         }
@@ -560,6 +596,18 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                             return Ok()
                                     finally
                                         vault.isBusyWriting <- wasBusyWriting
+                        })
+            with e ->
+                return Error e
+        }
+    movePath =
+        fun (request: MovePathRequest) -> promise {
+            try
+                return!
+                    withLoadedArcVault
+                        event
+                        (fun vault -> promise {
+                            return! ArcFileSystemHelper.moveGenericFileSystemItemOnDisk vault.path.Value request
                         })
             with e ->
                 return Error e

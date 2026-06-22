@@ -158,13 +158,26 @@ Vitest.describe (
 )
 
 Vitest.describe (
-    "FileIOHelper.createAvailableNotesTargets",
+    "FileIOHelper.createAvailableArcEntityTargets",
     fun () ->
         Vitest.test (
             "lists only solid study and assay entities with canonical ARC files",
             fun () ->
                 let targets =
-                    createAvailableNotesTargets [
+                    createAvailableArcEntityTargets [
+                        (ARCtrl.ArcPathHelper.StudiesFolderName,
+                         ARCtrl.ArcPathHelper.StudyFileName,
+                         fun name -> {
+                             Name = name
+                             Kind = NotesTargetKind.Study
+                         })
+                        (ARCtrl.ArcPathHelper.AssaysFolderName,
+                         ARCtrl.ArcPathHelper.AssayFileName,
+                         fun name -> {
+                             Name = name
+                             Kind = NotesTargetKind.Assay
+                         })
+                    ] [
                         FileEntry.create ("arc", "", true)
                         FileEntry.create ("studies", "studies", true)
                         FileEntry.create (".gitkeep", "studies/.gitkeep", false)
@@ -188,6 +201,26 @@ Vitest.describe (
                             NotesTargetKind.Assay, "AssayA"
                         |]
                     )
+        )
+
+        Vitest.test (
+            "lists entities from caller supplied canonical file rules",
+            fun () ->
+                let targets =
+                    createAvailableArcEntityTargets [
+                        ("workflows", "isa.workflow.xlsx", fun name -> "workflow", name)
+                        ("runs", "isa.run.xlsx", fun name -> "run", name)
+                    ] [
+                        FileEntry.create ("arc", "", true)
+                        FileEntry.create ("WorkflowA", "workflows/WorkflowA", true)
+                        FileEntry.create ("isa.workflow.xlsx", "workflows/WorkflowA/isa.workflow.xlsx", false)
+                        FileEntry.create ("draft.md", "workflows/DraftOnly/draft.md", false)
+                        FileEntry.create ("RunA", "runs/RunA", true)
+                        FileEntry.create ("isa.run.xlsx", "runs/RunA/isa.run.xlsx", false)
+                    ]
+                    |> Seq.toArray
+
+                Vitest.expect(targets).toEqual ([| "workflow", "WorkflowA"; "run", "RunA" |])
         )
 )
 

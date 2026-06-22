@@ -14,4 +14,6 @@ let shared =
         example_tests
         LandingTests.tests
         PathHelpersTests.tests
+        ProvenanceGroupingTests.tests
+        ProvenanceGroupingARCtrlConverterTests.tests
     ]

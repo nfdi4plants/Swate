@@ -3,10 +3,10 @@ module Renderer.Components.MainContent.NotesDraftTarget
 open Feliz
 open Swate.Components.Shared
 open Swate.Components.Composite.Notes.Editor
-open Swate.Components.Primitive.ErrorModal.Context
-open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Renderer.Components.MainContent.NoteTargetConflictHelper
+open Swate.Electron.Shared.FileIOTypes
+open Renderer.Components.Helper
+open Renderer.Components.Helper.FileSystemHelper
 
 
 [<ReactComponent>]
@@ -14,13 +14,33 @@ let NotesDraftTarget () =
 
     let notesDraft, setNotesDraft = React.useState NotesDraft.init
     let notesUiState, setNotesUiState = React.useState NotesUiState.init
+
+    let pendingOverwriteRequest, setPendingOverwriteRequest =
+        React.useState<FileContentDTO option> None
+
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
-    let errorModalCtx = useErrorModalCtx ()
 
     let availableNotesTargets =
         React.useMemo (
-            (fun _ -> createAvailableNotesTargets fileStateCtx.state.FileTree),
+            (fun _ ->
+                createAvailableArcEntityTargets
+                    [
+                        (ARCtrl.ArcPathHelper.StudiesFolderName,
+                         ARCtrl.ArcPathHelper.StudyFileName,
+                         fun name -> {
+                             Name = name
+                             Kind = NotesTargetKind.Study
+                         })
+                        (ARCtrl.ArcPathHelper.AssaysFolderName,
+                         ARCtrl.ArcPathHelper.AssayFileName,
+                         fun name -> {
+                             Name = name
+                             Kind = NotesTargetKind.Assay
+                         })
+                    ]
+                    fileStateCtx.state.FileTree
+            ),
             [| box fileStateCtx.state.FileTree |]
         )
 
@@ -31,33 +51,52 @@ let NotesDraftTarget () =
                 Error = error
         }
 
-    let submitRequest (payload: NotesSubmitPayload) (requestFileType: FileContentType) (request: FileContentDTO) =
+    let writeRequest (request: FileContentDTO) = promise {
+        let! writeResult =
+            writeFileWithEnsuredChildFolder
+                Api.ipcArcVaultApi.writeFile
+                Api.ipcArcVaultApi.createFileSystemItem
+                NoteConversion.tryGetNoteFolderRelativePath
+                NoteConversion.noteAssetsFolderName
+                request
+
+        match writeResult with
+        | Result.Error exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}")
+        | Ok() ->
+            setPendingOverwriteRequest None
+
+            let selectedPath = PathHelpers.normalizePath request.path
+
+            fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+            setNotesDraft NotesDraft.init
+            setNotesUiState NotesUiState.init
+
+            let! previewResult = Api.ipcArcVaultApi.openFile request.path
+
+            match previewResult with
+            | Ok previewData ->
+                let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
+                pageStateCtx.setState (Some pageState)
+            | Result.Error _ ->
+                let pageState = Renderer.Types.PageState.fromFileContentDTO request
+                pageStateCtx.setState (Some pageState)
+    }
+
+    let submitRequest (overwrite: bool) (request: FileContentDTO) =
         promise {
             setSubmitState true None
 
-            let! writeResult = Api.ipcArcVaultApi.writeFile request
+            if overwrite then
+                do! writeRequest request
+            else
+                let! targetAvailabilityResult = checkTargetAvailability Api.ipcArcVaultApi.pathExists request.path
 
-            match writeResult with
-            | Result.Error exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}")
-            | Ok() ->
-                let selectedPath = PathHelpers.normalizePath request.path
-
-                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-                setNotesDraft NotesDraft.init
-                setNotesUiState NotesUiState.init
-
-                let! previewResult = Api.ipcArcVaultApi.openFile request.path
-
-                match previewResult with
-                | Ok previewData ->
-                    let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
-                    pageStateCtx.setState (Some pageState)
-                | Result.Error _ ->
-                    let fallbackData =
-                        FileContentDTO.create requestFileType payload.Intent.Content request.path
-
-                    let pageState = Renderer.Types.PageState.fromFileContentDTO fallbackData
-                    pageStateCtx.setState (Some pageState)
+                match targetAvailabilityResult with
+                | Error exn -> setSubmitState false (Some $"Failed to check note target: {exn.Message}")
+                | Ok TargetAvailability.Exists ->
+                    setSubmitState false None
+                    setPendingOverwriteRequest (Some request)
+                | Ok TargetAvailability.Empty -> do! writeRequest request
         }
         |> Promise.catch (fun exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}"))
         |> Promise.start
@@ -66,33 +105,25 @@ let NotesDraftTarget () =
         fun (payload: NotesSubmitPayload) ->
             let targetPath = PathHelpers.normalizePath payload.Intent.RelativePath
 
-            let requestFileType = FileContentDTO.inferTextFileTypeFromPath targetPath
-
             let request: FileContentDTO =
-                FileContentDTO.create requestFileType payload.Intent.Content targetPath
+                FileContentDTO.create
+                    (FileContentDTO.inferTextFileTypeFromPath targetPath)
+                    payload.Intent.Content
+                    targetPath
 
-            let submit () =
-                submitRequest payload requestFileType request
+            submitRequest false request
 
-            promise {
-                setSubmitState true None
-
-                let targetExistsInSnapshot =
-                    PathHelpers.pathExistsInSnapshot (fileStateCtx.state.FileTree |> Array.map _.path) targetPath
-
-                if targetExistsInSnapshot then
+    React.Fragment [
+        Notes.Wizard(notesDraft, setNotesDraft, notesUiState, setNotesUiState, onSubmit, availableNotesTargets)
+        FileTargetConflictModal.Main(
+            isOpen = pendingOverwriteRequest.IsSome,
+            targetPath = (pendingOverwriteRequest |> Option.map _.path),
+            close =
+                (fun () ->
+                    setPendingOverwriteRequest None
                     setSubmitState false None
-                    showOverwriteConflictModal errorModalCtx targetPath submit
-                else
-                    let! targetExists = targetExistsOnDisk targetPath
-
-                    if targetExists then
-                        setSubmitState false None
-                        showOverwriteConflictModal errorModalCtx targetPath submit
-                    else
-                        submit ()
-            }
-            |> Promise.catch (fun exn -> setSubmitState false (Some $"Failed to check target note: {exn.Message}"))
-            |> Promise.start
-
-    Notes.Wizard(notesDraft, setNotesDraft, notesUiState, setNotesUiState, onSubmit, availableNotesTargets)
+                ),
+            overwrite = (fun () -> pendingOverwriteRequest |> Option.iter (submitRequest true)),
+            isBusy = notesUiState.IsSubmitting
+        )
+    ]

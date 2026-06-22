@@ -79,6 +79,16 @@ let ArcFilePreviewTarget (arcFile: ArcFiles) =
             setArcFilePageState nextArcFile
             setArcFileInMemoryWithErrorModal nextArcFile
 
+    let onSaveArcFile =
+        fun _ ->
+            promise {
+                match! Helper.saveArcFile arcFile with
+                | Ok() -> ()
+                | Error exn ->
+                    errorModal.enqueue (ErrorModalRequest.create (exn.Message, title = "Could not save ARC file"))
+            }
+            |> Promise.start
+
     let pickFilePaths =
         React.useCallback (
             (fun () -> promise {

@@ -82,16 +82,15 @@ type FileContentDTO = {|
     path: string
 |}
 
-type NoteTarget =
-    | Root
-    | Study of string
-    | Assay of string
-    | Workflow of string
-    | Run of string
-
 type RenamePathRequest = {
     relativePath: string
     newName: string
+}
+
+type MovePathRequest = {
+    sourceRelativePath: string
+    targetRelativePath: string
+    overwrite: bool
 }
 
 [<RequireQualifiedAccess>]

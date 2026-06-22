@@ -9,6 +9,7 @@ module NoteConversion =
 
     let private notesRootFolder = "notes"
     let private frontmatterDelimiter = "---"
+    let noteAssetsFolderName = "assets"
 
     type NoteFrontmatter = {
         Title: string
@@ -119,12 +120,15 @@ module NoteConversion =
         | _ -> None
 
     let formatDateFolder (dateCreated: DateTime) =
-        sprintf "%02d_%02d_%04d" dateCreated.Day dateCreated.Month dateCreated.Year
+        sprintf "%04d-%02d-%02d" dateCreated.Year dateCreated.Month dateCreated.Day
 
     let resolveProtocolName (draft: NotesDraft) =
         Validation.sanitizeProtocolName draft.Title
 
-    let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (_dateCreated: DateTime) (protocolName: string) =
+    let private mkNoteMarkdownRelativePath (parentPath: string) (protocolName: string) =
+        $"{parentPath}/{protocolName}/{protocolName}.md"
+
+    let mkExistingTargetRelativePath (targetRef: ExistingTargetRef) (protocolName: string) =
         let folder =
             match targetRef.Kind with
             | NotesTargetKind.Study -> "studies"
@@ -134,7 +138,7 @@ module NoteConversion =
             PathHelpers.isSafePathSegment targetRef.Name
             && PathHelpers.isSafePathSegment protocolName
         then
-            Some $"{folder}/{targetRef.Name}/protocols/{protocolName}.md"
+            Some(mkNoteMarkdownRelativePath $"{folder}/{targetRef.Name}/protocols" protocolName)
         else
             None
 
@@ -145,13 +149,22 @@ module NoteConversion =
             PathHelpers.isSafePathSegment dateFolder
             && PathHelpers.isSafePathSegment protocolName
         then
-            Some $"{notesRootFolder}/{dateFolder}/{protocolName}.md"
+            Some(mkNoteMarkdownRelativePath $"{notesRootFolder}/{dateFolder}" protocolName)
+        else
+            None
+
+    let tryGetNoteFolderRelativePath (markdownPath: string) =
+        let normalizedPath = PathHelpers.normalizePath markdownPath
+
+        if normalizedPath.EndsWith(".md", StringComparison.OrdinalIgnoreCase) then
+            PathHelpers.tryGetParentPath normalizedPath
         else
             None
 
     let formatMarkdown (draft: NotesDraft) =
         let title =
-            Validation.toOptionalString draft.Title |> Option.defaultValue "Untitled"
+            Validation.toOptionalString draft.Title
+            |> Option.defaultWith (fun () -> invalidArg (nameof draft) "Note title is required.")
 
         let dateCreated = (draft.DateCreated |> Option.defaultValue DateTime.Today).Date
 

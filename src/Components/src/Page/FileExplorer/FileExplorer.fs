@@ -123,6 +123,7 @@ type FileExplorer =
             ?directoryInteractionMode: DirectoryInteractionMode,
             ?directoryChevronToggleOnly: bool,
             ?delegateHorizontalScrollToParent: bool,
+            ?truncateOverflowingItemNames: bool,
             ?getItemIconClass: FileItem -> string option,
             ?getCopyPath: FileItem -> string option,
             ?getCopyRelativePath: FileItem -> string option,
@@ -139,6 +140,8 @@ type FileExplorer =
 
         let delegateHorizontalScrollToParent =
             defaultArg delegateHorizontalScrollToParent false
+
+        let truncateOverflowingItemNames = defaultArg truncateOverflowingItemNames false
 
         let getItemIconClass = defaultArg getItemIconClass (fun _ -> None)
         let getCopyPath = defaultArg getCopyPath (fun item -> item.Path)
@@ -161,10 +164,18 @@ type FileExplorer =
             |> Option.orElse onDirectoryArrowToggle
 
         let scrollContainerClassName =
-            if delegateHorizontalScrollToParent then
+            if truncateOverflowingItemNames then
+                "swt:w-full swt:min-w-0 swt:overflow-x-hidden"
+            elif delegateHorizontalScrollToParent then
                 "swt:w-max swt:min-w-full"
             else
                 "swt:w-full swt:overflow-x-auto"
+
+        let listClassName =
+            if truncateOverflowingItemNames then
+                "swt:w-full swt:min-w-0 swt:list-none swt:m-0 swt:p-0"
+            else
+                "swt:w-full swt:min-w-max swt:list-none swt:m-0 swt:p-0"
 
         React.useEffect (
             (fun () ->
@@ -201,9 +212,8 @@ type FileExplorer =
             if
                 directoryInteractionMode = DirectoryInteractionMode.SingleClickToggle
                 && canExpand
-                && not (model.ExpandedIds.Contains item.Id)
             then
-                setExpanded item true
+                setExpanded item (not (model.ExpandedIds.Contains item.Id))
 
             selectItem item
 
@@ -345,7 +355,7 @@ type FileExplorer =
                     prop.children [
                         Html.ul [
                             prop.testId "file-explorer-container"
-                            prop.className "swt:w-full swt:min-w-max swt:list-none swt:m-0 swt:p-0"
+                            prop.className listClassName
                             prop.children (model.Items |> List.map renderItem)
                         ]
                     ]

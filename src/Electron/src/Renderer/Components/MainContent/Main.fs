@@ -13,6 +13,7 @@ open Renderer.Components.MainContent.GitUnsupportedTarget
 open Renderer.Components.MainContent.LandingDraftTarget
 open Renderer.Components.MainContent.NotesDraftTarget
 open Renderer.Components.MainContent.NotesSearchTarget
+open Renderer.Components.MainContent.ProvenanceGroupingTarget
 open Renderer.Components.MainContent.TextPreviewTarget
 open Renderer.Components.MainContent.UnknownPreviewTarget
 open Renderer.Components.MainContent.SettingsPageTarget
@@ -61,6 +62,10 @@ module private LazyComponents =
     let LazyMarkdownEditorTarget (content: string) =
         Renderer.Components.MainContent.MarkdownEditorTargetView.MarkdownEditorTarget(content)
 
+    [<ReactLazyComponent>]
+    let ProvenanceGroupingTarget () =
+        Renderer.Components.MainContent.ProvenanceGroupingTarget.ProvenanceGroupingTarget()
+
 /// This can be further reduced by using the actual contexts instead of passing down the states and setters as props, but this is good enough for now
 [<ReactMemoComponent>]
 let Main (appRootPath: ArcRootPath, pageState: PageState option) =
@@ -95,6 +100,11 @@ let Main (appRootPath: ArcRootPath, pageState: PageState option) =
                     // | Some _, Some PageState.LandingDraftPage -> LandingDraftTarget()
                     | Some _, Some PageState.NotesDraftPage -> NotesDraftTarget()
                     | Some _, Some PageState.NotesSearchPage -> NotesSearchTarget()
+                    | Some _, Some PageState.ProvenanceGroupingPage ->
+                        React.Suspense(
+                            [ LazyComponents.ProvenanceGroupingTarget() ],
+                            fallback = LazyComponents.FullPageLoadingSpinner("Loading Table Editor...")
+                        )
                     | Some _, Some(PageState.GitDiffPage diffData) -> GitDiffTarget.Main diffData
                     | Some _, Some(PageState.GitMergeConflictPage mergeData) -> GitMergeConflictTarget.Main mergeData
                     | Some _, Some(PageState.GitUnsupportedPage unsupportedPage) ->

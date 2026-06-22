@@ -305,7 +305,7 @@ type FileExplorerItem =
 
                 prop.children [
                     Html.div [
-                        prop.className "swt:flex swt:w-full swt:items-center swt:gap-2"
+                        prop.className "swt:flex swt:w-full swt:min-w-0 swt:items-center swt:gap-2"
                         prop.children [
                             Html.button [
                                 prop.type'.button
@@ -322,7 +322,12 @@ type FileExplorerItem =
                                         )
                                     ]
                                     Html.span [
-                                        prop.className [ "swt:truncate"; selectedNameClass ]
+                                        prop.className [
+                                            "swt:min-w-0"
+                                            "swt:flex-1"
+                                            "swt:truncate"
+                                            selectedNameClass
+                                        ]
                                         prop.text item.Name
                                     ]
                                 ]
@@ -410,7 +415,7 @@ type FileExplorerItem =
                 Html.div [
                     prop.custom ("data-file-item-id", item.Id)
                     prop.className [
-                        "swt:group swt:px-2 swt:py-1 swt:flex swt:items-center swt:justify-between swt:cursor-default"
+                        "swt:group swt:px-2 swt:py-1 swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:cursor-default"
                         rowHighlightClass
                     ]
                     prop.children [
@@ -424,18 +429,26 @@ type FileExplorerItem =
                                 Html.i [
                                     prop.className (
                                         Swate.Components.Page.FileExplorer.Helper.iconClassName
-                                            [ "swt:iconify" ]
+                                            [ "swt:iconify"; "swt:shrink-0" ]
                                             item
                                             getItemIconClass
                                     )
                                 ]
-                                Html.span [ prop.className selectedNameClass; prop.text item.Name ]
+                                Html.span [
+                                    prop.className [
+                                        "swt:min-w-0"
+                                        "swt:flex-1"
+                                        "swt:truncate"
+                                        selectedNameClass
+                                    ]
+                                    prop.text item.Name
+                                ]
                             ]
                         ]
 
                         if hasStatusControl || hasItemActions || canDeleteFromFile then
                             Html.div [
-                                prop.className "swt:flex swt:items-center swt:gap-2"
+                                prop.className "swt:ml-auto swt:flex swt:shrink-0 swt:items-center swt:gap-2"
                                 prop.children [
                                     yield!
                                         itemActions
