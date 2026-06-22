@@ -1,6 +1,5 @@
 module ElectronCore.IpcArchitectureReviewTests
 
-open Fable.Core
 open Main.Bindings.Path
 open Main.ArcVault
 open Main.ArcVaultTypes
@@ -261,6 +260,8 @@ Vitest.describe (
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies/StudyA/isa.study.xlsx").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "test.fsx").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies/StudyA/resources").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "studies/StudyA/dataset/raw.tsv").toBe (true)
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "README.md").toBe (false)
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "../studies/StudyA/isa.study.xlsx").toBe (false)
         )

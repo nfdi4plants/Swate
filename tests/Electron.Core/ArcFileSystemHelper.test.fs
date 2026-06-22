@@ -7,7 +7,6 @@ open Main.Bindings.Path
 open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
-open ARCtrl
 open Vitest
 
 let private fsPromisesDynamic: obj = importAll "fs/promises"
@@ -177,6 +176,45 @@ Vitest.describe (
                             ARCtrl.FileSystemHelper.directoryExistsAsync (absoluteArcPath arcPath createdPath)
 
                         Vitest.expect(isDirectory).toBe (true)
+                })
+        )
+
+        Vitest.test (
+            "protects structural entity child folders while allowing their contents",
+            fun () ->
+                withAssayArc (fun arcPath -> promise {
+                    match!
+                        ArcFileSystemHelper.createFileSystemItemOnDisk
+                            arcPath
+                            (createItemRequest "assays/AssayA" "dataset" FileSystemItemKind.Folder)
+                    with
+                    | Ok createdPath -> failwith $"Expected structural folder creation to be rejected: {createdPath}"
+                    | Error error -> Vitest.expect(error.Message.Length).toBeGreaterThan (0)
+
+                    do! createRelativeDirectoryAsync arcPath "assays/AssayA/dataset"
+
+                    let! createdPath =
+                        createItemOrFail
+                            arcPath
+                            (createItemRequest "assays/AssayA/dataset" "raw.txt" FileSystemItemKind.File)
+
+                    Vitest.expect(createdPath).toBe ("assays/AssayA/dataset/raw.txt")
+                    do! expectRelativePathExists arcPath createdPath true
+
+                    match! ArcFileSystemHelper.deleteGenericFileSystemItemOnDisk arcPath "assays/AssayA/dataset" with
+                    | Ok() -> failwith "Expected structural folder deletion to be rejected."
+                    | Error error -> Vitest.expect(error.Message.Length).toBeGreaterThan (0)
+
+                    match!
+                        ArcFileSystemHelper.renameGenericFileSystemItemOnDisk
+                            arcPath
+                            (renameRequest "assays/AssayA/dataset" "raw-data")
+                    with
+                    | Ok() -> failwith "Expected structural folder rename to be rejected."
+                    | Error error -> Vitest.expect(error.Message.Length).toBeGreaterThan (0)
+
+                    do! deleteItemOrFail arcPath createdPath
+                    do! expectRelativePathExists arcPath createdPath false
                 })
         )
 

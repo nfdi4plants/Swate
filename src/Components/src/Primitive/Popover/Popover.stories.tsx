@@ -212,42 +212,42 @@ export const NonModal: Story = {
   },
 };
 
- //export const ModalFocus: Story = {
- //  render: () => <ModalPopoverExample />,
- //  play: async ({ canvasElement }) => {
- //    const canvas = within(canvasElement);
- //    const trigger = canvas.getByRole("button", { name: /open modal/i });
- //    const afterTarget = canvas.getByRole("button", { name: /after target/i });
+export const ModalFocus: Story = {
+  render: () => <ModalPopoverExample />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole("button", { name: /open modal/i });
+    const afterTarget = canvas.getByRole("button", { name: /after target/i });
 
- //    trigger.focus();
- //    expect(trigger).toHaveFocus();
+    trigger.focus();
+    expect(trigger).toHaveFocus();
 
- //    await userEvent.click(trigger);
+    await userEvent.click(trigger);
 
- //    const dialog = await screen.findByTestId("popover_content_modal");
- //    const firstAction = screen.getByTestId(TESTID_MODAL_PRIMARY_ACTION);
- //    const closeButton = screen.getByRole("button", { name: /close modal/i });
+    const dialog = await screen.findByTestId("popover_content_modal");
+    const firstAction = screen.getByTestId(TESTID_MODAL_PRIMARY_ACTION);
+    const closeButton = screen.getByRole("button", { name: /close modal/i });
 
- //    await waitFor(() => {
- //      expect(dialog.contains(document.activeElement)).toBe(true);
- //    });
+    await waitFor(() => {
+      expect(dialog.contains(document.activeElement)).toBe(true);
+    });
 
- //    await userEvent.tab();
- //    expect(dialog.contains(document.activeElement)).toBe(true);
+    await userEvent.tab();
+    expect(dialog.contains(document.activeElement)).toBe(true);
 
- //    await userEvent.tab();
- //    expect(dialog.contains(document.activeElement)).toBe(true);
- //    expect(document.activeElement === firstAction || document.activeElement === closeButton).toBe(true);
- //    expect(afterTarget).not.toHaveFocus();
+    await userEvent.tab();
+    expect(dialog.contains(document.activeElement)).toBe(true);
+    expect(document.activeElement === firstAction || document.activeElement === closeButton).toBe(true);
+    expect(afterTarget).not.toHaveFocus();
 
- //    await userEvent.click(closeButton);
+    await userEvent.click(closeButton);
 
- //    await waitFor(() =>
- //      expect(screen.queryByRole("dialog", { name: /modal popover/i })).not.toBeInTheDocument(),
- //    );
- //    await waitFor(() => expect(trigger).toHaveFocus());
- //  },
- //};
+    await waitFor(() =>
+      expect(screen.queryByRole("dialog", { name: /modal popover/i })).not.toBeInTheDocument(),
+    );
+    await waitFor(() => expect(trigger).toHaveFocus());
+  },
+};
 
 export const DuplicateHeading: Story = {
   render: () => <DuplicateHeadingPopoverExample />,

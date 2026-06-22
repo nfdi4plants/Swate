@@ -155,6 +155,36 @@ let tests =
                 (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/.gitattributes")
                 ".gitattributes should remain non-deletable."
 
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/dataset")
+                "Assay dataset folders should remain non-deletable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/protocols")
+                "Study protocol folders should remain non-deletable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/resources")
+                "Study resource folders should remain non-deletable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/dataset/raw.bin")
+                "Files below structural dataset folders should remain deletable."
+
+        testCase "native structural child folder matching is case-insensitive"
+        <| fun _ ->
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "assays/MyAssay/DataSet")
+                "Assay dataset folders should stay protected with non-canonical casing."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/Protocols")
+                "Study protocol folders should stay protected with non-canonical casing."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isDeletePathAllowed "studies/MyStudy/Resources")
+                "Study resource folders should stay protected with non-canonical casing."
+
         testCase "buildFallbackUnlinkPaths maps entity folder to canonical files"
         <| fun _ ->
             let fallbackPaths = ArcEntityPathRules.buildFallbackUnlinkPaths "runs/MyRun"
@@ -211,6 +241,22 @@ let tests =
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/notes/custom.txt")
                 "Safe generic descendants should be renameable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isRenamePathAllowed "assays/MyAssay/dataset")
+                "Assay dataset folders should not be renameable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isRenamePathAllowed "assays/MyAssay/protocols")
+                "Assay protocol folders should not be renameable."
+
+            Expect.isFalse
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/resources")
+                "Study resource folders should not be renameable."
+
+            Expect.isTrue
+                (ArcEntityPathRules.isRenamePathAllowed "studies/MyStudy/dataset/raw.tsv")
+                "Files below generic dataset folders should remain renameable."
 
             Expect.isTrue
                 (ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md")
