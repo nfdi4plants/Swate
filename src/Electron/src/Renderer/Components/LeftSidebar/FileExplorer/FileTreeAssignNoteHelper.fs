@@ -180,6 +180,17 @@ module FileTreeAssignNoteHelper =
         ]
         |> List.filter (assetDestinationExistsForTarget target)
 
+    let createDefaultAssetDestinations
+        (availableDestinations: AssignNoteAssetDestination list)
+        (assets: seq<AssignableNoteAssetRef>)
+        =
+        match availableDestinations |> List.tryHead with
+        | None -> Map.empty
+        | Some defaultDestination ->
+            assets
+            |> Seq.map (fun asset -> asset.SourceRelativePath, defaultDestination)
+            |> Map.ofSeq
+
     let private targetRootPath (target: ExistingTargetRef) =
         let targetFolder, _ = NoteConversion.existingTargetFolders target.Kind
         combineRelativePaths [| targetFolder; target.Name |]

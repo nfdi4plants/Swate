@@ -2,6 +2,7 @@ module ElectronRenderer.FileTreeContextMenuTests
 
 open Browser.Dom
 open Browser.Types
+open Fable.Core
 open Feliz
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
@@ -121,6 +122,40 @@ let private optionValues (container: HTMLDivElement) =
         for index in 0 .. optionNodes.length - 1 do
             (optionNodes.[index] :?> HTMLOptionElement).value
     |]
+
+let private selectAt (container: HTMLDivElement) index =
+    (container.querySelectorAll "select").[index] :?> HTMLSelectElement
+
+let private optionLabelsForSelect (container: HTMLDivElement) index =
+    let optionNodes = (selectAt container index).querySelectorAll ("option")
+
+    [|
+        for optionIndex in 0 .. optionNodes.length - 1 do
+            optionNodes.[optionIndex].textContent
+    |]
+
+let private optionValuesForSelect (container: HTMLDivElement) index =
+    let optionNodes = (selectAt container index).querySelectorAll ("option")
+
+    [|
+        for optionIndex in 0 .. optionNodes.length - 1 do
+            (optionNodes.[optionIndex] :?> HTMLOptionElement).value
+    |]
+
+let private selectValues (container: HTMLDivElement) =
+    let selectNodes = container.querySelectorAll ("select")
+
+    [|
+        for index in 0 .. selectNodes.length - 1 do
+            (selectNodes.[index] :?> HTMLSelectElement).value
+    |]
+
+[<Emit("""
+const setter = Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, "value").set;
+setter.call($0, $1);
+$0.dispatchEvent(new Event("change", { bubbles: true }));
+""")>]
+let private changeSelectValue (element: HTMLSelectElement) (value: string) : unit = jsNative
 
 Vitest.describe (
     "FileTreeContextMenu",
@@ -567,44 +602,119 @@ Vitest.describe (
                 }
 
                 let! assayContainer, assayCleanup =
+                    let availableDestinations = assignableAssetDestinationsForTarget assayTarget
+
                     FileTreeAssignNoteAssetSelector.Main(
                         assets,
-                        assignableAssetDestinationsForTarget assayTarget,
-                        Map.empty,
+                        availableDestinations,
+                        createDefaultAssetDestinations availableDestinations assets,
                         (fun _ _ -> ())
                     )
                     |> renderToBody
 
                 try
                     Vitest
-                        .expect(optionLabels assayContainer)
+                        .expect(optionLabelsForSelect assayContainer 0)
                         .toEqual ([| "Do not assign"; "protocol"; "dataset" |])
 
                     Vitest
-                        .expect(optionValues assayContainer)
+                        .expect(optionValuesForSelect assayContainer 0)
                         .toEqual ([| ""; "protocol"; "dataset" |])
+
+                    Vitest
+                        .expect(optionLabelsForSelect assayContainer 1)
+                        .toEqual ([| "Do not assign"; "protocol"; "dataset" |])
+
+                    Vitest.expect(selectValues assayContainer).toEqual ([| "protocol"; "protocol" |])
                 finally
                     assayCleanup ()
 
                 let! studyContainer, studyCleanup =
+                    let availableDestinations = assignableAssetDestinationsForTarget studyTarget
+
                     FileTreeAssignNoteAssetSelector.Main(
                         assets,
-                        assignableAssetDestinationsForTarget studyTarget,
-                        Map.empty,
+                        availableDestinations,
+                        createDefaultAssetDestinations availableDestinations assets,
                         (fun _ _ -> ())
                     )
                     |> renderToBody
 
                 try
                     Vitest
-                        .expect(optionLabels studyContainer)
-                        .toEqual ([| "Do not assign"; "Protocol"; "Resources" |])
+                        .expect(optionLabelsForSelect studyContainer 0)
+                        .toEqual ([| "Do not assign"; "protocol"; "resource" |])
 
                     Vitest
-                        .expect(optionValues studyContainer)
+                        .expect(optionValuesForSelect studyContainer 0)
                         .toEqual ([| ""; "protocol"; "resource" |])
+
+                    Vitest
+                        .expect(optionLabelsForSelect studyContainer 1)
+                        .toEqual ([| "Do not assign"; "protocol"; "resource" |])
+
+                    Vitest.expect(selectValues studyContainer).toEqual ([| "protocol"; "protocol" |])
                 finally
                     studyCleanup ()
+            }
+        )
+
+        Vitest.test (
+            "asset selector header destination overwrites every asset selector",
+            fun () -> promise {
+                let assets =
+                    ResizeArray [
+                        assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+                        assignableAsset "notes/2026-06-15/Sampling_protocol/assets/diagram.png" "diagram.png"
+                    ]
+
+                let availableDestinations = [
+                    AssignNoteAssetDestination.Protocol
+                    AssignNoteAssetDestination.Dataset
+                ]
+
+                let assetDestinations =
+                    [
+                        "notes/2026-06-15/Sampling_protocol/assets/data.csv", AssignNoteAssetDestination.Protocol
+                        "notes/2026-06-15/Sampling_protocol/assets/diagram.png", AssignNoteAssetDestination.Dataset
+                    ]
+                    |> Map.ofList
+
+                let updates = ResizeArray<string * AssignNoteAssetDestination option>()
+
+                let! container, cleanup =
+                    FileTreeAssignNoteAssetSelector.Main(
+                        assets,
+                        availableDestinations,
+                        assetDestinations,
+                        (fun assetPath destination -> updates.Add(assetPath, destination))
+                    )
+                    |> renderToBody
+
+                try
+                    Vitest
+                        .expect(optionLabelsForSelect container 0)
+                        .toEqual ([| "Mixed"; "Do not assign"; "protocol"; "dataset" |])
+
+                    Vitest.expect(selectValues container).toEqual ([| "__mixed__"; "protocol"; "dataset" |])
+
+                    changeSelectValue (selectAt container 0) "dataset"
+                    do! Promise.sleep 0
+
+                    Vitest.expect(updates.Count).toBe (2)
+
+                    Vitest
+                        .expect(updates.ToArray())
+                        .toEqual (
+                            [|
+                                ("notes/2026-06-15/Sampling_protocol/assets/data.csv",
+                                 Some AssignNoteAssetDestination.Dataset)
+                                ("notes/2026-06-15/Sampling_protocol/assets/diagram.png",
+                                 Some AssignNoteAssetDestination.Dataset)
+                            |]
+                        )
+                finally
+                    cleanup ()
             }
         )
 

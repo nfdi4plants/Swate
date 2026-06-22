@@ -22,20 +22,84 @@ type FileTreeAssignNoteAssetSelector =
         if assets.Count = 0 then
             Html.none
         else
+            let mixedHeaderValue = "__mixed__"
+
+            let selectedValueForAsset asset =
+                assetDestinations
+                |> Map.tryFind asset.SourceRelativePath
+                |> Option.map string
+                |> Option.defaultValue ""
+
+            let tryParseDestinationValue value =
+                if value = mixedHeaderValue then
+                    None
+                elif value = "" then
+                    Some None
+                else
+                    availableDestinations
+                    |> List.tryFind (fun destination -> string destination = value)
+                    |> Option.map Some
+
+            let headerSelectedValue =
+                let distinctSelectedValues =
+                    assets
+                    |> Seq.map selectedValueForAsset
+                    |> Seq.distinct
+                    |> Seq.toList
+
+                match distinctSelectedValues with
+                | [ selectedValue ] -> selectedValue
+                | _ -> mixedHeaderValue
+
+            let destinationOptions includeMixedOption = [
+                if includeMixedOption then
+                    Html.option [
+                        prop.value mixedHeaderValue
+                        prop.disabled true
+                        prop.text "Mixed"
+                    ]
+
+                Html.option [ prop.value ""; prop.text "Do not assign" ]
+
+                for destination in availableDestinations do
+                    Html.option [
+                        prop.key (string destination)
+                        prop.value (string destination)
+                        prop.text (destination.ToString())
+                    ]
+            ]
+
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:gap-2"
                 prop.children [
                     Html.div [
-                        prop.className "swt:text-sm swt:font-medium"
-                        prop.text "Assets"
+                        prop.className "swt:grid swt:grid-cols-[minmax(0,1fr)_9rem] swt:gap-2 swt:items-center"
+                        prop.children [
+                            Html.div [
+                                prop.className "swt:text-sm swt:font-medium"
+                                prop.text "Assets"
+                            ]
+
+                            Html.select [
+                                prop.testId "assign-note-assets-all-destination"
+                                prop.ariaLabel "Set all asset destinations"
+                                prop.className "swt:select swt:select-bordered swt:select-sm swt:w-full"
+                                prop.disabled isAssigning
+                                prop.valueOrDefault headerSelectedValue
+                                prop.onChange (fun value ->
+                                    match tryParseDestinationValue value with
+                                    | Some selectedDestination ->
+                                        for asset in assets do
+                                            setAssetDestination asset.SourceRelativePath selectedDestination
+                                    | None -> ()
+                                )
+                                prop.children (destinationOptions (headerSelectedValue = mixedHeaderValue))
+                            ]
+                        ]
                     ]
 
                     for asset in assets do
-                        let selectedValue =
-                            assetDestinations
-                            |> Map.tryFind asset.SourceRelativePath
-                            |> Option.map string
-                            |> Option.defaultValue ""
+                        let selectedValue = selectedValueForAsset asset
 
                         Html.div [
                             prop.key asset.SourceRelativePath
@@ -48,29 +112,17 @@ type FileTreeAssignNoteAssetSelector =
                                 ]
 
                                 Html.select [
+                                    prop.ariaLabel $"Set destination for {asset.RelativeAssetPath}"
                                     prop.className "swt:select swt:select-bordered swt:select-sm swt:w-full"
                                     prop.disabled isAssigning
                                     prop.valueOrDefault selectedValue
                                     prop.onChange (fun value ->
-                                        let selectedDestination =
-                                            if value = "" then
-                                                None
-                                            else
-                                                availableDestinations
-                                                |> List.tryFind (fun destination -> string destination = value)
-
-                                        setAssetDestination asset.SourceRelativePath selectedDestination
+                                        match tryParseDestinationValue value with
+                                        | Some selectedDestination ->
+                                            setAssetDestination asset.SourceRelativePath selectedDestination
+                                        | None -> ()
                                     )
-                                    prop.children [
-                                        Html.option [ prop.value ""; prop.text "Do not assign" ]
-
-                                        for destination in availableDestinations do
-                                            Html.option [
-                                                prop.key (string destination)
-                                                prop.value (string destination)
-                                                prop.text (destination.ToString())
-                                            ]
-                                    ]
+                                    prop.children (destinationOptions false)
                                 ]
                             ]
                         ]

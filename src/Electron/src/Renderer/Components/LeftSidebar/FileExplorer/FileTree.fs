@@ -262,9 +262,22 @@ type FileTree =
             setSelectedAssetDestinations (fun _ -> Map.empty)
             setActiveDialog None
 
+        let defaultAssetDestinationsForNote note =
+            match activeDialog, note with
+            | Some(AssignNoteDialog target), Some selectedNote ->
+                let assets =
+                    FileTreeAssignNoteHelper.createAssignableNoteAssetOptions
+                        fileStateCtx.state.FileTree
+                        (Some selectedNote)
+
+                FileTreeAssignNoteHelper.createDefaultAssetDestinations
+                    (FileTreeAssignNoteHelper.assignableAssetDestinationsForTarget target)
+                    assets
+            | _ -> Map.empty
+
         let selectAssignableNote note =
             setSelectedAssignableNote note
-            setSelectedAssetDestinations (fun _ -> Map.empty)
+            setSelectedAssetDestinations (fun _ -> defaultAssetDestinationsForNote note)
 
         let setAssetDestination assetPath destination =
             setSelectedAssetDestinations (fun current ->
