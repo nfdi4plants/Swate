@@ -309,12 +309,13 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "root notes folder context menu does not expose rename",
+            "root notes folder context menu does not expose rename or delete",
             fun () ->
                 let item = createFolderItem "notes" (Some "notes")
                 let menuItems = createComposedContextMenuItems (createContextMenuConfig ()) item
 
                 Vitest.expect(groupedLabels menuItems).not.toContain ("Rename")
+                Vitest.expect(groupedLabels menuItems).not.toContain ("Delete")
         )
 
         Vitest.test (

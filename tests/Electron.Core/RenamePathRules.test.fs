@@ -78,6 +78,15 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "root notes folder is protected from rename and delete while descendants are not",
+            fun () ->
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "notes").toBe (false)
+                Vitest.expect(ArcEntityPathRules.isRenamePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
+                Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "notes/2026-06-15/foo/foo.md").toBe (true)
+        )
+
+        Vitest.test (
             "native structural child matching is case-insensitive",
             fun () ->
                 Vitest.expect(ArcEntityPathRules.isDeletePathAllowed "assays/OldAssay/DataSet").toBe (false)

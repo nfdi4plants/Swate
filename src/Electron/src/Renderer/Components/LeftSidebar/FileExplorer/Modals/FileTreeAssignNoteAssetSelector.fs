@@ -68,7 +68,7 @@ type FileTreeAssignNoteAssetSelector =
                                             Html.option [
                                                 prop.key (string destination)
                                                 prop.value (string destination)
-                                                prop.text (string destination)
+                                                prop.text (destination.ToString())
                                             ]
                                     ]
                                 ]
