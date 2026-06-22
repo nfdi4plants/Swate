@@ -1,5 +1,6 @@
 module ElectronCore.RenamePathRulesTests
 
+open ARCtrl
 open Swate.Electron.Shared.RenamePathRules
 open Swate.Components.Shared
 open Vitest
@@ -37,6 +38,28 @@ Vitest.describe (
             fun () ->
                 let result = tryBuildRenameTargetPath "assays/OldAssay" "OldAssay"
                 Vitest.expect(result).toEqual (Error "Rename target is identical to the current path.")
+        )
+
+        Vitest.test (
+            "native entity child folders follow ARCtrl entity zones",
+            fun () ->
+                Vitest
+                    .expect(ArcEntityPathRules.nativeEntityChildFolderNames ArcEntityPathRules.AddZone.Assays)
+                    .toEqual (
+                        [
+                            ArcPathHelper.AssayDatasetFolderName
+                            ArcPathHelper.AssayProtocolsFolderName
+                        ]
+                    )
+
+                Vitest
+                    .expect(ArcEntityPathRules.nativeEntityChildFolderNames ArcEntityPathRules.AddZone.Studies)
+                    .toEqual (
+                        [
+                            ArcPathHelper.StudiesProtocolsFolderName
+                            ArcPathHelper.StudiesResourcesFolderName
+                        ]
+                    )
         )
 
         Vitest.test (

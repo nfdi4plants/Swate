@@ -11,19 +11,13 @@ type FileTreeAssignNoteAssetSelector =
     static member Main
         (
             assets: ResizeArray<AssignableNoteAssetRef>,
+            availableDestinations: AssignNoteAssetDestination list,
             assetDestinations: Map<string, AssignNoteAssetDestination>,
             setAssetDestination: string -> AssignNoteAssetDestination option -> unit,
             ?isAssigning: bool
         ) =
 
         let isAssigning = defaultArg isAssigning false
-
-        let destinationOptions = [
-            "", "Do not assign", None
-            "protocol", "Protocol", Some AssignNoteAssetDestination.Protocol
-            "dataset", "Datasets", Some AssignNoteAssetDestination.Dataset
-            "resource", "Resources", Some AssignNoteAssetDestination.Resource
-        ]
 
         if assets.Count = 0 then
             Html.none
@@ -40,11 +34,7 @@ type FileTreeAssignNoteAssetSelector =
                         let selectedValue =
                             assetDestinations
                             |> Map.tryFind asset.SourceRelativePath
-                            |> Option.bind (fun selectedDestination ->
-                                destinationOptions
-                                |> List.tryFind (fun (_, _, destination) -> destination = Some selectedDestination)
-                                |> Option.map (fun (value, _, _) -> value)
-                            )
+                            |> Option.map string
                             |> Option.defaultValue ""
 
                         Html.div [
@@ -62,15 +52,24 @@ type FileTreeAssignNoteAssetSelector =
                                     prop.disabled isAssigning
                                     prop.valueOrDefault selectedValue
                                     prop.onChange (fun value ->
-                                        destinationOptions
-                                        |> List.tryFind (fun (optionValue, _, _) -> optionValue = value)
-                                        |> Option.map (fun (_, _, destination) -> destination)
-                                        |> Option.defaultValue None
-                                        |> setAssetDestination asset.SourceRelativePath
+                                        let selectedDestination =
+                                            if value = "" then
+                                                None
+                                            else
+                                                availableDestinations
+                                                |> List.tryFind (fun destination -> string destination = value)
+
+                                        setAssetDestination asset.SourceRelativePath selectedDestination
                                     )
                                     prop.children [
-                                        for value, label, _ in destinationOptions do
-                                            Html.option [ prop.key value; prop.value value; prop.text label ]
+                                        Html.option [ prop.value ""; prop.text "Do not assign" ]
+
+                                        for destination in availableDestinations do
+                                            Html.option [
+                                                prop.key (string destination)
+                                                prop.value (string destination)
+                                                prop.text (string destination)
+                                            ]
                                     ]
                                 ]
                             ]

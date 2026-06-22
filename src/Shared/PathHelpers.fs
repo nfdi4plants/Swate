@@ -178,7 +178,7 @@ module ArcEntityPathRules =
         | AddZone.Workflows -> ARCtrl.ArcPathHelper.WorkflowFileName
         | AddZone.Runs -> ARCtrl.ArcPathHelper.RunFileName
 
-    let private nativeEntityChildFolderNames =
+    let nativeEntityChildFolderNames =
         function
         | AddZone.Studies -> [
             ARCtrl.ArcPathHelper.StudiesProtocolsFolderName

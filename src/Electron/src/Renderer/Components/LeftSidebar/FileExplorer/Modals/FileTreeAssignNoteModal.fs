@@ -17,6 +17,7 @@ type FileTreeAssignNoteModal =
             setSelectedNote: AssignableNoteRef option -> unit,
             availableNotes: ResizeArray<AssignableNoteRef>,
             availableAssets: ResizeArray<AssignableNoteAssetRef>,
+            availableAssetDestinations: AssignNoteAssetDestination list,
             assetDestinations: Map<string, AssignNoteAssetDestination>,
             setAssetDestination: string -> AssignNoteAssetDestination option -> unit,
             close: unit -> unit,
@@ -91,6 +92,7 @@ type FileTreeAssignNoteModal =
                         noteSelector
                         FileTreeAssignNoteAssetSelector.Main(
                             availableAssets,
+                            availableAssetDestinations,
                             assetDestinations,
                             setAssetDestination,
                             isAssigning

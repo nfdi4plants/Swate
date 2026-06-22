@@ -1,9 +1,13 @@
 module ElectronRenderer.FileTreeContextMenuTests
 
+open Browser.Dom
+open Browser.Types
+open Feliz
 open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeAssignNoteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
+open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -86,6 +90,37 @@ let private assignableAsset sourceRelativePath relativeAssetPath : AssignableNot
     SourceRelativePath = sourceRelativePath
     RelativeAssetPath = relativeAssetPath
 }
+
+let private renderToBody (element: ReactElement) = promise {
+    let container = document.createElement ("div") :?> HTMLDivElement
+    document.body.appendChild container |> ignore
+    let root = ReactDOM.createRoot container
+    root.render element
+    do! Promise.sleep 0
+
+    return
+        container,
+        (fun () ->
+            root.unmount ()
+            container.remove ()
+        )
+}
+
+let private optionLabels (container: HTMLDivElement) =
+    let optionNodes = container.querySelectorAll ("select option")
+
+    [|
+        for index in 0 .. optionNodes.length - 1 do
+            optionNodes.[index].textContent
+    |]
+
+let private optionValues (container: HTMLDivElement) =
+    let optionNodes = container.querySelectorAll ("select option")
+
+    [|
+        for index in 0 .. optionNodes.length - 1 do
+            (optionNodes.[index] :?> HTMLOptionElement).value
+    |]
 
 Vitest.describe (
     "FileTreeContextMenu",
@@ -481,6 +516,98 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "assignable asset destinations follow the selected target entity folders",
+            fun () ->
+                let assayTarget = {
+                    Name = "AssayA"
+                    Kind = NotesTargetKind.Assay
+                }
+
+                let studyTarget = {
+                    Name = "StudyA"
+                    Kind = NotesTargetKind.Study
+                }
+
+                Vitest
+                    .expect(assignableAssetDestinationsForTarget assayTarget |> List.toArray)
+                    .toEqual (
+                        [|
+                            AssignNoteAssetDestination.Protocol
+                            AssignNoteAssetDestination.Dataset
+                        |]
+                    )
+
+                Vitest
+                    .expect(assignableAssetDestinationsForTarget studyTarget |> List.toArray)
+                    .toEqual (
+                        [|
+                            AssignNoteAssetDestination.Protocol
+                            AssignNoteAssetDestination.Resource
+                        |]
+                    )
+        )
+
+        Vitest.test (
+            "asset selector only displays destinations valid for the target entity",
+            fun () -> promise {
+                let assets =
+                    ResizeArray [
+                        assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+                    ]
+
+                let assayTarget = {
+                    Name = "AssayA"
+                    Kind = NotesTargetKind.Assay
+                }
+
+                let studyTarget = {
+                    Name = "StudyA"
+                    Kind = NotesTargetKind.Study
+                }
+
+                let! assayContainer, assayCleanup =
+                    FileTreeAssignNoteAssetSelector.Main(
+                        assets,
+                        assignableAssetDestinationsForTarget assayTarget,
+                        Map.empty,
+                        (fun _ _ -> ())
+                    )
+                    |> renderToBody
+
+                try
+                    Vitest
+                        .expect(optionLabels assayContainer)
+                        .toEqual ([| "Do not assign"; "Protocol"; "Datasets" |])
+
+                    Vitest
+                        .expect(optionValues assayContainer)
+                        .toEqual ([| ""; "protocol"; "dataset" |])
+                finally
+                    assayCleanup ()
+
+                let! studyContainer, studyCleanup =
+                    FileTreeAssignNoteAssetSelector.Main(
+                        assets,
+                        assignableAssetDestinationsForTarget studyTarget,
+                        Map.empty,
+                        (fun _ _ -> ())
+                    )
+                    |> renderToBody
+
+                try
+                    Vitest
+                        .expect(optionLabels studyContainer)
+                        .toEqual ([| "Do not assign"; "Protocol"; "Resources" |])
+
+                    Vitest
+                        .expect(optionValues studyContainer)
+                        .toEqual ([| ""; "protocol"; "resource" |])
+                finally
+                    studyCleanup ()
+            }
+        )
+
+        Vitest.test (
             "assigned asset target path follows the selected asset destination",
             fun () ->
                 let target = {
@@ -501,9 +628,14 @@ Vitest.describe (
                     .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Dataset)
                     .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/nested/diagram.png")
 
+                let studyTarget = {
+                    Name = "StudyA"
+                    Kind = NotesTargetKind.Study
+                }
+
                 Vitest
-                    .expect(buildAssignedAssetTargetPath target note asset AssignNoteAssetDestination.Resource)
-                    .toBe ("assays/AssayA/resources/Sampling_protocol/assets/nested/diagram.png")
+                    .expect(buildAssignedAssetTargetPath studyTarget note asset AssignNoteAssetDestination.Resource)
+                    .toBe ("studies/StudyA/resources/Sampling_protocol/assets/nested/diagram.png")
         )
 
         Vitest.test (
@@ -556,7 +688,7 @@ Vitest.describe (
                     |> Map.ofList
 
                 assignNoteToTarget config target note assets selectedDestinations
-                do! waitUntil ((fun () -> closed && copyRequests.Count = 1 && moveRequests.Count = 2), 50)
+                do! waitUntil ((fun () -> closed && copyRequests.Count = 1 && moveRequests.Count = 1), 50)
 
                 Vitest.expect(copyRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
                 Vitest.expect(copyRequests.[0].targetRelativePath).toBe ("assays/AssayA/protocols/Sampling_protocol")
@@ -569,13 +701,7 @@ Vitest.describe (
                     .expect(moveRequests.[0].targetRelativePath)
                     .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
 
-                Vitest
-                    .expect(moveRequests.[1].sourceRelativePath)
-                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/nested/reference.pdf")
-
-                Vitest
-                    .expect(moveRequests.[1].targetRelativePath)
-                    .toBe ("assays/AssayA/resources/Sampling_protocol/assets/nested/reference.pdf")
+                Vitest.expect(moveRequests.Count).toBe (1)
             }
         )
 

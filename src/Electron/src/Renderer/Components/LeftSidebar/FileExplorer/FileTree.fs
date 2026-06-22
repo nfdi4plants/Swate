@@ -31,6 +31,7 @@ module private FileTreeHelper =
         Target: ExistingTargetRef option
         AvailableNotes: ResizeArray<AssignableNoteRef>
         AvailableAssets: ResizeArray<AssignableNoteAssetRef>
+        AvailableAssetDestinations: AssignNoteAssetDestination list
     }
 
     let createAssignNoteDialogState activeDialog fileEntries selectedNote =
@@ -43,6 +44,10 @@ module private FileTreeHelper =
             Target = target
             AvailableNotes = FileTreeAssignNoteHelper.createAssignableNoteOptions fileEntries
             AvailableAssets = FileTreeAssignNoteHelper.createAssignableNoteAssetOptions fileEntries selectedNote
+            AvailableAssetDestinations =
+                target
+                |> Option.map FileTreeAssignNoteHelper.assignableAssetDestinationsForTarget
+                |> Option.defaultValue []
         }
 
     let saveArcFileAndOpen (arcFile: ArcFiles) : JS.Promise<Result<FileContentDTO, exn>> = promise {
@@ -575,6 +580,7 @@ type FileTree =
                 setSelectedNote = selectAssignableNote,
                 availableNotes = assignNoteDialogState.AvailableNotes,
                 availableAssets = assignNoteDialogState.AvailableAssets,
+                availableAssetDestinations = assignNoteDialogState.AvailableAssetDestinations,
                 assetDestinations = selectedAssetDestinations,
                 setAssetDestination = setAssetDestination,
                 close = closeDialog,

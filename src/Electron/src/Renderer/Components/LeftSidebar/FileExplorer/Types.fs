@@ -1,5 +1,6 @@
 module Renderer.Components.LeftSidebar.FileExplorer.Types
 
+open Fable.Core
 open Swate.Components.Shared
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Electron.Shared.FileIOTypes
@@ -23,7 +24,7 @@ type AssignableNoteRef = {
     Label: string
 }
 
-[<RequireQualifiedAccess>]
+[<RequireQualifiedAccess; StringEnum(CaseRules.LowerAll)>]
 type AssignNoteAssetDestination =
     | Protocol
     | Dataset

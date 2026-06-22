@@ -153,6 +153,33 @@ module FileTreeAssignNoteHelper =
             |> Seq.sortBy (fun asset -> asset.RelativeAssetPath.ToLowerInvariant())
             |> ResizeArray
 
+    let private targetAddZone =
+        function
+        | NotesTargetKind.Study -> ArcEntityPathRules.AddZone.Studies
+        | NotesTargetKind.Assay -> ArcEntityPathRules.AddZone.Assays
+
+    let private targetChildFolderName targetKind destination =
+        match destination with
+        | AssignNoteAssetDestination.Protocol ->
+            let _, protocolsFolder = NoteConversion.existingTargetFolders targetKind
+            protocolsFolder
+        | AssignNoteAssetDestination.Dataset -> ARCtrl.ArcPathHelper.AssayDatasetFolderName
+        | AssignNoteAssetDestination.Resource -> ARCtrl.ArcPathHelper.StudiesResourcesFolderName
+
+    let assetDestinationExistsForTarget (target: ExistingTargetRef) destination =
+        let childFolderName = targetChildFolderName target.Kind destination
+
+        ArcEntityPathRules.nativeEntityChildFolderNames (targetAddZone target.Kind)
+        |> List.exists (fun folderName -> PathHelpers.pathsEqual folderName childFolderName)
+
+    let assignableAssetDestinationsForTarget target =
+        [
+            AssignNoteAssetDestination.Protocol
+            AssignNoteAssetDestination.Dataset
+            AssignNoteAssetDestination.Resource
+        ]
+        |> List.filter (assetDestinationExistsForTarget target)
+
     let private targetRootPath (target: ExistingTargetRef) =
         let targetFolder, _ = NoteConversion.existingTargetFolders target.Kind
         combineRelativePaths [| targetFolder; target.Name |]
@@ -203,6 +230,8 @@ module FileTreeAssignNoteHelper =
                 match assetDestinations |> Map.tryFind asset.SourceRelativePath with
                 | None
                 | Some AssignNoteAssetDestination.Protocol -> return! moveNext remainingAssets
+                | Some destination when assetDestinationExistsForTarget target destination |> not ->
+                    return! moveNext remainingAssets
                 | Some destination ->
                     let sourcePath =
                         combineRelativePaths [|
