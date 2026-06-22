@@ -17,6 +17,11 @@ let private mkdirRecursiveAsync (directoryPath: string) = promise {
 let private writeTextFileAsync (filePath: string) (content: string) =
     writeFileAsync filePath content TextEncoding.Utf8
 
+let private arctrlDefaultGitignoreContent () =
+    match ARCtrl.Contract.Git.gitignoreContract.DTO with
+    | Some(ARCtrl.Contract.DTO.Text content) -> content
+    | _ -> failwith "ARCtrl default .gitignore contract does not contain text content."
+
 let private addDataMapToAllEntityTypes (arc: ARC) =
     let study = ArcStudy("Study With DataMap")
     study.DataMap <- Some(DataMap.init ())
@@ -112,7 +117,7 @@ Vitest.describe (
                     | Ok _ -> ()
 
                     let! gitignoreContent = readFileAsync gitignorePath TextEncoding.Utf8
-                    Vitest.expect(gitignoreContent).toBe (Main.ArcScaffold.defaultGitignoreContent)
+                    Vitest.expect(gitignoreContent).toBe (arctrlDefaultGitignoreContent ())
                     do! TestHelpers.removeDirectoryAsync rootPath
                 with error ->
                     do! TestHelpers.removeDirectoryAsync rootPath
