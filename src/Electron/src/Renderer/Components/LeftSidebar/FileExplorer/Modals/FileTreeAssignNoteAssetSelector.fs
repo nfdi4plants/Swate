@@ -42,10 +42,7 @@ type FileTreeAssignNoteAssetSelector =
 
             let headerSelectedValue =
                 let distinctSelectedValues =
-                    assets
-                    |> Seq.map selectedValueForAsset
-                    |> Seq.distinct
-                    |> Seq.toList
+                    assets |> Seq.map selectedValueForAsset |> Seq.distinct |> Seq.toList
 
                 match distinctSelectedValues with
                 | [ selectedValue ] -> selectedValue

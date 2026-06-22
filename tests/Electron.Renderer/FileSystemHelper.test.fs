@@ -188,12 +188,7 @@ Vitest.describe (
 
                 let adapter =
                     createAssetFilePickerAdapter
-                        (fun () -> promise {
-                            return Ok [|
-                                "C:/outside/diagram-a.png"
-                                "D:/camera/diagram-b.jpg"
-                            |]
-                        })
+                        (fun () -> promise { return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |] })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
 

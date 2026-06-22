@@ -93,10 +93,7 @@ let private tryGetBrowserFilePathFromBridge (file: File) =
     with _ ->
         None
 
-let private tryResolvePromptFileHostPath
-    (tryResolveBrowserFilePath: File -> string option)
-    (file: MarkdownPromptFile)
-    =
+let private tryResolvePromptFileHostPath (tryResolveBrowserFilePath: File -> string option) (file: MarkdownPromptFile) =
     match file.HostPath with
     | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> Some(PathHelpers.normalizePath hostPath)
     | _ -> file.BrowserFile |> Option.bind tryResolveBrowserFilePath

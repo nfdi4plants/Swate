@@ -617,9 +617,7 @@ Vitest.describe (
                         .expect(optionLabelsForSelect assayContainer 0)
                         .toEqual ([| "Do not assign"; "protocol"; "dataset" |])
 
-                    Vitest
-                        .expect(optionValuesForSelect assayContainer 0)
-                        .toEqual ([| ""; "protocol"; "dataset" |])
+                    Vitest.expect(optionValuesForSelect assayContainer 0).toEqual ([| ""; "protocol"; "dataset" |])
 
                     Vitest
                         .expect(optionLabelsForSelect assayContainer 1)
@@ -645,9 +643,7 @@ Vitest.describe (
                         .expect(optionLabelsForSelect studyContainer 0)
                         .toEqual ([| "Do not assign"; "protocol"; "resource" |])
 
-                    Vitest
-                        .expect(optionValuesForSelect studyContainer 0)
-                        .toEqual ([| ""; "protocol"; "resource" |])
+                    Vitest.expect(optionValuesForSelect studyContainer 0).toEqual ([| ""; "protocol"; "resource" |])
 
                     Vitest
                         .expect(optionLabelsForSelect studyContainer 1)

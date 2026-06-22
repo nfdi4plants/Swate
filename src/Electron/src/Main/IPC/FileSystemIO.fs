@@ -372,8 +372,7 @@ module ArcFileSystemHelper =
                         match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
                         | Error removeError -> return Error removeError
                         | Ok() -> return! transferToTargetAsync ()
-                    | false, _, true, Some transferIntoDescendantPathAsync ->
-                        return! transferIntoDescendantPathAsync ()
+                    | false, _, true, Some transferIntoDescendantPathAsync -> return! transferIntoDescendantPathAsync ()
                     | false, _, _, _ -> return! transferToTargetAsync ()
         }
 
