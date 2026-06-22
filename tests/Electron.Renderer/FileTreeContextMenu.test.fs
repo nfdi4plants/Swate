@@ -578,7 +578,7 @@ Vitest.describe (
                 try
                     Vitest
                         .expect(optionLabels assayContainer)
-                        .toEqual ([| "Do not assign"; "Protocol"; "Datasets" |])
+                        .toEqual ([| "Do not assign"; "protocol"; "dataset" |])
 
                     Vitest
                         .expect(optionValues assayContainer)

@@ -1,8 +1,18 @@
 ﻿module Preload
 
+open Browser.Types
+open Fable.Core.JsInterop
+open Fable.Electron.Renderer
 open Fable.Electron.Remoting.Preload
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
+
+contextBridge.exposeInMainWorld (
+    "SwateElectronFileApi",
+    createObj [
+        "getPathForFile" ==> fun (file: File) -> webUtils.getPathForFile file
+    ]
+)
 
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IArcVaultsApi>
 Remoting.createIpc () |> Remoting.buildTwoWayBridge<IGitApi>

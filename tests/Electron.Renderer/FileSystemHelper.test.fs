@@ -1,6 +1,8 @@
 module ElectronRenderer.FileSystemHelperTests
 
+open Browser.Types
 open Renderer.Components.Helper.FileSystemHelper
+open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
@@ -176,6 +178,71 @@ Vitest.describe (
                 Vitest.expect(pendingAssets.Length).toBe (1)
                 Vitest.expect(pendingAssets.[0].sourceAbsolutePath).toBe ("C:/outside/diagram.png")
                 Vitest.expect(pendingAssets.[0].markdownRelativePath).toBe ("assets/diagram.png")
+            }
+        )
+
+        Vitest.test (
+            "createAssetFilePickerAdapter resolves multiple selected images independently",
+            fun () -> promise {
+                let mutable pendingAssets = []
+
+                let adapter =
+                    createAssetFilePickerAdapter
+                        (fun () -> promise {
+                            return Ok [|
+                                "C:/outside/diagram-a.png"
+                                "D:/camera/diagram-b.jpg"
+                            |]
+                        })
+                        "assets"
+                        (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
+
+                let! pickedFiles = adapter.PickFiles()
+                Vitest.expect(pickedFiles.Length).toBe (2)
+                Vitest.expect(pickedFiles.[0].Name).toBe ("diagram-a.png")
+                Vitest.expect(pickedFiles.[1].Name).toBe ("diagram-b.jpg")
+                Vitest.expect(pickedFiles.[0].HostPath).toEqual (Some "C:/outside/diagram-a.png")
+                Vitest.expect(pickedFiles.[1].HostPath).toEqual (Some "D:/camera/diagram-b.jpg")
+
+                let! firstMarkdownPath = adapter.ResolveMarkdownPath pickedFiles.[0]
+                let! secondMarkdownPath = adapter.ResolveMarkdownPath pickedFiles.[1]
+
+                Vitest.expect(firstMarkdownPath).toBe ("assets/diagram-a.png")
+                Vitest.expect(secondMarkdownPath).toBe ("assets/diagram-b.jpg")
+
+                Vitest.expect(pendingAssets.Length).toBe (2)
+                Vitest.expect(pendingAssets.[0].sourceAbsolutePath).toBe ("C:/outside/diagram-a.png")
+                Vitest.expect(pendingAssets.[0].markdownRelativePath).toBe ("assets/diagram-a.png")
+                Vitest.expect(pendingAssets.[1].sourceAbsolutePath).toBe ("D:/camera/diagram-b.jpg")
+                Vitest.expect(pendingAssets.[1].markdownRelativePath).toBe ("assets/diagram-b.jpg")
+            }
+        )
+
+        Vitest.test (
+            "createAssetFilePickerAdapter resolves browser files through the injected host path resolver",
+            fun () -> promise {
+                let mutable pendingAssets = []
+
+                let adapter =
+                    createAssetFilePickerAdapterWithBrowserFilePathResolver
+                        (fun () -> promise { return Ok [||] })
+                        "assets"
+                        (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
+                        (fun _ -> Some "C:/dropped/dropped-image.png")
+
+                let promptFile: MarkdownPromptFile = {
+                    Name = "dropped-image.png"
+                    MimeType = Some "image/png"
+                    HostPath = None
+                    BrowserFile = Some(unbox<File> (obj ()))
+                }
+
+                let! markdownPath = adapter.ResolveMarkdownPath promptFile
+
+                Vitest.expect(markdownPath).toBe ("assets/dropped-image.png")
+                Vitest.expect(pendingAssets.Length).toBe (1)
+                Vitest.expect(pendingAssets.[0].sourceAbsolutePath).toBe ("C:/dropped/dropped-image.png")
+                Vitest.expect(pendingAssets.[0].markdownRelativePath).toBe ("assets/dropped-image.png")
             }
         )
 )

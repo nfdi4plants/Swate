@@ -1,7 +1,10 @@
 module Renderer.Components.Helper.FileSystemHelper
 
 open System
+open Browser.Dom
+open Browser.Types
 open Fable.Core
+open Fable.Core.JsInterop
 open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -74,10 +77,35 @@ let private assetMarkdownPath assetFolderName (fileName: string) =
     else
         $"{assetFolder}/{imageFileName}"
 
-let createAssetFilePickerAdapter
+let private tryGetBrowserFilePathFromBridge (file: File) =
+    try
+        let fileApi: obj = window?SwateElectronFileApi
+
+        if isNullOrUndefined fileApi || isNullOrUndefined fileApi?getPathForFile then
+            None
+        else
+            let path = fileApi?getPathForFile (file) |> unbox<string>
+
+            if String.IsNullOrWhiteSpace path then
+                None
+            else
+                Some(PathHelpers.normalizePath path)
+    with _ ->
+        None
+
+let private tryResolvePromptFileHostPath
+    (tryResolveBrowserFilePath: File -> string option)
+    (file: MarkdownPromptFile)
+    =
+    match file.HostPath with
+    | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> Some(PathHelpers.normalizePath hostPath)
+    | _ -> file.BrowserFile |> Option.bind tryResolveBrowserFilePath
+
+let internal createAssetFilePickerAdapterWithBrowserFilePathResolver
     (pickImagePaths: unit -> JS.Promise<Result<string[], exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
+    (tryResolveBrowserFilePath: File -> string option)
     =
     let toPromptFile absolutePath =
         let hostPath = PathHelpers.normalizePath absolutePath
@@ -100,12 +128,12 @@ let createAssetFilePickerAdapter
             })
         ResolveMarkdownPath =
             (fun file -> promise {
-                match file.HostPath with
-                | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) ->
+                match tryResolvePromptFileHostPath tryResolveBrowserFilePath file with
+                | Some hostPath ->
                     let markdownPath = assetMarkdownPath assetFolderName file.Name
 
                     addAsset {
-                        sourceAbsolutePath = PathHelpers.normalizePath hostPath
+                        sourceAbsolutePath = hostPath
                         markdownRelativePath = markdownPath
                     }
 
@@ -113,6 +141,17 @@ let createAssetFilePickerAdapter
                 | _ -> return raise (exn "Could not resolve the selected image path.")
             })
     }
+
+let createAssetFilePickerAdapter
+    (pickImagePaths: unit -> JS.Promise<Result<string[], exn>>)
+    (assetFolderName: string)
+    (addAsset: ExternalAssetLink -> unit)
+    =
+    createAssetFilePickerAdapterWithBrowserFilePathResolver
+        pickImagePaths
+        assetFolderName
+        addAsset
+        tryGetBrowserFilePathFromBridge
 
 let writeFileWithOptionalExternalAssetLinks
     (writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>)
