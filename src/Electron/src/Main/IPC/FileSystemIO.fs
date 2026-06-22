@@ -209,21 +209,21 @@ module ArcFileSystemHelper =
         Kind: FileSystemItemKind
     }
 
-    type GenericRenamePlan = {
+    type RenamePlan = {
         SourcePath: string
         TargetPath: string
     }
 
-    type GenericMovePlan = {
-        SourcePath: string
-        TargetPath: string
-        Overwrite: bool
-    }
+    [<RequireQualifiedAccess; StringEnum>]
+    type TransferKind =
+        | Move
+        | Copy
 
-    type GenericCopyPlan = {
+    type PathBasedTransferPlan = {
         SourcePath: string
         TargetPath: string
         Overwrite: bool
+        TransferKind: TransferKind
     }
 
     let private resolveArcRelativePathPair arcPath firstRelativePath secondRelativePath =
@@ -337,6 +337,46 @@ module ArcFileSystemHelper =
                 return Error moveError
     }
 
+    let private executeGenericPathTransferOnDisk
+        (plan: PathBasedTransferPlan)
+        (sourceAbsolutePath: string)
+        (targetAbsolutePath: string)
+        (transferToTargetAsync: unit -> JS.Promise<Result<unit, exn>>)
+        (transferIntoDescendantPathAsync: (unit -> JS.Promise<Result<unit, exn>>) option)
+        : JS.Promise<Result<unit, exn>> =
+        promise {
+            let operationName = plan.TransferKind.ToString().ToLower()
+            let! sourceExists = pathExistsAsync sourceAbsolutePath
+
+            if sourceExists |> not then
+                return Error(exn $"Cannot {operationName} '{plan.SourcePath}' because it does not exist.")
+            else
+                let targetIsSameOrDescendant =
+                    PathHelpers.isSameOrDescendantPath plan.TargetPath plan.SourcePath
+
+                let! sourceIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync sourceAbsolutePath
+
+                if sourceIsDirectory && targetIsSameOrDescendant then
+                    return Error(exn $"{operationName} target must not be inside the source path.")
+                else
+                    let! targetExists = pathExistsAsync targetAbsolutePath
+
+                    match targetExists, plan.Overwrite, targetIsSameOrDescendant, transferIntoDescendantPathAsync with
+                    | true, false, _, _ ->
+                        return
+                            Error(
+                                exn
+                                    $"Cannot {operationName} '{plan.SourcePath}' to '{plan.TargetPath}' because the destination already exists."
+                            )
+                    | true, true, _, _ ->
+                        match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
+                        | Error removeError -> return Error removeError
+                        | Ok() -> return! transferToTargetAsync ()
+                    | false, _, true, Some transferIntoDescendantPathAsync ->
+                        return! transferIntoDescendantPathAsync ()
+                    | false, _, _, _ -> return! transferToTargetAsync ()
+        }
+
     let tryBuildCreateFileSystemItemPlan
         (request: CreateFileSystemItemRequest)
         : Result<CreateFileSystemItemPlan, exn> =
@@ -445,7 +485,7 @@ module ArcFileSystemHelper =
 
         requests |> Array.toList |> copyNext []
 
-    let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<GenericRenamePlan, exn> =
+    let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<RenamePlan, exn> =
         let requestedRelativePath =
             request.relativePath |> PathHelpers.normalizeCanonicalRelativePath
 
@@ -484,57 +524,56 @@ module ArcFileSystemHelper =
                                 targetAbsolutePath
         }
 
-    let tryBuildGenericMovePlan (request: MovePathRequest) : Result<GenericMovePlan, exn> =
+    let private tryBuildGenericPathTransferPlan
+        (kind: TransferKind)
+        (sourceRelativePath: string)
+        (targetRelativePath: string)
+        (overwrite: bool)
+        : Result<PathBasedTransferPlan, exn> =
+        let operationName = kind.ToString().ToLower()
+
         let sourcePath =
             ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
-                "Generic filesystem move is only supported for safe non-entity source paths."
-                request.sourceRelativePath
+                $"Generic filesystem {operationName} is only supported for safe non-entity source paths."
+                sourceRelativePath
 
         let targetPath =
             ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
-                "Generic filesystem move targets must stay inside safe non-entity ARC paths."
-                request.targetRelativePath
+                $"Generic filesystem {operationName} targets must stay inside safe non-entity ARC paths."
+                targetRelativePath
 
         match sourcePath, targetPath with
         | Error validationError, _
         | _, Error validationError -> Error(exn validationError)
         | Ok sourcePath, Ok targetPath when PathHelpers.pathsEqual sourcePath targetPath ->
-            Error(exn "Move target is identical to the current path.")
+            Error(exn $"{operationName} target is identical to the current path.")
         | Ok sourcePath, Ok targetPath ->
             Ok {
                 SourcePath = sourcePath
                 TargetPath = targetPath
-                Overwrite = request.overwrite
+                Overwrite = overwrite
+                TransferKind = kind
             }
 
-    let tryBuildGenericCopyPlan (request: CopyPathRequest) : Result<GenericCopyPlan, exn> =
-        let sourcePath =
-            ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
-                "Generic filesystem copy is only supported for safe non-entity source paths."
-                request.sourceRelativePath
+    let tryBuildGenericMovePlan (request: MovePathRequest) : Result<PathBasedTransferPlan, exn> =
+        tryBuildGenericPathTransferPlan
+            TransferKind.Move
+            request.sourceRelativePath
+            request.targetRelativePath
+            request.overwrite
 
-        let targetPath =
-            ArcEntityPathRules.tryNormalizeGenericFileSystemTarget
-                "Generic filesystem copy targets must stay inside safe non-entity ARC paths."
-                request.targetRelativePath
-
-        match sourcePath, targetPath with
-        | Error validationError, _
-        | _, Error validationError -> Error(exn validationError)
-        | Ok sourcePath, Ok targetPath when PathHelpers.pathsEqual sourcePath targetPath ->
-            Error(exn "Copy target is identical to the current path.")
-        | Ok sourcePath, Ok targetPath ->
-            Ok {
-                SourcePath = sourcePath
-                TargetPath = targetPath
-                Overwrite = request.overwrite
-            }
+    let tryBuildGenericCopyPlan (request: CopyPathRequest) : Result<PathBasedTransferPlan, exn> =
+        tryBuildGenericPathTransferPlan
+            TransferKind.Copy
+            request.sourceRelativePath
+            request.targetRelativePath
+            request.overwrite
 
     let moveGenericFileSystemItemOnDisk (arcPath: string) (request: MovePathRequest) : JS.Promise<Result<unit, exn>> = promise {
         match tryBuildGenericMovePlan request with
         | Error validationError -> return Error validationError
-        | Ok genericMovePlan ->
-            match resolveArcRelativePathPair arcPath genericMovePlan.SourcePath genericMovePlan.TargetPath with
+        | Ok transferPlan ->
+            match resolveArcRelativePathPair arcPath transferPlan.SourcePath transferPlan.TargetPath with
             | Error pathError -> return Error pathError
             | Ok(sourceAbsolutePath, targetAbsolutePath) ->
                 let moveToTargetAsync () = promise {
@@ -545,91 +584,49 @@ module ArcFileSystemHelper =
 
                     return!
                         renameResolvedPathOnDisk
-                            genericMovePlan.SourcePath
-                            genericMovePlan.TargetPath
+                            transferPlan.SourcePath
+                            transferPlan.TargetPath
                             sourceAbsolutePath
                             targetAbsolutePath
                 }
 
-                let! sourceExists = pathExistsAsync sourceAbsolutePath
+                let moveIntoDescendantPathAsync () =
+                    moveFileIntoDescendantPathOnDisk
+                        transferPlan.SourcePath
+                        transferPlan.TargetPath
+                        sourceAbsolutePath
+                        targetAbsolutePath
 
-                if sourceExists |> not then
-                    return Error(exn $"Cannot move '{genericMovePlan.SourcePath}' because it does not exist.")
-                else
-                    let! sourceIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync sourceAbsolutePath
-
-                    if
-                        sourceIsDirectory
-                        && PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
-                    then
-                        return Error(exn "Move target must not be inside the source path.")
-                    else
-                        let! targetExists = pathExistsAsync targetAbsolutePath
-
-                        match targetExists, genericMovePlan.Overwrite with
-                        | true, false ->
-                            return
-                                Error(
-                                    exn
-                                        $"Cannot move '{genericMovePlan.SourcePath}' to '{genericMovePlan.TargetPath}' because the destination already exists."
-                                )
-                        | true, true ->
-                            match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
-                            | Error removeError -> return Error removeError
-                            | Ok() -> return! moveToTargetAsync ()
-                        | false, _ when
-                            PathHelpers.isSameOrDescendantPath genericMovePlan.TargetPath genericMovePlan.SourcePath
-                            ->
-                            return!
-                                moveFileIntoDescendantPathOnDisk
-                                    genericMovePlan.SourcePath
-                                    genericMovePlan.TargetPath
-                                    sourceAbsolutePath
-                                    targetAbsolutePath
-                        | false, _ -> return! moveToTargetAsync ()
+                return!
+                    executeGenericPathTransferOnDisk
+                        transferPlan
+                        sourceAbsolutePath
+                        targetAbsolutePath
+                        moveToTargetAsync
+                        (Some moveIntoDescendantPathAsync)
     }
 
     let copyGenericFileSystemItemOnDisk (arcPath: string) (request: CopyPathRequest) : JS.Promise<Result<unit, exn>> = promise {
         match tryBuildGenericCopyPlan request with
         | Error validationError -> return Error validationError
-        | Ok genericCopyPlan ->
-            match resolveArcRelativePathPair arcPath genericCopyPlan.SourcePath genericCopyPlan.TargetPath with
+        | Ok transferPlan ->
+            match resolveArcRelativePathPair arcPath transferPlan.SourcePath transferPlan.TargetPath with
             | Error pathError -> return Error pathError
             | Ok(sourceAbsolutePath, targetAbsolutePath) ->
-                let! sourceExists = pathExistsAsync sourceAbsolutePath
+                let copyToTargetAsync () =
+                    copyResolvedPathOnDisk
+                        transferPlan.SourcePath
+                        transferPlan.TargetPath
+                        sourceAbsolutePath
+                        targetAbsolutePath
 
-                if sourceExists |> not then
-                    return Error(exn $"Cannot copy '{genericCopyPlan.SourcePath}' because it does not exist.")
-                else
-                    let! sourceIsDirectory = ARCtrl.FileSystemHelper.directoryExistsAsync sourceAbsolutePath
-
-                    if
-                        sourceIsDirectory
-                        && PathHelpers.isSameOrDescendantPath genericCopyPlan.TargetPath genericCopyPlan.SourcePath
-                    then
-                        return Error(exn "Copy target must not be inside the source path.")
-                    else
-                        let copyToTargetAsync () =
-                            copyResolvedPathOnDisk
-                                genericCopyPlan.SourcePath
-                                genericCopyPlan.TargetPath
-                                sourceAbsolutePath
-                                targetAbsolutePath
-
-                        let! targetExists = pathExistsAsync targetAbsolutePath
-
-                        match targetExists, genericCopyPlan.Overwrite with
-                        | true, false ->
-                            return
-                                Error(
-                                    exn
-                                        $"Cannot copy '{genericCopyPlan.SourcePath}' to '{genericCopyPlan.TargetPath}' because the destination already exists."
-                                )
-                        | true, true ->
-                            match! removePathWithRetriesAsync removeGenericFileSystemItemAsync targetAbsolutePath with
-                            | Error removeError -> return Error removeError
-                            | Ok() -> return! copyToTargetAsync ()
-                        | false, _ -> return! copyToTargetAsync ()
+                return!
+                    executeGenericPathTransferOnDisk
+                        transferPlan
+                        sourceAbsolutePath
+                        targetAbsolutePath
+                        copyToTargetAsync
+                        None
     }
 
     let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {
