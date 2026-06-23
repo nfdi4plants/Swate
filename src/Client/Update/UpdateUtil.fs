@@ -180,7 +180,7 @@ module JsonImportHelper =
 
             let addTables =
                 createUpdatedTables importTables importConfig deselectedColumns (Some true)
-                |> Seq.iter (fun table -> existingTables.Add(Table.normalizeCells table))
+                |> Seq.iter existingTables.Add
 
             existing
         | None -> //

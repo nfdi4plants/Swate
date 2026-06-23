@@ -154,7 +154,7 @@ let updateTables
         | _ -> ()
 
         createUpdatedTables importTables importConfig deselectedColumns (Some true)
-        |> Seq.iter (fun table -> existingTables.Add(Table.normalizeCells table))
+        |> Seq.iter existingTables.Add
 
         existing
     | None -> failwith "Error! Can only append information if metadata sheet exists!"

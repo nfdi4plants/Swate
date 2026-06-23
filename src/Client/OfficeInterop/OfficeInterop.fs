@@ -585,7 +585,7 @@ module UpdateHandler =
                         Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
 
                     originTable.Join(endTable, ?joinOptions = options)
-                    Table.normalizeCells originTable
+                    originTable
 
                 let! activeWorksheet =
                     if tableIndex = 0 && result.IsNone then
@@ -642,7 +642,6 @@ module UpdateHandler =
             | Result.Ok originTable ->
                 let finalTable =
                     Table.selectiveTablePrepare originTable tableToAdd deselectedColumnIndices
-                    |> Table.normalizeCells
 
                 let selectedRange = context.workbook.getSelectedRange ()
                 let tableStartIndex = table.getRange ()
@@ -1224,12 +1223,11 @@ module UpdateHandler =
                     let temp = Table.distinctByHeader originTable tableToAdd
 
                     Table.selectiveTablePrepare originTable temp deselectedColumnIndices
-                    |> Table.normalizeCells
 
                 let newTable =
                     if i > 0 then
                         originTable.Join(refinedTableToAdd, ?joinOptions = options, forceReplace = true)
-                        Table.normalizeCells originTable
+                        originTable
                     else
                         refinedTableToAdd
 
@@ -1243,7 +1241,6 @@ module UpdateHandler =
 
             let finalTable =
                 Table.selectiveTablePrepare originTable processedJoinTable List.empty
-                |> Table.normalizeCells
 
             originTable.Join(finalTable, targetIndex, ?joinOptions = options, forceReplace = true)
             let originTable = Table.normalizeCells originTable
