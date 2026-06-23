@@ -30,6 +30,13 @@ type FolderedDraggableData<'payload> = {
     Payload: 'payload
 }
 
+type FolderedDraggableExternalDrop<'payload> = {
+    TargetFolder: FolderedDraggableFolder<'payload>
+    ActiveId: string
+    ActiveData: obj
+    Folders: FolderedDraggableFolder<'payload> list
+}
+
 type FolderedDraggableItemRender<'payload> = {
     Folder: FolderedDraggableFolder<'payload>
     Item: FolderedDraggableItem<'payload>
@@ -38,3 +45,6 @@ type FolderedDraggableItemRender<'payload> = {
 }
 
 type FolderedDraggableItemRenderFn<'payload> = FolderedDraggableItemRender<'payload> -> ReactElement
+
+type FolderedDraggableExternalDropHandler<'payload> =
+    FolderedDraggableExternalDrop<'payload> -> FolderedDraggableItem<'payload> option

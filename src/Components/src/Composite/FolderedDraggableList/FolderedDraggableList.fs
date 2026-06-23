@@ -22,6 +22,39 @@ module private FolderedDraggableListHelper =
         | Some expandedFolderId when expandedFolderId = folderId -> Set.empty
         | _ -> Set.singleton folderId
 
+    let appendItemToFolder targetFolderId item folders =
+        folders
+        |> List.map (fun folder ->
+            if folder.Id = targetFolderId then
+                {
+                    folder with
+                        Items = folder.Items @ [ item ]
+                }
+            else
+                folder
+        )
+
+    let canAcceptExternalDrop
+        (expandedFolder: FolderedDraggableFolder<'payload> option)
+        (tryCreateItemFromExternalDrop: FolderedDraggableExternalDropHandler<'payload> option)
+        (onFoldersChange: (FolderedDraggableFolder<'payload> list -> unit) option)
+        =
+        expandedFolder.IsSome
+        && tryCreateItemFromExternalDrop.IsSome
+        && onFoldersChange.IsSome
+
+    let isShelfDrop shelfDropId (event: DndKit.IDndKitEvent) =
+        not (isNull event.over) && string event.over.id = shelfDropId
+
+    let activeId (event: DndKit.IDndKitEvent) =
+        if isNull event.active then "" else string event.active.id
+
+    let activeData (event: DndKit.IDndKitEvent) =
+        if isNull event.active || isNull event.active.data then
+            null
+        else
+            event.active.data.current
+
     let colorSwatch color =
         match color with
         | Some color when color <> "" ->
@@ -216,10 +249,17 @@ type FolderedDraggableList =
             ?defaultExpandedFolderIds: Set<string>,
             ?onExpandedFolderIdsChange: Set<string> -> unit,
             ?renderItemContent: FolderedDraggableItemRenderFn<'payload>,
+            ?shelfDropId: string,
+            ?tryCreateItemFromExternalDrop: FolderedDraggableExternalDropHandler<'payload>,
+            ?onFoldersChange: FolderedDraggableFolder<'payload> list -> unit,
             ?className: string,
             ?debug: bool
         ) =
         let debug = defaultArg debug false
+        let generatedShelfDropId = React.useId ()
+
+        let shelfDropId =
+            defaultArg shelfDropId $"foldered-draggable-list-shelf-{generatedShelfDropId}"
 
         let localExpanded, setLocalExpanded =
             React.useState (defaultArg defaultExpandedFolderIds Set.empty)
@@ -233,6 +273,20 @@ type FolderedDraggableList =
         let expandedFolder =
             folders |> List.tryFind (fun folder -> Some folder.Id = expandedFolderId)
 
+        let canAcceptExternalDrop =
+            FolderedDraggableListHelper.canAcceptExternalDrop
+                expandedFolder
+                tryCreateItemFromExternalDrop
+                onFoldersChange
+
+        let shelfDroppable =
+            DndKit.useDroppable (
+                {|
+                    id = shelfDropId
+                    disabled = not canAcceptExternalDrop
+                |}
+            )
+
         let setExpanded next =
             onExpandedFolderIdsChange |> Option.iter (fun fn -> fn next)
 
@@ -242,6 +296,31 @@ type FolderedDraggableList =
         let renderItemContent =
             renderItemContent
             |> Option.defaultValue FolderedDraggableListHelper.defaultItemContent
+
+        DndKit.useDndMonitor (
+            {|
+                onDragEnd =
+                    fun (event: DndKit.IDndKitEvent) ->
+                        match expandedFolder, tryCreateItemFromExternalDrop, onFoldersChange with
+                        | Some targetFolder, Some tryCreateItemFromExternalDrop, Some onFoldersChange when
+                            FolderedDraggableListHelper.isShelfDrop shelfDropId event
+                            ->
+                            let drop: FolderedDraggableExternalDrop<'payload> = {
+                                TargetFolder = targetFolder
+                                ActiveId = FolderedDraggableListHelper.activeId event
+                                ActiveData = FolderedDraggableListHelper.activeData event
+                                Folders = folders
+                            }
+
+                            match tryCreateItemFromExternalDrop drop with
+                            | Some item ->
+                                folders
+                                |> FolderedDraggableListHelper.appendItemToFolder targetFolder.Id item
+                                |> onFoldersChange
+                            | None -> ()
+                        | _ -> ()
+            |}
+        )
 
         Html.section [
             prop.className [
@@ -276,8 +355,14 @@ type FolderedDraggableList =
                     ]
                 ]
                 Html.div [
-                    prop.className
-                        "swt:min-h-24 swt:min-w-0 swt:rounded-lg swt:border swt:border-dashed swt:border-base-300 swt:bg-base-200/40 swt:p-3"
+                    prop.ref shelfDroppable.setNodeRef
+                    prop.className [
+                        "swt:min-h-24 swt:min-w-0 swt:rounded-lg swt:border swt:border-dashed swt:p-3 swt:transition-colors"
+                        if canAcceptExternalDrop && shelfDroppable.isOver then
+                            "swt:border-primary swt:bg-primary/10"
+                        else
+                            "swt:border-base-300 swt:bg-base-200/40"
+                    ]
                     if debug then
                         prop.testId "foldered-draggable-item-shelf"
                     prop.children [

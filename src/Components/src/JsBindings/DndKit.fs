@@ -109,6 +109,9 @@ type DndKit =
     [<Import("useDraggable", "@dnd-kit/core")>]
     static member useDraggable(props: obj) : IDraggable = jsNative
 
+    [<Import("useDndMonitor", "@dnd-kit/core")>]
+    static member useDndMonitor(props: obj) : unit = jsNative
+
     [<Import("useSensor", "@dnd-kit/core")>]
     static member useSensor(sensor, ?props) : ISensor = jsNative
 

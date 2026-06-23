@@ -1,6 +1,6 @@
 import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
-import { DndContext, useDroppable, type DragEndEvent } from '@dnd-kit/core';
+import { DndContext, useDraggable, useDroppable, type DragEndEvent } from '@dnd-kit/core';
 import { expect, fireEvent, userEvent, waitFor, within } from 'storybook/test';
 import { FolderedDraggableList } from './FolderedDraggableList.fs.js';
 import { ofArray, type FSharpList } from '../../fable_modules/fable-library-ts.5.0.0-alpha.21/List.ts';
@@ -38,8 +38,18 @@ type StoryListProps = {
   expandedFolderIds?: FSharpSet<string>;
   defaultExpandedFolderIds?: FSharpSet<string>;
   onExpandedFolderIdsChange?: (expandedFolderIds: FSharpSet<string>) => void;
+  shelfDropId?: string;
+  tryCreateItemFromExternalDrop?: (drop: StoryExternalDrop) => StoryItem | undefined;
+  onFoldersChange?: (folders: FSharpList<StoryFolder>) => void;
   className?: string;
   debug?: boolean;
+};
+
+type StoryExternalDrop = {
+  TargetFolder: StoryFolder;
+  ActiveId: string;
+  ActiveData: unknown;
+  Folders: FSharpList<StoryFolder>;
 };
 
 type StoryDragData = {
@@ -51,6 +61,13 @@ type StoryDragData = {
   ItemColor?: string;
   EffectiveColor?: string;
   Payload: PropertyPayload;
+};
+
+type ExternalPropertyDragData = {
+  Kind: 'external-property';
+  Id: string;
+  Label: string;
+  Origin: string;
 };
 
 const StoryFolderedDraggableList = FolderedDraggableList as React.ComponentType<StoryListProps>;
@@ -158,6 +175,31 @@ function DropZone() {
   );
 }
 
+function OutsideProperty() {
+  const draggable = useDraggable({
+    id: 'outside-property-temperature',
+    data: {
+      Kind: 'external-property',
+      Id: 'temperature',
+      Label: 'Temperature',
+      Origin: 'outside-source',
+    } satisfies ExternalPropertyDragData,
+  });
+
+  return (
+    <button
+      ref={draggable.setNodeRef}
+      type="button"
+      data-testid="outside-property-temperature"
+      className="swt:btn swt:btn-sm swt:btn-outline swt:w-fit swt:cursor-grab active:swt:cursor-grabbing"
+      {...draggable.attributes}
+      {...draggable.listeners}
+    >
+      External temperature
+    </button>
+  );
+}
+
 function UpdatingHarness() {
   const [folders, setFolders] = React.useState(() => initialFolders());
 
@@ -222,6 +264,46 @@ function UpdatingHarness() {
       <DndContext>
         <StoryFolderedDraggableList folders={folders} dragId={dragId} debug />
       </DndContext>
+    </div>
+  );
+}
+
+function OutsideDropHarness() {
+  const [folders, setFolders] = React.useState(() => initialFolders());
+
+  const targetFolder = Array.from(folders).find((candidate) => candidate.Id === 'layer-b');
+  const targetFolderCount = targetFolder ? Array.from(targetFolder.Items).length : 0;
+
+  const tryCreateItemFromExternalDrop = (drop: StoryExternalDrop): StoryItem | undefined => {
+    const activeData = drop.ActiveData as Partial<ExternalPropertyDragData> | undefined;
+
+    if (activeData?.Kind !== 'external-property' || !activeData.Id || !activeData.Label) {
+      return undefined;
+    }
+
+    return propertyItem(
+      `${drop.TargetFolder.Id}-${activeData.Id}`,
+      activeData.Label,
+      drop.TargetFolder.Id,
+      activeData.Origin ?? 'outside-source'
+    );
+  };
+
+  return (
+    <div className="swt:flex swt:w-96 swt:flex-col swt:gap-3">
+      <DndContext>
+        <OutsideProperty />
+        <StoryFolderedDraggableList
+          folders={folders}
+          dragId={dragId}
+          defaultExpandedFolderIds={fsSet(['layer-b'])}
+          shelfDropId="story-foldered-shelf"
+          tryCreateItemFromExternalDrop={tryCreateItemFromExternalDrop}
+          onFoldersChange={setFolders}
+          debug
+        />
+      </DndContext>
+      <pre data-testid="layer-b-count">{targetFolderCount}</pre>
     </div>
   );
 }
@@ -507,6 +589,31 @@ export const UpdatesWhenFoldersPropChanges: Story = {
       .querySelector<HTMLElement>('[data-foldered-color-swatch="true"]');
     expect(folderSwatch).not.toBeNull();
     expect(folderSwatch!).toHaveStyle({ backgroundColor: '#7c3aed' });
+  },
+};
+
+export const AcceptsOutsideDropsIntoExpandedShelf: Story = {
+  render: () => <OutsideDropHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
+
+    expect(within(shelf).queryByTestId('foldered-draggable-item-layer-b-temperature')).not.toBeInTheDocument();
+    expect(canvas.getByTestId('layer-b-count')).toHaveTextContent('2');
+
+    await dragByPointer(canvas.getByTestId('outside-property-temperature'), shelf);
+
+    await waitFor(() => {
+      const addedItem = within(shelf).getByTestId('foldered-draggable-item-layer-b-temperature');
+      expect(addedItem).toBeVisible();
+      expect(canvas.getByTestId('layer-b-count')).toHaveTextContent('3');
+    });
+
+    const addedSwatch = canvas
+      .getByTestId('foldered-draggable-item-layer-b-temperature')
+      .querySelector<HTMLElement>('[data-foldered-color-swatch="true"]');
+    expect(addedSwatch).not.toBeNull();
+    expect(addedSwatch!).toHaveStyle({ backgroundColor: '#d97706' });
   },
 };
 
