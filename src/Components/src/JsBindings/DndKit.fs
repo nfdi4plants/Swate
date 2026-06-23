@@ -49,9 +49,20 @@ module DndKit =
         abstract member x: float
         abstract member y: float
 
+    [<AllowNullLiteral>]
+    type IDndKitActiveData =
+        abstract member current: obj
+
+    [<AllowNullLiteral>]
+    type IDndKitActive =
+        abstract member id: obj
+        abstract member data: IDndKitActiveData
+
     type IDndKitEvent =
-        abstract member active: HTMLElement
-        abstract member over: HTMLElement
+        abstract member active: IDndKitActive
+        /// DnD Kit returns null when the drag ends outside every droppable.
+        /// Consumers must null-check before reading over.id or over.data.
+        abstract member over: IDndKitActive
         abstract member delta: ICoordinates
 
     type IDndKitMoveEvent =
