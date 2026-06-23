@@ -256,7 +256,12 @@ function DragHarness() {
   return (
     <div className="swt:flex swt:flex-col swt:gap-3 swt:w-96">
       <DndContext onDragEnd={onDragEnd}>
-        <StoryFolderedDraggableList folders={initialFolders()} dragId={dragId} debug />
+        <StoryFolderedDraggableList
+          folders={initialFolders()}
+          dragId={dragId}
+          defaultExpandedFolderIds={fsSet(['layer-a', 'layer-b'])}
+          debug
+        />
         <DropZone />
       </DndContext>
       <pre data-testid="last-drag">{lastDrag}</pre>
@@ -265,17 +270,60 @@ function DragHarness() {
 }
 
 async function dragByPointer(source: Element, target: Element) {
-  const sourceBox = source.getBoundingClientRect();
-  const targetBox = target.getBoundingClientRect();
-  const sourceX = sourceBox.left + sourceBox.width / 2;
-  const sourceY = sourceBox.top + sourceBox.height / 2;
-  const targetX = targetBox.left + targetBox.width / 2;
-  const targetY = targetBox.top + targetBox.height / 2;
+  const from = source.getBoundingClientRect();
+  const to = target.getBoundingClientRect();
+  const fromX = from.left + from.width / 2;
+  const fromY = from.top + from.height / 2;
+  const toX = to.left + to.width / 2;
+  const toY = to.top + to.height / 2;
+  const deltaX = toX - fromX;
+  const deltaY = toY - fromY;
+  const distance = Math.hypot(deltaX, deltaY) || 1;
+  const activationX = fromX + (deltaX / distance) * 8;
+  const activationY = fromY + (deltaY / distance) * 8;
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
-  fireEvent.pointerDown(source, { clientX: sourceX, clientY: sourceY, pointerId: 1 });
-  fireEvent.pointerMove(document, { clientX: sourceX + 8, clientY: sourceY + 8, pointerId: 1 });
-  fireEvent.pointerMove(document, { clientX: targetX, clientY: targetY, pointerId: 1 });
-  fireEvent.pointerUp(document, { clientX: targetX, clientY: targetY, pointerId: 1 });
+  fireEvent.pointerDown(source, {
+    clientX: fromX,
+    clientY: fromY,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+
+  await nextFrame();
+
+  fireEvent.pointerMove(target, {
+    clientX: activationX,
+    clientY: activationY,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+
+  await nextFrame();
+
+  fireEvent.pointerMove(document, {
+    clientX: toX,
+    clientY: toY,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+
+  await nextFrame();
+
+  fireEvent.pointerUp(target, {
+    clientX: toX,
+    clientY: toY,
+    button: 0,
+    buttons: 0,
+    isPrimary: true,
+    pointerId: 1,
+  });
 }
 
 const meta = {
@@ -306,7 +354,7 @@ export const TogglesFolders: Story = {
     expect(canvas.getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
     expect(canvas.getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
     expect(canvas.getByText('Species')).toBeVisible();
-    expect(canvas.getByText('2')).toBeVisible();
+    expect(within(canvas.getByTestId('foldered-draggable-item-layer-a-species')).getByText('2')).toBeVisible();
 
     await userEvent.click(canvas.getByRole('button', { name: 'Collapse Layer A' }));
 
@@ -392,7 +440,6 @@ export const CarriesStructuredDragDataAndColor: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer A' }));
     await dragByPointer(
       canvas.getByTestId('foldered-draggable-item-layer-a-species'),
       canvas.getByTestId('outside-drop')
@@ -419,7 +466,6 @@ export const CarriesFolderFallbackColor: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer A' }));
     await dragByPointer(
       canvas.getByTestId('foldered-draggable-item-layer-a-mass'),
       canvas.getByTestId('outside-drop')
@@ -440,7 +486,6 @@ export const DisabledItemsDoNotDrag: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer B' }));
     const disabledItem = canvas.getByTestId('foldered-draggable-item-layer-b-archived');
     expect(disabledItem).toBeDisabled();
 
