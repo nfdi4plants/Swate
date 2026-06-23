@@ -89,3 +89,4 @@ Components in `src/Components` are expected to be reusable and application-agnos
 # Design Rules
 
 - Keep states at the lowest level possible. Every state change forces a re-render of the component and all its children. If a state is only used in a subcomponent, it should be defined in that subcomponent. 
+- Only use "useEffect" when absolutly necessary. It is a common source of bugs and should be avoided if possible. Check out this read: https://react.dev/learn/you-might-not-need-an-effect
