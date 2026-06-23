@@ -1,13 +1,14 @@
 module Renderer.Components.MainContent.NotesDraftTarget
 
 open Feliz
+open Renderer.Context.UnsavedChangesContext
 open Swate.Components.Shared
 open Swate.Components.Composite.Notes.Editor
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
 open Renderer.Components.Helper
 open Renderer.Components.Helper.FileSystemHelper
 
+module MainContentHelper = Renderer.Components.MainContent.Helper
 
 [<ReactComponent>]
 let NotesDraftTarget () =
@@ -23,60 +24,53 @@ let NotesDraftTarget () =
     let pageStateCtx = Renderer.Context.PageStateContext.usePageStateCtx ()
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
 
+    let unsavedChangesCtx =
+        Renderer.Context.UnsavedChangesContext.useUnsavedChangesCtx ()
+
+    let notesDraftRef = React.useRef notesDraft
+    let notesUiStateRef = React.useRef notesUiState
+
+    let setNotesDraftAndRef nextDraft =
+        notesDraftRef.current <- nextDraft
+        setNotesDraft nextDraft
+
+    let setNotesUiStateAndRef nextUiState =
+        notesUiStateRef.current <- nextUiState
+        setNotesUiState nextUiState
+
+    React.useEffect ((fun () -> notesDraftRef.current <- notesDraft), [| box notesDraft |])
+    React.useEffect ((fun () -> notesUiStateRef.current <- notesUiState), [| box notesUiState |])
+
+    let hasUnsavedDraft = State.hasUnsavedDraft notesDraft
+
+    MainContentHelper.usePublishedUnsavedNoteChanges hasUnsavedDraft
+
     let imageFilePickerAdapter =
-        React.useMemo (
-            (fun _ ->
-                createAssetFilePickerAdapter
-                    Api.ipcArcVaultApi.pickImagePaths
-                    NoteConversion.noteAssetsFolderName
-                    (fun asset -> pendingImageAssetsRef.current <- pendingImageAssetsRef.current @ [ asset ])
-            ),
-            [||]
-        )
+        MainContentHelper.useNoteImageFilePickerAdapter pendingImageAssetsRef
 
     let availableNotesTargets =
         React.useMemo (
-            (fun _ ->
-                createAvailableArcEntityTargets
-                    [
-                        (ARCtrl.ArcPathHelper.StudiesFolderName,
-                         ARCtrl.ArcPathHelper.StudyFileName,
-                         fun name -> {
-                             Name = name
-                             Kind = NotesTargetKind.Study
-                         })
-                        (ARCtrl.ArcPathHelper.AssaysFolderName,
-                         ARCtrl.ArcPathHelper.AssayFileName,
-                         fun name -> {
-                             Name = name
-                             Kind = NotesTargetKind.Assay
-                         })
-                    ]
-                    fileStateCtx.state.FileTree
-            ),
+            (fun _ -> MainContentHelper.availableExistingNoteTargets fileStateCtx.state.FileTree),
             [| box fileStateCtx.state.FileTree |]
         )
 
     let setSubmitState isSubmitting error =
-        setNotesUiState {
-            notesUiState with
-                IsSubmitting = isSubmitting
-                Error = error
-        }
+        notesUiStateRef.current
+        |> (if isSubmitting then
+                State.startSubmitting
+            else
+                State.stopSubmitting)
+        |> State.setError error
+        |> setNotesUiStateAndRef
 
     let writeRequest (request: FileContentDTO) = promise {
-        let! writeResult =
-            writeFileWithOptionalExternalAssetLinks
-                Api.ipcArcVaultApi.writeFile
-                Api.ipcArcVaultApi.createFileSystemItem
-                Api.ipcArcVaultApi.copyExternalFilesToArc
-                NoteConversion.tryGetNoteFolderRelativePath
-                NoteConversion.noteAssetsFolderName
-                request
-                pendingImageAssetsRef.current
+        let! writeResult = MainContentHelper.writeNoteMarkdownFile request pendingImageAssetsRef.current
 
         match writeResult with
-        | Result.Error exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}")
+        | Result.Error error ->
+            let message = $"Failed to write note: {error.Message}"
+            setSubmitState false (Some message)
+            return Error(exn message)
         | Ok() ->
             setPendingOverwriteRequest None
             pendingImageAssetsRef.current <- []
@@ -84,57 +78,74 @@ let NotesDraftTarget () =
             let selectedPath = PathHelpers.normalizePath request.path
 
             fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-            setNotesDraft NotesDraft.init
-            setNotesUiState NotesUiState.init
+            setNotesDraftAndRef NotesDraft.init
+            setNotesUiStateAndRef NotesUiState.init
 
             let! previewResult = Api.ipcArcVaultApi.openFile request.path
 
-            match previewResult with
-            | Ok previewData ->
-                let pageState = Renderer.Types.PageState.fromFileContentDTO previewData
-                pageStateCtx.setState (Some pageState)
-            | Result.Error _ ->
-                let pageState = Renderer.Types.PageState.fromFileContentDTO request
-                pageStateCtx.setState (Some pageState)
+            let pageState =
+                match previewResult with
+                | Ok previewData -> Renderer.Types.PageState.fromFileContentDTO previewData
+                | Result.Error _ -> Renderer.Types.PageState.fromFileContentDTO request
+
+            do! unsavedChangesCtx.RunWithoutGuard(fun () -> promise { pageStateCtx.setState (Some pageState) })
+
+            return Ok()
     }
 
-    let submitRequest (overwrite: bool) (request: FileContentDTO) =
-        promise {
+    let submitRequestAsync (overwrite: bool) (request: FileContentDTO) = promise {
+        try
             setSubmitState true None
 
             if overwrite then
-                do! writeRequest request
+                return! writeRequest request
             else
                 let! targetAvailabilityResult = checkTargetAvailability Api.ipcArcVaultApi.pathExists request.path
 
                 match targetAvailabilityResult with
-                | Error exn -> setSubmitState false (Some $"Failed to check note target: {exn.Message}")
+                | Error error ->
+                    let message = $"Failed to check note target: {error.Message}"
+                    setSubmitState false (Some message)
+                    return Error(exn message)
                 | Ok TargetAvailability.Exists ->
-                    setSubmitState false None
+                    let message = $"A note already exists at '{request.path}'."
                     setPendingOverwriteRequest (Some request)
-                | Ok TargetAvailability.Empty -> do! writeRequest request
+                    setSubmitState false None
+                    return Error(UnsavedChangesSaveError.hide (exn message))
+                | Ok TargetAvailability.Empty -> return! writeRequest request
+        with error ->
+            let message = $"Failed to write note: {error.Message}"
+            setSubmitState false (Some message)
+            return Error(exn message)
+    }
+
+    let submitRequest (overwrite: bool) (request: FileContentDTO) =
+        promise {
+            let! _ = submitRequestAsync overwrite request
+            return ()
         }
-        |> Promise.catch (fun exn -> setSubmitState false (Some $"Failed to write note: {exn.Message}"))
         |> Promise.start
 
     let onSubmit =
-        fun (payload: NotesSubmitPayload) ->
-            let targetPath = PathHelpers.normalizePath payload.Intent.RelativePath
+        fun (payload: NotesSubmitPayload) -> submitRequest false (MainContentHelper.requestFromNotesPayload payload)
 
-            let request: FileContentDTO =
-                FileContentDTO.create
-                    (FileContentDTO.inferTextFileTypeFromPath targetPath)
-                    payload.Intent.Content
-                    targetPath
+    let saveDraftAsync () =
+        match NoteConversion.tryCreateNewRootNotePayload notesDraftRef.current with
+        | Error message ->
+            setSubmitState false (Some message)
+            promise { return Error(exn message) }
+        | Ok payload -> submitRequestAsync false (MainContentHelper.requestFromNotesPayload payload)
 
-            submitRequest false request
+    useUnsavedChangesGuard (
+        UnsavedChangesGuard.note saveDraftAsync (fun () -> State.hasUnsavedDraft notesDraftRef.current)
+    )
 
     React.Fragment [
         Notes.Wizard(
             notesDraft,
-            setNotesDraft,
+            setNotesDraftAndRef,
             notesUiState,
-            setNotesUiState,
+            setNotesUiStateAndRef,
             onSubmit,
             availableNotesTargets,
             filePickerAdapter = imageFilePickerAdapter

@@ -3,10 +3,8 @@ module Renderer.Components.CloseWindowController
 
 open Feliz
 open Fable.Core
-open Swate.Components
-open Swate.Components.Primitive.BaseModal
-open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Components.Primitive.ErrorModal.Types
+open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Electron.Shared.IPCTypes
 open Swate.Electron.Shared.IPCTypes.IPCTypesHelper
 
@@ -21,7 +19,11 @@ type CloseWindowController =
         ) =
 
         let modalIsOpen, setModalIsOpen = React.useState false
+        let isBusy, setIsBusy = React.useState false
         let errorModal = useErrorModalCtx ()
+
+        let unsavedChangesCtx =
+            Renderer.Context.UnsavedChangesContext.useUnsavedChangesCtx ()
 
         let enqueueCloseError (title: string) (saveError: exn) =
             errorModal.enqueue (ErrorModalRequest.create (saveError.Message, title = title))
@@ -30,43 +32,56 @@ type CloseWindowController =
             Api.ipcArcVaultApi.resolveCloseRequest decision
 
         let handleCancel () =
-            promise {
-                match! resolveCloseRequest SaveBeforeQuitDecision.CancelClose with
-                | Ok() ->
-                    setModalIsOpen false
-                    onCancelClose |> Option.iter (fun fn -> fn ())
-                | Error resolveError -> enqueueCloseError "Could not cancel close request" resolveError
-            }
-            |> Promise.start
+            if not isBusy then
+                promise {
+                    match! resolveCloseRequest SaveBeforeQuitDecision.CancelClose with
+                    | Ok() ->
+                        setModalIsOpen false
+                        onCancelClose |> Option.iter (fun fn -> fn ())
+                    | Error resolveError -> enqueueCloseError "Could not cancel close request" resolveError
+                }
+                |> Promise.start
 
         let handleCloseWithoutSaving () =
-            promise {
-                match! resolveCloseRequest SaveBeforeQuitDecision.CloseWithoutSaving with
-                | Ok() ->
-                    setModalIsOpen false
-                    onConfirmClose |> Option.iter (fun fn -> fn ())
-                | Error resolveError -> enqueueCloseError "Could not close window" resolveError
-            }
-            |> Promise.start
+            if not isBusy then
+                promise {
+                    match! resolveCloseRequest SaveBeforeQuitDecision.CloseWithoutSaving with
+                    | Ok() ->
+                        setModalIsOpen false
+                        onConfirmClose |> Option.iter (fun fn -> fn ())
+                    | Error resolveError -> enqueueCloseError "Could not close window" resolveError
+                }
+                |> Promise.start
 
-        let saveBeforeClose () : JS.Promise<Result<unit, exn>> =
-            if onConfirmSave.IsSome then
-                onConfirmSave.Value()
-            else
-                promise { return Ok() }
+        let saveBeforeClose () : JS.Promise<Result<unit, exn>> = promise {
+            match! unsavedChangesCtx.SaveActiveGuard() with
+            | Error saveError -> return Error saveError
+            | Ok() ->
+                match onConfirmSave with
+                | Some confirmSave -> return! confirmSave ()
+                | None -> return Ok()
+        }
 
         let handleSaveAndClose () =
-            promise {
-                let! saveResult = saveBeforeClose ()
+            if not isBusy then
+                promise {
+                    setIsBusy true
+                    let! saveResult = saveBeforeClose ()
 
-                match saveResult with
-                | Ok() ->
-                    match! resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose with
-                    | Ok() -> setModalIsOpen false
-                    | Error resolveError -> enqueueCloseError "Could not save and close window" resolveError
-                | Error saveError -> enqueueCloseError "Save before close failed" saveError
-            }
-            |> Promise.start
+                    match saveResult with
+                    | Ok() ->
+                        match! resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose with
+                        | Ok() -> setModalIsOpen false
+                        | Error resolveError -> enqueueCloseError "Could not save and close window" resolveError
+                    | Error saveError -> enqueueCloseError "Save before close failed" saveError
+
+                    setIsBusy false
+                }
+                |> Promise.catch (fun exn ->
+                    setIsBusy false
+                    enqueueCloseError "Save before close failed" exn
+                )
+                |> Promise.start
 
         let saveBeforeQuitHandler: IMainSaveBeforeQuitApi = {
             // This IPC call is triggered by the ArcVaults window close event. It should open the modal to ask user what they want to do.
@@ -75,35 +90,16 @@ type CloseWindowController =
 
         Renderer.IpcReceiver.useProxyReceiver<IMainSaveBeforeQuitApi> ((fun () -> saveBeforeQuitHandler), [||])
 
-        BaseModal.Modal(
+        Renderer.Components.Modals.UnsavedChangesModal.Main(
             isOpen = modalIsOpen,
-            setIsOpen =
-                (fun isOpen ->
-                    if not isOpen then
-                        handleCancel ()
-                ),
-            header = Html.text "Close Window",
-            description = Html.text "Do you want to save your changes before closing this window?",
-            children = Html.none,
-            footer =
-                Html.div [
-                    prop.className "swt:flex swt:gap-2 swt:w-full"
-                    prop.children [
-                        Html.button [
-                            prop.className "swt:btn swt:btn-neutral"
-                            prop.text "Cancel"
-                            prop.onClick (fun _ -> handleCancel ())
-                        ]
-                        Html.button [
-                            prop.className "swt:btn swt:ml-auto"
-                            prop.text "Close"
-                            prop.onClick (fun _ -> handleCloseWithoutSaving ())
-                        ]
-                        Html.button [
-                            prop.className "swt:btn swt:btn-primary"
-                            prop.text "Save and Close"
-                            prop.onClick (fun _ -> handleSaveAndClose ())
-                        ]
-                    ]
-                ]
+            title = "Close Window",
+            description = "Do you want to save your changes before closing this window?",
+            cancel = handleCancel,
+            discard = handleCloseWithoutSaving,
+            save = handleSaveAndClose,
+            isBusy = isBusy,
+            discardButtonText = "Close",
+            saveButtonText = "Save and Close",
+            savingText = "Saving...",
+            debug = "close-window"
         )

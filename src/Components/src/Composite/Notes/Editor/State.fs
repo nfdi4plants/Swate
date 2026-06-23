@@ -1,5 +1,7 @@
 namespace Swate.Components.Composite.Notes.Editor
 
+open System
+
 module State =
 
     let setError (error: string option) (state: NotesUiState) = { state with Error = error }
@@ -13,3 +15,11 @@ module State =
     }
 
     let stopSubmitting (state: NotesUiState) = { state with IsSubmitting = false }
+
+    let hasUnsavedDraft (draft: NotesDraft) =
+        let initial = NotesDraft.init
+
+        not (String.IsNullOrWhiteSpace draft.Title)
+        || draft.DateCreated <> initial.DateCreated
+        || draft.Tags.Count > 0
+        || not (String.IsNullOrWhiteSpace draft.MainText)

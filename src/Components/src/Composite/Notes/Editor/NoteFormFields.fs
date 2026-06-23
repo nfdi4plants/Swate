@@ -23,6 +23,9 @@ module NoteFormFields =
             |> Option.map (fun dateValue -> dateValue.ToString("yyyy-MM-dd"))
             |> Option.defaultValue ""
 
+        let setMainText value =
+            setDraft { draft with MainText = value }
+
         let currentTagTerm, setCurrentTagTerm = React.useState (None: Term option)
         let currentTagTermRef = React.useRef currentTagTerm
 
@@ -186,11 +189,12 @@ module NoteFormFields =
                 prop.children [
                     TextInputWithMarkdown.TextInputWithMarkdown(
                         draft.MainText,
-                        (fun value -> setDraft { draft with MainText = value }),
+                        setMainText,
                         height = 360,
                         label = "Main Text",
                         placeholder = "Write note markdown...",
-                        ?filePickerAdapter = filePickerAdapter
+                        ?filePickerAdapter = filePickerAdapter,
+                        onImmediateChange = setMainText
                     )
                 ]
             ]

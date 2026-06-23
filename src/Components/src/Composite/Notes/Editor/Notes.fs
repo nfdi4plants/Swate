@@ -88,23 +88,11 @@ type Notes =
         let setError (value: string option) =
             setUiState (State.setError value uiState)
 
-        let createPayload (target: NotesTarget) (relativePath: string) =
-            match draft.DateCreated with
-            | None -> setError (Some "Date Created is required.")
-            | Some dateCreated ->
-                let content = NoteConversion.formatMarkdown draft
-
-                let payload = {
-                    Intent = {
-                        RelativePath = relativePath
-                        Content = content
-                        Target = target
-                    }
-                    Title = draft.Title.Trim()
-                    DateCreated = dateCreated
-                    Tags = draft.Tags |> Seq.toList
-                }
-
+        let submitPayload onSuccess =
+            function
+            | Error message -> setError (Some message)
+            | Ok payload ->
+                onSuccess ()
                 onSubmit payload
 
         let setExistingTargetSelector isOpen =
@@ -129,37 +117,14 @@ type Notes =
             setExistingTargetSelector true
 
         let submitToExisting () =
-            if Validation.isRequiredDataValid draft |> not then
-                setError (Some "Please enter a Title and a Date Created value before submitting.")
-            else
-                match draft.SelectedExistingTarget with
-                | None -> setError (Some "Select a Study or Assay target first.")
-                | Some targetRef ->
-                    match draft.DateCreated with
-                    | None -> setError (Some "Date Created is required.")
-                    | Some dateCreated ->
-                        match NoteConversion.resolveProtocolName draft with
-                        | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
-                        | Some protocolName ->
-                            match NoteConversion.mkExistingTargetRelativePath targetRef protocolName with
-                            | None -> setError (Some "Could not resolve a safe target path.")
-                            | Some relativePath ->
-                                setExistingTargetSelector false
-                                createPayload (NotesTarget.ExistingTarget targetRef) relativePath
+            match draft.SelectedExistingTarget with
+            | None -> setError (Some "Select a Study or Assay target first.")
+            | Some targetRef ->
+                NoteConversion.tryCreateExistingTargetPayload targetRef draft
+                |> submitPayload (fun () -> setExistingTargetSelector false)
 
         let submitNewRootNote () =
-            if Validation.isRequiredDataValid draft |> not then
-                setError (Some "Please enter a Title and a Date Created value before submitting.")
-            else
-                match draft.DateCreated with
-                | None -> setError (Some "Date Created is required.")
-                | Some dateCreated ->
-                    match NoteConversion.resolveProtocolName draft with
-                    | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
-                    | Some protocolName ->
-                        match NoteConversion.mkNewRootNoteRelativePath dateCreated protocolName with
-                        | None -> setError (Some "Could not resolve a safe note path.")
-                        | Some relativePath -> createPayload NotesTarget.NewRootNote relativePath
+            NoteConversion.tryCreateNewRootNotePayload draft |> submitPayload ignore
 
         Html.div [
             prop.className "swt:p-8 swt:flex swt:justify-center swt:overflow-y-auto"

@@ -12,6 +12,7 @@
     <Compile Include="MainSyncedState.fs" />
     <Compile Include="GitApiClient.fs" />
     <Compile Include="Context\AppStateContext.fs" />
+    <Compile Include="Context\UnsavedChangesContext.fs" />
     <Compile Include="Context\PageStateContext.fs" />
     <Compile Include="Context\FileStateContext.fs" />
     <Compile Include="Context\AuthStateContext.fs" />
@@ -22,6 +23,7 @@
     <Compile Include="Components\Helper\ArcVaultHelper.fs" />
     <Compile Include="Components\Helper\FileSystemHelper.fs" />
     <Compile Include="Components\Helper\FileTargetConflictModal.fs" />
+    <Compile Include="Components\Modals\UnsavedChangesModal.fs" />
     <Compile Include="Components\InitState.fs" />
     <Compile Include="Components\FileExplorerLfs.fs" />
     <Compile Include="Components\FileExplorerDeleteHelper.fs" />
@@ -65,6 +67,7 @@
     <Compile Include="Components\MainContent\DataHubBrowserTarget.fs" />
     <Compile Include="Components\MainContent\ProvenanceGroupingTarget.fs" />
     <Compile Include="Components\MainContent\Main.fs" />
+    <Compile Include="Components\UnsavedChangesController.fs" />
     <Compile Include="Components\CloseWindowController.fs" />
     <Compile Include="Components\Navbar.fs" />
     <Compile Include="App.fs" />

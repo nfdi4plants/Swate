@@ -64,6 +64,8 @@ type IArcVaultsApi = {
     copyExternalFilesToArc: CopyExternalFileRequest[] -> JS.Promise<Result<string[], exn>>
     /// Checks if there are unsaved changes in the in-memory ARC scaffold compared to the last saved state on disk. Does not trigger a save or write to disk.
     getHasUnsavedArcChanges: unit -> JS.Promise<Result<bool, exn>>
+    /// Lets the renderer tell the main process that an open markdown note has unsaved changes.
+    setHasUnsavedNoteChanges: bool -> JS.Promise<Result<unit, exn>>
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>

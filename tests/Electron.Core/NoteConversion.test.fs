@@ -148,4 +148,40 @@ Body
                     .expect(NoteConversion.mkNewRootNoteRelativePath (DateTime(2026, 6, 15)) "Sampling_protocol")
                     .toEqual (Some "notes/2026-06-15/Sampling_protocol/Sampling_protocol.md")
         )
+
+        Vitest.test (
+            "tryCreateNewRootNotePayload creates the same root note intent as the wizard",
+            fun () ->
+                let draft = {
+                    NotesDraft.init with
+                        Title = " Sampling protocol "
+                        DateCreated = Some(DateTime(2026, 6, 15))
+                        MainText = "Body"
+                }
+
+                match NoteConversion.tryCreateNewRootNotePayload draft with
+                | Error message -> failwith $"Expected payload, got error: {message}"
+                | Ok payload ->
+                    Vitest.expect(payload.Title).toBe ("Sampling protocol")
+
+                    Vitest
+                        .expect(payload.Intent.RelativePath)
+                        .toBe ("notes/2026-06-15/Sampling_protocol/Sampling_protocol.md")
+
+                    Vitest.expect(payload.Intent.Target).toEqual (NotesTarget.NewRootNote)
+                    Vitest.expect(payload.Intent.Content.Contains("Body")).toBe (true)
+        )
+
+        Vitest.test (
+            "hasUnsavedDraft detects user-entered note draft content",
+            fun () ->
+                Vitest.expect(State.hasUnsavedDraft NotesDraft.init).toBe (false)
+
+                let editedDraft = {
+                    NotesDraft.init with
+                        MainText = "draft body"
+                }
+
+                Vitest.expect(State.hasUnsavedDraft editedDraft).toBe (true)
+        )
 )

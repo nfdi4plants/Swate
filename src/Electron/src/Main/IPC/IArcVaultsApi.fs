@@ -542,6 +542,19 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    setHasUnsavedNoteChanges =
+        fun hasUnsavedNoteChanges -> promise {
+            try
+                let windowId = windowIdFromIpcEvent event
+
+                match ARC_VAULTS.TryGetVault(windowId) with
+                | None -> return Error(exn $"The ARC for window id {windowId} should exist")
+                | Some vault ->
+                    vault.hasUnsavedNoteChanges <- hasUnsavedNoteChanges
+                    return Ok()
+            with e ->
+                return Error e
+        }
     deletePath =
         fun (relativePath: string) -> promise {
             try
