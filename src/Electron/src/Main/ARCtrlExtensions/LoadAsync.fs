@@ -135,6 +135,16 @@ module ArcLoadExtensions =
         return repairedAny
     }
 
+    let private ensureDefaultAnnotationTables (arc: ARC) =
+        for study in arc.Studies do
+            (ArcFiles.Study(study, [])).EnsureDefaultAnnotationTable() |> ignore
+
+        for assay in arc.Assays do
+            (ArcFiles.Assay assay).EnsureDefaultAnnotationTable() |> ignore
+
+        for run in arc.Runs do
+            (ArcFiles.Run run).EnsureDefaultAnnotationTable() |> ignore
+
     type ARC with
 
         /// Hotfix for #619, not fixed in the consumed ARCtrl 3.0.0-beta.12.
@@ -147,6 +157,7 @@ module ArcLoadExtensions =
             match! fullFillContractBatchAsync arcPath contracts with
             | Ok fulfilledContracts ->
                 arc.SetISAFromContracts fulfilledContracts
+                ensureDefaultAnnotationTables arc
                 return Ok arc
             | Error errors -> return Error errors
         }

@@ -86,6 +86,19 @@ module ARCtrlHelper =
 
             combineMany [| folderName; dmpi.ParentId; DatamapFileName |]
 
+    let createNewTableName (tables: seq<ArcTable>) =
+        let existingNames = tables |> Seq.map _.Name |> Set.ofSeq
+
+        let rec loop index =
+            let name = $"New Table {index}"
+
+            if existingNames.Contains name then
+                loop (index + 1)
+            else
+                name
+
+        loop 0
+
     type ArcFiles =
         | Template of Template
         | Investigation of ArcInvestigation
@@ -156,32 +169,14 @@ module ARCtrlHelper =
             | _ -> false
 
         member this.EnsureDefaultAnnotationTable() =
-            let defaultTableName (identifier: string) =
-                let normalizedIdentifier =
-                    if String.IsNullOrWhiteSpace identifier then
-                        "New"
-                    else
-                        identifier.Trim()
-
-                $"{normalizedIdentifier} Table"
-
-            let ensureStarterColumn (table: ArcTable) =
-                if table.ColumnCount = 0 then
-                    table.AddColumn(CompositeHeader.Input IOType.Source, ResizeArray([ CompositeCell.emptyFreeText ]))
-
-            let ensureDefaultTable (arcTables: ArcTables) identifier =
-                let table =
-                    if arcTables.TableCount = 0 then
-                        arcTables.InitTable(defaultTableName identifier)
-                    else
-                        arcTables.[0]
-
-                ensureStarterColumn table
+            let ensureDefaultTable (arcTables: ArcTables) =
+                if arcTables.TableCount = 0 then
+                    arcTables.InitTable(createNewTableName arcTables.Tables) |> ignore
 
             match this with
-            | ArcFiles.Study(study, _) -> ensureDefaultTable study study.Identifier
-            | ArcFiles.Assay assay -> ensureDefaultTable assay assay.Identifier
-            | ArcFiles.Run run -> ensureDefaultTable run run.Identifier
+            | ArcFiles.Study(study, _) -> ensureDefaultTable study
+            | ArcFiles.Assay assay -> ensureDefaultTable assay
+            | ArcFiles.Run run -> ensureDefaultTable run
             | _ -> ()
 
             this

@@ -108,7 +108,7 @@ let tests =
                 ({ baseDraft with Description = "" } |> Validation.isRequiredDataValid)
                 "Empty description should fail."
 
-        testCase "Conversion.toArcFile maps study fields and initializes first table input rows"
+        testCase "Conversion.toArcFile maps study fields and initializes an empty plus-button-named table"
         <| fun _ ->
             let draft = mkBaseDraft ()
             let identifier, arcFile = Conversion.toArcFile draft LandingTarget.Study
@@ -133,14 +133,12 @@ let tests =
 
                 let firstTable = study.Tables.[0]
 
-                Expect.isTrue
-                    (firstTable.TryGetInputColumn().IsSome)
-                    "Input column should exist when files were provided."
-
-                Expect.equal firstTable.RowCount 2 "Only non-empty normalized files should be added as rows."
+                Expect.equal firstTable.Name "New Table 0" "The default table should use the plus-button name."
+                Expect.equal firstTable.ColumnCount 0 "The default table should not create starter columns."
+                Expect.equal firstTable.RowCount 0 "The default table should not create starter rows."
             | _ -> failwith "Expected ArcFiles.Study"
 
-        testCase "Conversion.toArcFile maps assay fields and initializes first table input rows"
+        testCase "Conversion.toArcFile maps assay fields and initializes an empty plus-button-named table"
         <| fun _ ->
             let draft = {
                 mkBaseDraft () with
@@ -169,11 +167,9 @@ let tests =
 
                 let firstTable = assay.Tables.[0]
 
-                Expect.isTrue
-                    (firstTable.TryGetInputColumn().IsSome)
-                    "Input column should exist when files were provided."
-
-                Expect.equal firstTable.RowCount 2 "Only non-empty normalized files should be added as rows."
+                Expect.equal firstTable.Name "New Table 0" "The default table should use the plus-button name."
+                Expect.equal firstTable.ColumnCount 0 "The default table should not create starter columns."
+                Expect.equal firstTable.RowCount 0 "The default table should not create starter rows."
             | _ -> failwith "Expected ArcFiles.Assay"
 
         testCase "Conversion.toSubmitPayload includes protocol intent when main text is present"

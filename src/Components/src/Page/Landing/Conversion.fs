@@ -7,25 +7,6 @@ open Swate.Components.Shared
 [<RequireQualifiedAccess>]
 module Conversion =
 
-    let private normalizeFiles (files: string list) =
-        files
-        |> List.map _.Trim()
-        |> List.filter (System.String.IsNullOrWhiteSpace >> not)
-
-    let private fillInputColumnIfFilesExist (table: ArcTable) (files: string list) =
-        let normalizedFiles = normalizeFiles files
-
-        if normalizedFiles.Length > 0 then
-            if table.TryGetInputColumn().IsNone then
-                table.AddColumn(CompositeHeader.Input IOType.Data)
-
-            let rows =
-                normalizedFiles
-                |> List.map (fun fileName -> ResizeArray [ CompositeCell.createDataFromString (fileName) ])
-                |> ResizeArray
-
-            table.AddRows(rows)
-
     let private applyCommonFieldsToStudy (draft: LandingDraft) (study: ArcStudy) =
         study.Title <- Some(draft.Title.Trim())
         study.Description <- Some(draft.Description.Trim())
@@ -40,7 +21,7 @@ module Conversion =
 
     let private toStudy (draft: LandingDraft) (identifier: string) =
         let study = ArcStudy.init identifier
-        study.InitTable($"{identifier} Table") |> ignore
+        (ArcFiles.Study(study, [])).EnsureDefaultAnnotationTable() |> ignore
 
         applyCommonFieldsToStudy draft study
         study.Publications <- ResizeArray draft.Publications
@@ -48,22 +29,16 @@ module Conversion =
         study.PublicReleaseDate <- Validation.toOptionalString draft.PublicReleaseDate
         study.StudyDesignDescriptors <- ResizeArray draft.StudyDesignDescriptors
 
-        let firstTable = study.Tables.[0]
-        fillInputColumnIfFilesExist firstTable draft.Files
-
         study
 
     let private toAssay (draft: LandingDraft) (identifier: string) =
         let assay = ArcAssay.init identifier
-        assay.InitTable($"{identifier} Table") |> ignore
+        (ArcFiles.Assay assay).EnsureDefaultAnnotationTable() |> ignore
 
         applyCommonFieldsToAssay draft assay
         assay.MeasurementType <- draft.MeasurementType
         assay.TechnologyType <- draft.TechnologyType
         assay.TechnologyPlatform <- draft.TechnologyPlatform
-
-        let firstTable = assay.Tables.[0]
-        fillInputColumnIfFilesExist firstTable draft.Files
 
         assay
 
