@@ -409,13 +409,7 @@ module ArcVaultExtensions =
 
                 try
                     match! arc.TryWriteAsyncSwate(normalizedPath) with
-                    | Ok _ ->
-                        match! ArcScaffold.tryWriteDefaultGitignoreAsync normalizedPath with
-                        | Ok _ -> ()
-                        | Error errors ->
-                            failwithf
-                                "Could not write ARC default .gitignore, failed with the following errors %s"
-                                (PathHelpers.formatContractErrors errors)
+                    | Ok _ -> ()
                     | Error errors ->
                         failwithf
                             "Could not write ARC, failed with the following errors %s"

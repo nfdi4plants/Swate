@@ -24,7 +24,6 @@
     <Compile Include="Git\GitlfsAdapter.fs" />
     <Compile Include="Git\GitLfsService.fs" />
     <Compile Include="FileTreeCreator.fs" />
-    <Compile Include="ArcScaffold.fs" />
     <Compile Include="ArcMerge\Types.fs" />
     <Compile Include="ARCtrlExtensions\InMemoryChanges.fs" />
     <Compile Include="ARCtrlExtensions\WriteAsync.fs" />
