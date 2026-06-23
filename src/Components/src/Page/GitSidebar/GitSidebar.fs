@@ -584,8 +584,8 @@ type GitSidebar =
                                 prop.testId "GitSidebarOpenRemoteRepositoryButton"
                                 prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm swt:shrink-0"
                                 prop.disabled (props.IsBusy || not props.CanOpenRemoteRepository)
-                                prop.title "Open origin repository"
-                                prop.ariaLabel "Open origin repository"
+                                prop.title "Open ARC in DataHUB"
+                                prop.ariaLabel "Open ARC in DataHUB"
                                 prop.onClick (fun _ -> props.OnOpenRemoteRepository())
                                 prop.children [
                                     Html.span [
