@@ -59,7 +59,9 @@ let MarkdownEditorTarget (content: string) =
             try
                 let currentMarkdown = markdownRef.current
                 let currentAssets = pendingImageAssetsRef.current
-                let! writeResult = Renderer.Components.MainContent.Helper.writeMarkdownNote relativePath currentMarkdown currentAssets
+
+                let! writeResult =
+                    Renderer.Components.MainContent.Helper.writeMarkdownNote relativePath currentMarkdown currentAssets
 
                 match writeResult with
                 | Ok() ->
