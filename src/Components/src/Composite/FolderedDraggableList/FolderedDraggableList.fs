@@ -3,12 +3,13 @@ namespace Swate.Components.Composite.FolderedDraggableList
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Composite.FolderedDraggableList.Types
 
 module private FolderedDraggableListHelper =
 
-    let effectiveColor folder item =
+    let effectiveColor (folder: FolderedDraggableFolder<'payload>) (item: FolderedDraggableItem<'payload>) =
         item.Color |> Option.orElse folder.Color
 
     let toggleExpanded allowMultipleOpen folderId (expanded: Set<string>) =
