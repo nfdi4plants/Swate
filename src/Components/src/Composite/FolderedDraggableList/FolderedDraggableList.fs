@@ -12,10 +12,15 @@ module private FolderedDraggableListHelper =
     let effectiveColor (folder: FolderedDraggableFolder<'payload>) (item: FolderedDraggableItem<'payload>) =
         item.Color |> Option.orElse folder.Color
 
-    let toggleExpanded allowMultipleOpen folderId (expanded: Set<string>) =
-        if expanded.Contains folderId then expanded.Remove folderId
-        elif allowMultipleOpen then expanded.Add folderId
-        else Set.singleton folderId
+    let expandedFolderId folders (expanded: Set<string>) =
+        folders
+        |> List.tryFind (fun folder -> expanded.Contains folder.Id)
+        |> Option.map (fun folder -> folder.Id)
+
+    let toggleExpanded folderId expandedFolderId =
+        match expandedFolderId with
+        | Some expandedFolderId when expandedFolderId = folderId -> Set.empty
+        | _ -> Set.singleton folderId
 
     let colorSwatch color =
         match color with
@@ -37,11 +42,21 @@ module private FolderedDraggableListHelper =
             match render.Item.Badge with
             | Some badge when badge <> "" ->
                 Html.span [
-                    prop.className "swt:badge swt:badge-xs swt:shrink-0"
+                    prop.className "swt:badge swt:badge-sm swt:shrink-0"
                     prop.text badge
                 ]
             | _ -> Html.none
         ]
+
+    let itemShellClass isDisabled isDragging = [
+        "swt:btn swt:btn-sm swt:h-auto swt:min-h-10 swt:w-fit swt:max-w-56 swt:shrink-0 swt:min-w-0 swt:justify-start swt:gap-2 swt:overflow-hidden swt:px-3 swt:py-2 swt:text-sm swt:normal-case"
+        if isDisabled then
+            "swt:btn-disabled swt:cursor-not-allowed"
+        else
+            "swt:btn-outline swt:bg-base-100 swt:cursor-grab swt:shadow-sm active:swt:cursor-grabbing"
+        if isDragging then
+            "swt:absolute swt:pointer-events-none swt:opacity-0"
+    ]
 
 [<Erase; Mangle(false)>]
 type FolderedDraggableList =
@@ -53,6 +68,7 @@ type FolderedDraggableList =
             item: FolderedDraggableItem<'payload>,
             dragId: FolderedDraggableFolder<'payload> -> FolderedDraggableItem<'payload> -> string,
             renderItemContent: FolderedDraggableItemRenderFn<'payload>,
+            onActiveDragChange: FolderedDraggableItemRender<'payload> option -> unit,
             ?debug: bool,
             ?key: string
         ) =
@@ -83,6 +99,16 @@ type FolderedDraggableList =
             IsDragging = draggable.isDragging
         }
 
+        React.useEffect (
+            (fun () ->
+                if draggable.isDragging then
+                    onActiveDragChange (Some renderProps)
+                else
+                    onActiveDragChange None
+            ),
+            [| box draggable.isDragging |]
+        )
+
         Html.button [
             match key with
             | Some key -> prop.key key
@@ -94,13 +120,7 @@ type FolderedDraggableList =
                 yield! prop.spread (!!draggable.attributes)
                 yield! prop.spread (!!draggable.listeners)
             prop.className [
-                "swt:btn swt:btn-sm swt:h-auto swt:min-h-8 swt:w-fit swt:max-w-full swt:shrink swt:min-w-0 swt:justify-start swt:gap-2 swt:overflow-hidden swt:px-3 swt:py-1.5 swt:text-xs swt:normal-case"
-                if item.Disabled then
-                    "swt:btn-disabled swt:cursor-not-allowed"
-                else
-                    "swt:btn-outline swt:bg-base-100 swt:cursor-grab active:swt:cursor-grabbing"
-                if draggable.isDragging then
-                    "swt:opacity-60 swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
+                yield! FolderedDraggableListHelper.itemShellClass item.Disabled draggable.isDragging
                 match item.Tooltip with
                 | Some tooltip when tooltip <> "" -> "swt:tooltip swt:tooltip-right"
                 | _ -> ()
@@ -118,49 +138,36 @@ type FolderedDraggableList =
 
     [<ReactComponent>]
     static member private Folder<'payload>
-        (
-            folder: FolderedDraggableFolder<'payload>,
-            isExpanded: bool,
-            onToggle: unit -> unit,
-            dragId: FolderedDraggableFolder<'payload> -> FolderedDraggableItem<'payload> -> string,
-            renderItemContent: FolderedDraggableItemRenderFn<'payload>,
-            ?debug: bool,
-            ?key: string
-        ) =
-        Html.div [
+        (folder: FolderedDraggableFolder<'payload>, isExpanded: bool, onToggle: unit -> unit, ?debug: bool, ?key: string) =
+        Html.button [
             match key with
             | Some key -> prop.key key
             | None -> ()
-            prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
+            prop.type'.button
+            prop.className [
+                "swt:btn swt:h-32 swt:w-36 swt:min-w-36 swt:flex-none swt:flex-col swt:items-stretch swt:justify-between swt:gap-2 swt:overflow-hidden swt:rounded-lg swt:border swt:p-3 swt:text-left swt:normal-case swt:shadow-sm swt:transition-all"
+                if isExpanded then
+                    "swt:border-primary swt:bg-primary/10 swt:text-primary swt:ring-2 swt:ring-primary/20"
+                else
+                    "swt:border-base-300 swt:bg-base-100 hover:swt:border-primary/60 hover:swt:bg-base-200"
+            ]
+            prop.custom ("aria-expanded", isExpanded)
+            prop.ariaLabel (
+                if isExpanded then
+                    $"Collapse {folder.Name}"
+                else
+                    $"Expand {folder.Name}"
+            )
+            prop.onClick (fun _ -> onToggle ())
             if defaultArg debug false then
                 prop.testId $"foldered-draggable-folder-{folder.Id}"
             prop.children [
-                Html.button [
-                    prop.type'.button
-                    prop.className
-                        "swt:btn swt:btn-sm swt:btn-ghost swt:min-h-8 swt:h-auto swt:w-full swt:justify-start swt:gap-2 swt:px-2 swt:py-1 swt:text-left"
-                    prop.custom ("aria-expanded", isExpanded)
-                    prop.ariaLabel (
-                        if isExpanded then
-                            $"Collapse {folder.Name}"
-                        else
-                            $"Expand {folder.Name}"
-                    )
-                    prop.onClick (fun _ -> onToggle ())
+                Html.div [
+                    prop.className "swt:flex swt:items-start swt:justify-between swt:gap-2"
                     prop.children [
                         Html.i [
                             prop.className [
-                                "swt:iconify swt:size-4 swt:shrink-0"
-                                if isExpanded then
-                                    "swt:fluent--chevron-down-20-regular"
-                                else
-                                    "swt:fluent--chevron-right-20-regular"
-                            ]
-                        ]
-                        FolderedDraggableListHelper.colorSwatch folder.Color
-                        Html.i [
-                            prop.className [
-                                "swt:iconify swt:size-4 swt:shrink-0"
+                                "swt:iconify swt:size-14 swt:shrink-0"
                                 if isExpanded then
                                     "swt:fluent--folder-open-24-regular"
                                 else
@@ -168,30 +175,35 @@ type FolderedDraggableList =
                             ]
                         ]
                         Html.span [
-                            prop.className "swt:min-w-0 swt:truncate swt:font-medium"
-                            prop.text folder.Name
-                        ]
-                        Html.span [
-                            prop.className "swt:badge swt:badge-xs swt:ml-auto swt:shrink-0"
+                            prop.className "swt:badge swt:badge-sm swt:shrink-0"
                             prop.text (string folder.Items.Length)
                         ]
                     ]
                 ]
-                if isExpanded then
-                    Html.div [
-                        prop.className "swt:flex swt:flex-wrap swt:gap-2 swt:pl-6"
-                        prop.children [
-                            for item in folder.Items do
-                                FolderedDraggableList.Item(
-                                    folder,
-                                    item,
-                                    dragId,
-                                    renderItemContent,
-                                    ?debug = debug,
-                                    key = $"{folder.Id}:{item.Id}"
-                                )
+                Html.div [
+                    prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:w-full swt:truncate swt:text-sm swt:font-semibold"
+                            prop.text folder.Name
+                        ]
+                        Html.div [
+                            prop.className "swt:flex swt:items-center swt:gap-2"
+                            prop.children [
+                                FolderedDraggableListHelper.colorSwatch folder.Color
+                                Html.span [
+                                    prop.className "swt:text-xs swt:font-normal swt:text-base-content/70"
+                                    prop.text (
+                                        if folder.Items.Length = 1 then
+                                            "1 item"
+                                        else
+                                            $"{folder.Items.Length} items"
+                                    )
+                                ]
+                            ]
                         ]
                     ]
+                ]
             ]
         ]
 
@@ -203,18 +215,23 @@ type FolderedDraggableList =
             ?expandedFolderIds: Set<string>,
             ?defaultExpandedFolderIds: Set<string>,
             ?onExpandedFolderIdsChange: Set<string> -> unit,
-            ?allowMultipleOpen: bool,
             ?renderItemContent: FolderedDraggableItemRenderFn<'payload>,
             ?className: string,
             ?debug: bool
         ) =
-        let allowMultipleOpen = defaultArg allowMultipleOpen true
         let debug = defaultArg debug false
 
         let localExpanded, setLocalExpanded =
             React.useState (defaultArg defaultExpandedFolderIds Set.empty)
 
+        let activeDrag, setActiveDrag =
+            React.useState (None: FolderedDraggableItemRender<'payload> option)
+
         let expanded = expandedFolderIds |> Option.defaultValue localExpanded
+        let expandedFolderId = FolderedDraggableListHelper.expandedFolderId folders expanded
+
+        let expandedFolder =
+            folders |> List.tryFind (fun folder -> Some folder.Id = expandedFolderId)
 
         let setExpanded next =
             onExpandedFolderIdsChange |> Option.iter (fun fn -> fn next)
@@ -228,7 +245,7 @@ type FolderedDraggableList =
 
         Html.section [
             prop.className [
-                "swt:flex swt:min-w-0 swt:flex-col swt:gap-3"
+                "swt:flex swt:min-w-0 swt:flex-col swt:gap-4"
                 match className with
                 | Some className -> className
                 | None -> ()
@@ -236,21 +253,71 @@ type FolderedDraggableList =
             if debug then
                 prop.testId "foldered-draggable-list"
             prop.children [
-                for folder in folders do
-                    let isExpanded = expanded.Contains folder.Id
+                Html.div [
+                    prop.className
+                        "swt:flex swt:min-w-0 swt:flex-row swt:flex-nowrap swt:gap-3 swt:overflow-x-auto swt:overflow-y-hidden swt:pb-2"
+                    if debug then
+                        prop.testId "foldered-draggable-folder-row"
+                    prop.children [
+                        for folder in folders do
+                            let isExpanded = Some folder.Id = expandedFolderId
 
-                    FolderedDraggableList.Folder(
-                        folder,
-                        isExpanded,
-                        (fun () ->
-                            expanded
-                            |> FolderedDraggableListHelper.toggleExpanded allowMultipleOpen folder.Id
-                            |> setExpanded
-                        ),
-                        dragId,
-                        renderItemContent,
-                        debug = debug,
-                        key = folder.Id
-                    )
+                            FolderedDraggableList.Folder(
+                                folder,
+                                isExpanded,
+                                (fun () ->
+                                    expandedFolderId
+                                    |> FolderedDraggableListHelper.toggleExpanded folder.Id
+                                    |> setExpanded
+                                ),
+                                debug = debug,
+                                key = folder.Id
+                            )
+                    ]
+                ]
+                Html.div [
+                    prop.className
+                        "swt:min-h-24 swt:min-w-0 swt:rounded-lg swt:border swt:border-dashed swt:border-base-300 swt:bg-base-200/40 swt:p-3"
+                    if debug then
+                        prop.testId "foldered-draggable-item-shelf"
+                    prop.children [
+                        Html.div [
+                            prop.className
+                                "swt:relative swt:flex swt:min-h-12 swt:min-w-0 swt:flex-row swt:flex-nowrap swt:items-center swt:gap-2 swt:overflow-x-auto swt:overflow-y-hidden swt:pb-1"
+                            if debug then
+                                prop.testId "foldered-draggable-item-row"
+                            prop.children [
+                                match expandedFolder with
+                                | Some folder ->
+                                    for item in folder.Items do
+                                        FolderedDraggableList.Item(
+                                            folder,
+                                            item,
+                                            dragId,
+                                            renderItemContent,
+                                            setActiveDrag,
+                                            debug = debug,
+                                            key = $"{folder.Id}:{item.Id}"
+                                        )
+                                | None -> ()
+                            ]
+                        ]
+                    ]
+                ]
+                DndKit.DragOverlay(
+                    children =
+                        match activeDrag with
+                        | Some render ->
+                            Html.div [
+                                prop.className [
+                                    yield! FolderedDraggableListHelper.itemShellClass render.Item.Disabled false
+                                    "swt:pointer-events-none swt:shadow-xl swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
+                                ]
+                                if debug then
+                                    prop.testId "foldered-draggable-drag-overlay"
+                                prop.children [ renderItemContent { render with IsDragging = true } ]
+                            ]
+                        | None -> Html.none
+                )
             ]
         ]

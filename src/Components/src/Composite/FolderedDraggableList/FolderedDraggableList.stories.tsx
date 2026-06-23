@@ -38,7 +38,6 @@ type StoryListProps = {
   expandedFolderIds?: FSharpSet<string>;
   defaultExpandedFolderIds?: FSharpSet<string>;
   onExpandedFolderIdsChange?: (expandedFolderIds: FSharpSet<string>) => void;
-  allowMultipleOpen?: boolean;
   className?: string;
   debug?: boolean;
 };
@@ -114,6 +113,28 @@ function initialFolders() {
       propertyItem('layer-b-archived', 'Archived method', 'layer-b', 'upstream-layer', '#6b7280', 'disabled', true),
     ]),
   ]);
+}
+
+function overflowingFolders() {
+  return fsList(
+    Array.from({ length: 8 }, (_, folderIndex) =>
+      folder(
+        `wide-layer-${folderIndex + 1}`,
+        `Wide Layer ${folderIndex + 1}`,
+        folderIndex % 2 === 0 ? '#2563eb' : '#d97706',
+        Array.from({ length: 8 }, (_, itemIndex) =>
+          propertyItem(
+            `wide-layer-${folderIndex + 1}-property-${itemIndex + 1}`,
+            `Property ${itemIndex + 1}`,
+            `wide-layer-${folderIndex + 1}`,
+            'overflow-story',
+            itemIndex % 2 === 0 ? '#16a34a' : undefined,
+            `${itemIndex + 1}`
+          )
+        )
+      )
+    )
+  );
 }
 
 function dragId(_folder: StoryFolder, item: StoryItem) {
@@ -222,7 +243,6 @@ function ControlledExpansionHarness() {
           dragId={dragId}
           expandedFolderIds={expandedFolderIds}
           onExpandedFolderIdsChange={handleExpandedChange}
-          allowMultipleOpen={false}
           debug
         />
       </DndContext>
@@ -269,7 +289,7 @@ function DragHarness() {
   );
 }
 
-async function dragByPointer(source: Element, target: Element) {
+function getPointerGeometry(source: Element, target: Element) {
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
   const fromX = from.left + from.width / 2;
@@ -281,11 +301,18 @@ async function dragByPointer(source: Element, target: Element) {
   const distance = Math.hypot(deltaX, deltaY) || 1;
   const activationX = fromX + (deltaX / distance) * 8;
   const activationY = fromY + (deltaY / distance) * 8;
-  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+
+  return { fromX, fromY, toX, toY, activationX, activationY };
+}
+
+const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+
+async function beginDragByPointer(source: Element, target: Element = source) {
+  const geometry = getPointerGeometry(source, target);
 
   fireEvent.pointerDown(source, {
-    clientX: fromX,
-    clientY: fromY,
+    clientX: geometry.fromX,
+    clientY: geometry.fromY,
     button: 0,
     buttons: 1,
     isPrimary: true,
@@ -295,8 +322,8 @@ async function dragByPointer(source: Element, target: Element) {
   await nextFrame();
 
   fireEvent.pointerMove(target, {
-    clientX: activationX,
-    clientY: activationY,
+    clientX: geometry.activationX,
+    clientY: geometry.activationY,
     button: 0,
     buttons: 1,
     isPrimary: true,
@@ -305,9 +332,15 @@ async function dragByPointer(source: Element, target: Element) {
 
   await nextFrame();
 
-  fireEvent.pointerMove(document, {
-    clientX: toX,
-    clientY: toY,
+  return geometry;
+}
+
+async function dragByPointer(source: Element, target: Element) {
+  const geometry = await beginDragByPointer(source, target);
+
+  fireEvent.pointerMove(target, {
+    clientX: geometry.toX,
+    clientY: geometry.toY,
     button: 0,
     buttons: 1,
     isPrimary: true,
@@ -317,8 +350,8 @@ async function dragByPointer(source: Element, target: Element) {
   await nextFrame();
 
   fireEvent.pointerUp(target, {
-    clientX: toX,
-    clientY: toY,
+    clientX: geometry.toX,
+    clientY: geometry.toY,
     button: 0,
     buttons: 0,
     isPrimary: true,
@@ -346,20 +379,30 @@ export const TogglesFolders: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
 
-    expect(canvas.queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
+    expect(shelf).toBeVisible();
+    expect(within(shelf).queryByRole('button', { name: /Drag/i })).not.toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer A' }));
 
-    expect(canvas.getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
-    expect(canvas.getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
+    expect(within(shelf).queryByTestId('foldered-draggable-item-layer-b-instrument')).not.toBeInTheDocument();
     expect(canvas.getByText('Species')).toBeVisible();
     expect(within(canvas.getByTestId('foldered-draggable-item-layer-a-species')).getByText('2')).toBeVisible();
 
-    await userEvent.click(canvas.getByRole('button', { name: 'Collapse Layer A' }));
+    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer B' }));
 
     await waitFor(() => {
-      expect(canvas.queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
+      expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
+      expect(within(shelf).getByTestId('foldered-draggable-item-layer-b-instrument')).toBeVisible();
+    });
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Collapse Layer B' }));
+
+    await waitFor(() => {
+      expect(within(shelf).queryByRole('button', { name: /Drag/i })).not.toBeInTheDocument();
     });
   },
 };
@@ -379,9 +422,10 @@ export const DefaultExpansionOpensInitialFolders: Story = {
   ),
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
 
-    expect(canvas.getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
-    expect(canvas.queryByTestId('foldered-draggable-item-layer-b-instrument')).not.toBeInTheDocument();
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
+    expect(within(shelf).queryByTestId('foldered-draggable-item-layer-b-instrument')).not.toBeInTheDocument();
   },
 };
 
@@ -389,17 +433,47 @@ export const ControlledExpansionFollowsProps: Story = {
   render: () => <ControlledExpansionHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
 
-    expect(canvas.getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
-    expect(canvas.queryByTestId('foldered-draggable-item-layer-b-instrument')).not.toBeInTheDocument();
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
+    expect(within(shelf).queryByTestId('foldered-draggable-item-layer-b-instrument')).not.toBeInTheDocument();
 
     await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer B' }));
 
     await waitFor(() => {
-      expect(canvas.queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
-      expect(canvas.getByTestId('foldered-draggable-item-layer-b-instrument')).toBeVisible();
+      expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-mass')).not.toBeInTheDocument();
+      expect(within(shelf).getByTestId('foldered-draggable-item-layer-b-instrument')).toBeVisible();
       expect(canvas.getByTestId('last-expanded')).toHaveTextContent('layer-b');
     });
+  },
+};
+
+export const HorizontalRowsScrollWhenOverflowing: Story = {
+  render: () => (
+    <DndContext>
+      <div className="swt:w-72">
+        <StoryFolderedDraggableList folders={overflowingFolders()} dragId={dragId} debug />
+      </div>
+    </DndContext>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const folderRow = canvas.getByTestId('foldered-draggable-folder-row');
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
+
+    expect(folderRow).toHaveClass('swt:flex-row');
+    expect(folderRow).toHaveClass('swt:flex-nowrap');
+    expect(folderRow).toHaveClass('swt:overflow-x-auto');
+    expect(shelf).toBeVisible();
+    expect(canvas.getAllByRole('button', { name: /Wide Layer/i })).toHaveLength(8);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Expand Wide Layer 1' }));
+
+    const itemRow = canvas.getByTestId('foldered-draggable-item-row');
+    expect(itemRow).toHaveClass('swt:flex-row');
+    expect(itemRow).toHaveClass('swt:flex-nowrap');
+    expect(itemRow).toHaveClass('swt:overflow-x-auto');
+    expect(within(itemRow).getAllByRole('button', { name: /Drag Property/i })).toHaveLength(8);
   },
 };
 
@@ -407,12 +481,13 @@ export const UpdatesWhenFoldersPropChanges: Story = {
   render: () => <UpdatingHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
 
     await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer A' }));
-    expect(canvas.getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
 
     await userEvent.click(canvas.getByRole('button', { name: 'Add replicate' }));
-    expect(await canvas.findByTestId('foldered-draggable-item-layer-a-replicate')).toBeVisible();
+    expect(await within(shelf).findByTestId('foldered-draggable-item-layer-a-replicate')).toBeVisible();
     const replicateSwatch = canvas
       .getByTestId('foldered-draggable-item-layer-a-replicate')
       .querySelector<HTMLElement>('[data-foldered-color-swatch="true"]');
@@ -421,9 +496,9 @@ export const UpdatesWhenFoldersPropChanges: Story = {
 
     await userEvent.click(canvas.getByRole('button', { name: 'Remove species' }));
     await waitFor(() => {
-      expect(canvas.queryByTestId('foldered-draggable-item-layer-a-species')).not.toBeInTheDocument();
+      expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-species')).not.toBeInTheDocument();
     });
-    expect(canvas.getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
+    expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
 
     await userEvent.click(canvas.getByRole('button', { name: 'Rename and recolor Layer A' }));
     expect(canvas.getByRole('button', { name: 'Collapse Layer Alpha' })).toBeVisible();
@@ -481,10 +556,41 @@ export const CarriesFolderFallbackColor: Story = {
   },
 };
 
+export const ShowsDragPreviewAndRestoresUnacceptedDrag: Story = {
+  render: () => <DragHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
+    const source = within(shelf).getByTestId('foldered-draggable-item-layer-a-mass');
+    const geometry = await beginDragByPointer(source);
+
+    await waitFor(() => {
+      expect(source).not.toBeVisible();
+      expect(within(document.body).getByTestId('foldered-draggable-drag-overlay')).toBeVisible();
+    });
+
+    fireEvent.pointerUp(document, {
+      clientX: geometry.activationX,
+      clientY: geometry.activationY,
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId: 1,
+    });
+
+    await waitFor(() => {
+      expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
+      expect(within(document.body).queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument();
+    });
+  },
+};
+
 export const DisabledItemsDoNotDrag: Story = {
   render: () => <DragHarness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Expand Layer B' }));
 
     const disabledItem = canvas.getByTestId('foldered-draggable-item-layer-b-archived');
     expect(disabledItem).toBeDisabled();
