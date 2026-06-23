@@ -4,7 +4,7 @@ Components in `src/Components` are expected to be reusable and application-agnos
 
 # File Rules
 
-- **Component folder**: Each component should be placed in a folder named after the component use context.
+- **Component folder**: Each component should be placed in a folder named after the component.
     - e.g. `src/Components/src/TermSearch` contains `TermSearch.tsx`, `TermSearchConfigProvider.fs` and `TermSearchConfigSetter.fs`
     - e.g. `src/Components/src/Authentication` contains `Authentication.fs`, `AccountManager.fs`, `Helper.fs` and `Types.fs`
     - e.g. higher level nested components MAY be placed in subfolders and add the subfolder name to the namespace, e.g. `/Notes/NoteSearch/NoteSearchComponent.fs` with namespace `namespace Swate.Components.Notes.NoteSearch`.
@@ -31,6 +31,15 @@ Components in `src/Components` are expected to be reusable and application-agnos
         // ...
         ```
 - **Colocated stories**: Storybook files must be colocated with the component and named `<Component>.stories.tsx`.
+- **Types**
+    - Types used by multiple files MUST be placed in a separate file `Types.fs`. 
+    - Types only used inside a single file can MUST be placed inside a private `module <FileName>Types` in the same file. 
+    - If there are multiple domains requiring types, place them in a `Types/<DomainName>.fs` file.
+- **Helper functions**: Helper functions follow the same rules as Types.
+- **Subcomponents**: 
+    - Large subcomponents SHOULD be split into logical subcomponents.
+    - Subcomponents MUST be defined as static members of the main component class if they are sufficiently simple.
+    - Subcomponents MUST be placed in separate component-files in the same folder if they are complex.
 
 # Syntax Rules
 
@@ -49,9 +58,6 @@ Components in `src/Components` are expected to be reusable and application-agnos
         static member MyComponent () : ReactElement =
             // ...
     ```
-- **Subcomponents**: Larger components MUST be split into smaller logical subcomponents. These subcomponents MAY be defined as static members of the main component class, or as separate component-files in the same folder.
-- **Types**: `private` types that are only used within a single component file MUST be defined in the same file. Public types that are shared across multiple files MUST be defined in a separate `Types.fs` file.
-- **Helper functions**: Helper functions MUST NOT be defined as static members of the component class. They MUST be defined in a separate file if they are used by multiple files. Otherwise they MUST be defined in a **private** module `module <FileName>Helper` within the component file.
 - **React context**: If a component needs to share state or configuration with a React context. It MUST define the base context in a separate file `**/<ComponentName>/Context.fs` or `**/<ComponentName>/Contexts/<ContextName>Context.fs` or `**/<ComponentName>/<ContextName>Context.fs` if there are multiple contexts associated with the component, with the following properties.
     - File namespace MUST follow folder structure and be named `module Swate.Components.<Path>.<ContextName>Context` or if there is a single context `module Swate.Components.<Path>.Context`.
     - MAY contain the relevant public types.
@@ -79,3 +85,7 @@ Components in `src/Components` are expected to be reusable and application-agnos
         [<Hook>]
         let useExampleCtx () = React.useContext ExampleCtx
         ```
+
+# Design Rules
+
+- Keep states at the lowest level possible. Every state change forces a re-render of the component and all its children. If a state is only used in a subcomponent, it should be defined in that subcomponent. 
