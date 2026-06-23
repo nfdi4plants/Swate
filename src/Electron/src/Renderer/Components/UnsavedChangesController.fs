@@ -17,7 +17,10 @@ let useUnsavedChangesController () =
     let isRunning, setIsRunning = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
 
+    let setActiveGuard guard = activeGuardRef.current <- guard
+
     let runWithoutGuard (action: GuardedAction) = promise {
+        setActiveGuard None
         bypassGuardDepthRef.current <- bypassGuardDepthRef.current + 1
 
         try
@@ -48,7 +51,7 @@ let useUnsavedChangesController () =
     let controller: UnsavedChangesController =
         React.useMemo (
             (fun _ -> {
-                RegisterGuard = fun guard -> activeGuardRef.current <- guard
+                SetActiveGuard = setActiveGuard
                 RequestAction =
                     fun action ->
                         if hasActiveUnsavedChanges () then

@@ -21,25 +21,16 @@ let MarkdownEditorTarget (content: string) =
         fileStateCtx.state.Selection.TreePath |> Option.map PathHelpers.normalizePath
 
     let hasUnsavedChanges = markdown <> lastSavedContent
-    let markdownRef = React.useRef markdown
-    let lastSavedContentRef = React.useRef lastSavedContent
-    let selectedPathRef = React.useRef selectedPath
 
     React.useEffect (
         (fun () ->
             setMarkdown content
             setLastSavedContent content
-            markdownRef.current <- content
-            lastSavedContentRef.current <- content
             setSaveError None
             pendingImageAssetsRef.current <- []
         ),
         [| box content |]
     )
-
-    React.useEffect ((fun () -> markdownRef.current <- markdown), [| box markdown |])
-    React.useEffect ((fun () -> lastSavedContentRef.current <- lastSavedContent), [| box lastSavedContent |])
-    React.useEffect ((fun () -> selectedPathRef.current <- selectedPath), [| box selectedPath |])
 
     Renderer.Components.MainContent.Helper.usePublishedUnsavedNoteChanges hasUnsavedChanges
 
@@ -47,7 +38,7 @@ let MarkdownEditorTarget (content: string) =
         Renderer.Components.MainContent.Helper.useNoteImageFilePickerAdapter pendingImageAssetsRef
 
     let saveMarkdownAsync () =
-        match selectedPathRef.current with
+        match selectedPath with
         | None ->
             let message = "No markdown file is selected."
             setSaveError (Some message)
@@ -57,7 +48,7 @@ let MarkdownEditorTarget (content: string) =
             setSaveError None
 
             try
-                let currentMarkdown = markdownRef.current
+                let currentMarkdown = markdown
                 let currentAssets = pendingImageAssetsRef.current
 
                 let! writeResult =
@@ -66,7 +57,6 @@ let MarkdownEditorTarget (content: string) =
                 match writeResult with
                 | Ok() ->
                     setLastSavedContent currentMarkdown
-                    lastSavedContentRef.current <- currentMarkdown
                     pendingImageAssetsRef.current <- []
                     return Ok()
                 | Error error ->
@@ -84,9 +74,7 @@ let MarkdownEditorTarget (content: string) =
         }
         |> Promise.start
 
-    useUnsavedChangesGuard (
-        UnsavedChangesGuard.note saveMarkdownAsync (fun () -> markdownRef.current <> lastSavedContentRef.current)
-    )
+    useUnsavedChangesGuard (UnsavedChangesGuard.note saveMarkdownAsync (fun () -> hasUnsavedChanges))
 
     let saveStatusText =
         match saveError with

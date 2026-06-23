@@ -159,6 +159,15 @@ let Main () =
     let unsavedChanges =
         Renderer.Components.UnsavedChangesController.useUnsavedChangesController ()
 
+    let pageProvidesUnsavedChangesGuard =
+        match model.PageState with
+        | Some(PageState.MarkdownPage _)
+        | Some PageState.NotesDraftPage -> true
+        | _ -> false
+
+    if not pageProvidesUnsavedChangesGuard then
+        unsavedChanges.Controller.SetActiveGuard None
+
     let setPageState (pageState: PageState option) =
         unsavedChanges.Controller.RequestAction(fun () -> promise { dispatch (PageStateChanged pageState) })
 

@@ -41,14 +41,14 @@ module UnsavedChangesSaveError =
         | _ -> Some error.Message
 
 type UnsavedChangesController = {
-    RegisterGuard: UnsavedChangesGuard option -> unit
+    SetActiveGuard: UnsavedChangesGuard option -> unit
     RequestAction: GuardedAction -> unit
     RunWithoutGuard: GuardedAction -> JS.Promise<unit>
     SaveActiveGuard: unit -> JS.Promise<Result<unit, exn>>
 }
 
 let private defaultController = {
-    RegisterGuard = ignore
+    SetActiveGuard = ignore
     RequestAction = fun action -> action () |> Promise.start
     RunWithoutGuard = fun action -> action ()
     SaveActiveGuard = fun () -> promise { return Ok() }
@@ -63,11 +63,4 @@ let useUnsavedChangesCtx () = React.useContext UnsavedChangesCtx
 [<Hook>]
 let useUnsavedChangesGuard (guard: UnsavedChangesGuard) =
     let unsavedChangesCtx = useUnsavedChangesCtx ()
-
-    React.useEffectOnce (fun _ ->
-        unsavedChangesCtx.RegisterGuard(Some guard)
-
-        { new System.IDisposable with
-            member _.Dispose() = unsavedChangesCtx.RegisterGuard None
-        }
-    )
+    unsavedChangesCtx.SetActiveGuard(Some guard)

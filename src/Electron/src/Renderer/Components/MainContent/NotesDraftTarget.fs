@@ -14,7 +14,11 @@ module MainContentHelper = Renderer.Components.MainContent.Helper
 let NotesDraftTarget () =
 
     let notesDraft, setNotesDraft = React.useState NotesDraft.init
-    let notesUiState, setNotesUiState = React.useState NotesUiState.init
+
+    let notesUiState, updateNotesUiState = React.useStateWithUpdater NotesUiState.init
+
+    let setNotesUiState nextUiState =
+        updateNotesUiState (fun _ -> nextUiState)
 
     let pendingOverwriteRequest, setPendingOverwriteRequest =
         React.useState<FileContentDTO option> None
@@ -26,20 +30,6 @@ let NotesDraftTarget () =
 
     let unsavedChangesCtx =
         Renderer.Context.UnsavedChangesContext.useUnsavedChangesCtx ()
-
-    let notesDraftRef = React.useRef notesDraft
-    let notesUiStateRef = React.useRef notesUiState
-
-    let setNotesDraftAndRef nextDraft =
-        notesDraftRef.current <- nextDraft
-        setNotesDraft nextDraft
-
-    let setNotesUiStateAndRef nextUiState =
-        notesUiStateRef.current <- nextUiState
-        setNotesUiState nextUiState
-
-    React.useEffect ((fun () -> notesDraftRef.current <- notesDraft), [| box notesDraft |])
-    React.useEffect ((fun () -> notesUiStateRef.current <- notesUiState), [| box notesUiState |])
 
     let hasUnsavedDraft = State.hasUnsavedDraft notesDraft
 
@@ -55,13 +45,14 @@ let NotesDraftTarget () =
         )
 
     let setSubmitState isSubmitting error =
-        notesUiStateRef.current
-        |> (if isSubmitting then
-                State.startSubmitting
-            else
-                State.stopSubmitting)
-        |> State.setError error
-        |> setNotesUiStateAndRef
+        updateNotesUiState (fun current ->
+            current
+            |> (if isSubmitting then
+                    State.startSubmitting
+                else
+                    State.stopSubmitting)
+            |> State.setError error
+        )
 
     let writeRequest (request: FileContentDTO) = promise {
         let! writeResult = MainContentHelper.writeNoteMarkdownFile request pendingImageAssetsRef.current
@@ -78,8 +69,8 @@ let NotesDraftTarget () =
             let selectedPath = PathHelpers.normalizePath request.path
 
             fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-            setNotesDraftAndRef NotesDraft.init
-            setNotesUiStateAndRef NotesUiState.init
+            setNotesDraft NotesDraft.init
+            setNotesUiState NotesUiState.init
 
             let! previewResult = Api.ipcArcVaultApi.openFile request.path
 
@@ -130,22 +121,20 @@ let NotesDraftTarget () =
         fun (payload: NotesSubmitPayload) -> submitRequest false (MainContentHelper.requestFromNotesPayload payload)
 
     let saveDraftAsync () =
-        match NoteConversion.tryCreateNewRootNotePayload notesDraftRef.current with
+        match NoteConversion.tryCreateNewRootNotePayload notesDraft with
         | Error message ->
             setSubmitState false (Some message)
             promise { return Error(exn message) }
         | Ok payload -> submitRequestAsync false (MainContentHelper.requestFromNotesPayload payload)
 
-    useUnsavedChangesGuard (
-        UnsavedChangesGuard.note saveDraftAsync (fun () -> State.hasUnsavedDraft notesDraftRef.current)
-    )
+    useUnsavedChangesGuard (UnsavedChangesGuard.note saveDraftAsync (fun () -> hasUnsavedDraft))
 
     React.Fragment [
         Notes.Wizard(
             notesDraft,
-            setNotesDraftAndRef,
+            setNotesDraft,
             notesUiState,
-            setNotesUiStateAndRef,
+            setNotesUiState,
             onSubmit,
             availableNotesTargets,
             filePickerAdapter = imageFilePickerAdapter
