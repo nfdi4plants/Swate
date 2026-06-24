@@ -397,6 +397,7 @@ type Controls =
             DndKit.useDraggable (
                 {|
                     id = DragDrop.propertyDragId side header
+                    data = {| label = header.Category.Name |}
                 |}
             )
 

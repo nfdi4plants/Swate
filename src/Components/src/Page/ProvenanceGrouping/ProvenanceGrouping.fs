@@ -32,6 +32,11 @@ type private DragContext = {
     ConnectSetPairs: (ProvenanceSetId * ProvenanceSetId) list -> unit
 }
 
+type private ActiveDrag = {
+    Payload: DragDrop.Payload
+    Label: string option
+}
+
 type private PropertyShelfItemPayload = {
     Header: ProvenancePropertyHeader
     SourceSide: ProvenanceSide
@@ -527,6 +532,26 @@ module private DropHitTesting =
 /// DnD event handlers that translate library events into session or UI state changes.
 module private DragHandlers =
 
+    let private activeLabel (event: DndKit.IDndKitEvent) =
+        if
+            isNull event.active
+            || isNull event.active.data
+            || isNull event.active.data.current
+        then
+            None
+        else
+            let labelObj: obj = event.active.data.current?label
+
+            if isNull labelObj then
+                None
+            else
+                let label = string labelObj
+
+                if String.IsNullOrWhiteSpace label || label = "undefined" then
+                    None
+                else
+                    Some label
+
     let handleStart
         (surfaceRef: IRefValue<Browser.Types.HTMLElement option>)
         setActiveDrag
@@ -534,7 +559,14 @@ module private DragHandlers =
         (event: DndKit.IDndKitEvent)
         =
         let payload = DragDrop.tryDragId (string event.active.id)
-        setActiveDrag payload
+
+        setActiveDrag (
+            payload
+            |> Option.map (fun payload -> {
+                Payload = payload
+                Label = activeLabel event
+            })
+        )
 
         match payload, surfaceRef.current with
         | Some(DragDrop.Payload.ConnectionHandle handle), Some surface ->
@@ -1055,10 +1087,27 @@ module private EditorSurface =
 
     let dragOverlay findPropertyValue debug activeDrag =
         match activeDrag with
-        | Some(DragDrop.Payload.PropertyValue propertyValueId) ->
+        | Some {
+                   Payload = DragDrop.Payload.PropertyValue propertyValueId
+               } ->
             match findPropertyValue propertyValueId with
             | Some propertyValue -> Controls.ValueDragPreview(propertyValue, showHeader = false, debug = debug)
             | None -> Html.none
+        | Some {
+                   Payload = DragDrop.Payload.PropertyHeader _
+                   Label = label
+               } ->
+            Html.div [
+                prop.className Styles.propertyValueOverlayClasses
+                if debug then
+                    prop.testId "provenance-drag-overlay-property"
+                prop.children [
+                    Html.span [
+                        prop.className "swt:min-w-0 swt:truncate"
+                        prop.text (label |> Option.defaultValue "Property")
+                    ]
+                ]
+            ]
         | _ -> Html.none
 
 [<Erase; Mangle(false)>]
@@ -1070,7 +1119,7 @@ type ProvenanceGrouping =
         =
         let debug = defaultArg debug false
         let rawUiState, setUiState = React.useState (State.init session)
-        let activeDrag, setActiveDrag = React.useState<DragDrop.Payload option> None
+        let activeDrag, setActiveDrag = React.useState<ActiveDrag option> None
         let surfaceRef = React.useElementRef ()
         let splitDrag = React.useRef (None: Splitter.SplitterSide option)
         let rootRef = React.useElementRef ()
@@ -1451,8 +1500,12 @@ type ProvenanceGrouping =
                     |> Option.exists (fun header -> PropertyRails.canSwitchHeader header layer.Model |> not))
 
             match activeDrag with
-            | Some(DragDrop.Payload.FolderPropertyHeader(sourceSide, headerId))
-            | Some(DragDrop.Payload.PropertyHeader(sourceSide, headerId)) -> headerCannotSwitch sourceSide headerId
+            | Some {
+                       Payload = DragDrop.Payload.FolderPropertyHeader(sourceSide, headerId)
+                   }
+            | Some {
+                       Payload = DragDrop.Payload.PropertyHeader(sourceSide, headerId)
+                   } -> headerCannotSwitch sourceSide headerId
             | _ -> false
 
         let railPanel side =
