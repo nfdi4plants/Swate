@@ -195,6 +195,7 @@ type FolderedDraggableList =
                     prop.style [ style.borderColor color ]
             | _ -> ()
             prop.custom ("aria-expanded", isExpanded)
+            prop.title folder.Name
             prop.ariaLabel (
                 if isExpanded then
                     $"Collapse {folder.Name}"
