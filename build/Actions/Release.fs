@@ -160,7 +160,7 @@ open System.IO
 open System.IO.Compression
 
 /// Builds the frontend and zips it for the GitHub release
-let electron (version: Changelog.Version) =
+let electron () =
 
     let sourceDir = Path.Combine(ProjectPaths.deployPath, "public")
     let targetZip = "./SwateClient.zip"

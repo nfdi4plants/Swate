@@ -105,8 +105,10 @@ let main args =
 
             printGreenfn ("Release docker!")
             0
+        // electron-web builds the prebundled web client frontend,
+        // historically used as an iframe in an external Electron app.
         | "electron-web" ->
-            Release.electron latestVersion
+            Release.electron ()
             printGreenfn ("Release electron-web!")
             0
         | "electron-bin" ->
@@ -163,19 +165,7 @@ let main args =
         let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
         let latestVersion = Changelog.getLatestVersion ()
 
-        if Directory.Exists(dir) then
-            let files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
-
-            if files.Length > 0 then
-                for file in files do
-                    GitHub.uploadReleaseAsset GitHubToken latestVersion file |> ignore
-
-                printGreenfn "Uploaded %d assets to release %O" files.Length latestVersion.Version
-            else
-                printGreenfn "No assets found in %s, skipping upload." dir
-        else
-            printRedfn "Directory not found: %s" dir
-            exit 1
+        GitHub.uploadReleaseAssets GitHubToken latestVersion dir
 
         let isPrerelease = latestVersion.Version.IsPrerelease
 
@@ -196,22 +186,9 @@ let main args =
         let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
         let latestVersion = Changelog.getLatestVersion ()
 
-        if not (Directory.Exists(dir)) then
-            printRedfn "Directory not found: %s" dir
-            exit 1
+        GitHub.uploadReleaseAssets GitHubToken latestVersion dir
 
-        let files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
-
-        if files.Length = 0 then
-            printGreenfn "No assets found in %s, skipping upload." dir
-            0
-        else
-            for file in files do
-                GitHub.uploadReleaseAsset GitHubToken latestVersion file |> ignore
-
-            printGreenfn "Uploaded %d assets to release %O" files.Length latestVersion.Version
-
-            0
+        0
     | "dev" :: a ->
         let latestVersion = Changelog.getLatestVersion ()
         0
