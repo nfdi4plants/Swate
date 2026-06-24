@@ -8,4 +8,5 @@ export { Viewer as GitDiffViewer } from './output/GitComparison/GitDiffViewer.fs
 export { Viewer as GitMergeConflictViewer } from './output/GitComparison/GitMergeConflictViewer.fs.ts';
 export { Main as GitSidebar } from './output/GitSidebar/GitSidebar.fs.ts';
 export { SwateApi, TIBApi } from './output/Util/Api.fs.ts'
+export { View_Main as BOAT } from './output/Page/BOAT/BOAT.fs.ts'
 import '../tailwind.css'
