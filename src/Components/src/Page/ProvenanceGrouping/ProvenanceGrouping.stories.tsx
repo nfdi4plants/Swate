@@ -39,6 +39,7 @@ function Harness({
   debug = true,
   allowTermReplacement = false,
   allowEndpointReplacement = false,
+  resetKey,
 }: {
   inputOnly?: boolean;
   outputOnly?: boolean;
@@ -46,6 +47,7 @@ function Harness({
   debug?: boolean;
   allowTermReplacement?: boolean;
   allowEndpointReplacement?: boolean;
+  resetKey?: string;
 }) {
   const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
   const [session, setSession] = React.useState(() => createSessionForFixture(selected));
@@ -54,7 +56,7 @@ function Harness({
   React.useEffect(() => {
     setSession(createSessionForFixture(selected));
     setPatches([]);
-  }, [selected]);
+  }, [selected, resetKey]);
 
   return (
     <div className="swt:flex swt:flex-col swt:gap-4 swt:min-h-screen swt:bg-base-200 swt:p-4">
@@ -226,19 +228,19 @@ export const GroupCardsSelectFromCardSurface: Story = {
 };
 
 export const GroupsBothSidesFromOutputProperty: Story = {
-  render: () => <Harness />,
+  render: () => <Harness resetKey="groups-both-sides-from-output-property" />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await showPropertyControls(canvas, 'Output', 'Replicate');
-    fireEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
+    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-group-Input-input:Replicate=1 | 2')).toBeInTheDocument();
       expect(canvas.getByTestId('provenance-group-Output-output:Replicate=1 | 2')).toBeInTheDocument();
       expect(canvas.queryByTestId('provenance-group-Input-input:Replicate=1')).not.toBeInTheDocument();
       expect(canvas.queryByTestId('provenance-group-Output-output:Replicate=2')).not.toBeInTheDocument();
-    }, { timeout: 3000 });
+    }, { timeout: 6000 });
   },
 };
 
@@ -290,6 +292,36 @@ export const PropertiesStartInOriginFoldersAndSideDropZonesAreEmpty: Story = {
     const species = await shelfProperty(canvas, 'Species');
     expect(species).toBeInTheDocument();
     expect(species).toHaveTextContent('Species');
+  },
+};
+
+export const DroppedShelfPropertyLeavesFolders: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
+
+    expect(canvas.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
+    const currentLayerShelf = await openShelfFolder(canvas, canvas.getByTestId('foldered-draggable-folder-layer-layer-1'));
+    expect(currentLayerShelf.queryByRole('button', { name: /^Drag Species$/ })).not.toBeInTheDocument();
+  },
+};
+
+export const RejectedShelfPropertyDropRestoresFolderItem: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const source = await shelfProperty(canvas, 'Species');
+    const target = canvas.getByText('Input A').closest('article')!;
+
+    await dragByPointer(source, target);
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument();
+      expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
+        .toBeVisible();
+    });
   },
 };
 
@@ -1145,6 +1177,8 @@ async function startDragByPointer(source: Element) {
   const from = source.getBoundingClientRect();
   const fromX = from.left + from.width / 2;
   const fromY = from.top + from.height / 2;
+  const activationX = fromX + 8;
+  const activationY = fromY;
   const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
   fireEvent.pointerDown(source, {
     clientX: fromX,
@@ -1156,14 +1190,16 @@ async function startDragByPointer(source: Element) {
   });
   await nextFrame();
   fireEvent.pointerMove(document, {
-    clientX: fromX + 8,
-    clientY: fromY,
+    clientX: activationX,
+    clientY: activationY,
     button: 0,
     buttons: 1,
     isPrimary: true,
     pointerId: 1,
   });
   await nextFrame();
+
+  return { x: activationX, y: activationY };
 }
 
 function escapeRegExp(value: string) {

@@ -223,6 +223,19 @@ module private PropertyShelf =
     let private manualColor (uiState: UiState) (header: ProvenancePropertyHeader) =
         uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header }
 
+    let private isPlacedInCurrentLayer (layer: ProvenanceLayer) (uiState: UiState) header =
+        let key = State.Keys.groupingKey header
+
+        let placedInRail = uiState.PropertyRailPlacements |> Map.containsKey (layer.Id, key)
+
+        let groupedOnSide sideId =
+            (State.Sides.get sideId uiState).GroupingAssignments
+            |> List.exists (fun assignment -> assignment.Key = key)
+
+        placedInRail
+        || groupedOnSide layer.InputSideId
+        || groupedOnSide layer.OutputSideId
+
     let private itemForHeader
         (session: ProvenanceSession)
         (sourceSide: ProvenanceSide)
@@ -281,6 +294,7 @@ module private PropertyShelf =
                 yield! outputProjection.Headers
             ]
             |> List.distinct
+            |> List.filter (isPlacedInCurrentLayer layer uiState >> not)
 
         let itemEntries =
             headers
