@@ -2547,7 +2547,10 @@ let uiStateTests =
             let projection =
                 PropertyProjection.railProjectionWithFilters session layer.Id ProvenanceSide.Output layer.Model uiState
 
-            Expect.contains projection.Headers species "Search should keep headers with matching projected values."
+            Expect.isTrue
+                (projection.Headers |> List.contains species)
+                "Search should keep headers with matching projected values."
+
             Expect.equal projection.ColorByHeader.[species] (Some "#2563eb") "Manual color should be projected."
 
             let nonMatching =
@@ -2575,9 +2578,8 @@ let uiStateTests =
             let projection =
                 PropertyProjection.railProjectionWithFilters session layer.Id ProvenanceSide.Input layer.Model state
 
-            Expect.contains
-                projection.Headers
-                previousTreatment
+            Expect.isTrue
+                (projection.Headers |> List.contains previousTreatment)
                 "Attached previous context should still appear in the property rail."
 
             Expect.equal
@@ -2604,9 +2606,8 @@ let uiStateTests =
                 (inputHeaders |> List.contains species)
                 "A connected current input property should not be duplicated on the input rail by default."
 
-            Expect.contains
-                outputHeaders
-                species
+            Expect.isTrue
+                (outputHeaders |> List.contains species)
                 "A connected current input property should default to the output rail."
 
         testCase "previous context properties stay on input rail even when inherited by outputs"
@@ -2626,7 +2627,9 @@ let uiStateTests =
                 (PropertyProjection.railProjectionWithFilters session layer.Id ProvenanceSide.Output layer.Model state)
                     .Headers
 
-            Expect.contains inputHeaders previousTreatment "A previous-context property should stay on the input rail."
+            Expect.isTrue
+                (inputHeaders |> List.contains previousTreatment)
+                "A previous-context property should stay on the input rail."
 
             Expect.isFalse
                 (outputHeaders |> List.contains previousTreatment)
@@ -2659,9 +2662,8 @@ let uiStateTests =
                 (PropertyProjection.railProjectionWithFilters session layer.Id ProvenanceSide.Output layer.Model state)
                     .Headers
 
-            Expect.contains
-                inputHeaders
-                species
+            Expect.isTrue
+                (inputHeaders |> List.contains species)
                 "An incomplete layer with no output should keep current properties on the input rail."
 
             Expect.isFalse
