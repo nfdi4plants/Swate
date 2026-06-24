@@ -40,7 +40,6 @@ function Harness({
   debug = true,
   allowTermReplacement = false,
   allowEndpointReplacement = false,
-  resetKey,
 }: {
   inputOnly?: boolean;
   outputOnly?: boolean;
@@ -48,13 +47,13 @@ function Harness({
   debug?: boolean;
   allowTermReplacement?: boolean;
   allowEndpointReplacement?: boolean;
-  resetKey?: string;
 }) {
   const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
+  const id = React.useId();
 
   return (
     <HarnessState
-      key={`${selected}:${resetKey ?? ''}`}
+      key={`${selected}:${id}`}
       selected={selected}
       debug={debug}
       allowTermReplacement={allowTermReplacement}
@@ -252,7 +251,7 @@ export const GroupCardsSelectFromCardSurface: Story = {
 };
 
 export const GroupsBothSidesFromOutputProperty: Story = {
-  render: () => <Harness resetKey="groups-both-sides-from-output-property" />,
+  render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
@@ -342,7 +341,7 @@ export const DroppedShelfPropertyLeavesFolders: Story = {
 };
 
 export const DroppedShelfPropertyKeepsLayerColorAndSyncsUpdates: Story = {
-  render: () => <Harness resetKey="dropped-shelf-property-keeps-layer-color-and-syncs-updates" />,
+  render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const initialLayerColor = canvas.getByTestId('provenance-layer-layer-1').getAttribute('data-provenance-layer-color') ?? '';
