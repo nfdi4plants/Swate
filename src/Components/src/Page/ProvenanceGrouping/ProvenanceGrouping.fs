@@ -676,9 +676,12 @@ module private DragHandlers =
         match dragPayload, groupDrop, propertyDrop with
         | Some(DragDrop.Payload.PropertyValue propertyValueId), Some(side, groupId), _ ->
             routePropertyValueDrop context side groupId propertyValueId
-        | Some(DragDrop.Payload.FolderPropertyHeader(_, headerId)), _, Some targetSide ->
+        | Some(DragDrop.Payload.FolderPropertyHeader(sourceSide, headerId)), _, Some targetSide ->
             match context.Lookups.FindHeader headerId with
-            | Some header ->
+            | Some header when
+                sourceSide = targetSide
+                || PropertyRails.canSwitchHeader header context.Layer.Model
+                ->
                 context.GetUiState()
                 |> State.PropertyPlacement.place context.Layer.Id targetSide header
                 |> context.SetUiState

@@ -370,6 +370,23 @@ export const RejectedShelfPropertyDropRestoresFolderItem: Story = {
   },
 };
 
+export const SingleSidedShelfPropertiesCannotDropOnOppositeSide: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const source = await shelfProperty(canvas, 'Analysis');
+
+    await dragByPointer(source, canvas.getByTestId('provenance-property-rail-Input'));
+    await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument());
+
+    expect(canvas.queryByTestId('provenance-property-Input-Analysis')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Analysis$/ }))
+        .toBeVisible();
+    });
+  },
+};
+
 export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
