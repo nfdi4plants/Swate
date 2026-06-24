@@ -88,7 +88,7 @@ module private FolderedDraggableListHelper =
         else
             "swt:btn-outline swt:bg-base-100 swt:cursor-grab swt:shadow-sm active:swt:cursor-grabbing"
         if isDragging then
-            "swt:absolute swt:pointer-events-none swt:opacity-0"
+            "swt:pointer-events-none swt:opacity-0"
     ]
 
 [<Erase; Mangle(false)>]
@@ -159,12 +159,15 @@ type FolderedDraggableList =
                 | _ -> ()
             ]
             prop.ariaLabel $"Drag {item.Label}"
+            if draggable.isDragging then
+                prop.custom ("aria-hidden", true)
+                prop.tabIndex -1
             match item.Tooltip with
             | Some tooltip when tooltip <> "" ->
                 prop.custom ("data-tip", tooltip)
                 prop.title tooltip
             | _ -> ()
-            if defaultArg debug false then
+            if defaultArg debug false && not draggable.isDragging then
                 prop.testId $"foldered-draggable-item-{item.Id}"
             prop.children [ renderItemContent renderProps ]
         ]
@@ -309,8 +312,11 @@ type FolderedDraggableList =
 
         DndKit.useDndMonitor (
             {|
+                onDragCancel = fun (_: DndKit.IDndKitEvent) -> setActiveDrag None
                 onDragEnd =
                     fun (event: DndKit.IDndKitEvent) ->
+                        setActiveDrag None
+
                         match expandedFolder, tryCreateItemFromExternalDrop, onFoldersChange with
                         | Some targetFolder, Some tryCreateItemFromExternalDrop, Some onFoldersChange when
                             FolderedDraggableListHelper.isShelfDrop shelfDropId event
@@ -400,6 +406,7 @@ type FolderedDraggableList =
                     ]
                 ]
                 DndKit.DragOverlay(
+                    dropAnimation = {| duration = 0; easing = "linear" |},
                     children =
                         match activeDrag with
                         | Some render ->

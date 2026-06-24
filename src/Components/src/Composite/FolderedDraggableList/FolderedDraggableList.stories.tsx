@@ -371,6 +371,50 @@ function DragHarness() {
   );
 }
 
+function removeItemFromFolders(folders: FSharpList<StoryFolder>, itemId: string) {
+  return fsList(
+    Array.from(folders).map((candidate) =>
+      folder(
+        candidate.Id,
+        candidate.Name,
+        candidate.Color,
+        Array.from(candidate.Items).filter((item) => item.Id !== itemId)
+      )
+    )
+  );
+}
+
+function ParentRemovalHarness() {
+  const [folders, setFolders] = React.useState(() => initialFolders());
+  const [lastDrop, setLastDrop] = React.useState('none');
+
+  const onDragEnd = (event: DragEndEvent) => {
+    const current = event.active.data.current as StoryDragData;
+
+    if (event.over?.id === 'outside-drop') {
+      setFolders((currentFolders) => removeItemFromFolders(currentFolders, current.ItemId));
+      setLastDrop(`accepted:${current.ItemId}`);
+    } else {
+      setLastDrop(`rejected:${current.ItemId}`);
+    }
+  };
+
+  return (
+    <div className="swt:flex swt:flex-col swt:gap-3 swt:w-96">
+      <DndContext onDragEnd={onDragEnd}>
+        <StoryFolderedDraggableList
+          folders={folders}
+          dragId={dragId}
+          defaultExpandedFolderIds={fsSet(['layer-a'])}
+          debug
+        />
+        <DropZone />
+      </DndContext>
+      <pre data-testid="last-drop">{lastDrop}</pre>
+    </div>
+  );
+}
+
 function getPointerGeometry(source: Element, target: Element) {
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
@@ -688,6 +732,74 @@ export const ShowsDragPreviewAndRestoresUnacceptedDrag: Story = {
     await waitFor(() => {
       expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-mass')).toBeVisible();
       expect(within(document.body).queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument();
+    });
+  },
+};
+
+export const SecondItemDragPreviewStartsAtGrabbedItem: Story = {
+  render: () => <DragHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
+    const firstItem = within(shelf).getByTestId('foldered-draggable-item-layer-a-mass');
+    const secondItem = within(shelf).getByTestId('foldered-draggable-item-layer-a-species');
+    const firstRect = firstItem.getBoundingClientRect();
+    const secondRect = secondItem.getBoundingClientRect();
+    const geometry = await beginDragByPointer(secondItem);
+
+    const overlay = await waitFor(() => within(document.body).getByTestId('foldered-draggable-drag-overlay'));
+    expect(overlay).toHaveTextContent('Species');
+
+    const overlayRect = overlay.getBoundingClientRect();
+    expect(overlayRect.left).toBeGreaterThan(firstRect.right);
+    expect(Math.abs(overlayRect.left - (secondRect.left + (geometry.activationX - geometry.fromX)))).toBeLessThan(24);
+
+    fireEvent.pointerUp(document, {
+      clientX: geometry.activationX,
+      clientY: geometry.activationY,
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId: 1,
+    });
+  },
+};
+
+export const ParentControlsAcceptedDropRemoval: Story = {
+  render: () => <ParentRemovalHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const shelf = canvas.getByTestId('foldered-draggable-item-shelf');
+    const source = within(shelf).getByTestId('foldered-draggable-item-layer-a-species');
+    const geometry = await beginDragByPointer(source);
+
+    await waitFor(() => {
+      expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-species')).not.toBeInTheDocument();
+      expect(within(document.body).getByTestId('foldered-draggable-drag-overlay')).toBeVisible();
+    });
+
+    fireEvent.pointerUp(document, {
+      clientX: geometry.activationX,
+      clientY: geometry.activationY,
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId: 1,
+    });
+
+    await waitFor(() => {
+      expect(within(shelf).getByTestId('foldered-draggable-item-layer-a-species')).toBeVisible();
+      expect(canvas.getByTestId('last-drop')).toHaveTextContent('rejected:layer-a-species');
+    });
+
+    await dragByPointer(
+      within(shelf).getByTestId('foldered-draggable-item-layer-a-species'),
+      canvas.getByTestId('outside-drop')
+    );
+
+    await waitFor(() => {
+      expect(within(shelf).queryByTestId('foldered-draggable-item-layer-a-species')).not.toBeInTheDocument();
+      expect(canvas.getByTestId('last-drop')).toHaveTextContent('accepted:layer-a-species');
     });
   },
 };
