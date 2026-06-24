@@ -10,17 +10,17 @@ Vitest.describe (
     "ProvenanceGrouping State",
     fun () ->
         Vitest.test (
-            "Layers.ensure returns the same instance for unchanged state",
+            "Sides.ensure returns the same instance for unchanged state",
             fun () ->
                 let session = sampleSession ()
-                let state = State.init session
+                let state = State.Sides.ensure session (State.init session)
                 let ensured = State.Sides.ensure session state
 
                 Vitest.expect(obj.ReferenceEquals(ensured, state)).toBe (true)
         )
 
         Vitest.test (
-            "Layers.ensure still prunes pair-scoped state for removed pairs",
+            "Sides.ensure still prunes pair-scoped state for removed pairs",
             fun () ->
                 let session = sampleSession ()
                 let pair = Session.activePair session
@@ -29,7 +29,7 @@ Vitest.describe (
                 let staleSlot = "removed-pair", ProvenanceSide.Input, State.Keys.groupingKey header
 
                 let state = {
-                    State.init session with
+                    State.Sides.ensure session (State.init session) with
                         ExpandedProperties = Set.singleton staleSlot
                 }
 
