@@ -18,3 +18,5 @@
     - Anonymous record types and classes with the `[<POJO>]` attribute translate to native JavaScript objects.
     - Arrays/ResizeArrays translate to native JavaScript arrays.
     - for promised use Fable.Promise's `promise {}` computation expression. It can be converted easily from and to F#s `async {}` computation expression.
+    - `[<StringEnum>]` discriminated unions translate to native JavaScript strings.
+    - `[<Erase>]`/`U2`/`U3`/.. discriminated unions translate to JavaScript fields, which allow for different types to be used in the same field. The transpiler will erase the union type and only keep the underlying types, which can be used in JavaScript code.
