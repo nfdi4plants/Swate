@@ -181,15 +181,10 @@ module private PropertyShelf =
 
     let private folderId =
         function
-        | LayerFolder layerId -> $"layer-{slug layerId}"
+        | LayerFolder layerId -> PropertyFolderColors.layerFolderId layerId
         | PreviousContextFolder(tableName, processName) ->
-            let table = tableName |> Option.map slug |> Option.defaultValue "unknown-table"
-
-            let processSlug =
-                processName |> Option.map slug |> Option.defaultValue "unknown-process"
-
-            $"context-{processSlug}-{table}"
-        | UnknownFolder -> "unknown-origin"
+            PropertyFolderColors.previousContextFolderId tableName processName
+        | UnknownFolder -> PropertyFolderColors.unknownFolderId
 
     let private folderName (session: ProvenanceSession) =
         function
@@ -209,8 +204,19 @@ module private PropertyShelf =
     let private folderColor (uiState: UiState) =
         function
         | LayerFolder layerId -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
-        | PreviousContextFolder _
-        | UnknownFolder -> None
+        | PreviousContextFolder _ as key -> uiState.PropertyColors.FolderColors |> Map.tryFind (folderId key)
+        | UnknownFolder as key -> uiState.PropertyColors.FolderColors |> Map.tryFind (folderId key)
+
+    let setFolderColor (session: ProvenanceSession) folderId color state =
+        let layerId =
+            session.LayerOrder
+            |> List.tryFind (fun layerId -> PropertyFolderColors.layerFolderId layerId = folderId)
+
+        match layerId, color with
+        | Some layerId, Some selectedColor -> State.PropertyColors.setLayerColor layerId selectedColor state
+        | Some layerId, None -> State.PropertyColors.clearLayerColor layerId state
+        | None, Some selectedColor -> State.PropertyColors.setFolderColor folderId selectedColor state
+        | None, None -> State.PropertyColors.clearFolderColor folderId state
 
     let private folderSort (session: ProvenanceSession) activeLayerId key =
         match key with
@@ -1162,6 +1168,12 @@ type ProvenanceGrouping =
         let activeLayerId = React.useRef layer.Id
         latestUiState.current <- uiState
         activeLayerId.current <- layer.Id
+
+        let applyUiState update =
+            let next = update latestUiState.current
+            latestUiState.current <- next
+            setUiState next
+
         let panelRatios = State.PanelLayout.get layer.Id uiState
 
         let endpointKinds = Endpoints.endpointKindOptions ()
@@ -1259,6 +1271,9 @@ type ProvenanceGrouping =
         let setPropertyShelfExpandedFolderIds folderIds =
             setPropertyShelfFolderExpansion (Some(layer.Id, folderIds))
 
+        let setPropertyShelfFolderColor folderId color =
+            applyUiState (PropertyShelf.setFolderColor session folderId color)
+
         let propertyShelf =
             Html.section [
                 prop.className
@@ -1327,16 +1342,12 @@ type ProvenanceGrouping =
                             (fun _ item -> DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header),
                             expandedFolderIds = propertyShelfExpandedFolderIds,
                             onExpandedFolderIdsChange = setPropertyShelfExpandedFolderIds,
+                            onSetFolderColor = setPropertyShelfFolderColor,
                             className = "swt:min-w-0",
                             debug = debug
                         )
                 ]
             ]
-
-        let applyUiState update =
-            let next = update latestUiState.current
-            latestUiState.current <- next
-            setUiState next
 
         let commitUiState next =
             latestUiState.current <- next

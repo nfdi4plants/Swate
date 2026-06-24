@@ -363,6 +363,47 @@ export const DroppedShelfPropertyKeepsLayerColorAndSyncsUpdates: Story = {
   },
 };
 
+export const FolderColorPreviewSyncsLayerTabAndRailProperty: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await setFolderPreviewColor(canvas.getByTestId('foldered-draggable-folder-layer-layer-1'), '#be185d');
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveAttribute(
+        'data-provenance-layer-color',
+        '#be185d',
+      );
+    });
+
+    const property = await ensurePropertyInRail(canvas, 'Output', 'Species');
+    expect(propertyColorSwatch(property)).toHaveStyle({ backgroundColor: '#be185d' });
+  },
+};
+
+export const NonLayerFolderColorAppliesToShelfAndRailProperties: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const previousContextFolder = canvas.getByTestId(
+      'foldered-draggable-folder-context-previous-process-previous-study-table',
+    );
+
+    await setFolderPreviewColor(previousContextFolder, '#0891b2');
+
+    const previousContextShelf = await openShelfFolder(canvas, previousContextFolder);
+    const shelfPropertyButton = previousContextShelf.getByRole('button', { name: /^Drag Previous Treatment$/ });
+    const shelfSwatch = shelfPropertyButton.querySelector<HTMLElement>('[data-foldered-color-swatch="true"]');
+
+    expect(shelfSwatch).not.toBeNull();
+    expect(shelfSwatch!).toHaveStyle({ backgroundColor: '#0891b2' });
+
+    const property = await ensurePropertyInRail(canvas, 'Input', 'Previous Treatment');
+    expect(propertyColorSwatch(property)).toHaveStyle({ backgroundColor: '#0891b2' });
+  },
+};
+
 export const RejectedShelfPropertyDropRestoresFolderItem: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -1324,7 +1365,7 @@ async function openShelfFolder(canvas: ReturnType<typeof within>, folder: HTMLEl
   const currentFolder = () => canvas.getByTestId(folderTestId);
 
   if (currentFolder().getAttribute('aria-expanded') !== 'true') {
-    await userEvent.click(currentFolder());
+    await userEvent.click(within(currentFolder()).getByRole('button', { name: /^Expand / }));
   }
 
   await waitFor(() => expect(currentFolder()).toHaveAttribute('aria-expanded', 'true'));
@@ -1373,6 +1414,20 @@ function propertyColorSwatch(property: HTMLElement) {
   }
 
   return swatch;
+}
+
+async function setFolderPreviewColor(folder: HTMLElement, color: string) {
+  const trigger = within(folder).getByRole('button', { name: /^Set color for folder / });
+  const triggerLabel = trigger.getAttribute('aria-label') ?? '';
+  const inputLabel = triggerLabel.replace(/^Set /, 'Choose ');
+
+  await userEvent.click(trigger);
+  const body = within(document.body);
+  const colorInput = await waitFor(() => body.getByLabelText(inputLabel));
+  fireEvent.change(colorInput, { target: { value: color } });
+  await userEvent.click(body.getByRole('button', { name: 'Select' }));
+
+  await waitFor(() => expect(trigger).toHaveStyle({ backgroundColor: color }));
 }
 
 async function showPropertyControls(

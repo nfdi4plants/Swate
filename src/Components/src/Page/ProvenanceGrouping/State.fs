@@ -96,6 +96,7 @@ module PropertyColors =
     let empty = {
         ManualPropertyColors = Map.empty
         LayerColors = Map.empty
+        FolderColors = Map.empty
     }
 
     let private automaticColorForLayer layerIndex = palette.[layerIndex % palette.Length]
@@ -135,6 +136,22 @@ module PropertyColors =
             PropertyColors = {
                 state.PropertyColors with
                     LayerColors = state.PropertyColors.LayerColors |> Map.remove layerId
+            }
+    }
+
+    let setFolderColor folderId color state = {
+        state with
+            PropertyColors = {
+                state.PropertyColors with
+                    FolderColors = state.PropertyColors.FolderColors |> Map.add folderId color
+            }
+    }
+
+    let clearFolderColor folderId state = {
+        state with
+            PropertyColors = {
+                state.PropertyColors with
+                    FolderColors = state.PropertyColors.FolderColors |> Map.remove folderId
             }
     }
 

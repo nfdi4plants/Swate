@@ -206,6 +206,52 @@ module DragDrop =
             tryParseHandleParts kind side sourceId parent
         | _ -> None
 
+/// Stable keys for the property shelf folders that can own fallback colors.
+module PropertyFolderColors =
+
+    open System
+    open Swate.Components.Shared.ProvenanceGrouping.Types
+    open Swate.Components.Shared.ProvenanceGrouping.Session
+
+    let private slug (value: string) =
+        let text = if isNull value then "" else value.Trim()
+
+        let chars =
+            text
+            |> Seq.map (fun character ->
+                if Char.IsLetterOrDigit character || character = '-' || character = '_' then
+                    Char.ToLowerInvariant character
+                else
+                    '-'
+            )
+            |> Seq.toArray
+
+        let compact =
+            String(chars).Split([| '-' |], StringSplitOptions.RemoveEmptyEntries)
+            |> String.concat "-"
+
+        if String.IsNullOrWhiteSpace compact then
+            "unknown"
+        else
+            compact
+
+    let layerFolderId (layerId: ProvenanceLayerId) = $"layer-{slug layerId}"
+
+    let previousContextFolderId (tableName: ProvenanceTableName option) (processName: ProvenanceProcessName option) =
+        let table = tableName |> Option.map slug |> Option.defaultValue "unknown-table"
+
+        let processSlug =
+            processName |> Option.map slug |> Option.defaultValue "unknown-process"
+
+        $"context-{processSlug}-{table}"
+
+    let unknownFolderId = "unknown-origin"
+
+    let tryOriginFolderId =
+        function
+        | PropertyOrigin.PreviousContext source -> Some(previousContextFolderId source.TableName source.ProcessName)
+        | _ -> None
+
 /// Keeps transient connector dragging outside editor state so pointer moves only
 /// repaint the overlay layer that needs the live path.
 module LiveDrag =
@@ -745,8 +791,15 @@ module PropertyProjection =
                     )
                     |> List.distinct
 
-                match layerOrigins with
-                | [ layerId ] -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
+                let folderOrigins =
+                    origins
+                    |> Set.toList
+                    |> List.choose PropertyFolderColors.tryOriginFolderId
+                    |> List.distinct
+
+                match layerOrigins, folderOrigins with
+                | [ layerId ], [] -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
+                | [], [ folderId ] -> uiState.PropertyColors.FolderColors |> Map.tryFind folderId
                 | _ -> None
 
         let colorByHeader =

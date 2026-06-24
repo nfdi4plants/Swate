@@ -96,6 +96,7 @@ type ProvenanceColor = string
 type PropertyColorSettings = {
     ManualPropertyColors: Map<GroupingKey, ProvenanceColor>
     LayerColors: Map<ProvenanceLayerId, ProvenanceColor>
+    FolderColors: Map<string, ProvenanceColor>
 }
 
 [<RequireQualifiedAccess>]
