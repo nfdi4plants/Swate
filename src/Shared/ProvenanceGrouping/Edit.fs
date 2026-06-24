@@ -36,11 +36,13 @@ type ProvenanceTablePatch =
         unit: ProvenanceTerm option
     | AddLoadedConnection of
         tableName: ProvenanceTableName *
+        processId: ProvenanceProcessId option *
         processName: ProvenanceProcessName option *
         inputSetId: ProvenanceSetId *
         outputSetId: ProvenanceSetId
     | RemoveLoadedConnection of
         tableName: ProvenanceTableName *
+        processId: ProvenanceProcessId option *
         processName: ProvenanceProcessName option *
         inputSetId: ProvenanceSetId *
         outputSetId: ProvenanceSetId
@@ -196,8 +198,19 @@ let private sourceFromTarget (model: ProvenanceModel) header target resolvedTarg
             )
         | _ -> None
 
+    let processId =
+        match target with
+        | ProvenancePropertyTarget.Connections connectionIds ->
+            connectionIds
+            |> List.tryPick (fun connectionId ->
+                model.Connections.TryFind connectionId
+                |> Option.bind (fun connection -> connection.ProcessId)
+            )
+        | _ -> None
+
     {
         TableName = model.LoadedTableName
+        ProcessId = processId
         ProcessName = processName
         Header = header
         InputNames = resolvedTarget.InputSets |> List.map (fun set -> set.Name) |> List.distinct
@@ -228,11 +241,15 @@ let private sourceFromLoadedMembership (model: ProvenanceModel) (propertyValue: 
 let private processNameCompatible (left: ProvenanceProcessName option) (right: ProvenanceProcessName option) =
     left = right || left.IsNone || right.IsNone
 
+let private processIdCompatible (left: ProvenanceProcessId option) (right: ProvenanceProcessId option) =
+    left = right || left.IsNone || right.IsNone
+
 let private sourceContextMatches (left: ProvenanceWritebackAnchor) (right: ProvenanceWritebackAnchor) =
     left.TableName = right.TableName
     && left.Header = right.Header
     && left.InputNames = right.InputNames
     && left.OutputNames = right.OutputNames
+    && processIdCompatible left.ProcessId right.ProcessId
     && processNameCompatible left.ProcessName right.ProcessName
 
 let private tryFindEquivalentLoadedPropertyValue
@@ -443,6 +460,7 @@ let removeConnection (connectionId: ProvenanceConnectionId) (model: ProvenanceMo
             [
                 ProvenanceTablePatch.RemoveLoadedConnection(
                     connection.TableName,
+                    connection.ProcessId,
                     connection.ProcessName,
                     connection.InputSetId,
                     connection.OutputSetId
@@ -460,6 +478,7 @@ let connectSets inputSetId outputSetId processName (model: ProvenanceModel) : Ed
         let connection: ProvenanceConnection = {
             Id = connectionId
             TableName = model.LoadedTableName
+            ProcessId = None
             ProcessName = processName
             InputSetId = inputSetId
             OutputSetId = outputSetId
@@ -475,6 +494,12 @@ let connectSets inputSetId outputSetId processName (model: ProvenanceModel) : Ed
         Ok(
             nextModel,
             [
-                ProvenanceTablePatch.AddLoadedConnection(model.LoadedTableName, processName, inputSetId, outputSetId)
+                ProvenanceTablePatch.AddLoadedConnection(
+                    model.LoadedTableName,
+                    None,
+                    processName,
+                    inputSetId,
+                    outputSetId
+                )
             ]
         )

@@ -10,6 +10,7 @@ type ProvenanceLayerSideId = string
 
 type PropertyValueSourceInfo = {
     TableName: ProvenanceTableName option
+    ProcessId: ProvenanceProcessId option
     ProcessName: ProvenanceProcessName option
     InputNames: string list
     OutputNames: string list
@@ -609,6 +610,7 @@ module Session =
         : PropertyValueSourceInfo =
         {
             TableName = Some source.TableName
+            ProcessId = source.ProcessId
             ProcessName = source.ProcessName
             InputNames = source.InputNames
             OutputNames = source.OutputNames
@@ -634,6 +636,7 @@ module Session =
         | _ ->
             Some {
                 TableName = Some layer.Model.LoadedTableName
+                ProcessId = None
                 ProcessName = None
                 InputNames = inputSets |> List.map (fun set -> set.Name) |> List.distinct
                 OutputNames = outputSets |> List.map (fun set -> set.Name) |> List.distinct

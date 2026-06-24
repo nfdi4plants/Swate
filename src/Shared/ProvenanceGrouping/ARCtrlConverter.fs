@@ -53,7 +53,9 @@ type ArcEndpointLocation = {
 type ArcWritebackLocation = {
     /// Study, assay, or run table containing this property value.
     Table: ArcTableLocation
-    /// Process name derived from ARCtrl table semantics.
+    /// Source-model process identity when ARCtrl exposes one.
+    ProcessId: ProvenanceProcessId option
+    /// Logical process name derived from ARCtrl table semantics.
     ProcessName: ProvenanceProcessName option
     /// Converted property header.
     Header: ProvenancePropertyHeader
@@ -70,7 +72,9 @@ type ArcWritebackLocation = {
 type ArcConnectionLocation = {
     /// Loaded table containing this input/output connection.
     Table: ArcTableLocation
-    /// Process name derived from the row that produced this connection.
+    /// Source-model process identity when ARCtrl exposes one.
+    ProcessId: ProvenanceProcessId option
+    /// Logical process name derived from the row that produced this connection.
     ProcessName: ProvenanceProcessName option
     /// Loaded input set ID in the core model.
     InputSetId: ProvenanceSetId
@@ -112,6 +116,7 @@ type internal TableRef = {
 
 type internal ProcessPairContext = {
     Location: ArcTableLocation
+    ProcessId: ProvenanceProcessId option
     ProcessName: ProvenanceProcessName option
     InputName: string option
     OutputName: string option
@@ -320,6 +325,7 @@ module internal Normalize =
 
     let sourceAnchor (pair: ProcessPairContext) header : ProvenanceWritebackAnchor = {
         TableName = pair.Location.TableName
+        ProcessId = pair.ProcessId
         ProcessName = pair.ProcessName
         Header = header
         InputNames = pairInputNames pair
@@ -328,6 +334,7 @@ module internal Normalize =
 
     let writebackLocation (pair: ProcessPairContext) header columnIndex : ArcWritebackLocation = {
         Table = pair.Location
+        ProcessId = pair.ProcessId
         ProcessName = pair.ProcessName
         Header = header
         InputNames = pairInputNames pair
@@ -448,6 +455,7 @@ module internal Dedup =
 
     let addConnection
         (location: ArcTableLocation)
+        processId
         processName
         inputSetId
         inputName
@@ -460,7 +468,7 @@ module internal Dedup =
                 [ "connection" ]
                 @ Normalize.locationParts location
                 @ [
-                    processName |> Option.defaultValue ""
+                    processId |> Option.defaultValue ""
                     inputSetId
                     outputSetId
                 ]
@@ -469,6 +477,7 @@ module internal Dedup =
         let connection: ProvenanceConnection = {
             Id = id
             TableName = location.TableName
+            ProcessId = processId
             ProcessName = processName
             InputSetId = inputSetId
             OutputSetId = outputSetId
@@ -476,6 +485,7 @@ module internal Dedup =
 
         let connectionLocation: ArcConnectionLocation = {
             Table = location
+            ProcessId = processId
             ProcessName = processName
             InputSetId = inputSetId
             OutputSetId = outputSetId
@@ -509,16 +519,6 @@ module internal Dedup =
             sets
 
     let private propertyValueId (candidate: CandidatePropertyValue) =
-        let inputNames =
-            candidate.Source
-            |> Option.map (fun source -> source.InputNames)
-            |> Option.defaultValue candidate.WritebackLocation.InputNames
-
-        let outputNames =
-            candidate.Source
-            |> Option.map (fun source -> source.OutputNames)
-            |> Option.defaultValue candidate.WritebackLocation.OutputNames
-
         Normalize.stableId (
             [ "property" ]
             @ Normalize.locationParts candidate.WritebackLocation.Table
@@ -526,8 +526,6 @@ module internal Dedup =
                 candidate.WritebackLocation.ProcessName |> Option.defaultValue ""
                 candidate.Header.Kind.Id
                 candidate.Header.Category.Name
-                String.concat "|" inputNames
-                String.concat "|" outputNames
                 Normalize.valueIdentityText candidate.Value candidate.Unit
             ]
         )
@@ -536,6 +534,30 @@ module internal Dedup =
         match map |> Map.tryFind propertyValueId with
         | Some _ -> map
         | None -> map |> Map.add propertyValueId location
+
+    let private mergeDistinct left right = left @ right |> List.distinct
+
+    let private keepExisting existing incoming =
+        match existing with
+        | Some _ -> existing
+        | None -> incoming
+
+    let private mergeSource
+        (existing: ProvenanceWritebackAnchor option)
+        (incoming: ProvenanceWritebackAnchor option)
+        : ProvenanceWritebackAnchor option =
+        match existing, incoming with
+        | Some existing, Some incoming ->
+            Some {
+                existing with
+                    ProcessId = keepExisting existing.ProcessId incoming.ProcessId
+                    ProcessName = keepExisting existing.ProcessName incoming.ProcessName
+                    InputNames = mergeDistinct existing.InputNames incoming.InputNames
+                    OutputNames = mergeDistinct existing.OutputNames incoming.OutputNames
+            }
+        | Some existing, None -> Some existing
+        | None, Some incoming -> Some incoming
+        | None, None -> None
 
     let addCandidateProperty (candidate: CandidatePropertyValue) (state: ConvertState) =
         let targetInputSetIds = candidate.TargetInputSetIds |> List.distinct
@@ -550,15 +572,18 @@ module internal Dedup =
             let id = propertyValueId candidate
 
             let propertyValue: ProvenancePropertyValue =
-                state.PropertyValues
-                |> Map.tryFind id
-                |> Option.defaultValue {
+                match state.PropertyValues |> Map.tryFind id with
+                | Some existing -> {
+                    existing with
+                        Source = mergeSource existing.Source candidate.Source
+                  }
+                | None -> {
                     Id = id
                     Header = candidate.Header
                     Value = candidate.Value
                     Unit = candidate.Unit
                     Source = candidate.Source
-                }
+                  }
 
             {
                 state with
@@ -606,7 +631,8 @@ module internal LoadedTable =
         : ProcessPairContext =
         {
             Location = location
-            ProcessName = proc.Name
+            ProcessId = proc.Name
+            ProcessName = Normalize.trimToOption location.TableName
             InputName = Normalize.trimToOption input.Name
             OutputName = Normalize.trimToOption output.Name
         }
@@ -820,7 +846,8 @@ module internal LoadedTable =
                             | Some inputSetId, Some inputName, Some outputSetId, Some outputName ->
                                 Dedup.addConnection
                                     location
-                                    proc.Name
+                                    pair.ProcessId
+                                    pair.ProcessName
                                     inputSetId
                                     inputName
                                     outputSetId
@@ -872,6 +899,7 @@ module internal PreviousContext =
                                 Normalize.locationParts pair.Location
                                 @ [
                                     pair.ProcessName |> Option.defaultValue ""
+                                    pair.ProcessId |> Option.defaultValue ""
                                     pair.InputName |> Option.defaultValue ""
                                     pair.OutputName |> Option.defaultValue ""
                                 ]

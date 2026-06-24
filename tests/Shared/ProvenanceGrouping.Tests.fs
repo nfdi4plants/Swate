@@ -36,6 +36,7 @@ let typeTests =
                 Source =
                     Some {
                         TableName = "previous-table"
+                        ProcessId = None
                         ProcessName = Some "previous-process"
                         Header = species
                         InputNames = [ "Ancestor A" ]
@@ -1004,7 +1005,7 @@ let editTests =
             let createdOutputId = created.OutputSets |> Map.toList |> List.exactlyOne |> fst
 
             match connectSets "input-a" createdOutputId None created with
-            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedConnection(_, _, inputSetId, outputSetId) ]) ->
+            | Ok(nextModel, [ ProvenanceTablePatch.AddLoadedConnection(_, _, _, inputSetId, outputSetId) ]) ->
                 Expect.equal inputSetId "input-a" "Connection patch should target the existing loaded input."
                 Expect.equal outputSetId createdOutputId "Connection patch should target the created loaded output."
 
@@ -1020,8 +1021,9 @@ let editTests =
 
             match connectSets "input-c" "output-a" None model with
             | Ok(nextModel,
-                 [ ProvenanceTablePatch.AddLoadedConnection(tableName, processName, inputSetId, outputSetId) ]) ->
+                 [ ProvenanceTablePatch.AddLoadedConnection(tableName, processId, processName, inputSetId, outputSetId) ]) ->
                 Expect.equal tableName "assay-table" "Patch should target loaded table."
+                Expect.equal processId None "Caller-created connections do not have a source process id."
                 Expect.equal processName None "Caller may create a connection without assigning a process name yet."
                 Expect.equal inputSetId "input-c" "Patch should keep input set."
                 Expect.equal outputSetId "output-a" "Patch should keep output set."
@@ -1044,8 +1046,13 @@ let editTests =
 
             match removeConnection "connection-c" model with
             | Ok(nextModel,
-                 [ ProvenanceTablePatch.RemoveLoadedConnection(tableName, processName, inputSetId, outputSetId) ]) ->
+                 [ ProvenanceTablePatch.RemoveLoadedConnection(tableName,
+                                                               processId,
+                                                               processName,
+                                                               inputSetId,
+                                                               outputSetId) ]) ->
                 Expect.equal tableName "assay-table" "Patch should target the loaded table."
+                Expect.equal processId None "Fixture connections do not have a source process id."
                 Expect.equal processName (Some "assay-process") "Patch should keep the process name for writeback."
                 Expect.equal inputSetId "input-b" "Patch should keep the input set."
                 Expect.equal outputSetId "output-b" "Patch should keep the output set."
