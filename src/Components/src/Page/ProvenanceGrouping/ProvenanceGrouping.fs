@@ -957,6 +957,7 @@ module private EditorSurface =
         addPaletteValue
         setPropertyColor
         sourceInfoForValue
+        isDropRejected
         debug
         setIsValueChipDragging
 
@@ -973,6 +974,7 @@ module private EditorSurface =
             toggleExpanded,
             addPaletteValue,
             (fun header -> projection.CanSwitchHeaders.Contains header),
+            isDropRejected,
             setIsValueChipDragging,
             (fun header -> projection.StatsByHeader |> Map.tryFind header),
             (fun header -> projection.BadgeByHeader |> Map.tryFind header),
@@ -1442,6 +1444,17 @@ type ProvenanceGrouping =
         let toggleRail side =
             setOpenRail (if openRail = Some side then None else Some side)
 
+        let isRejectedPropertyRailDrop targetSide =
+            let headerCannotSwitch sourceSide headerId =
+                sourceSide <> targetSide
+                && (lookups.FindHeader headerId
+                    |> Option.exists (fun header -> PropertyRails.canSwitchHeader header layer.Model |> not))
+
+            match activeDrag with
+            | Some(DragDrop.Payload.FolderPropertyHeader(sourceSide, headerId))
+            | Some(DragDrop.Payload.PropertyHeader(sourceSide, headerId)) -> headerCannotSwitch sourceSide headerId
+            | _ -> false
+
         let railPanel side =
             let layer = Session.activeLayer session
 
@@ -1470,6 +1483,7 @@ type ProvenanceGrouping =
                 (fun header value unit -> addPaletteValue side header value unit)
                 setPropertyColor
                 sourceInfoForValue
+                (isRejectedPropertyRailDrop side)
                 debug
                 setIsValueChipDragging
 

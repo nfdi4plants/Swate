@@ -375,8 +375,23 @@ export const SingleSidedShelfPropertiesCannotDropOnOppositeSide: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const source = await shelfProperty(canvas, 'Analysis');
+    const inputRail = canvas.getByTestId('provenance-property-rail-Input');
 
-    await dragByPointer(source, canvas.getByTestId('provenance-property-rail-Input'));
+    await startDragByPointer(source);
+    const pointer = await moveDragPointerTo(inputRail);
+    await waitFor(() => {
+      expect(inputRail).toHaveAttribute('data-provenance-drop-state', 'rejecting');
+      expect(inputRail).toHaveClass('swt:border-warning');
+    });
+
+    fireEvent.pointerUp(inputRail, {
+      clientX: pointer.x,
+      clientY: pointer.y,
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId: 1,
+    });
     await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument());
 
     expect(canvas.queryByTestId('provenance-property-Input-Analysis')).not.toBeInTheDocument();
@@ -1262,6 +1277,24 @@ async function startDragByPointer(source: Element) {
   await nextFrame();
 
   return { x: activationX, y: activationY };
+}
+
+async function moveDragPointerTo(target: Element) {
+  const to = target.getBoundingClientRect();
+  const toX = to.left + to.width / 2;
+  const toY = to.top + to.height / 2;
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  fireEvent.pointerMove(document, {
+    clientX: toX,
+    clientY: toY,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+  await nextFrame();
+
+  return { x: toX, y: toY };
 }
 
 function escapeRegExp(value: string) {

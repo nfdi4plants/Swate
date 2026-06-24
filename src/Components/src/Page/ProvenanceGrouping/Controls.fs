@@ -754,6 +754,7 @@ type Controls =
             onToggleExpanded: ProvenancePropertyHeader -> unit,
             onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             canSwitch: ProvenancePropertyHeader -> bool,
+            isDropRejected: bool,
             setIsValueChipDragging: bool -> unit,
             statsForHeader: ProvenancePropertyHeader -> PropertyStats option,
             badgeForHeader: ProvenancePropertyHeader -> PropertyCountBadge option,
@@ -797,15 +798,23 @@ type Controls =
 
         let hiddenHeaderCount = headers.Length - visibleHeaders.Length
 
+        let dropState =
+            if droppable.isOver && isDropRejected then "rejecting"
+            elif droppable.isOver then "over"
+            else "idle"
+
         Html.aside [
             prop.ref droppable.setNodeRef
             prop.className [
                 "swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-dashed swt:border-base-content/25 swt:border-2 swt:p-3 swt:transition-colors"
-                if droppable.isOver then
+                if dropState = "rejecting" then
+                    "swt:border-warning swt:bg-warning/10 swt:ring-2 swt:ring-warning/30"
+                elif droppable.isOver then
                     "swt:border-primary swt:bg-primary/10"
                 if headers.IsEmpty then
                     "swt:items-center swt:justify-center"
             ]
+            prop.custom ("data-provenance-drop-state", dropState)
             if defaultArg debug false then
                 prop.testId $"provenance-property-rail-{side}"
 
