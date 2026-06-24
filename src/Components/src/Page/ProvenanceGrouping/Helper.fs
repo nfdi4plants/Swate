@@ -361,9 +361,6 @@ module PropertyRails =
     let headersForSide side (model: ProvenanceModel) =
         headersFromSets ProvenanceSet.effectivePropertyValueIds side model
 
-    let ownedHeadersForSide side (model: ProvenanceModel) =
-        headersFromSets (fun set -> set.PropertyValueIds) side model
-
     let headersForModel (model: ProvenanceModel) =
         [
             yield! headersForSide ProvenanceSide.Input model
@@ -462,9 +459,6 @@ module PropertyRails =
         )
         |> List.sortBy (fun header -> header.Category.Name)
 
-    let propertyRailHeadersForSide layerId side model uiState =
-        propertyRailHeadersForSideUsing (fun header -> defaultRailSide header model) layerId side model uiState
-
     let propertyRailHeadersForSideInSession session layerId side model uiState =
         propertyRailHeadersForSideUsing
             (fun header -> defaultRailSideInSession session layerId header model)
@@ -489,37 +483,6 @@ module PropertyRails =
         |> List.groupBy (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
         |> List.map (fun (_, values) -> values |> List.sortBy (fun value -> value.Id) |> List.head)
         |> List.sortBy (fun propertyValue -> Formatting.formatValue propertyValue.Value propertyValue.Unit)
-
-    let railProjection layerId side model uiState =
-        let headers = propertyRailHeadersForSide layerId side model uiState
-
-        let valuesByHeader =
-            headers
-            |> List.map (fun header -> header, propertyValuesForSideHeader layerId side header model uiState)
-            |> Map.ofList
-
-        let expandedHeaders =
-            headers
-            |> List.filter (fun header -> State.PropertyExpansion.isExpanded layerId side header uiState)
-            |> Set.ofList
-
-        let canSwitchHeaders =
-            headers
-            |> List.filter (fun header -> canSwitchHeader header model)
-            |> Set.ofList
-
-        {
-            Headers = headers
-            ValuesByHeader = valuesByHeader
-            ExpandedHeaders = expandedHeaders
-            CanSwitchHeaders = canSwitchHeaders
-            StatsByHeader = Map.empty
-            ConnectionCountByHeader = Map.empty
-            BadgeByHeader = Map.empty
-            ColorByHeader = Map.empty
-            OriginByHeader = Map.empty
-            OriginFilterOptions = []
-        }
 
 module Search =
 
@@ -1063,37 +1026,6 @@ module ValueAssignment =
             ]
         else
             findGroup dropSide dropGroupId |> Option.toList
-
-/// Builds property-value views with source and origin info for display.
-module PropertyValueViewing =
-
-    open Swate.Components.Shared.ProvenanceGrouping.Types
-    open Swate.Components.Shared.ProvenanceGrouping.Session
-    open Swate.Components.Page.ProvenanceGrouping.Types
-
-    type PropertyValueView = {
-        Value: ProvenancePropertyValue
-        SourceInfo: PropertyValueSourceInfo option
-        Origin: PropertyOrigin option
-        Color: ProvenanceColor option
-    }
-
-    let buildPropertyValueView
-        (layerId: ProvenanceLayerId)
-        (side: ProvenanceSide)
-        (session: ProvenanceSession)
-        (color: ProvenanceColor option)
-        (value: ProvenancePropertyValue)
-        : PropertyValueView =
-        let sourceInfo = Session.propertyValueSourceInfo (Session.activeLayer session) value
-        let origin = Session.propertyValueOriginInSession layerId side value.Id session
-
-        {
-            Value = value
-            SourceInfo = sourceInfo
-            Origin = origin
-            Color = color
-        }
 
 [<Fable.Core.Mangle(false)>]
 module Exports =

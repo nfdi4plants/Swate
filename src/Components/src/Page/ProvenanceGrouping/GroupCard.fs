@@ -339,24 +339,6 @@ type GroupCard =
             articleRef.current <- (if isNull element then None else Some(unbox element))
             droppable.setNodeRef element
 
-        // let dnd = DndKit.use()
-
-        // let isValueChipDragging =
-        //     match dnd.active with
-        //     | Some active ->
-        //         active.data.current?type = DragDrop.PropertyValue
-        //     | None ->
-        //         false
-
-        // let dnd = DndKit.use()
-
-        // let isValueChipDragging =
-        //     match dnd.active with
-        //     | Some active ->
-        //         active.data.current?type = DragDrop.PropertyValue
-        //     | None ->
-        //         false
-
         // Two anchors at opposite card edges: the group-facing edge carries the draggable
         // group connection handle, the property-facing edge is measurement-only and is
         // where property/value connectors from the same-side rail attach.

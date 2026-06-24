@@ -1180,9 +1180,6 @@ type Controls =
             [| box drag.isDragging |]
         )
 
-        // let isdragging = setIsValueChipDragging drag.isDragging
-
-
         let text = Formatting.formatValue propertyValue.Value propertyValue.Unit
 
         let label =
