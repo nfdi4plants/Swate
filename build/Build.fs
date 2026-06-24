@@ -106,8 +106,7 @@ let main args =
             printGreenfn ("Release docker!")
             0
         | "electron-web" ->
-            let GithubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
-            Release.electron latestVersion GithubToken isDryRun
+            Release.electron latestVersion
             printGreenfn ("Release electron-web!")
             0
         | "electron-bin" ->
@@ -120,8 +119,7 @@ let main args =
                     exit 1
                 )
 
-            let GithubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
-            Release.electronBinaries arch GithubToken latestVersion isDryRun
+            Release.electronBinaries arch
             printGreenfn "Release electron-bin for arch %s!" arch
             0
         | "storybook" ->
@@ -160,10 +158,25 @@ let main args =
             | None -> GitHub.mkRelease GitHubToken latestVersion |> ignore
 
             0
-    | "postrelease" :: _ ->
+    | "postrelease" :: dir :: _ ->
 
         let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
         let latestVersion = Changelog.getLatestVersion ()
+
+        if Directory.Exists(dir) then
+            let files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
+
+            if files.Length > 0 then
+                for file in files do
+                    GitHub.uploadReleaseAsset GitHubToken latestVersion file |> ignore
+
+                printGreenfn "Uploaded %d assets to release %O" files.Length latestVersion.Version
+            else
+                printGreenfn "No assets found in %s, skipping upload." dir
+        else
+            printRedfn "Directory not found: %s" dir
+            exit 1
+
         let isPrerelease = latestVersion.Version.IsPrerelease
 
         GitHub.updateRelease

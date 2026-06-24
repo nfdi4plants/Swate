@@ -159,8 +159,8 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
 open System.IO
 open System.IO.Compression
 
-/// This currently builds the frontend, zips it to add it as asset to github release
-let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
+/// Builds the frontend and zips it for the GitHub release
+let electron (version: Changelog.Version) =
 
     let sourceDir = Path.Combine(ProjectPaths.deployPath, "public")
     let targetZip = "./SwateClient.zip"
@@ -172,26 +172,13 @@ let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
 
     ZipFile.CreateFromDirectory(sourceDir, targetZip, CompressionLevel.Optimal, includeBaseDirectory = false)
 
-    let response = GitHub.uploadReleaseAsset token version targetZip
-
     ()
 
-let electronBinaries (arch: string) (token: string) (version: Changelog.Version) (isDryRun: bool) =
+let electronBinaries (arch: string) =
 
     run "npm" [ "run"; "fable" ] ProjectPaths.electronPath
 
     run "npx" [ "electron-forge"; "make"; sprintf "--arch=%s" arch ] ProjectPaths.electronPath
-
-    if not isDryRun then
-        let makeDir = Path.Combine(ProjectPaths.electronPath, "out", "make")
-
-        if Directory.Exists(makeDir) then
-            let files = Directory.GetFiles(makeDir, "*", SearchOption.AllDirectories)
-
-            for file in files do
-                GitHub.uploadReleaseAsset token version file |> ignore
-
-            printGreenfn "Uploaded %d electron binaries to release %O" files.Length version.Version
 
     ()
 

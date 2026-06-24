@@ -118,6 +118,12 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }}
 
+      - uses: actions/upload-artifact@v4
+        if: ${{ matrix.target == 'electron-web' }}
+        with:
+          name: release-assets-client
+          path: SwateClient.zip
+
       # This publishes storybook folder to gh-pages. Only run on matrix.target == 'storybook'
       - name: Publish Storybook to GitHub Pages
         uses: bitovi/github-actions-storybook-to-github-pages@v1.0.3
@@ -178,9 +184,18 @@ jobs:
         run: npm i
 
       - name: Build and release Electron binaries
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project ./build/Build.fsproj release electron-bin --ci --arch=${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-electron-${{ runner.os }}-${{ matrix.arch }}
+          path: |
+            src/Electron/out/make/**/*.exe
+            src/Electron/out/make/**/*.nupkg
+            src/Electron/out/make/**/*.zip
+            src/Electron/out/make/**/*.dmg
+            src/Electron/out/make/**/*.deb
+            src/Electron/out/make/**/*.rpm
 
   post_release:
     needs: [release, release_electron_binaries, verify_release]
@@ -198,7 +213,12 @@ jobs:
         with:
           dotnet-version: 10.x.x
 
-      - name: Finalize GitHub Release
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          path: release-assets
+
+      - name: Upload assets and finalize release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet run --project ./build/Build.fsproj postrelease
+        run: dotnet run --project ./build/Build.fsproj postrelease release-assets
