@@ -176,5 +176,24 @@ let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
 
     ()
 
+let electronBinaries (arch: string) (token: string) (version: Changelog.Version) (isDryRun: bool) =
+
+    run "npm" [ "run"; "fable" ] ProjectPaths.electronPath
+
+    run "npx" [ "electron-forge"; "make"; sprintf "--arch=%s" arch ] ProjectPaths.electronPath
+
+    if not isDryRun then
+        let makeDir = Path.Combine(ProjectPaths.electronPath, "out", "make")
+
+        if Directory.Exists(makeDir) then
+            let files = Directory.GetFiles(makeDir, "*", SearchOption.AllDirectories)
+
+            for file in files do
+                GitHub.uploadReleaseAsset token version file |> ignore
+
+            printGreenfn "Uploaded %d electron binaries to release %O" files.Length version.Version
+
+    ()
+
 let storybook () =
     run "npm" [ "run"; "build:storybook" ] ProjectPaths.componentsPath

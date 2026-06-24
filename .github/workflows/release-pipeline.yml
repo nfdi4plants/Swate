@@ -59,6 +59,7 @@ jobs:
     needs: test
     outputs:
       should_skip: ${{ steps.buildscript.outputs.should_skip }}
+      version: ${{ steps.buildscript.outputs.version }}
     steps:
       - uses: actions/checkout@v5
 
@@ -83,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [nuget, npm, docker, electron, storybook]
+        target: [nuget, npm, docker, electron-web, storybook]
     steps:
       # Checkout the repository
       - name: Checkout code
@@ -127,8 +128,62 @@ jobs:
           path: src/Components/storybook-static # default: dist/storybook
           checkout: false # default: true
 
+  release_electron_binaries:
+    needs: verify_release
+    if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+
+          # - os: windows-latest
+          #   arch: arm64
+
+          - os: macos-latest
+            arch: x64
+
+          - os: macos-latest
+            arch: arm64
+
+          - os: ubuntu-latest
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      # Install Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: "npm"
+
+      # Install npm dependencies
+      - name: Install root dependencies
+        run: npm i
+
+      - name: Build and release Electron binaries
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: dotnet run --project ./build/Build.fsproj release electron-bin --ci --arch=${{ matrix.arch }}
+
   post_release:
-    needs: [release, verify_release]
+    needs: [release, release_electron_binaries, verify_release]
     runs-on: windows-latest
     if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
 

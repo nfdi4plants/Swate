@@ -11,3 +11,5 @@ let setGitHubOutput (name: string) (value: string) =
     | path -> File.AppendAllText(path, $"{name}={value}\n")
 
 let setShouldSkip () = setGitHubOutput "should_skip" "true"
+
+let setVersion (version: string) = setGitHubOutput "version" version

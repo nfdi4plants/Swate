@@ -106,7 +106,21 @@ let updateComponentsPackageJSONVersion (version: Changelog.Version) =
 
     printfn "Updated src/Components/package.json to version %O" version.Version
 
+let updateElectronPackageJSONVersion (version: Changelog.Version) =
+    run
+        "npm"
+        [
+            "version"
+            version.Version.ToString()
+            "--allow-same-version"
+            "--no-git-tag-version"
+        ]
+        "src/Electron"
+
+    printfn "Updated src/Electron/package.json to version %O" version.Version
+
 let updateAllVersionInformationInFiles (version: Changelog.Version) =
     updateVersionFiles version
     updateFSharpProjectVersions version
     updateComponentsPackageJSONVersion version
+    updateElectronPackageJSONVersion version

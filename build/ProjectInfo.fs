@@ -10,6 +10,7 @@ module ProjectPaths =
     let serverPath = Path.GetFullPath "src/Server"
     let clientPath = Path.GetFullPath "src/Client"
     let componentsPath = Path.GetFullPath "src/Components"
+    let electronPath = Path.GetFullPath "src/Electron"
     let deployPath = Path.GetFullPath "deploy"
     let nugetDeployPath = Path.GetFullPath "nupkgs"
     let nugetSln = Path.GetFullPath "Nuget.sln"

@@ -1,4 +1,5 @@
 open System
+open System.IO
 open ProjectInfo
 
 [<EntryPoint>]
@@ -104,10 +105,24 @@ let main args =
 
             printGreenfn ("Release docker!")
             0
-        | "electron" ->
+        | "electron-web" ->
             let GithubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
             Release.electron latestVersion GithubToken isDryRun
-            printGreenfn ("Release electron!")
+            printGreenfn ("Release electron-web!")
+            0
+        | "electron-bin" ->
+            let arch =
+                otherArgs
+                |> List.tryFind (fun x -> x.StartsWith "--arch=")
+                |> Option.map (fun x -> x.Substring 7)
+                |> Option.defaultWith (fun () ->
+                    printRedfn "No --arch provided for electron-bin target!"
+                    exit 1
+                )
+
+            let GithubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
+            Release.electronBinaries arch GithubToken latestVersion isDryRun
+            printGreenfn "Release electron-bin for arch %s!" arch
             0
         | "storybook" ->
             printfn "Starting Storybook release!"
@@ -124,6 +139,8 @@ let main args =
         let tags = Git.getTags () |> Array.toList |> List.distinct
 
         let nextTag = latestVersion.Version.ToString()
+
+        GHActions.setVersion nextTag
 
         let releaseAlreadyExists = tags |> List.contains (nextTag)
 
@@ -161,6 +178,27 @@ let main args =
         |> ignore
 
         0
+    | "upload-release-assets" :: dir :: _ ->
+
+        let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
+        let latestVersion = Changelog.getLatestVersion ()
+
+        if not (Directory.Exists(dir)) then
+            printRedfn "Directory not found: %s" dir
+            exit 1
+
+        let files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
+
+        if files.Length = 0 then
+            printGreenfn "No assets found in %s, skipping upload." dir
+            0
+        else
+            for file in files do
+                GitHub.uploadReleaseAsset GitHubToken latestVersion file |> ignore
+
+            printGreenfn "Uploaded %d assets to release %O" files.Length latestVersion.Version
+
+            0
     | "dev" :: a ->
         let latestVersion = Changelog.getLatestVersion ()
         0
