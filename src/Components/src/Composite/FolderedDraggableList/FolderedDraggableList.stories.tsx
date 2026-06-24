@@ -41,6 +41,7 @@ type StoryListProps = {
   shelfDropId?: string;
   tryCreateItemFromExternalDrop?: (drop: StoryExternalDrop) => StoryItem | undefined;
   onFoldersChange?: (folders: FSharpList<StoryFolder>) => void;
+  onSetFolderColor?: (folderId: string, color?: string) => void;
   className?: string;
   debug?: boolean;
 };
@@ -263,6 +264,33 @@ function UpdatingHarness() {
       </div>
       <DndContext>
         <StoryFolderedDraggableList folders={folders} dragId={dragId} debug />
+      </DndContext>
+    </div>
+  );
+}
+
+function FolderColorHarness() {
+  const [folders, setFolders] = React.useState(() => initialFolders());
+
+  const setFolderColor = (folderId: string, color?: string) => {
+    setFolders((current) =>
+      fsList(
+        Array.from(current).map((currentFolder) =>
+          currentFolder.Id === folderId
+            ? {
+                ...currentFolder,
+                Color: color,
+              }
+            : currentFolder,
+        ),
+      ),
+    );
+  };
+
+  return (
+    <div className="swt:flex swt:w-96 swt:flex-col swt:gap-3">
+      <DndContext>
+        <StoryFolderedDraggableList folders={folders} dragId={dragId} onSetFolderColor={setFolderColor} debug />
       </DndContext>
     </div>
   );
@@ -633,6 +661,44 @@ export const UpdatesWhenFoldersPropChanges: Story = {
       .querySelector<HTMLElement>('[data-foldered-color-swatch="true"]');
     expect(folderSwatch).not.toBeNull();
     expect(folderSwatch!).toHaveStyle({ backgroundColor: '#7c3aed' });
+  },
+};
+
+export const SetsFolderColorFromPreview: Story = {
+  render: () => <FolderColorHarness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const trigger = canvas.getByRole('button', { name: 'Set color for folder Layer A' });
+    const triggerTarget = trigger.parentElement!;
+    const folderCard = canvas.getByTestId('foldered-draggable-folder-layer-a');
+    const folderToggle = canvas.getByRole('button', { name: 'Expand Layer A' });
+
+    expect(folderCard).not.toHaveAttribute('role', 'button');
+    expect(folderCard).not.toHaveAttribute('tabindex');
+    expect(folderCard).toHaveAttribute('aria-expanded', 'false');
+
+    await userEvent.click(triggerTarget);
+    expect(folderCard).toHaveAttribute('aria-expanded', 'false');
+    expect(folderCard).not.toHaveFocus();
+    expect(folderToggle).not.toHaveFocus();
+
+    const body = within(document.body);
+    const colorInput = await waitFor(() => body.getByLabelText('Choose color for folder Layer A'));
+    fireEvent.change(colorInput, { target: { value: '#be185d' } });
+    await userEvent.click(body.getByRole('button', { name: 'Select' }));
+
+    await waitFor(() => {
+      expect(canvas.getByRole('button', { name: 'Set color for folder Layer A' })).toHaveStyle({
+        backgroundColor: '#be185d',
+      });
+    });
+
+    expect(canvas.getByTestId('foldered-draggable-folder-layer-a')).toHaveAttribute(
+      'data-foldered-folder-color',
+      '#be185d',
+    );
+    expect(canvas.getByTestId('foldered-draggable-folder-layer-a')).not.toHaveFocus();
+    expect(folderToggle).not.toHaveFocus();
   },
 };
 

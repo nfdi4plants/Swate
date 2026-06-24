@@ -5,9 +5,20 @@ open Fable.Core.JsInterop
 open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
+open Swate.Components.Primitive.Popover
 open Swate.Components.Composite.FolderedDraggableList.Types
 
 module private FolderedDraggableListHelper =
+
+    let fallbackColor = "#2563eb"
+
+    let currentOrFallback color =
+        match color with
+        | Some c when c <> "" -> c
+        | _ -> fallbackColor
+
+    [<Emit("$0.target && $0.target.closest && $0.target.closest('[data-folder-color-control]') !== null")>]
+    let isFolderColorControlEvent (_event: Browser.Types.Event) : bool = jsNative
 
     let effectiveColor (folder: FolderedDraggableFolder<'payload>) (item: FolderedDraggableItem<'payload>) =
         item.Color |> Option.orElse folder.Color
@@ -64,6 +75,35 @@ module private FolderedDraggableListHelper =
                 prop.style [ style.backgroundColor color ]
             ]
         | _ -> Html.none
+
+    let colorPickerContent ariaLabel (draftColor: string) (setDraftColor: string -> unit) onSetColor =
+        Html.div [
+            prop.className "swt:flex swt:items-center swt:gap-2 swt:p-2"
+            prop.children [
+                Html.input [
+                    prop.custom ("type", "color")
+                    prop.className "swt:h-8 swt:w-10 swt:cursor-pointer swt:rounded swt:border swt:border-base-300"
+                    prop.value draftColor
+                    prop.ariaLabel ariaLabel
+                    prop.onChange (fun (color: string) -> setDraftColor color)
+                ]
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-xs swt:btn-primary swt:min-h-0 swt:py-0"
+                    prop.text "Select"
+                    prop.onClick (fun _ -> onSetColor (Some draftColor))
+                ]
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:min-h-0 swt:py-0"
+                    prop.text "Clear"
+                    prop.onClick (fun _ ->
+                        setDraftColor fallbackColor
+                        onSetColor None
+                    )
+                ]
+            ]
+        ]
 
     let defaultItemContent (render: FolderedDraggableItemRender<'payload>) =
         React.Fragment [
@@ -173,84 +213,172 @@ type FolderedDraggableList =
         ]
 
     [<ReactComponent>]
+    static member private FolderColorButton<'payload>
+        (folder: FolderedDraggableFolder<'payload>, onSetColor: string option -> unit, ?key: string)
+        =
+        let draftColor, setDraftColor =
+            React.useState (FolderedDraggableListHelper.currentOrFallback folder.Color)
+
+        React.useEffect (
+            (fun () -> setDraftColor (FolderedDraggableListHelper.currentOrFallback folder.Color)),
+            [| box folder.Color |]
+        )
+
+        let trigger =
+            Html.button [
+                match key with
+                | Some key -> prop.key key
+                | None -> ()
+                prop.type'.button
+                prop.custom ("data-folder-color-control", "true")
+                prop.custom ("data-foldered-color-swatch", "true")
+                prop.className
+                    "swt:size-3 swt:shrink-0 swt:cursor-pointer swt:rounded-full swt:border swt:border-base-300 swt:bg-base-100 swt:p-0 swt:shadow-sm"
+                match folder.Color with
+                | Some color when color <> "" -> prop.style [ style.backgroundColor color ]
+                | _ -> ()
+                prop.ariaLabel $"Set color for folder {folder.Name}"
+            ]
+
+        let content =
+            FolderedDraggableListHelper.colorPickerContent
+                $"Choose color for folder {folder.Name}"
+                draftColor
+                setDraftColor
+                onSetColor
+
+        Popover.Popover(
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        trigger,
+                        className = "swt:inline-flex swt:shrink-0",
+                        props = [ prop.custom ("data-folder-color-control", "true") ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:flex swt:items-start swt:justify-between swt:gap-2"
+                                        prop.children [
+                                            Html.div [ prop.className "swt:flex-1"; prop.children content ]
+                                            Popover.Close()
+                                        ]
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
+        )
+
+    [<ReactComponent>]
     static member private Folder<'payload>
-        (folder: FolderedDraggableFolder<'payload>, isExpanded: bool, onToggle: unit -> unit, ?debug: bool, ?key: string) =
-        Html.button [
+        (
+            folder: FolderedDraggableFolder<'payload>,
+            isExpanded: bool,
+            onToggle: unit -> unit,
+            ?onSetColor: string option -> unit,
+            ?debug: bool,
+            ?key: string
+        ) =
+        Html.div [
             match key with
             | Some key -> prop.key key
             | None -> ()
-            prop.type'.button
-            prop.className [
-                "swt:btn swt:h-32 swt:w-36 swt:min-w-36 swt:flex-none swt:flex-col swt:items-stretch swt:justify-between swt:gap-2 swt:overflow-hidden swt:rounded-lg swt:border swt:p-3 swt:text-left swt:normal-case swt:shadow-sm swt:transition-all"
-                if isExpanded then
-                    "swt:border-primary swt:bg-primary/10 swt:text-primary swt:ring-2 swt:ring-primary/20"
-                else
-                    "swt:border-base-300 swt:bg-base-100 hover:swt:border-primary/60 hover:swt:bg-base-200"
-            ]
+            prop.className "swt:relative swt:h-32 swt:w-36 swt:min-w-36 swt:flex-none"
             match folder.Color with
-            | Some color when color <> "" ->
-                prop.custom ("data-foldered-folder-color", color)
-
-                if not isExpanded then
-                    prop.style [ style.borderColor color ]
+            | Some color when color <> "" -> prop.custom ("data-foldered-folder-color", color)
             | _ -> ()
             prop.custom ("aria-expanded", isExpanded)
-            prop.title folder.Name
-            prop.ariaLabel (
-                if isExpanded then
-                    $"Collapse {folder.Name}"
-                else
-                    $"Expand {folder.Name}"
-            )
-            prop.onClick (fun _ -> onToggle ())
             if defaultArg debug false then
                 prop.testId $"foldered-draggable-folder-{folder.Id}"
             prop.children [
-                Html.div [
-                    prop.className "swt:flex swt:items-start swt:justify-between swt:gap-2"
-                    prop.children [
-                        Html.i [
-                            prop.className [
-                                "swt:iconify swt:size-14 swt:shrink-0"
-                                if isExpanded then
-                                    "swt:fluent--folder-open-24-regular"
-                                else
-                                    "swt:fluent--folder-24-regular"
-                            ]
-                            match folder.Color with
-                            | Some color when color <> "" -> prop.style [ style.color color ]
-                            | _ -> ()
-                        ]
-                        Html.span [
-                            prop.className "swt:badge swt:badge-sm swt:shrink-0"
-                            prop.text (string folder.Items.Length)
-                        ]
+                Html.button [
+                    prop.type'.button
+                    prop.className [
+                        "swt:btn swt:h-full swt:w-full swt:flex-col swt:items-stretch swt:justify-between swt:gap-2 swt:overflow-hidden swt:rounded-lg swt:border swt:p-3 swt:text-left swt:normal-case swt:shadow-sm swt:transition-all"
+                        if isExpanded then
+                            "swt:border-primary swt:bg-primary/10 swt:text-primary swt:ring-2 swt:ring-primary/20"
+                        else
+                            "swt:border-base-300 swt:bg-base-100 hover:swt:border-primary/60 hover:swt:bg-base-200"
                     ]
-                ]
-                Html.div [
-                    prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
+                    match folder.Color with
+                    | Some color when color <> "" && not isExpanded -> prop.style [ style.borderColor color ]
+                    | _ -> ()
+                    prop.custom ("aria-expanded", isExpanded)
+                    prop.title folder.Name
+                    prop.ariaLabel (
+                        if isExpanded then
+                            $"Collapse {folder.Name}"
+                        else
+                            $"Expand {folder.Name}"
+                    )
+                    prop.onClick (fun _ -> onToggle ())
                     prop.children [
-                        Html.span [
-                            prop.className "swt:w-full swt:truncate swt:text-sm swt:font-semibold"
-                            prop.text folder.Name
+                        Html.div [
+                            prop.className "swt:flex swt:items-start swt:justify-between swt:gap-2"
+                            prop.children [
+                                Html.i [
+                                    prop.className [
+                                        "swt:iconify swt:size-14 swt:shrink-0"
+                                        if isExpanded then
+                                            "swt:fluent--folder-open-24-regular"
+                                        else
+                                            "swt:fluent--folder-24-regular"
+                                    ]
+                                    match folder.Color with
+                                    | Some color when color <> "" -> prop.style [ style.color color ]
+                                    | _ -> ()
+                                ]
+                                Html.span [
+                                    prop.className "swt:badge swt:badge-sm swt:shrink-0"
+                                    prop.text (string folder.Items.Length)
+                                ]
+                            ]
                         ]
                         Html.div [
-                            prop.className "swt:flex swt:items-center swt:gap-2"
+                            prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
                             prop.children [
-                                FolderedDraggableListHelper.colorSwatch folder.Color
                                 Html.span [
-                                    prop.className "swt:text-xs swt:font-normal swt:text-base-content/70"
-                                    prop.text (
-                                        if folder.Items.Length = 1 then
-                                            "1 item"
-                                        else
-                                            $"{folder.Items.Length} items"
-                                    )
+                                    prop.className "swt:w-full swt:truncate swt:text-sm swt:font-semibold"
+                                    prop.text folder.Name
+                                ]
+                                Html.div [
+                                    prop.className "swt:flex swt:items-center swt:gap-2"
+                                    prop.children [
+                                        match onSetColor with
+                                        | Some _ ->
+                                            Html.span [
+                                                prop.className "swt:size-3 swt:shrink-0"
+                                                prop.custom ("aria-hidden", true)
+                                            ]
+                                        | None -> FolderedDraggableListHelper.colorSwatch folder.Color
+                                        Html.span [
+                                            prop.className "swt:text-xs swt:font-normal swt:text-base-content/70"
+                                            prop.text (
+                                                if folder.Items.Length = 1 then
+                                                    "1 item"
+                                                else
+                                                    $"{folder.Items.Length} items"
+                                            )
+                                        ]
+                                    ]
                                 ]
                             ]
                         ]
                     ]
                 ]
+                match onSetColor with
+                | Some setColor ->
+                    Html.div [
+                        prop.className "swt:absolute swt:bottom-3 swt:left-3 swt:z-10 swt:flex swt:items-center"
+                        prop.children [
+                            FolderedDraggableList.FolderColorButton(folder, setColor, key = $"{folder.Id}:color")
+                        ]
+                    ]
+                | None -> Html.none
             ]
         ]
 
@@ -266,6 +394,7 @@ type FolderedDraggableList =
             ?shelfDropId: string,
             ?tryCreateItemFromExternalDrop: FolderedDraggableExternalDropHandler<'payload>,
             ?onFoldersChange: FolderedDraggableFolder<'payload> list -> unit,
+            ?onSetFolderColor: string -> string option -> unit,
             ?className: string,
             ?debug: bool
         ) =
@@ -358,6 +487,10 @@ type FolderedDraggableList =
                         for folder in folders do
                             let isExpanded = Some folder.Id = expandedFolderId
 
+                            let onSetColor =
+                                onSetFolderColor
+                                |> Option.map (fun setFolderColor -> fun color -> setFolderColor folder.Id color)
+
                             FolderedDraggableList.Folder(
                                 folder,
                                 isExpanded,
@@ -366,6 +499,7 @@ type FolderedDraggableList =
                                     |> FolderedDraggableListHelper.toggleExpanded folder.Id
                                     |> setExpanded
                                 ),
+                                ?onSetColor = onSetColor,
                                 debug = debug,
                                 key = folder.Id
                             )
