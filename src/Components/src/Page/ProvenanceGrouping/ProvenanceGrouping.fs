@@ -1,9 +1,12 @@
 namespace Swate.Components.Page.ProvenanceGrouping
 
+open System
 open System.Globalization
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components.Composite.FolderedDraggableList
+open Swate.Components.Composite.FolderedDraggableList.Types
 open Swate.Components.JsBindings
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
@@ -22,10 +25,16 @@ type private DragContext = {
     Session: ProvenanceSession
     Layer: ProvenanceLayer
     UiState: UiState
+    GetUiState: unit -> UiState
     Publish: SessionResult -> unit
     SetUiState: UiState -> unit
     Lookups: EditorLookups
     ConnectSetPairs: (ProvenanceSetId * ProvenanceSetId) list -> unit
+}
+
+type private PropertyShelfItemPayload = {
+    Header: ProvenancePropertyHeader
+    SourceSide: ProvenanceSide
 }
 
 /// Resizable three-panel surface helpers.
@@ -93,6 +102,225 @@ module private TierObserver =
     [<Emit("$0.disconnect()")>]
     let disconnect (observer: obj) : unit = jsNative
 
+module private PropertyShelf =
+
+    type private FolderKey =
+        | LayerFolder of ProvenanceLayerId
+        | PreviousContextFolder of ProvenanceTableName option * ProvenanceProcessName option
+        | UnknownFolder
+
+    let private slug (value: string) =
+        let text = if isNull value then "" else value.Trim()
+
+        let chars =
+            text
+            |> Seq.map (fun character ->
+                if Char.IsLetterOrDigit character || character = '-' || character = '_' then
+                    Char.ToLowerInvariant character
+                else
+                    '-'
+            )
+            |> Seq.toArray
+
+        let slug = String(chars).Trim('-')
+
+        if String.IsNullOrWhiteSpace slug then "item" else slug
+
+    let private badgeText (badge: PropertyCountBadge option) : string option =
+        match badge with
+        | Some PropertyCountBadge.Hide
+        | None -> None
+        | Some(PropertyCountBadge.DistinctValues count) -> Some(string count)
+        | Some(PropertyCountBadge.Coverage(withValue, total)) -> Some($"{withValue}/{total}")
+
+    let private headerIdentity (header: ProvenancePropertyHeader) = DragDrop.propertyHeaderIdentity header
+
+    let private headerId (header: ProvenancePropertyHeader) = headerIdentity header |> slug
+
+    let private sourceSideForHeader
+        (layerId: ProvenanceLayerId)
+        (inputProjection: PropertyRails.RailProjection)
+        (outputProjection: PropertyRails.RailProjection)
+        (uiState: UiState)
+        (header: ProvenancePropertyHeader)
+        =
+        match uiState.PropertyRailPlacements |> Map.tryFind (layerId, { Header = header }) with
+        | Some side -> side
+        | None when outputProjection.Headers |> List.contains header -> ProvenanceSide.Output
+        | _ -> ProvenanceSide.Input
+
+    let private originsForHeader
+        (layerId: ProvenanceLayerId)
+        (sourceSide: ProvenanceSide)
+        (inputProjection: PropertyRails.RailProjection)
+        (outputProjection: PropertyRails.RailProjection)
+        (header: ProvenancePropertyHeader)
+        =
+        [
+            inputProjection.OriginByHeader |> Map.tryFind header
+            outputProjection.OriginByHeader |> Map.tryFind header
+        ]
+        |> List.choose id
+        |> List.fold Set.union Set.empty
+        |> fun origins ->
+            if origins.IsEmpty then
+                Set.singleton (PropertyOrigin.Current(layerId, sourceSide))
+            else
+                origins
+
+    let private folderKeyForOrigin (origin: PropertyOrigin) =
+        match origin with
+        | PropertyOrigin.Current(layerId, _) -> LayerFolder layerId
+        | PropertyOrigin.UpstreamLayer layerId -> LayerFolder layerId
+        | PropertyOrigin.PreviousContext source -> PreviousContextFolder(source.TableName, source.ProcessName)
+
+    let private folderId =
+        function
+        | LayerFolder layerId -> $"layer-{slug layerId}"
+        | PreviousContextFolder(tableName, processName) ->
+            let table = tableName |> Option.map slug |> Option.defaultValue "unknown-table"
+
+            let processSlug =
+                processName |> Option.map slug |> Option.defaultValue "unknown-process"
+
+            $"context-{processSlug}-{table}"
+        | UnknownFolder -> "unknown-origin"
+
+    let private folderName (session: ProvenanceSession) =
+        function
+        | LayerFolder layerId ->
+            session.Layers
+            |> List.tryFind (fun layer -> layer.Id = layerId)
+            |> Option.map (fun layer -> layer.Label)
+            |> Option.defaultValue layerId
+        | PreviousContextFolder(tableName, processName) ->
+            match processName, tableName with
+            | Some processName, Some tableName -> $"{processName} / {tableName}"
+            | Some processName, None -> processName
+            | None, Some tableName -> tableName
+            | None, None -> "Previous context"
+        | UnknownFolder -> "Unknown origin"
+
+    let private folderColor (uiState: UiState) =
+        function
+        | LayerFolder layerId -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
+        | PreviousContextFolder _
+        | UnknownFolder -> None
+
+    let private folderSort (session: ProvenanceSession) activeLayerId key =
+        match key with
+        | LayerFolder layerId when layerId = activeLayerId -> 0, 0, folderName session key
+        | LayerFolder layerId ->
+            let layerIndex =
+                session.LayerOrder
+                |> List.tryFindIndex ((=) layerId)
+                |> Option.defaultValue Int32.MaxValue
+
+            1, layerIndex, folderName session key
+        | PreviousContextFolder _ -> 2, Int32.MaxValue, folderName session key
+        | UnknownFolder -> 3, Int32.MaxValue, folderName session key
+
+    let private manualColor (uiState: UiState) (header: ProvenancePropertyHeader) =
+        uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header }
+
+    let private itemForHeader
+        (session: ProvenanceSession)
+        (sourceSide: ProvenanceSide)
+        (folderKey: FolderKey)
+        (inputProjection: PropertyRails.RailProjection)
+        (outputProjection: PropertyRails.RailProjection)
+        (uiState: UiState)
+        (header: ProvenancePropertyHeader)
+        : FolderedDraggableItem<PropertyShelfItemPayload> =
+        let badge =
+            outputProjection.BadgeByHeader
+            |> Map.tryFind header
+            |> Option.orElseWith (fun () -> inputProjection.BadgeByHeader |> Map.tryFind header)
+            |> badgeText
+
+        let tooltip =
+            [
+                ProvenanceKind.displayName header.Kind
+                folderName session folderKey
+            ]
+            |> List.filter (String.IsNullOrWhiteSpace >> not)
+            |> String.concat " · "
+
+        {
+            Id = $"{folderId folderKey}-{headerId header}"
+            Label = header.Category.Name
+            Payload = {
+                Header = header
+                SourceSide = sourceSide
+            }
+            Color = manualColor uiState header
+            Badge = badge
+            Tooltip =
+                if String.IsNullOrWhiteSpace tooltip then
+                    None
+                else
+                    Some tooltip
+            Disabled = false
+        }
+
+    let private dedupeItems (items: FolderedDraggableItem<PropertyShelfItemPayload> list) =
+        items
+        |> List.groupBy (fun item -> item.Id)
+        |> List.map (fun (_, matching) -> matching.Head)
+
+    let folders
+        session
+        (layer: ProvenanceLayer)
+        uiState
+        (inputProjection: PropertyRails.RailProjection)
+        (outputProjection: PropertyRails.RailProjection)
+        : FolderedDraggableFolder<PropertyShelfItemPayload> list =
+        let headers =
+            [
+                yield! inputProjection.Headers
+                yield! outputProjection.Headers
+            ]
+            |> List.distinct
+
+        let itemEntries =
+            headers
+            |> List.collect (fun header ->
+                let sourceSide =
+                    sourceSideForHeader layer.Id inputProjection outputProjection uiState header
+
+                originsForHeader layer.Id sourceSide inputProjection outputProjection header
+                |> Set.toList
+                |> List.map folderKeyForOrigin
+                |> List.distinct
+                |> List.map (fun folderKey ->
+                    folderKey,
+                    itemForHeader session sourceSide folderKey inputProjection outputProjection uiState header
+                )
+            )
+
+        let folderKeys =
+            [
+                yield LayerFolder layer.Id
+                yield! itemEntries |> List.map fst
+            ]
+            |> List.distinct
+            |> List.sortBy (folderSort session layer.Id)
+
+        folderKeys
+        |> List.map (fun key ->
+            let items =
+                itemEntries
+                |> List.choose (fun (itemFolderKey, item) -> if itemFolderKey = key then Some item else None)
+                |> dedupeItems
+
+            {
+                Id = folderId key
+                Name = folderName session key
+                Color = folderColor uiState key
+                Items = items
+            }
+        )
+
 /// Resolves drag payload ids and display ids against the active layer and UI palette.
 module private EditorLookups =
 
@@ -107,7 +335,12 @@ module private EditorLookups =
             groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
 
         let findHeader headerId =
-            PropertyRails.headersForModel layer.Model
+            [
+                yield! PropertyRails.headersForModel layer.Model
+                yield! State.Palette.headersForSide layer.Id ProvenanceSide.Input uiState
+                yield! State.Palette.headersForSide layer.Id ProvenanceSide.Output uiState
+            ]
+            |> List.distinct
             |> List.tryFind (fun header -> DragDrop.propertyHeaderIdentity header = headerId)
 
         let findPropertyValue propertyValueId =
@@ -314,13 +547,15 @@ module private DragHandlers =
     let private routePropertyValueDrop context side groupId propertyValueId =
         match context.Lookups.FindPropertyValue propertyValueId with
         | Some propertyValue ->
+            let uiState = context.GetUiState()
+
             let targetGroups =
                 ValueAssignment.selectedTargetGroupsForDrop
                     context.Layer.Id
                     side
                     groupId
-                    context.UiState.SelectedInputs
-                    context.UiState.SelectedOutputs
+                    uiState.SelectedInputs
+                    uiState.SelectedOutputs
                     context.Lookups.FindGroup
 
             match
@@ -367,10 +602,10 @@ module private DragHandlers =
                         AffectedValueCount = affectedValueCount
                     }
 
-                    State.AssignmentBatch.set pendingBatch context.UiState |> context.SetUiState
+                    State.AssignmentBatch.set pendingBatch uiState |> context.SetUiState
             | Error error ->
                 context.SetUiState {
-                    context.UiState with
+                    uiState with
                         Error = Some(AssignmentErrors.text error)
                 }
         | _ -> ()
@@ -392,7 +627,7 @@ module private DragHandlers =
                         InputMemberCount = inputGroup.Members.Length
                         OutputMemberCount = outputGroup.Members.Length
                     }
-                    context.UiState
+                    (context.GetUiState())
                 |> context.SetUiState
         | _ -> ()
 
@@ -427,6 +662,13 @@ module private DragHandlers =
         match dragPayload, groupDrop, propertyDrop with
         | Some(DragDrop.Payload.PropertyValue propertyValueId), Some(side, groupId), _ ->
             routePropertyValueDrop context side groupId propertyValueId
+        | Some(DragDrop.Payload.FolderPropertyHeader(_, headerId)), _, Some targetSide ->
+            match context.Lookups.FindHeader headerId with
+            | Some header ->
+                context.GetUiState()
+                |> State.PropertyPlacement.place context.Layer.Id targetSide header
+                |> context.SetUiState
+            | _ -> ()
         | Some(DragDrop.Payload.PropertyHeader(sourceSide, headerId)), _, Some targetSide when sourceSide <> targetSide ->
             match context.Lookups.FindHeader headerId with
             | Some header when PropertyRails.canSwitchHeader header context.Layer.Model ->
@@ -436,7 +678,7 @@ module private DragHandlers =
                     (layerIdForSide context.Layer targetSide)
                     targetSide
                     header
-                    context.UiState
+                    (context.GetUiState())
                 |> context.SetUiState
             | _ -> ()
         | _ -> ()
@@ -647,6 +889,44 @@ module private EditorPanels =
 
 /// Render helpers for side rails, group columns, and drag overlays.
 module private EditorSurface =
+
+    let dropZoneProjection layerId side uiState activeAssignments (projection: PropertyRails.RailProjection) =
+        let activeHeaders =
+            [
+                yield!
+                    activeAssignments
+                    |> List.map (fun (assignment: GroupingAssignment) -> assignment.Key.Header)
+                yield!
+                    uiState.PropertyRailPlacements
+                    |> Map.toList
+                    |> List.choose (fun ((currentLayerId, key), placedSide) ->
+                        if currentLayerId = layerId && placedSide = side then
+                            Some key.Header
+                        else
+                            None
+                    )
+            ]
+            |> Set.ofList
+
+        let filterMap map =
+            map |> Map.filter (fun header _ -> activeHeaders.Contains header)
+
+        {
+            projection with
+                Headers = projection.Headers |> List.filter (fun header -> activeHeaders.Contains header)
+                ValuesByHeader = projection.ValuesByHeader |> filterMap
+                ExpandedHeaders =
+                    projection.ExpandedHeaders
+                    |> Set.filter (fun header -> activeHeaders.Contains header)
+                CanSwitchHeaders =
+                    projection.CanSwitchHeaders
+                    |> Set.filter (fun header -> activeHeaders.Contains header)
+                StatsByHeader = projection.StatsByHeader |> filterMap
+                ConnectionCountByHeader = projection.ConnectionCountByHeader |> filterMap
+                BadgeByHeader = projection.BadgeByHeader |> filterMap
+                ColorByHeader = projection.ColorByHeader |> filterMap
+                OriginByHeader = projection.OriginByHeader |> filterMap
+        }
 
     let propertyRail
         side
@@ -871,6 +1151,36 @@ type ProvenanceGrouping =
                 |]
             )
 
+        let inputSideState = State.Sides.get layer.InputSideId uiState
+        let outputSideState = State.Sides.get layer.OutputSideId uiState
+
+        let activeInputRailProjection =
+            EditorSurface.dropZoneProjection
+                layer.Id
+                ProvenanceSide.Input
+                uiState
+                inputSideState.GroupingAssignments
+                inputRailProjection
+
+        let activeOutputRailProjection =
+            EditorSurface.dropZoneProjection
+                layer.Id
+                ProvenanceSide.Output
+                uiState
+                outputSideState.GroupingAssignments
+                outputRailProjection
+
+        let propertyShelfFolders =
+            PropertyShelf.folders session layer uiState inputRailProjection outputRailProjection
+
+        let propertyShelf =
+            FolderedDraggableList.FolderedDraggableList<PropertyShelfItemPayload>(
+                propertyShelfFolders,
+                (fun _ item -> DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header),
+                className = "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100/80 swt:p-3 swt:shadow-sm",
+                debug = debug
+            )
+
         let applyUiState update =
             let next = update latestUiState.current
             latestUiState.current <- next
@@ -983,19 +1293,19 @@ type ProvenanceGrouping =
             EditorActions.createSet session publish command
 
         let addPaletteValue side header value unit =
-            State.Palette.addValue layer.Id side header value unit uiState |> setUiState
+            applyUiState (State.Palette.addValue layer.Id side header value unit)
 
         let toggleSideGrouping layerId side header =
-            State.GroupingAssignments.toggleSide layerId side header uiState |> setUiState
+            applyUiState (State.GroupingAssignments.toggleSide layerId side header)
 
         let togglePropertyExpanded side header =
-            State.PropertyExpansion.toggle layer.Id side header uiState |> setUiState
+            applyUiState (State.PropertyExpansion.toggle layer.Id side header)
 
         let toggleSelection side groupId =
-            State.Selection.toggle layer.Id side groupId uiState |> setUiState
+            applyUiState (State.Selection.toggle layer.Id side groupId)
 
         let toggleGroupDetail side groupId =
-            State.Detail.toggleGroup side groupId uiState |> setUiState
+            applyUiState (State.Detail.toggleGroup side groupId)
 
         let sourceInfoForValue value =
             Session.propertyValueSourceInfo layer value
@@ -1100,6 +1410,7 @@ type ProvenanceGrouping =
             Session = session
             Layer = layer
             UiState = uiState
+            GetUiState = fun () -> latestUiState.current
             Publish = publish
             SetUiState = commitUiState
             Lookups = lookups
@@ -1126,17 +1437,17 @@ type ProvenanceGrouping =
                 side
                 sideId
                 (match side with
-                 | ProvenanceSide.Input -> inputRailProjection
-                 | ProvenanceSide.Output -> outputRailProjection)
-                (State.Sides.get sideId uiState).GroupingAssignments
+                 | ProvenanceSide.Input -> activeInputRailProjection
+                 | ProvenanceSide.Output -> activeOutputRailProjection)
+                (match side with
+                 | ProvenanceSide.Input -> inputSideState.GroupingAssignments
+                 | ProvenanceSide.Output -> outputSideState.GroupingAssignments)
                 (fun header -> toggleSideGrouping sideId side header)
                 (fun header ->
-                    State.GroupingAssignments.toggleBoth layer.InputSideId layer.OutputSideId header uiState
-                    |> setUiState
+                    applyUiState (State.GroupingAssignments.toggleBoth layer.InputSideId layer.OutputSideId header)
                 )
                 (fun header ->
-                    State.GroupingAssignments.move layer.Id sideId oppositeSideId targetSide header uiState
-                    |> setUiState
+                    applyUiState (State.GroupingAssignments.move layer.Id sideId oppositeSideId targetSide header)
                 )
                 (fun header -> togglePropertyExpanded side header)
                 (fun header value unit -> addPaletteValue side header value unit)
@@ -1310,8 +1621,8 @@ type ProvenanceGrouping =
                 inputGroups,
                 outputGroups,
                 connections,
-                inputRailProjection,
-                outputRailProjection,
+                activeInputRailProjection,
+                activeOutputRailProjection,
                 ConnectorOverlayState.fromUiState uiState,
                 showPropertyHeaderConnectors,
                 liveDragStore.current,
@@ -1522,6 +1833,7 @@ type ProvenanceGrouping =
                                     ]
                                 ]
                             ]
+                            propertyShelf
                             Controls.FilterToolbar(
                                 uiState.Filters,
                                 (fun text -> applyUiState (State.Filters.setSearch text)),

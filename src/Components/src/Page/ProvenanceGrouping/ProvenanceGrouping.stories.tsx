@@ -117,7 +117,7 @@ export const GroupsByPropertiesAndShowsMembers: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Output-Species'));
+    await groupByProperty(canvas, 'Output', 'Species');
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
     expect(canvas.getByTestId('provenance-group-Output-output:Species=Chlamydomonas')).toBeInTheDocument();
 
@@ -138,7 +138,7 @@ export const ExpandedGroupsShowMemberHoverValues: Story = {
     expect(within(canvas.getByText('Output A').closest('article')!).queryByRole('button', { name: 'Show members' }))
       .not.toBeInTheDocument();
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Output-Species'));
+    await groupByProperty(canvas, 'Output', 'Species');
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
 
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
@@ -162,7 +162,7 @@ export const ShowsEntityTypesAndCollapsedSymbols: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Output-Species'));
+    await groupByProperty(canvas, 'Output', 'Species');
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
 
     // The collapsed card previews its member types as symbols instead of a bare "×3" count.
@@ -183,7 +183,7 @@ export const HoveringGroupTabHighlightsItAndKeepsFolderPreview: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Output-Species'));
+    await groupByProperty(canvas, 'Output', 'Species');
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
     const tab = within(grouped).getByTestId('provenance-group-tab-Output-output:Species=Arabidopsis-0');
 
@@ -230,15 +230,15 @@ export const GroupsBothSidesFromOutputProperty: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Replicate'));
-    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
+    await showPropertyControls(canvas, 'Output', 'Replicate');
+    fireEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-group-Input-input:Replicate=1 | 2')).toBeInTheDocument();
       expect(canvas.getByTestId('provenance-group-Output-output:Replicate=1 | 2')).toBeInTheDocument();
       expect(canvas.queryByTestId('provenance-group-Input-input:Replicate=1')).not.toBeInTheDocument();
       expect(canvas.queryByTestId('provenance-group-Output-output:Replicate=2')).not.toBeInTheDocument();
-    });
+    }, { timeout: 3000 });
   },
 };
 
@@ -247,10 +247,8 @@ export const MissingSecondGroupingKeyKeepsAvailableGroupingKeys: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Species'));
-    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Species'));
-    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Temperature'));
-    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Temperature'));
+    await groupByProperty(canvas, 'Input', 'Species');
+    await groupByProperty(canvas, 'Input', 'Temperature');
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis|Temperature=12 C'))
@@ -277,24 +275,21 @@ export const ConnectedOutputsKeepPropertiesInRailsAndConnections: Story = {
   },
 };
 
-export const GroupingPropertiesStayOnOwningSide: Story = {
+export const PropertiesStartInOriginFoldersAndSideDropZonesAreEmpty: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
-    const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
-    expect(inputRail.getByTestId('provenance-property-Input-Previous Treatment')).toBeInTheDocument();
-    expect(inputRail.queryByTestId('provenance-property-Input-Species')).not.toBeInTheDocument();
-    expect(inputRail.queryByTestId('provenance-property-Input-Temperature')).not.toBeInTheDocument();
-    expect(inputRail.queryByTestId('provenance-property-Input-Analysis')).not.toBeInTheDocument();
-    expect(inputRail.queryByTestId('provenance-property-Input-Replicate')).not.toBeInTheDocument();
+    expect(canvas.getByTestId('foldered-draggable-list')).toBeInTheDocument();
+    expect(canvas.getByTestId('foldered-draggable-folder-layer-layer-1')).toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-property-rail-Input').querySelector('[data-testid^="provenance-property-Input-"]'))
+      .not.toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-property-rail-Output').querySelector('[data-testid^="provenance-property-Output-"]'))
+      .not.toBeInTheDocument();
 
-    expect(outputRail.getByTestId('provenance-property-Output-Analysis')).toBeInTheDocument();
-    expect(outputRail.getByTestId('provenance-property-Output-Replicate')).toBeInTheDocument();
-    expect(outputRail.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
-    expect(outputRail.getByTestId('provenance-property-Output-Temperature')).toBeInTheDocument();
-    expect(outputRail.queryByTestId('provenance-property-Output-Previous Treatment')).not.toBeInTheDocument();
+    const species = await shelfProperty(canvas, 'Species');
+    expect(species).toBeInTheDocument();
+    expect(species).toHaveTextContent('Species');
   },
 };
 
@@ -330,8 +325,8 @@ export const SortsPropertiesByNameAndConnectionCount: Story = {
     await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
     await userEvent.click(toolbar.getByRole('button', { name: /^Name$/i }));
 
-    await waitFor(() => {
-      expect(propertyOrder(canvas, 'Output').slice(0, 4)).toEqual([
+    await waitFor(async () => {
+      expect((await shelfPropertyOrder(canvas)).slice(0, 4)).toEqual([
         'Analysis',
         'Replicate',
         'Species',
@@ -342,8 +337,8 @@ export const SortsPropertiesByNameAndConnectionCount: Story = {
     await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
     await userEvent.click(toolbar.getByRole('button', { name: /^Connection Count$/i }));
 
-    await waitFor(() => {
-      expect(propertyOrder(canvas, 'Output').slice(0, 4)).toEqual([
+    await waitFor(async () => {
+      expect((await shelfPropertyOrder(canvas)).slice(0, 4)).toEqual([
         'Species',
         'Analysis',
         'Temperature',
@@ -382,7 +377,7 @@ export const LayerFocusDoesNotResortInitializedRails: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const initialOutputOrder = propertyOrder(canvas, 'Output').slice(0, 4);
+    const initialOutputOrder = (await shelfPropertyOrder(canvas)).slice(0, 4);
 
     await selectGroup(canvas.getByText('Output A').closest('article')!);
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
@@ -394,7 +389,7 @@ export const LayerFocusDoesNotResortInitializedRails: Story = {
 
     await userEvent.click(canvas.getByTestId('provenance-layer-layer-1'));
     await waitFor(() => expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveClass('swt:btn-primary'));
-    expect(propertyOrder(canvas, 'Output').slice(0, 4)).toEqual(initialOutputOrder);
+    expect((await shelfPropertyOrder(canvas)).slice(0, 4)).toEqual(initialOutputOrder);
   },
 };
 
@@ -462,6 +457,8 @@ export const SingleSidedPropertiesCannotSwitchSides: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    await ensurePropertyInRail(canvas, 'Output', 'Analysis');
+    await ensurePropertyInRail(canvas, 'Output', 'Replicate');
     expect(canvas.getByTestId('provenance-property-drag-Output-Analysis')).toBeDisabled();
     expect(canvas.getByTestId('provenance-property-drag-Output-Replicate')).toBeDisabled();
   },
@@ -472,11 +469,8 @@ export const SwitchesPropertyGroupingSideByDrag: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Output-Batch'));
-    await waitFor(() => {
-      expect(canvas.getByTestId('provenance-group-Output-output:Batch=A')).toBeInTheDocument();
-      expect(canvas.queryByTestId('provenance-group-Input-input:Batch=A')).not.toBeInTheDocument();
-    });
+    await groupByProperty(canvas, 'Output', 'Batch');
+    expect(canvas.queryByTestId('provenance-group-Input-input:Batch=A')).not.toBeInTheDocument();
 
     await dragByPointer(
       canvas.getByTestId('provenance-property-Output-Batch'),
@@ -499,6 +493,7 @@ export const SwitchesInheritedPropertyGroupingToInputSide: Story = {
     const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
     expect(canvas.getByTestId('provenance-property-drag-Output-Species')).not.toBeDisabled();
     await dragByPointer(
       canvas.getByTestId('provenance-property-Output-Species'),
@@ -522,6 +517,7 @@ export const ClicksSwapHandleToSwitchGroupingSide: Story = {
     const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
     await userEvent.hover(canvas.getByTestId('provenance-property-Output-Species'));
     await userEvent.click(canvas.getByTestId('provenance-property-drag-Output-Species'));
 
@@ -539,7 +535,7 @@ export const RegroupedValuesAreReadOnlyOnCards: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Output-Species'));
+    await groupByProperty(canvas, 'Output', 'Species');
     const grouped = await waitFor(
       () => canvas.getByTestId('provenance-group-Output-output:Species=Chlamydomonas'),
       { timeout: 3000 },
@@ -566,7 +562,7 @@ export const RemeasuresConnectionsAfterGroupExpansion: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    fireEvent.click(canvas.getByTestId('provenance-property-Output-Species'));
+    await groupByProperty(canvas, 'Output', 'Species');
 
     const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
 
@@ -671,6 +667,7 @@ export const ExpandedPropertyValuesConnectValueChipsToMatchingGroups: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
     await waitFor(() => {
       const headerKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'));
       expect(headerKeys.some((key) => key.includes('Species'))).toBe(true);
@@ -709,6 +706,7 @@ export const CollapsedPropertiesConnectToMatchingGroupsAutomatically: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
     await waitFor(() => {
       const paths = canvas.getAllByTestId('provenance-property-connection');
       expect(paths.every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
@@ -1168,9 +1166,94 @@ async function startDragByPointer(source: Element) {
   await nextFrame();
 }
 
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function shelfFolders(canvas: ReturnType<typeof within>) {
+  return Array.from(
+    canvas
+      .getByTestId('foldered-draggable-folder-row')
+      .querySelectorAll<HTMLElement>('[data-testid^="foldered-draggable-folder-"]'),
+  );
+}
+
+async function openShelfFolder(canvas: ReturnType<typeof within>, folder: HTMLElement) {
+  const folderTestId = folder.getAttribute('data-testid')!;
+  const currentFolder = () => canvas.getByTestId(folderTestId);
+
+  if (currentFolder().getAttribute('aria-expanded') !== 'true') {
+    await userEvent.click(currentFolder());
+  }
+
+  await waitFor(() => expect(currentFolder()).toHaveAttribute('aria-expanded', 'true'));
+  return within(canvas.getByTestId('foldered-draggable-item-row'));
+}
+
+async function shelfProperty(canvas: ReturnType<typeof within>, propertyName: string) {
+  const name = new RegExp(`^Drag ${escapeRegExp(propertyName)}$`);
+
+  for (const folder of shelfFolders(canvas)) {
+    const row = await openShelfFolder(canvas, folder);
+    const item = row.queryByRole('button', { name });
+
+    if (item) {
+      return item;
+    }
+  }
+
+  throw new Error(`Could not find shelf property "${propertyName}".`);
+}
+
+async function ensurePropertyInRail(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  propertyName: string,
+) {
+  const propertyId = `provenance-property-${side}-${propertyName}`;
+  const existing = canvas.queryByTestId(propertyId);
+
+  if (existing) {
+    return existing;
+  }
+
+  const source = await shelfProperty(canvas, propertyName);
+  await dragByPointer(source, canvas.getByTestId(`provenance-property-rail-${side}`));
+
+  await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument());
+  return waitFor(() => canvas.getByTestId(propertyId));
+}
+
+async function showPropertyControls(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  propertyName: string,
+) {
+  const property = await ensurePropertyInRail(canvas, side, propertyName);
+  property.focus();
+  await userEvent.hover(property);
+
+  const controls = canvas.getByTestId(`provenance-property-both-${side}-${propertyName}`).parentElement!;
+  await waitFor(() => expect(controls).not.toHaveClass('swt:hidden'));
+
+  return property;
+}
+
+async function shelfPropertyOrder(canvas: ReturnType<typeof within>) {
+  const folder = canvas.getByTestId('foldered-draggable-folder-layer-layer-1');
+  await openShelfFolder(canvas, folder);
+
+  return Array.from(
+    canvas
+      .getByTestId('foldered-draggable-item-row')
+      .querySelectorAll<HTMLElement>('[data-testid^="foldered-draggable-item-"]'),
+  ).map((element) => (element.getAttribute('aria-label') ?? '').replace(/^Drag\s+/, ''));
+}
+
 async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
   const panelId = `provenance-property-values-${side}-${propertyName}`;
   const triggerId = `provenance-property-expand-${side}-${propertyName}`;
+  await ensurePropertyInRail(canvas, side, propertyName);
   // The row controls only enter the layout while the row is hovered or focused.
   await userEvent.hover(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
   for (let attempt = 0; attempt < 3 && !canvas.queryByTestId(panelId); attempt += 1) {
@@ -1187,6 +1270,7 @@ async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' |
 
 async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
   const groupedPattern = new RegExp(`^provenance-group-${side}-${side.toLowerCase()}:.*${propertyName}=`);
+  await ensurePropertyInRail(canvas, side, propertyName);
 
   for (let attempt = 0; attempt < 3 && canvas.queryAllByTestId(groupedPattern).length === 0; attempt += 1) {
     fireEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
@@ -1214,13 +1298,6 @@ async function selectGroup(groupCard: HTMLElement) {
   }
 
   await waitFor(() => expect(groupCard).toHaveClass('swt:border-primary'), { timeout: 3000 });
-}
-
-function propertyOrder(canvas: ReturnType<typeof within>, side: 'Input' | 'Output') {
-  const prefix = `provenance-property-${side}-`;
-  const rail = canvas.getByTestId(`provenance-property-rail-${side}`);
-  return Array.from(rail.querySelectorAll<HTMLElement>(`[data-testid^="${prefix}"]`))
-    .map((element) => element.getAttribute('data-testid')!.slice(prefix.length));
 }
 
 async function railValue(

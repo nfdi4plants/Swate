@@ -101,6 +101,9 @@ module DragDrop =
     let propertyDragId side header =
         $"provenance-property|{side}|{encode (propertyHeaderIdentity header)}"
 
+    let folderPropertyDragId side header =
+        $"provenance-folder-property|{side}|{encode (propertyHeaderIdentity header)}"
+
     let propertyRailDropId side = $"provenance-property-drop|{side}"
 
     let groupDragId side groupId =
@@ -145,6 +148,7 @@ module DragDrop =
     type Payload =
         | PropertyValue of ProvenancePropertyValueId
         | PropertyHeader of ProvenanceSide * string
+        | FolderPropertyHeader of ProvenanceSide * string
         | Group of ProvenanceSide * string
         | ConnectionHandle of ConnectionHandleRef
 
@@ -173,6 +177,10 @@ module DragDrop =
             Some(Payload.PropertyHeader(ProvenanceSide.Input, decode headerId))
         | [| "provenance-property"; "Output"; headerId |] ->
             Some(Payload.PropertyHeader(ProvenanceSide.Output, decode headerId))
+        | [| "provenance-folder-property"; "Input"; headerId |] ->
+            Some(Payload.FolderPropertyHeader(ProvenanceSide.Input, decode headerId))
+        | [| "provenance-folder-property"; "Output"; headerId |] ->
+            Some(Payload.FolderPropertyHeader(ProvenanceSide.Output, decode headerId))
         | [| "provenance-group"; "Input"; groupId |] -> Some(Payload.Group(ProvenanceSide.Input, decode groupId))
         | [| "provenance-group"; "Output"; groupId |] -> Some(Payload.Group(ProvenanceSide.Output, decode groupId))
         | [| "provenance-connection-drag"; kind; side; sourceId; parent |] ->

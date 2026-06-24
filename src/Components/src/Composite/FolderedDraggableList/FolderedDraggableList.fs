@@ -184,6 +184,13 @@ type FolderedDraggableList =
                 else
                     "swt:border-base-300 swt:bg-base-100 hover:swt:border-primary/60 hover:swt:bg-base-200"
             ]
+            match folder.Color with
+            | Some color when color <> "" ->
+                prop.custom ("data-foldered-folder-color", color)
+
+                if not isExpanded then
+                    prop.style [ style.borderColor color ]
+            | _ -> ()
             prop.custom ("aria-expanded", isExpanded)
             prop.ariaLabel (
                 if isExpanded then
@@ -206,6 +213,9 @@ type FolderedDraggableList =
                                 else
                                     "swt:fluent--folder-24-regular"
                             ]
+                            match folder.Color with
+                            | Some color when color <> "" -> prop.style [ style.color color ]
+                            | _ -> ()
                         ]
                         Html.span [
                             prop.className "swt:badge swt:badge-sm swt:shrink-0"

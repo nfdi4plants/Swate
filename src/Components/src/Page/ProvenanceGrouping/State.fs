@@ -364,6 +364,19 @@ module RailOrder =
 
         set layerId side next state
 
+/// Tracks explicit side drop-zone placement without changing grouping selection.
+module PropertyPlacement =
+
+    let place layerId side header state =
+        let key = Keys.groupingKey header
+
+        {
+            state with
+                PropertyRailPlacements = state.PropertyRailPlacements |> Map.add (layerId, key) side
+                Error = None
+        }
+        |> RailOrder.appendHeader layerId side header
+
 /// Tracks expanded property value panels on the side rails.
 module PropertyExpansion =
 
