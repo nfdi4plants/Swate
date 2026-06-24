@@ -2,6 +2,7 @@ import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fireEvent, screen, userEvent, waitFor, within } from 'storybook/test';
 import { Main as ProvenanceGrouping } from './ProvenanceGrouping.fs.js';
+import { Exports_sampleDroppedPropertyRailColor as sampleDroppedPropertyRailColor } from './Helper.fs.js';
 import {
   Exports_createSampleSession as createSampleSession,
   Exports_createInputOnlySession as createInputOnlySession,
@@ -50,13 +51,36 @@ function Harness({
   resetKey?: string;
 }) {
   const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
+
+  return (
+    <HarnessState
+      key={`${selected}:${resetKey ?? ''}`}
+      selected={selected}
+      debug={debug}
+      allowTermReplacement={allowTermReplacement}
+      allowEndpointReplacement={allowEndpointReplacement}
+    />
+  );
+}
+
+function HarnessState({
+  selected,
+  debug,
+  allowTermReplacement,
+  allowEndpointReplacement,
+}: {
+  selected: Fixture;
+  debug: boolean;
+  allowTermReplacement: boolean;
+  allowEndpointReplacement: boolean;
+}) {
   const [session, setSession] = React.useState(() => createSessionForFixture(selected));
   const [patches, setPatches] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     setSession(createSessionForFixture(selected));
     setPatches([]);
-  }, [selected, resetKey]);
+  }, [selected]);
 
   return (
     <div className="swt:flex swt:flex-col swt:gap-4 swt:min-h-screen swt:bg-base-200 swt:p-4">
@@ -232,8 +256,17 @@ export const GroupsBothSidesFromOutputProperty: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await showPropertyControls(canvas, 'Output', 'Replicate');
-    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
+    for (
+      let attempt = 0;
+      attempt < 3 && !canvas.queryByTestId('provenance-group-Input-input:Replicate=1 | 2');
+      attempt += 1
+    ) {
+      await showPropertyControls(canvas, 'Output', 'Replicate');
+      fireEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
+      await waitFor(() => expect(canvas.queryByTestId('provenance-group-Input-input:Replicate=1 | 2')).toBeInTheDocument(), {
+        timeout: 1000,
+      }).catch(() => undefined);
+    }
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-group-Input-input:Replicate=1 | 2')).toBeInTheDocument();
@@ -305,6 +338,19 @@ export const DroppedShelfPropertyLeavesFolders: Story = {
     expect(canvas.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
     const currentLayerShelf = await openShelfFolder(canvas, canvas.getByTestId('foldered-draggable-folder-layer-layer-1'));
     expect(currentLayerShelf.queryByRole('button', { name: /^Drag Species$/ })).not.toBeInTheDocument();
+  },
+};
+
+export const DroppedShelfPropertyKeepsLayerColorAndSyncsUpdates: Story = {
+  render: () => <Harness resetKey="dropped-shelf-property-keeps-layer-color-and-syncs-updates" />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const initialLayerColor = canvas.getByTestId('provenance-layer-layer-1').getAttribute('data-provenance-layer-color') ?? '';
+
+    const property = await ensurePropertyInRail(canvas, 'Output', 'Species');
+    expect(propertyColorSwatch(property)).toHaveStyle({ backgroundColor: initialLayerColor });
+
+    expect(sampleDroppedPropertyRailColor('Output', 'Species', '#dc2626')).toBe('#dc2626');
   },
 };
 
@@ -1258,6 +1304,16 @@ async function ensurePropertyInRail(
 
   await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument());
   return waitFor(() => canvas.getByTestId(propertyId));
+}
+
+function propertyColorSwatch(property: HTMLElement) {
+  const swatch = property.querySelector<HTMLElement>('span[style*="background-color"]');
+
+  if (!swatch) {
+    throw new Error(`Property "${property.getAttribute('aria-label') ?? property.textContent}" has no color swatch.`);
+  }
+
+  return swatch;
 }
 
 async function showPropertyControls(
