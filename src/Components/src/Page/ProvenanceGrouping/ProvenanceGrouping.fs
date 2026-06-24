@@ -1126,6 +1126,10 @@ type ProvenanceGrouping =
         let tier, setTier = React.useState LayoutTier.Wide
         let openRail, setOpenRail = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
+        let isPropertyShelfExpanded, setIsPropertyShelfExpanded = React.useState true
+
+        let propertyShelfFolderExpansion, setPropertyShelfFolderExpansion =
+            React.useState<(ProvenanceLayerId * Set<string>) option> None
 
         let showPropertyHeaderConnectors, setShowPropertyHeaderConnectors =
             React.useState true
@@ -1241,13 +1245,93 @@ type ProvenanceGrouping =
         let propertyShelfFolders =
             PropertyShelf.folders session layer uiState inputRailProjection outputRailProjection
 
+        let defaultPropertyShelfFolderIds =
+            propertyShelfFolders
+            |> List.tryHead
+            |> Option.map (fun folder -> Set.singleton folder.Id)
+            |> Option.defaultValue Set.empty
+
+        let propertyShelfExpandedFolderIds =
+            match propertyShelfFolderExpansion with
+            | Some(expandedLayerId, folderIds) when expandedLayerId = layer.Id -> folderIds
+            | _ -> defaultPropertyShelfFolderIds
+
+        let setPropertyShelfExpandedFolderIds folderIds =
+            setPropertyShelfFolderExpansion (Some(layer.Id, folderIds))
+
         let propertyShelf =
-            FolderedDraggableList.FolderedDraggableList<PropertyShelfItemPayload>(
-                propertyShelfFolders,
-                (fun _ item -> DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header),
-                className = "swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100/80 swt:p-3 swt:shadow-sm",
-                debug = debug
-            )
+            Html.section [
+                prop.className
+                    "swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100/80 swt:p-3 swt:shadow-sm"
+                if debug then
+                    prop.testId "provenance-property-shelf"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2"
+                        prop.children [
+                            Html.div [
+                                prop.className
+                                    "swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-sm swt:font-medium"
+                                prop.children [
+                                    Html.i [
+                                        prop.className [
+                                            "swt:iconify swt:size-5 swt:shrink-0"
+                                            if isPropertyShelfExpanded then
+                                                "swt:fluent--folder-open-24-regular"
+                                            else
+                                                "swt:fluent--folder-24-regular"
+                                        ]
+                                    ]
+                                    Html.span [
+                                        prop.className "swt:min-w-0 swt:truncate"
+                                        prop.text "Available properties"
+                                    ]
+                                ]
+                            ]
+                            Html.button [
+                                prop.title (
+                                    if isPropertyShelfExpanded then
+                                        "Minimize property folders"
+                                    else
+                                        "Expand property folders"
+                                )
+                                prop.type'.button
+                                prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:size-8 swt:p-0"
+                                prop.custom ("aria-expanded", isPropertyShelfExpanded)
+                                prop.ariaLabel (
+                                    if isPropertyShelfExpanded then
+                                        "Minimize property folders"
+                                    else
+                                        "Expand property folders"
+                                )
+                                if debug then
+                                    prop.testId "provenance-property-shelf-toggle"
+                                prop.onClick (fun _ -> setIsPropertyShelfExpanded (not isPropertyShelfExpanded))
+                                prop.children [
+                                    Html.i [
+                                        prop.className [
+                                            "swt:iconify swt:size-4"
+                                            if isPropertyShelfExpanded then
+                                                "swt:fluent--chevron-up-20-regular"
+                                            else
+                                                "swt:fluent--chevron-down-20-regular"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                    if isPropertyShelfExpanded then
+                        FolderedDraggableList.FolderedDraggableList<PropertyShelfItemPayload>(
+                            propertyShelfFolders,
+                            (fun _ item -> DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header),
+                            expandedFolderIds = propertyShelfExpandedFolderIds,
+                            onExpandedFolderIdsChange = setPropertyShelfExpandedFolderIds,
+                            className = "swt:min-w-0",
+                            debug = debug
+                        )
+                ]
+            ]
 
         let applyUiState update =
             let next = update latestUiState.current
