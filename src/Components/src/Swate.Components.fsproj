@@ -34,7 +34,6 @@
     <PackageReference Include="Feliz" />
     <PackageReference Include="Feliz.UseElmish" />
     <PackageReference Include="Fable.Browser.Dom" />
-    <PackageReference Include="Feliz.Router"/>
   </ItemGroup>
 
   <ItemGroup>
