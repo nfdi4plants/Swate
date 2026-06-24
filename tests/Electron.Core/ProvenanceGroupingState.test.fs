@@ -14,7 +14,7 @@ Vitest.describe (
             fun () ->
                 let session = sampleSession ()
                 let state = State.init session
-                let ensured = State.Layers.ensure session state
+                let ensured = State.Sides.ensure session state
 
                 Vitest.expect(obj.ReferenceEquals(ensured, state)).toBe (true)
         )
@@ -33,7 +33,7 @@ Vitest.describe (
                         ExpandedProperties = Set.singleton staleSlot
                 }
 
-                let ensured = State.Layers.ensure session state
+                let ensured = State.Sides.ensure session state
 
                 Vitest.expect(obj.ReferenceEquals(ensured, state)).toBe (false)
                 Vitest.expect(ensured.ExpandedProperties.Count).toBe (0)
