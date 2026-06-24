@@ -800,9 +800,11 @@ type Controls =
         Html.aside [
             prop.ref droppable.setNodeRef
             prop.className [
-                "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
+                "swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-dashed swt:border-base-content/25 swt:border-2 swt:p-3 swt:transition-colors"
                 if droppable.isOver then
-                    "swt:ring-2 swt:ring-primary swt:rounded"
+                    "swt:border-primary swt:bg-primary/10"
+                if headers.IsEmpty then
+                    "swt:items-center swt:justify-center"
             ]
             if defaultArg debug false then
                 prop.testId $"provenance-property-rail-{side}"
@@ -811,65 +813,81 @@ type Controls =
                 | Some sideId -> prop.custom ("data-provenance-side-id", sideId)
                 | None -> ()
             prop.children [
-                Html.h3 [
-                    prop.className [
-                        "swt:text-sm swt:font-semibold swt:text-primary"
-                        if side = ProvenanceSide.Output then
-                            "swt:self-end"
+                if headers.IsEmpty then
+                    Html.p [
+                        prop.className "swt:text-sm swt:text-base-content/60 swt:text-center swt:py-8"
+                        prop.text "Drag Properties here to use them for grouping"
                     ]
-                    prop.text "Properties"
-                ]
-                for header in visibleHeaders do
-                    Controls.PropertyRailItem(
-                        side,
-                        header,
-                        valuesForHeader header,
-                        active,
-                        canSwitch header,
-                        isExpanded header,
-                        onToggleSide,
-                        onToggleBoth,
-                        onSwitch,
-                        onToggleExpanded,
-                        onAddValue,
-                        setIsValueChipDragging,
-                        ?stats = statsForHeader header,
-                        ?badge = badgeForHeader header,
-                        ?color = colorForHeader header,
-                        ?origins = originsForHeader header,
-                        onSetColor = onSetColor header,
-                        sourceInfoForValue = sourceInfoForValue,
-                        debug = defaultArg debug false,
-                        key = DragDrop.propertyHeaderIdentity header
-                    )
-                if hiddenHeaderCount > 0 || showAllHeaders && headers.Length > collapseThreshold then
-                    Html.button [
-                        prop.type'.button
+
+                    Html.div [
+                        prop.className "swt:w-fit"
+                        prop.children [
+                            Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                        ]
+                    ]
+                else
+                    Html.h3 [
                         prop.className [
-                            "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
+                            "swt:text-sm swt:font-semibold swt:text-primary"
                             if side = ProvenanceSide.Output then
                                 "swt:self-end"
                         ]
-                        if defaultArg debug false then
-                            prop.testId $"provenance-property-overflow-{side}"
-                        prop.onClick (fun _ -> setShowAllHeaders (not showAllHeaders))
-                        prop.text (
-                            if showAllHeaders then
-                                "Show fewer"
-                            else
-                                $"+{hiddenHeaderCount} more"
+                        prop.text "Properties"
+                    ]
+
+                    for header in visibleHeaders do
+                        Controls.PropertyRailItem(
+                            side,
+                            header,
+                            valuesForHeader header,
+                            active,
+                            canSwitch header,
+                            isExpanded header,
+                            onToggleSide,
+                            onToggleBoth,
+                            onSwitch,
+                            onToggleExpanded,
+                            onAddValue,
+                            setIsValueChipDragging,
+                            ?stats = statsForHeader header,
+                            ?badge = badgeForHeader header,
+                            ?color = colorForHeader header,
+                            ?origins = originsForHeader header,
+                            onSetColor = onSetColor header,
+                            sourceInfoForValue = sourceInfoForValue,
+                            debug = defaultArg debug false,
+                            key = DragDrop.propertyHeaderIdentity header
                         )
+
+                    if hiddenHeaderCount > 0 || showAllHeaders && headers.Length > collapseThreshold then
+                        Html.button [
+                            prop.type'.button
+                            prop.className [
+                                "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
+                                if side = ProvenanceSide.Output then
+                                    "swt:self-end"
+                            ]
+                            if defaultArg debug false then
+                                prop.testId $"provenance-property-overflow-{side}"
+                            prop.onClick (fun _ -> setShowAllHeaders (not showAllHeaders))
+                            prop.text (
+                                if showAllHeaders then
+                                    "Show fewer"
+                                else
+                                    $"+{hiddenHeaderCount} more"
+                            )
+                        ]
+
+                    Html.div [
+                        prop.className [
+                            "swt:w-fit"
+                            if side = ProvenanceSide.Output then
+                                "swt:self-end"
+                        ]
+                        prop.children [
+                            Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                        ]
                     ]
-                Html.div [
-                    prop.className [
-                        "swt:w-fit"
-                        if side = ProvenanceSide.Output then
-                            "swt:self-end"
-                    ]
-                    prop.children [
-                        Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
-                    ]
-                ]
             ]
         ]
 
