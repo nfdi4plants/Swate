@@ -2190,14 +2190,12 @@ let uiStateTests =
 
             Expect.equal manual.PendingMemberResolution None "Choosing manual should close the prompt."
 
-            Expect.isTrue
-                (State.MemberResolution.isManualPair layer.Id pending.InputGroupId pending.OutputGroupId manual)
-                "Choosing manual should keep the layer expanded for member-level resolution."
-
             Expect.equal
-                manual.Detail
-                (Some(Types.ProvenanceDetail.Group(ProvenanceSide.Input, pending.InputGroupId)))
-                "Choosing manual should expand the input group and allow the output layer to auto-expand from manual state."
+                manual.ExpandedGroup
+                (Some(ProvenanceSide.Input, pending.InputGroupId))
+                "Choosing manual should expand the input group."
+
+            Expect.equal manual.Detail None "Choosing manual should clear the detail panel."
 
         testCase "property value drop plan adds only when every group member has no value for the property"
         <| fun _ ->
@@ -2531,7 +2529,7 @@ let uiStateTests =
                 ]
 
             let sorted =
-                PropertyProjection.sortHeaders Types.PropertySort.ValueCountDesc stats [ lowCount; highCount ]
+                PropertyProjection.sortHeaders Types.PropertySort.ValueCountDesc stats Map.empty [ lowCount; highCount ]
 
             Expect.equal sorted [ highCount; lowCount ] "Higher value count should sort before name/kind."
 
