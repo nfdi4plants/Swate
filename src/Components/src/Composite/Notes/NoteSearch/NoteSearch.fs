@@ -20,7 +20,7 @@ module InputField =
 
         ) =
         Html.div [
-            prop.className "swt:w-full swt:mt-4 swt:join"
+            prop.className "swt:w-full swt:mt-4 swt:join swt:shrink-0"
             prop.children [
                 Html.div [
                     prop.className "swt:relative swt:flex-1 swt:join-item"
@@ -116,11 +116,11 @@ type SearchComponent =
 
 
         Html.div [
-            prop.className "swt:flex swt:flex-col swt:items-center swt:pt-8 swt:min-h-screen"
+            prop.className "swt:size-full swt:min-h-0 swt:overflow-hidden swt:flex swt:flex-col swt:items-center swt:pt-8 swt:px-4"
             prop.onClick (fun _ -> setStartSearch false)
             prop.children [
                 Html.div [
-                    prop.className "swt:w-full swt:max-w-md"
+                    prop.className "swt:w-full swt:max-w-md swt:min-h-0 swt:flex-1 swt:flex swt:flex-col"
                     prop.onClick (fun e -> e.stopPropagation ())
                     prop.children [
                         InputField.SearchInput(
@@ -144,7 +144,7 @@ type SearchComponent =
                             elif not searchResults.IsEmpty then
                                 Html.div [
                                     prop.className
-                                        "swt:border-2 swt:border-current swt:rounded-md swt:mt-2 swt:bg-base-100 swt:shadow-md swt:divide-y swt:divide-current"
+                                        "swt:border-2 swt:border-current swt:rounded-md swt:mt-2 swt:bg-base-100 swt:shadow-md swt:divide-y swt:divide-current swt:min-h-0 swt:max-h-[calc(100%_-_5rem)] swt:overflow-y-auto"
                                     prop.children [
                                         for note in searchResults do
                                             SearchComponent.SearchSuggestion(note, onOpen)

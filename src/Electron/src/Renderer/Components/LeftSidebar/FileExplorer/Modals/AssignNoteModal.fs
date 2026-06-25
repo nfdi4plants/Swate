@@ -66,13 +66,13 @@ type FileTreeAssignNoteModal =
                 prop.className "swt:flex swt:gap-2 swt:justify-end swt:w-full"
                 prop.children [
                     Html.button [
-                        prop.className "swt:btn swt:btn-ghost"
+                        prop.className "swt:btn swt:btn-ghost swt:btn-sm"
                         prop.disabled isAssigning
                         prop.onClick (fun _ -> close ())
                         prop.text "Cancel"
                     ]
                     Html.button [
-                        prop.className "swt:btn swt:btn-primary"
+                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
                         prop.disabled (isAssigning || selectedNote.IsNone)
                         prop.onClick (fun _ -> submit ())
                         prop.text (if isAssigning then "Assigning..." else "Assign")
@@ -80,25 +80,39 @@ type FileTreeAssignNoteModal =
                 ]
             ]
 
+        let modalActions =
+            Html.div [
+                prop.className "swt:flex swt:flex-col swt:gap-4 swt:w-full"
+                prop.children [
+                    noteSelector
+                    FileTreeAssignNoteAssetSelector.Header(
+                        availableAssets,
+                        availableAssetDestinations,
+                        assetDestinations,
+                        setAssetDestination,
+                        isAssigning
+                    )
+                ]
+            ]
+
+        let assetRows =
+            FileTreeAssignNoteAssetSelector.Rows(
+                availableAssets,
+                availableAssetDestinations,
+                assetDestinations,
+                setAssetDestination,
+                isAssigning
+            )
+
         BaseModal.Modal(
             isOpen = isOpen,
             setIsOpen = setClose,
             header = Html.text "Assign Note",
             description = Html.text $"Assign a note to '{displayName}'.",
-            children =
-                Html.div [
-                    prop.className "swt:flex swt:flex-col swt:gap-4"
-                    prop.children [
-                        noteSelector
-                        FileTreeAssignNoteAssetSelector.Main(
-                            availableAssets,
-                            availableAssetDestinations,
-                            assetDestinations,
-                            setAssetDestination,
-                            isAssigning
-                        )
-                    ]
-                ],
+            modalActions = modalActions,
+            modalActionsClassName = "swt:w-full swt:flex swt:flex-col swt:items-stretch swt:justify-start swt:gap-4 swt:p-2",
+            children = assetRows,
             footer = footer,
-            debug = "arc-assign-note"
+            debug = "arc-assign-note",
+            className = "swt:!flex swt:flex-col swt:max-h-[calc(100vh_-_5rem)] swt:!overflow-hidden"
         )
