@@ -108,7 +108,7 @@ let tests =
                 ({ baseDraft with Description = "" } |> Validation.isRequiredDataValid)
                 "Empty description should fail."
 
-        testCase "Conversion.toArcFile maps study fields and initializes an empty plus-button-named table"
+        testCase "Conversion.toArcFile maps study fields and initializes an empty identifier-named table"
         <| fun _ ->
             let draft = mkBaseDraft ()
             let identifier, arcFile = Conversion.toArcFile draft LandingTarget.Study
@@ -133,12 +133,12 @@ let tests =
 
                 let firstTable = study.Tables.[0]
 
-                Expect.equal firstTable.Name "New Table 0" "The default table should use the plus-button name."
+                Expect.equal firstTable.Name "study_01 Table" "The default table should use the identifier name."
                 Expect.equal firstTable.ColumnCount 0 "The default table should not create starter columns."
                 Expect.equal firstTable.RowCount 0 "The default table should not create starter rows."
             | _ -> failwith "Expected ArcFiles.Study"
 
-        testCase "Conversion.toArcFile maps assay fields and initializes an empty plus-button-named table"
+        testCase "Conversion.toArcFile maps assay fields and initializes an empty identifier-named table"
         <| fun _ ->
             let draft = {
                 mkBaseDraft () with
@@ -167,7 +167,7 @@ let tests =
 
                 let firstTable = assay.Tables.[0]
 
-                Expect.equal firstTable.Name "New Table 0" "The default table should use the plus-button name."
+                Expect.equal firstTable.Name "assay_01 Table" "The default table should use the identifier name."
                 Expect.equal firstTable.ColumnCount 0 "The default table should not create starter columns."
                 Expect.equal firstTable.RowCount 0 "The default table should not create starter rows."
             | _ -> failwith "Expected ArcFiles.Assay"

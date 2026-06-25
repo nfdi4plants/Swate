@@ -67,7 +67,7 @@ Vitest.describe (
     "FileTreeContextMenu",
     fun () ->
         Vitest.test (
-            "ARC create drafts include an empty plus-button-named table when supported",
+            "ARC create drafts include an empty identifier-named table when supported",
             fun () ->
                 let tableCapableKinds = [|
                     ArcExplorerNodeKind.Study
@@ -82,7 +82,7 @@ Vitest.describe (
                     | Ok arcFile ->
                         let tables = arcFile.Tables()
                         Vitest.expect(tables.Count).toBe (1)
-                        Vitest.expect(tables.[0].Name).toBe ("New Table 0")
+                        Vitest.expect(tables.[0].Name).toBe ($"{identifier} Table")
                         Vitest.expect(tables.[0].ColumnCount).toBe (0)
                         Vitest.expect(tables.[0].RowCount).toBe (0)
                     | Error error -> failwith error

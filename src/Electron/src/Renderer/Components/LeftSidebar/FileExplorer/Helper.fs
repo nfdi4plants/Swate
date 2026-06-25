@@ -209,19 +209,12 @@ let arcCreateIdentifierError =
 
 let tryCreateArcFile kind identifier =
     match kind with
-    | ArcExplorerNodeKind.Study ->
-        ArcFiles.Study(ArcStudy.init identifier, [])
-        |> fun arcFile -> arcFile.EnsureDefaultAnnotationTable()
+    | ArcExplorerNodeKind.Study -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Study identifier |> Ok
+    | ArcExplorerNodeKind.Assay -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Assay identifier |> Ok
+    | ArcExplorerNodeKind.Workflow ->
+        ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Workflow identifier
         |> Ok
-    | ArcExplorerNodeKind.Assay ->
-        ArcFiles.Assay(ArcAssay.init identifier)
-        |> fun arcFile -> arcFile.EnsureDefaultAnnotationTable()
-        |> Ok
-    | ArcExplorerNodeKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow |> Ok
-    | ArcExplorerNodeKind.Run ->
-        ArcFiles.Run(ArcRun.init identifier)
-        |> fun arcFile -> arcFile.EnsureDefaultAnnotationTable()
-        |> Ok
+    | ArcExplorerNodeKind.Run -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Run identifier |> Ok
     | kind -> Error $"Creating {ArcExplorerNodeKind.label kind} files is not supported from the file explorer."
 
 let tryGetInlineArcCreateKind (rootPath: string) (item: FileItem) =

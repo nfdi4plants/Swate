@@ -20,8 +20,10 @@ module Conversion =
         assay.Comments <- ResizeArray draft.Comments
 
     let private toStudy (draft: LandingDraft) (identifier: string) =
-        let study = ArcStudy.init identifier
-        (ArcFiles.Study(study, [])).EnsureDefaultAnnotationTable() |> ignore
+        let study =
+            match ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Study identifier with
+            | ArcFiles.Study(study, _) -> study
+            | _ -> failwith "Expected default study ArcFile."
 
         applyCommonFieldsToStudy draft study
         study.Publications <- ResizeArray draft.Publications
@@ -32,8 +34,10 @@ module Conversion =
         study
 
     let private toAssay (draft: LandingDraft) (identifier: string) =
-        let assay = ArcAssay.init identifier
-        (ArcFiles.Assay assay).EnsureDefaultAnnotationTable() |> ignore
+        let assay =
+            match ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Assay identifier with
+            | ArcFiles.Assay assay -> assay
+            | _ -> failwith "Expected default assay ArcFile."
 
         applyCommonFieldsToAssay draft assay
         assay.MeasurementType <- draft.MeasurementType

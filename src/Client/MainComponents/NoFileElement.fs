@@ -71,6 +71,12 @@ module private Helper =
             ]
         ]
 
+    let createDefaultFile fileType identifier dispatch =
+        ArcFileDefaults.createDefaultArcFile fileType identifier
+        |> UpdateArcFile
+        |> InterfaceMsg
+        |> dispatch
+
     let createNewFile (dispatch: Messages.Msg -> unit) =
         Html.div [
             prop.className "swt:dropdown"
@@ -94,30 +100,19 @@ module private Helper =
                             )
                             createNewTableItem (
                                 "Study",
-                                fun _ ->
-                                    let s = ArcStudy.init ("New Study")
-                                    let _ = s.InitTable("New Study Table")
-                                    ArcFiles.Study(s, []) |> UpdateArcFile |> InterfaceMsg |> dispatch
+                                fun _ -> createDefaultFile ArcFilesDiscriminate.Study "New Study" dispatch
                             )
                             createNewTableItem (
                                 "Assay",
-                                fun _ ->
-                                    let a = ArcAssay.init ("New Assay")
-                                    let _ = a.InitTable("New Assay Table")
-                                    ArcFiles.Assay a |> UpdateArcFile |> InterfaceMsg |> dispatch
+                                fun _ -> createDefaultFile ArcFilesDiscriminate.Assay "New Assay" dispatch
                             )
                             createNewTableItem (
                                 "Run",
-                                fun _ ->
-                                    let r = ArcRun.init ("New Run")
-                                    let _ = r.InitTable("New Run Table")
-                                    ArcFiles.Run r |> UpdateArcFile |> InterfaceMsg |> dispatch
+                                fun _ -> createDefaultFile ArcFilesDiscriminate.Run "New Run" dispatch
                             )
                             createNewTableItem (
                                 "Workflow",
-                                fun _ ->
-                                    let w = ArcWorkflow.init ("New Workflow")
-                                    ArcFiles.Workflow w |> UpdateArcFile |> InterfaceMsg |> dispatch
+                                fun _ -> createDefaultFile ArcFilesDiscriminate.Workflow "New Workflow" dispatch
                             )
                             createNewTableItem (
                                 "Datamap",

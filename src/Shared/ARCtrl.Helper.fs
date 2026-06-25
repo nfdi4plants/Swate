@@ -168,19 +168,6 @@ module ARCtrlHelper =
             | ArcFiles.Run _ -> true
             | _ -> false
 
-        member this.EnsureDefaultAnnotationTable() =
-            let ensureDefaultTable (arcTables: ArcTables) =
-                if arcTables.TableCount = 0 then
-                    arcTables.InitTable(createNewTableName arcTables.Tables) |> ignore
-
-            match this with
-            | ArcFiles.Study(study, _) -> ensureDefaultTable study
-            | ArcFiles.Assay assay -> ensureDefaultTable assay
-            | ArcFiles.Run run -> ensureDefaultTable run
-            | _ -> ()
-
-            this
-
         member this.TryGetActiveTable(activeTableIndex: int option) =
             match activeTableIndex with
             | Some tableIndex when tableIndex >= 0 && tableIndex < this.Tables().Count ->
@@ -208,6 +195,21 @@ module ARCtrlHelper =
             | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
             | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
             | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
+
+    [<RequireQualifiedAccess>]
+    module ArcFileDefaults =
+
+        let private withInitialTable (identifier: string) (arcFile: ArcFiles) =
+            arcFile.ArcTables().InitTable($"{identifier} Table") |> ignore
+            arcFile
+
+        let createDefaultArcFile (fileType: ArcFilesDiscriminate) (identifier: string) =
+            match fileType with
+            | ArcFilesDiscriminate.Study -> ArcFiles.Study(ArcStudy.init identifier, []) |> withInitialTable identifier
+            | ArcFilesDiscriminate.Assay -> ArcFiles.Assay(ArcAssay.init identifier) |> withInitialTable identifier
+            | ArcFilesDiscriminate.Workflow -> ArcFiles.Workflow(ArcWorkflow.init identifier)
+            | ArcFilesDiscriminate.Run -> ArcFiles.Run(ArcRun.init identifier) |> withInitialTable identifier
+            | unsupportedFileType -> failwithf "Cannot create default ARC file for %A." unsupportedFileType
 
     [<RequireQualifiedAccess>]
     type JsonExportFormat =

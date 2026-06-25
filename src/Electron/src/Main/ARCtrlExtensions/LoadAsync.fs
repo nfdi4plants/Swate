@@ -3,9 +3,10 @@ namespace Main.ARCtrlExtensions
 open System
 open ARCtrl
 open ARCtrl.Contract
+open FsSpreadsheet
+open Main.ArcMerge
 open Main.Bindings.Path
 open Main.Bindings.Filesystem
-open Main.ArcMerge.ArcFileDefaults
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 
@@ -50,26 +51,34 @@ module ArcLoadExtensions =
         CreateContracts: string -> Contract[]
     }
 
+    let private createDefaultArcFileContracts (fileType: ArcFilesDiscriminate) (identifier: string) =
+        match ARCtrlHelper.ArcFileDefaults.createDefaultArcFile fileType identifier with
+        | ArcFiles.Assay assay -> assay.ToCreateContract(false)
+        | ArcFiles.Study(study, _) -> study.ToCreateContract(false)
+        | ArcFiles.Workflow workflow -> workflow.ToCreateContract(false)
+        | ArcFiles.Run run -> run.ToCreateContract(false)
+        | _ -> failwithf "Cannot create default ARC file contracts for %A." fileType
+
     let private canonicalArcFileRepairSpecs = [|
         {
             CollectionFolder = "assays"
             FileName = "isa.assay.xlsx"
-            CreateContracts = createDefaultEntityContracts ArcFilesDiscriminate.Assay false
+            CreateContracts = createDefaultArcFileContracts ArcFilesDiscriminate.Assay
         }
         {
             CollectionFolder = "studies"
             FileName = "isa.study.xlsx"
-            CreateContracts = createDefaultEntityContracts ArcFilesDiscriminate.Study false
+            CreateContracts = createDefaultArcFileContracts ArcFilesDiscriminate.Study
         }
         {
             CollectionFolder = "workflows"
             FileName = "isa.workflow.xlsx"
-            CreateContracts = createDefaultEntityContracts ArcFilesDiscriminate.Workflow false
+            CreateContracts = createDefaultArcFileContracts ArcFilesDiscriminate.Workflow
         }
         {
             CollectionFolder = "runs"
             FileName = "isa.run.xlsx"
-            CreateContracts = createDefaultEntityContracts ArcFilesDiscriminate.Run false
+            CreateContracts = createDefaultArcFileContracts ArcFilesDiscriminate.Run
         }
     |]
 
@@ -135,15 +144,37 @@ module ArcLoadExtensions =
         return repairedAny
     }
 
-    let private ensureDefaultAnnotationTables (arc: ARC) =
-        for study in arc.Studies do
-            (ArcFiles.Study(study, [])).EnsureDefaultAnnotationTable() |> ignore
+    let private addRecoveredEmptyAnnotationTables (arc: ARC) (contracts: Contract[]) =
+        let addTables (target: ArcTables) (workbook: FsWorkbook) =
+            if target.TableCount = 0 then
+                let recoveredTables =
+                    workbook.GetWorksheets()
+                    |> Seq.filter (fun sheet ->
+                        sheet.CellCollection.Count = 0
+                        && not (sheet.Name.StartsWith("isa_", StringComparison.OrdinalIgnoreCase))
+                    )
+                    |> Seq.map (fun sheet -> ArcTable.init sheet.Name)
+                    |> Seq.toArray
 
-        for assay in arc.Assays do
-            (ArcFiles.Assay assay).EnsureDefaultAnnotationTable() |> ignore
+                if recoveredTables.Length > 0 then
+                    target.AddTables(recoveredTables)
 
-        for run in arc.Runs do
-            (ArcFiles.Run run).EnsureDefaultAnnotationTable() |> ignore
+        for contract in contracts do
+            match contract.Operation, contract.DTO with
+            | Operation.READ, Some(DTO.Spreadsheet workbook) ->
+                let workbook = workbook :?> FsWorkbook
+
+                match ArcEntityRef.fromPath contract.Path with
+                | ArcEntityRef.Assay identifier ->
+                    arc.TryGetAssay identifier
+                    |> Option.iter (fun assay -> addTables assay workbook)
+                | ArcEntityRef.Study identifier ->
+                    arc.TryGetStudy identifier
+                    |> Option.iter (fun study -> addTables study workbook)
+                | ArcEntityRef.Run identifier ->
+                    arc.TryGetRun identifier |> Option.iter (fun run -> addTables run workbook)
+                | _ -> ()
+            | _ -> ()
 
     type ARC with
 
@@ -157,7 +188,7 @@ module ArcLoadExtensions =
             match! fullFillContractBatchAsync arcPath contracts with
             | Ok fulfilledContracts ->
                 arc.SetISAFromContracts fulfilledContracts
-                ensureDefaultAnnotationTables arc
+                addRecoveredEmptyAnnotationTables arc fulfilledContracts
                 return Ok arc
             | Error errors -> return Error errors
         }
