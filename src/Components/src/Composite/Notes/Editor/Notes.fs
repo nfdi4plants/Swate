@@ -94,7 +94,7 @@ type Notes =
         let setError (value: string option) =
             setUiState (State.setError value uiState)
 
-        let submitRequirements = NoteConversion.tryResolvePayloadRequirements draft
+        let submitRequirements = NoteConversion.PayloadRequirements.tryResolve(draft)
         let canSubmitDraft = submitRequirements.IsSome
 
         let submitPayload onSuccess =
@@ -130,16 +130,22 @@ type Notes =
 
         let submitToExisting () =
             match draft.SelectedExistingTarget, submitRequirements with
-            | Some targetRef, Some requirements ->
-                NoteConversion.tryCreateExistingTargetPayload targetRef requirements draft
+            | Some targetRef, Some(dateCreated, protocolName) ->
+                NoteConversion.PayloadRequirements.tryCreateExistingTargetPayload(
+                    targetRef,
+                    dateCreated,
+                    protocolName,
+                    draft
+                )
                 |> submitPayload (fun () -> setExistingTargetSelector false)
             | _ -> ()
 
         let submitNewRootNote () =
             match submitRequirements with
             | None -> ()
-            | Some requirements ->
-                NoteConversion.tryCreateNewRootNotePayload requirements draft |> submitPayload ignore
+            | Some(dateCreated, protocolName) ->
+                NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload(dateCreated, protocolName, draft)
+                |> submitPayload ignore
 
         Html.div [
             prop.className "swt:p-8 swt:flex swt:justify-center swt:overflow-y-auto"

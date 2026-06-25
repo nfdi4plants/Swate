@@ -34,9 +34,10 @@ let NotesDraftTarget () =
     let hasUnsavedDraft = State.hasUnsavedDraft notesDraft
 
     let tryCreateDraftPayload () =
-        match NoteConversion.tryResolvePayloadRequirements notesDraft with
-        | None -> Error "Please enter a Title and a Date Created value before saving."
-        | Some requirements -> NoteConversion.tryCreateNewRootNotePayload requirements notesDraft
+        match NoteConversion.PayloadRequirements.tryResolve(notesDraft) with
+        | None -> Error "Please enter a Title that can be used as a protocol name before saving."
+        | Some(dateCreated, protocolName) ->
+            NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload(dateCreated, protocolName, notesDraft)
 
     let draftUnsavedPath =
         if hasUnsavedDraft then

@@ -150,7 +150,7 @@ Body
         )
 
         Vitest.test (
-            "tryResolvePayloadRequirements requires a date and protocol-safe title",
+            "PayloadRequirements.tryResolve defaults missing dates and requires a protocol-safe title",
             fun () ->
                 let validDraft = {
                     NotesDraft.init with
@@ -158,28 +158,57 @@ Body
                         DateCreated = Some(DateTime(2026, 6, 15))
                 }
 
-                Vitest.expect((NoteConversion.tryResolvePayloadRequirements validDraft).IsSome).toBe (true)
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve(validDraft)).IsSome).toBe (true)
 
                 let missingDateDraft = {
                     validDraft with
                         DateCreated = None
                 }
 
-                Vitest.expect((NoteConversion.tryResolvePayloadRequirements missingDateDraft).IsNone).toBe (true)
+                let beforeResolve = DateTime.Today
+
+                let missingDate, missingDateProtocolName =
+                    NoteConversion.PayloadRequirements.tryResolve(missingDateDraft)
+                    |> expectSome "Expected missing date to default."
+
+                let afterResolve = DateTime.Today
+
+                match
+                    NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload(
+                        missingDate,
+                        missingDateProtocolName,
+                        missingDateDraft
+                    )
+                with
+                | Error message -> failwith $"Expected payload, got error: {message}"
+                | Ok payload ->
+                    Vitest.expect(payload.DateCreated = beforeResolve || payload.DateCreated = afterResolve).toBe (true)
+
+                    Vitest
+                        .expect(payload.Intent.RelativePath)
+                        .toBe (
+                            $"notes/{NoteConversion.formatDateFolder payload.DateCreated}/Sampling_protocol/Sampling_protocol.md"
+                        )
+
+                    let frontmatter, _ =
+                        NoteConversion.tryDecodeMarkdownFrontmatter payload.Intent.Content
+                        |> expectSome "Expected YAML frontmatter to decode."
+
+                    Vitest.expect(frontmatter.Date).toEqual (payload.DateCreated)
 
                 let missingTitleDraft = {
                     validDraft with
                         Title = "   "
                 }
 
-                Vitest.expect((NoteConversion.tryResolvePayloadRequirements missingTitleDraft).IsNone).toBe (true)
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve(missingTitleDraft)).IsNone).toBe (true)
 
                 let unsafeTitleDraft = {
                     validDraft with
                         Title = "!!!"
                 }
 
-                Vitest.expect((NoteConversion.tryResolvePayloadRequirements unsafeTitleDraft).IsNone).toBe (true)
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve(unsafeTitleDraft)).IsNone).toBe (true)
         )
 
         Vitest.test (
@@ -192,11 +221,11 @@ Body
                         MainText = "Body"
                 }
 
-                let requirements =
-                    NoteConversion.tryResolvePayloadRequirements draft
+                let dateCreated, protocolName =
+                    NoteConversion.PayloadRequirements.tryResolve(draft)
                     |> expectSome "Expected payload requirements to resolve."
 
-                match NoteConversion.tryCreateNewRootNotePayload requirements draft with
+                match NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload(dateCreated, protocolName, draft) with
                 | Error message -> failwith $"Expected payload, got error: {message}"
                 | Ok payload ->
                     Vitest.expect(payload.Title).toBe ("Sampling protocol")

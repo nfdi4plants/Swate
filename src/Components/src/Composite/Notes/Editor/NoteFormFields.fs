@@ -117,7 +117,7 @@ module NoteFormFields =
                 prop.testId "notes-date-field"
                 prop.className "swt:fieldset swt:w-full swt:max-w-36"
                 prop.children [
-                    LayoutComponents.FieldTitle "Date Created (Required)"
+                    LayoutComponents.FieldTitle "Date Created (Optional)"
                     Html.input [
                         prop.className "swt:input swt:input-bordered swt:w-full"
                         prop.type'.date
