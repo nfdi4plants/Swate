@@ -6,6 +6,7 @@ open Fable.Core
 open Feliz
 open Renderer.Context.UnsavedChangesContext
 open Swate.Components.ReactHooks
+open Swate.Electron.Shared.IPCTypes.MainToRendererIpc
 
 [<Emit("$0.returnValue = ''")>]
 let private setBeforeUnloadReturnValue (_event: Event) : unit = jsNative
@@ -15,12 +16,16 @@ type UnsavedChangesControllerView = {
     Modal: ReactElement
 }
 
+type private PendingGuardedAction = {
+    Run: GuardedAction
+}
+
 [<Hook>]
 let useUnsavedChangesController () =
     let activeGuardRef = React.useRef<UnsavedChangesGuard option> None
     let bypassGuardDepthRef = React.useRef 0
     let allowWindowUnloadRef = React.useRef false
-    let pendingAction, setPendingAction = React.useState (None: GuardedAction option)
+    let pendingAction, setPendingAction = React.useState (None: PendingGuardedAction option)
     let isRunning, setIsRunning = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
 
@@ -48,7 +53,7 @@ let useUnsavedChangesController () =
     let requestAction action =
         if hasActiveUnsavedChanges () then
             setSaveError None
-            setPendingAction (Some action)
+            setPendingAction (Some { Run = action })
         else
             startWithoutGuard action
 
@@ -77,6 +82,12 @@ let useUnsavedChangesController () =
                 requestAction closeWindowAfterGuard
     )
 
+    let rendererUnsavedChangesHandler: IRendererUnsavedChangesApi = {
+        hasUnsavedNoteChanges = fun () -> promise { return hasActiveUnsavedChanges () }
+    }
+
+    Renderer.IpcReceiver.useProxyReceiver<IRendererUnsavedChangesApi> ((fun () -> rendererUnsavedChangesHandler), [||])
+
     let controller: UnsavedChangesController =
         React.useMemo (
             (fun _ -> {
@@ -97,7 +108,7 @@ let useUnsavedChangesController () =
             match pendingAction with
             | Some action ->
                 clearPendingAction ()
-                startWithoutGuard action
+                startWithoutGuard action.Run
             | None -> ()
 
     let saveAndRun () =
@@ -111,7 +122,7 @@ let useUnsavedChangesController () =
                     match! saveActiveGuard () with
                     | Ok() ->
                         setPendingAction None
-                        do! runWithoutGuard action
+                        do! runWithoutGuard action.Run
                     | Error exn -> setSaveError (UnsavedChangesSaveError.toModalMessage exn)
 
                     setIsRunning false

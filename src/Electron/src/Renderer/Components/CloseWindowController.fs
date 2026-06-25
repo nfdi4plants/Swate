@@ -31,11 +31,22 @@ type CloseWindowController =
         let resolveCloseRequest (decision: SaveBeforeQuitDecision) =
             Api.ipcArcVaultApi.resolveCloseRequest decision
 
+        let rec resolveCloseRequestWithNoteGuard decision errorTitle onHandled = promise {
+            match! resolveCloseRequest decision with
+            | Error resolveError -> enqueueCloseError errorTitle resolveError
+            | Ok CloseRequestResolution.Handled ->
+                setModalIsOpen false
+                onHandled ()
+            | Ok CloseRequestResolution.BlockedByUnsavedNote ->
+                setModalIsOpen false
+                unsavedChangesCtx.RequestAction(fun () -> resolveCloseRequestWithNoteGuard decision errorTitle onHandled)
+        }
+
         let handleCancel () =
             if not isBusy then
                 promise {
                     match! resolveCloseRequest SaveBeforeQuitDecision.CancelClose with
-                    | Ok() ->
+                    | Ok _ ->
                         setModalIsOpen false
                         onCancelClose |> Option.iter (fun fn -> fn ())
                     | Error resolveError -> enqueueCloseError "Could not cancel close request" resolveError
@@ -44,13 +55,10 @@ type CloseWindowController =
 
         let handleCloseWithoutSaving () =
             if not isBusy then
-                promise {
-                    match! resolveCloseRequest SaveBeforeQuitDecision.CloseWithoutSaving with
-                    | Ok() ->
-                        setModalIsOpen false
-                        onConfirmClose |> Option.iter (fun fn -> fn ())
-                    | Error resolveError -> enqueueCloseError "Could not close window" resolveError
-                }
+                resolveCloseRequestWithNoteGuard
+                    SaveBeforeQuitDecision.CloseWithoutSaving
+                    "Could not close window"
+                    (fun () -> onConfirmClose |> Option.iter (fun fn -> fn ()))
                 |> Promise.start
 
         let saveBeforeClose () : JS.Promise<Result<unit, exn>> = promise {
@@ -70,9 +78,11 @@ type CloseWindowController =
 
                     match saveResult with
                     | Ok() ->
-                        match! resolveCloseRequest SaveBeforeQuitDecision.SaveAndClose with
-                        | Ok() -> setModalIsOpen false
-                        | Error resolveError -> enqueueCloseError "Could not save and close window" resolveError
+                        do!
+                            resolveCloseRequestWithNoteGuard
+                                SaveBeforeQuitDecision.SaveAndClose
+                                "Could not save and close window"
+                                ignore
                     | Error saveError -> enqueueCloseError "Save before close failed" saveError
 
                     setIsBusy false

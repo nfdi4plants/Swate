@@ -1,8 +1,4 @@
-open System.IO
-open System.Threading.Tasks
-
 open Microsoft.AspNetCore.Builder
-open Microsoft.Extensions.DependencyInjection
 open Giraffe
 open Saturn
 open Swate.Components.Shared

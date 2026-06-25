@@ -20,6 +20,11 @@ module IPCTypesHelper =
         | CloseWithoutSaving
         | CancelClose
 
+    [<RequireQualifiedAccess>]
+    type CloseRequestResolution =
+        | Handled
+        | BlockedByUnsavedNote
+
 open IPCTypesHelper
 
 type CreateArcRequest = { identifier: string; initGit: bool }
@@ -72,7 +77,7 @@ type IArcVaultsApi = {
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
     cancelGitLfs: string -> JS.Promise<Result<string, exn>>
-    resolveCloseRequest: SaveBeforeQuitDecision -> JS.Promise<Result<unit, exn>>
+    resolveCloseRequest: SaveBeforeQuitDecision -> JS.Promise<Result<CloseRequestResolution, exn>>
 }
 
 /// Two Way Bridge: Renderer <-> Main
@@ -163,6 +168,10 @@ module MainToRendererIpc =
 
     type IHasUnsavedArcChangesRendererApi = {
         arcUnsavedChangesUpdate: bool -> unit
+    }
+
+    type IRendererUnsavedChangesApi = {
+        hasUnsavedNoteChanges: unit -> JS.Promise<bool>
     }
 
 // TODO: What should filewatcher do when detecting changes?
