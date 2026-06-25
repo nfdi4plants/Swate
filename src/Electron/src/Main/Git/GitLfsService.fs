@@ -633,6 +633,39 @@ let private extractSpawnFailureMessage (result: GitSpawnResult) =
 
 let private spawnFailure (result: GitSpawnResult) = exn (extractSpawnFailureMessage result)
 
+let private isHttpExtraHeaderConfigArg (configArg: string) =
+    let trimmed = configArg.Trim()
+    let equalsIndex = trimmed.IndexOf("=")
+
+    let key =
+        if equalsIndex >= 0 then
+            trimmed.Substring(0, equalsIndex)
+        else
+            trimmed
+
+    let normalizedKey = key.Trim().ToLowerInvariant()
+
+    normalizedKey.Equals("http.extraheader", StringComparison.Ordinal)
+    || (normalizedKey.StartsWith("http.", StringComparison.Ordinal)
+        && normalizedKey.EndsWith(".extraheader", StringComparison.Ordinal))
+
+let private lfsTransferConfigArgs (configArgs: string[]) =
+    let filtered = ResizeArray<string>()
+    let mutable index = 0
+
+    while index < configArgs.Length do
+        if
+            configArgs.[index] = "-c"
+            && index + 1 < configArgs.Length
+            && isHttpExtraHeaderConfigArg configArgs.[index + 1]
+        then
+            index <- index + 2
+        else
+            filtered.Add configArgs.[index]
+            index <- index + 1
+
+    filtered.ToArray()
+
 let runAuthenticatedTransferWith
     (runSpawnedGit: GitSpawnRequest -> JS.Promise<GitSpawnResult>)
     (commandAuth: GitCommandAuthentication)
@@ -644,7 +677,10 @@ let runAuthenticatedTransferWith
         let! result =
             runSpawnedGit {
                 WorkingDirectory = Some repoPath
-                Arguments = [| yield! commandAuth.ConfigArgs; yield! arguments |]
+                Arguments = [|
+                    yield! lfsTransferConfigArgs commandAuth.ConfigArgs
+                    yield! arguments
+                |]
                 Environment = Some commandAuth.Environment
                 StandardInput = None
                 CancelCheck = cancelCheck
@@ -696,7 +732,7 @@ let downloadObjectFromListing
             runGitDiscardingStdout {
                 WorkingDirectory = Some repoPath
                 Arguments = [|
-                    yield! commandAuth.ConfigArgs
+                    yield! lfsTransferConfigArgs commandAuth.ConfigArgs
                     yield! buildSmudgePointerArgs relativePath
                 |]
                 Environment = Some commandAuth.Environment
@@ -1027,7 +1063,7 @@ let uploadObjects
                 runSpawnedGit {
                     WorkingDirectory = Some repoPath
                     Arguments = [|
-                        yield! commandAuth.ConfigArgs
+                        yield! lfsTransferConfigArgs commandAuth.ConfigArgs
                         "lfs"
                         "push"
                         "--object-id"
@@ -1050,7 +1086,7 @@ let uploadObjects
                         runSpawnedGit {
                             WorkingDirectory = Some repoPath
                             Arguments = [|
-                                yield! commandAuth.ConfigArgs
+                                yield! lfsTransferConfigArgs commandAuth.ConfigArgs
                                 "lfs"
                                 "push"
                                 remoteName
