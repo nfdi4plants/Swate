@@ -158,7 +158,7 @@ type TemplatesDisplay =
             ]
         )
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member TemplatesDisplay
         (
             templates: Template[],

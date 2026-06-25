@@ -269,7 +269,7 @@ type ArcFileFooterTabs =
         )
 
     [<ReactComponent>]
-    static member DragAndDropContainer(tableIds: ResizeArray<string>, handleDragEnd, children: ReactElement) =
+    static member private DragAndDropContainer(tableIds: ResizeArray<string>, handleDragEnd, children: ReactElement) =
 
         let pointerSensor =
             DndKit.useSensor (
@@ -293,7 +293,7 @@ type ArcFileFooterTabs =
                 )
         )
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (arcFile: ArcFiles, activeView: ActiveView, setActiveView: ActiveView -> unit, setArcFile: ArcFiles -> unit)
         =

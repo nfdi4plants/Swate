@@ -685,7 +685,7 @@ type DataHubBrowser =
             ]
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Entry() =
         let accounts, setAccounts = React.useState (AuthStateDto.Empty: AuthStateDto)
 

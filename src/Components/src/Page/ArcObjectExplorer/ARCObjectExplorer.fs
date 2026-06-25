@@ -102,7 +102,7 @@ module private ARCObjectExplorerHelper =
 [<Erase; Mangle(false)>]
 type ARCObjectExplorer =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member ARCObjectExplorer(children: ReactElement) =
         let isOpen, setIsOpen = React.useState false
 

@@ -34,7 +34,7 @@ module private PopoverHelper =
 [<Erase; Mangle(false)>]
 type Popover =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Popover
         (
             children: ReactElement,

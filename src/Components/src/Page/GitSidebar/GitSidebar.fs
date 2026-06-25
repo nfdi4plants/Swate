@@ -1588,7 +1588,7 @@ type GitSidebar =
             debug = "GitSidebarPublishRename"
         )
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (
             status: GitSidebarStatus,

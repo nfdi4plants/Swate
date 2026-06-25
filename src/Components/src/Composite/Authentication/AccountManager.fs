@@ -162,7 +162,7 @@ type AccountManager =
             ]
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (
             accounts: AuthStateDto,

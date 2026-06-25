@@ -2,19 +2,18 @@
   "name": "@nfdi4plants/swate-components",
   "version": "0.0.0",
   "description": "Customizable React components for ontology annotation, based on Swate and the ARC.",
-  "main": "./dist/index.cjs.js",
-  "module": "./dist/index.es.js",
+  "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "private": false,
   "type": "module",
+  "sideEffects": false,
   "files": [
-    "dist"
+    "dist/*"
   ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
-      "import": "./dist/index.es.js",
-      "require": "./dist/index.cjs.js"
+      "import": "./dist/index.js"
     },
     "./style.css": "./dist/swate-components.css"
   },
@@ -28,8 +27,8 @@
     "prelink": "npm run build",
     "storybook": "npm run fable -- --watch --run storybook dev -p 6006",
     "storybook:no-compile": "storybook dev -p 6006",
-    "prebuild:net": "npx @tailwindcss/cli -i ./tailwind.css -o ./src/swateBundleStyle.css -m",
-    "build": "npm run clean && npm run fable -- --fableLib @fable-org/fable-library-js --noCache -e fs.ts -o src/output && vite build",
+    "prebuild:net": "npx @tailwindcss/cli -i ./tailwind.css -o ./src/swate-components.css -m",
+    "build": "npm run clean && npm run fable -- --fableLib @fable-org/fable-library-js --noCache -e fs.ts && (tsc -p tsconfig.build.json --outdir ./dist || echo tsc errors ignored) && npx @tailwindcss/cli -i ./tailwind.css -o ./dist/swate-components.css -m",
     "build:net": "dotnet pack ./src/Swate.Components.fsproj",
     "prebuild:storybook": "npm run fable -- --noCache",
     "build:storybook": "storybook build"

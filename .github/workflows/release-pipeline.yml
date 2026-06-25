@@ -216,7 +216,6 @@ jobs:
         with:
           pattern: release-assets-*
           path: release-assets
-          if-no-files-found: warn
 
       - name: Upload assets and finalize release
         env:

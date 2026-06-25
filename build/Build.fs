@@ -66,7 +66,7 @@ let main args =
         let isDryRun = otherArgs |> List.contains "--dry-run"
         let isCi = otherArgs |> List.contains "--ci"
 
-        if not isCi then
+        if not isCi && not isDryRun then
             printRedfn "Currently the worklow only supports CI releases!"
             exit 1
 

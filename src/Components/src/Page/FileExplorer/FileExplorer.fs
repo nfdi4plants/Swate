@@ -104,7 +104,7 @@ module private FileExplorerHelper =
 [<Mangle(false); Erase>]
 type FileExplorer =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member FileExplorer
         (
             ?initialItems: FileItem list,

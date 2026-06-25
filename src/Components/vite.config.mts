@@ -34,28 +34,27 @@ export default defineConfig({
         // Avoid runtime re-optimization reloads during Vitest browser runs in CI.
         include: ["react-dom/client"],
     },
-    build: {
-        sourcemap: true,
-        lib: {
-            entry: './src/index.js', // Entry file
-            name: "@nfdi4plants/swate-components",
-            formats: ['es', 'cjs'],
-            fileName: (format) => `index.${format}.js`,
-        },
-        rollupOptions: {
-            // Exclude peer dependencies from the final bundle
-            external: (id) =>
-                externalPackages.includes(id) ||
-                id.startsWith('@fable-org/fable-library-js/'),
-            output: {
-                globals: {
-                    react: 'React',
-                    'react-dom': 'ReactDOM',
-                    tailwindcss: "tailwindcss",
-                },
-            },
-        },
-    },
+    // build: {
+    //     sourcemap: true,
+    //     lib: {
+    //         entry: './src/index.ts',
+    //         name: "@nfdi4plants/swate-components",
+    //         formats: ['es', 'cjs'],
+    //         fileName: (format) => `index.${format}.js`,
+    //     },
+    //     rollupOptions: {
+    //         external: (id) =>
+    //             externalPackages.includes(id) ||
+    //             id.startsWith('@fable-org/fable-library-js/'),
+    //         output: {
+    //             globals: {
+    //                 react: 'React',
+    //                 'react-dom': 'ReactDOM',
+    //                 tailwindcss: "tailwindcss",
+    //             },
+    //         },
+    //     },
+    // },
     server: {
         watch: {
             ignored: ["**/*.fs"]

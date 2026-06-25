@@ -72,7 +72,7 @@ type Notes =
             debug = "notes-existing-target"
         )
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Wizard
         (
             draft: NotesDraft,
