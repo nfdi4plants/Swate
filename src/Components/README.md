@@ -39,6 +39,10 @@
 0. Release normally and copy `<new_version>` from console output.
 1. `npm version <new_version> --no-git-tag-version`
 2. `npm run build` (transpiles with fable, creates tsc types, and bundles with rollup)
+
+> Background info: 
+> Why transpile to `src/dist`, instead of using the fable transpiled files next to the f# files? Because otherwise the tsc compiler cannot find the f# code from Swate.Components.Shared. By giving fable a specific output dir `src/dist`, all code, including the f# code from Swate.Components.Shared, is in one place and tsc can find it.
+
 3. (Due to [#701](https://github.com/nfdi4plants/Swate/issues/701)) replace `@layer base` with `@layer swt-base` in `dist/swate-components.css`
 4. `npm publish --access public --tag next` (Use `--tag next` for prerelease)
 

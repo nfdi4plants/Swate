@@ -2,92 +2,92 @@
 // Primitive
 // ---------------------------------------------------------------------------
 
-export { default as Actionbar } from './Primitive/Actionbar/Actionbar.fs.ts';
-export { default as BaseModal } from './Primitive/BaseModal/BaseModal.fs.ts';
-export { default as Blankslate } from './Primitive/Blankslate/Blankslate.fs.ts';
-export { default as CardGrid } from './Primitive/CardGrid/CardGrid.fs.ts';
-export { default as ComboBox } from './Primitive/ComboBox/ComboBox.fs.ts';
-export { default as ContextMenu } from './Primitive/ContextMenu/ContextMenu.fs.ts';
-export { default as Dropdown } from './Primitive/Dropdown/Dropdown.fs.ts';
-export { default as ErrorModal } from './Primitive/ErrorModal/ErrorModal.fs.ts';
-export { default as ErrorModalProvider } from './Primitive/ErrorModal/Provider.fs.ts';
-export { default as LoadingSpinner } from './Primitive/LoadingSpinner/LoadingSpinner.fs.ts';
-export { default as Navbar } from './Primitive/Navbar/Navbar.fs.ts';
-export { default as Popover } from './Primitive/Popover/Popover.fs.ts';
-export { default as Select } from './Primitive/Select/Select.fs.ts';
-export * as Icons from './Primitive/Icons.fs.ts';
+export { default as Actionbar } from './dist/Primitive/Actionbar/Actionbar.fs';
+export { default as BaseModal } from './dist/Primitive/BaseModal/BaseModal.fs';
+export { default as Blankslate } from './dist/Primitive/Blankslate/Blankslate.fs';
+export { default as CardGrid } from './dist/Primitive/CardGrid/CardGrid.fs';
+export { default as ComboBox } from './dist/Primitive/ComboBox/ComboBox.fs';
+export { default as ContextMenu } from './dist/Primitive/ContextMenu/ContextMenu.fs';
+export { default as Dropdown } from './dist/Primitive/Dropdown/Dropdown.fs';
+export { default as ErrorModal } from './dist/Primitive/ErrorModal/ErrorModal.fs';
+export { default as ErrorModalProvider } from './dist/Primitive/ErrorModal/Provider.fs';
+export { default as LoadingSpinner } from './dist/Primitive/LoadingSpinner/LoadingSpinner.fs';
+export { default as Navbar } from './dist/Primitive/Navbar/Navbar.fs';
+export { default as Popover } from './dist/Primitive/Popover/Popover.fs';
+export { default as Select } from './dist/Primitive/Select/Select.fs';
+export * as Icons from './dist/Primitive/Icons.fs';
 
-export { DeleteButton, CircularExitButton, CollapseButton, QuickAccessButton } from './Primitive/Buttons/Buttons.fs.ts';
-export { LayoutComponents } from './Primitive/LayoutComponents/LayoutComponents.fs.ts';
-export { Dialog, StringSubmissionDialog } from './Primitive/Dialog/Dialog.fs.ts';
+export { DeleteButton, CircularExitButton, CollapseButton, QuickAccessButton } from './dist/Primitive/Buttons/Buttons.fs';
+export { LayoutComponents } from './dist/Primitive/LayoutComponents/LayoutComponents.fs';
+export { Dialog, StringSubmissionDialog } from './dist/Primitive/Dialog/Dialog.fs';
 
 // ---------------------------------------------------------------------------
 // Composite
 // ---------------------------------------------------------------------------
 
-export { default as AccountManager } from './Composite/Authentication/AccountManager.fs.ts';
-export { default as AnnotationTable } from './Composite/AnnotationTable/AnnotationTable.fs.ts';
-export { default as ArcSelector } from './Composite/ArcSelector/ArcSelector.fs.ts';
-export { default as ArcVaultActions } from './Composite/ArcVaultActions/ArcVaultActions.fs.ts';
-export { default as Authentication } from './Composite/Authentication/Authentication.fs.ts';
-export { default as BuildingBlockWidget } from './Composite/Widgets/BuildingBlockWidget/BuildingBlockWidget.fs.ts';
-export { default as DataAnnotator } from './Composite/Widgets/DataAnnotator/DataAnnotator.fs.ts';
-export { default as DataMapTable } from './Composite/DataMapTable/DataMapTable.fs.ts';
-export { default as FilePickerWidget } from './Composite/Widgets/FilePickerWidget.fs.ts';
-export { default as JsonExport } from './Composite/Widgets/JsonExport/JsonExport.fs.ts';
-export { default as JsonImport } from './Composite/Widgets/JsonImport/JsonImport.fs.ts';
-export { default as Layout } from './Composite/Layout/Layout.fs.ts';
-export { default as MarkdownTextInput } from './Composite/MarkdownText/TextInputWithMarkdown.fs.ts';
-export { default as Notes } from './Composite/Notes/Editor/Notes.fs.ts';
-export { default as Table } from './Composite/Table/Table.fs.ts';
-export { default as TemplateBrowser } from './Composite/TemplateBrowser/TemplateBrowser.fs.ts';
-export { default as TemplateCacheProvider } from './Composite/TemplateBrowser/TemplateCacheProvider.fs.ts';
-export { default as TemplateFilter } from './Composite/TemplateBrowser/TemplateFilter.fs.ts';
-export { default as TemplateImportModal } from './Composite/TemplateBrowser/TemplateImportModal.fs.ts';
-export { default as TemplateImportModalPreview } from './Composite/TemplateBrowser/TemplateImportModalPreview.fs.ts';
-export { default as TemplatesDisplay } from './Composite/TemplateBrowser/TemplatesDisplay.fs.ts';
-export { default as TemplateWidget } from './Composite/Widgets/TemplateWidget.fs.ts';
-export { default as TermSearch } from './Composite/TermSearch/TermSearch.fs.ts';
-export { default as TermSearchConfigProvider } from './Composite/TermSearch/ConfigProvider.fs.ts';
-export { default as ThemeProvider } from './Composite/ThemeSelector/ThemeProvider.fs.ts';
-export { default as ThemeSelector } from './Composite/ThemeSelector/ThemeSelector.fs.ts';
+export { default as AccountManager } from './dist/Composite/Authentication/AccountManager.fs';
+export { default as AnnotationTable } from './dist/Composite/AnnotationTable/AnnotationTable.fs';
+export { default as ArcSelector } from './dist/Composite/ArcSelector/ArcSelector.fs';
+export { default as ArcVaultActions } from './dist/Composite/ArcVaultActions/ArcVaultActions.fs';
+export { default as Authentication } from './dist/Composite/Authentication/Authentication.fs';
+export { default as BuildingBlockWidget } from './dist/Composite/Widgets/BuildingBlockWidget/BuildingBlockWidget.fs';
+export { default as DataAnnotator } from './dist/Composite/Widgets/DataAnnotator/DataAnnotator.fs';
+export { default as DataMapTable } from './dist/Composite/DataMapTable/DataMapTable.fs';
+export { default as FilePickerWidget } from './dist/Composite/Widgets/FilePickerWidget.fs';
+export { default as JsonExport } from './dist/Composite/Widgets/JsonExport/JsonExport.fs';
+export { default as JsonImport } from './dist/Composite/Widgets/JsonImport/JsonImport.fs';
+export { default as Layout } from './dist/Composite/Layout/Layout.fs';
+export { default as MarkdownTextInput } from './dist/Composite/MarkdownText/TextInputWithMarkdown.fs';
+export { default as Notes } from './dist/Composite/Notes/Editor/Notes.fs';
+export { default as Table } from './dist/Composite/Table/Table.fs';
+export { default as TemplateBrowser } from './dist/Composite/TemplateBrowser/TemplateBrowser.fs';
+export { default as TemplateCacheProvider } from './dist/Composite/TemplateBrowser/TemplateCacheProvider.fs';
+export { default as TemplateFilter } from './dist/Composite/TemplateBrowser/TemplateFilter.fs';
+export { default as TemplateImportModal } from './dist/Composite/TemplateBrowser/TemplateImportModal.fs';
+export { default as TemplateImportModalPreview } from './dist/Composite/TemplateBrowser/TemplateImportModalPreview.fs';
+export { default as TemplatesDisplay } from './dist/Composite/TemplateBrowser/TemplatesDisplay.fs';
+export { default as TemplateWidget } from './dist/Composite/Widgets/TemplateWidget.fs';
+export { default as TermSearch } from './dist/Composite/TermSearch/TermSearch.fs';
+export { default as TermSearchConfigProvider } from './dist/Composite/TermSearch/ConfigProvider.fs';
+export { default as ThemeProvider } from './dist/Composite/ThemeSelector/ThemeProvider.fs';
+export { default as ThemeSelector } from './dist/Composite/ThemeSelector/ThemeSelector.fs';
 
-export { Main as NoteSearch, SearchSuggestion } from './Composite/Notes/NoteSearch/NoteSearch.fs.ts';
-export { WidgetController, Entry as WidgetEntry } from './Composite/Widgets/Widgets.fs.ts';
+export { Main as NoteSearch, SearchSuggestion } from './dist/Composite/Notes/NoteSearch/NoteSearch.fs';
+export { WidgetController, Entry as WidgetEntry } from './dist/Composite/Widgets/Widgets.fs';
 
 // ---------------------------------------------------------------------------
 // Page
 // ---------------------------------------------------------------------------
 
-export { default as ArcFileEditor } from './Page/ArcFileEditor/ArcFileEditor.fs.ts';
-export { default as ArcFileFooterTabs } from './Page/ArcFileEditor/ArcFileFooterTabs.fs.ts';
-export { default as EmptyTableView } from './Page/ArcFileEditor/EmptyTableView/Main.fs.ts';
-export { default as ARCObjectExplorer } from './Page/ArcObjectExplorer/ARCObjectExplorer.fs.ts';
-export { default as DataHubBrowser } from './Page/DataHubBrowser/DataHubBrowser.fs.ts';
-export { default as FileExplorer } from './Page/FileExplorer/FileExplorer.fs.ts';
-export { default as GitDiffViewer } from './Page/GitComparison/GitDiffViewer.fs.ts';
-export { default as GitSidebar } from './Page/GitSidebar/GitSidebar.fs.ts';
-export { default as Landing } from './Page/Landing/Landing.fs.ts';
-export { default as SettingsPage } from './Page/SettingsPage/SettingsPage.fs.ts';
-export { default as ProvenanceGrouping } from './Page/ProvenanceGrouping/ProvenanceGrouping.fs.ts';
+export { default as ArcFileEditor } from './dist/Page/ArcFileEditor/ArcFileEditor.fs';
+export { default as ArcFileFooterTabs } from './dist/Page/ArcFileEditor/ArcFileFooterTabs.fs';
+export { default as EmptyTableView } from './dist/Page/ArcFileEditor/EmptyTableView/Main.fs';
+export { default as ARCObjectExplorer } from './dist/Page/ArcObjectExplorer/ARCObjectExplorer.fs';
+export { default as DataHubBrowser } from './dist/Page/DataHubBrowser/DataHubBrowser.fs';
+export { default as FileExplorer } from './dist/Page/FileExplorer/FileExplorer.fs';
+export { default as GitDiffViewer } from './dist/Page/GitComparison/GitDiffViewer.fs';
+export { default as GitSidebar } from './dist/Page/GitSidebar/GitSidebar.fs';
+export { default as Landing } from './dist/Page/Landing/Landing.fs';
+export { default as SettingsPage } from './dist/Page/SettingsPage/SettingsPage.fs';
+export { default as ProvenanceGrouping } from './dist/Page/ProvenanceGrouping/ProvenanceGrouping.fs';
 
-export { Viewer as GitMergeConflictViewer } from './Page/GitComparison/GitMergeConflictViewer.fs.ts';
-export { TitleStack, HeaderRow, PanelShell, SectionCard } from './Page/GitComparison/GitComparisonView.fs.ts';
+export { Viewer as GitMergeConflictViewer } from './dist/Page/GitComparison/GitMergeConflictViewer.fs';
+export { TitleStack, HeaderRow, PanelShell, SectionCard } from './dist/Page/GitComparison/GitComparisonView.fs';
 
 // -- Metadata --
-export { default as ArcFileMetadata } from './Page/Metadata/ArcFileMetadata.fs.ts';
-export { default as AssayMetadata } from './Page/Metadata/AssayMetadata.fs.ts';
-export { default as DataMapMetadata } from './Page/Metadata/DataMapMetadata.fs.ts';
-export { default as InvestigationMetadata } from './Page/Metadata/InvestigationMetadata.fs.ts';
-export { default as RunMetadata } from './Page/Metadata/RunMetadata.fs.ts';
-export { default as StudyMetadata } from './Page/Metadata/StudyMetadata.fs.ts';
-export { default as TemplateMetadata } from './Page/Metadata/TemplateMetadata.fs.ts';
-export { default as WorkflowMetadata } from './Page/Metadata/WorkflowMetadata.fs.ts';
+export { default as ArcFileMetadata } from './dist/Page/Metadata/ArcFileMetadata.fs';
+export { default as AssayMetadata } from './dist/Page/Metadata/AssayMetadata.fs';
+export { default as DataMapMetadata } from './dist/Page/Metadata/DataMapMetadata.fs';
+export { default as InvestigationMetadata } from './dist/Page/Metadata/InvestigationMetadata.fs';
+export { default as RunMetadata } from './dist/Page/Metadata/RunMetadata.fs';
+export { default as StudyMetadata } from './dist/Page/Metadata/StudyMetadata.fs';
+export { default as TemplateMetadata } from './dist/Page/Metadata/TemplateMetadata.fs';
+export { default as WorkflowMetadata } from './dist/Page/Metadata/WorkflowMetadata.fs';
 
 // ---------------------------------------------------------------------------
 // Api
 // ---------------------------------------------------------------------------
 
-export { SwateApi } from './Api/SwateApi.fs.ts';
-export { TIBApi } from './Api/TIBApi.fs.ts';
-export { GitLabApi } from './Api/GitLabApi.fs.ts';
+export { SwateApi } from './dist/Api/SwateApi.fs';
+export { TIBApi } from './dist/Api/TIBApi.fs';
+export { GitLabApi } from './dist/Api/GitLabApi.fs';
