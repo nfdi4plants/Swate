@@ -16,16 +16,17 @@ type UnsavedChangesControllerView = {
     Modal: ReactElement
 }
 
-type private PendingGuardedAction = {
-    Run: GuardedAction
-}
+type private PendingGuardedAction = { Run: GuardedAction }
 
 [<Hook>]
 let useUnsavedChangesController () =
     let activeGuardRef = React.useRef<UnsavedChangesGuard option> None
     let bypassGuardDepthRef = React.useRef 0
     let allowWindowUnloadRef = React.useRef false
-    let pendingAction, setPendingAction = React.useState (None: PendingGuardedAction option)
+
+    let pendingAction, setPendingAction =
+        React.useState (None: PendingGuardedAction option)
+
     let isRunning, setIsRunning = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
 

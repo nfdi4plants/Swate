@@ -35,7 +35,8 @@ type Notes =
             if not isOpen then
                 close ()
 
-        let createInExistingDisabled = isSubmitting || selectedTarget.IsNone || not canSubmitDraft
+        let createInExistingDisabled =
+            isSubmitting || selectedTarget.IsNone || not canSubmitDraft
 
         let footer =
             Html.div [
@@ -94,7 +95,7 @@ type Notes =
         let setError (value: string option) =
             setUiState (State.setError value uiState)
 
-        let submitRequirements = NoteConversion.PayloadRequirements.tryResolve(draft)
+        let submitRequirements = NoteConversion.PayloadRequirements.tryResolve (draft)
         let canSubmitDraft = submitRequirements.IsSome
 
         let submitPayload onSuccess =
@@ -131,7 +132,7 @@ type Notes =
         let submitToExisting () =
             match draft.SelectedExistingTarget, submitRequirements with
             | Some targetRef, Some(dateCreated, protocolName) ->
-                NoteConversion.PayloadRequirements.tryCreateExistingTargetPayload(
+                NoteConversion.PayloadRequirements.tryCreateExistingTargetPayload (
                     targetRef,
                     dateCreated,
                     protocolName,
@@ -144,7 +145,7 @@ type Notes =
             match submitRequirements with
             | None -> ()
             | Some(dateCreated, protocolName) ->
-                NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload(dateCreated, protocolName, draft)
+                NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload (dateCreated, protocolName, draft)
                 |> submitPayload ignore
 
         Html.div [

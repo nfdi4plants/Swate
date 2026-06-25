@@ -600,25 +600,33 @@ type ArcVaults() =
                 return Ok CloseRequestResolution.Handled
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
                 return!
-                    this.ResolveWhenRendererHasNoUnsavedNotes(windowId, vault, fun () -> promise {
-                        swatelogfn windowId "Close request approved by user. Closing without saving."
-                        vault.RefreshHasUnsavedArcChangesFlag()
-                        return Ok(this.ApproveClose vault)
-                    })
+                    this.ResolveWhenRendererHasNoUnsavedNotes(
+                        windowId,
+                        vault,
+                        fun () -> promise {
+                            swatelogfn windowId "Close request approved by user. Closing without saving."
+                            vault.RefreshHasUnsavedArcChangesFlag()
+                            return Ok(this.ApproveClose vault)
+                        }
+                    )
             | SaveBeforeQuitDecision.SaveAndClose ->
                 return!
-                    this.ResolveWhenRendererHasNoUnsavedNotes(windowId, vault, fun () -> promise {
-                        swatelogfn windowId "Close request approved by user. Closing after main save."
+                    this.ResolveWhenRendererHasNoUnsavedNotes(
+                        windowId,
+                        vault,
+                        fun () -> promise {
+                            swatelogfn windowId "Close request approved by user. Closing after main save."
 
-                        if vault.hasUnsavedArcChanges then
-                            let! persistResult = vault.WriteArc()
+                            if vault.hasUnsavedArcChanges then
+                                let! persistResult = vault.WriteArc()
 
-                            match persistResult with
-                            | Error saveError -> return Error saveError
-                            | Ok() -> return Ok(this.ApproveClose vault)
-                        else
-                            return Ok(this.ApproveClose vault)
-                    })
+                                match persistResult with
+                                | Error saveError -> return Error saveError
+                                | Ok() -> return Ok(this.ApproveClose vault)
+                            else
+                                return Ok(this.ApproveClose vault)
+                        }
+                    )
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =

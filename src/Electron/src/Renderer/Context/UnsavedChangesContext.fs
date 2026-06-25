@@ -25,13 +25,13 @@ module UnsavedChangesGuard =
             |> Option.defaultValue "This note has unsaved changes. Save it before closing?"
 
         {
-        Title = "Unsaved Note"
-        Description = description
-        SaveButtonText = "Save"
-        DiscardButtonText = "Don't Save"
-        SavingText = "Saving..."
-        HasUnsavedChanges = hasUnsavedChanges
-        Save = save
+            Title = "Unsaved Note"
+            Description = description
+            SaveButtonText = "Save"
+            DiscardButtonText = "Don't Save"
+            SavingText = "Saving..."
+            HasUnsavedChanges = hasUnsavedChanges
+            Save = save
         }
 
 module UnsavedChangesSaveError =

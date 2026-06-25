@@ -39,7 +39,10 @@ type CloseWindowController =
                 onHandled ()
             | Ok CloseRequestResolution.BlockedByUnsavedNote ->
                 setModalIsOpen false
-                unsavedChangesCtx.RequestAction(fun () -> resolveCloseRequestWithNoteGuard decision errorTitle onHandled)
+
+                unsavedChangesCtx.RequestAction(fun () ->
+                    resolveCloseRequestWithNoteGuard decision errorTitle onHandled
+                )
         }
 
         let handleCancel () =

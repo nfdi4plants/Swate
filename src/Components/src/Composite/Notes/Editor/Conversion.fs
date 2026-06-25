@@ -192,7 +192,7 @@ module NoteConversion =
             |> Option.map (fun protocolName -> (dateCreated |> Option.defaultValue DateTime.Today).Date, protocolName)
 
         static member tryResolve(draft: NotesDraft) =
-            PayloadRequirements.tryCreate(draft.Title, ?dateCreated = draft.DateCreated)
+            PayloadRequirements.tryCreate (draft.Title, ?dateCreated = draft.DateCreated)
 
         static member private createPayloadWithDate
             (target: NotesTarget, relativePath: string, dateCreated: DateTime, draft: NotesDraft)
@@ -227,12 +227,12 @@ module NoteConversion =
             match resolveRelativePath dateCreated protocolName with
             | None -> Error unsafePathMessage
             | Some relativePath ->
-                Ok(PayloadRequirements.createPayloadWithDate(target, relativePath, dateCreated, draft))
+                Ok(PayloadRequirements.createPayloadWithDate (target, relativePath, dateCreated, draft))
 
         static member tryCreateExistingTargetPayload
             (targetRef: ExistingTargetRef, dateCreated: DateTime, protocolName: string, draft: NotesDraft)
             =
-            PayloadRequirements.tryCreatePayload(
+            PayloadRequirements.tryCreatePayload (
                 NotesTarget.ExistingTarget targetRef,
                 (fun _ protocolName -> mkExistingTargetRelativePath targetRef protocolName),
                 "Could not resolve a safe target path.",
@@ -242,7 +242,7 @@ module NoteConversion =
             )
 
         static member tryCreateNewRootNotePayload(dateCreated: DateTime, protocolName: string, draft: NotesDraft) =
-            PayloadRequirements.tryCreatePayload(
+            PayloadRequirements.tryCreatePayload (
                 NotesTarget.NewRootNote,
                 (fun dateCreated protocolName -> mkNewRootNoteRelativePath dateCreated protocolName),
                 "Could not resolve a safe note path.",

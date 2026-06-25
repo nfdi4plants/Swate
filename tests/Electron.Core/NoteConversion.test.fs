@@ -158,23 +158,20 @@ Body
                         DateCreated = Some(DateTime(2026, 6, 15))
                 }
 
-                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve(validDraft)).IsSome).toBe (true)
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve (validDraft)).IsSome).toBe (true)
 
-                let missingDateDraft = {
-                    validDraft with
-                        DateCreated = None
-                }
+                let missingDateDraft = { validDraft with DateCreated = None }
 
                 let beforeResolve = DateTime.Today
 
                 let missingDate, missingDateProtocolName =
-                    NoteConversion.PayloadRequirements.tryResolve(missingDateDraft)
+                    NoteConversion.PayloadRequirements.tryResolve (missingDateDraft)
                     |> expectSome "Expected missing date to default."
 
                 let afterResolve = DateTime.Today
 
                 match
-                    NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload(
+                    NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload (
                         missingDate,
                         missingDateProtocolName,
                         missingDateDraft
@@ -196,19 +193,13 @@ Body
 
                     Vitest.expect(frontmatter.Date).toEqual (payload.DateCreated)
 
-                let missingTitleDraft = {
-                    validDraft with
-                        Title = "   "
-                }
+                let missingTitleDraft = { validDraft with Title = "   " }
 
-                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve(missingTitleDraft)).IsNone).toBe (true)
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve (missingTitleDraft)).IsNone).toBe (true)
 
-                let unsafeTitleDraft = {
-                    validDraft with
-                        Title = "!!!"
-                }
+                let unsafeTitleDraft = { validDraft with Title = "!!!" }
 
-                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve(unsafeTitleDraft)).IsNone).toBe (true)
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve (unsafeTitleDraft)).IsNone).toBe (true)
         )
 
         Vitest.test (
@@ -222,10 +213,12 @@ Body
                 }
 
                 let dateCreated, protocolName =
-                    NoteConversion.PayloadRequirements.tryResolve(draft)
+                    NoteConversion.PayloadRequirements.tryResolve (draft)
                     |> expectSome "Expected payload requirements to resolve."
 
-                match NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload(dateCreated, protocolName, draft) with
+                match
+                    NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload (dateCreated, protocolName, draft)
+                with
                 | Error message -> failwith $"Expected payload, got error: {message}"
                 | Ok payload ->
                     Vitest.expect(payload.Title).toBe ("Sampling protocol")

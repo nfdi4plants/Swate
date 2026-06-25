@@ -147,8 +147,7 @@ module React =
                 action: #Event -> unit,
                 ?options: AddEventListenerOptions,
                 ?dependencies: obj[]
-            )
-            =
+            ) =
             let addOptions =
                 React.useMemo ((fun () -> Impl.adjustPassive options), [| options |])
 
