@@ -51,24 +51,6 @@ let saveArcFileAndOpen (arcFile: ArcFiles) =
                 return openResult
         })
 
-let private publishUnsavedNoteChanges hasChanges =
-    promise {
-        match! Api.ipcArcVaultApi.setHasUnsavedNoteChanges hasChanges with
-        | Ok() -> ()
-        | Error exn -> Browser.Dom.console.error ("Failed to publish note dirty state", exn.Message)
-    }
-    |> Promise.start
-
-[<Hook>]
-let usePublishedUnsavedNoteChanges hasChanges =
-    React.useEffect ((fun () -> publishUnsavedNoteChanges hasChanges), [| box hasChanges |])
-
-    React.useEffectOnce (fun _ ->
-        { new System.IDisposable with
-            member _.Dispose() = publishUnsavedNoteChanges false
-        }
-    )
-
 [<Hook>]
 let useNoteImageFilePickerAdapter (pendingImageAssetsRef: IRefValue<ExternalAssetLink list>) =
     React.useMemo (

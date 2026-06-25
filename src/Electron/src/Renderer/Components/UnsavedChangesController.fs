@@ -1,8 +1,14 @@
 module Renderer.Components.UnsavedChangesController
 
+open Browser.Dom
+open Browser.Types
 open Fable.Core
 open Feliz
 open Renderer.Context.UnsavedChangesContext
+open Swate.Components.ReactHooks
+
+[<Emit("$0.returnValue = ''")>]
+let private setBeforeUnloadReturnValue (_event: Event) : unit = jsNative
 
 type UnsavedChangesControllerView = {
     Controller: UnsavedChangesController
@@ -13,6 +19,7 @@ type UnsavedChangesControllerView = {
 let useUnsavedChangesController () =
     let activeGuardRef = React.useRef<UnsavedChangesGuard option> None
     let bypassGuardDepthRef = React.useRef 0
+    let allowWindowUnloadRef = React.useRef false
     let pendingAction, setPendingAction = React.useState (None: GuardedAction option)
     let isRunning, setIsRunning = React.useState false
     let saveError, setSaveError = React.useState (None: string option)
@@ -38,6 +45,13 @@ let useUnsavedChangesController () =
         |> Promise.catch (fun ex -> Browser.Dom.console.error ("Guarded action failed", ex.Message))
         |> Promise.start
 
+    let requestAction action =
+        if hasActiveUnsavedChanges () then
+            setSaveError None
+            setPendingAction (Some action)
+        else
+            startWithoutGuard action
+
     let clearPendingAction () =
         setPendingAction None
         setSaveError None
@@ -48,17 +62,26 @@ let useUnsavedChangesController () =
         | _ -> return Ok()
     }
 
+    let closeWindowAfterGuard () = promise {
+        allowWindowUnloadRef.current <- true
+        window.close ()
+    }
+
+    React.useListener.on (
+        window,
+        "beforeunload",
+        fun (event: Event) ->
+            if not allowWindowUnloadRef.current && hasActiveUnsavedChanges () then
+                event.preventDefault ()
+                setBeforeUnloadReturnValue event
+                requestAction closeWindowAfterGuard
+    )
+
     let controller: UnsavedChangesController =
         React.useMemo (
             (fun _ -> {
                 SetActiveGuard = setActiveGuard
-                RequestAction =
-                    fun action ->
-                        if hasActiveUnsavedChanges () then
-                            setSaveError None
-                            setPendingAction (Some action)
-                        else
-                            startWithoutGuard action
+                RequestAction = requestAction
                 RunWithoutGuard = runWithoutGuard
                 SaveActiveGuard = saveActiveGuard
             }),

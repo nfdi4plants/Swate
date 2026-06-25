@@ -33,7 +33,16 @@ let NotesDraftTarget () =
 
     let hasUnsavedDraft = State.hasUnsavedDraft notesDraft
 
-    MainContentHelper.usePublishedUnsavedNoteChanges hasUnsavedDraft
+    let tryCreateDraftPayload () =
+        NoteConversion.tryCreateNewRootNotePayload notesDraft
+
+    let draftUnsavedPath =
+        if hasUnsavedDraft then
+            match tryCreateDraftPayload () with
+            | Ok payload -> Some(PathHelpers.normalizePath payload.Intent.RelativePath)
+            | Error _ -> Some($"{NoteConversion.notesRootFolder}/.draft.md")
+        else
+            None
 
     let imageFilePickerAdapter =
         MainContentHelper.useNoteImageFilePickerAdapter pendingImageAssetsRef
@@ -121,13 +130,13 @@ let NotesDraftTarget () =
         fun (payload: NotesSubmitPayload) -> submitRequest false (MainContentHelper.requestFromNotesPayload payload)
 
     let saveDraftAsync () =
-        match NoteConversion.tryCreateNewRootNotePayload notesDraft with
+        match tryCreateDraftPayload () with
         | Error message ->
             setSubmitState false (Some message)
             promise { return Error(exn message) }
         | Ok payload -> submitRequestAsync false (MainContentHelper.requestFromNotesPayload payload)
 
-    useUnsavedChangesGuard (UnsavedChangesGuard.note saveDraftAsync (fun () -> hasUnsavedDraft))
+    useUnsavedChangesGuard (UnsavedChangesGuard.note draftUnsavedPath saveDraftAsync (fun () -> hasUnsavedDraft))
 
     React.Fragment [
         Notes.Wizard(

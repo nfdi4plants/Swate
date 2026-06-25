@@ -141,7 +141,13 @@ module React =
     [<Erase>]
     type useListener =
         static member inline on
-            (eventType: string, action: #Event -> unit, ?options: AddEventListenerOptions, ?dependencies: obj[])
+            (
+                target: #EventTarget,
+                eventType: string,
+                action: #Event -> unit,
+                ?options: AddEventListenerOptions,
+                ?dependencies: obj[]
+            )
             =
             let addOptions =
                 React.useMemo ((fun () -> Impl.adjustPassive options), [| options |])
@@ -162,17 +168,22 @@ module React =
             let listener =
                 React.useCallback (fun () ->
                     match addOptions with
-                    | Some options -> document.addEventListener (eventType, fn, options)
-                    | None -> document.addEventListener (eventType, fn)
+                    | Some options -> target.addEventListener (eventType, fn, options)
+                    | None -> target.addEventListener (eventType, fn)
 
                     FsReact.createDisposable (fun () ->
                         match removeOptions with
-                        | Some options -> document.removeEventListener (eventType, fn, options)
-                        | None -> document.removeEventListener (eventType, fn)
+                        | Some options -> target.removeEventListener (eventType, fn, options)
+                        | None -> target.removeEventListener (eventType, fn)
                     )
                 )
 
             React.useEffect (listener)
+
+        static member inline on
+            (eventType: string, action: #Event -> unit, ?options: AddEventListenerOptions, ?dependencies: obj[])
+            =
+            useListener.on (document, eventType, action, ?options = options, ?dependencies = dependencies)
 
         static member inline onMouseDown(action: MouseEvent -> unit, ?options: AddEventListenerOptions, ?dependencies) =
             useListener.on ("mousedown", action, ?options = options, ?dependencies = dependencies)

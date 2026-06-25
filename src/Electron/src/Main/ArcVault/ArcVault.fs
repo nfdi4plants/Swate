@@ -34,8 +34,6 @@ type ArcVault(window: BrowserWindow) =
     //I am not sure if performance of calculating changes or precision should be more important. Lets see in the future. Maybe you can add this comment as /// comment on this member?
     /// Dirty marker for unsaved in-memory ARC mutations.
     member val hasUnsavedArcChanges: bool = false with get, private set
-    /// Dirty marker for unsaved renderer-owned markdown note edits.
-    member val hasUnsavedNoteChanges: bool = false with get, set
     member val fileTree: Dictionary<string, FileEntry> = Dictionary<string, FileEntry>() with get, set
     member val watcher: Chokidar.IWatcher option = None with get, set
     member val fileWatcherReloadArcTimeout: int option = None with get, set
@@ -607,7 +605,7 @@ type ArcVaults() =
 
         window.onClose (fun closeEvent ->
             if not vault.isCloseApproved then
-                if vault.hasUnsavedArcChanges || vault.hasUnsavedNoteChanges then
+                if vault.hasUnsavedArcChanges then
                     closeEvent.preventDefault ()
 
                     if not vault.isCloseRequestPending then

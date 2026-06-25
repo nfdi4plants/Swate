@@ -18,15 +18,21 @@ type UnsavedChangesGuard = {
 
 module UnsavedChangesGuard =
 
-    let note save hasUnsavedChanges = {
+    let note relativePath save hasUnsavedChanges =
+        let description =
+            relativePath
+            |> Option.map (fun path -> $"'{path}' has unsaved changes. Save it before closing?")
+            |> Option.defaultValue "This note has unsaved changes. Save it before closing?"
+
+        {
         Title = "Unsaved Note"
-        Description = "This note has unsaved changes. Save it before closing?"
+        Description = description
         SaveButtonText = "Save"
         DiscardButtonText = "Don't Save"
         SavingText = "Saving..."
         HasUnsavedChanges = hasUnsavedChanges
         Save = save
-    }
+        }
 
 module UnsavedChangesSaveError =
 

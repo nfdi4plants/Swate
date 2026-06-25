@@ -32,8 +32,6 @@ let MarkdownEditorTarget (content: string) =
         [| box content |]
     )
 
-    Renderer.Components.MainContent.Helper.usePublishedUnsavedNoteChanges hasUnsavedChanges
-
     let imageFilePickerAdapter =
         Renderer.Components.MainContent.Helper.useNoteImageFilePickerAdapter pendingImageAssetsRef
 
@@ -74,7 +72,7 @@ let MarkdownEditorTarget (content: string) =
         }
         |> Promise.start
 
-    useUnsavedChangesGuard (UnsavedChangesGuard.note saveMarkdownAsync (fun () -> hasUnsavedChanges))
+    useUnsavedChangesGuard (UnsavedChangesGuard.note selectedPath saveMarkdownAsync (fun () -> hasUnsavedChanges))
 
     let saveStatusText =
         match saveError with
