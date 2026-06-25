@@ -264,6 +264,14 @@ let api (event: IpcMainInvokeEvent) : IGitApi = {
                 let! result = GitService.push arcPath request.Remote request.Branch (Some progressReporter)
                 return toGitOperationResult (fun () -> Some "Push completed.") None None result
         }
+    gitCancelPush =
+        fun () -> promise {
+            match tryGetVaultAndArcPath event with
+            | Error error -> return Error error
+            | Ok(_, arcPath) ->
+                let result = GitService.cancelPush arcPath
+                return toGitOperationResult (fun () -> Some "Push cancellation requested.") None None result
+        }
     gitInitRepository =
         fun (targetPath: string) -> promise {
             // Init provisioning is path-driven only; no vault/window context is required.

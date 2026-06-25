@@ -82,6 +82,7 @@ type GitSidebarCallbacks = {
     OnSelectChange: GitSidebarChange -> JS.Promise<Result<unit, string>>
     OnPruneLfsCache: unit -> unit
     OnDedupLfsStorage: unit -> unit
+    OnCancelOperation: unit -> unit
 }
 
 [<RequireQualifiedAccess>]

@@ -1513,9 +1513,14 @@ Vitest.describe (
                     }
 
                 let! result =
-                    GitLfsService.uploadObjects fakeSpawnedGit commandAuth "C:/repo" "origin" "refs/heads/main" [|
-                        lfsObjectId
-                    |]
+                    GitLfsService.uploadObjects
+                        fakeSpawnedGit
+                        commandAuth
+                        (fun () -> false)
+                        "C:/repo"
+                        "origin"
+                        "refs/heads/main"
+                        [| lfsObjectId |]
 
                 expectOkResult "upload exact object ids" result |> ignore
 
@@ -1530,6 +1535,137 @@ Vitest.describe (
 
                 Vitest.expect(recordedArgs).toEqual (expectedArgs)
                 Vitest.expect(recordedStdin).toEqual (Some $"{lfsObjectId}\n")
+            }
+        )
+
+        Vitest.test (
+            "uploadObjects does not set a timeout for LFS transfers",
+            fun () -> promise {
+                let lfsObjectId = "b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1b1"
+
+                let commandAuth: GitAuthAdapter.GitCommandAuthentication = {
+                    ConfigArgs = [||]
+                    Environment = createObj []
+                }
+
+                let mutable recordedTimeout = Some 0
+
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
+                        recordedTimeout <- request.TimeoutMs
+
+                        return {
+                            ExitCode = 0
+                            StdoutBuffer = utf8Buffer ""
+                            StdoutText = ""
+                            StderrText = ""
+                            TimedOut = false
+                        }
+                    }
+
+                let! result =
+                    GitLfsService.uploadObjects
+                        fakeSpawnedGit
+                        commandAuth
+                        (fun () -> false)
+                        "C:/repo"
+                        "origin"
+                        "refs/heads/main"
+                        [| lfsObjectId |]
+
+                expectOkResult "upload without timeout" result |> ignore
+                Vitest.expect(recordedTimeout).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "runAuthenticatedTransferWith does not set a timeout for LFS downloads",
+            fun () -> promise {
+                let commandAuth: GitAuthAdapter.GitCommandAuthentication = {
+                    ConfigArgs = [| "-c"; "lfs.url=https://example.test/info/lfs" |]
+                    Environment = createObj []
+                }
+
+                let mutable recordedArgs = [||]
+                let mutable recordedTimeout = Some 0
+
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun (request: GitLfsAdapter.GitSpawnRequest) -> promise {
+                        recordedArgs <- request.Arguments
+                        recordedTimeout <- request.TimeoutMs
+
+                        return {
+                            ExitCode = 0
+                            StdoutBuffer = utf8Buffer ""
+                            StdoutText = ""
+                            StderrText = ""
+                            TimedOut = false
+                        }
+                    }
+
+                let! result =
+                    GitLfsService.runAuthenticatedTransferWith
+                        fakeSpawnedGit
+                        commandAuth
+                        "C:/repo"
+                        [| "lfs"; "pull" |]
+                        None
+
+                expectOkResult "download without timeout" result |> ignore
+
+                Vitest
+                    .expect(recordedArgs)
+                    .toEqual (
+                        [|
+                            "-c"
+                            "lfs.url=https://example.test/info/lfs"
+                            "lfs"
+                            "pull"
+                        |]
+                    )
+
+                Vitest.expect(recordedTimeout).toEqual (None)
+            }
+        )
+
+        Vitest.test (
+            "uploadObjects stops before spawning when cancellation is already requested",
+            fun () -> promise {
+                let commandAuth: GitAuthAdapter.GitCommandAuthentication = {
+                    ConfigArgs = [||]
+                    Environment = createObj []
+                }
+
+                let mutable spawnCount = 0
+
+                let fakeSpawnedGit: GitLfsAdapter.GitSpawnRequest -> JS.Promise<GitLfsAdapter.GitSpawnResult> =
+                    fun _ -> promise {
+                        spawnCount <- spawnCount + 1
+
+                        return {
+                            ExitCode = 0
+                            StdoutBuffer = utf8Buffer ""
+                            StdoutText = ""
+                            StderrText = ""
+                            TimedOut = false
+                        }
+                    }
+
+                let! result =
+                    GitLfsService.uploadObjects
+                        fakeSpawnedGit
+                        commandAuth
+                        (fun () -> true)
+                        "C:/repo"
+                        "origin"
+                        "refs/heads/main"
+                        [|
+                            "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+                        |]
+
+                let failure = expectErrorResult result
+                Vitest.expect(spawnCount).toEqual (0)
+                Vitest.expect(failure.Message.ToLowerInvariant().Contains("cancel")).toBe (true)
             }
         )
 
@@ -1808,9 +1944,14 @@ Vitest.describe (
                     }
 
                 let! result =
-                    GitLfsService.uploadObjects fakeSpawnedGit commandAuth "C:/repo" "origin" "refs/heads/main" [|
-                        lfsObjectId
-                    |]
+                    GitLfsService.uploadObjects
+                        fakeSpawnedGit
+                        commandAuth
+                        (fun () -> false)
+                        "C:/repo"
+                        "origin"
+                        "refs/heads/main"
+                        [| lfsObjectId |]
 
                 expectOkResult "upload fallback" result |> ignore
 
@@ -2001,9 +2142,16 @@ Vitest.describe (
                     }
 
                 let! result =
-                    GitLfsService.uploadObjects fakeSpawnedGit commandAuth "C:/repo" "origin" "refs/heads/main" [|
-                        "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
-                    |]
+                    GitLfsService.uploadObjects
+                        fakeSpawnedGit
+                        commandAuth
+                        (fun () -> false)
+                        "C:/repo"
+                        "origin"
+                        "refs/heads/main"
+                        [|
+                            "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+                        |]
 
                 let failure = expectErrorResult result
                 Vitest.expect(failure.Message.Contains("timed out")).toBe (true)

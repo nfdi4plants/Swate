@@ -281,6 +281,7 @@ let private defaultDependencies: GitDependencies = {
     gitFetch = fun _ -> unexpectedPromise "gitFetch"
     gitPull = fun _ -> unexpectedPromise "gitPull"
     gitPush = fun _ -> unexpectedPromise "gitPush"
+    gitCancelPush = fun () -> unexpectedPromise "gitCancelPush"
     gitCloneRepository = fun _ -> unexpectedPromise "gitCloneRepository"
     createBranch = fun _ -> unexpectedPromise "createBranch"
     checkoutBranch = fun _ -> unexpectedPromise "checkoutBranch"
@@ -340,6 +341,7 @@ let private noopCallbacks: GitSidebarCallbacks = {
     OnSelectChange = fun _ -> promise { return Ok() }
     OnPruneLfsCache = fun () -> ()
     OnDedupLfsStorage = fun () -> ()
+    OnCancelOperation = fun () -> ()
 }
 
 Vitest.afterEach (fun () -> document.body.innerHTML <- "")
@@ -972,6 +974,68 @@ Vitest.describe (
                 Vitest.expect(reportedErrors.Count).toBe (1)
                 Vitest.expect(reportedErrors[0].Title).toBe ("Could not push changes")
                 Vitest.expect(reportedErrors[0].Message).toBe ("remote rejected the push")
+            }
+        )
+
+        Vitest.test (
+            "CancelCurrentOperationRequested requests push cancellation while pushing",
+            fun () -> promise {
+                let mutable cancelCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        gitCancelPush =
+                            fun () -> promise {
+                                cancelCalls <- cancelCalls + 1
+                                return Ok okOperationResult
+                            }
+                }
+
+                let state = {
+                    GitState.Empty with
+                        BusyOperation = Some GitBusyOperation.PushingToRemote
+                        BusyNotice = Some "Pushing to remote"
+                }
+
+                let nextState, cmd = update deps ignore CancelCurrentOperationRequested state
+
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "Canceling push...")
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(cancelCalls).toBe (1)
+
+                match messages with
+                | [| CancelCurrentOperationCompleted(Ok result) |] -> Vitest.expect(result.Success).toBe (true)
+                | _ -> failwith "Expected push cancellation completion message."
+            }
+        )
+
+        Vitest.test (
+            "CancelCurrentOperationRequested always forwards cancel to the backend",
+            fun () -> promise {
+                let mutable cancelCalls = 0
+
+                let deps = {
+                    defaultDependencies with
+                        gitCancelPush =
+                            fun () -> promise {
+                                cancelCalls <- cancelCalls + 1
+                                return Ok okOperationResult
+                            }
+                }
+
+                let nextState, cmd =
+                    update deps ignore CancelCurrentOperationRequested GitState.Empty
+
+                let! messages = collectMessages cmd
+
+                Vitest.expect(nextState.WarningNotice).toEqual (Some "Canceling push...")
+                Vitest.expect(cancelCalls).toBe (1)
+
+                match messages with
+                | [| CancelCurrentOperationCompleted(Ok result) |] -> Vitest.expect(result.Success).toBe (true)
+                | _ -> failwith "Expected push cancellation completion message."
             }
         )
 
@@ -2356,6 +2420,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2436,6 +2501,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5,
@@ -2490,6 +2556,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2542,6 +2609,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2594,6 +2662,7 @@ Vitest.describe (
                                         OnSelectChange = fun _ -> promise { return Ok() }
                                         OnPruneLfsCache = fun () -> ()
                                         OnDedupLfsStorage = fun () -> ()
+                                        OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5
@@ -2685,6 +2754,7 @@ Vitest.describe (
                                         OnSelectChange = fun _ -> promise { return Ok() }
                                         OnPruneLfsCache = fun () -> ()
                                         OnDedupLfsStorage = fun () -> ()
+                                        OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5
@@ -2772,6 +2842,7 @@ Vitest.describe (
                                                         OnSelectChange = fun _ -> promise { return Ok() }
                                                         OnPruneLfsCache = fun () -> ()
                                                         OnDedupLfsStorage = fun () -> ()
+                                                        OnCancelOperation = fun () -> ()
                                                     },
                                                     downloadLargeFiles = true,
                                                     lfsAutoTrackThresholdMb = 5
@@ -2841,6 +2912,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -2900,6 +2972,7 @@ Vitest.describe (
                                         OnSelectChange = fun _ -> promise { return Ok() }
                                         OnPruneLfsCache = fun () -> ()
                                         OnDedupLfsStorage = fun () -> ()
+                                        OnCancelOperation = fun () -> ()
                                     },
                                     downloadLargeFiles = true,
                                     lfsAutoTrackThresholdMb = 5
@@ -2954,6 +3027,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -3083,6 +3157,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -3169,6 +3244,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -3263,6 +3339,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Error "Diff failed to load." }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5
@@ -3373,6 +3450,7 @@ Vitest.describe (
                                 OnSelectChange = fun _ -> promise { return Ok() }
                                 OnPruneLfsCache = fun () -> ()
                                 OnDedupLfsStorage = fun () -> ()
+                                OnCancelOperation = fun () -> ()
                             },
                             downloadLargeFiles = true,
                             lfsAutoTrackThresholdMb = 5

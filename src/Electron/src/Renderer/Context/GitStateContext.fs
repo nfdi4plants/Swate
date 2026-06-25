@@ -21,6 +21,7 @@ type GitStateController = {
     fetch: unit -> unit
     pull: unit -> unit
     push: unit -> unit
+    cancelOperation: unit -> unit
     updateFromOnline: unit -> unit
     primarySaveSelection: GitSidebarCommitSelectionRequest -> unit
     primarySaveAll: string -> unit
@@ -82,6 +83,7 @@ module private Helper =
         gitFetch = Renderer.GitApiClient.gitFetch
         gitPull = Renderer.GitApiClient.gitPull
         gitPush = Renderer.GitApiClient.gitPush
+        gitCancelPush = Renderer.GitApiClient.gitCancelPush
         gitCloneRepository = Renderer.GitApiClient.gitCloneRepository
         createBranch = Renderer.GitApiClient.createBranch
         checkoutBranch = Renderer.GitApiClient.checkoutBranch
@@ -107,6 +109,7 @@ let GitStateCtx =
             fetch = fun () -> ()
             pull = fun () -> ()
             push = fun () -> ()
+            cancelOperation = fun () -> ()
             updateFromOnline = fun () -> ()
             primarySaveSelection = fun _ -> ()
             primarySaveAll = fun _ -> ()
@@ -166,6 +169,9 @@ let GitStateCtxProvider (children: ReactElement) =
     let pull () = dispatch PullRequested
 
     let push () = dispatch PushRequested
+
+    let cancelOperation () =
+        dispatch CancelCurrentOperationRequested
 
     let updateFromOnline () = dispatch UpdateFromOnlineRequested
 
@@ -230,6 +236,7 @@ let GitStateCtxProvider (children: ReactElement) =
                 fetch = fetch
                 pull = pull
                 push = push
+                cancelOperation = cancelOperation
                 updateFromOnline = updateFromOnline
                 primarySaveSelection = primarySaveSelection
                 primarySaveAll = primarySaveAll
