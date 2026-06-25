@@ -131,6 +131,20 @@ module NoteConversion =
     let resolveProtocolName (draft: NotesDraft) =
         Validation.sanitizeProtocolName draft.Title
 
+    type PayloadRequirements = private {
+        DateCreated: DateTime
+        ProtocolName: string
+    }
+
+    let tryResolvePayloadRequirements (draft: NotesDraft) =
+        match draft.DateCreated, resolveProtocolName draft with
+        | Some dateCreated, Some protocolName ->
+            Some {
+                DateCreated = dateCreated
+                ProtocolName = protocolName
+            }
+        | _ -> None
+
     let private mkNoteMarkdownRelativePath (parentPath: string) (protocolName: string) =
         $"{parentPath}/{protocolName}/{protocolName}.md"
 
@@ -198,28 +212,23 @@ module NoteConversion =
         Tags = draft.Tags |> Seq.toList
     }
 
-    let private tryCreatePayload target resolveRelativePath unsafePathMessage draft =
-        if Validation.isRequiredDataValid draft |> not then
-            Error "Please enter a Title and a Date Created value before submitting."
-        else
-            match draft.DateCreated, resolveProtocolName draft with
-            | None, _ -> Error "Date Created is required."
-            | _, None -> Error "Title is invalid for protocol naming. Choose a different title."
-            | Some dateCreated, Some protocolName ->
-                match resolveRelativePath dateCreated protocolName with
-                | None -> Error unsafePathMessage
-                | Some relativePath -> Ok(createPayloadWithDate target relativePath dateCreated draft)
+    let private tryCreatePayload target resolveRelativePath unsafePathMessage requirements draft =
+        match resolveRelativePath requirements.DateCreated requirements.ProtocolName with
+        | None -> Error unsafePathMessage
+        | Some relativePath -> Ok(createPayloadWithDate target relativePath requirements.DateCreated draft)
 
-    let tryCreateExistingTargetPayload (targetRef: ExistingTargetRef) (draft: NotesDraft) =
+    let tryCreateExistingTargetPayload (targetRef: ExistingTargetRef) (requirements: PayloadRequirements) (draft: NotesDraft) =
         tryCreatePayload
             (NotesTarget.ExistingTarget targetRef)
             (fun _ protocolName -> mkExistingTargetRelativePath targetRef protocolName)
             "Could not resolve a safe target path."
+            requirements
             draft
 
-    let tryCreateNewRootNotePayload (draft: NotesDraft) =
+    let tryCreateNewRootNotePayload (requirements: PayloadRequirements) (draft: NotesDraft) =
         tryCreatePayload
             NotesTarget.NewRootNote
             (fun dateCreated protocolName -> mkNewRootNoteRelativePath dateCreated protocolName)
             "Could not resolve a safe note path."
+            requirements
             draft

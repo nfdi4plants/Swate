@@ -34,7 +34,9 @@ let NotesDraftTarget () =
     let hasUnsavedDraft = State.hasUnsavedDraft notesDraft
 
     let tryCreateDraftPayload () =
-        NoteConversion.tryCreateNewRootNotePayload notesDraft
+        match NoteConversion.tryResolvePayloadRequirements notesDraft with
+        | None -> Error "Please enter a Title and a Date Created value before saving."
+        | Some requirements -> NoteConversion.tryCreateNewRootNotePayload requirements notesDraft
 
     let draftUnsavedPath =
         if hasUnsavedDraft then

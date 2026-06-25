@@ -150,6 +150,39 @@ Body
         )
 
         Vitest.test (
+            "tryResolvePayloadRequirements requires a date and protocol-safe title",
+            fun () ->
+                let validDraft = {
+                    NotesDraft.init with
+                        Title = " Sampling protocol "
+                        DateCreated = Some(DateTime(2026, 6, 15))
+                }
+
+                Vitest.expect((NoteConversion.tryResolvePayloadRequirements validDraft).IsSome).toBe (true)
+
+                let missingDateDraft = {
+                    validDraft with
+                        DateCreated = None
+                }
+
+                Vitest.expect((NoteConversion.tryResolvePayloadRequirements missingDateDraft).IsNone).toBe (true)
+
+                let missingTitleDraft = {
+                    validDraft with
+                        Title = "   "
+                }
+
+                Vitest.expect((NoteConversion.tryResolvePayloadRequirements missingTitleDraft).IsNone).toBe (true)
+
+                let unsafeTitleDraft = {
+                    validDraft with
+                        Title = "!!!"
+                }
+
+                Vitest.expect((NoteConversion.tryResolvePayloadRequirements unsafeTitleDraft).IsNone).toBe (true)
+        )
+
+        Vitest.test (
             "tryCreateNewRootNotePayload creates the same root note intent as the wizard",
             fun () ->
                 let draft = {
@@ -159,7 +192,11 @@ Body
                         MainText = "Body"
                 }
 
-                match NoteConversion.tryCreateNewRootNotePayload draft with
+                let requirements =
+                    NoteConversion.tryResolvePayloadRequirements draft
+                    |> expectSome "Expected payload requirements to resolve."
+
+                match NoteConversion.tryCreateNewRootNotePayload requirements draft with
                 | Error message -> failwith $"Expected payload, got error: {message}"
                 | Ok payload ->
                     Vitest.expect(payload.Title).toBe ("Sampling protocol")

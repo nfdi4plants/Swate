@@ -20,6 +20,7 @@ type Notes =
             setSelectedTarget: ExistingTargetRef option -> unit,
             availableTargets: ResizeArray<ExistingTargetRef>,
             isSubmitting: bool,
+            canSubmitDraft: bool,
             error: string option,
             submit: unit -> unit
         ) =
@@ -33,6 +34,8 @@ type Notes =
         let setClose isOpen =
             if not isOpen then
                 close ()
+
+        let createInExistingDisabled = isSubmitting || selectedTarget.IsNone || not canSubmitDraft
 
         let footer =
             Html.div [
@@ -48,11 +51,14 @@ type Notes =
                         prop.testId "notes-create-existing-button"
                         prop.className [
                             "swt:btn swt:btn-primary"
-                            if isSubmitting || selectedTarget.IsNone then
+                            if createInExistingDisabled then
                                 "swt:btn-disabled"
                         ]
-                        prop.disabled (isSubmitting || selectedTarget.IsNone)
-                        prop.onClick (fun _ -> submit ())
+                        prop.disabled createInExistingDisabled
+                        prop.onClick (fun _ ->
+                            if not createInExistingDisabled then
+                                submit ()
+                        )
                         prop.text createInExistingText
                     ]
                 ]
@@ -88,6 +94,9 @@ type Notes =
         let setError (value: string option) =
             setUiState (State.setError value uiState)
 
+        let submitRequirements = NoteConversion.tryResolvePayloadRequirements draft
+        let canSubmitDraft = submitRequirements.IsSome
+
         let submitPayload onSuccess =
             function
             | Error message -> setError (Some message)
@@ -103,28 +112,34 @@ type Notes =
             }
 
         let openExistingTargetSelector () =
-            let selectedTarget =
-                draft.SelectedExistingTarget
-                |> Option.bind (fun targetRef -> availableExistingTargets |> Seq.tryFind ((=) targetRef))
-                |> Option.orElseWith (fun () -> availableExistingTargets |> Seq.tryHead)
+            match submitRequirements with
+            | None -> ()
+            | Some _ ->
+                let selectedTarget =
+                    draft.SelectedExistingTarget
+                    |> Option.bind (fun targetRef -> availableExistingTargets |> Seq.tryFind ((=) targetRef))
+                    |> Option.orElseWith (fun () -> availableExistingTargets |> Seq.tryHead)
 
-            if draft.SelectedExistingTarget <> selectedTarget then
-                setDraft {
-                    draft with
-                        SelectedExistingTarget = selectedTarget
-                }
+                if draft.SelectedExistingTarget <> selectedTarget then
+                    setDraft {
+                        draft with
+                            SelectedExistingTarget = selectedTarget
+                    }
 
-            setExistingTargetSelector true
+                setExistingTargetSelector true
 
         let submitToExisting () =
-            match draft.SelectedExistingTarget with
-            | None -> setError (Some "Select a Study or Assay target first.")
-            | Some targetRef ->
-                NoteConversion.tryCreateExistingTargetPayload targetRef draft
+            match draft.SelectedExistingTarget, submitRequirements with
+            | Some targetRef, Some requirements ->
+                NoteConversion.tryCreateExistingTargetPayload targetRef requirements draft
                 |> submitPayload (fun () -> setExistingTargetSelector false)
+            | _ -> ()
 
         let submitNewRootNote () =
-            NoteConversion.tryCreateNewRootNotePayload draft |> submitPayload ignore
+            match submitRequirements with
+            | None -> ()
+            | Some requirements ->
+                NoteConversion.tryCreateNewRootNotePayload requirements draft |> submitPayload ignore
 
         Html.div [
             prop.className "swt:p-8 swt:flex swt:justify-center swt:overflow-y-auto"
@@ -138,7 +153,13 @@ type Notes =
                             prop.text "Notes"
                         ]
                         NoteFormFields.Main(draft, setDraft, filePickerAdapter)
-                        Actions.Main(uiState.IsSubmitting, openExistingTargetSelector, submitNewRootNote, uiState.Error)
+                        Actions.Main(
+                            uiState.IsSubmitting,
+                            canSubmitDraft,
+                            openExistingTargetSelector,
+                            submitNewRootNote,
+                            uiState.Error
+                        )
                         Notes.ExistingTargetModal(
                             uiState.ShowExistingTargetSelector,
                             (fun () -> setExistingTargetSelector false),
@@ -151,6 +172,7 @@ type Notes =
                             ),
                             availableExistingTargets,
                             uiState.IsSubmitting,
+                            canSubmitDraft,
                             uiState.Error,
                             submitToExisting
                         )
