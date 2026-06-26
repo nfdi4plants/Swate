@@ -34,7 +34,8 @@ module ArcPathValidation =
         normalizedCandidatePath = normalizedRootPath
         || normalizedCandidatePath.StartsWith(normalizedRootPath + "/")
 
-let resolveAbsolutePath (pathValue: string) = Main.Bindings.Path.resolve [| pathValue |]
+let resolveAbsolutePath (pathValue: string) =
+    Main.Bindings.Path.resolve [| pathValue |]
 
 let tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
     let arcRoot = resolveAbsolutePath arcPath
@@ -164,7 +165,11 @@ let removePathWithRetriesAsync
     attempt 0
 
 let private removeGenericFileSystemItemAsync absolutePath = promise {
-    do! Main.Bindings.Filesystem.rmAsync absolutePath (Main.Bindings.Filesystem.RmOptions(recursive = true, force = false))
+    do!
+        Main.Bindings.Filesystem.rmAsync
+            absolutePath
+            (Main.Bindings.Filesystem.RmOptions(recursive = true, force = false))
+
     return ()
 }
 
@@ -253,7 +258,13 @@ module ArcFileSystemHelper =
 
         try
             do! mkdirAsync targetParentAbsolutePath
-            do! Main.Bindings.Filesystem.cpAsync sourceAbsolutePath targetAbsolutePath (Main.Bindings.Filesystem.CpOptions(recursive = true, force = false))
+
+            do!
+                Main.Bindings.Filesystem.cpAsync
+                    sourceAbsolutePath
+                    targetAbsolutePath
+                    (Main.Bindings.Filesystem.CpOptions(recursive = true, force = false))
+
             return Ok()
         with copyError ->
             return Error(exn $"Cannot copy '{sourcePath}' to '{targetPath}': {copyError.Message}")
@@ -273,7 +284,8 @@ module ArcFileSystemHelper =
 
         let tempFileName = ".swate-move-" + Guid.NewGuid().ToString("N") + ".tmp"
 
-        let tempAbsolutePath = Main.Bindings.Path.join [| sourceParentAbsolutePath; tempFileName |]
+        let tempAbsolutePath =
+            Main.Bindings.Path.join [| sourceParentAbsolutePath; tempFileName |]
 
         match! renameWithRetriesAsync sourceAbsolutePath tempAbsolutePath with
         | Error renameError -> return Error(mapRenameDiskError sourcePath targetPath renameError)
@@ -418,7 +430,13 @@ module ArcFileSystemHelper =
                 let targetParentAbsolutePath = Main.Bindings.Path.dirname targetAbsolutePath
 
                 do! mkdirAsync targetParentAbsolutePath
-                do! Main.Bindings.Filesystem.cpAsync sourceAbsolutePath targetAbsolutePath (Main.Bindings.Filesystem.CpOptions(force = request.overwrite))
+
+                do!
+                    Main.Bindings.Filesystem.cpAsync
+                        sourceAbsolutePath
+                        targetAbsolutePath
+                        (Main.Bindings.Filesystem.CpOptions(force = request.overwrite))
+
                 return Ok targetPath
             with copyError ->
                 return Error copyError

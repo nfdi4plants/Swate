@@ -129,11 +129,7 @@ let private openDialogFiltersFromExtensions (filterExtensions: string[] option) 
                 if String.IsNullOrWhiteSpace value then
                     None
                 else
-                    let normalizedValue =
-                        if value.StartsWith(".") then
-                            value.Substring(1)
-                        else
-                            value
+                    let normalizedValue = if value.StartsWith(".") then value.Substring(1) else value
 
                     if String.IsNullOrWhiteSpace normalizedValue then
                         None
@@ -365,7 +361,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
 
                 let! result =
                     match filters with
-                    | Some filters -> dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
+                    | Some filters ->
+                        dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
                     | None -> dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then

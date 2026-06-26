@@ -16,23 +16,22 @@ type TargetAvailability =
     | Empty
     | Exists
 
-let internal imageFileExtensions =
-    [|
-        "apng"
-        "avif"
-        "bmp"
-        "gif"
-        "heic"
-        "heif"
-        "ico"
-        "jpeg"
-        "jpg"
-        "png"
-        "svg"
-        "tif"
-        "tiff"
-        "webp"
-    |]
+let internal imageFileExtensions = [|
+    "apng"
+    "avif"
+    "bmp"
+    "gif"
+    "heic"
+    "heif"
+    "ico"
+    "jpeg"
+    "jpg"
+    "png"
+    "svg"
+    "tif"
+    "tiff"
+    "webp"
+|]
 
 let private isAlreadyExistsError (error: exn) =
     error.Message.ToLowerInvariant().Contains("already exists")
@@ -93,19 +92,15 @@ let private assetMarkdownPath assetFolderName (fileName: string) =
     else
         $"{assetFolder}/{imageFileName}"
 
-let private tryGetBrowserFilePathFromIpc
-    (getPathForFile: File -> JS.Promise<Result<string, exn>>)
-    (file: File)
-    =
-    promise {
-        try
-            match! getPathForFile file with
-            | Ok path when not (String.IsNullOrWhiteSpace path) -> return Some(PathHelpers.normalizePath path)
-            | Ok _
-            | Error _ -> return None
-        with _ ->
-            return None
-    }
+let private tryGetBrowserFilePathFromIpc (getPathForFile: File -> JS.Promise<Result<string, exn>>) (file: File) = promise {
+    try
+        match! getPathForFile file with
+        | Ok path when not (String.IsNullOrWhiteSpace path) -> return Some(PathHelpers.normalizePath path)
+        | Ok _
+        | Error _ -> return None
+    with _ ->
+        return None
+}
 
 let private tryResolvePromptFileHostPath
     (tryResolveBrowserFilePath: File -> JS.Promise<string option>)

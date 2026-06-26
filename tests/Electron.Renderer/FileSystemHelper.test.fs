@@ -172,6 +172,7 @@ Vitest.describe (
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
 
                 let! pickedFiles = adapter.PickFiles()
+
                 match requestedExtensions with
                 | Some extensions -> Vitest.expect(extensions).toEqual (imageFileExtensions)
                 | None -> failwith "Expected image extensions to be passed to the absolute path picker."
@@ -197,9 +198,7 @@ Vitest.describe (
 
                 let adapter =
                     createAssetFilePickerAdapter
-                        (fun _ -> promise {
-                            return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |]
-                        })
+                        (fun _ -> promise { return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |] })
                         (fun _ -> promise { return Error(exn "Browser file path resolver should not be used.") })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
