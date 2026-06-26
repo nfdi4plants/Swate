@@ -88,6 +88,7 @@ type IGitApi = {
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCancelPush: unit -> JS.Promise<Result<GitOperationResult, exn>>
     gitInitRepository: string -> JS.Promise<Result<GitOperationResult, exn>>
     gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>
