@@ -1,5 +1,6 @@
 namespace Swate.Components.Page.FileExplorer
 
+open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
 open Fable.Core
 open Fable.Core.JsInterop
@@ -26,8 +27,7 @@ module private FileExplorerHelper =
     let private copyPathToClipboard (path: string) =
         promise {
             try
-                let windowObj: obj = Browser.Dom.window
-                do! windowObj?navigator?clipboard?writeText (path)
+                do! navigator.clipboard.writeText path
             with ex ->
                 Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
         }

@@ -4,11 +4,12 @@ open System
 open Fable.Core
 open Fable.Core.JsInterop
 open Swate.Electron.Shared.GitTypes
-open Main.Bindings.Filesystem
+open Main.Bindings.Node
 open Main.Bindings.Path
 open Main.Bindings.SimpleGit
-open Main.Git.GitAuthAdapter
+open Main.Bindings.Filesystem
 open Main.Git.GitInternals
+open Main.Git.GitAuthAdapter
 open Main.Git.GitTokenProvider
 
 let private gitLfsDownloadLargeFilesConfigKey = "swate.lfs.downloadlargefiles"
@@ -24,15 +25,9 @@ type CloneTargetState =
     | ExistingEmpty
     | ExistingNonEmpty
 
-let private tryGetNodeErrorCode (error: exn) : string option =
-    try
-        error?code |> unbox<string> |> Option.ofObj
-    with _ ->
-        None
-
 let private createPathAccessError (pathValue: string) (error: exn) =
     let code =
-        match tryGetNodeErrorCode error with
+        match tryGetErrorCode error with
         | Some codeValue -> codeValue
         | None -> "UNKNOWN"
 
@@ -56,7 +51,7 @@ let private tryGetExistingPathKindWithStats
             let! stats = getStatsAsync pathValue
             return Ok(Some(classifyStatsObject stats))
         with error ->
-            match tryGetNodeErrorCode error with
+            match tryGetErrorCode error with
             | Some "ENOENT" -> return Ok None
             | _ -> return Error(createPathAccessError pathValue error)
     }

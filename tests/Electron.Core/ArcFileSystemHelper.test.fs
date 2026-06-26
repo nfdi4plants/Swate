@@ -2,14 +2,13 @@ module ElectronCore.ArcFileSystemHelperTests
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
+module Fs = Main.Bindings.Filesystem
 
 [<Emit("Object.assign(new Error($0), { code: $1 })")>]
 let private nodeError (message: string) (code: string) : exn = jsNative
@@ -101,25 +100,15 @@ let private expectPathExistsRequest arcPath relativePath expected = promise {
 
 let private writeRelativeFileAsync arcPath relativePath content = promise {
     let absolutePath = absoluteArcPath arcPath relativePath
-
-    let! _ =
-        fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
-        |> unbox<JS.Promise<obj>>
-
-    return ()
+    do! Fs.writeFileAsync absolutePath content Fs.TextEncoding.Utf8
 }
 
 let private readRelativeFileAsync arcPath relativePath =
-    fsPromisesDynamic?readFile (absoluteArcPath arcPath relativePath, "utf8")
-    |> unbox<JS.Promise<string>>
+    Fs.readFileAsync (absoluteArcPath arcPath relativePath) Fs.TextEncoding.Utf8
 
 let private createRelativeDirectoryAsync arcPath relativePath = promise {
     let absolutePath = absoluteArcPath arcPath relativePath
-
-    let! _ =
-        fsPromisesDynamic?mkdir (absolutePath, createObj [ "recursive" ==> true ])
-        |> unbox<JS.Promise<obj>>
-
+    let! _ = Fs.mkdirAsync absolutePath (Fs.MkdirOptions(recursive = true))
     return ()
 }
 
@@ -360,9 +349,7 @@ Vitest.describe (
                     let sourcePath = absoluteArcPath arcPath "../external-diagram.png"
                     let targetPath = "notes/2026-06-15/Field_observations/assets/external-diagram.png"
 
-                    let! _ =
-                        fsPromisesDynamic?writeFile (sourcePath, "image-content", "utf8")
-                        |> unbox<JS.Promise<obj>>
+                    do! Fs.writeFileAsync sourcePath "image-content" Fs.TextEncoding.Utf8
 
                     match!
                         ArcFileSystemHelper.copyExternalFileToArcOnDisk

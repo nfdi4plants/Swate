@@ -1,10 +1,8 @@
 module Renderer.Components.Helper.FileSystemHelper
 
 open System
-open Browser.Dom
 open Browser.Types
 open Fable.Core
-open Fable.Core.JsInterop
 open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -17,6 +15,13 @@ type ExternalAssetLink = {
 type TargetAvailability =
     | Empty
     | Exists
+
+[<AllowNullLiteral>]
+type private SwateElectronFileApi =
+    abstract member getPathForFile: File -> string
+
+[<Global("window.SwateElectronFileApi")>]
+let private swateElectronFileApi: SwateElectronFileApi = jsNative
 
 let private isAlreadyExistsError (error: exn) =
     error.Message.ToLowerInvariant().Contains("already exists")
@@ -79,12 +84,10 @@ let private assetMarkdownPath assetFolderName (fileName: string) =
 
 let private tryGetBrowserFilePathFromBridge (file: File) =
     try
-        let fileApi: obj = window?SwateElectronFileApi
-
-        if isNullOrUndefined fileApi || isNullOrUndefined fileApi?getPathForFile then
+        if isNull swateElectronFileApi then
             None
         else
-            let path = fileApi?getPathForFile (file) |> unbox<string>
+            let path = swateElectronFileApi.getPathForFile file
 
             if String.IsNullOrWhiteSpace path then
                 None

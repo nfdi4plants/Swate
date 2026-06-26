@@ -2,7 +2,7 @@ module Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
+open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Shared
@@ -83,8 +83,7 @@ let private runPathAction
 let private copyTextToClipboard (text: string) =
     promise {
         try
-            let windowObj: obj = Browser.Dom.window
-            do! windowObj?navigator?clipboard?writeText (text)
+            do! navigator.clipboard.writeText text
         with ex ->
             Browser.Dom.console.warn ($"Could not copy filetree path: {text}", ex)
     }

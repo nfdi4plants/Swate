@@ -160,12 +160,6 @@ let private abortGitPromise<'T> (message: string) : 'T = raise (exn message)
 
 let private abortGitPromiseWith<'T> (error: exn) : 'T = raise error
 
-let private tryGetNodeErrorCode (error: exn) : string option =
-    try
-        error?code |> unbox<string> |> Option.ofObj
-    with _ ->
-        None
-
 let private valueOrEmptyArray (items: 'T[]) = if isNull items then [||] else items
 
 // GitService validates the threshold because it owns the policy that decides when normal git actions must switch into LFS handling.
@@ -220,7 +214,7 @@ let private tryGetFileSizeInBytes (absolutePath: string) : JS.Promise<int64 opti
         let! stats = statAsync absolutePath
         return Some(stats.size |> int64)
     with error ->
-        match tryGetNodeErrorCode error with
+        match tryGetErrorCode error with
         | Some "ENOENT" -> return None
         | _ -> return raise error
 }

@@ -2,14 +2,10 @@ module Main.IPC.FileSystemIO
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.RenamePathRules
 
-
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private pathDynamic: obj = importAll "path"
 
 [<RequireQualifiedAccess>]
 module ArcPathValidation =
@@ -25,32 +21,27 @@ module ArcPathValidation =
 
         not (String.IsNullOrWhiteSpace normalizedPath)
         && normalizedPath <> "."
-        && not (pathDynamic?isAbsolute (normalizedPath) |> unbox<bool>)
+        && not (Main.Bindings.Path.isAbsolute normalizedPath)
         && not (containsTraversalSegments normalizedPath)
 
     let isWithinRootPath (rootPath: string) (candidatePath: string) =
         let normalizedRootPath =
-            pathDynamic?resolve (rootPath) |> unbox<string> |> normalizePathForComparison
+            Main.Bindings.Path.resolve [| rootPath |] |> normalizePathForComparison
 
         let normalizedCandidatePath =
-            pathDynamic?resolve (candidatePath)
-            |> unbox<string>
-            |> normalizePathForComparison
+            Main.Bindings.Path.resolve [| candidatePath |] |> normalizePathForComparison
 
         normalizedCandidatePath = normalizedRootPath
         || normalizedCandidatePath.StartsWith(normalizedRootPath + "/")
 
-let resolveAbsolutePath (pathValue: string) =
-    pathDynamic?resolve (pathValue) |> unbox<string>
+let resolveAbsolutePath (pathValue: string) = Main.Bindings.Path.resolve [| pathValue |]
 
 let tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
     let arcRoot = resolveAbsolutePath arcPath
     let absolutePath = resolveAbsolutePath requestedAbsolutePath
 
     let relativePath =
-        pathDynamic?relative (arcRoot, absolutePath)
-        |> unbox<string>
-        |> PathHelpers.normalizePath
+        Main.Bindings.Path.relative arcRoot absolutePath |> PathHelpers.normalizePath
 
     if String.IsNullOrWhiteSpace relativePath || relativePath = "." then
         Ok ""
@@ -68,13 +59,13 @@ let tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) 
     if String.IsNullOrWhiteSpace relativePath then
         Error(exn "RelativePath must not be empty.")
     elif not (ArcPathValidation.isSafeRelativePathCandidate relativePath) then
-        if pathDynamic?isAbsolute (relativePath) |> unbox<bool> then
+        if Main.Bindings.Path.isAbsolute relativePath then
             Error(exn "RelativePath must not be absolute.")
         else
             Error(exn "RelativePath must not contain path traversal segments.")
     else
         let arcRoot = resolveAbsolutePath arcPath
-        let absolutePath = pathDynamic?resolve (arcRoot, relativePath) |> unbox<string>
+        let absolutePath = Main.Bindings.Path.resolve [| arcRoot; relativePath |]
 
         if ArcPathValidation.isWithinRootPath arcRoot absolutePath then
             Ok absolutePath
@@ -93,12 +84,6 @@ let pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
 
 let mkdirAsync (directoryPath: string) : JS.Promise<unit> =
     ARCtrl.FileSystemHelper.createDirectoryAsync directoryPath
-
-let tryGetNodeErrorCode (error: exn) : string option =
-    try
-        error?code |> unbox<string> |> Option.ofObj
-    with _ ->
-        None
 
 type private FileSystemRetryStrategy = {
     DelaysMs: int[]
@@ -137,13 +122,10 @@ let private renameWithRetriesAsync
             do! Promise.sleep renameRetryStrategy.DelaysMs.[attemptIndex]
 
         try
-            let! _ =
-                fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath)
-                |> unbox<JS.Promise<obj>>
-
+            do! Main.Bindings.Filesystem.renameAsync sourceAbsolutePath targetAbsolutePath
             return Ok()
         with renameError ->
-            let errorCode = tryGetNodeErrorCode renameError
+            let errorCode = Main.Bindings.Node.tryGetErrorCode renameError
 
             if
                 attemptIndex < renameRetryStrategy.DelaysMs.Length - 1
@@ -168,7 +150,7 @@ let removePathWithRetriesAsync
             do! removePathAsync absolutePath
             return Ok()
         with removeError ->
-            let errorCode = tryGetNodeErrorCode removeError
+            let errorCode = Main.Bindings.Node.tryGetErrorCode removeError
 
             if
                 attemptIndex < removeRetryStrategy.DelaysMs.Length - 1
@@ -182,15 +164,12 @@ let removePathWithRetriesAsync
     attempt 0
 
 let private removeGenericFileSystemItemAsync absolutePath = promise {
-    let! _ =
-        fsPromisesDynamic?rm (absolutePath, createObj [ "recursive" ==> true; "force" ==> false ])
-        |> unbox<JS.Promise<obj>>
-
+    do! Main.Bindings.Filesystem.rmAsync absolutePath (Main.Bindings.Filesystem.RmOptions(recursive = true, force = false))
     return ()
 }
 
 let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
-    match tryGetNodeErrorCode renameError with
+    match Main.Bindings.Node.tryGetErrorCode renameError with
     | Some "EPERM"
     | Some "EACCES" ->
         exn
@@ -263,14 +242,6 @@ module ArcFileSystemHelper =
         | FileSystemItemKind.File -> ARCtrl.FileSystemHelper.writeFileTextAsync targetAbsolutePath ""
         | FileSystemItemKind.Folder -> mkdirAsync targetAbsolutePath
 
-    let private copyFileAsync sourceAbsolutePath targetAbsolutePath = promise {
-        let! _ =
-            fsPromisesDynamic?copyFile (sourceAbsolutePath, targetAbsolutePath)
-            |> unbox<JS.Promise<obj>>
-
-        return ()
-    }
-
     let private renameResolvedPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
         match! renameWithRetriesAsync sourceAbsolutePath targetAbsolutePath with
         | Ok() -> return Ok()
@@ -278,20 +249,11 @@ module ArcFileSystemHelper =
     }
 
     let private copyResolvedPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
-        let targetParentAbsolutePath =
-            pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+        let targetParentAbsolutePath = Main.Bindings.Path.dirname targetAbsolutePath
 
         try
             do! mkdirAsync targetParentAbsolutePath
-
-            let! _ =
-                fsPromisesDynamic?cp (
-                    sourceAbsolutePath,
-                    targetAbsolutePath,
-                    createObj [ "recursive" ==> true; "force" ==> false ]
-                )
-                |> unbox<JS.Promise<obj>>
-
+            do! Main.Bindings.Filesystem.cpAsync sourceAbsolutePath targetAbsolutePath (Main.Bindings.Filesystem.CpOptions(recursive = true, force = false))
             return Ok()
         with copyError ->
             return Error(exn $"Cannot copy '{sourcePath}' to '{targetPath}': {copyError.Message}")
@@ -300,29 +262,23 @@ module ArcFileSystemHelper =
     ///WIP must be simplified in future pr
     let private renameIgnoringErrorsAsync sourceAbsolutePath targetAbsolutePath = promise {
         try
-            let! _ =
-                fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath)
-                |> unbox<JS.Promise<obj>>
-
+            do! Main.Bindings.Filesystem.renameAsync sourceAbsolutePath targetAbsolutePath
             return ()
         with _ ->
             return ()
     }
 
     let private moveFileIntoDescendantPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
-        let sourceParentAbsolutePath =
-            pathDynamic?dirname (sourceAbsolutePath) |> unbox<string>
+        let sourceParentAbsolutePath = Main.Bindings.Path.dirname sourceAbsolutePath
 
         let tempFileName = ".swate-move-" + Guid.NewGuid().ToString("N") + ".tmp"
 
-        let tempAbsolutePath =
-            pathDynamic?join (sourceParentAbsolutePath, tempFileName) |> unbox<string>
+        let tempAbsolutePath = Main.Bindings.Path.join [| sourceParentAbsolutePath; tempFileName |]
 
         match! renameWithRetriesAsync sourceAbsolutePath tempAbsolutePath with
         | Error renameError -> return Error(mapRenameDiskError sourcePath targetPath renameError)
         | Ok() ->
-            let targetParentAbsolutePath =
-                pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+            let targetParentAbsolutePath = Main.Bindings.Path.dirname targetAbsolutePath
 
             try
                 do! mkdirAsync targetParentAbsolutePath
@@ -434,7 +390,7 @@ module ArcFileSystemHelper =
                 if String.IsNullOrWhiteSpace sourcePath then
                     raise (exn "Source file path is required.")
 
-                if pathDynamic?isAbsolute (sourcePath) |> unbox<bool> |> not then
+                if Main.Bindings.Path.isAbsolute sourcePath |> not then
                     raise (exn "Source file path must be absolute.")
 
                 if ArcEntityPathRules.isGenericFileSystemTargetAllowed targetPath |> not then
@@ -459,11 +415,10 @@ module ArcFileSystemHelper =
                             $"Cannot copy '{request.sourceAbsolutePath}' to '{targetPath}' because the destination already exists."
                     )
 
-                let targetParentAbsolutePath =
-                    pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+                let targetParentAbsolutePath = Main.Bindings.Path.dirname targetAbsolutePath
 
                 do! mkdirAsync targetParentAbsolutePath
-                do! copyFileAsync sourceAbsolutePath targetAbsolutePath
+                do! Main.Bindings.Filesystem.cpAsync sourceAbsolutePath targetAbsolutePath (Main.Bindings.Filesystem.CpOptions(force = request.overwrite))
                 return Ok targetPath
             with copyError ->
                 return Error copyError
@@ -576,8 +531,7 @@ module ArcFileSystemHelper =
             | Error pathError -> return Error pathError
             | Ok(sourceAbsolutePath, targetAbsolutePath) ->
                 let moveToTargetAsync () = promise {
-                    let targetParentAbsolutePath =
-                        pathDynamic?dirname (targetAbsolutePath) |> unbox<string>
+                    let targetParentAbsolutePath = Main.Bindings.Path.dirname targetAbsolutePath
 
                     do! mkdirAsync targetParentAbsolutePath
 

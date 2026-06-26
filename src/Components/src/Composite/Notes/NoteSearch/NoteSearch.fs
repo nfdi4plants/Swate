@@ -2,7 +2,6 @@ namespace Swate.Components.Composite
 
 open Browser.Dom
 open Fable.Core
-open Fable.Core.JsInterop
 open Feliz
 open Swate.Components.Composite.Notes.Types
 open Swate.Components.Primitive
@@ -30,7 +29,8 @@ module InputField =
                             prop.placeholder "Search Notes..."
                             prop.onClick (fun _ -> setStartSearch true)
                             prop.onChange (fun (ev: Browser.Types.Event) ->
-                                let value: string = ev.target?value
+                                let input = ev.target :?> Browser.Types.HTMLInputElement
+                                let value = input.value
                                 setSearchTerm value
                                 setStartSearch true
                             )
