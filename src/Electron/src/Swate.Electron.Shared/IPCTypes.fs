@@ -1,6 +1,7 @@
 /// This module SHOULD only contain the exact IPC communication types.
 module Swate.Electron.Shared.IPCTypes
 
+open Browser.Types
 open Fable.Core
 open Swate.Components.Api.GitLabApi
 open Swate.Components.Composite.Authentication.Types
@@ -42,6 +43,7 @@ type IArcVaultsApi = {
     pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
     pickDirectory: unit -> JS.Promise<Result<string, exn>>
     pickAbsolutePaths: string[] option -> JS.Promise<Result<string[], exn>>
+    getPathForFile: File -> JS.Promise<Result<string, exn>>
     pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>

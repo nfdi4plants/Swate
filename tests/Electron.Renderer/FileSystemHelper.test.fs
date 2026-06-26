@@ -167,6 +167,7 @@ Vitest.describe (
                             requestedExtensions <- extensions
                             promise { return Ok [| "C:/outside/diagram.png" |] }
                         )
+                        (fun _ -> promise { return Error(exn "Browser file path resolver should not be used.") })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
 
@@ -199,6 +200,7 @@ Vitest.describe (
                         (fun _ -> promise {
                             return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |]
                         })
+                        (fun _ -> promise { return Error(exn "Browser file path resolver should not be used.") })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
 
@@ -248,6 +250,34 @@ Vitest.describe (
                 Vitest.expect(pendingAssets.Length).toBe (1)
                 Vitest.expect(pendingAssets.[0].sourceAbsolutePath).toBe ("C:/dropped/dropped-image.png")
                 Vitest.expect(pendingAssets.[0].markdownRelativePath).toBe ("assets/dropped-image.png")
+            }
+        )
+
+        Vitest.test (
+            "createAssetFilePickerAdapter resolves browser files through an async host path resolver",
+            fun () -> promise {
+                let mutable pendingAssets = []
+
+                let adapter =
+                    createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
+                        (fun _ -> promise { return Ok [||] })
+                        "assets"
+                        (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
+                        (fun _ -> promise { return Some "C:/dropped/async-dropped-image.png" })
+
+                let promptFile: MarkdownPromptFile = {
+                    Name = "async-dropped-image.png"
+                    MimeType = Some "image/png"
+                    HostPath = None
+                    BrowserFile = Some(unbox<File> (obj ()))
+                }
+
+                let! markdownPath = adapter.ResolveMarkdownPath promptFile
+
+                Vitest.expect(markdownPath).toBe ("assets/async-dropped-image.png")
+                Vitest.expect(pendingAssets.Length).toBe (1)
+                Vitest.expect(pendingAssets.[0].sourceAbsolutePath).toBe ("C:/dropped/async-dropped-image.png")
+                Vitest.expect(pendingAssets.[0].markdownRelativePath).toBe ("assets/async-dropped-image.png")
             }
         )
 )

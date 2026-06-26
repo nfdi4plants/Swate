@@ -38,6 +38,7 @@ let MarkdownEditorTarget (content: string) =
             (fun _ ->
                 createAssetFilePickerAdapter
                     Api.ipcArcVaultApi.pickAbsolutePaths
+                    Api.ipcArcVaultApi.getPathForFile
                     NoteConversion.noteAssetsFolderName
                     (fun asset -> pendingImageAssetsRef.current <- pendingImageAssetsRef.current @ [ asset ])
             ),

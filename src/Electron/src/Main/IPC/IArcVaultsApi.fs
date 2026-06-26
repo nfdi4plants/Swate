@@ -1,9 +1,11 @@
 module Main.IPC.ArcVaultsApi
 
 open System
+open Browser.Types
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
+open Fable.Electron.Renderer
 open Fable.Electron.Remoting.Main
 open Swate.Components.Shared
 open Swate.Electron.Shared
@@ -372,6 +374,14 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                     return Ok result.filePaths
             with e ->
                 return Error(exn $"Could not pick files: {e.Message}")
+        }
+    getPathForFile =
+        fun (file: File) -> promise {
+            try
+                let filePath = webUtils.getPathForFile file
+                return Ok(PathHelpers.normalizePath filePath)
+            with e ->
+                return Error e
         }
     pickExternalTextFiles =
         fun _ -> promise {

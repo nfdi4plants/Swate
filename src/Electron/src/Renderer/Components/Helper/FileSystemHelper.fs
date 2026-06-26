@@ -34,13 +34,6 @@ let internal imageFileExtensions =
         "webp"
     |]
 
-[<AllowNullLiteral>]
-type private SwateElectronFileApi =
-    abstract member getPathForFile: File -> string
-
-[<Global("window.SwateElectronFileApi")>]
-let private swateElectronFileApi: SwateElectronFileApi = jsNative
-
 let private isAlreadyExistsError (error: exn) =
     error.Message.ToLowerInvariant().Contains("already exists")
 
@@ -100,30 +93,38 @@ let private assetMarkdownPath assetFolderName (fileName: string) =
     else
         $"{assetFolder}/{imageFileName}"
 
-let private tryGetBrowserFilePathFromBridge (file: File) =
-    try
-        if isNull swateElectronFileApi then
-            None
-        else
-            let path = swateElectronFileApi.getPathForFile file
+let private tryGetBrowserFilePathFromIpc
+    (getPathForFile: File -> JS.Promise<Result<string, exn>>)
+    (file: File)
+    =
+    promise {
+        try
+            match! getPathForFile file with
+            | Ok path when not (String.IsNullOrWhiteSpace path) -> return Some(PathHelpers.normalizePath path)
+            | Ok _
+            | Error _ -> return None
+        with _ ->
+            return None
+    }
 
-            if String.IsNullOrWhiteSpace path then
-                None
-            else
-                Some(PathHelpers.normalizePath path)
-    with _ ->
-        None
+let private tryResolvePromptFileHostPath
+    (tryResolveBrowserFilePath: File -> JS.Promise<string option>)
+    (file: MarkdownPromptFile)
+    =
+    promise {
+        match file.HostPath with
+        | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> return Some(PathHelpers.normalizePath hostPath)
+        | _ ->
+            match file.BrowserFile with
+            | Some browserFile -> return! tryResolveBrowserFilePath browserFile
+            | None -> return None
+    }
 
-let private tryResolvePromptFileHostPath (tryResolveBrowserFilePath: File -> string option) (file: MarkdownPromptFile) =
-    match file.HostPath with
-    | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> Some(PathHelpers.normalizePath hostPath)
-    | _ -> file.BrowserFile |> Option.bind tryResolveBrowserFilePath
-
-let internal createAssetFilePickerAdapterWithBrowserFilePathResolver
+let internal createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
     (pickAbsolutePaths: string[] option -> JS.Promise<Result<string[], exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
-    (tryResolveBrowserFilePath: File -> string option)
+    (tryResolveBrowserFilePath: File -> JS.Promise<string option>)
     =
     let toPromptFile absolutePath =
         let hostPath = PathHelpers.normalizePath absolutePath
@@ -146,7 +147,7 @@ let internal createAssetFilePickerAdapterWithBrowserFilePathResolver
             })
         ResolveMarkdownPath =
             (fun file -> promise {
-                match tryResolvePromptFileHostPath tryResolveBrowserFilePath file with
+                match! tryResolvePromptFileHostPath tryResolveBrowserFilePath file with
                 | Some hostPath ->
                     let markdownPath = assetMarkdownPath assetFolderName file.Name
 
@@ -160,16 +161,29 @@ let internal createAssetFilePickerAdapterWithBrowserFilePathResolver
             })
     }
 
-let createAssetFilePickerAdapter
+let internal createAssetFilePickerAdapterWithBrowserFilePathResolver
     (pickAbsolutePaths: string[] option -> JS.Promise<Result<string[], exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
+    (tryResolveBrowserFilePath: File -> string option)
     =
-    createAssetFilePickerAdapterWithBrowserFilePathResolver
+    createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
         pickAbsolutePaths
         assetFolderName
         addAsset
-        tryGetBrowserFilePathFromBridge
+        (fun file -> promise { return tryResolveBrowserFilePath file })
+
+let createAssetFilePickerAdapter
+    (pickAbsolutePaths: string[] option -> JS.Promise<Result<string[], exn>>)
+    (getPathForFile: File -> JS.Promise<Result<string, exn>>)
+    (assetFolderName: string)
+    (addAsset: ExternalAssetLink -> unit)
+    =
+    createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
+        pickAbsolutePaths
+        assetFolderName
+        addAsset
+        (tryGetBrowserFilePathFromIpc getPathForFile)
 
 let writeFileWithOptionalExternalAssetLinks
     (writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>)
