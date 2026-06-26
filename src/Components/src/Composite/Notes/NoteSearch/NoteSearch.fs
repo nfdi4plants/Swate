@@ -116,7 +116,8 @@ type SearchComponent =
 
 
         Html.div [
-            prop.className "swt:size-full swt:min-h-0 swt:overflow-hidden swt:flex swt:flex-col swt:items-center swt:pt-8 swt:px-4"
+            prop.className
+                "swt:size-full swt:min-h-0 swt:overflow-hidden swt:flex swt:flex-col swt:items-center swt:pt-8 swt:px-4"
             prop.onClick (fun _ -> setStartSearch false)
             prop.children [
                 Html.div [

@@ -110,7 +110,8 @@ type FileTreeAssignNoteModal =
             header = Html.text "Assign Note",
             description = Html.text $"Assign a note to '{displayName}'.",
             modalActions = modalActions,
-            modalActionsClassName = "swt:w-full swt:flex swt:flex-col swt:items-stretch swt:justify-start swt:gap-4 swt:p-2",
+            modalActionsClassName =
+                "swt:w-full swt:flex swt:flex-col swt:items-stretch swt:justify-start swt:gap-4 swt:p-2",
             children = assetRows,
             footer = footer,
             debug = "arc-assign-note",
