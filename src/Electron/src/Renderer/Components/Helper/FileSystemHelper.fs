@@ -16,6 +16,24 @@ type TargetAvailability =
     | Empty
     | Exists
 
+let internal imageFileExtensions =
+    [|
+        "apng"
+        "avif"
+        "bmp"
+        "gif"
+        "heic"
+        "heif"
+        "ico"
+        "jpeg"
+        "jpg"
+        "png"
+        "svg"
+        "tif"
+        "tiff"
+        "webp"
+    |]
+
 [<AllowNullLiteral>]
 type private SwateElectronFileApi =
     abstract member getPathForFile: File -> string
@@ -102,7 +120,7 @@ let private tryResolvePromptFileHostPath (tryResolveBrowserFilePath: File -> str
     | _ -> file.BrowserFile |> Option.bind tryResolveBrowserFilePath
 
 let internal createAssetFilePickerAdapterWithBrowserFilePathResolver
-    (pickImagePaths: unit -> JS.Promise<Result<string[], exn>>)
+    (pickAbsolutePaths: string[] option -> JS.Promise<Result<string[], exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
     (tryResolveBrowserFilePath: File -> string option)
@@ -121,7 +139,7 @@ let internal createAssetFilePickerAdapterWithBrowserFilePathResolver
     {
         PickFiles =
             (fun () -> promise {
-                match! pickImagePaths () with
+                match! pickAbsolutePaths (Some imageFileExtensions) with
                 | Ok paths -> return paths |> Array.map toPromptFile |> Array.toList
                 | Error error when error.Message = "Cancelled" -> return []
                 | Error error -> return raise error
@@ -143,12 +161,12 @@ let internal createAssetFilePickerAdapterWithBrowserFilePathResolver
     }
 
 let createAssetFilePickerAdapter
-    (pickImagePaths: unit -> JS.Promise<Result<string[], exn>>)
+    (pickAbsolutePaths: string[] option -> JS.Promise<Result<string[], exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
     =
     createAssetFilePickerAdapterWithBrowserFilePathResolver
-        pickImagePaths
+        pickAbsolutePaths
         assetFolderName
         addAsset
         tryGetBrowserFilePathFromBridge

@@ -93,7 +93,7 @@ type MovePathRequest = {
     overwrite: bool
 }
 
-type CopyPathRequest = {
+type CopyFileSystemItemRequest = {
     sourceRelativePath: string
     targetRelativePath: string
     overwrite: bool

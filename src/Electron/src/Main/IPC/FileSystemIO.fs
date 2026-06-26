@@ -516,7 +516,7 @@ module ArcFileSystemHelper =
             request.targetRelativePath
             request.overwrite
 
-    let tryBuildGenericCopyPlan (request: CopyPathRequest) : Result<PathBasedTransferPlan, exn> =
+    let tryBuildGenericCopyPlan (request: CopyFileSystemItemRequest) : Result<PathBasedTransferPlan, exn> =
         tryBuildGenericPathTransferPlan
             TransferKind.Copy
             request.sourceRelativePath
@@ -559,28 +559,32 @@ module ArcFileSystemHelper =
                         (Some moveIntoDescendantPathAsync)
     }
 
-    let copyGenericFileSystemItemOnDisk (arcPath: string) (request: CopyPathRequest) : JS.Promise<Result<unit, exn>> = promise {
-        match tryBuildGenericCopyPlan request with
-        | Error validationError -> return Error validationError
-        | Ok transferPlan ->
-            match resolveArcRelativePathPair arcPath transferPlan.SourcePath transferPlan.TargetPath with
-            | Error pathError -> return Error pathError
-            | Ok(sourceAbsolutePath, targetAbsolutePath) ->
-                let copyToTargetAsync () =
-                    copyResolvedPathOnDisk
-                        transferPlan.SourcePath
-                        transferPlan.TargetPath
-                        sourceAbsolutePath
-                        targetAbsolutePath
+    let copyGenericFileSystemItemOnDisk
+        (arcPath: string)
+        (request: CopyFileSystemItemRequest)
+        : JS.Promise<Result<unit, exn>> =
+        promise {
+            match tryBuildGenericCopyPlan request with
+            | Error validationError -> return Error validationError
+            | Ok transferPlan ->
+                match resolveArcRelativePathPair arcPath transferPlan.SourcePath transferPlan.TargetPath with
+                | Error pathError -> return Error pathError
+                | Ok(sourceAbsolutePath, targetAbsolutePath) ->
+                    let copyToTargetAsync () =
+                        copyResolvedPathOnDisk
+                            transferPlan.SourcePath
+                            transferPlan.TargetPath
+                            sourceAbsolutePath
+                            targetAbsolutePath
 
-                return!
-                    executeGenericPathTransferOnDisk
-                        transferPlan
-                        sourceAbsolutePath
-                        targetAbsolutePath
-                        copyToTargetAsync
-                        None
-    }
+                    return!
+                        executeGenericPathTransferOnDisk
+                            transferPlan
+                            sourceAbsolutePath
+                            targetAbsolutePath
+                            copyToTargetAsync
+                            None
+        }
 
     let deleteGenericFileSystemItemOnDisk (arcPath: string) (relativePath: string) : JS.Promise<Result<unit, exn>> = promise {
         let normalizedRelativePath =

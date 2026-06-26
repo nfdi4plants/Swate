@@ -530,7 +530,7 @@ type FileTree =
                             closeDialog = closeDialog
                             setIsAssigning = setIsDialogBusy
                             refreshGitStatus = gitStateCtx.refresh
-                            copyPath = Api.ipcArcVaultApi.copyPath
+                            copyFileSystemItem = Api.ipcArcVaultApi.copyFileSystemItem
                             movePath = Api.ipcArcVaultApi.movePath
                             enqueueError = errorModal.enqueue
                         }

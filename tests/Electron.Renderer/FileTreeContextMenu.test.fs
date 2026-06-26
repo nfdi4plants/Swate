@@ -755,7 +755,7 @@ Vitest.describe (
 
                 let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
 
-                let copyRequests = ResizeArray<CopyPathRequest>()
+                let copyRequests = ResizeArray<CopyFileSystemItemRequest>()
                 let moveRequests = ResizeArray<MovePathRequest>()
                 let mutable closed = false
 
@@ -763,7 +763,7 @@ Vitest.describe (
                     closeDialog = fun () -> closed <- true
                     setIsAssigning = ignore
                     refreshGitStatus = ignore
-                    copyPath =
+                    copyFileSystemItem =
                         fun request -> promise {
                             copyRequests.Add request
                             return Ok()

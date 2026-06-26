@@ -115,6 +115,37 @@ let private notifyGitRepositoryInitialized (arcPath: string) =
         |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
     )
 
+let private openDialogFiltersFromExtensions (filterExtensions: string[] option) =
+    let normalizedExtensions =
+        filterExtensions
+        |> Option.defaultValue [||]
+        |> Array.choose (fun extension ->
+            extension
+            |> Option.ofObj
+            |> Option.map (fun value -> value.Trim())
+            |> Option.bind (fun value ->
+                if String.IsNullOrWhiteSpace value then
+                    None
+                else
+                    let normalizedValue =
+                        if value.StartsWith(".") then
+                            value.Substring(1)
+                        else
+                            value
+
+                    if String.IsNullOrWhiteSpace normalizedValue then
+                        None
+                    else
+                        Some normalizedValue
+            )
+        )
+        |> Array.distinct
+
+    if normalizedExtensions.Length = 0 then
+        None
+    else
+        Some [| FileFilter("Supported files", normalizedExtensions) |]
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
@@ -319,46 +350,28 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error(exn $"Could not pick directory: {e.Message}")
         }
-    pickImagePaths =
-        fun () -> promise {
+    pickAbsolutePaths =
+        fun filterExtensions -> promise {
             try
                 let properties = [|
                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                     Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                 |]
 
-                let filters = [|
-                    FileFilter(
-                        "Images",
-                        [|
-                            "apng"
-                            "avif"
-                            "bmp"
-                            "gif"
-                            "heic"
-                            "heif"
-                            "ico"
-                            "jpeg"
-                            "jpg"
-                            "png"
-                            "svg"
-                            "tif"
-                            "tiff"
-                            "webp"
-                        |]
-                    )
-                |]
-
                 let window = dialogParentFromIpcEvent event
+                let filters = openDialogFiltersFromExtensions filterExtensions
 
-                let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
+                let! result =
+                    match filters with
+                    | Some filters -> dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
+                    | None -> dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then
                     return Error(exn "Cancelled")
                 else
                     return Ok result.filePaths
             with e ->
-                return Error(exn $"Could not pick image files: {e.Message}")
+                return Error(exn $"Could not pick files: {e.Message}")
         }
     pickExternalTextFiles =
         fun _ -> promise {
@@ -656,8 +669,8 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    copyPath =
-        fun (request: CopyPathRequest) -> promise {
+    copyFileSystemItem =
+        fun (request: CopyFileSystemItemRequest) -> promise {
             try
                 return!
                     withLoadedArcVault

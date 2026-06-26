@@ -159,14 +159,22 @@ Vitest.describe (
             "createAssetFilePickerAdapter resolves selected images and tracks copy source",
             fun () -> promise {
                 let mutable pendingAssets = []
+                let mutable requestedExtensions: string[] option = None
 
                 let adapter =
                     createAssetFilePickerAdapter
-                        (fun () -> promise { return Ok [| "C:/outside/diagram.png" |] })
+                        (fun extensions ->
+                            requestedExtensions <- extensions
+                            promise { return Ok [| "C:/outside/diagram.png" |] }
+                        )
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
 
                 let! pickedFiles = adapter.PickFiles()
+                match requestedExtensions with
+                | Some extensions -> Vitest.expect(extensions).toEqual (imageFileExtensions)
+                | None -> failwith "Expected image extensions to be passed to the absolute path picker."
+
                 Vitest.expect(pickedFiles.Length).toBe (1)
                 Vitest.expect(pickedFiles.[0].Name).toBe ("diagram.png")
                 Vitest.expect(pickedFiles.[0].MimeType).toEqual (Some "image/*")
@@ -188,7 +196,9 @@ Vitest.describe (
 
                 let adapter =
                     createAssetFilePickerAdapter
-                        (fun () -> promise { return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |] })
+                        (fun _ -> promise {
+                            return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |]
+                        })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
 
@@ -220,7 +230,7 @@ Vitest.describe (
 
                 let adapter =
                     createAssetFilePickerAdapterWithBrowserFilePathResolver
-                        (fun () -> promise { return Ok [||] })
+                        (fun _ -> promise { return Ok [||] })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
                         (fun _ -> Some "C:/dropped/dropped-image.png")

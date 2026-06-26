@@ -16,7 +16,7 @@ module FileTreeAssignNoteHelper =
         closeDialog: unit -> unit
         setIsAssigning: bool -> unit
         refreshGitStatus: unit -> unit
-        copyPath: CopyPathRequest -> JS.Promise<Result<unit, exn>>
+        copyFileSystemItem: CopyFileSystemItemRequest -> JS.Promise<Result<unit, exn>>
         movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
         enqueueError: ErrorModalRequest -> unit
     }
@@ -283,7 +283,7 @@ module FileTreeAssignNoteHelper =
 
             promise {
                 let! copyResult =
-                    config.copyPath {
+                    config.copyFileSystemItem {
                         sourceRelativePath = note.SourceFolderPath
                         targetRelativePath = targetFolderPath
                         overwrite = false
