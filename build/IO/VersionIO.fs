@@ -25,8 +25,8 @@ let tryReplace (pattern: Regex) (replacement: string) (content: string[]) =
 
 let updateVersionFiles (version: Changelog.Version) =
     printGreenfn "Updating version files to %O" version.Version
-    let serverPath = "src/Server/Version.fs"
-    let clientPath = "src/Client/Version.fs"
+    let serverPath = Path.Combine(ProjectInfo.ProjectPaths.serverPath, "Version.fs")
+    let clientPath = Path.Combine(ProjectInfo.ProjectPaths.clientPath, "Version.fs")
 
     let nextReleaseDate =
         match version.Date with
@@ -70,8 +70,8 @@ let updateVersionFiles (version: Changelog.Version) =
 
 let updateFSharpProjectVersions (version: Changelog.Version) =
     printGreenfn "Updating .fsproj files to version %O" version.Version
-    let componentsProjectPath = "src/Components/src/Swate.Components.fsproj"
-    let sharedProjectPath = "src/Shared/Swate.Components.Core.fsproj"
+    let componentsProjectPath = Path.Combine(ProjectInfo.ProjectPaths.componentsPath, "Swate.Components.fsproj")
+    let sharedProjectPath = Path.Combine(ProjectInfo.ProjectPaths.sharedPath, "Swate.Components.Core.fsproj")
 
 
     let nextVersion = version.Version.ToString()
@@ -102,9 +102,9 @@ let updateComponentsPackageJSONVersion (version: Changelog.Version) =
             "--allow-same-version"
             "--no-git-tag-version"
         ]
-        "src/Components"
+        ProjectInfo.ProjectPaths.componentsPath
 
-    printfn "Updated src/Components/package.json to version %O" version.Version
+    printfn "Updated %s/package.json to version %O" ProjectInfo.ProjectPaths.componentsPath version.Version
 
 let updateElectronPackageJSONVersion (version: Changelog.Version) =
     run
@@ -115,9 +115,9 @@ let updateElectronPackageJSONVersion (version: Changelog.Version) =
             "--allow-same-version"
             "--no-git-tag-version"
         ]
-        "src/Electron"
+        ProjectInfo.ProjectPaths.electronPath
 
-    printfn "Updated src/Electron/package.json to version %O" version.Version
+    printfn "Updated %s/package.json to version %O" ProjectInfo.ProjectPaths.electronPath version.Version
 
 let updateAllVersionInformationInFiles (version: Changelog.Version) =
     updateVersionFiles version
