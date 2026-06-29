@@ -42,7 +42,14 @@ Vitest.describe (
                     ignore
                     (fun arcPath -> promise {
                         let! arc = loadArcAsync arcPath
-                        do! arc.AddArcFileAsync(arcPath, Swate.Components.Shared.ARCtrlHelper.ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Assay "NewAssay")
+
+                        do!
+                            arc.AddArcFileAsync(
+                                arcPath,
+                                Swate.Components.Shared.ARCtrlHelper.ArcFileDefaults.createDefaultArcFile
+                                    ArcFilesDiscriminate.Assay
+                                    "NewAssay"
+                            )
 
                         Vitest.expect(arc.ContainsAssay("NewAssay")).toBe (true)
                         let addedAssay = arc.GetAssay("NewAssay")
@@ -83,7 +90,10 @@ Vitest.describe (
                 withTempArc
                     ignore
                     (fun arcPath -> promise {
-                        let arcFile = Swate.Components.Shared.ARCtrlHelper.ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Assay "New Assay"
+                        let arcFile =
+                            Swate.Components.Shared.ARCtrlHelper.ArcFileDefaults.createDefaultArcFile
+                                ArcFilesDiscriminate.Assay
+                                "New Assay"
 
                         let tables = arcFile.Tables()
                         expectSingleEmptyTable tables "New Assay Table"
@@ -162,7 +172,14 @@ Vitest.describe (
                     ignore
                     (fun arcPath -> promise {
                         let! arc = loadArcAsync arcPath
-                        do! arc.AddArcFileAsync(arcPath, Swate.Components.Shared.ARCtrlHelper.ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Study "NewStudy")
+
+                        do!
+                            arc.AddArcFileAsync(
+                                arcPath,
+                                Swate.Components.Shared.ARCtrlHelper.ArcFileDefaults.createDefaultArcFile
+                                    ArcFilesDiscriminate.Study
+                                    "NewStudy"
+                            )
 
                         Vitest.expect(arc.ContainsStudy("NewStudy")).toBe (true)
                         let addedStudy = arc.GetStudy("NewStudy")
@@ -186,7 +203,14 @@ Vitest.describe (
                     ignore
                     (fun arcPath -> promise {
                         let! arc = loadArcAsync arcPath
-                        do! arc.AddArcFileAsync(arcPath, Swate.Components.Shared.ARCtrlHelper.ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Run "NewRun")
+
+                        do!
+                            arc.AddArcFileAsync(
+                                arcPath,
+                                Swate.Components.Shared.ARCtrlHelper.ArcFileDefaults.createDefaultArcFile
+                                    ArcFilesDiscriminate.Run
+                                    "NewRun"
+                            )
 
                         Vitest.expect(arc.ContainsRun("NewRun")).toBe (true)
                         let addedRun = arc.GetRun("NewRun")
