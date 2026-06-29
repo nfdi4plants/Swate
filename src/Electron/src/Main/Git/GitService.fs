@@ -990,8 +990,8 @@ let private validateCommitLfsPolicy (git: ISimpleGit) : JS.Promise<GitResult<uni
         | None -> return Error(createCommitLfsValidationFailure thresholdMb (oversizedPaths.ToArray()))
 }
 
-// Pull always skips smudge downloads; when enabled, LFS content is hydrated afterward by a no-timeout transfer.
-let private applyPullLfsSkipSmudge (git: ISimpleGit) = git.env (GitLfsSkipSmudgeEnvKey, "1")
+// Worktree-populating commands skip implicit LFS downloads; explicit LFS hydration uses authenticated transfers.
+let private applyLfsSkipSmudge (git: ISimpleGit) = git.env (GitLfsSkipSmudgeEnvKey, "1")
 
 // GitService keeps explicit post-pull hydration here because it must reuse the authenticated git instance created for the pull workflow.
 let private hydratePulledLfsContent
@@ -1738,7 +1738,7 @@ let pull
                         runSimpleGit
                             (fun git -> promise {
                                 let! downloadLargeFiles = getConfiguredLfsDownloadLargeFiles git
-                                let effectiveGit = applyPullLfsSkipSmudge git
+                                let effectiveGit = applyLfsSkipSmudge git
 
                                 match safeBranchName with
                                 | None ->
@@ -2189,7 +2189,7 @@ let freeLocalLfsCopy (arcPath: string) (requestedPath: string) : JS.Promise<GitR
 
                         return errorResult validationError
                     | Ok() ->
-                        let pointerGit = git.env (GitLfsSkipSmudgeEnvKey, "1")
+                        let pointerGit = applyLfsSkipSmudge git
 
                         let! checkoutResult =
                             runSimpleGit
@@ -2267,12 +2267,14 @@ let discardPaths (arcPath: string) (pathSpecs: string[]) : JS.Promise<GitResult<
                             let! headPaths = headPathsForPathspecs git discardPathSpecs
 
                             if headPaths.Length > 0 then
+                                let restoreGit = applyLfsSkipSmudge git
+
                                 let! restoreResult =
                                     runSimpleGit
                                         (fun currentGit ->
                                             currentGit.raw (withGitPathspecs [| "restore"; "--worktree" |] headPaths)
                                         )
-                                        git
+                                        restoreGit
 
                                 match restoreResult with
                                 | Error failure -> return abortGitPromise failure.Message
@@ -2439,7 +2441,9 @@ let createBranch (arcPath: string) (branchName: string) (startPoint: string opti
                 withLocalGit
                     arcPath
                     (fun git -> promise {
-                        let! _ = git.checkoutLocalBranch (safeBranchName)
+                        let checkoutGit = applyLfsSkipSmudge git
+
+                        let! _ = checkoutGit.checkoutLocalBranch (safeBranchName)
                         do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
                         return ()
                     })
@@ -2451,7 +2455,9 @@ let createBranch (arcPath: string) (branchName: string) (startPoint: string opti
                     withLocalGit
                         arcPath
                         (fun git -> promise {
-                            let! _ = git.checkoutBranch (safeBranchName, safeStartPoint)
+                            let checkoutGit = applyLfsSkipSmudge git
+
+                            let! _ = checkoutGit.checkoutBranch (safeBranchName, safeStartPoint)
                             do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
                             return ()
                         })
@@ -2579,7 +2585,9 @@ let checkoutBranch (arcPath: string) (request: GitCheckoutBranchRequest) : JS.Pr
                     withLocalGit
                         arcPath
                         (fun git -> promise {
-                            let! _ = git.checkoutBranch (safeBranchName, safeStartPoint)
+                            let checkoutGit = applyLfsSkipSmudge git
+
+                            let! _ = checkoutGit.checkoutBranch (safeBranchName, safeStartPoint)
                             do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
                             return ()
                         })
@@ -2588,6 +2596,8 @@ let checkoutBranch (arcPath: string) (request: GitCheckoutBranchRequest) : JS.Pr
                 withLocalGit
                     arcPath
                     (fun git -> promise {
+                        let checkoutGit = applyLfsSkipSmudge git
+
                         let! localBranches = git.branchLocal ()
                         let branches = valueOrEmptyArray localBranches.all
 
@@ -2600,7 +2610,7 @@ let checkoutBranch (arcPath: string) (request: GitCheckoutBranchRequest) : JS.Pr
                         if not exists then
                             return abortGitPromise $"Branch '{safeBranchName}' does not exist in the local repository."
 
-                        let! _ = git.checkout (safeBranchName)
+                        let! _ = checkoutGit.checkout (safeBranchName)
                         do! reconcileTrackingBranchForCheckout "origin" safeBranchName git
                         return ()
                     })

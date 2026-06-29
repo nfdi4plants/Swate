@@ -965,7 +965,9 @@ let planOutboundPush
         let! dryRunResult =
             runSimpleGitRaw
                 (fun currentGit ->
-                    currentGit.raw [|
+                    let dryRunGit = currentGit.env ("GIT_LFS_SKIP_PUSH", "1")
+
+                    dryRunGit.raw [|
                         "push"
                         "--porcelain"
                         "--dry-run"
