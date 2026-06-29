@@ -3,8 +3,6 @@ namespace Main.ARCtrlExtensions
 open System
 open ARCtrl
 open ARCtrl.Contract
-open FsSpreadsheet
-open Main.ArcMerge
 open Main.Bindings.Path
 open Main.Bindings.Filesystem
 open Swate.Components.Shared
@@ -52,12 +50,8 @@ module ArcLoadExtensions =
     }
 
     let private createDefaultArcFileContracts (fileType: ArcFilesDiscriminate) (identifier: string) =
-        match ARCtrlHelper.ArcFileDefaults.createDefaultArcFile fileType identifier with
-        | ArcFiles.Assay assay -> assay.ToCreateContract(false)
-        | ArcFiles.Study(study, _) -> study.ToCreateContract(false)
-        | ArcFiles.Workflow workflow -> workflow.ToCreateContract(false)
-        | ArcFiles.Run run -> run.ToCreateContract(false)
-        | _ -> failwithf "Cannot create default ARC file contracts for %A." fileType
+        ARCtrlHelper.ArcFileDefaults.createDefaultArcFile fileType identifier
+        |> ArcFileCreateContracts.createContracts false
 
     let private canonicalArcFileRepairSpecs = [|
         {
@@ -144,38 +138,6 @@ module ArcLoadExtensions =
         return repairedAny
     }
 
-    let private addRecoveredEmptyAnnotationTables (arc: ARC) (contracts: Contract[]) =
-        let addTables (target: ArcTables) (workbook: FsWorkbook) =
-            if target.TableCount = 0 then
-                let recoveredTables =
-                    workbook.GetWorksheets()
-                    |> Seq.filter (fun sheet ->
-                        sheet.CellCollection.Count = 0
-                        && not (sheet.Name.StartsWith("isa_", StringComparison.OrdinalIgnoreCase))
-                    )
-                    |> Seq.map (fun sheet -> ArcTable.init sheet.Name)
-                    |> Seq.toArray
-
-                if recoveredTables.Length > 0 then
-                    target.AddTables(recoveredTables)
-
-        for contract in contracts do
-            match contract.Operation, contract.DTO with
-            | Operation.READ, Some(DTO.Spreadsheet workbook) ->
-                let workbook = workbook :?> FsWorkbook
-
-                match ArcEntityRef.fromPath contract.Path with
-                | ArcEntityRef.Assay identifier ->
-                    arc.TryGetAssay identifier
-                    |> Option.iter (fun assay -> addTables assay workbook)
-                | ArcEntityRef.Study identifier ->
-                    arc.TryGetStudy identifier
-                    |> Option.iter (fun study -> addTables study workbook)
-                | ArcEntityRef.Run identifier ->
-                    arc.TryGetRun identifier |> Option.iter (fun run -> addTables run workbook)
-                | _ -> ()
-            | _ -> ()
-
     type ARC with
 
         /// Hotfix for #619, not fixed in the consumed ARCtrl 3.0.0-beta.12.
@@ -188,7 +150,6 @@ module ArcLoadExtensions =
             match! fullFillContractBatchAsync arcPath contracts with
             | Ok fulfilledContracts ->
                 arc.SetISAFromContracts fulfilledContracts
-                addRecoveredEmptyAnnotationTables arc fulfilledContracts
                 return Ok arc
             | Error errors -> return Error errors
         }
