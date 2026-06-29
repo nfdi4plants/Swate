@@ -25,7 +25,8 @@ export default defineConfig({
         // Avoid runtime re-optimization reloads during Vitest browser runs in CI.
         include: ["react-dom/client"],
     },
-    build: {
+    build: { // changes to the build config below should be well tested. See README.md for more information.
+    // README.md: local dev -> release -> npm -> background info
         minify: false,
         sourcemap: true,
         lib: {
