@@ -3,6 +3,7 @@ module Release
 
 open SimpleExec
 open ProjectInfo
+open System.IO
 
 let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
@@ -37,7 +38,7 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
                 ]
                 ProjectPaths.componentsPath
 
-        let cssFilePath = @"src/Components/src/swate-components.css"
+        let cssFilePath = Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "swate-components.css")
 
         if not (System.IO.File.Exists(cssFilePath)) then
             failwithf "CSS file not found at %s" cssFilePath
