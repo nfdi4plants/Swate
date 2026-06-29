@@ -33,6 +33,31 @@ let internal imageFileExtensions = [|
     "webp"
 |]
 
+let internal fileExtensionsFromAcceptTypes (acceptTypes: string option) =
+    let extensions =
+        acceptTypes
+        |> PluginTextInputHelpers.acceptTypeTokens
+        |> List.toArray
+        |> Array.collect (fun token ->
+            if token = "image/*" then
+                imageFileExtensions
+            elif token.StartsWith(".") then
+                let extension = token.Substring(1)
+
+                if String.IsNullOrWhiteSpace extension then
+                    [||]
+                else
+                    [| extension |]
+            else
+                [||]
+        )
+        |> Array.distinct
+
+    if extensions.Length = 0 then
+        None
+    else
+        Some extensions
+
 let private isAlreadyExistsError (error: exn) =
     error.Message.ToLowerInvariant().Contains("already exists")
 
@@ -134,8 +159,8 @@ let internal createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
 
     {
         PickFiles =
-            (fun () -> promise {
-                match! pickAbsolutePaths (Some imageFileExtensions) with
+            (fun options -> promise {
+                match! pickAbsolutePaths (fileExtensionsFromAcceptTypes options.AcceptTypes) with
                 | Ok paths -> return paths |> Array.map toPromptFile |> Array.toList
                 | Error error when error.Message = "Cancelled" -> return []
                 | Error error -> return raise error
