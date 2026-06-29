@@ -36,26 +36,28 @@ module private AssignNoteAssetSelector =
         | [ selectedValue ] -> selectedValue
         | _ -> MixedHeaderValue
 
-    let destinationOptions availableDestinations includeMixedOption = [
-        if includeMixedOption then
-            Html.option [
-                prop.value MixedHeaderValue
-                prop.disabled true
-                prop.text "Mixed"
-            ]
-
-        Html.option [ prop.value ""; prop.text "Do not assign" ]
-
-        for destination in availableDestinations do
-            Html.option [
-                prop.key (string destination)
-                prop.value (string destination)
-                prop.text (destination.ToString())
-            ]
-    ]
-
 [<Erase; Mangle(false)>]
 type FileTreeAssignNoteAssetSelector =
+
+    [<ReactComponent>]
+    static member DestinationOptions(availableDestinations: AssignNoteAssetDestination list, includeMixedOption: bool) = 
+        React.Fragment [
+            if includeMixedOption then
+                Html.option [
+                    prop.value AssignNoteAssetSelector.MixedHeaderValue
+                    prop.disabled true
+                    prop.text "Mixed"
+                ]
+
+            Html.option [ prop.value ""; prop.text "Do not assign" ]
+
+            for destination in availableDestinations do
+                Html.option [
+                    prop.key (string destination)
+                    prop.value (string destination)
+                    prop.text (destination.ToString())
+                ]
+        ]
 
     [<ReactComponent>]
     static member Header
@@ -99,11 +101,11 @@ type FileTreeAssignNoteAssetSelector =
                                     setAssetDestination asset.SourceRelativePath selectedDestination
                             | None -> ()
                         )
-                        prop.children (
-                            AssignNoteAssetSelector.destinationOptions
-                                availableDestinations
-                                (headerSelectedValue = AssignNoteAssetSelector.MixedHeaderValue)
-                        )
+                        prop.children [
+                            FileTreeAssignNoteAssetSelector.DestinationOptions(
+                                availableDestinations,
+                                (headerSelectedValue = AssignNoteAssetSelector.MixedHeaderValue))
+                        ]
                     ]
                 ]
             ]
@@ -156,9 +158,9 @@ type FileTreeAssignNoteAssetSelector =
                                             setAssetDestination asset.SourceRelativePath selectedDestination
                                         | None -> ()
                                     )
-                                    prop.children (
-                                        AssignNoteAssetSelector.destinationOptions availableDestinations false
-                                    )
+                                    prop.children [
+                                        FileTreeAssignNoteAssetSelector.DestinationOptions(availableDestinations, false)
+                                    ]
                                 ]
                             ]
                         ]
