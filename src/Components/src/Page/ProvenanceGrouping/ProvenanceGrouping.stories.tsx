@@ -627,8 +627,13 @@ export const ConnectionDetailsDoNotExposePropertyCreation: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
-    await userEvent.click(connector);
+    const connector = await waitFor(() => {
+      const firstConnection = canvas.getAllByTestId('provenance-connection')[0];
+      expect(firstConnection).toHaveAttribute('role', 'button');
+      return firstConnection;
+    });
+    connector.focus();
+    await userEvent.keyboard('{Enter}');
 
     const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
     expect(details).toHaveTextContent('Connection IDs');
