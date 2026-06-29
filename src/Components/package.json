@@ -8,14 +8,14 @@
   "type": "module",
   "sideEffects": false,
   "files": [
-    "dist/*"
+    "dist"
   ],
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
       "import": "./dist/index.js"
     },
-    "./style.css": "./dist/swate-components.css"
+    "./style.css": "./dist/assets/swate-components.css"
   },
   "scripts": {
     "clean": "dotnet fable clean -e fs.ts --yes",
@@ -28,7 +28,7 @@
     "storybook": "npm run fable -- --watch --run storybook dev -p 6006",
     "storybook:no-compile": "storybook dev -p 6006",
     "prebuild:net": "npx @tailwindcss/cli -i ./tailwind.css -o ./src/swate-components.css -m",
-    "build": "npm run clean && npm run fable -- --fableLib @fable-org/fable-library-ts --noCache -e fs.ts -o ./src/dist && (tsc -p tsconfig.build.json --outdir ./dist || echo tsc errors ignored) && npx @tailwindcss/cli -i ./tailwind.css -o ./dist/swate-components.css -m",
+    "build": "npm run clean && npm run fable -- --fableLib @fable-org/fable-library-ts --noCache -e fs.ts -o ./src/dist && vite build",
     "build:net": "dotnet pack ./src/Swate.Components.fsproj",
     "prebuild:storybook": "npm run fable -- --noCache",
     "build:storybook": "storybook build"
