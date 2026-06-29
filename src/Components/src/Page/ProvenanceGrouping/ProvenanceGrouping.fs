@@ -1,9 +1,12 @@
 namespace Swate.Components.Page.ProvenanceGrouping
 
+open System
 open System.Globalization
 open Fable.Core
 open Fable.Core.JsInterop
 open Feliz
+open Swate.Components.Composite.FolderedDraggableList
+open Swate.Components.Composite.FolderedDraggableList.Types
 open Swate.Components.JsBindings
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
@@ -20,12 +23,23 @@ type private EditorLookups = {
 
 type private DragContext = {
     Session: ProvenanceSession
-    Pair: ProvenanceLayerPair
+    Layer: ProvenanceLayer
     UiState: UiState
+    GetUiState: unit -> UiState
     Publish: SessionResult -> unit
     SetUiState: UiState -> unit
     Lookups: EditorLookups
     ConnectSetPairs: (ProvenanceSetId * ProvenanceSetId) list -> unit
+}
+
+type private ActiveDrag = {
+    Payload: DragDrop.Payload
+    Label: string option
+}
+
+type private PropertyShelfItemPayload = {
+    Header: ProvenancePropertyHeader
+    SourceSide: ProvenanceSide
 }
 
 /// Resizable three-panel surface helpers.
@@ -93,10 +107,249 @@ module private TierObserver =
     [<Emit("$0.disconnect()")>]
     let disconnect (observer: obj) : unit = jsNative
 
-/// Resolves drag payload ids and display ids against the active pair and UI palette.
+module private PropertyShelf =
+
+    type private FolderKey =
+        | LayerFolder of ProvenanceLayerId
+        | PreviousContextFolder of ProvenanceTableName option * ProvenanceProcessName option
+        | UnknownFolder
+
+    let private slug (value: string) =
+        let text = if isNull value then "" else value.Trim()
+
+        let chars =
+            text
+            |> Seq.map (fun character ->
+                if Char.IsLetterOrDigit character || character = '-' || character = '_' then
+                    Char.ToLowerInvariant character
+                else
+                    '-'
+            )
+            |> Seq.toArray
+
+        let slug = String(chars).Trim('-')
+
+        if String.IsNullOrWhiteSpace slug then "item" else slug
+
+    let private badgeText (badge: PropertyCountBadge option) : string option =
+        match badge with
+        | Some PropertyCountBadge.Hide
+        | None -> None
+        | Some(PropertyCountBadge.DistinctValues count) -> Some(string count)
+        | Some(PropertyCountBadge.Coverage(withValue, total)) -> Some($"{withValue}/{total}")
+
+    let private headerIdentity (header: ProvenancePropertyHeader) = DragDrop.propertyHeaderIdentity header
+
+    let private headerId (header: ProvenancePropertyHeader) = headerIdentity header |> slug
+
+    let private sourceSideForHeader
+        (layerId: ProvenanceLayerId)
+        (inputProjection: PropertyRails.RailProjection)
+        (outputProjection: PropertyRails.RailProjection)
+        (uiState: UiState)
+        (header: ProvenancePropertyHeader)
+        =
+        match uiState.PropertyRailPlacements |> Map.tryFind (layerId, { Header = header }) with
+        | Some side -> side
+        | None when outputProjection.Headers |> List.contains header -> ProvenanceSide.Output
+        | _ -> ProvenanceSide.Input
+
+    let private originsForHeader
+        (layerId: ProvenanceLayerId)
+        (sourceSide: ProvenanceSide)
+        (inputProjection: PropertyRails.RailProjection)
+        (outputProjection: PropertyRails.RailProjection)
+        (header: ProvenancePropertyHeader)
+        =
+        [
+            inputProjection.OriginByHeader |> Map.tryFind header
+            outputProjection.OriginByHeader |> Map.tryFind header
+        ]
+        |> List.choose id
+        |> List.fold Set.union Set.empty
+        |> fun origins ->
+            if origins.IsEmpty then
+                Set.singleton (PropertyOrigin.Current(layerId, sourceSide))
+            else
+                origins
+
+    let private folderKeyForOrigin (origin: PropertyOrigin) =
+        match origin with
+        | PropertyOrigin.Current(layerId, _) -> LayerFolder layerId
+        | PropertyOrigin.UpstreamLayer layerId -> LayerFolder layerId
+        | PropertyOrigin.PreviousContext source -> PreviousContextFolder(source.TableName, source.ProcessName)
+
+    let private folderId =
+        function
+        | LayerFolder layerId -> PropertyFolderColors.layerFolderId layerId
+        | PreviousContextFolder(tableName, processName) ->
+            PropertyFolderColors.previousContextFolderId tableName processName
+        | UnknownFolder -> PropertyFolderColors.unknownFolderId
+
+    let private folderName (session: ProvenanceSession) =
+        function
+        | LayerFolder layerId ->
+            session.Layers
+            |> List.tryFind (fun layer -> layer.Id = layerId)
+            |> Option.map (fun layer -> layer.Label)
+            |> Option.defaultValue layerId
+        | PreviousContextFolder(tableName, processName) ->
+            match processName, tableName with
+            | Some processName, Some tableName -> $"{processName} / {tableName}"
+            | Some processName, None -> processName
+            | None, Some tableName -> tableName
+            | None, None -> "Previous context"
+        | UnknownFolder -> "Unknown origin"
+
+    let private folderColor (uiState: UiState) =
+        function
+        | LayerFolder layerId -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
+        | PreviousContextFolder _ as key -> uiState.PropertyColors.FolderColors |> Map.tryFind (folderId key)
+        | UnknownFolder as key -> uiState.PropertyColors.FolderColors |> Map.tryFind (folderId key)
+
+    let setFolderColor (session: ProvenanceSession) folderId color state =
+        let layerId =
+            session.LayerOrder
+            |> List.tryFind (fun layerId -> PropertyFolderColors.layerFolderId layerId = folderId)
+
+        match layerId, color with
+        | Some layerId, Some selectedColor -> State.PropertyColors.setLayerColor layerId selectedColor state
+        | Some layerId, None -> State.PropertyColors.clearLayerColor layerId state
+        | None, Some selectedColor -> State.PropertyColors.setFolderColor folderId selectedColor state
+        | None, None -> State.PropertyColors.clearFolderColor folderId state
+
+    let private folderSort (session: ProvenanceSession) activeLayerId key =
+        match key with
+        | LayerFolder layerId when layerId = activeLayerId -> 0, 0, folderName session key
+        | LayerFolder layerId ->
+            let layerIndex =
+                session.LayerOrder
+                |> List.tryFindIndex ((=) layerId)
+                |> Option.defaultValue Int32.MaxValue
+
+            1, layerIndex, folderName session key
+        | PreviousContextFolder _ -> 2, Int32.MaxValue, folderName session key
+        | UnknownFolder -> 3, Int32.MaxValue, folderName session key
+
+    let private manualColor (uiState: UiState) (header: ProvenancePropertyHeader) =
+        uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header }
+
+    let private isPlacedInCurrentLayer (layer: ProvenanceLayer) (uiState: UiState) header =
+        let key = State.Keys.groupingKey header
+
+        let placedInRail = uiState.PropertyRailPlacements |> Map.containsKey (layer.Id, key)
+
+        let groupedOnSide sideId =
+            (State.Sides.get sideId uiState).GroupingAssignments
+            |> List.exists (fun assignment -> assignment.Key = key)
+
+        placedInRail
+        || groupedOnSide layer.InputSideId
+        || groupedOnSide layer.OutputSideId
+
+    let private itemForHeader
+        (session: ProvenanceSession)
+        (sourceSide: ProvenanceSide)
+        (folderKey: FolderKey)
+        (inputProjection: PropertyRails.RailProjection)
+        (outputProjection: PropertyRails.RailProjection)
+        (uiState: UiState)
+        (header: ProvenancePropertyHeader)
+        : FolderedDraggableItem<PropertyShelfItemPayload> =
+        let badge =
+            outputProjection.BadgeByHeader
+            |> Map.tryFind header
+            |> Option.orElseWith (fun () -> inputProjection.BadgeByHeader |> Map.tryFind header)
+            |> badgeText
+
+        let tooltip =
+            [
+                ProvenanceKind.displayName header.Kind
+                folderName session folderKey
+            ]
+            |> List.filter (String.IsNullOrWhiteSpace >> not)
+            |> String.concat " · "
+
+        {
+            Id = $"{folderId folderKey}-{headerId header}"
+            Label = header.Category.Name
+            Payload = {
+                Header = header
+                SourceSide = sourceSide
+            }
+            Color = manualColor uiState header
+            Badge = badge
+            Tooltip =
+                if String.IsNullOrWhiteSpace tooltip then
+                    None
+                else
+                    Some tooltip
+            Disabled = false
+        }
+
+    let private dedupeItems (items: FolderedDraggableItem<PropertyShelfItemPayload> list) =
+        items
+        |> List.groupBy (fun item -> item.Id)
+        |> List.map (fun (_, matching) -> matching.Head)
+
+    let folders
+        session
+        (layer: ProvenanceLayer)
+        uiState
+        (inputProjection: PropertyRails.RailProjection)
+        (outputProjection: PropertyRails.RailProjection)
+        : FolderedDraggableFolder<PropertyShelfItemPayload> list =
+        let headers =
+            [
+                yield! inputProjection.Headers
+                yield! outputProjection.Headers
+            ]
+            |> List.distinct
+            |> List.filter (isPlacedInCurrentLayer layer uiState >> not)
+
+        let itemEntries =
+            headers
+            |> List.collect (fun header ->
+                let sourceSide =
+                    sourceSideForHeader layer.Id inputProjection outputProjection uiState header
+
+                originsForHeader layer.Id sourceSide inputProjection outputProjection header
+                |> Set.toList
+                |> List.map folderKeyForOrigin
+                |> List.distinct
+                |> List.map (fun folderKey ->
+                    folderKey,
+                    itemForHeader session sourceSide folderKey inputProjection outputProjection uiState header
+                )
+            )
+
+        let folderKeys =
+            [
+                yield LayerFolder layer.Id
+                yield! itemEntries |> List.map fst
+            ]
+            |> List.distinct
+            |> List.sortBy (folderSort session layer.Id)
+
+        folderKeys
+        |> List.map (fun key ->
+            let items =
+                itemEntries
+                |> List.choose (fun (itemFolderKey, item) -> if itemFolderKey = key then Some item else None)
+                |> dedupeItems
+
+            {
+                Id = folderId key
+                Name = folderName session key
+                Color = folderColor uiState key
+                Items = items
+            }
+        )
+
+/// Resolves drag payload ids and display ids against the active layer and UI palette.
 module private EditorLookups =
 
-    let create pair uiState inputGroups outputGroups =
+    let create layer uiState inputGroups outputGroups =
         let findGroup side groupId =
             let groups: DisplayGroup list =
                 if side = ProvenanceSide.Input then
@@ -107,16 +360,21 @@ module private EditorLookups =
             groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
 
         let findHeader headerId =
-            PropertyRails.headersForModel pair.Model
+            [
+                yield! PropertyRails.headersForModel layer.Model
+                yield! State.Palette.headersForSide layer.Id ProvenanceSide.Input uiState
+                yield! State.Palette.headersForSide layer.Id ProvenanceSide.Output uiState
+            ]
+            |> List.distinct
             |> List.tryFind (fun header -> DragDrop.propertyHeaderIdentity header = headerId)
 
         let findPropertyValue propertyValueId =
-            pair.Model.PropertyValues.TryFind propertyValueId
+            layer.Model.PropertyValues.TryFind propertyValueId
             |> Option.orElseWith (fun () -> State.Palette.tryFindValue propertyValueId uiState)
 
         let sourceForValue propertyValueId (propertyValue: ProvenancePropertyValue) : ValueAssignmentSource = {
             CopiedFrom =
-                if pair.Model.PropertyValues.ContainsKey propertyValueId then
+                if layer.Model.PropertyValues.ContainsKey propertyValueId then
                     Some propertyValueId
                 else
                     None
@@ -147,30 +405,39 @@ module private AssignmentErrors =
 /// Session-changing actions that publish patches back to the host component.
 module private EditorActions =
 
-    let addLayer session pairId inputGroups outputGroups uiState publish =
-        Display.layerCommand pairId inputGroups outputGroups uiState
+    let addLayer session layerId inputGroups outputGroups uiState publish =
+        Display.layerCommand layerId inputGroups outputGroups uiState
         |> fun command -> Session.addLayer command session
         |> publish
 
     let createSet session publish command =
         Session.createLoadedSet command session |> publish
 
-    let confirmPendingOverwrite session publish setUiState uiState warning =
-        let rec apply current patches propertyValueIds =
-            match propertyValueIds with
-            | [] -> Ok(current, patches)
-            | propertyValueId :: rest ->
-                match Session.updatePropertyValue propertyValueId warning.Value warning.Unit current with
-                | Ok(next, addedPatches) -> apply next (patches @ addedPatches) rest
-                | Error error -> Error error
+    let private applyOverwrite result warning =
+        warning.ExistingValueIds
+        |> List.distinct
+        |> List.fold
+            (fun result propertyValueId ->
+                result
+                |> Result.bind (fun (currentSession, patches) ->
+                    Session.updatePropertyValue propertyValueId warning.Value warning.Unit currentSession
+                    |> Result.map (fun (next, added) -> next, patches @ added)
+                )
+            )
+            result
 
-        match warning.ExistingValueIds with
-        | [] ->
-            setUiState {
-                uiState with
-                    Error = Some "Cannot overwrite because the target value context is no longer available."
-            }
-        | propertyValueIds -> apply session [] propertyValueIds |> publish
+    let private applyAdd result command =
+        result
+        |> Result.bind (fun (currentSession, patches) ->
+            Session.createLoadedPropertyValue command currentSession
+            |> Result.map (fun (next, added) -> next, patches @ added)
+        )
+
+    let applyAssignmentBatch session publish batch =
+        batch.Overwrites
+        |> List.fold applyOverwrite (Ok(session, []))
+        |> Result.bind (fun afterOverwrites -> batch.Adds |> List.fold applyAdd (Ok afterOverwrites))
+        |> publish
 
     let connectSetPairs session publish pairs =
         pairs
@@ -271,6 +538,26 @@ module private DropHitTesting =
 /// DnD event handlers that translate library events into session or UI state changes.
 module private DragHandlers =
 
+    let private activeLabel (event: DndKit.IDndKitEvent) =
+        if
+            isNull event.active
+            || isNull event.active.data
+            || isNull event.active.data.current
+        then
+            None
+        else
+            let labelObj: obj = event.active.data.current?label
+
+            if isNull labelObj then
+                None
+            else
+                let label = string labelObj
+
+                if String.IsNullOrWhiteSpace label || label = "undefined" then
+                    None
+                else
+                    Some label
+
     let handleStart
         (surfaceRef: IRefValue<Browser.Types.HTMLElement option>)
         setActiveDrag
@@ -278,7 +565,14 @@ module private DragHandlers =
         (event: DndKit.IDndKitEvent)
         =
         let payload = DragDrop.tryDragId (string event.active.id)
-        setActiveDrag payload
+
+        setActiveDrag (
+            payload
+            |> Option.map (fun payload -> {
+                Payload = payload
+                Label = activeLabel event
+            })
+        )
 
         match payload, surfaceRef.current with
         | Some(DragDrop.Payload.ConnectionHandle handle), Some surface ->
@@ -297,28 +591,73 @@ module private DragHandlers =
                 liveDragStore
         | None -> ()
 
-    let private layerIdForSide pair side =
+    let private layerIdForSide (layer: ProvenanceLayer) side =
         match side with
-        | ProvenanceSide.Input -> pair.LeftLayerId
-        | ProvenanceSide.Output -> pair.RightLayerId
+        | ProvenanceSide.Input -> layer.InputSideId
+        | ProvenanceSide.Output -> layer.OutputSideId
 
     let private routePropertyValueDrop context side groupId propertyValueId =
-        match context.Lookups.FindGroup side groupId, context.Lookups.FindPropertyValue propertyValueId with
-        | Some group, Some propertyValue ->
+        match context.Lookups.FindPropertyValue propertyValueId with
+        | Some propertyValue ->
+            let uiState = context.GetUiState()
+
+            let targetGroups =
+                ValueAssignment.selectedTargetGroupsForDrop
+                    context.Layer.Id
+                    side
+                    groupId
+                    uiState.SelectedInputs
+                    uiState.SelectedOutputs
+                    context.Lookups.FindGroup
+
             match
-                ValueAssignment.planPropertyValueDrop
+                ValueAssignment.planPropertyValueDropToGroups
                     (context.Lookups.SourceForValue propertyValueId propertyValue)
-                    group
-                    context.Pair.Model
+                    targetGroups
+                    context.Layer.Model
             with
-            | Ok(ValueAssignmentPlan.AddCurrent command) ->
-                Session.createCurrentLoadedPropertyValue command context.Session
-                |> context.Publish
-            | Ok(ValueAssignmentPlan.ConfirmOverwrite warning) ->
-                State.Overwrite.set warning context.UiState |> context.SetUiState
+            | Ok batch ->
+                let affectedValueCount =
+                    batch.Overwrites |> List.sumBy (fun w -> w.ExistingValueIds.Length)
+
+                let sideForTarget target =
+                    match target with
+                    | ProvenancePropertyTarget.InputSets _ -> Some ProvenanceSide.Input
+                    | ProvenancePropertyTarget.OutputSets _ -> Some ProvenanceSide.Output
+                    | ProvenancePropertyTarget.Connections _ -> None
+
+                let affectedSideCount =
+                    [
+                        yield! batch.Adds |> List.choose (fun command -> sideForTarget command.Target)
+                        yield! batch.Overwrites |> List.choose (fun warning -> sideForTarget warning.Target)
+                    ]
+                    |> List.distinct
+                    |> List.length
+
+                if batch.Overwrites.IsEmpty then
+                    if not batch.Adds.IsEmpty then
+                        batch.Adds
+                        |> List.fold
+                            (fun (result: SessionResult) cmd ->
+                                match result with
+                                | Ok(current, patches) ->
+                                    Session.createCurrentLoadedPropertyValue cmd current
+                                    |> Result.map (fun (next, added) -> next, patches @ added)
+                                | Error _ -> result
+                            )
+                            (Ok(context.Session, []))
+                        |> context.Publish
+                else
+                    let pendingBatch = {
+                        Batch = batch
+                        AffectedSideCount = affectedSideCount
+                        AffectedValueCount = affectedValueCount
+                    }
+
+                    State.AssignmentBatch.set pendingBatch uiState |> context.SetUiState
             | Error error ->
                 context.SetUiState {
-                    context.UiState with
+                    uiState with
                         Error = Some(AssignmentErrors.text error)
                 }
         | _ -> ()
@@ -334,13 +673,13 @@ module private DragHandlers =
             | None ->
                 State.MemberResolution.request
                     {
-                        PairId = context.Pair.Id
+                        LayerId = context.Layer.Id
                         InputGroupId = inputGroup.Id
                         OutputGroupId = outputGroup.Id
                         InputMemberCount = inputGroup.Members.Length
                         OutputMemberCount = outputGroup.Members.Length
                     }
-                    context.UiState
+                    (context.GetUiState())
                 |> context.SetUiState
         | _ -> ()
 
@@ -375,16 +714,26 @@ module private DragHandlers =
         match dragPayload, groupDrop, propertyDrop with
         | Some(DragDrop.Payload.PropertyValue propertyValueId), Some(side, groupId), _ ->
             routePropertyValueDrop context side groupId propertyValueId
+        | Some(DragDrop.Payload.FolderPropertyHeader(sourceSide, headerId)), _, Some targetSide ->
+            match context.Lookups.FindHeader headerId with
+            | Some header when
+                sourceSide = targetSide
+                || PropertyRails.canSwitchHeader header context.Layer.Model
+                ->
+                context.GetUiState()
+                |> State.PropertyPlacement.place context.Layer.Id targetSide header
+                |> context.SetUiState
+            | _ -> ()
         | Some(DragDrop.Payload.PropertyHeader(sourceSide, headerId)), _, Some targetSide when sourceSide <> targetSide ->
             match context.Lookups.FindHeader headerId with
-            | Some header when PropertyRails.canSwitchHeader header context.Pair.Model ->
+            | Some header when PropertyRails.canSwitchHeader header context.Layer.Model ->
                 State.GroupingAssignments.move
-                    context.Pair.Id
-                    (layerIdForSide context.Pair sourceSide)
-                    (layerIdForSide context.Pair targetSide)
+                    context.Layer.Id
+                    (layerIdForSide context.Layer sourceSide)
+                    (layerIdForSide context.Layer targetSide)
                     targetSide
                     header
-                    context.UiState
+                    (context.GetUiState())
                 |> context.SetUiState
             | _ -> ()
         | _ -> ()
@@ -423,9 +772,21 @@ module private EditorPanels =
             prop.text error
         ]
 
-    let overwriteWarning debug warning onConfirm onCancel =
-        let count = warning.ExistingValueIds.Length
-        let valueText = Formatting.formatValue warning.Value warning.Unit
+    let assignmentBatchWarning debug (pending: PendingAssignmentBatch) onConfirm onCancel =
+        let overwriteCount = pending.AffectedValueCount
+        let sideCount = pending.AffectedSideCount
+
+        let headerText =
+            pending.Batch.Overwrites
+            |> List.tryHead
+            |> Option.map (fun w -> w.Header.Category.Name)
+            |> Option.defaultValue "property"
+
+        let valueText =
+            pending.Batch.Overwrites
+            |> List.tryHead
+            |> Option.map (fun w -> Formatting.formatValue w.Value w.Unit)
+            |> Option.defaultValue "new value"
 
         Html.div [
             prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
@@ -440,16 +801,16 @@ module private EditorPanels =
                     prop.children [
                         Html.strong [
                             prop.text (
-                                if count > 1 then
-                                    $"Overwrite {count} {warning.Header.Category.Name} values?"
+                                if overwriteCount > 1 then
+                                    $"Overwrite {overwriteCount} {headerText} values?"
                                 else
-                                    $"Overwrite {warning.Header.Category.Name} value?"
+                                    $"Overwrite {headerText} value?"
                             )
                         ]
                         Html.span [
                             prop.className "swt:text-sm"
                             prop.text
-                                $"The selected targets already have {warning.Header.Category.Name}. Confirm to replace with {valueText} using the existing edit path."
+                                $"The selected targets already have {headerText}. Confirm to replace with {valueText} across {sideCount} side(s) using the existing edit path."
                         ]
                     ]
                 ]
@@ -461,8 +822,8 @@ module private EditorPanels =
                             prop.className "swt:btn swt:btn-warning swt:btn-sm"
                             if debug then
                                 prop.testId "provenance-confirm-overwrite"
-                            prop.onPointerUp (fun _ -> onConfirm warning)
-                            prop.onClick (fun _ -> onConfirm warning)
+                            prop.onPointerUp (fun _ -> onConfirm pending)
+                            prop.onClick (fun _ -> onConfirm pending)
                             prop.text "Overwrite"
                         ]
                         Html.button [
@@ -584,8 +945,47 @@ module private EditorPanels =
 /// Render helpers for side rails, group columns, and drag overlays.
 module private EditorSurface =
 
+    let dropZoneProjection layerId side uiState activeAssignments (projection: PropertyRails.RailProjection) =
+        let activeHeaders =
+            [
+                yield!
+                    activeAssignments
+                    |> List.map (fun (assignment: GroupingAssignment) -> assignment.Key.Header)
+                yield!
+                    uiState.PropertyRailPlacements
+                    |> Map.toList
+                    |> List.choose (fun ((currentLayerId, key), placedSide) ->
+                        if currentLayerId = layerId && placedSide = side then
+                            Some key.Header
+                        else
+                            None
+                    )
+            ]
+            |> Set.ofList
+
+        let filterMap map =
+            map |> Map.filter (fun header _ -> activeHeaders.Contains header)
+
+        {
+            projection with
+                Headers = projection.Headers |> List.filter (fun header -> activeHeaders.Contains header)
+                ValuesByHeader = projection.ValuesByHeader |> filterMap
+                ExpandedHeaders =
+                    projection.ExpandedHeaders
+                    |> Set.filter (fun header -> activeHeaders.Contains header)
+                CanSwitchHeaders =
+                    projection.CanSwitchHeaders
+                    |> Set.filter (fun header -> activeHeaders.Contains header)
+                StatsByHeader = projection.StatsByHeader |> filterMap
+                ConnectionCountByHeader = projection.ConnectionCountByHeader |> filterMap
+                BadgeByHeader = projection.BadgeByHeader |> filterMap
+                ColorByHeader = projection.ColorByHeader |> filterMap
+                OriginByHeader = projection.OriginByHeader |> filterMap
+        }
+
     let propertyRail
         side
+        sideId
         (projection: PropertyRails.RailProjection)
         activeAssignments
         toggleSide
@@ -593,6 +993,9 @@ module private EditorSurface =
         move
         toggleExpanded
         addPaletteValue
+        setPropertyColor
+        sourceInfoForValue
+        isDropRejected
         debug
         setIsValueChipDragging
 
@@ -609,13 +1012,21 @@ module private EditorSurface =
             toggleExpanded,
             addPaletteValue,
             (fun header -> projection.CanSwitchHeaders.Contains header),
+            isDropRejected,
             setIsValueChipDragging,
+            (fun header -> projection.StatsByHeader |> Map.tryFind header),
+            (fun header -> projection.BadgeByHeader |> Map.tryFind header),
+            (fun header -> projection.ColorByHeader |> Map.tryFind header |> Option.bind id),
+            (fun header -> projection.OriginByHeader |> Map.tryFind header),
+            setPropertyColor,
+            sourceInfoForValue,
+            sideId = sideId,
             debug = debug
         )
 
     let groupColumn
         side
-        (pair: ProvenanceLayerPair)
+        (layer: ProvenanceLayer)
         model
         (groups: DisplayGroup list)
         endpointKinds
@@ -626,6 +1037,7 @@ module private EditorSurface =
         toggleSelection
         toggleDetail
         (connectionCountFor: string -> int option)
+        sourceInfoForValue
         debug
         isValueChipDragging
         =
@@ -653,19 +1065,20 @@ module private EditorSurface =
                     existingEndpointNames,
                     createSet,
                     debug = debug,
-                    key = $"{pair.Id}:{keyPrefix}:{endpointKindsKey}"
+                    key = $"{layer.Id}:{keyPrefix}:{endpointKindsKey}"
                 )
                 for group in groups do
                     GroupCard.Main(
                         side,
                         group,
                         model,
-                        State.Selection.contains pair.Id side group.Id uiState,
+                        State.Selection.contains layer.Id side group.Id uiState,
                         isExpanded side group.Id,
                         (fun () -> toggleSelection side group.Id),
                         (fun () -> toggleDetail side group.Id),
                         isValueChipDragging,
                         ?connectionCount = connectionCountFor group.Id,
+                        sourceInfoForValue = sourceInfoForValue,
                         debug = debug,
                         key = $"{keyPrefix}:{group.Id}"
                     )
@@ -680,10 +1093,27 @@ module private EditorSurface =
 
     let dragOverlay findPropertyValue debug activeDrag =
         match activeDrag with
-        | Some(DragDrop.Payload.PropertyValue propertyValueId) ->
+        | Some {
+                   Payload = DragDrop.Payload.PropertyValue propertyValueId
+               } ->
             match findPropertyValue propertyValueId with
             | Some propertyValue -> Controls.ValueDragPreview(propertyValue, showHeader = false, debug = debug)
             | None -> Html.none
+        | Some {
+                   Payload = DragDrop.Payload.PropertyHeader _
+                   Label = label
+               } ->
+            Html.div [
+                prop.className Styles.propertyValueOverlayClasses
+                if debug then
+                    prop.testId "provenance-drag-overlay-property"
+                prop.children [
+                    Html.span [
+                        prop.className "swt:min-w-0 swt:truncate"
+                        prop.text (label |> Option.defaultValue "Property")
+                    ]
+                ]
+            ]
         | _ -> Html.none
 
 [<Erase; Mangle(false)>]
@@ -695,13 +1125,17 @@ type ProvenanceGrouping =
         =
         let debug = defaultArg debug false
         let rawUiState, setUiState = React.useState (State.init session)
-        let activeDrag, setActiveDrag = React.useState<DragDrop.Payload option> None
+        let activeDrag, setActiveDrag = React.useState<ActiveDrag option> None
         let surfaceRef = React.useElementRef ()
         let splitDrag = React.useRef (None: Splitter.SplitterSide option)
         let rootRef = React.useElementRef ()
         let tier, setTier = React.useState LayoutTier.Wide
         let openRail, setOpenRail = React.useState<ProvenanceSide option> None
         let density, setDensity = React.useState Density.EditorDensity.Comfortable
+        let isPropertyShelfExpanded, setIsPropertyShelfExpanded = React.useState true
+
+        let propertyShelfFolderExpansion, setPropertyShelfFolderExpansion =
+            React.useState<(ProvenanceLayerId * Set<string>) option> None
 
         let showPropertyHeaderConnectors, setShowPropertyHeaderConnectors =
             React.useState true
@@ -725,16 +1159,22 @@ type ProvenanceGrouping =
             FsReact.createDisposable (fun () -> TierObserver.disconnect observer)
         )
 
-        let uiState = State.Layers.ensure session rawUiState
+        let uiState = State.Sides.ensure session rawUiState
 
-        let pair, inputGroups, outputGroups, connections =
-            React.useMemo ((fun () -> Display.displayPair session uiState), [| box session; box uiState.LayerStates |])
+        let layer, inputGroups, outputGroups, connections =
+            React.useMemo ((fun () -> Display.displayLayer session uiState), [| box session; box uiState.SideStates |])
 
         let latestUiState = React.useRef uiState
-        let activePairId = React.useRef pair.Id
+        let activeLayerId = React.useRef layer.Id
         latestUiState.current <- uiState
-        activePairId.current <- pair.Id
-        let panelRatios = State.PanelLayout.get pair.Id uiState
+        activeLayerId.current <- layer.Id
+
+        let applyUiState update =
+            let next = update latestUiState.current
+            latestUiState.current <- next
+            setUiState next
+
+        let panelRatios = State.PanelLayout.get layer.Id uiState
 
         let endpointKinds = Endpoints.endpointKindOptions ()
 
@@ -747,40 +1187,188 @@ type ProvenanceGrouping =
                 |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
         ]
 
-        let lookups = EditorLookups.create pair uiState inputGroups outputGroups
+        let lookups = EditorLookups.create layer uiState inputGroups outputGroups
 
         let inputRailProjection =
             React.useMemo (
-                (fun () -> PropertyRails.railProjection pair.Id ProvenanceSide.Input pair.Model uiState),
+                (fun () ->
+                    PropertyProjection.railProjectionWithFilters
+                        session
+                        layer.Id
+                        ProvenanceSide.Input
+                        layer.Model
+                        uiState
+                ),
                 [|
-                    box pair.Id
-                    box pair.Model
+                    box session
+                    box layer.Id
+                    box layer.Model
                     box uiState.PropertyRailPlacements
+                    box uiState.PropertyRailOrders
                     box uiState.ExpandedProperties
                     box uiState.PaletteValues
+                    box uiState.PropertyColors
+                    box uiState.Filters
                 |]
             )
 
         let outputRailProjection =
             React.useMemo (
-                (fun () -> PropertyRails.railProjection pair.Id ProvenanceSide.Output pair.Model uiState),
+                (fun () ->
+                    PropertyProjection.railProjectionWithFilters
+                        session
+                        layer.Id
+                        ProvenanceSide.Output
+                        layer.Model
+                        uiState
+                ),
                 [|
-                    box pair.Id
-                    box pair.Model
+                    box session
+                    box layer.Id
+                    box layer.Model
                     box uiState.PropertyRailPlacements
+                    box uiState.PropertyRailOrders
                     box uiState.ExpandedProperties
                     box uiState.PaletteValues
+                    box uiState.PropertyColors
+                    box uiState.Filters
                 |]
             )
 
-        let applyUiState update =
-            let next = update latestUiState.current
-            latestUiState.current <- next
-            setUiState next
+        let inputSideState = State.Sides.get layer.InputSideId uiState
+        let outputSideState = State.Sides.get layer.OutputSideId uiState
+
+        let activeInputRailProjection =
+            EditorSurface.dropZoneProjection
+                layer.Id
+                ProvenanceSide.Input
+                uiState
+                inputSideState.GroupingAssignments
+                inputRailProjection
+
+        let activeOutputRailProjection =
+            EditorSurface.dropZoneProjection
+                layer.Id
+                ProvenanceSide.Output
+                uiState
+                outputSideState.GroupingAssignments
+                outputRailProjection
+
+        let propertyShelfFolders =
+            PropertyShelf.folders session layer uiState inputRailProjection outputRailProjection
+
+        let defaultPropertyShelfFolderIds =
+            propertyShelfFolders
+            |> List.tryHead
+            |> Option.map (fun folder -> Set.singleton folder.Id)
+            |> Option.defaultValue Set.empty
+
+        let propertyShelfExpandedFolderIds =
+            match propertyShelfFolderExpansion with
+            | Some(expandedLayerId, folderIds) when expandedLayerId = layer.Id -> folderIds
+            | _ -> defaultPropertyShelfFolderIds
+
+        let setPropertyShelfExpandedFolderIds folderIds =
+            setPropertyShelfFolderExpansion (Some(layer.Id, folderIds))
+
+        let setPropertyShelfFolderColor folderId color =
+            applyUiState (PropertyShelf.setFolderColor session folderId color)
+
+        let propertyShelf =
+            Html.section [
+                prop.className
+                    "swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100/80 swt:p-3 swt:shadow-sm"
+                if debug then
+                    prop.testId "provenance-property-shelf"
+                prop.children [
+                    Html.div [
+                        prop.className "swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2"
+                        prop.children [
+                            Html.div [
+                                prop.className
+                                    "swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-sm swt:font-medium"
+                                prop.children [
+                                    Html.i [
+                                        prop.className [
+                                            "swt:iconify swt:size-5 swt:shrink-0"
+                                            if isPropertyShelfExpanded then
+                                                "swt:fluent--folder-open-24-regular"
+                                            else
+                                                "swt:fluent--folder-24-regular"
+                                        ]
+                                    ]
+                                    Html.span [
+                                        prop.className "swt:min-w-0 swt:truncate"
+                                        prop.text "Available properties"
+                                    ]
+                                ]
+                            ]
+                            Html.button [
+                                prop.title (
+                                    if isPropertyShelfExpanded then
+                                        "Minimize property folders"
+                                    else
+                                        "Expand property folders"
+                                )
+                                prop.type'.button
+                                prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:size-8 swt:p-0"
+                                prop.custom ("aria-expanded", isPropertyShelfExpanded)
+                                prop.ariaLabel (
+                                    if isPropertyShelfExpanded then
+                                        "Minimize property folders"
+                                    else
+                                        "Expand property folders"
+                                )
+                                if debug then
+                                    prop.testId "provenance-property-shelf-toggle"
+                                prop.onClick (fun _ -> setIsPropertyShelfExpanded (not isPropertyShelfExpanded))
+                                prop.children [
+                                    Html.i [
+                                        prop.className [
+                                            "swt:iconify swt:size-4"
+                                            if isPropertyShelfExpanded then
+                                                "swt:fluent--chevron-up-20-regular"
+                                            else
+                                                "swt:fluent--chevron-down-20-regular"
+                                        ]
+                                    ]
+                                ]
+                            ]
+                        ]
+                    ]
+                    if isPropertyShelfExpanded then
+                        FolderedDraggableList.FolderedDraggableList<PropertyShelfItemPayload>(
+                            propertyShelfFolders,
+                            (fun _ item -> DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header),
+                            expandedFolderIds = propertyShelfExpandedFolderIds,
+                            onExpandedFolderIdsChange = setPropertyShelfExpandedFolderIds,
+                            onSetFolderColor = setPropertyShelfFolderColor,
+                            className = "swt:min-w-0",
+                            debug = debug
+                        )
+                ]
+            ]
 
         let commitUiState next =
             latestUiState.current <- next
             setUiState next
+
+        React.useEffect (
+            (fun () ->
+                let next =
+                    latestUiState.current
+                    |> State.RailOrder.ensure layer.Id ProvenanceSide.Input inputRailProjection.Headers
+                    |> State.RailOrder.ensure layer.Id ProvenanceSide.Output outputRailProjection.Headers
+
+                if next <> latestUiState.current then
+                    commitUiState next
+            ),
+            [|
+                box layer.Id
+                box inputRailProjection.Headers
+                box outputRailProjection.Headers
+            |]
+        )
 
         let commitPanelRatio side clientX =
             match surfaceRef.current with
@@ -800,8 +1388,8 @@ type ProvenanceGrouping =
 
                 let next =
                     match side with
-                    | Splitter.Left -> State.PanelLayout.setLeft activePairId.current splitPercent current
-                    | Splitter.Right -> State.PanelLayout.setRight activePairId.current (100 - splitPercent) current
+                    | Splitter.Left -> State.PanelLayout.setLeft activeLayerId.current splitPercent current
+                    | Splitter.Right -> State.PanelLayout.setRight activeLayerId.current (100 - splitPercent) current
 
                 latestUiState.current <- next
                 setUiState next
@@ -846,12 +1434,12 @@ type ProvenanceGrouping =
             | Ok(next, patches) ->
                 LiveDrag.clear liveDragStore.current
 
-                let nextUiState = latestUiState.current |> State.Layers.ensure next
+                let nextUiState = latestUiState.current |> State.Sides.ensure next
 
                 commitUiState {
                     nextUiState with
                         Error = None
-                        PendingOverwrite = None
+                        PendingAssignmentBatch = None
                         PendingMemberResolution = None
                 }
 
@@ -868,22 +1456,62 @@ type ProvenanceGrouping =
             EditorActions.createSet session publish command
 
         let addPaletteValue side header value unit =
-            State.Palette.addValue pair.Id side header value unit uiState |> setUiState
+            applyUiState (State.Palette.addValue layer.Id side header value unit)
 
         let toggleSideGrouping layerId side header =
-            State.GroupingAssignments.toggleSide layerId side header uiState |> setUiState
+            applyUiState (State.GroupingAssignments.toggleSide layerId side header)
 
         let togglePropertyExpanded side header =
-            State.PropertyExpansion.toggle pair.Id side header uiState |> setUiState
+            applyUiState (State.PropertyExpansion.toggle layer.Id side header)
 
         let toggleSelection side groupId =
-            State.Selection.toggle pair.Id side groupId uiState |> setUiState
+            applyUiState (State.Selection.toggle layer.Id side groupId)
 
         let toggleGroupDetail side groupId =
-            State.Detail.toggleGroup side groupId uiState |> setUiState
+            applyUiState (State.Detail.toggleGroup side groupId)
 
-        let confirmPendingOverwrite =
-            EditorActions.confirmPendingOverwrite session publish setUiState uiState
+        let sourceInfoForValue value =
+            Session.propertyValueSourceInfo layer value
+
+        let setPropertyColor header color =
+            let update =
+                match color with
+                | Some selectedColor -> State.PropertyColors.setColor header selectedColor
+                | None -> State.PropertyColors.clearColor header
+
+            applyUiState update
+
+        let setLayerColor layerId color =
+            let update =
+                match color with
+                | Some selectedColor -> State.PropertyColors.setLayerColor layerId selectedColor
+                | None -> State.PropertyColors.clearLayerColor layerId
+
+            applyUiState update
+
+        let setPropertySort sort =
+            let sortedInputHeaders =
+                PropertyProjection.sortHeaders
+                    sort
+                    inputRailProjection.StatsByHeader
+                    inputRailProjection.ConnectionCountByHeader
+                    inputRailProjection.Headers
+
+            let sortedOutputHeaders =
+                PropertyProjection.sortHeaders
+                    sort
+                    outputRailProjection.StatsByHeader
+                    outputRailProjection.ConnectionCountByHeader
+                    outputRailProjection.Headers
+
+            applyUiState (
+                State.Filters.setPropertySort sort
+                >> State.RailOrder.reorderVisible layer.Id ProvenanceSide.Input sortedInputHeaders
+                >> State.RailOrder.reorderVisible layer.Id ProvenanceSide.Output sortedOutputHeaders
+            )
+
+        let confirmBatch (pending: PendingAssignmentBatch) =
+            EditorActions.applyAssignmentBatch session publish pending.Batch
 
         let connectSetPairs = EditorActions.connectSetPairs session publish
 
@@ -892,12 +1520,12 @@ type ProvenanceGrouping =
             | Ok(next, patches) ->
                 LiveDrag.clear liveDragStore.current
 
-                let nextUiState = latestUiState.current |> State.Layers.ensure next
+                let nextUiState = latestUiState.current |> State.Sides.ensure next
 
                 commitUiState {
                     nextUiState with
                         Error = None
-                        PendingOverwrite = None
+                        PendingAssignmentBatch = None
                         PendingMemberResolution = None
                         Detail = None
                 }
@@ -920,35 +1548,32 @@ type ProvenanceGrouping =
                 EditorActions.allMemberPairs inputGroup outputGroup |> connectSetPairs
             | _ -> State.MemberResolution.clearPending uiState |> setUiState
 
-        let isManuallyResolving side groupId =
-            uiState.ManualResolutionPairs
-            |> List.exists (fun resolution ->
-                resolution.PairId = pair.Id
-                && ((side = ProvenanceSide.Input && resolution.InputGroupId = groupId)
-                    || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId))
-            )
+        let isGroupedCard side groupId =
+            lookups.FindGroup side groupId
+            |> Option.exists (fun group -> group.GroupingValues |> List.isEmpty |> not)
 
         let isConnectedToExpanded side groupId =
-            connections
-            |> List.exists (fun connection ->
-                match side with
-                | ProvenanceSide.Input ->
-                    connection.SourceGroupId = groupId
-                    && State.Detail.isGroupExpanded ProvenanceSide.Output connection.TargetGroupId uiState
-                | ProvenanceSide.Output ->
-                    connection.TargetGroupId = groupId
-                    && State.Detail.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId uiState
-            )
+            isGroupedCard side groupId
+            && (connections
+                |> List.exists (fun connection ->
+                    match side with
+                    | ProvenanceSide.Input ->
+                        connection.SourceGroupId = groupId
+                        && State.Detail.isGroupExpanded ProvenanceSide.Output connection.TargetGroupId uiState
+                    | ProvenanceSide.Output ->
+                        connection.TargetGroupId = groupId
+                        && State.Detail.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId uiState
+                ))
 
         let isGroupExpanded side groupId =
             State.Detail.isGroupExpanded side groupId uiState
-            || isManuallyResolving side groupId
             || isConnectedToExpanded side groupId
 
         let dragContext = {
             Session = session
-            Pair = pair
+            Layer = layer
             UiState = uiState
+            GetUiState = fun () -> latestUiState.current
             Publish = publish
             SetUiState = commitUiState
             Lookups = lookups
@@ -963,29 +1588,50 @@ type ProvenanceGrouping =
         let toggleRail side =
             setOpenRail (if openRail = Some side then None else Some side)
 
+        let isRejectedPropertyRailDrop targetSide =
+            let headerCannotSwitch sourceSide headerId =
+                sourceSide <> targetSide
+                && (lookups.FindHeader headerId
+                    |> Option.exists (fun header -> PropertyRails.canSwitchHeader header layer.Model |> not))
+
+            match activeDrag with
+            | Some {
+                       Payload = DragDrop.Payload.FolderPropertyHeader(sourceSide, headerId)
+                   }
+            | Some {
+                       Payload = DragDrop.Payload.PropertyHeader(sourceSide, headerId)
+                   } -> headerCannotSwitch sourceSide headerId
+            | _ -> false
+
         let railPanel side =
-            let layerId, oppositeLayerId, targetSide =
+            let layer = Session.activeLayer session
+
+            let sideId, oppositeSideId, targetSide =
                 match side with
-                | ProvenanceSide.Input -> pair.LeftLayerId, pair.RightLayerId, ProvenanceSide.Output
-                | ProvenanceSide.Output -> pair.RightLayerId, pair.LeftLayerId, ProvenanceSide.Input
+                | ProvenanceSide.Input -> layer.InputSideId, layer.OutputSideId, ProvenanceSide.Output
+                | ProvenanceSide.Output -> layer.OutputSideId, layer.InputSideId, ProvenanceSide.Input
 
             EditorSurface.propertyRail
                 side
+                sideId
                 (match side with
-                 | ProvenanceSide.Input -> inputRailProjection
-                 | ProvenanceSide.Output -> outputRailProjection)
-                (State.Layers.get layerId uiState).GroupingAssignments
-                (fun header -> toggleSideGrouping layerId side header)
+                 | ProvenanceSide.Input -> activeInputRailProjection
+                 | ProvenanceSide.Output -> activeOutputRailProjection)
+                (match side with
+                 | ProvenanceSide.Input -> inputSideState.GroupingAssignments
+                 | ProvenanceSide.Output -> outputSideState.GroupingAssignments)
+                (fun header -> toggleSideGrouping sideId side header)
                 (fun header ->
-                    State.GroupingAssignments.toggleBoth pair.LeftLayerId pair.RightLayerId header uiState
-                    |> setUiState
+                    applyUiState (State.GroupingAssignments.toggleBoth layer.InputSideId layer.OutputSideId header)
                 )
                 (fun header ->
-                    State.GroupingAssignments.move pair.Id layerId oppositeLayerId targetSide header uiState
-                    |> setUiState
+                    applyUiState (State.GroupingAssignments.move layer.Id sideId oppositeSideId targetSide header)
                 )
                 (fun header -> togglePropertyExpanded side header)
                 (fun header value unit -> addPaletteValue side header value unit)
+                setPropertyColor
+                sourceInfoForValue
+                (isRejectedPropertyRailDrop side)
                 debug
                 setIsValueChipDragging
 
@@ -1014,10 +1660,12 @@ type ProvenanceGrouping =
             connectionCounts |> Map.tryFind (side, groupId) |> Option.defaultValue 0
 
         let groupColumnFor side withConnectionBadges =
-            let groups =
+            let unsorted =
                 match side with
                 | ProvenanceSide.Input -> inputGroups
                 | ProvenanceSide.Output -> outputGroups
+
+            let groups = Display.sortGroups uiState.Filters.GroupSort connections unsorted
 
             let counts groupId =
                 if withConnectionBadges then
@@ -1027,8 +1675,8 @@ type ProvenanceGrouping =
 
             EditorSurface.groupColumn
                 side
-                pair
-                pair.Model
+                layer
+                layer.Model
                 groups
                 endpointKinds
                 existingEndpointNames
@@ -1038,6 +1686,7 @@ type ProvenanceGrouping =
                 toggleSelection
                 toggleGroupDetail
                 counts
+                sourceInfoForValue
                 debug
                 isValueChipDragging
 
@@ -1146,13 +1795,13 @@ type ProvenanceGrouping =
         let connectorOverlay =
             ConnectorOverlay.Main(
                 surfaceRef,
-                pair.Id,
-                pair.Model,
+                layer.Id,
+                layer.Model,
                 inputGroups,
                 outputGroups,
                 connections,
-                inputRailProjection,
-                outputRailProjection,
+                activeInputRailProjection,
+                activeOutputRailProjection,
                 ConnectorOverlayState.fromUiState uiState,
                 showPropertyHeaderConnectors,
                 liveDragStore.current,
@@ -1268,16 +1917,18 @@ type ProvenanceGrouping =
                                 prop.children [
                                     Controls.LayerTabs(
                                         session,
-                                        (fun pairId -> Session.selectPair pairId session |> publish),
+                                        (fun layerId -> Session.selectLayer layerId session |> publish),
                                         (fun () ->
                                             EditorActions.addLayer
                                                 session
-                                                pair.Id
+                                                layer.Id
                                                 inputGroups
                                                 outputGroups
                                                 uiState
                                                 publish
                                         ),
+                                        layerColors = uiState.PropertyColors.LayerColors,
+                                        onSetLayerColor = setLayerColor,
                                         debug = debug
                                     )
                                     Html.div [
@@ -1361,16 +2012,26 @@ type ProvenanceGrouping =
                                     ]
                                 ]
                             ]
+                            propertyShelf
+                            Controls.FilterToolbar(
+                                uiState.Filters,
+                                (fun text -> applyUiState (State.Filters.setSearch text)),
+                                setPropertySort,
+                                (fun sort -> applyUiState (State.Filters.setGroupSort sort)),
+                                (fun filter -> applyUiState (State.Filters.setValueCountFilter filter)),
+                                (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),
+                                debug = debug
+                            )
                             match uiState.Error with
                             | Some error -> EditorPanels.errorAlert error
                             | None -> Html.none
-                            match uiState.PendingOverwrite with
-                            | Some warning ->
-                                EditorPanels.overwriteWarning
+                            match uiState.PendingAssignmentBatch with
+                            | Some batch ->
+                                EditorPanels.assignmentBatchWarning
                                     debug
-                                    warning
-                                    confirmPendingOverwrite
-                                    (fun () -> State.Overwrite.clear uiState |> setUiState)
+                                    batch
+                                    confirmBatch
+                                    (fun () -> State.AssignmentBatch.clear uiState |> setUiState)
                             | None -> Html.none
                             match uiState.PendingMemberResolution with
                             | Some pending ->

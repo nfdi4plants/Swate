@@ -15,6 +15,7 @@ const noopWithBranch = (_branchName: string) => {};
 const noopWithThreshold = (_thresholdMb: number) => {};
 const noopWithDownloadPreference = (_downloadLargeFiles: boolean) => {};
 const noopOpenRemoteRepository = () => {};
+const cancelOperationSpy = fn();
 const noopSelectChange = (_change: unknown) =>
   Promise.resolve(FSharpResult$2_Ok<void, string>(undefined));
 
@@ -38,6 +39,7 @@ const baseCallbacks = {
   OnSelectChange: noopSelectChange,
   OnPruneLfsCache: noop,
   OnDedupLfsStorage: noop,
+  OnCancelOperation: noop,
 };
 
 const buildCallbacks = (
@@ -601,6 +603,35 @@ export const BusyProgressState: Story = {
       canvas.getByTestId("GitSidebarProgressNotice").compareDocumentPosition(trackingInfo) &
         Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
+  },
+};
+
+export const CancelableUploadProgressState: Story = {
+  args: {
+    status: baseStatus,
+    changedFiles: changedFiles.slice(),
+    branchOptions: branchOptions.slice(),
+    runStatus: buildProgressRunStatus({
+      Method: "lfs",
+      Stage: "Uploading Git LFS objects",
+      Output: "Uploading LFS objects: 0% (0/6), 524 KB | 121 KB/s\n",
+    }),
+    callbacks: buildCallbacks({
+      OnCancelOperation: cancelOperationSpy,
+    }),
+    canCancelOperation: true,
+    downloadLargeFiles: true,
+    lfsAutoTrackThresholdMb: 1,
+  },
+  play: async ({ canvasElement }) => {
+    cancelOperationSpy.mockClear();
+    const canvas = within(canvasElement);
+
+    const cancelButton = canvas.getByTestId("GitSidebarCancelOperationButton");
+    await expect(cancelButton).toHaveTextContent("Cancel");
+
+    await userEvent.click(cancelButton);
+    await expect(cancelOperationSpy).toHaveBeenCalledTimes(1);
   },
 };
 

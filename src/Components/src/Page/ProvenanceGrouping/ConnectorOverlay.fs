@@ -20,40 +20,34 @@ type private MeasuredConnector = {
     StrokeDasharray: string option
     InteractiveConnection: DisplayConnection option
     AriaLabel: string option
+    Color: string option
 }
 
 type ConnectorOverlayState = {
     ExpandedGroup: (ProvenanceSide * string) option
     SelectedConnectionId: string option
-    ManualResolutionPairs: ManualResolutionPair list
-    ExpandedProperties: Set<ProvenancePairId * ProvenanceSide * GroupingKey>
+    ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
 }
 
 module ConnectorOverlayState =
 
     let fromUiState (uiState: UiState) =
-        let expandedGroup =
-            match uiState.Detail with
-            | Some(ProvenanceDetail.Group(side, groupId)) -> Some(side, groupId)
-            | _ -> None
-
         let selectedConnectionId =
             match uiState.Detail with
             | Some(ProvenanceDetail.Connection connectionId) -> Some connectionId
             | _ -> None
 
         {
-            ExpandedGroup = expandedGroup
+            ExpandedGroup = uiState.ExpandedGroup
             SelectedConnectionId = selectedConnectionId
-            ManualResolutionPairs = uiState.ManualResolutionPairs
             ExpandedProperties = uiState.ExpandedProperties
         }
 
     let isGroupExpanded side groupId state =
         state.ExpandedGroup = Some(side, groupId)
 
-    let isPropertyExpanded pairId side header state =
-        state.ExpandedProperties.Contains(pairId, side, { Header = header })
+    let isPropertyExpanded layerId side header state =
+        state.ExpandedProperties.Contains(layerId, side, { Header = header })
 
 type private ConnectorMeasureContext = {
     Container: HTMLElement
@@ -174,7 +168,7 @@ module private ConnectorHandles =
 /// Projects model/UI state into concrete connector path definitions.
 module private ConnectorPaths =
 
-    let private measured key testId className strokeWidth strokeDasharray interactiveConnection ariaLabel path = {
+    let private measured key testId className strokeWidth strokeDasharray interactiveConnection ariaLabel color path = {
         Key = key
         Path = path
         TestId = testId
@@ -183,41 +177,85 @@ module private ConnectorPaths =
         StrokeDasharray = strokeDasharray
         InteractiveConnection = interactiveConnection
         AriaLabel = ariaLabel
+        Color = color
     }
 
-    let private isManuallyResolving pairId side groupId overlayState =
-        overlayState.ManualResolutionPairs
-        |> List.exists (fun resolution ->
-            resolution.PairId = pairId
-            && ((side = ProvenanceSide.Input && resolution.InputGroupId = groupId)
-                || (side = ProvenanceSide.Output && resolution.OutputGroupId = groupId))
-        )
-
-    let private isConnectedToExpanded connections side groupId overlayState =
-        connections
-        |> List.exists (fun connection ->
+    let private groupById (inputGroups: DisplayGroup list) (outputGroups: DisplayGroup list) side groupId =
+        let groups =
             match side with
-            | ProvenanceSide.Input ->
-                connection.SourceGroupId = groupId
-                && ConnectorOverlayState.isGroupExpanded ProvenanceSide.Output connection.TargetGroupId overlayState
-            | ProvenanceSide.Output ->
-                connection.TargetGroupId = groupId
-                && ConnectorOverlayState.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId overlayState
-        )
+            | ProvenanceSide.Input -> inputGroups
+            | ProvenanceSide.Output -> outputGroups
 
-    let private isGroupExpanded pairId connections side groupId overlayState =
+        groups |> List.tryFind (fun group -> group.Id = groupId)
+
+    let private isGroupedCard (inputGroups: DisplayGroup list) (outputGroups: DisplayGroup list) side groupId =
+        groupById inputGroups outputGroups side groupId
+        |> Option.exists (fun group -> group.GroupingValues |> List.isEmpty |> not)
+
+    let private isConnectedToExpanded
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        connections
+        side
+        groupId
+        overlayState
+        =
+        isGroupedCard inputGroups outputGroups side groupId
+        && (connections
+            |> List.exists (fun connection ->
+                match side with
+                | ProvenanceSide.Input ->
+                    connection.SourceGroupId = groupId
+                    && ConnectorOverlayState.isGroupExpanded
+                        ProvenanceSide.Output
+                        connection.TargetGroupId
+                        overlayState
+                | ProvenanceSide.Output ->
+                    connection.TargetGroupId = groupId
+                    && ConnectorOverlayState.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId overlayState
+            ))
+
+    let private isGroupExpanded
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        connections
+        side
+        groupId
+        overlayState
+        =
         ConnectorOverlayState.isGroupExpanded side groupId overlayState
-        || isManuallyResolving pairId side groupId overlayState
-        || isConnectedToExpanded connections side groupId overlayState
+        || isConnectedToExpanded inputGroups outputGroups connections side groupId overlayState
 
-    let groupConnections context pairId connections overlayState =
+    let groupConnections
+        context
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        connections
+        overlayState
+        =
         connections
         // Expanded endpoints swap the aggregate group connector for the
         // member-level connectors, so the group line disappears instead of
         // doubling up underneath them.
         |> List.filter (fun connection ->
-            not (isGroupExpanded pairId connections ProvenanceSide.Input connection.SourceGroupId overlayState)
-            && not (isGroupExpanded pairId connections ProvenanceSide.Output connection.TargetGroupId overlayState)
+            not (
+                isGroupExpanded
+                    inputGroups
+                    outputGroups
+                    connections
+                    ProvenanceSide.Input
+                    connection.SourceGroupId
+                    overlayState
+            )
+            && not (
+                isGroupExpanded
+                    inputGroups
+                    outputGroups
+                    connections
+                    ProvenanceSide.Output
+                    connection.TargetGroupId
+                    overlayState
+            )
         )
         |> List.choose (fun connection ->
             ConnectorMeasure.pathBetweenHandles
@@ -233,17 +271,37 @@ module private ConnectorPaths =
                     None
                     (Some connection)
                     (Some $"Select connection {connection.Id}")
+                    None
             )
         )
 
-    let memberConnections context pairId (model: ProvenanceModel) connections overlayState =
+    let memberConnections
+        context
+        (model: ProvenanceModel)
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        connections
+        overlayState
+        =
         connections
         |> List.collect (fun displayConnection ->
             let inputExpanded =
-                isGroupExpanded pairId connections ProvenanceSide.Input displayConnection.SourceGroupId overlayState
+                isGroupExpanded
+                    inputGroups
+                    outputGroups
+                    connections
+                    ProvenanceSide.Input
+                    displayConnection.SourceGroupId
+                    overlayState
 
             let outputExpanded =
-                isGroupExpanded pairId connections ProvenanceSide.Output displayConnection.TargetGroupId overlayState
+                isGroupExpanded
+                    inputGroups
+                    outputGroups
+                    connections
+                    ProvenanceSide.Output
+                    displayConnection.TargetGroupId
+                    overlayState
 
             if not inputExpanded && not outputExpanded then
                 []
@@ -285,6 +343,7 @@ module private ConnectorPaths =
                                 None
                                 (Some singleConnection)
                                 (Some $"Select connection {displayConnection.Id}")
+                                None
                         )
                     )
                 )
@@ -304,16 +363,23 @@ module private ConnectorPaths =
     /// draw one line per same-side group containing any value for that property.
     let private railConnectionsForSide
         context
-        pairId
+        layerId
         (model: ProvenanceModel)
         side
         groups
         (railProjection: PropertyRails.RailProjection)
+        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         =
         railProjection.Headers
-        |> List.filter (fun header -> not (ConnectorOverlayState.isPropertyExpanded pairId side header overlayState))
+        |> List.filter (fun header -> not (ConnectorOverlayState.isPropertyExpanded layerId side header overlayState))
         |> List.collect (fun header ->
+            let color =
+                railProjection.ColorByHeader
+                |> Map.tryFind header
+                |> Option.bind id
+                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
+
             groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
             |> List.choose (fun group ->
                 ConnectorMeasure.pathBetweenDistantHandles
@@ -329,6 +395,7 @@ module private ConnectorPaths =
                         (Some "4 4")
                         None
                         None
+                        color
                 )
             )
         )
@@ -340,16 +407,23 @@ module private ConnectorPaths =
 
     let private valueRailConnectionsForSide
         context
-        pairId
+        layerId
         (model: ProvenanceModel)
         side
         groups
         (railProjection: PropertyRails.RailProjection)
+        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         =
         railProjection.Headers
-        |> List.filter (fun header -> ConnectorOverlayState.isPropertyExpanded pairId side header overlayState)
+        |> List.filter (fun header -> ConnectorOverlayState.isPropertyExpanded layerId side header overlayState)
         |> List.collect (fun header ->
+            let color =
+                railProjection.ColorByHeader
+                |> Map.tryFind header
+                |> Option.bind id
+                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
+
             railProjection.ValuesByHeader
             |> Map.tryFind header
             |> Option.defaultValue []
@@ -369,6 +443,7 @@ module private ConnectorPaths =
                             (Some "4 4")
                             None
                             None
+                            color
                     )
                 )
             )
@@ -376,12 +451,13 @@ module private ConnectorPaths =
 
     let railConnections
         context
-        pairId
+        layerId
         model
         inputGroups
         outputGroups
         inputRailProjection
         outputRailProjection
+        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         showPropertyHeaderConnectors
         =
@@ -390,39 +466,43 @@ module private ConnectorPaths =
                 yield!
                     railConnectionsForSide
                         context
-                        pairId
+                        layerId
                         model
                         ProvenanceSide.Input
                         inputGroups
                         inputRailProjection
+                        colorByHeader
                         overlayState
 
                 yield!
                     railConnectionsForSide
                         context
-                        pairId
+                        layerId
                         model
                         ProvenanceSide.Output
                         outputGroups
                         outputRailProjection
+                        colorByHeader
                         overlayState
             yield!
                 valueRailConnectionsForSide
                     context
-                    pairId
+                    layerId
                     model
                     ProvenanceSide.Input
                     inputGroups
                     inputRailProjection
+                    colorByHeader
                     overlayState
             yield!
                 valueRailConnectionsForSide
                     context
-                    pairId
+                    layerId
                     model
                     ProvenanceSide.Output
                     outputGroups
                     outputRailProjection
+                    colorByHeader
                     overlayState
         ]
 
@@ -439,18 +519,20 @@ module private ConnectorPaths =
                     (Some "6 4")
                     None
                     None
+                    None
             )
         )
 
     let all
         context
-        pairId
+        layerId
         model
         inputGroups
         outputGroups
         connections
         inputRailProjection
         outputRailProjection
+        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         showPropertyHeaderConnectors
         =
@@ -458,16 +540,17 @@ module private ConnectorPaths =
             yield!
                 railConnections
                     context
-                    pairId
+                    layerId
                     model
                     inputGroups
                     outputGroups
                     inputRailProjection
                     outputRailProjection
+                    colorByHeader
                     overlayState
                     showPropertyHeaderConnectors
-            yield! groupConnections context pairId connections overlayState
-            yield! memberConnections context pairId model connections overlayState
+            yield! groupConnections context inputGroups outputGroups connections overlayState
+            yield! memberConnections context model inputGroups outputGroups connections overlayState
         ]
 
 module private ConnectorSvg =
@@ -479,6 +562,7 @@ module private ConnectorSvg =
     ]
 
     let strokeElements measured strokeWidth strokeOpacity debug =
+        let strokeColor = measured.Color |> Option.defaultValue "currentColor"
         let debugAttributes = debugAttributes debug measured
 
         [
@@ -497,13 +581,16 @@ module private ConnectorSvg =
             Svg.path [
                 svg.d measured.Path
                 svg.fill "none"
-                svg.stroke "currentColor"
+                svg.stroke strokeColor
                 svg.strokeWidth strokeWidth
                 svg.strokeLineCap "round"
                 svg.custom ("strokeOpacity", strokeOpacity)
                 svg.className measured.ClassName
                 match measured.StrokeDasharray with
                 | Some dash -> svg.custom ("strokeDasharray", dash)
+                | None -> ()
+                match measured.Color with
+                | Some color -> svg.custom ("data-provenance-color", color)
                 | None -> ()
                 if measured.InteractiveConnection.IsNone then
                     yield! debugAttributes
@@ -661,7 +748,7 @@ type ConnectorOverlay =
     static member Main
         (
             containerRef: IRefValue<HTMLElement option>,
-            pairId: ProvenancePairId,
+            layerId: ProvenanceLayerId,
             model: ProvenanceModel,
             inputGroups: DisplayGroup list,
             outputGroups: DisplayGroup list,
@@ -673,12 +760,14 @@ type ConnectorOverlay =
             liveDragStore: LiveDrag.Store,
             onSelect: DisplayConnection -> unit,
             ?onRemove: DisplayConnection -> unit,
-            ?debug: bool
+            ?debug: bool,
+            ?railColorByHeader: Map<ProvenancePropertyHeader, string option>
         ) =
         let paths, setPaths = React.useStateWithUpdater ([]: MeasuredConnector list)
         let hoveredKey, setHoveredKey = React.useState<string option> None
         let pendingFrame = React.useRef (None: float option)
         let debugEnabled = defaultArg debug false
+        let colorByHeader = defaultArg railColorByHeader Map.empty
 
         let setMeasuredPaths next =
             setPaths (fun current -> if current = next then current else next)
@@ -693,13 +782,14 @@ type ConnectorOverlay =
 
                 ConnectorPaths.all
                     context
-                    pairId
+                    layerId
                     model
                     inputGroups
                     outputGroups
                     connections
                     inputRailProjection
                     outputRailProjection
+                    colorByHeader
                     overlayState
                     showPropertyHeaderConnectors
                 |> setMeasuredPaths
@@ -746,7 +836,7 @@ type ConnectorOverlay =
                     )
             ),
             [|
-                box pairId
+                box layerId
                 box model
                 box inputGroups
                 box outputGroups
@@ -754,7 +844,6 @@ type ConnectorOverlay =
                 box inputRailProjection
                 box outputRailProjection
                 box overlayState.ExpandedGroup
-                box overlayState.ManualResolutionPairs
                 box overlayState.ExpandedProperties
                 box showPropertyHeaderConnectors
             |]

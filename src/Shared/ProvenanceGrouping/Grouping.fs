@@ -226,9 +226,12 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
     | activeAssignments ->
         let grouped = [
             for set in sets do
-                let keyValues = activeAssignments |> List.map (valuesForAssignment model side set)
+                let keyValues =
+                    activeAssignments
+                    |> List.map (valuesForAssignment model side set)
+                    |> List.filter (fun values -> values |> List.isEmpty |> not)
 
-                if keyValues |> List.exists List.isEmpty then
+                if keyValues.IsEmpty then
                     yield
                         groupId side [] set.Id,
                         set.TableName,

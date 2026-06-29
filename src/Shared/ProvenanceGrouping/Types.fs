@@ -4,8 +4,12 @@ module Swate.Components.Shared.ProvenanceGrouping.Types
 type ProvenanceTableName = string
 
 /// Optional process name from the source model.
-/// This is metadata for writeback/disambiguation, not a public process ID.
+/// This is display/logical metadata, not a unique process ID.
 type ProvenanceProcessName = string
+
+/// Optional stable source-model process identity for disambiguation/writeback.
+/// Adapters should keep generated row or object IDs here instead of appending them to `ProvenanceProcessName`.
+type ProvenanceProcessId = string
 
 /// Swate-local stable ID for one loaded input or output endpoint.
 /// The actual user-facing input/output name lives on `ProvenanceSet.Name`.
@@ -89,7 +93,9 @@ type ProvenancePropertyHeader = {
 type ProvenanceWritebackAnchor = {
     /// Source table containing the property value occurrence.
     TableName: ProvenanceTableName
-    /// Optional source process name when the adapter can provide one.
+    /// Optional source process ID when the adapter needs a unique process identity.
+    ProcessId: ProvenanceProcessId option
+    /// Optional source process name when the adapter can provide a logical/display name.
     ProcessName: ProvenanceProcessName option
     /// Property header to locate the source column/value family.
     Header: ProvenancePropertyHeader
@@ -178,6 +184,8 @@ type ProvenanceConnection = {
     Id: ProvenanceConnectionId
     /// Loaded table containing this editable connection.
     TableName: ProvenanceTableName
+    /// Optional process ID associated with this connection.
+    ProcessId: ProvenanceProcessId option
     /// Optional process name associated with this connection.
     ProcessName: ProvenanceProcessName option
     /// Loaded input endpoint ID.
