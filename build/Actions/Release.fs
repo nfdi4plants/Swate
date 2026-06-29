@@ -38,7 +38,8 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
                 ]
                 ProjectPaths.componentsPath
 
-        let cssFilePath = Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "swate-components.css")
+        let cssFilePath =
+            Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "swate-components.css")
 
         if not (System.IO.File.Exists(cssFilePath)) then
             failwithf "CSS file not found at %s" cssFilePath

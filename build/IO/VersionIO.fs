@@ -70,8 +70,12 @@ let updateVersionFiles (version: Changelog.Version) =
 
 let updateFSharpProjectVersions (version: Changelog.Version) =
     printGreenfn "Updating .fsproj files to version %O" version.Version
-    let componentsProjectPath = Path.Combine(ProjectInfo.ProjectPaths.componentsPath, "Swate.Components.fsproj")
-    let sharedProjectPath = Path.Combine(ProjectInfo.ProjectPaths.sharedPath, "Swate.Components.Core.fsproj")
+
+    let componentsProjectPath =
+        Path.Combine(ProjectInfo.ProjectPaths.componentsPath, "Swate.Components.fsproj")
+
+    let sharedProjectPath =
+        Path.Combine(ProjectInfo.ProjectPaths.sharedPath, "Swate.Components.Core.fsproj")
 
 
     let nextVersion = version.Version.ToString()
