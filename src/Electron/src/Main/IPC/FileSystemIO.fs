@@ -187,6 +187,8 @@ let mapRenameDiskError (sourcePath: string) (targetPath: string) (renameError: e
 [<RequireQualifiedAccess>]
 module ArcFileSystemHelper =
 
+    let private maxParallelExternalFileCopyWorkers = 16
+
     type CreateFileSystemItemPlan = {
         ParentPath: string
         TargetPath: string
@@ -256,6 +258,19 @@ module ArcFileSystemHelper =
     let private copyResolvedPathWithOptionsAsync sourceAbsolutePath targetAbsolutePath copyOptions = promise {
         do! mkdirAsync (Main.Bindings.Path.dirname targetAbsolutePath)
         do! Main.Bindings.Filesystem.cpAsync sourceAbsolutePath targetAbsolutePath copyOptions
+    }
+
+    let private copyResolvedFilePathAsync sourceAbsolutePath targetAbsolutePath overwrite = promise {
+        do! mkdirAsync (Main.Bindings.Path.dirname targetAbsolutePath)
+
+        if overwrite then
+            do! Main.Bindings.Filesystem.copyFileAsync sourceAbsolutePath targetAbsolutePath
+        else
+            do!
+                Main.Bindings.Filesystem.copyFileWithModeAsync
+                    sourceAbsolutePath
+                    targetAbsolutePath
+                    Main.Bindings.Filesystem.constants.COPYFILE_EXCL
     }
 
     let private copyResolvedPathOnDisk sourcePath targetPath sourceAbsolutePath targetAbsolutePath = promise {
@@ -396,13 +411,16 @@ module ArcFileSystemHelper =
         (request: CopyExternalFileRequest)
         : JS.Promise<Result<string, exn>> =
         promise {
+            let sourcePath =
+                request.sourceAbsolutePath |> Option.ofObj |> Option.defaultValue ""
+
+            let targetPath =
+                request.targetRelativePath |> PathHelpers.normalizeCanonicalRelativePath
+
+            let targetExistsMessage () =
+                $"Cannot copy '{sourcePath}' to '{targetPath}' because the destination already exists."
+
             try
-                let sourcePath =
-                    request.sourceAbsolutePath |> Option.ofObj |> Option.defaultValue ""
-
-                let targetPath =
-                    request.targetRelativePath |> PathHelpers.normalizeCanonicalRelativePath
-
                 if String.IsNullOrWhiteSpace sourcePath then
                     raise (exn "Source file path is required.")
 
@@ -426,36 +444,75 @@ module ArcFileSystemHelper =
                 let! targetExists = pathExistsAsync targetAbsolutePath
 
                 if targetExists && not request.overwrite then
-                    raise (
-                        exn
-                            $"Cannot copy '{request.sourceAbsolutePath}' to '{targetPath}' because the destination already exists."
-                    )
+                    raise (exn (targetExistsMessage ()))
 
-                do!
-                    copyResolvedPathWithOptionsAsync
-                        sourceAbsolutePath
-                        targetAbsolutePath
-                        (Main.Bindings.Filesystem.CpOptions(force = request.overwrite))
+                do! copyResolvedFilePathAsync sourceAbsolutePath targetAbsolutePath request.overwrite
 
                 return Ok targetPath
             with copyError ->
-                return Error copyError
+                match Main.Bindings.Node.tryGetErrorCode copyError with
+                | Some "EEXIST" when not request.overwrite -> return Error(exn (targetExistsMessage ()))
+                | _ -> return Error copyError
         }
+
+    let private getExternalFileCopyWorkerCount (fileCount: int) =
+        Main.Bindings.Node.cpus().Length * 2
+        |> max 1
+        |> min maxParallelExternalFileCopyWorkers
+        |> min fileCount
+
+    let private groupExternalFileCopyRequestIndexesByTarget (requests: CopyExternalFileRequest[]) =
+        requests
+        |> Array.mapi (fun requestIndex request ->
+            request.targetRelativePath |> PathHelpers.normalizeCanonicalRelativePath, requestIndex
+        )
+        |> Array.groupBy fst
+        |> Array.map (snd >> Array.map snd >> Array.sort)
 
     let copyExternalFilesToArcOnDisk
         (arcPath: string)
         (requests: CopyExternalFileRequest[])
         : JS.Promise<Result<string[], exn>> =
-        let rec copyNext copiedPaths remainingRequests = promise {
-            match remainingRequests with
-            | [] -> return Ok(copiedPaths |> List.rev |> List.toArray)
-            | request :: rest ->
-                match! copyExternalFileToArcOnDisk arcPath request with
-                | Ok copiedPath -> return! copyNext (copiedPath :: copiedPaths) rest
-                | Error copyError -> return Error copyError
-        }
+        promise {
+            if requests.Length = 0 then
+                return Ok [||]
+            else
+                let requestGroups = groupExternalFileCopyRequestIndexesByTarget requests
+                let workerCount = getExternalFileCopyWorkerCount requestGroups.Length
+                let copiedPaths = Array.zeroCreate<string> requests.Length
+                let mutable nextGroupIndex = 0
+                let mutable firstCopyError: exn option = None
 
-        requests |> Array.toList |> copyNext []
+                let canContinueCopying () = firstCopyError |> Option.isNone
+
+                let rememberCopyError copyError =
+                    if canContinueCopying () then
+                        firstCopyError <- Some copyError
+
+                let copyWorker () = promise {
+                    while nextGroupIndex < requestGroups.Length && canContinueCopying () do
+                        let requestIndexes = requestGroups.[nextGroupIndex]
+                        nextGroupIndex <- nextGroupIndex + 1
+
+                        let mutable groupRequestIndex = 0
+
+                        while groupRequestIndex < requestIndexes.Length && canContinueCopying () do
+                            let requestIndex = requestIndexes.[groupRequestIndex]
+                            groupRequestIndex <- groupRequestIndex + 1
+
+                            match! copyExternalFileToArcOnDisk arcPath requests.[requestIndex] with
+                            | Ok copiedPath -> copiedPaths.[requestIndex] <- copiedPath
+                            | Error copyError -> rememberCopyError copyError
+                }
+
+                let workerPromises = Array.init workerCount (fun _ -> copyWorker ())
+
+                let! _ = Fable.Core.JS.Constructors.Promise.all workerPromises
+
+                match firstCopyError with
+                | Some copyError -> return Error copyError
+                | None -> return Ok copiedPaths
+        }
 
     let tryBuildGenericRenamePlan (request: RenamePathRequest) : Result<RenamePlan, exn> =
         let requestedRelativePath =

@@ -6,6 +6,9 @@ open Fable.Core.JsInterop
 
 let childProcessDynamic: obj = importAll "node:child_process"
 
+[<Import("cpus", "node:os")>]
+let cpus () : obj[] = jsNative
+
 [<AllowNullLiteral>]
 type NodeError =
     abstract member code: string

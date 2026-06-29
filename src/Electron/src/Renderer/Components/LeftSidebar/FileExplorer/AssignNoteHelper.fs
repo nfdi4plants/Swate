@@ -254,7 +254,7 @@ let private moveAssignedAssets config target note targetFolderPath assets assetD
                     config.movePath {
                         sourceRelativePath = sourcePath
                         targetRelativePath = targetPath
-                        overwrite = false
+                        overwrite = true
                     }
 
                 match moveResult with
@@ -283,7 +283,7 @@ let assignNoteToTarget
                 config.copyFileSystemItem {
                     sourceRelativePath = note.SourceFolderPath
                     targetRelativePath = targetFolderPath
-                    overwrite = false
+                    overwrite = true
                 }
 
             match copyResult with

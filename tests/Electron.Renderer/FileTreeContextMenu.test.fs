@@ -799,6 +799,7 @@ Vitest.describe (
 
                 Vitest.expect(copyRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
                 Vitest.expect(copyRequests.[0].targetRelativePath).toBe ("assays/AssayA/protocols/Sampling_protocol")
+                Vitest.expect(copyRequests.[0].overwrite).toBe (true)
 
                 Vitest
                     .expect(moveRequests.[0].sourceRelativePath)
@@ -808,7 +809,71 @@ Vitest.describe (
                     .expect(moveRequests.[0].targetRelativePath)
                     .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
 
+                Vitest.expect(moveRequests.[0].overwrite).toBe (true)
                 Vitest.expect(moveRequests.Count).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "assignNoteToTarget refreshes the assigned note folder before moving selected assets",
+            fun () -> promise {
+                let target = {
+                    Name = "AssayA"
+                    Kind = NotesTargetKind.Assay
+                }
+
+                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+
+                let copyRequests = ResizeArray<CopyFileSystemItemRequest>()
+                let moveRequests = ResizeArray<MovePathRequest>()
+
+                let errors =
+                    ResizeArray<Swate.Components.Primitive.ErrorModal.Types.ErrorModalRequest>()
+
+                let mutable closed = false
+
+                let config: AssignNoteConfig = {
+                    closeDialog = fun () -> closed <- true
+                    setIsAssigning = ignore
+                    refreshGitStatus = ignore
+                    copyFileSystemItem =
+                        fun request -> promise {
+                            copyRequests.Add request
+                            return Ok()
+                        }
+                    movePath =
+                        fun request -> promise {
+                            moveRequests.Add request
+                            return Ok()
+                        }
+                    enqueueError = errors.Add
+                }
+
+                let assets = [
+                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+                ]
+
+                let selectedDestinations =
+                    [
+                        "notes/2026-06-15/Sampling_protocol/assets/data.csv", AssignNoteAssetDestination.Dataset
+                    ]
+                    |> Map.ofList
+
+                assignNoteToTarget config target note assets selectedDestinations
+                do! waitUntil ((fun () -> closed && copyRequests.Count = 1 && moveRequests.Count = 1), 50)
+
+                Vitest.expect(errors.Count).toBe (0)
+                Vitest.expect(copyRequests.[0].overwrite).toBe (true)
+
+                Vitest
+                    .expect(moveRequests.[0].sourceRelativePath)
+                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/data.csv")
+
+                Vitest
+                    .expect(moveRequests.[0].targetRelativePath)
+                    .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
+
+                Vitest.expect(moveRequests.[0].overwrite).toBe (true)
             }
         )
 
