@@ -8,7 +8,6 @@ open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Renderer.Components.LeftSidebar.FileExplorer.Types
 
 type AssignNoteConfig = {
     closeDialog: unit -> unit

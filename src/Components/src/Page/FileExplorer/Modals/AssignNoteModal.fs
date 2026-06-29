@@ -1,15 +1,15 @@
-namespace Renderer.Components.LeftSidebar.FileExplorer.Modals
+namespace Swate.Components.Page.FileExplorer.Modals
 
 open Fable.Core
 open Feliz
 open Swate.Components.Primitive.BaseModal
-open Renderer.Components.LeftSidebar.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 
 [<Erase; Mangle(false)>]
-type FileTreeAssignNoteModal =
+type AssignNoteModal =
 
     [<ReactComponent>]
-    static member Main
+    static member AssignNoteModal
         (
             isOpen: bool,
             itemName: string option,
@@ -85,7 +85,7 @@ type FileTreeAssignNoteModal =
                 prop.className "swt:flex swt:flex-col swt:gap-4 swt:w-full"
                 prop.children [
                     noteSelector
-                    FileTreeAssignNoteAssetSelector.Header(
+                    AssignNoteAssetSelector.Header(
                         availableAssets,
                         availableAssetDestinations,
                         assetDestinations,
@@ -96,7 +96,7 @@ type FileTreeAssignNoteModal =
             ]
 
         let assetRows =
-            FileTreeAssignNoteAssetSelector.Rows(
+            AssignNoteAssetSelector.Rows(
                 availableAssets,
                 availableAssetDestinations,
                 assetDestinations,

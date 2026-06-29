@@ -8,7 +8,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeAssignNoteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
-open Renderer.Components.LeftSidebar.FileExplorer.Modals
+open Swate.Components.Page.FileExplorer.Modals
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -604,7 +604,7 @@ Vitest.describe (
                 let! assayContainer, assayCleanup =
                     let availableDestinations = assignableAssetDestinationsForTarget assayTarget
 
-                    FileTreeAssignNoteAssetSelector.Main(
+                    AssignNoteAssetSelector.AssignNoteAssetSelector(
                         assets,
                         availableDestinations,
                         createDefaultAssetDestinations availableDestinations assets,
@@ -630,7 +630,7 @@ Vitest.describe (
                 let! studyContainer, studyCleanup =
                     let availableDestinations = assignableAssetDestinationsForTarget studyTarget
 
-                    FileTreeAssignNoteAssetSelector.Main(
+                    AssignNoteAssetSelector.AssignNoteAssetSelector(
                         assets,
                         availableDestinations,
                         createDefaultAssetDestinations availableDestinations assets,
@@ -679,7 +679,7 @@ Vitest.describe (
                 let updates = ResizeArray<string * AssignNoteAssetDestination option>()
 
                 let! container, cleanup =
-                    FileTreeAssignNoteAssetSelector.Main(
+                    AssignNoteAssetSelector.AssignNoteAssetSelector(
                         assets,
                         availableDestinations,
                         assetDestinations,
