@@ -156,6 +156,27 @@ Vitest.describe (
         )
 
         Vitest.test (
+            "fileExtensionsFromAcceptTypes maps image wildcard accepts to image picker extensions",
+            fun () ->
+                match fileExtensionsFromAcceptTypes (Some "image/*") with
+                | Some extensions -> Vitest.expect(extensions).toEqual (imageFileExtensions)
+                | None -> failwith "Expected image wildcard accept types to produce image extensions."
+        )
+
+        Vitest.test (
+            "fileExtensionsFromAcceptTypes maps explicit extension accepts and ignores mime-only tokens",
+            fun () ->
+                match fileExtensionsFromAcceptTypes (Some ".png, image/jpeg, .SVG") with
+                | Some extensions -> Vitest.expect(extensions).toEqual ([| "png"; "svg" |])
+                | None -> failwith "Expected explicit accept types to produce picker extensions."
+        )
+
+        Vitest.test (
+            "fileExtensionsFromAcceptTypes returns no picker filter for empty accepts",
+            fun () -> Vitest.expect(fileExtensionsFromAcceptTypes None).toEqual (None)
+        )
+
+        Vitest.test (
             "createAssetFilePickerAdapter resolves selected images and tracks copy source",
             fun () -> promise {
                 let mutable pendingAssets = []
@@ -171,7 +192,7 @@ Vitest.describe (
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
 
-                let! pickedFiles = adapter.PickFiles()
+                let! pickedFiles = adapter.PickFiles { AcceptTypes = Some "image/*" }
 
                 match requestedExtensions with
                 | Some extensions -> Vitest.expect(extensions).toEqual (imageFileExtensions)
@@ -203,7 +224,7 @@ Vitest.describe (
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
 
-                let! pickedFiles = adapter.PickFiles()
+                let! pickedFiles = adapter.PickFiles { AcceptTypes = Some "image/*" }
                 Vitest.expect(pickedFiles.Length).toBe (2)
                 Vitest.expect(pickedFiles.[0].Name).toBe ("diagram-a.png")
                 Vitest.expect(pickedFiles.[1].Name).toBe ("diagram-b.jpg")

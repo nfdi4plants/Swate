@@ -1,10 +1,10 @@
-namespace Renderer.Components.LeftSidebar.FileExplorer.Modals
+namespace Swate.Components.Page.FileExplorer.Modals
 
 open Fable.Core
 open Feliz
-open Renderer.Components.LeftSidebar.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 
-module private AssignNoteAssetSelector =
+module private AssignNoteAssetSelectorHelper =
 
     [<Literal>]
     let MixedHeaderValue = "__mixed__"
@@ -36,26 +36,28 @@ module private AssignNoteAssetSelector =
         | [ selectedValue ] -> selectedValue
         | _ -> MixedHeaderValue
 
-    let destinationOptions availableDestinations includeMixedOption = [
-        if includeMixedOption then
-            Html.option [
-                prop.value MixedHeaderValue
-                prop.disabled true
-                prop.text "Mixed"
-            ]
-
-        Html.option [ prop.value ""; prop.text "Do not assign" ]
-
-        for destination in availableDestinations do
-            Html.option [
-                prop.key (string destination)
-                prop.value (string destination)
-                prop.text (destination.ToString())
-            ]
-    ]
-
 [<Erase; Mangle(false)>]
-type FileTreeAssignNoteAssetSelector =
+type AssignNoteAssetSelector =
+
+    [<ReactComponent>]
+    static member DestinationOptions(availableDestinations: AssignNoteAssetDestination list, includeMixedOption: bool) =
+        React.Fragment [
+            if includeMixedOption then
+                Html.option [
+                    prop.value AssignNoteAssetSelectorHelper.MixedHeaderValue
+                    prop.disabled true
+                    prop.text "Mixed"
+                ]
+
+            Html.option [ prop.value ""; prop.text "Do not assign" ]
+
+            for destination in availableDestinations do
+                Html.option [
+                    prop.key (string destination)
+                    prop.value (string destination)
+                    prop.text (destination.ToString())
+                ]
+        ]
 
     [<ReactComponent>]
     static member Header
@@ -73,10 +75,10 @@ type FileTreeAssignNoteAssetSelector =
             Html.none
         else
             let headerSelectedValue =
-                AssignNoteAssetSelector.headerSelectedValue assets assetDestinations
+                AssignNoteAssetSelectorHelper.headerSelectedValue assets assetDestinations
 
             let tryParseDestinationValue =
-                AssignNoteAssetSelector.tryParseDestinationValue availableDestinations
+                AssignNoteAssetSelectorHelper.tryParseDestinationValue availableDestinations
 
             Html.div [
                 prop.className "swt:grid swt:grid-cols-[minmax(0,1fr)_9rem] swt:gap-2 swt:items-center"
@@ -99,11 +101,12 @@ type FileTreeAssignNoteAssetSelector =
                                     setAssetDestination asset.SourceRelativePath selectedDestination
                             | None -> ()
                         )
-                        prop.children (
-                            AssignNoteAssetSelector.destinationOptions
-                                availableDestinations
-                                (headerSelectedValue = AssignNoteAssetSelector.MixedHeaderValue)
-                        )
+                        prop.children [
+                            AssignNoteAssetSelector.DestinationOptions(
+                                availableDestinations,
+                                (headerSelectedValue = AssignNoteAssetSelectorHelper.MixedHeaderValue)
+                            )
+                        ]
                     ]
                 ]
             ]
@@ -124,10 +127,10 @@ type FileTreeAssignNoteAssetSelector =
             Html.none
         else
             let selectedValueForAsset =
-                AssignNoteAssetSelector.selectedValueForAsset assetDestinations
+                AssignNoteAssetSelectorHelper.selectedValueForAsset assetDestinations
 
             let tryParseDestinationValue =
-                AssignNoteAssetSelector.tryParseDestinationValue availableDestinations
+                AssignNoteAssetSelectorHelper.tryParseDestinationValue availableDestinations
 
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:gap-2"
@@ -156,9 +159,9 @@ type FileTreeAssignNoteAssetSelector =
                                             setAssetDestination asset.SourceRelativePath selectedDestination
                                         | None -> ()
                                     )
-                                    prop.children (
-                                        AssignNoteAssetSelector.destinationOptions availableDestinations false
-                                    )
+                                    prop.children [
+                                        AssignNoteAssetSelector.DestinationOptions(availableDestinations, false)
+                                    ]
                                 ]
                             ]
                         ]
@@ -166,7 +169,7 @@ type FileTreeAssignNoteAssetSelector =
             ]
 
     [<ReactComponent>]
-    static member Main
+    static member AssignNoteAssetSelector
         (
             assets: ResizeArray<AssignableNoteAssetRef>,
             availableDestinations: AssignNoteAssetDestination list,
@@ -183,7 +186,7 @@ type FileTreeAssignNoteAssetSelector =
             Html.div [
                 prop.className "swt:flex swt:flex-col swt:gap-2"
                 prop.children [
-                    FileTreeAssignNoteAssetSelector.Header(
+                    AssignNoteAssetSelector.Header(
                         assets,
                         availableDestinations,
                         assetDestinations,
@@ -191,7 +194,7 @@ type FileTreeAssignNoteAssetSelector =
                         isAssigning
                     )
 
-                    FileTreeAssignNoteAssetSelector.Rows(
+                    AssignNoteAssetSelector.Rows(
                         assets,
                         availableDestinations,
                         assetDestinations,

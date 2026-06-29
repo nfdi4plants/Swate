@@ -8,7 +8,6 @@ open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
-open Renderer.Components.LeftSidebar.FileExplorer.Types
 
 type AssignNoteConfig = {
     closeDialog: unit -> unit
@@ -255,7 +254,7 @@ let private moveAssignedAssets config target note targetFolderPath assets assetD
                     config.movePath {
                         sourceRelativePath = sourcePath
                         targetRelativePath = targetPath
-                        overwrite = false
+                        overwrite = true
                     }
 
                 match moveResult with
@@ -284,7 +283,7 @@ let assignNoteToTarget
                 config.copyFileSystemItem {
                     sourceRelativePath = note.SourceFolderPath
                     targetRelativePath = targetFolderPath
-                    overwrite = false
+                    overwrite = true
                 }
 
             match copyResult with

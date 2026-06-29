@@ -1,6 +1,7 @@
 module Swate.Components.Page.FileExplorer.Types
 
 open System
+open Fable.Core
 open Feliz
 
 [<RequireQualifiedAccess>]
@@ -105,6 +106,22 @@ type DirectoryInteractionMode =
     | OpenOnDoubleClickCloseOnSingleClick
     | ToggleOnSingleClickSelectOnDoubleClick
 
+type AssignableNoteRef = {
+    SourceFolderPath: string
+    NoteFolderName: string
+    Label: string
+}
+
+[<RequireQualifiedAccess; StringEnum(CaseRules.LowerAll)>]
+type AssignNoteAssetDestination =
+    | Protocol
+    | Dataset
+    | Resource
+
+type AssignableNoteAssetRef = {
+    SourceRelativePath: string
+    RelativeAssetPath: string
+}
 
 // ============================================================================
 // FILE TREE OPERATIONS

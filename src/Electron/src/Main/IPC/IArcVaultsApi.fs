@@ -533,6 +533,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    /// Copies one or more files from the host filesystem into the ARC's filesystem.
     copyExternalFilesToArc =
         fun (requests: CopyExternalFileRequest[]) -> promise {
             try
@@ -676,6 +677,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    /// Copies a file or folder from one location to another within the ARC's filesystem.
     copyFileSystemItem =
         fun (request: CopyFileSystemItemRequest) -> promise {
             try

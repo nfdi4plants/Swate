@@ -219,7 +219,11 @@ type TextInputWithMarkdown =
                 match filePickerAdapter with
                 | Some adapter ->
                     // Preferred substitution point for runtime-specific file pickers.
-                    let! files = adapter.PickFiles()
+                    let! files =
+                        adapter.PickFiles {
+                            AcceptTypes = PluginTextInputHelpers.activePromptAcceptTypes activePrompt
+                        }
+
                     applyPickedPromptFiles files
                 | None ->
                     // Built-in fallback: standard browser file input dialog.

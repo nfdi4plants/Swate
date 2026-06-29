@@ -44,8 +44,8 @@ module PluginTextInputHelpers =
             | Some lastFile -> [ lastFile ]
             | None -> []
 
-    let private acceptedTypeTokens (activePrompt: MarkdownPromptPlugin option) =
-        activePromptAcceptTypes activePrompt
+    let acceptTypeTokens (acceptTypes: string option) =
+        acceptTypes
         |> Option.defaultValue ""
         |> fun accept ->
             accept.Split(',')
@@ -72,7 +72,7 @@ module PluginTextInputHelpers =
             not (String.IsNullOrWhiteSpace mimeLower) && mimeLower = token
 
     let partitionFilesByAccept (activePrompt: MarkdownPromptPlugin option) (files: MarkdownPromptFile list) =
-        let tokens = acceptedTypeTokens activePrompt
+        let tokens = activePromptAcceptTypes activePrompt |> acceptTypeTokens
 
         if List.isEmpty tokens then
             files, []
