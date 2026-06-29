@@ -53,10 +53,7 @@ let internal fileExtensionsFromAcceptTypes (acceptTypes: string option) =
         )
         |> Array.distinct
 
-    if extensions.Length = 0 then
-        None
-    else
-        Some extensions
+    if extensions.Length = 0 then None else Some extensions
 
 let private isAlreadyExistsError (error: exn) =
     error.Message.ToLowerInvariant().Contains("already exists")
