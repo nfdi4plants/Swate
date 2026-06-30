@@ -87,7 +87,7 @@ let private loadedSets (model: ProvenanceModel) side =
 
     source
     |> mapValues
-    |> List.filter (fun set -> set.TableName = model.LoadedTableName)
+    |> List.filter (fun set -> set.Source.Id = model.Source.Id)
     |> List.sortBy (fun set -> set.Name, set.Id)
 
 let private setPropertyValues (model: ProvenanceModel) (set: ProvenanceSet) =
@@ -138,12 +138,9 @@ let private combineValueSets key valueSets : GroupingValue list list =
 let private connectedOutputSets model inputSetId =
     model.Connections
     |> mapValues
-    |> List.filter (fun connection ->
-        connection.TableName = model.LoadedTableName
-        && connection.InputSetId = inputSetId
-    )
+    |> List.filter (fun connection -> connection.Source.Id = model.Source.Id && connection.InputSetId = inputSetId)
     |> List.choose (fun connection -> model.OutputSets.TryFind connection.OutputSetId)
-    |> List.filter (fun set -> set.TableName = model.LoadedTableName)
+    |> List.filter (fun set -> set.Source.Id = model.Source.Id)
 
 let private inheritedOutputValuesForKey model inputSetId key =
     connectedOutputSets model inputSetId
@@ -216,7 +213,7 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
         sets
         |> List.map (fun set -> {
             Id = groupId side [] set.Id
-            TableName = set.TableName
+            TableName = set.Source.Name
             Side = side
             GroupingValues = []
             Members = [
@@ -234,7 +231,7 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
                 if keyValues.IsEmpty then
                     yield
                         groupId side [] set.Id,
-                        set.TableName,
+                        set.Source.Name,
                         [],
                         displayMember set (ProvenanceSet.effectivePropertyValueIds set)
                 else
@@ -250,7 +247,7 @@ let displayGroupsForAssignments (model: ProvenanceModel) side assignments =
 
                         yield
                             groupId side groupingValues set.Id,
-                            set.TableName,
+                            set.Source.Name,
                             groupingValues,
                             displayMember set (ProvenanceSet.effectivePropertyValueIds set)
         ]
@@ -294,7 +291,7 @@ let displayConnections (model: ProvenanceModel) inputGroups outputGroups =
 
         model.Connections
         |> mapValues
-        |> List.filter (fun connection -> connection.TableName = model.LoadedTableName)
+        |> List.filter (fun connection -> connection.Source.Id = model.Source.Id)
         |> List.collect (fun connection ->
             match
                 inputGroupBySetId.TryFind connection.InputSetId, outputGroupBySetId.TryFind connection.OutputSetId
