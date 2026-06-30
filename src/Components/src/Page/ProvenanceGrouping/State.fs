@@ -95,14 +95,54 @@ module PropertyColors =
 
     let empty = {
         ManualPropertyColors = Map.empty
-        LayerColors = Map.empty
-        FolderColors = Map.empty
+        SourceColors = Map.empty
+        SourceColorSetOrder = Map.empty
+        NextSourceColorSetOrder = 0
     }
 
     let private automaticColorForLayer layerIndex = palette.[layerIndex % palette.Length]
 
-    let setColor (header: ProvenancePropertyHeader) color state =
-        let key = Keys.groupingKey header
+    let private layerOrderIndex session layerId =
+        session.LayerOrder
+        |> List.tryFindIndex ((=) layerId)
+        |> Option.defaultValue System.Int32.MaxValue
+
+    let visibleColorContextForLayer (session: ProvenanceSession) (layer: ProvenanceLayer) =
+        let incomingByTargetLayer =
+            session.ReferenceLinks
+            |> List.groupBy (fun link -> link.Target.LayerId)
+            |> Map.ofList
+
+        let rec rootLayerId currentLayerId visited =
+            if visited |> Set.contains currentLayerId then
+                currentLayerId
+            else
+                match incomingByTargetLayer |> Map.tryFind currentLayerId with
+                | None -> currentLayerId
+                | Some links ->
+                    links
+                    |> List.map (fun link -> link.Source.LayerId)
+                    |> List.distinct
+                    |> List.sortBy (layerOrderIndex session)
+                    |> List.tryHead
+                    |> Option.map (fun sourceLayerId -> rootLayerId sourceLayerId (visited |> Set.add currentLayerId))
+                    |> Option.defaultValue currentLayerId
+
+        let rootId = rootLayerId layer.Id Set.empty
+        let rootLayer = Session.layerById rootId session
+
+        {
+            Id = rootLayer.Id
+            DefaultSourceId = rootLayer.Model.Source.Id
+        }
+
+    let private visiblePropertyColorKey contextId header = {
+        ContextId = contextId
+        Header = header
+    }
+
+    let setColor contextId (header: ProvenancePropertyHeader) color state =
+        let key = visiblePropertyColorKey contextId header
 
         {
             state with
@@ -112,8 +152,8 @@ module PropertyColors =
                 }
         }
 
-    let clearColor (header: ProvenancePropertyHeader) state =
-        let key = Keys.groupingKey header
+    let clearColor contextId (header: ProvenancePropertyHeader) state =
+        let key = visiblePropertyColorKey contextId header
 
         {
             state with
@@ -123,60 +163,81 @@ module PropertyColors =
                 }
         }
 
-    let setLayerColor (layerId: ProvenanceLayerId) color state = {
+    let setSourceColor (sourceId: ProvenanceSourceId) color state =
+        let setOrder = state.PropertyColors.NextSourceColorSetOrder
+
+        {
+            state with
+                PropertyColors = {
+                    state.PropertyColors with
+                        SourceColors = state.PropertyColors.SourceColors |> Map.add sourceId color
+                        SourceColorSetOrder = state.PropertyColors.SourceColorSetOrder |> Map.add sourceId setOrder
+                        NextSourceColorSetOrder = setOrder + 1
+                }
+        }
+
+    let clearSourceColor (sourceId: ProvenanceSourceId) state = {
         state with
             PropertyColors = {
                 state.PropertyColors with
-                    LayerColors = state.PropertyColors.LayerColors |> Map.add layerId color
+                    SourceColors = state.PropertyColors.SourceColors |> Map.remove sourceId
+                    SourceColorSetOrder = state.PropertyColors.SourceColorSetOrder |> Map.remove sourceId
             }
     }
 
-    let clearLayerColor (layerId: ProvenanceLayerId) state = {
-        state with
-            PropertyColors = {
-                state.PropertyColors with
-                    LayerColors = state.PropertyColors.LayerColors |> Map.remove layerId
-            }
-    }
+    let private anchorOfOrigin =
+        function
+        | ProvenancePropertyOrigin.Real anchor
+        | ProvenancePropertyOrigin.Virtual anchor -> anchor
 
-    let setFolderColor folderId color state = {
-        state with
-            PropertyColors = {
-                state.PropertyColors with
-                    FolderColors = state.PropertyColors.FolderColors |> Map.add folderId color
-            }
-    }
+    let private sourceIdOfPropertyValue propertyValue =
+        (anchorOfOrigin propertyValue.Origin).Source.Id
 
-    let clearFolderColor folderId state = {
-        state with
-            PropertyColors = {
-                state.PropertyColors with
-                    FolderColors = state.PropertyColors.FolderColors |> Map.remove folderId
-            }
-    }
+    let ensureSourceColors (session: ProvenanceSession) (state: UiState) : PropertyColorSettings =
+        let orderedSourceIds =
+            [
+                for layer in session.Layers do
+                    yield layer.Model.Source.Id
 
-    let ensureLayerColors (session: ProvenanceSession) (state: UiState) : PropertyColorSettings =
-        let liveLayerIds = session.LayerOrder |> Set.ofList
+                    yield!
+                        layer.Model.PropertyValues
+                        |> Map.toList
+                        |> List.map (snd >> sourceIdOfPropertyValue)
+
+                yield!
+                    state.PaletteValues
+                    |> Map.toList
+                    |> List.collect snd
+                    |> List.map sourceIdOfPropertyValue
+            ]
+            |> List.distinct
+
+        let liveSources = orderedSourceIds |> Set.ofList
 
         let retained =
-            state.PropertyColors.LayerColors
-            |> Map.filter (fun layerId _ -> liveLayerIds.Contains layerId)
+            state.PropertyColors.SourceColors
+            |> Map.filter (fun sourceId _ -> liveSources.Contains sourceId)
+
+        let retainedSetOrder =
+            state.PropertyColors.SourceColorSetOrder
+            |> Map.filter (fun sourceId _ -> liveSources.Contains sourceId)
 
         let withMissingDefaults =
-            session.LayerOrder
-            |> List.mapi (fun index layerId -> layerId, automaticColorForLayer index)
+            orderedSourceIds
+            |> List.mapi (fun index sourceId -> sourceId, automaticColorForLayer index)
             |> List.fold
-                (fun (colors: Map<ProvenanceLayerId, ProvenanceColor>) (layerId, color) ->
-                    if colors.ContainsKey layerId then
+                (fun (colors: Map<ProvenanceSourceId, ProvenanceColor>) (sourceId, color) ->
+                    if colors.ContainsKey sourceId then
                         colors
                     else
-                        colors |> Map.add layerId color
+                        colors |> Map.add sourceId color
                 )
                 retained
 
         {
             state.PropertyColors with
-                LayerColors = withMissingDefaults
+                SourceColors = withMissingDefaults
+                SourceColorSetOrder = retainedSetOrder
         }
 
 module Filters =
@@ -282,7 +343,7 @@ module Sides =
             state.PendingMemberResolution
             |> Option.filter (fun pending -> currentLayerIds.Contains pending.LayerId)
 
-        let propertyColors = PropertyColors.ensureLayerColors session state
+        let propertyColors = PropertyColors.ensureSourceColors session state
 
         if
             sideStates = state.SideStates
@@ -457,15 +518,24 @@ module Palette =
 
         loop (existing.Count + 1)
 
-    let addValue layerId side header value unit state =
+    let addValue layerId source side header value unit state =
         let key = Keys.paletteKey layerId side
+
+        let anchor = {
+            Source = source
+            ProcessId = None
+            ProcessName = None
+            Header = header
+            InputNames = []
+            OutputNames = []
+        }
 
         let propertyValue: ProvenancePropertyValue = {
             Id = nextValueId layerId side state
             Header = header
             Value = value
             Unit = unit
-            Source = None
+            Origin = ProvenancePropertyOrigin.Virtual anchor
         }
 
         let nextValues = valuesForSide layerId side state @ [ propertyValue ]

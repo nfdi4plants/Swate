@@ -93,10 +93,23 @@ type PendingMemberResolution = {
 
 type ProvenanceColor = string
 
+type ProvenanceColorContextId = string
+
+type VisiblePropertyColorContext = {
+    Id: ProvenanceColorContextId
+    DefaultSourceId: ProvenanceSourceId
+}
+
+type VisiblePropertyColorKey = {
+    ContextId: ProvenanceColorContextId
+    Header: ProvenancePropertyHeader
+}
+
 type PropertyColorSettings = {
-    ManualPropertyColors: Map<GroupingKey, ProvenanceColor>
-    LayerColors: Map<ProvenanceLayerId, ProvenanceColor>
-    FolderColors: Map<string, ProvenanceColor>
+    ManualPropertyColors: Map<VisiblePropertyColorKey, ProvenanceColor>
+    SourceColors: Map<ProvenanceSourceId, ProvenanceColor>
+    SourceColorSetOrder: Map<ProvenanceSourceId, int>
+    NextSourceColorSetOrder: int
 }
 
 [<RequireQualifiedAccess>]
@@ -123,8 +136,7 @@ type PropertyOriginFilter =
     | AnyOrigin
     | CurrentOnly
     | AnyUpstream
-    | UpstreamLayer of ProvenanceLayerId
-    | PreviousContext of tableName: ProvenanceTableName * processName: ProvenanceProcessName option
+    | Source of ProvenanceSourceId
 
 type FilterState = {
     SearchText: string
