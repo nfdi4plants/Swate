@@ -93,8 +93,8 @@ type InputSequence =
             let over = event.over
 
             if isNull over |> not && active.id <> over.id then
-                let oldIndex = getIndexFromId active.id
-                let newIndex = getIndexFromId over.id
+                let oldIndex = getIndexFromId (string active.id)
+                let newIndex = getIndexFromId (string over.id)
 
                 if oldIndex >= 0 && newIndex >= 0 then
                     DndKit.arrayMove (inputs, oldIndex, newIndex) |> validateSetter

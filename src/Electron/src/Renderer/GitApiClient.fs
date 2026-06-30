@@ -50,6 +50,9 @@ let previewGitPull (request: GitRemoteOperationRequest) =
 
 let gitPush (request: GitRemoteOperationRequest) = callIpcWith request (gitApi.gitPush)
 
+let gitCancelPush () =
+    callIpc (fun () -> gitApi.gitCancelPush ())
+
 let gitInitRepository (targetPath: string) = promise {
     let! result = gitApi.gitInitRepository targetPath
 

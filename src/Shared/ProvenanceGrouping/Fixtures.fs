@@ -30,6 +30,7 @@ let propertyHeader kind name = { Kind = kind; Category = term name }
 
 let anchor tableName processName header inputNames outputNames : ProvenanceWritebackAnchor = {
     TableName = tableName
+    ProcessId = None
     ProcessName = processName
     Header = header
     InputNames = inputNames
@@ -65,6 +66,7 @@ let outputSet id tableName header name propertyValueIds : ProvenanceSet = {
 let connection id tableName processName inputSetId outputSetId : ProvenanceConnection = {
     Id = id
     TableName = tableName
+    ProcessId = None
     ProcessName = processName
     InputSetId = inputSetId
     OutputSetId = outputSetId

@@ -4,9 +4,19 @@ open ARCtrl
 open ARCtrl.Contract
 open ARCtrl.Helper
 open ARCtrl.Spreadsheet
+open Main.Notes.NoteConstants
 
 [<AutoOpen>]
 module ArcWriteExtensions =
+
+    let private notesReadmeContract =
+        let path = ArcPathHelper.combine NotesRootFolderName NotesReadmeFileName
+        Contract.createCreate (path, DTOType.PlainText, DTO.Text NotesReadmeContent)
+
+    let private swateScaffoldContracts = [|
+        ARCtrl.Contract.Git.gitignoreContract
+        notesReadmeContract
+    |]
 
     let private collectionGitKeepContracts =
         [|
@@ -137,6 +147,7 @@ module ArcWriteExtensions =
             | None -> ()
 
             [|
+                yield! swateScaffoldContracts
                 yield! collectionGitKeepContracts
 
                 for entry in filemap do

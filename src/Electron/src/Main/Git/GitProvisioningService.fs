@@ -209,13 +209,26 @@ let private cloneWithGit
 // after clone via a separate `git lfs pull` step (see hydrateClonedLfsContent).
 let private applyCloneSkipSmudge (git: ISimpleGit) = git.env (GitLfsSkipSmudgeEnvKey, "1")
 
-let private hydrateClonedLfsContent (git: ISimpleGit) : JS.Promise<GitService.GitResult<unit>> =
-    runSimpleGit
-        (fun currentGit -> promise {
-            let! _ = currentGit.raw [| "lfs"; "pull" |]
-            return ()
-        })
-        git
+let private createCloneLfsCommandAuth host tokenOption remoteUrl =
+    match
+        tokenOption
+        |> Option.filter (fun token -> not (String.IsNullOrWhiteSpace token))
+    with
+    | Some token -> createCommandAuthentication host token (Some "origin") (Some remoteUrl)
+    | None -> {
+        ConfigArgs = [||]
+        Environment = createNonInteractiveEnv ()
+      }
+
+let private hydrateClonedLfsContent
+    (repoPath: string)
+    (commandAuth: GitCommandAuthentication)
+    : JS.Promise<GitService.GitResult<unit>> =
+    promise {
+        match! GitLfsService.pullAll repoPath commandAuth None with
+        | Ok() -> return Ok()
+        | Error error -> return errorResult error
+    }
 
 let private persistCloneDownloadPreference
     (repoPath: string)
@@ -391,51 +404,20 @@ let cloneRepository
                                                     | Error failure -> return Error failure
                                                     | Ok() when not downloadLargeFiles -> return cloneResult
                                                     | Ok() ->
-                                                        let repoOptions =
-                                                            createOptions normalizedTargetPath syncTimeout progress
+                                                        GitInternals.reportPhase
+                                                            progress
+                                                            "lfs"
+                                                            "Downloading Git LFS files"
 
-                                                        let hydrateGitResult =
-                                                            try
-                                                                match
-                                                                    tokenOption
-                                                                    |> Option.filter (fun token ->
-                                                                        not (String.IsNullOrWhiteSpace token)
-                                                                    )
-                                                                with
-                                                                | Some token ->
-                                                                    Ok(
-                                                                        applyAuth
-                                                                            (fun options ->
-                                                                                createGit options
-                                                                                |> withGitOutputProgress progress
-                                                                            )
-                                                                            repoOptions
-                                                                            host
-                                                                            token
-                                                                            (Some "origin")
-                                                                            (Some safeRemoteUrl)
-                                                                    )
-                                                                | None ->
-                                                                    Ok(
-                                                                        createGit repoOptions
-                                                                        |> withGitOutputProgress progress
-                                                                    )
-                                                            with authError ->
-                                                                Error authError
+                                                        let commandAuth =
+                                                            createCloneLfsCommandAuth host tokenOption safeRemoteUrl
 
-                                                        match hydrateGitResult with
-                                                        | Error authError -> return errorResult authError
-                                                        | Ok hydrateGit ->
-                                                            GitInternals.reportPhase
-                                                                progress
-                                                                "lfs"
-                                                                "Downloading Git LFS files"
+                                                        let! hydrateResult =
+                                                            hydrateClonedLfsContent normalizedTargetPath commandAuth
 
-                                                            let! hydrateResult = hydrateClonedLfsContent hydrateGit
-
-                                                            match hydrateResult with
-                                                            | Ok() -> return cloneResult
-                                                            | Error failure -> return Error failure
+                                                        match hydrateResult with
+                                                        | Ok() -> return cloneResult
+                                                        | Error failure -> return Error failure
                                             }
 
                                             match tokenResult with

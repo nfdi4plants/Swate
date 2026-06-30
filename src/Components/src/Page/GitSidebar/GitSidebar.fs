@@ -262,9 +262,27 @@ type GitSidebar =
             ?warningNotice: string,
             ?busyTestId: string,
             ?errorTestId: string,
-            ?warningTestId: string
+            ?warningTestId: string,
+            ?onCancelOperation: unit -> unit
         ) =
         let runStatus = defaultArg runStatus GitSidebarRunStatus.Idle
+
+        let cancelButton =
+            onCancelOperation
+            |> Option.map (fun cancel ->
+                Html.button [
+                    prop.testId "GitSidebarCancelOperationButton"
+                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:shrink-0 swt:gap-1 swt:normal-case"
+                    prop.title "Cancel"
+                    prop.onClick (fun _ -> cancel ())
+                    prop.children [
+                        Html.span [
+                            prop.className "swt:iconify swt:fluent--dismiss-circle-24-regular swt:size-4"
+                        ]
+                        Html.span [ prop.text "Cancel" ]
+                    ]
+                ]
+            )
 
         React.Fragment [
             match runStatus with
@@ -339,6 +357,9 @@ type GitSidebar =
                                         | None -> Html.none
                                     ]
                                 ]
+                                match cancelButton with
+                                | Some button -> button
+                                | None -> Html.none
                             ]
                         ]
                     ]
@@ -360,6 +381,9 @@ type GitSidebar =
                                     prop.className "swt:min-w-0 swt:wrap-anywhere"
                                     prop.text notice
                                 ]
+                                match cancelButton with
+                                | Some button -> button
+                                | None -> Html.none
                             ]
                         ]
                     ]
@@ -584,8 +608,8 @@ type GitSidebar =
                                 prop.testId "GitSidebarOpenRemoteRepositoryButton"
                                 prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-sm swt:shrink-0"
                                 prop.disabled (props.IsBusy || not props.CanOpenRemoteRepository)
-                                prop.title "Open origin repository"
-                                prop.ariaLabel "Open origin repository"
+                                prop.title "Open ARC in DataHUB"
+                                prop.ariaLabel "Open ARC in DataHUB"
                                 prop.onClick (fun _ -> props.OnOpenRemoteRepository())
                                 prop.children [
                                     Html.span [
@@ -1606,6 +1630,7 @@ type GitSidebar =
             ?remoteActionsEnabled: bool,
             ?remoteActionsWarning: string,
             ?canOpenRemoteRepository: bool,
+            ?canCancelOperation: bool,
             ?onOpenRemoteRepository: unit -> unit,
             ?onSubmitPublishRename: string -> unit,
             ?onCancelPublishRename: unit -> unit
@@ -1619,6 +1644,7 @@ type GitSidebar =
         let remoteActionsEnabled = defaultArg remoteActionsEnabled true
         let remoteActionsWarning = remoteActionsWarning
         let canOpenRemoteRepository = defaultArg canOpenRemoteRepository false
+        let canCancelOperation = defaultArg canCancelOperation false
         let onOpenRemoteRepository = defaultArg onOpenRemoteRepository (fun () -> ())
         let onSubmitPublishRename = defaultArg onSubmitPublishRename (fun _ -> ())
         let onCancelPublishRename = defaultArg onCancelPublishRename (fun () -> ())
@@ -1640,6 +1666,7 @@ type GitSidebar =
         let onCreateBranch = callbacks.OnCreateBranch
         let onSwitchBranch = callbacks.OnSwitchBranch
         let onSelectChange = callbacks.OnSelectChange
+        let onCancelOperation = callbacks.OnCancelOperation
 
         let localError, setLocalError = React.useState (None: string option)
         let activeDialog, setActiveDialog = React.useState ActiveDialog.None
@@ -1978,7 +2005,12 @@ type GitSidebar =
                     ?errorNotice = visibleError,
                     ?warningNotice = warningNotice,
                     busyTestId = "GitSidebarProgressNotice",
-                    errorTestId = "GitSidebarErrorNotice"
+                    errorTestId = "GitSidebarErrorNotice",
+                    ?onCancelOperation =
+                        (if canCancelOperation && isBusy then
+                             Some onCancelOperation
+                         else
+                             None)
                 )
 
                 GitSidebar.BranchStatusDetails(branchHeaderProps)
