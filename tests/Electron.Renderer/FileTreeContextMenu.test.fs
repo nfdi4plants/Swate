@@ -85,9 +85,7 @@ Vitest.describe (
                         let table = tables.[0]
                         Vitest.expect(table.Name).toBe ($"{identifier} Table")
                         Vitest.expect(table.ColumnCount).toBe (3)
-                        Vitest.expect(table.RowCount).toBe (
-                            ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount
-                        )
+                        Vitest.expect(table.RowCount).toBe (ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount)
                         Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
                         Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
                         Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")

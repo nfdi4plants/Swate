@@ -21,10 +21,23 @@ let private mkDescriptor (name: string) (accession: string) =
 let private expectBasicAnnotationTable (table: ArcTable) (expectedName: string) =
     Expect.equal table.Name expectedName "The default table should use the identifier name."
     Expect.equal table.ColumnCount 3 "The default table should create basic starter columns."
-    Expect.equal table.RowCount ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount "The default table should create starter rows."
-    Expect.equal (table.Headers.[0].ToString()) "Input [Source Name]" "The default table should start with an input column."
+
+    Expect.equal
+        table.RowCount
+        ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount
+        "The default table should create starter rows."
+
+    Expect.equal
+        (table.Headers.[0].ToString())
+        "Input [Source Name]"
+        "The default table should start with an input column."
+
     Expect.equal (table.Headers.[1].ToString()) "Protocol Uri" "The default table should include a protocol column."
-    Expect.equal (table.Headers.[2].ToString()) "Output [Sample Name]" "The default table should end with an output column."
+
+    Expect.equal
+        (table.Headers.[2].ToString())
+        "Output [Sample Name]"
+        "The default table should end with an output column."
 
 let private mkBaseDraft () = {
     LandingDraft.init with
