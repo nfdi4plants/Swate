@@ -63,8 +63,6 @@ type CreateLoadedSetCommand = {
 
 type EditResult = Result<ProvenanceModel * ProvenanceTablePatch list, EditError>
 
-let private mapValues map = map |> Map.toList |> List.map snd
-
 let private nextPropertyValueId (model: ProvenanceModel) =
     let rec loop index =
         let id = sprintf "property-value-%i" index
@@ -100,10 +98,10 @@ let private nextSetId side (model: ProvenanceModel) =
     loop 1
 
 let private loadedSet (model: ProvenanceModel) (set: ProvenanceSet) =
-    if set.TableName = model.LoadedTableName then
+    if set.Source.Id = model.Source.Id then
         Ok set
     else
-        Error(EditError.PreviousContextCreationNotAllowed set.TableName)
+        Error(EditError.PreviousContextCreationNotAllowed set.Source.Name)
 
 let private addPropertyValueId propertyValueId (set: ProvenanceSet) =
     if set.PropertyValueIds |> List.contains propertyValueId then
@@ -130,8 +128,8 @@ let private chooseOutputSet (model: ProvenanceModel) setId =
 
 let private chooseConnection (model: ProvenanceModel) connectionId =
     match model.Connections.TryFind connectionId with
-    | Some connection when connection.TableName = model.LoadedTableName -> Ok connection
-    | Some connection -> Error(EditError.PreviousContextConnectionCreationNotAllowed connection.TableName)
+    | Some connection when connection.Source.Id = model.Source.Id -> Ok connection
+    | Some connection -> Error(EditError.PreviousContextConnectionCreationNotAllowed connection.Source.Name)
     | None -> Error(EditError.ConnectionNotFound connectionId)
 
 let private collectResults results =
@@ -187,7 +185,12 @@ let private targetSets model target =
             | Error error, _ -> Error error
             | _, Error error -> Error error
 
-let private sourceFromTarget (model: ProvenanceModel) header target resolvedTarget =
+let private sourceFromTarget
+    (model: ProvenanceModel)
+    (header: ProvenancePropertyHeader)
+    (target: ProvenancePropertyTarget)
+    (resolvedTarget: ResolvedPropertyTarget)
+    : ProvenanceWritebackAnchor =
     let processName =
         match target with
         | ProvenancePropertyTarget.Connections connectionIds ->
@@ -209,7 +212,7 @@ let private sourceFromTarget (model: ProvenanceModel) header target resolvedTarg
         | _ -> None
 
     {
-        TableName = model.LoadedTableName
+        Source = model.Source
         ProcessId = processId
         ProcessName = processName
         Header = header
@@ -217,35 +220,19 @@ let private sourceFromTarget (model: ProvenanceModel) header target resolvedTarg
         OutputNames = resolvedTarget.OutputSets |> List.map (fun set -> set.Name) |> List.distinct
     }
 
-let private sourceFromLoadedMembership (model: ProvenanceModel) (propertyValue: ProvenancePropertyValue) =
-    let inputSets =
-        model.InputSets
-        |> mapValues
-        |> List.filter (fun set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValue.Id)
-
-    let outputSets =
-        model.OutputSets
-        |> mapValues
-        |> List.filter (fun set -> ProvenanceSet.effectivePropertyValueIds set |> List.contains propertyValue.Id)
-
-    match inputSets, outputSets with
-    | [], [] -> None
-    | _ ->
-        Some(
-            sourceFromTarget model propertyValue.Header (ProvenancePropertyTarget.InputSets []) {
-                InputSets = inputSets
-                OutputSets = outputSets
-            }
-        )
-
 let private processNameCompatible (left: ProvenanceProcessName option) (right: ProvenanceProcessName option) =
     left = right || left.IsNone || right.IsNone
 
 let private processIdCompatible (left: ProvenanceProcessId option) (right: ProvenanceProcessId option) =
     left = right || left.IsNone || right.IsNone
 
+let private anchorOfOrigin =
+    function
+    | ProvenancePropertyOrigin.Real anchor
+    | ProvenancePropertyOrigin.Virtual anchor -> anchor
+
 let private sourceContextMatches (left: ProvenanceWritebackAnchor) (right: ProvenanceWritebackAnchor) =
-    left.TableName = right.TableName
+    left.Source.Id = right.Source.Id
     && left.Header = right.Header
     && left.InputNames = right.InputNames
     && left.OutputNames = right.OutputNames
@@ -262,19 +249,17 @@ let private tryFindEquivalentLoadedPropertyValue
     model.PropertyValues
     |> Map.toList
     |> List.tryPick (fun (propertyValueId, propertyValue) ->
-        let resolvedSource =
-            propertyValue.Source
-            |> Option.orElseWith (fun () -> sourceFromLoadedMembership model propertyValue)
+        let resolvedAnchor = anchorOfOrigin propertyValue.Origin
 
-        match resolvedSource with
-        | Some existingSource when
+        if
             propertyValue.Header = header
             && propertyValue.Value = value
             && propertyValue.Unit = unit
-            && sourceContextMatches existingSource source
-            ->
+            && sourceContextMatches resolvedAnchor source
+        then
             Some propertyValueId
-        | _ -> None
+        else
+            None
     )
 
 let createLoadedSet (command: CreateLoadedSetCommand) (model: ProvenanceModel) : EditResult =
@@ -283,14 +268,14 @@ let createLoadedSet (command: CreateLoadedSetCommand) (model: ProvenanceModel) :
         | ProvenanceSide.Input ->
             model.InputSets
             |> Map.tryFindKey (fun _ set ->
-                set.TableName = model.LoadedTableName
+                set.Source.Id = model.Source.Id
                 && set.Header = command.Header
                 && set.Name = command.Name
             )
         | ProvenanceSide.Output ->
             model.OutputSets
             |> Map.tryFindKey (fun _ set ->
-                set.TableName = model.LoadedTableName
+                set.Source.Id = model.Source.Id
                 && set.Header = command.Header
                 && set.Name = command.Name
             )
@@ -302,7 +287,7 @@ let createLoadedSet (command: CreateLoadedSetCommand) (model: ProvenanceModel) :
 
         let loadedSet: ProvenanceSet = {
             Id = id
-            TableName = model.LoadedTableName
+            Source = model.Source
             Header = command.Header
             Name = command.Name
             PropertyValueIds = []
@@ -323,7 +308,7 @@ let createLoadedSet (command: CreateLoadedSetCommand) (model: ProvenanceModel) :
         Ok(
             nextModel,
             [
-                ProvenanceTablePatch.AddLoadedSet(command.Side, model.LoadedTableName, command.Header, command.Name)
+                ProvenanceTablePatch.AddLoadedSet(command.Side, model.Source.Name, command.Header, command.Name)
             ]
         )
 
@@ -331,17 +316,12 @@ let updatePropertyValue propertyValueId newValue newUnit (model: ProvenanceModel
     match model.PropertyValues.TryFind propertyValueId with
     | None -> Error(EditError.PropertyNotFound propertyValueId)
     | Some propertyValue ->
-        match
-            propertyValue.Source
-            |> Option.orElseWith (fun () -> sourceFromLoadedMembership model propertyValue)
-        with
-        | None -> Error(EditError.MissingSourceAnchor propertyValueId)
-        | Some source ->
+        match propertyValue.Origin with
+        | ProvenancePropertyOrigin.Real anchor ->
             let nextPropertyValue: ProvenancePropertyValue = {
                 propertyValue with
                     Value = newValue
                     Unit = newUnit
-                    Source = Some source
             }
 
             let nextModel = {
@@ -354,25 +334,39 @@ let updatePropertyValue propertyValueId newValue newUnit (model: ProvenanceModel
                 [
                     ProvenanceTablePatch.UpdatePropertyValue(
                         propertyValueId,
-                        source,
+                        anchor,
                         propertyValue.Value,
                         newValue,
                         newUnit
                     )
                 ]
             )
+        | ProvenancePropertyOrigin.Virtual _anchor ->
+            let nextPropertyValue: ProvenancePropertyValue = {
+                propertyValue with
+                    Value = newValue
+                    Unit = newUnit
+            }
+
+            let nextModel = {
+                model with
+                    PropertyValues = model.PropertyValues |> Map.add propertyValueId nextPropertyValue
+            }
+
+            Ok(nextModel, [])
 
 let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) (model: ProvenanceModel) : EditResult =
     match targetSets model command.Target with
     | Error error -> Error error
     | Ok resolvedTarget ->
-        let source = sourceFromTarget model command.Header command.Target resolvedTarget
+        let anchor = sourceFromTarget model command.Header command.Target resolvedTarget
+        let origin = ProvenancePropertyOrigin.Virtual anchor
 
         let inputSetIds = resolvedTarget.InputSets |> List.map (fun set -> set.Id)
 
         let outputSetIds = resolvedTarget.OutputSets |> List.map (fun set -> set.Id)
 
-        match tryFindEquivalentLoadedPropertyValue model command.Header command.Value command.Unit source with
+        match tryFindEquivalentLoadedPropertyValue model command.Header command.Value command.Unit anchor with
         | Some propertyValueId ->
             let nextModel =
                 {
@@ -405,7 +399,7 @@ let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) (model
                 Header = command.Header
                 Value = command.Value
                 Unit = command.Unit
-                Source = Some source
+                Origin = origin
             }
 
             let nextModel =
@@ -459,7 +453,7 @@ let removeConnection (connectionId: ProvenanceConnectionId) (model: ProvenanceMo
             nextModel,
             [
                 ProvenanceTablePatch.RemoveLoadedConnection(
-                    connection.TableName,
+                    connection.Source.Name,
                     connection.ProcessId,
                     connection.ProcessName,
                     connection.InputSetId,
@@ -477,7 +471,7 @@ let connectSets inputSetId outputSetId processName (model: ProvenanceModel) : Ed
 
         let connection: ProvenanceConnection = {
             Id = connectionId
-            TableName = model.LoadedTableName
+            Source = model.Source
             ProcessId = None
             ProcessName = processName
             InputSetId = inputSetId
@@ -494,12 +488,6 @@ let connectSets inputSetId outputSetId processName (model: ProvenanceModel) : Ed
         Ok(
             nextModel,
             [
-                ProvenanceTablePatch.AddLoadedConnection(
-                    model.LoadedTableName,
-                    None,
-                    processName,
-                    inputSetId,
-                    outputSetId
-                )
+                ProvenanceTablePatch.AddLoadedConnection(model.Source.Name, None, processName, inputSetId, outputSetId)
             ]
         )
