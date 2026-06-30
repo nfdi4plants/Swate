@@ -479,6 +479,33 @@ export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
   },
 };
 
+export const SearchInputUpdatesImmediatelyButFiltersAfterDebounce: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
+    const search = toolbar.getByPlaceholderText('Search properties & values...') as HTMLInputElement;
+
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
+    await ensurePropertyInRail(canvas, 'Output', 'Analysis');
+
+    const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
+
+    expect(outputRail.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
+    expect(outputRail.getByTestId('provenance-property-Output-Analysis')).toBeInTheDocument();
+
+    await userEvent.type(search, 'mass');
+
+    expect(search).toHaveValue('mass');
+    expect(outputRail.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
+
+    await waitFor(() => {
+      expect(outputRail.queryByTestId('provenance-property-Output-Species')).not.toBeInTheDocument();
+      expect(outputRail.getByTestId('provenance-property-Output-Analysis')).toBeInTheDocument();
+    }, { timeout: 1200 });
+  },
+};
+
 export const SortsPropertiesByNameAndConnectionCount: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
