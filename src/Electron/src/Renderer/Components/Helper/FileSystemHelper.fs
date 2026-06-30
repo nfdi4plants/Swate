@@ -227,9 +227,7 @@ let writeFileWithOptionalExternalAssetLinks
         | Error error -> return Error error
         | Ok() ->
             let copyRequests =
-                assets
-                |> List.map (copyRequestForAsset parentPath)
-                |> List.toArray
+                assets |> List.map (copyRequestForAsset parentPath) |> List.toArray
 
             match! copyExternalFilesToArc copyRequests with
             | Ok _ -> return Ok()

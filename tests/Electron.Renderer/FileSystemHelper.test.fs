@@ -211,7 +211,8 @@ Vitest.describe (
                     createAssetAdapter
                         (fun extensions ->
                             requestedExtensions <- extensions
-                            promise { return Ok [| "C:/outside/diagram.png" |] })
+                            promise { return Ok [| "C:/outside/diagram.png" |] }
+                        )
                         noBrowserFileAbsolutePath
 
                 let! pickedFiles = adapter.PickFiles { AcceptTypes = Some "image/*" }
@@ -289,9 +290,7 @@ Vitest.describe (
             "createAssetFilePickerAdapter rejects files without a source",
             fun () -> promise {
                 let adapter, pendingAssets =
-                    createAssetAdapter
-                        (fun _ -> promise { return Ok [||] })
-                        noBrowserFileAbsolutePath
+                    createAssetAdapter (fun _ -> promise { return Ok [||] }) noBrowserFileAbsolutePath
 
                 let promptFile: MarkdownPromptFile = {
                     Name = "dropped-image.png"
