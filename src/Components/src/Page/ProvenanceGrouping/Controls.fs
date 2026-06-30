@@ -1516,6 +1516,23 @@ type Controls =
             ?debug: bool
         ) =
         let sortOpen, setSortOpen = React.useState false
+        let searchDraft, setSearchDraft = React.useState filters.SearchText
+        let latestSearchText = React.useRef filters.SearchText
+        let latestOnSearch = React.useRef onSearch
+        latestSearchText.current <- filters.SearchText
+        latestOnSearch.current <- onSearch
+
+        let debouncedSearchDraft = React.useDebounce (searchDraft, 300)
+
+        React.useEffect ((fun () -> setSearchDraft filters.SearchText), [| box filters.SearchText |])
+
+        React.useEffect (
+            (fun () ->
+                if debouncedSearchDraft <> latestSearchText.current then
+                    latestOnSearch.current debouncedSearchDraft
+            ),
+            [| box debouncedSearchDraft |]
+        )
 
         let propertySortOption sort label =
             let active = filters.PropertySort = sort
@@ -1571,8 +1588,8 @@ type Controls =
                         Html.input [
                             prop.className "swt:input swt:input-bordered swt:input-sm swt:pl-8"
                             prop.placeholder "Search properties & values..."
-                            prop.value filters.SearchText
-                            prop.onChange onSearch
+                            prop.value searchDraft
+                            prop.onChange setSearchDraft
                         ]
                     ]
                 ]
