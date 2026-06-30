@@ -10,6 +10,7 @@ open Swate.Components.Api.GitLabApi
 open Swate.Components.Primitive.Actionbar.Types
 open Swate.Components.Primitive.ErrorModal.Context
 open Swate.Electron.Shared.GitTypes
+open Renderer.Components.Helper.FileSystemHelper
 
 module DataHubBrowserHelper =
     let isCancelError (error: exn) =
@@ -69,7 +70,7 @@ let DataHubBrowserTarget () =
 
     let cloneAndOpenRepo (projectInfo: ExploreProjectDto) =
         promise {
-            let! destinationResult = Api.ipcArcVaultApi.pickDirectory ()
+            let! destinationResult = pickDirectory ()
 
             match destinationResult with
             | Error error when DataHubBrowserHelper.isCancelError error -> ()

@@ -460,7 +460,6 @@ type FileTree =
 
         let contextMenuConfig: FileTreeContextMenu.ContextMenuConfig = {
             openItem = openPreview
-            arcRootPath = appStateCtx
             openCreateModal = openCreateModal
             openFileSystemCreateModal = openFileSystemCreateModal
             requestAssignNoteItem = requestAssignNoteItem

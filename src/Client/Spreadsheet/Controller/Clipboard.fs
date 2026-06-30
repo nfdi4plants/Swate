@@ -7,11 +7,11 @@ open Swate.Components.Shared
 
 let copyCell (cell: CompositeCell) : JS.Promise<unit> =
     let tab = cell.ToTabStr()
-    navigator.clipboard.writeText (tab)
+    Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText tab
 
 let copyCells (cells: CompositeCell[]) : JS.Promise<unit> =
     let tab = CompositeCell.ToTabTxt cells
-    navigator.clipboard.writeText (tab)
+    Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText tab
 
 let copyCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<unit> =
     let cell = Generic.getCell (index.x, index.y) state
@@ -47,7 +47,7 @@ let cutCellsByIndices (indices: CellCoordinate[]) (state: Spreadsheet.Model) : S
     state
 
 let pasteCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
-    let! tab = navigator.clipboard.readText ()
+    let! tab = Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.readText ()
     let header = Generic.getHeader index.x state
     let cell = CompositeCell.fromTabTxt tab header |> Array.head
     Generic.setCell (index.x, index.y) cell state
@@ -55,7 +55,7 @@ let pasteCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Pro
 }
 
 let pasteCellsByIndexExtend (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
-    let! tab = navigator.clipboard.readText ()
+    let! tab = Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.readText ()
     let header = Generic.getHeader index.x state
     let cells = CompositeCell.fromTabTxt tab header
 

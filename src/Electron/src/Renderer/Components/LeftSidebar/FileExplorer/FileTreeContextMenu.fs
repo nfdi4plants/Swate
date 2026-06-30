@@ -1,6 +1,5 @@
 module Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
 
-open System
 open Fable.Core
 open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
@@ -19,7 +18,6 @@ type PathActionConfig = {
 
 type ContextMenuConfig = {
     openItem: FileItem -> unit
-    arcRootPath: string option
     openCreateModal: ArcExplorerNodeKind -> unit
     openFileSystemCreateModal: FileSystemItemKind -> FileItem -> unit
     requestAssignNoteItem: FileItem -> unit
@@ -43,26 +41,6 @@ let private withDividers (groups: ContextMenuItem list list) =
     )
     |> List.collect id
 
-let tryGetAbsoluteItemPath (arcRootPath: string option) (item: FileItem) =
-    match arcRootPath, item.Path with
-    | Some rootPath, Some relativePath ->
-        let normalizedRootPath = PathHelpers.normalizePath rootPath
-        let normalizedRelativePath = PathHelpers.normalizeRelativePath relativePath
-
-        if String.IsNullOrWhiteSpace normalizedRootPath then
-            None
-        elif String.IsNullOrWhiteSpace normalizedRelativePath then
-            Some normalizedRootPath
-        else
-            Some(PathHelpers.normalizePath $"{normalizedRootPath}/{normalizedRelativePath}")
-    | _ -> None
-
-let tryGetRelativeItemPath (item: FileItem) =
-    item.Path
-    |> Option.map PathHelpers.normalizeRelativePath
-    |> Option.map PathHelpers.normalizePath
-    |> Option.filter (String.IsNullOrWhiteSpace >> not)
-
 let private applyPathActionError (config: PathActionConfig) (title: string) (message: string) =
     config.enqueueError (ErrorModalRequest.create (message, title = title))
 
@@ -78,15 +56,6 @@ let private runPathAction
         | Error exn -> applyPathActionError config title exn.Message
     }
     |> Promise.catch (fun exn -> applyPathActionError config title exn.Message)
-    |> Promise.start
-
-let private copyTextToClipboard (text: string) =
-    promise {
-        try
-            do! navigator.clipboard.writeText text
-        with ex ->
-            Browser.Dom.console.warn ($"Could not copy filetree path: {text}", ex)
-    }
     |> Promise.start
 
 let private pathActionContextMenuItemsForRelativePath
@@ -108,12 +77,12 @@ let private pathActionContextMenuItemsForRelativePath
     ]
 
 let pathActionContextMenuItems (config: PathActionConfig) (item: FileItem) =
-    match tryGetRelativeItemPath item with
+    match tryGetNonEmptyItemRelativePath item with
     | None -> []
     | Some relativePath -> pathActionContextMenuItemsForRelativePath config item relativePath
 
 let openContextMenuItems (config: ContextMenuConfig) (item: FileItem) =
-    match tryGetRelativeItemPath item with
+    match tryGetNonEmptyItemRelativePath item with
     | None -> []
     | Some relativePath -> [
         ContextMenuItem.create "Open" "swt:fluent--open-24-regular" (fun () -> config.openItem item)
@@ -122,14 +91,36 @@ let openContextMenuItems (config: ContextMenuConfig) (item: FileItem) =
       ]
 
 let copyPathContextMenuItems (arcRootPath: string option) (item: FileItem) = [
-    match tryGetRelativeItemPath item with
+    match tryGetNonEmptyItemRelativePath item with
     | Some relativePath ->
-        ContextMenuItem.create "Copy Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard relativePath)
+        ContextMenuItem.create
+            "Copy Path"
+            "swt:fluent--copy-24-regular"
+            (fun () ->
+                promise {
+                    try
+                        do! Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText relativePath
+                    with ex ->
+                        Browser.Dom.console.warn ($"Could not copy filetree path: {relativePath}", ex)
+                }
+                |> Promise.start
+            )
     | None -> ()
 
-    match tryGetAbsoluteItemPath arcRootPath item with
+    match tryGetItemAbsolutePath arcRootPath item with
     | Some fullPath ->
-        ContextMenuItem.create "Copy Full Path" "swt:fluent--copy-24-regular" (fun () -> copyTextToClipboard fullPath)
+        ContextMenuItem.create
+            "Copy Full Path"
+            "swt:fluent--copy-24-regular"
+            (fun () ->
+                promise {
+                    try
+                        do! Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText fullPath
+                    with ex ->
+                        Browser.Dom.console.warn ($"Could not copy filetree path: {fullPath}", ex)
+                }
+                |> Promise.start
+            )
     | None -> ()
 ]
 
@@ -231,7 +222,7 @@ let createContextMenuItems (config: ContextMenuConfig) arcScopeId =
     fun item ->
         withDividers [
             openContextMenuItems config item
-            copyPathContextMenuItems config.arcRootPath item
+            copyPathContextMenuItems arcScopeId item
             fileSystemCreateContextMenuItems config.openFileSystemCreateModal item
             Swate.Components.Page.FileExplorer.FileExplorerGitLfsHelper.contextMenuItems
                 item

@@ -41,10 +41,6 @@ type IArcVaultsApi = {
     removeRecentARC: ARCPointer -> JS.Promise<Result<unit, exn>>
 
     pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
-    pickDirectory: unit -> JS.Promise<Result<string, exn>>
-    pickAbsolutePaths: string[] option -> JS.Promise<Result<string[], exn>>
-    getPathForFile: File -> JS.Promise<Result<string, exn>>
-    pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>

@@ -124,6 +124,23 @@ let tryGetItemRelativePath (item: FileItem) =
     |> Option.map PathHelpers.normalizeRelativePath
     |> Option.map PathHelpers.normalizePath
 
+let tryGetNonEmptyItemRelativePath (item: FileItem) =
+    tryGetItemRelativePath item
+    |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+let tryGetItemAbsolutePath (arcRootPath: string option) (item: FileItem) =
+    match arcRootPath, tryGetItemRelativePath item with
+    | Some rootPath, Some relativePath ->
+        let normalizedRootPath = PathHelpers.normalizePath rootPath
+
+        if String.IsNullOrWhiteSpace normalizedRootPath then
+            None
+        elif String.IsNullOrWhiteSpace relativePath then
+            Some normalizedRootPath
+        else
+            Some(PathHelpers.normalizePath $"{normalizedRootPath}/{relativePath}")
+    | _ -> None
+
 let canCreateFileSystemItemIn (item: FileItem) =
     item.IsDirectory
     && (tryGetItemRelativePath item

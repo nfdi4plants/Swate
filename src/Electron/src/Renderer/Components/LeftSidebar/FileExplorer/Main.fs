@@ -9,14 +9,6 @@ open Swate.Components.Primitive.ErrorModal.Types
 
 module private FileExplorerHelper =
 
-    let copyArcPathToClipboard (onError: exn -> unit) =
-        fun (path: string) -> promise {
-            try
-                do! navigator.clipboard.writeText path
-            with ex ->
-                onError ex
-        }
-
     let openArcFolderInFileExplorer (onError: exn -> unit) =
         fun () -> promise {
             match! Api.ipcArcVaultApi.openArcFolderInFileExplorer () with
@@ -111,13 +103,16 @@ type Main =
         let errorModalCtx = useErrorModalCtx ()
         let arcNameContextMenuRef = React.useElementRef ()
 
-        let copyArcPathToClipboard =
-            copyArcPathToClipboard (fun ex ->
-                errorModalCtx.enqueue (
-                    ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
-                )
-            )
-            >> Promise.start
+        let copyArcPathToClipboard path =
+            promise {
+                try
+                    do! Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText path
+                with ex ->
+                    errorModalCtx.enqueue (
+                        ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")
+                    )
+            }
+            |> Promise.start
 
         let openArcFolderInFileExplorer =
             openArcFolderInFileExplorer (fun ex ->

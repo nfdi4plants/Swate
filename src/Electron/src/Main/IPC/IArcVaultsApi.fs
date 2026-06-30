@@ -1,11 +1,9 @@
 module Main.IPC.ArcVaultsApi
 
 open System
-open Browser.Types
 open Fable.Core
 open Fable.Electron
 open Fable.Electron.Main
-open Fable.Electron.Renderer
 open Fable.Electron.Remoting.Main
 open Swate.Components.Shared
 open Swate.Electron.Shared
@@ -116,33 +114,6 @@ let private notifyGitRepositoryInitialized (arcPath: string) =
         |> Remoting.buildProxySender<IGitRepositoryRendererApi>
         |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
     )
-
-let private openDialogFiltersFromExtensions (filterExtensions: string[] option) =
-    let normalizedExtensions =
-        filterExtensions
-        |> Option.defaultValue [||]
-        |> Array.choose (fun extension ->
-            extension
-            |> Option.ofObj
-            |> Option.map (fun value -> value.Trim())
-            |> Option.bind (fun value ->
-                if String.IsNullOrWhiteSpace value then
-                    None
-                else
-                    let normalizedValue = if value.StartsWith(".") then value.Substring(1) else value
-
-                    if String.IsNullOrWhiteSpace normalizedValue then
-                        None
-                    else
-                        Some normalizedValue
-            )
-        )
-        |> Array.distinct
-
-    if normalizedExtensions.Length = 0 then
-        None
-    else
-        Some [| FileFilter("Supported files", normalizedExtensions) |]
 
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
@@ -327,92 +298,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                                     |> Ok
             with e ->
                 return Error e
-        }
-    pickDirectory =
-        fun () -> promise {
-            try
-                let properties = [|
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-                |]
-
-                let window = dialogParentFromIpcEvent event
-
-                let! result = dialog.showOpenDialog (?window = window, properties = properties)
-
-                if result.canceled then
-                    return Error(exn "Cancelled")
-                elif result.filePaths.Length <> 1 then
-                    return Error(exn "Not exactly one path")
-                else
-                    return Ok(result.filePaths |> Array.exactlyOne)
-            with e ->
-                return Error(exn $"Could not pick directory: {e.Message}")
-        }
-    pickAbsolutePaths =
-        fun filterExtensions -> promise {
-            try
-                let properties = [|
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-                |]
-
-                let window = dialogParentFromIpcEvent event
-                let filters = openDialogFiltersFromExtensions filterExtensions
-
-                let! result =
-                    match filters with
-                    | Some filters ->
-                        dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
-                    | None -> dialog.showOpenDialog (?window = window, properties = properties)
-
-                if result.canceled then
-                    return Error(exn "Cancelled")
-                else
-                    return Ok result.filePaths
-            with e ->
-                return Error(exn $"Could not pick files: {e.Message}")
-        }
-    getPathForFile =
-        fun (file: File) -> promise {
-            try
-                let filePath = webUtils.getPathForFile file
-                return Ok(PathHelpers.normalizePath filePath)
-            with e ->
-                return Error e
-        }
-    pickExternalTextFiles =
-        fun _ -> promise {
-            try
-                let properties = [|
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-                |]
-
-                let filters = [|
-                    FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |])
-                |]
-
-                let window = dialogParentFromIpcEvent event
-
-                let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
-
-                if result.canceled then
-                    return Error(exn "Cancelled")
-                else
-                    let importedFiles = ResizeArray<ImportedTextFile>()
-
-                    for filePath in result.filePaths do
-                        let absolutePath = resolveAbsolutePath filePath
-                        let! content = ARCtrl.FileSystemHelper.readFileTextAsync absolutePath
-
-                        importedFiles.Add {
-                            Name = path.basename absolutePath
-                            Content = content
-                        }
-
-                    return Ok(importedFiles.ToArray())
-            with e ->
-                return Error(exn $"Could not import external text files: {e.Message}")
         }
     getFileTree =
         fun () -> promise {

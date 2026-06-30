@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
+    <Compile Include="JsBindings\Clipboard.fs" />
     <Compile Include="PathHelpers.fs" />
     <Compile Include="Database.fs" />
     <Compile Include="ARCtrl.Helper.fs" />

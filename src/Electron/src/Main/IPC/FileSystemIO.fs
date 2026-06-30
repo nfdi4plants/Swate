@@ -10,26 +10,22 @@ open Swate.Electron.Shared.RenamePathRules
 [<RequireQualifiedAccess>]
 module ArcPathValidation =
 
-    let normalizePathForComparison (pathValue: string) =
-        PathHelpers.normalizePathForFsComparison pathValue
-
-    let containsTraversalSegments (pathValue: string) =
-        PathHelpers.containsPathTraversalSegments pathValue
-
     let isSafeRelativePathCandidate (pathValue: string) =
         let normalizedPath = PathHelpers.normalizePath pathValue
 
         not (String.IsNullOrWhiteSpace normalizedPath)
         && normalizedPath <> "."
         && not (Main.Bindings.Path.isAbsolute normalizedPath)
-        && not (containsTraversalSegments normalizedPath)
+        && not (PathHelpers.containsPathTraversalSegments normalizedPath)
 
     let isWithinRootPath (rootPath: string) (candidatePath: string) =
         let normalizedRootPath =
-            Main.Bindings.Path.resolve [| rootPath |] |> normalizePathForComparison
+            Main.Bindings.Path.resolve [| rootPath |]
+            |> PathHelpers.normalizePathForFsComparison
 
         let normalizedCandidatePath =
-            Main.Bindings.Path.resolve [| candidatePath |] |> normalizePathForComparison
+            Main.Bindings.Path.resolve [| candidatePath |]
+            |> PathHelpers.normalizePathForFsComparison
 
         normalizedCandidatePath = normalizedRootPath
         || normalizedCandidatePath.StartsWith(normalizedRootPath + "/")
@@ -55,9 +51,14 @@ let tryGetArcRelativePath (arcPath: string) (requestedAbsolutePath: string) =
 
 /// Resolves a relative path against the ARC root and rejects absolute or traversal-based escapes.
 let tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) =
+    let normalizedArcPath = PathHelpers.normalizePath arcPath
     let relativePath = PathHelpers.normalizePath requestedRelativePath
 
-    if String.IsNullOrWhiteSpace relativePath then
+    if String.IsNullOrWhiteSpace normalizedArcPath then
+        Error(exn "ArcPath must not be empty.")
+    elif not (Main.Bindings.Path.isAbsolute normalizedArcPath) then
+        Error(exn "ArcPath must be absolute.")
+    elif String.IsNullOrWhiteSpace relativePath then
         Error(exn "RelativePath must not be empty.")
     elif not (ArcPathValidation.isSafeRelativePathCandidate relativePath) then
         if Main.Bindings.Path.isAbsolute relativePath then
@@ -65,14 +66,13 @@ let tryResolveArcRelativePath (arcPath: string) (requestedRelativePath: string) 
         else
             Error(exn "RelativePath must not contain path traversal segments.")
     else
-        let arcRoot = resolveAbsolutePath arcPath
-        let absolutePath = Main.Bindings.Path.resolve [| arcRoot; relativePath |]
+        let arcRootPath = resolveAbsolutePath normalizedArcPath
+        let absolutePath = Main.Bindings.Path.resolve [| arcRootPath; relativePath |]
 
-        if ArcPathValidation.isWithinRootPath arcRoot absolutePath then
+        if ArcPathValidation.isWithinRootPath arcRootPath absolutePath then
             Ok absolutePath
         else
             Error(exn "RelativePath resolves outside the ARC root.")
-
 
 let pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
     let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath

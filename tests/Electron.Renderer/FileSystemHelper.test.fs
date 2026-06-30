@@ -183,14 +183,14 @@ Vitest.describe (
                 let mutable requestedExtensions: string[] option = None
 
                 let adapter =
-                    createAssetFilePickerAdapter
+                    createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
                         (fun extensions ->
                             requestedExtensions <- extensions
                             promise { return Ok [| "C:/outside/diagram.png" |] }
                         )
-                        (fun _ -> promise { return Error(exn "Browser file path resolver should not be used.") })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
+                        (fun _ -> promise { return None })
 
                 let! pickedFiles = adapter.PickFiles { AcceptTypes = Some "image/*" }
 
@@ -218,11 +218,11 @@ Vitest.describe (
                 let mutable pendingAssets = []
 
                 let adapter =
-                    createAssetFilePickerAdapter
+                    createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
                         (fun _ -> promise { return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |] })
-                        (fun _ -> promise { return Error(exn "Browser file path resolver should not be used.") })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
+                        (fun _ -> promise { return None })
 
                 let! pickedFiles = adapter.PickFiles { AcceptTypes = Some "image/*" }
                 Vitest.expect(pickedFiles.Length).toBe (2)
@@ -251,11 +251,11 @@ Vitest.describe (
                 let mutable pendingAssets = []
 
                 let adapter =
-                    createAssetFilePickerAdapterWithBrowserFilePathResolver
+                    createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
                         (fun _ -> promise { return Ok [||] })
                         "assets"
                         (fun asset -> pendingAssets <- pendingAssets @ [ asset ])
-                        (fun _ -> Some "C:/dropped/dropped-image.png")
+                        (fun _ -> promise { return Some "C:/dropped/dropped-image.png" })
 
                 let promptFile: MarkdownPromptFile = {
                     Name = "dropped-image.png"

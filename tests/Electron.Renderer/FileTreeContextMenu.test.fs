@@ -22,7 +22,6 @@ let private createConfig () : PathActionConfig = {
 
 let private createContextMenuConfig () : ContextMenuConfig = {
     openItem = ignore
-    arcRootPath = Some "C:\\arc-root"
     openCreateModal = ignore
     openFileSystemCreateModal = fun _ _ -> ()
     requestAssignNoteItem = ignore
@@ -35,7 +34,7 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
 }
 
-let private createComposedContextMenuItems config item = createContextMenuItems config None item
+let private createComposedContextMenuItems config item = createContextMenuItems config (Some "C:/Arc") item
 
 let private createFileItem (name: string) (path: string option) = {
     FileTree.createFile name path FileItemIcon.Document with
@@ -225,21 +224,11 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "absolute copy path resolver combines the active ARC root with filetree paths",
-            fun () ->
-                let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
-
-                Vitest
-                    .expect(tryGetAbsoluteItemPath (Some "C:\\arc-root") item)
-                    .toEqual (Some "C:/arc-root/assays/AssayA/protocol.md")
-        )
-
-        Vitest.test (
             "relative copy path resolver keeps filetree paths relative",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
 
-                Vitest.expect(tryGetRelativeItemPath item).toEqual (Some "assays/AssayA/protocol.md")
+                Vitest.expect(tryGetNonEmptyItemRelativePath item).toEqual (Some "assays/AssayA/protocol.md")
         )
 
         Vitest.test (
@@ -247,7 +236,17 @@ Vitest.describe (
             fun () ->
                 let item = createFileItem "virtual.md" None
 
-                Vitest.expect(tryGetRelativeItemPath item).toEqual (None)
+                Vitest.expect(tryGetNonEmptyItemRelativePath item).toEqual (None)
+        )
+
+        Vitest.test (
+            "full path copy resolver combines the renderer ARC root and relative path",
+            fun () ->
+                let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
+
+                Vitest
+                    .expect(tryGetItemAbsolutePath (Some "C:/Arc") item)
+                    .toEqual (Some "C:/Arc/assays/AssayA/protocol.md")
         )
 
         Vitest.test (
