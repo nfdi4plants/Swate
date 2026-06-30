@@ -252,6 +252,19 @@ let private expectText expected value =
     | ProvenanceValue.Integer actual -> Expect.equal (string actual) expected "Expected integer value."
     | ProvenanceValue.Float actual -> Expect.equal (string actual) expected "Expected float value."
 
+let private anchorOfOrigin (origin: ProvenancePropertyOrigin) : ProvenanceWritebackAnchor =
+    match origin with
+    | ProvenancePropertyOrigin.Real anchor
+    | ProvenancePropertyOrigin.Virtual anchor -> anchor
+
+let private assertRealOriginProcess expectedProcessName expectedProcessId (value: ProvenancePropertyValue) =
+    match value.Origin with
+    | ProvenancePropertyOrigin.Real anchor ->
+        Expect.equal anchor.ProcessName expectedProcessName "Origin process name should match."
+        Expect.equal anchor.ProcessId expectedProcessId "Origin process id should match."
+        anchor
+    | ProvenancePropertyOrigin.Virtual _ -> failwith "Expected converted ARCtrl values to have real origins."
+
 let tests =
     testList "ProvenanceGrouping ARCtrl converter" [
         testCase "converts loaded input and output names into first-class sets"
@@ -281,15 +294,35 @@ let tests =
                 result.Model.PropertyValues
                 |> Map.toSeq
                 |> Seq.map snd
-                |> Seq.filter (fun value ->
-                    value.Source
-                    |> Option.exists (fun source -> source.TableName <> result.Model.LoadedTableName)
-                )
+                |> Seq.filter (fun value -> (anchorOfOrigin value.Origin).Source.Id <> result.Model.Source.Id)
                 |> Seq.toList
 
             Expect.isEmpty
                 previousValues
                 "No property values from non-loaded tables should appear when previous context is excluded."
+
+        testCase "converted property values have real origins with source refs"
+        <| fun _ ->
+            let result = convertWithPreviousContext ()
+            let values = result.Model.PropertyValues |> Map.toList |> List.map snd
+
+            Expect.isNonEmpty values "Converted models should contain property values."
+
+            Expect.all
+                values
+                (fun value ->
+                    match value.Origin with
+                    | ProvenancePropertyOrigin.Real anchor ->
+                        not (System.String.IsNullOrWhiteSpace anchor.Source.Id)
+                        && not (System.String.IsNullOrWhiteSpace anchor.Source.Name)
+                    | ProvenancePropertyOrigin.Virtual _ -> false
+                )
+                "Every converted property value should have a real source origin."
+
+            Expect.isTrue
+                (values
+                 |> List.exists (fun value -> (anchorOfOrigin value.Origin).Source.Id <> result.Model.Source.Id))
+                "Previous-context values should keep their original source identity."
 
         testCase "converts loaded row input-to-output connections"
         <| fun _ ->
@@ -519,13 +552,16 @@ let tests =
 
             let sharedBuffer = result.Model.PropertyValues.[cam01BufferIds.Head]
 
+            let sharedBufferAnchor =
+                assertRealOriginProcess (Some "metabolite_extraction") (Some "metabolite_extraction_0") sharedBuffer
+
             Expect.equal
-                (sharedBuffer.Source |> Option.bind (fun source -> source.ProcessName))
+                sharedBufferAnchor.ProcessName
                 (Some "metabolite_extraction")
                 "Generated row process suffixes should not leak into the normalized property source process."
 
             Expect.equal
-                (sharedBuffer.Source |> Option.bind (fun source -> source.ProcessId))
+                sharedBufferAnchor.ProcessId
                 (Some "metabolite_extraction_0")
                 "The representative ARCtrl row process identity should be preserved separately from the process name."
 
@@ -573,19 +609,12 @@ let tests =
 
             let sharedBuffer = result.Model.PropertyValues.[db23BufferIds.Head]
 
-            Expect.equal
-                (sharedBuffer.Source |> Option.bind (fun source -> source.ProcessName))
-                (Some "metabolite_extraction")
-                "Previous-context folders should group by the logical source process, not row process suffixes."
+            let sharedBufferAnchor =
+                assertRealOriginProcess (Some "metabolite_extraction") (Some "metabolite_extraction_0") sharedBuffer
 
             Expect.equal
-                (sharedBuffer.Source |> Option.bind (fun source -> source.ProcessId))
-                (Some "metabolite_extraction_0")
-                "A representative ARCtrl row process id should remain available without being appended to the process name."
-
-            Expect.equal
-                (sharedBuffer.Source |> Option.map (fun source -> source.OutputNames))
-                (Some [ "DB23"; "DB24" ])
+                sharedBufferAnchor.OutputNames
+                [ "DB23"; "DB24" ]
                 "A shared previous-context value should remember every loaded input it was attached through."
 
         testCase "collapsed previous-context duplicates keep one representative writeback slot"

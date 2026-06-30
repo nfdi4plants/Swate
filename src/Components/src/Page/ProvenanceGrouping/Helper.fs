@@ -518,6 +518,22 @@ module PropertyRails =
         |> List.map (fun (_, values) -> values |> List.sortBy (fun value -> value.Id) |> List.head)
         |> List.sortBy (fun propertyValue -> Formatting.formatValue propertyValue.Value propertyValue.Unit)
 
+    let propertyOriginsForSideHeader layerId side header (model: ProvenanceModel) uiState =
+        [
+            yield!
+                setsForSide side model
+                |> Map.toList
+                |> List.collect (fun (_, set) -> ProvenanceSet.effectivePropertyValueIds set)
+                |> List.distinct
+                |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
+                |> List.filter (fun propertyValue -> propertyValue.Header = header)
+                |> List.map (fun propertyValue -> propertyValue.Origin)
+            yield!
+                State.Palette.valuesForHeader layerId side header uiState
+                |> List.map (fun propertyValue -> propertyValue.Origin)
+        ]
+        |> Set.ofList
+
 module Search =
 
     let contains (needle: string) (haystack: string) =
@@ -738,14 +754,7 @@ module PropertyProjection =
         let originByHeader =
             headers
             |> List.map (fun header ->
-                let values = valuesByHeader.[header]
-
-                let origins =
-                    values
-                    |> List.choose (originForProjectedValue layerId side session uiState)
-                    |> Set.ofList
-
-                header, origins
+                header, PropertyRails.propertyOriginsForSideHeader layerId side header model uiState
             )
             |> Map.ofList
 

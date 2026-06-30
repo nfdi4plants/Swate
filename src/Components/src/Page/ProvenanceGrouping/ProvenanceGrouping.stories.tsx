@@ -315,7 +315,7 @@ export const PropertiesStartInOriginFoldersAndSideDropZonesAreEmpty: Story = {
     const canvas = within(canvasElement);
 
     expect(canvas.getByTestId('foldered-draggable-list')).toBeInTheDocument();
-    expect(canvas.getByTestId('foldered-draggable-folder-layer-layer-1')).toBeInTheDocument();
+    expect(canvas.getByTestId('foldered-draggable-folder-source-fixture-assay-table')).toBeInTheDocument();
     expect(canvas.getByTestId('provenance-property-rail-Input').querySelector('[data-testid^="provenance-property-Input-"]'))
       .not.toBeInTheDocument();
     expect(canvas.getByTestId('provenance-property-rail-Output').querySelector('[data-testid^="provenance-property-Output-"]'))
@@ -345,7 +345,10 @@ export const DroppedShelfPropertyLeavesFolders: Story = {
     await ensurePropertyInRail(canvas, 'Output', 'Species');
 
     expect(canvas.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
-    const currentLayerShelf = await openShelfFolder(canvas, canvas.getByTestId('foldered-draggable-folder-layer-layer-1'));
+    const currentLayerShelf = await openShelfFolder(
+      canvas,
+      canvas.getByTestId('foldered-draggable-folder-source-fixture-assay-table'),
+    );
     expect(currentLayerShelf.queryByRole('button', { name: /^Drag Species$/ })).not.toBeInTheDocument();
   },
 };
@@ -368,7 +371,7 @@ export const FolderColorPreviewSyncsLayerTabAndRailProperty: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await setFolderPreviewColor(canvas.getByTestId('foldered-draggable-folder-layer-layer-1'), '#be185d');
+    await setFolderPreviewColor(canvas.getByTestId('foldered-draggable-folder-source-fixture-assay-table'), '#be185d');
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveAttribute(
@@ -387,7 +390,7 @@ export const NonLayerFolderColorAppliesToShelfAndRailProperties: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const previousContextFolder = canvas.getByTestId(
-      'foldered-draggable-folder-context-previous-process-previous-study-table',
+      'foldered-draggable-folder-source-fixture-previous-study-table',
     );
 
     await setFolderPreviewColor(previousContextFolder, '#0891b2');
@@ -540,7 +543,7 @@ export const LayerFocusDoesNotResortInitializedRails: Story = {
     const initialOutputOrder = (await shelfPropertyOrder(canvas)).slice(0, 4);
 
     await selectGroup(canvas.getByText('Output A').closest('article')!);
-    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    await createLayer(canvas, 'Layer 2');
     await waitFor(() => expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary'));
 
     const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
@@ -1178,7 +1181,7 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
 
     const outputA = canvas.getByText('Output A').closest('article')!;
     await selectGroup(outputA);
-    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    await createLayer(canvas, 'Layer 2');
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
@@ -1372,6 +1375,15 @@ async function openShelfFolder(canvas: ReturnType<typeof within>, folder: HTMLEl
   return within(canvas.getByTestId('foldered-draggable-item-row'));
 }
 
+async function createLayer(canvas: ReturnType<typeof within>, name: string) {
+  await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+  const dialog = within(document.body);
+  const input = await waitFor(() => dialog.getByRole('textbox', { name: 'Layer name' }));
+  await userEvent.clear(input);
+  await userEvent.type(input, name);
+  await userEvent.click(dialog.getByRole('button', { name: 'Create layer' }));
+}
+
 async function shelfProperty(canvas: ReturnType<typeof within>, propertyName: string) {
   const name = new RegExp(`^Drag ${escapeRegExp(propertyName)}$`);
 
@@ -1446,7 +1458,7 @@ async function showPropertyControls(
 }
 
 async function shelfPropertyOrder(canvas: ReturnType<typeof within>) {
-  const folder = canvas.getByTestId('foldered-draggable-folder-layer-layer-1');
+  const folder = canvas.getByTestId('foldered-draggable-folder-source-fixture-assay-table');
   await openShelfFolder(canvas, folder);
 
   return Array.from(
@@ -1778,12 +1790,28 @@ export const AddsLayerFromMixedSelection: Story = {
 
     await selectGroup(inputA);
     await selectGroup(outputB);
-    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    await createLayer(canvas, 'Layer 2');
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
       expect(canvasElement).toHaveTextContent('Input A');
       expect(canvasElement).toHaveTextContent('Output B');
+    });
+  },
+};
+
+export const CreatesNamedLayer: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await createLayer(canvas, 'Extraction');
+
+    await waitFor(() => {
+      const layer = canvas.getByTestId('provenance-layer-layer-2');
+      expect(layer).toHaveClass('swt:btn-primary');
+      expect(layer).toHaveTextContent('Extraction');
+      expect(layer).toHaveAccessibleName('View provenance layer Extraction');
     });
   },
 };
@@ -1795,7 +1823,7 @@ export const DoesNotReuseSelectionForEqualGroupIdsInDifferentLayers: Story = {
     const outputA = canvas.getByText('Output A').closest('article')!;
 
     await selectGroup(outputA);
-    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    await createLayer(canvas, 'Layer 2');
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
     await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Layer 2 Output');
@@ -1803,7 +1831,7 @@ export const DoesNotReuseSelectionForEqualGroupIdsInDifferentLayers: Story = {
     const layer2Output = await waitFor(() => canvas.getByText('Layer 2 Output').closest('article')!);
 
     await selectGroup(layer2Output);
-    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    await createLayer(canvas, 'Layer 3');
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
     await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Layer 3 Output');
