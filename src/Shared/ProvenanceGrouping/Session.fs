@@ -87,7 +87,7 @@ module Session =
         | ProvenanceSide.Input -> $"{layerId}-input"
         | ProvenanceSide.Output -> $"{layerId}-output"
 
-    let init model =
+    let init (model: ProvenanceModel) =
         let layerId = "layer-1"
 
         let layer = {

@@ -110,8 +110,7 @@ module private TierObserver =
 module private PropertyShelf =
 
     type private FolderKey =
-        | LayerFolder of ProvenanceLayerId
-        | PreviousContextFolder of ProvenanceTableName option * ProvenanceProcessName option
+        | SourceFolder of ProvenanceSourceRef
         | UnknownFolder
 
     let private slug (value: string) =
@@ -155,8 +154,8 @@ module private PropertyShelf =
         | _ -> ProvenanceSide.Input
 
     let private originsForHeader
-        (layerId: ProvenanceLayerId)
-        (sourceSide: ProvenanceSide)
+        (_layerId: ProvenanceLayerId)
+        (_sourceSide: ProvenanceSide)
         (inputProjection: PropertyRails.RailProjection)
         (outputProjection: PropertyRails.RailProjection)
         (header: ProvenancePropertyHeader)
@@ -167,72 +166,80 @@ module private PropertyShelf =
         ]
         |> List.choose id
         |> List.fold Set.union Set.empty
-        |> fun origins ->
-            if origins.IsEmpty then
-                Set.singleton (PropertyOrigin.Current(layerId, sourceSide))
-            else
-                origins
 
-    let private folderKeyForOrigin (origin: PropertyOrigin) =
-        match origin with
-        | PropertyOrigin.Current(layerId, _) -> LayerFolder layerId
-        | PropertyOrigin.UpstreamLayer layerId -> LayerFolder layerId
-        | PropertyOrigin.PreviousContext source -> PreviousContextFolder(source.TableName, source.ProcessName)
-
-    let private folderId =
+    let private sourceOfOrigin =
         function
-        | LayerFolder layerId -> PropertyFolderColors.layerFolderId layerId
-        | PreviousContextFolder(tableName, processName) ->
-            PropertyFolderColors.previousContextFolderId tableName processName
-        | UnknownFolder -> PropertyFolderColors.unknownFolderId
+        | ProvenancePropertyOrigin.Real anchor
+        | ProvenancePropertyOrigin.Virtual anchor -> anchor.Source
 
-    let private folderName (session: ProvenanceSession) =
+    let private folderKeyForOrigin origin = SourceFolder(sourceOfOrigin origin)
+
+    let private folderKeyId =
         function
-        | LayerFolder layerId ->
-            session.Layers
-            |> List.tryFind (fun layer -> layer.Id = layerId)
-            |> Option.map (fun layer -> layer.Label)
-            |> Option.defaultValue layerId
-        | PreviousContextFolder(tableName, processName) ->
-            match processName, tableName with
-            | Some processName, Some tableName -> $"{processName} / {tableName}"
-            | Some processName, None -> processName
-            | None, Some tableName -> tableName
-            | None, None -> "Previous context"
+        | SourceFolder source -> PropertyFolders.sourceFolderId source
+        | UnknownFolder -> PropertyFolders.unknownFolderId
+
+    let private folderName =
+        function
+        | SourceFolder source -> source.Name
         | UnknownFolder -> "Unknown origin"
 
     let private folderColor (uiState: UiState) =
         function
-        | LayerFolder layerId -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
-        | PreviousContextFolder _ as key -> uiState.PropertyColors.FolderColors |> Map.tryFind (folderId key)
-        | UnknownFolder as key -> uiState.PropertyColors.FolderColors |> Map.tryFind (folderId key)
+        | SourceFolder source -> uiState.PropertyColors.SourceColors |> Map.tryFind source.Id
+        | UnknownFolder -> None
 
     let setFolderColor (session: ProvenanceSession) folderId color state =
-        let layerId =
-            session.LayerOrder
-            |> List.tryFind (fun layerId -> PropertyFolderColors.layerFolderId layerId = folderId)
+        let sourceRefs =
+            [
+                for layer in session.Layers do
+                    yield layer.Model.Source
 
-        match layerId, color with
-        | Some layerId, Some selectedColor -> State.PropertyColors.setLayerColor layerId selectedColor state
-        | Some layerId, None -> State.PropertyColors.clearLayerColor layerId state
-        | None, Some selectedColor -> State.PropertyColors.setFolderColor folderId selectedColor state
-        | None, None -> State.PropertyColors.clearFolderColor folderId state
+                    yield!
+                        layer.Model.PropertyValues
+                        |> Map.toList
+                        |> List.map (snd >> fun propertyValue -> sourceOfOrigin propertyValue.Origin)
+
+                yield!
+                    state.PaletteValues
+                    |> Map.toList
+                    |> List.collect snd
+                    |> List.map (fun propertyValue -> sourceOfOrigin propertyValue.Origin)
+            ]
+            |> List.distinctBy (fun source -> source.Id)
+
+        let source =
+            sourceRefs
+            |> List.tryFind (fun source -> folderKeyId (SourceFolder source) = folderId)
+
+        match source, color with
+        | Some source, Some selectedColor -> State.PropertyColors.setSourceColor source.Id selectedColor state
+        | Some source, None -> State.PropertyColors.clearSourceColor source.Id state
+        | None, _ -> state
 
     let private folderSort (session: ProvenanceSession) activeLayerId key =
+        let activeLayer = Session.layerById activeLayerId session
+
         match key with
-        | LayerFolder layerId when layerId = activeLayerId -> 0, 0, folderName session key
-        | LayerFolder layerId ->
+        | SourceFolder source when source.Id = activeLayer.Model.Source.Id -> 0, 0, folderName key
+        | SourceFolder source ->
             let layerIndex =
                 session.LayerOrder
-                |> List.tryFindIndex ((=) layerId)
+                |> List.tryFindIndex (fun layerId -> (Session.layerById layerId session).Model.Source.Id = source.Id)
                 |> Option.defaultValue Int32.MaxValue
 
-            1, layerIndex, folderName session key
-        | PreviousContextFolder _ -> 2, Int32.MaxValue, folderName session key
-        | UnknownFolder -> 3, Int32.MaxValue, folderName session key
+            1, layerIndex, folderName key
+        | UnknownFolder -> 2, Int32.MaxValue, folderName key
 
-    let private manualColor (uiState: UiState) (header: ProvenancePropertyHeader) =
-        uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header }
+    let private manualColor (session: ProvenanceSession) (uiState: UiState) (header: ProvenancePropertyHeader) =
+        let layer = Session.activeLayer session
+        let colorContext = State.PropertyColors.visibleColorContextForLayer session layer
+
+        uiState.PropertyColors.ManualPropertyColors
+        |> Map.tryFind {
+            ContextId = colorContext.Id
+            Header = header
+        }
 
     let private isPlacedInCurrentLayer (layer: ProvenanceLayer) (uiState: UiState) header =
         let key = State.Keys.groupingKey header
@@ -265,19 +272,19 @@ module private PropertyShelf =
         let tooltip =
             [
                 ProvenanceKind.displayName header.Kind
-                folderName session folderKey
+                folderName folderKey
             ]
             |> List.filter (String.IsNullOrWhiteSpace >> not)
             |> String.concat " · "
 
         {
-            Id = $"{folderId folderKey}-{headerId header}"
+            Id = $"{folderKeyId folderKey}-{headerId header}"
             Label = header.Category.Name
             Payload = {
                 Header = header
                 SourceSide = sourceSide
             }
-            Color = manualColor uiState header
+            Color = manualColor session uiState header
             Badge = badge
             Tooltip =
                 if String.IsNullOrWhiteSpace tooltip then
@@ -315,7 +322,9 @@ module private PropertyShelf =
 
                 originsForHeader layer.Id sourceSide inputProjection outputProjection header
                 |> Set.toList
-                |> List.map folderKeyForOrigin
+                |> function
+                    | [] -> [ UnknownFolder ]
+                    | origins -> origins |> List.map folderKeyForOrigin
                 |> List.distinct
                 |> List.map (fun folderKey ->
                     folderKey,
@@ -325,7 +334,7 @@ module private PropertyShelf =
 
         let folderKeys =
             [
-                yield LayerFolder layer.Id
+                yield SourceFolder layer.Model.Source
                 yield! itemEntries |> List.map fst
             ]
             |> List.distinct
@@ -339,8 +348,8 @@ module private PropertyShelf =
                 |> dedupeItems
 
             {
-                Id = folderId key
-                Name = folderName session key
+                Id = folderKeyId key
+                Name = folderName key
                 Color = folderColor uiState key
                 Items = items
             }
@@ -985,6 +994,7 @@ module private EditorSurface =
 
     let propertyRail
         side
+        activeSourceId
         sideId
         (projection: PropertyRails.RailProjection)
         activeAssignments
@@ -1002,6 +1012,7 @@ module private EditorSurface =
         =
         Controls.PropertyRail(
             side,
+            activeSourceId,
             projection.Headers,
             activeAssignments,
             (fun header -> projection.ValuesByHeader |> Map.tryFind header |> Option.defaultValue []),
@@ -1615,6 +1626,7 @@ type ProvenanceGrouping =
 
             EditorSurface.propertyRail
                 side
+                layer.Model.Source.Id
                 sideId
                 (match side with
                  | ProvenanceSide.Input -> activeInputRailProjection

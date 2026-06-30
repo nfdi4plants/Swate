@@ -206,12 +206,11 @@ module DragDrop =
             tryParseHandleParts kind side sourceId parent
         | _ -> None
 
-/// Stable keys for the property shelf folders that can own fallback colors.
-module PropertyFolderColors =
+/// Stable keys for the property shelf folders.
+module PropertyFolders =
 
     open System
     open Swate.Components.Shared.ProvenanceGrouping.Types
-    open Swate.Components.Shared.ProvenanceGrouping.Session
 
     let private slug (value: string) =
         let text = if isNull value then "" else value.Trim()
@@ -235,15 +234,7 @@ module PropertyFolderColors =
         else
             compact
 
-    let layerFolderId (layerId: ProvenanceLayerId) = $"layer-{slug layerId}"
-
-    let previousContextFolderId (tableName: ProvenanceTableName option) (processName: ProvenanceProcessName option) =
-        let table = tableName |> Option.map slug |> Option.defaultValue "unknown-table"
-
-        let processSlug =
-            processName |> Option.map slug |> Option.defaultValue "unknown-process"
-
-        $"context-{processSlug}-{table}"
+    let sourceFolderId (source: ProvenanceSourceRef) = $"source-{slug source.Id}"
 
     let unknownFolderId = "unknown-origin"
 

@@ -436,6 +436,7 @@ type Controls =
     static member private PropertyRailItem
         (
             side: ProvenanceSide,
+            activeSourceId: ProvenanceSourceId,
             header: ProvenancePropertyHeader,
             propertyValues: ProvenancePropertyValue list,
             active: GroupingAssignment list,
@@ -452,7 +453,7 @@ type Controls =
             ?stats: PropertyStats,
             ?badge: PropertyCountBadge,
             ?color: ProvenanceColor,
-            ?origins: Set<PropertyOrigin>,
+            ?origins: Set<ProvenancePropertyOrigin>,
             ?onSetColor: ProvenanceColor option -> unit,
             ?sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option
         ) =
@@ -563,22 +564,18 @@ type Controls =
                     | None -> Html.none
                     match origins with
                     | Some origins ->
+                        let sourceOfOrigin =
+                            function
+                            | ProvenancePropertyOrigin.Real anchor
+                            | ProvenancePropertyOrigin.Virtual anchor -> anchor.Source
+
                         let hasCurrent =
                             origins
-                            |> Set.exists (
-                                function
-                                | PropertyOrigin.Current _ -> true
-                                | _ -> false
-                            )
+                            |> Set.exists (fun origin -> (sourceOfOrigin origin).Id = activeSourceId)
 
                         let hasUpstream =
                             origins
-                            |> Set.exists (
-                                function
-                                | PropertyOrigin.UpstreamLayer _
-                                | PropertyOrigin.PreviousContext _ -> true
-                                | _ -> false
-                            )
+                            |> Set.exists (fun origin -> (sourceOfOrigin origin).Id <> activeSourceId)
 
                         if hasCurrent && hasUpstream then
                             Html.span [
@@ -808,6 +805,7 @@ type Controls =
     static member PropertyRail
         (
             side: ProvenanceSide,
+            activeSourceId: ProvenanceSourceId,
             headers: ProvenancePropertyHeader list,
             active: GroupingAssignment list,
             valuesForHeader: ProvenancePropertyHeader -> ProvenancePropertyValue list,
@@ -823,7 +821,7 @@ type Controls =
             statsForHeader: ProvenancePropertyHeader -> PropertyStats option,
             badgeForHeader: ProvenancePropertyHeader -> PropertyCountBadge option,
             colorForHeader: ProvenancePropertyHeader -> ProvenanceColor option,
-            originsForHeader: ProvenancePropertyHeader -> Set<PropertyOrigin> option,
+            originsForHeader: ProvenancePropertyHeader -> Set<ProvenancePropertyOrigin> option,
             onSetColor: ProvenancePropertyHeader -> ProvenanceColor option -> unit,
             sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
             ?sideId: ProvenanceLayerSideId,
@@ -911,6 +909,7 @@ type Controls =
                     for header in visibleHeaders do
                         Controls.PropertyRailItem(
                             side,
+                            activeSourceId,
                             header,
                             valuesForHeader header,
                             active,
@@ -1538,9 +1537,7 @@ type Controls =
             match filter, filters.OriginFilter with
             | PropertyOriginFilter.AnyOrigin, PropertyOriginFilter.AnyOrigin -> true
             | PropertyOriginFilter.CurrentOnly, PropertyOriginFilter.CurrentOnly -> true
-            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.AnyUpstream
-            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.UpstreamLayer _
-            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.PreviousContext _ -> true
+            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.AnyUpstream -> true
             | _ -> false
 
         let originButton filter label icon =
