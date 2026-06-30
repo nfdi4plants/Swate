@@ -52,9 +52,9 @@ module MarkdownPluginPromptModal =
         let promptDescription = promptViewModel.Description |> Option.map Html.text
 
         let promptFileKey (file: MarkdownPromptFile) =
-            let hostPath = file.HostPath |> Option.defaultValue ""
+            let sourceId = file.SourceId |> Option.defaultValue ""
             let mimeType = file.MimeType |> Option.defaultValue ""
-            $"{hostPath}|{file.Name}|{mimeType}"
+            $"{sourceId}|{file.Name}|{mimeType}"
 
         BaseModal.Modal(
             isOpen = isOpen,

@@ -125,8 +125,7 @@ let tryGetItemRelativePath (item: FileItem) =
     |> Option.map PathHelpers.normalizePath
 
 let tryGetNonEmptyItemRelativePath (item: FileItem) =
-    tryGetItemRelativePath item
-    |> Option.filter (String.IsNullOrWhiteSpace >> not)
+    tryGetItemRelativePath item |> Option.filter (String.IsNullOrWhiteSpace >> not)
 
 let tryGetItemAbsolutePath (arcRootPath: string option) (item: FileItem) =
     match arcRootPath, tryGetItemRelativePath item with

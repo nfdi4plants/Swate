@@ -249,7 +249,7 @@ type TextInputWithMarkdown =
                 e.stopPropagation ()
                 setPromptFileDropActive false
 
-                // Built-in fallback: use dropped browser File objects directly.
+                // Built-in browser File objects are passed to the active file adapter, when present.
                 let files =
                     if isNull e.dataTransfer || isNull e.dataTransfer.files then
                         []

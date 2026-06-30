@@ -132,4 +132,3 @@ let throttleAndDebounce (fn: 'a -> unit, timespan: int) =
                 timespan
 
         id <- Some timeoutId
-

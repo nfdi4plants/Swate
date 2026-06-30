@@ -34,7 +34,8 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
 }
 
-let private createComposedContextMenuItems config item = createContextMenuItems config (Some "C:/Arc") item
+let private createComposedContextMenuItems config item =
+    createContextMenuItems config (Some "C:/Arc") item
 
 let private createFileItem (name: string) (path: string option) = {
     FileTree.createFile name path FileItemIcon.Document with

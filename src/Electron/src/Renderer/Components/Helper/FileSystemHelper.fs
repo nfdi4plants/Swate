@@ -1,15 +1,12 @@
 module Renderer.Components.Helper.FileSystemHelper
 
 open System
+open System.Collections.Generic
 open Browser.Types
 open Fable.Core
-open Fable.Electron
 open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
-
-module ElectronMain = Fable.Electron.Main
-module ElectronRenderer = Fable.Electron.Renderer
 
 type ExternalAssetLink = {
     sourceAbsolutePath: string
@@ -58,82 +55,6 @@ let internal fileExtensionsFromAcceptTypes (acceptTypes: string option) =
         |> Array.distinct
 
     if extensions.Length = 0 then None else Some extensions
-
-let private normalizeExtension (extension: string) =
-    extension
-    |> Option.ofObj
-    |> Option.map (fun value -> value.Trim())
-    |> Option.bind (fun value ->
-        let normalizedValue =
-            if value.StartsWith(".") then
-                value.Substring(1)
-            else
-                value
-
-        if String.IsNullOrWhiteSpace normalizedValue then
-            None
-        else
-            Some normalizedValue
-    )
-
-let private openDialogFiltersFromExtensions (filterExtensions: string[] option) =
-    let normalizedExtensions =
-        filterExtensions
-        |> Option.defaultValue [||]
-        |> Array.choose normalizeExtension
-        |> Array.distinct
-
-    if normalizedExtensions.Length = 0 then
-        None
-    else
-        Some [| FileFilter("Supported files", normalizedExtensions) |]
-
-let pickDirectory () : JS.Promise<Result<string, exn>> = promise {
-    try
-        let properties = [|
-            ElectronMain.Enums.Dialog.ShowOpenDialog.Options.Properties.OpenDirectory
-        |]
-
-        let! result = ElectronMain.dialog.showOpenDialog (properties = properties)
-
-        if result.canceled then
-            return Error(exn "Cancelled")
-        elif result.filePaths.Length <> 1 then
-            return Error(exn "Not exactly one path")
-        else
-            return Ok(result.filePaths |> Array.exactlyOne)
-    with e ->
-        return Error(exn $"Could not pick directory: {e.Message}")
-}
-
-let pickAbsolutePaths (filterExtensions: string[] option) : JS.Promise<Result<string[], exn>> = promise {
-    try
-        let properties = [|
-            ElectronMain.Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-            ElectronMain.Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-        |]
-
-        let filters = openDialogFiltersFromExtensions filterExtensions
-
-        let! result =
-            match filters with
-            | Some filters -> ElectronMain.dialog.showOpenDialog (properties = properties, filters = filters)
-            | None -> ElectronMain.dialog.showOpenDialog (properties = properties)
-
-        if result.canceled then
-            return Error(exn "Cancelled")
-        else
-            return Ok result.filePaths
-    with e ->
-        return Error(exn $"Could not pick files: {e.Message}")
-}
-
-let getPathForFile (file: File) : JS.Promise<Result<string, exn>> = promise {
-    try
-        return Ok(PathHelpers.normalizePath (ElectronRenderer.webUtils.getPathForFile file))
-    with e ->
-        return Error e
-}
 
 let private isAlreadyExistsError (error: exn) =
     error.Message.ToLowerInvariant().Contains("already exists")
@@ -185,6 +106,12 @@ let private fileNameFromPath (path: string) =
         else
             name.Trim()
 
+let private tryNormalizeNonEmptyPath (path: string) =
+    path
+    |> Option.ofObj
+    |> Option.map PathHelpers.normalizePath
+    |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
 let private assetMarkdownPath assetFolderName (fileName: string) =
     let assetFolder = PathHelpers.normalizeCanonicalRelativePath assetFolderName
     let imageFileName = fileNameFromPath fileName
@@ -194,43 +121,65 @@ let private assetMarkdownPath assetFolderName (fileName: string) =
     else
         $"{assetFolder}/{imageFileName}"
 
-let private tryGetBrowserFilePath (getPathForFile: File -> JS.Promise<Result<string, exn>>) (file: File) = promise {
+let private tryGetAbsolutePathForBrowserFile (file: File) = promise {
     try
-        match! getPathForFile file with
-        | Ok path when not (String.IsNullOrWhiteSpace path) -> return Some(PathHelpers.normalizePath path)
-        | Ok _
-        | Error _ -> return None
+        return Renderer.Types.PreloadBindings.getPathForFile file |> tryNormalizeNonEmptyPath
     with _ ->
         return None
 }
 
-let private tryResolvePromptFileHostPath
-    (tryResolveBrowserFilePath: File -> JS.Promise<string option>)
+let private tryGetStoredAbsolutePath (absolutePathsById: Dictionary<string, string>) (sourceId: string option) =
+    match sourceId with
+    | Some sourceId when not (String.IsNullOrWhiteSpace sourceId) ->
+        match absolutePathsById.TryGetValue sourceId with
+        | true, absolutePath -> tryNormalizeNonEmptyPath absolutePath
+        | _ -> None
+    | _ -> None
+
+let private tryResolvePromptFileAbsolutePath
+    (absolutePathsById: Dictionary<string, string>)
+    (tryResolveBrowserFileAbsolutePath: File -> JS.Promise<string option>)
     (file: MarkdownPromptFile)
     =
     promise {
-        match file.HostPath with
-        | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> return Some(PathHelpers.normalizePath hostPath)
-        | _ ->
+        match tryGetStoredAbsolutePath absolutePathsById file.SourceId with
+        | Some absolutePath -> return Some absolutePath
+        | None ->
             match file.BrowserFile with
-            | Some browserFile -> return! tryResolveBrowserFilePath browserFile
+            | Some browserFile -> return! tryResolveBrowserFileAbsolutePath browserFile
             | None -> return None
     }
 
-let internal createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
+let private externalAssetLink assetFolderName (file: MarkdownPromptFile) sourceAbsolutePath = {
+    sourceAbsolutePath = sourceAbsolutePath
+    markdownRelativePath = assetMarkdownPath assetFolderName file.Name
+}
+
+let private copyRequestForAsset parentPath asset = {
+    sourceAbsolutePath = asset.sourceAbsolutePath
+    targetRelativePath = combineRelativePath parentPath asset.markdownRelativePath
+    overwrite = true
+}
+
+let internal createAssetFilePickerAdapterWithAbsolutePathResolverAsync
     (pickPaths: string[] option -> JS.Promise<Result<string[], exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
-    (tryResolveBrowserFilePath: File -> JS.Promise<string option>)
+    (tryResolveBrowserFileAbsolutePath: File -> JS.Promise<string option>)
     =
+    let absolutePathsById = Dictionary<string, string>()
+
     let toPromptFile absolutePath =
-        let hostPath = PathHelpers.normalizePath absolutePath
-        let fileName = fileNameFromPath hostPath
+        let sourceAbsolutePath = PathHelpers.normalizePath absolutePath
+        let fileName = fileNameFromPath sourceAbsolutePath
+        let sourceId = Guid.NewGuid().ToString("N")
+
+        absolutePathsById.[sourceId] <- sourceAbsolutePath
 
         {
             Name = fileName
             MimeType = Some "image/*"
-            HostPath = Some hostPath
+            SourceId = Some sourceId
             BrowserFile = None
         }
 
@@ -244,29 +193,25 @@ let internal createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
             })
         ResolveMarkdownPath =
             (fun file -> promise {
-                match! tryResolvePromptFileHostPath tryResolveBrowserFilePath file with
-                | Some hostPath ->
-                    let markdownPath = assetMarkdownPath assetFolderName file.Name
-
-                    addAsset {
-                        sourceAbsolutePath = hostPath
-                        markdownRelativePath = markdownPath
-                    }
-
-                    return markdownPath
-                | _ -> return raise (exn "Could not resolve the selected image path.")
+                match! tryResolvePromptFileAbsolutePath absolutePathsById tryResolveBrowserFileAbsolutePath file with
+                | Some sourceAbsolutePath ->
+                    let asset = externalAssetLink assetFolderName file sourceAbsolutePath
+                    addAsset asset
+                    return asset.markdownRelativePath
+                | _ -> return raise (exn "Could not resolve the selected image source path.")
             })
     }
 
 let createAssetFilePickerAdapter
+    (pickExternalFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
     =
-    createAssetFilePickerAdapterWithBrowserFilePathResolverAsync
-        pickAbsolutePaths
+    createAssetFilePickerAdapterWithAbsolutePathResolverAsync
+        (fun filterExtensions -> pickExternalFilePaths { filterExtensions = filterExtensions })
         assetFolderName
         addAsset
-        (tryGetBrowserFilePath getPathForFile)
+        tryGetAbsolutePathForBrowserFile
 
 let writeFileWithOptionalExternalAssetLinks
     (writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>)
@@ -283,11 +228,7 @@ let writeFileWithOptionalExternalAssetLinks
         | Ok() ->
             let copyRequests =
                 assets
-                |> List.map (fun asset -> {
-                    sourceAbsolutePath = asset.sourceAbsolutePath
-                    targetRelativePath = combineRelativePath parentPath asset.markdownRelativePath
-                    overwrite = true
-                })
+                |> List.map (copyRequestForAsset parentPath)
                 |> List.toArray
 
             match! copyExternalFilesToArc copyRequests with

@@ -109,17 +109,12 @@ module PluginTextInputHelpers =
                 None
             else
                 Some file.``type``
-        // Browser fallback cannot reliably resolve host filesystem paths.
-        HostPath = None
+        SourceId = None
         BrowserFile = Some file
     }
 
     let resolvePromptFilePath (filePickerAdapter: MarkdownFilePickerAdapter option) (file: MarkdownPromptFile) = promise {
-        // Fallback path strategy when no host resolver is provided.
-        let fallbackPath =
-            match file.HostPath with
-            | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> normalizePath hostPath
-            | _ -> file.Name
+        let fallbackPath = file.Name
 
         match filePickerAdapter with
         | Some adapter ->

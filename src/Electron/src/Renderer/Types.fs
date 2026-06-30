@@ -1,10 +1,23 @@
 [<AutoOpenAttribute>]
 module Renderer.Types
 
+open Browser.Types
+open Fable.Core
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.GitTypes
+
+module PreloadBindings =
+
+    type ISwateElectronFileSystemApi =
+        abstract getPathForFile: File -> string
+
+    [<Global("window.swateElectron")>]
+    let private swateElectronFileSystemApi: ISwateElectronFileSystemApi = jsNative
+
+    let getPathForFile (file: File) =
+        swateElectronFileSystemApi.getPathForFile file
 
 [<RequireQualifiedAccess>]
 type LeftSidebarPage =

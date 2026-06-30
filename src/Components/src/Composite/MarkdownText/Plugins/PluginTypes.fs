@@ -12,7 +12,8 @@ type MarkdownPromptInputMode =
 type MarkdownPromptFile = {
     Name: string
     MimeType: string option
-    HostPath: string option
+    // Opaque runtime-specific identifier. This is not a filesystem path.
+    SourceId: string option
     BrowserFile: File option
 }
 
