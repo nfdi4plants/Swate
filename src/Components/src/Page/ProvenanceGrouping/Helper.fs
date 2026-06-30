@@ -247,11 +247,6 @@ module PropertyFolderColors =
 
     let unknownFolderId = "unknown-origin"
 
-    let tryOriginFolderId =
-        function
-        | PropertyOrigin.PreviousContext source -> Some(previousContextFolderId source.TableName source.ProcessName)
-        | _ -> None
-
 /// Keeps transient connector dragging outside editor state so pointer moves only
 /// repaint the overlay layer that needs the live path.
 module LiveDrag =
@@ -379,7 +374,7 @@ module PropertyRails =
         ConnectionCountByHeader: Map<ProvenancePropertyHeader, int>
         BadgeByHeader: Map<ProvenancePropertyHeader, PropertyCountBadge>
         ColorByHeader: Map<ProvenancePropertyHeader, ProvenanceColor option>
-        OriginByHeader: Map<ProvenancePropertyHeader, Set<PropertyOrigin>>
+        OriginByHeader: Map<ProvenancePropertyHeader, Set<ProvenancePropertyOrigin>>
         OriginFilterOptions: PropertyOriginFilter list
     }
 
@@ -460,14 +455,16 @@ module PropertyRails =
         |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
         |> List.filter (fun propertyValue -> propertyValue.Header = header)
 
-    let private hasPreviousOrigin session layerId header model =
+    let private anchorOfOrigin =
+        function
+        | ProvenancePropertyOrigin.Real anchor -> anchor
+        | ProvenancePropertyOrigin.Virtual anchor -> anchor
+
+    let private sourceOfOrigin origin = (anchorOfOrigin origin).Source
+
+    let private hasPreviousOrigin _session _layerId header model =
         referencedPropertyValuesForHeader header model
-        |> List.exists (fun propertyValue ->
-            match Session.propertyValueOriginInSession layerId ProvenanceSide.Input propertyValue.Id session with
-            | Some(PropertyOrigin.UpstreamLayer _)
-            | Some(PropertyOrigin.PreviousContext _) -> true
-            | _ -> false
-        )
+        |> List.exists (fun propertyValue -> (sourceOfOrigin propertyValue.Origin).Id <> model.Source.Id)
 
     let private defaultRailSideInSession session layerId header model =
         if hasPreviousOrigin session layerId header model then
@@ -548,6 +545,16 @@ module PropertyProjection =
     open Swate.Components.Shared.ProvenanceGrouping.Session
     open Swate.Components.Page.ProvenanceGrouping.Types
 
+    let anchorOfOrigin =
+        function
+        | ProvenancePropertyOrigin.Real anchor -> anchor
+        | ProvenancePropertyOrigin.Virtual anchor -> anchor
+
+    let sourceOfOrigin origin = (anchorOfOrigin origin).Source
+
+    let originIsCurrent (model: ProvenanceModel) origin =
+        (sourceOfOrigin origin).Id = model.Source.Id
+
     let propertyStatsForSide
         (side: ProvenanceSide)
         (header: ProvenancePropertyHeader)
@@ -615,33 +622,17 @@ module PropertyProjection =
         | PropertyValueCountFilter.CoverageGap, PropertyCountBadge.Coverage _ -> true
         | _ -> false
 
-    let originFilterMatches (filter: PropertyOriginFilter) (origins: Set<PropertyOrigin>) =
+    let originFilterMatches
+        (model: ProvenanceModel)
+        (filter: PropertyOriginFilter)
+        (origins: Set<ProvenancePropertyOrigin>)
+        =
         match filter with
         | PropertyOriginFilter.AnyOrigin -> true
-        | PropertyOriginFilter.CurrentOnly ->
-            origins
-            |> Set.exists (
-                function
-                | PropertyOrigin.Current _ -> true
-                | _ -> false
-            )
-        | PropertyOriginFilter.AnyUpstream ->
-            origins
-            |> Set.exists (
-                function
-                | PropertyOrigin.UpstreamLayer _
-                | PropertyOrigin.PreviousContext _ -> true
-                | _ -> false
-            )
-        | PropertyOriginFilter.UpstreamLayer layerId -> origins |> Set.contains (PropertyOrigin.UpstreamLayer layerId)
-        | PropertyOriginFilter.PreviousContext(tableName, processName) ->
-            origins
-            |> Set.exists (
-                function
-                | PropertyOrigin.PreviousContext source ->
-                    source.TableName = Some tableName && source.ProcessName = processName
-                | _ -> false
-            )
+        | PropertyOriginFilter.CurrentOnly -> origins |> Set.exists (originIsCurrent model)
+        | PropertyOriginFilter.AnyUpstream -> origins |> Set.exists (originIsCurrent model >> not)
+        | PropertyOriginFilter.Source sourceId ->
+            origins |> Set.exists (fun origin -> (sourceOfOrigin origin).Id = sourceId)
 
     let private headerNameSortKey (header: ProvenancePropertyHeader) =
         header.Category.Name.Trim().ToLowerInvariant(), header.Category.Name, header.Kind.Id
@@ -663,7 +654,7 @@ module PropertyProjection =
         model.Connections
         |> Map.toList
         |> List.sumBy (fun (_, connection) ->
-            if connection.TableName <> model.LoadedTableName then
+            if connection.Source.Id <> model.Source.Id then
                 0
             else
                 let setId =
@@ -677,20 +668,13 @@ module PropertyProjection =
         )
 
     let originForProjectedValue
-        (layerId: ProvenanceLayerId)
-        (side: ProvenanceSide)
-        (session: ProvenanceSession)
-        (uiState: UiState)
+        (_layerId: ProvenanceLayerId)
+        (_side: ProvenanceSide)
+        (_session: ProvenanceSession)
+        (_uiState: UiState)
         (propertyValue: ProvenancePropertyValue)
         =
-        let isPaletteValue =
-            State.Palette.valuesForSide layerId side uiState
-            |> List.exists (fun value -> value.Id = propertyValue.Id)
-
-        if isPaletteValue then
-            Some(PropertyOrigin.Current(layerId, side))
-        else
-            Session.propertyValueOriginInSession layerId side propertyValue.Id session
+        Some propertyValue.Origin
 
     let sortHeaders
         (sort: PropertySort)
@@ -723,7 +707,7 @@ module PropertyProjection =
             )
 
     let originFilterOptions
-        (_originByHeader: Map<ProvenancePropertyHeader, Set<PropertyOrigin>>)
+        (_originByHeader: Map<ProvenancePropertyHeader, Set<ProvenancePropertyOrigin>>)
         : PropertyOriginFilter list =
         [
             PropertyOriginFilter.AnyOrigin
@@ -776,31 +760,45 @@ module PropertyProjection =
 
         let badgeByHeader = statsByHeader |> Map.map (fun _ stats -> badgeForStats stats)
 
+        let colorContext =
+            State.PropertyColors.visibleColorContextForLayer session (Session.layerById layerId session)
+
+        let visibleColorKey header = {
+            ContextId = colorContext.Id
+            Header = header
+        }
+
+        let latestExplicitSourceColor sourceIds =
+            sourceIds
+            |> List.choose (fun sourceId ->
+                uiState.PropertyColors.SourceColorSetOrder
+                |> Map.tryFind sourceId
+                |> Option.map (fun order -> order, sourceId)
+            )
+            |> List.sortByDescending fst
+            |> List.tryHead
+            |> Option.bind (fun (_, sourceId) -> uiState.PropertyColors.SourceColors |> Map.tryFind sourceId)
+
         let resolvedColorForHeader header origins =
-            match uiState.PropertyColors.ManualPropertyColors |> Map.tryFind { Header = header } with
+            match
+                uiState.PropertyColors.ManualPropertyColors
+                |> Map.tryFind (visibleColorKey header)
+            with
             | Some color -> Some color
             | None ->
-                let layerOrigins =
+                let sourceIds =
                     origins
                     |> Set.toList
-                    |> List.choose (
-                        function
-                        | PropertyOrigin.Current(layerId, _) -> Some layerId
-                        | PropertyOrigin.UpstreamLayer layerId -> Some layerId
-                        | PropertyOrigin.PreviousContext _ -> None
+                    |> List.map (sourceOfOrigin >> fun source -> source.Id)
+                    |> List.distinct
+
+                match sourceIds with
+                | [ sourceId ] -> uiState.PropertyColors.SourceColors |> Map.tryFind sourceId
+                | _ ->
+                    latestExplicitSourceColor sourceIds
+                    |> Option.orElseWith (fun () ->
+                        uiState.PropertyColors.SourceColors |> Map.tryFind colorContext.DefaultSourceId
                     )
-                    |> List.distinct
-
-                let folderOrigins =
-                    origins
-                    |> Set.toList
-                    |> List.choose PropertyFolderColors.tryOriginFolderId
-                    |> List.distinct
-
-                match layerOrigins, folderOrigins with
-                | [ layerId ], [] -> uiState.PropertyColors.LayerColors |> Map.tryFind layerId
-                | [], [ folderId ] -> uiState.PropertyColors.FolderColors |> Map.tryFind folderId
-                | _ -> None
 
         let colorByHeader =
             headers
@@ -816,7 +814,7 @@ module PropertyProjection =
 
                 headerMatchesProjectedValues filters.SearchText header values
                 && valueCountFilterMatches filters.ValueCountFilter badge
-                && originFilterMatches filters.OriginFilter origins
+                && originFilterMatches model filters.OriginFilter origins
             )
 
         let defaultSorted =
