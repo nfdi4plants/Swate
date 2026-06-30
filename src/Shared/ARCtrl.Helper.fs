@@ -199,8 +199,23 @@ module ARCtrlHelper =
     [<RequireQualifiedAccess>]
     module ArcFileDefaults =
 
+        [<Literal>]
+        let BasicAnnotationTableRowCount = 3
+
+        let createBasicAnnotationTable (tableName: string) =
+            let table = ArcTable.init tableName
+
+            table.AddColumns [|
+                CompositeColumn.create (CompositeHeader.Input IOType.Source)
+                CompositeColumn.create CompositeHeader.ProtocolUri
+                CompositeColumn.create (CompositeHeader.Output IOType.Sample)
+            |]
+
+            table.AddRowsEmpty BasicAnnotationTableRowCount
+            table
+
         let private withInitialTable (identifier: string) (arcFile: ArcFiles) =
-            arcFile.ArcTables().InitTable($"{identifier} Table") |> ignore
+            arcFile.ArcTables().AddTable(createBasicAnnotationTable $"{identifier} Table")
             arcFile
 
         let createDefaultArcFile (fileType: ArcFilesDiscriminate) (identifier: string) =

@@ -67,7 +67,7 @@ Vitest.describe (
     "FileTreeContextMenu",
     fun () ->
         Vitest.test (
-            "ARC create drafts include an empty identifier-named table when supported",
+            "ARC create drafts include a basic identifier-named annotation table when supported",
             fun () ->
                 let tableCapableKinds = [|
                     ArcExplorerNodeKind.Study
@@ -82,9 +82,15 @@ Vitest.describe (
                     | Ok arcFile ->
                         let tables = arcFile.Tables()
                         Vitest.expect(tables.Count).toBe (1)
-                        Vitest.expect(tables.[0].Name).toBe ($"{identifier} Table")
-                        Vitest.expect(tables.[0].ColumnCount).toBe (0)
-                        Vitest.expect(tables.[0].RowCount).toBe (0)
+                        let table = tables.[0]
+                        Vitest.expect(table.Name).toBe ($"{identifier} Table")
+                        Vitest.expect(table.ColumnCount).toBe (3)
+                        Vitest.expect(table.RowCount).toBe (
+                            ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount
+                        )
+                        Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
+                        Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
+                        Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")
                     | Error error -> failwith error
 
                 match tryCreateArcFile ArcExplorerNodeKind.Workflow "Default Workflow" with

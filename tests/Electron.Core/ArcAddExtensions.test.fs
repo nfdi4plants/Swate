@@ -27,10 +27,15 @@ let private testWindow = TestHelpers.testWindow
 let private withTempArc =
     TestHelpers.withTempArcWith "swate-add-arc-file-" "AddArcFileArc"
 
-let private expectSingleEmptyTable (tables: ResizeArray<ArcTable>) (name: string) =
+let private expectBasicAnnotationTable (tables: ResizeArray<ArcTable>) (name: string) =
     Vitest.expect(tables.Count).toBe (1)
-    Vitest.expect(tables.[0].Name).toBe (name)
-    Vitest.expect(tables.[0].ColumnCount).toBe (0)
+    let table = tables.[0]
+    Vitest.expect(table.Name).toBe (name)
+    Vitest.expect(table.ColumnCount).toBe (3)
+    Vitest.expect(table.RowCount).toBe (ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount)
+    Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
+    Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
+    Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")
 
 Vitest.describe (
     "ARC AddArcFileAsync",
@@ -53,7 +58,7 @@ Vitest.describe (
 
                         Vitest.expect(arc.ContainsAssay("NewAssay")).toBe (true)
                         let addedAssay = arc.GetAssay("NewAssay")
-                        expectSingleEmptyTable addedAssay.Tables "NewAssay Table"
+                        expectBasicAnnotationTable addedAssay.Tables "NewAssay Table"
 
                         let canonicalPath = join [| arcPath; "assays"; "NewAssay"; "isa.assay.xlsx" |]
                         let! exists = pathExistsAsync canonicalPath
@@ -62,7 +67,7 @@ Vitest.describe (
                         let! reloadedArc = loadArcAsync arcPath
                         Vitest.expect(reloadedArc.ContainsAssay("NewAssay")).toBe (true)
                         let reloadedAssay = reloadedArc.GetAssay("NewAssay")
-                        expectSingleEmptyTable reloadedAssay.Tables "NewAssay Table"
+                        expectBasicAnnotationTable reloadedAssay.Tables "NewAssay Table"
                     })
         )
 
@@ -96,7 +101,7 @@ Vitest.describe (
                                 "New Assay"
 
                         let tables = arcFile.Tables()
-                        expectSingleEmptyTable tables "New Assay Table"
+                        expectBasicAnnotationTable tables "New Assay Table"
 
                         let vault = ArcVault(testWindow ())
                         let! loadedArc = loadArcAsync arcPath
@@ -118,10 +123,10 @@ Vitest.describe (
                         let! reloadedArc = loadArcAsync arcPath
                         Vitest.expect(reloadedArc.ContainsAssay("New Assay")).toBe (true)
                         let reloadedAssay = reloadedArc.GetAssay("New Assay")
-                        expectSingleEmptyTable reloadedAssay.Tables "New Assay Table"
+                        expectBasicAnnotationTable reloadedAssay.Tables "New Assay Table"
 
                         let inMemoryAssay = vault.arc.Value.GetAssay("New Assay")
-                        expectSingleEmptyTable inMemoryAssay.Tables "New Assay Table"
+                        expectBasicAnnotationTable inMemoryAssay.Tables "New Assay Table"
 
                         let openedDto =
                             FileContentDTO.fromArcByPath "assays/New Assay/isa.assay.xlsx" vault.arc.Value
@@ -133,7 +138,7 @@ Vitest.describe (
                             <| "Expected open-file DTO to decode to an assay."
 
                         let openedAssayTables = openedArcFile.Tables()
-                        expectSingleEmptyTable openedAssayTables "New Assay Table"
+                        expectBasicAnnotationTable openedAssayTables "New Assay Table"
 
                         Vitest.expect(vault.hasUnsavedArcChanges).toBe (false)
                         Vitest.expect(vault.arc.Value.hasInMemoryChanges ()).toBe (false)
@@ -183,7 +188,7 @@ Vitest.describe (
 
                         Vitest.expect(arc.ContainsStudy("NewStudy")).toBe (true)
                         let addedStudy = arc.GetStudy("NewStudy")
-                        expectSingleEmptyTable addedStudy.Tables "NewStudy Table"
+                        expectBasicAnnotationTable addedStudy.Tables "NewStudy Table"
 
                         let canonicalPath = join [| arcPath; "studies"; "NewStudy"; "isa.study.xlsx" |]
                         let! exists = pathExistsAsync canonicalPath
@@ -192,7 +197,7 @@ Vitest.describe (
                         let! reloadedArc = loadArcAsync arcPath
                         Vitest.expect(reloadedArc.ContainsStudy("NewStudy")).toBe (true)
                         let reloadedStudy = reloadedArc.GetStudy("NewStudy")
-                        expectSingleEmptyTable reloadedStudy.Tables "NewStudy Table"
+                        expectBasicAnnotationTable reloadedStudy.Tables "NewStudy Table"
                     })
         )
 
@@ -214,7 +219,7 @@ Vitest.describe (
 
                         Vitest.expect(arc.ContainsRun("NewRun")).toBe (true)
                         let addedRun = arc.GetRun("NewRun")
-                        expectSingleEmptyTable addedRun.Tables "NewRun Table"
+                        expectBasicAnnotationTable addedRun.Tables "NewRun Table"
 
                         let canonicalPath = join [| arcPath; "runs"; "NewRun"; "isa.run.xlsx" |]
                         let! exists = pathExistsAsync canonicalPath
@@ -223,7 +228,7 @@ Vitest.describe (
                         let! reloadedArc = loadArcAsync arcPath
                         Vitest.expect(reloadedArc.ContainsRun("NewRun")).toBe (true)
                         let reloadedRun = reloadedArc.GetRun("NewRun")
-                        expectSingleEmptyTable reloadedRun.Tables "NewRun Table"
+                        expectBasicAnnotationTable reloadedRun.Tables "NewRun Table"
                     })
         )
 
