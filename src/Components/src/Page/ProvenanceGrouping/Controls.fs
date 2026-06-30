@@ -234,19 +234,60 @@ type Controls =
         (
             session: ProvenanceSession,
             onSelect: ProvenanceLayerId -> unit,
-            onAddLayer: unit -> unit,
+            onAddLayer: ProvenanceSourceName -> unit,
             ?debug: bool,
-            ?layerColors: Map<ProvenanceLayerId, ProvenanceColor>,
-            ?onSetLayerColor: ProvenanceLayerId -> ProvenanceColor option -> unit
+            ?sourceColors: Map<ProvenanceSourceId, ProvenanceColor>,
+            ?onSetSourceColor: ProvenanceSourceId -> ProvenanceColor option -> unit
         ) =
+        let defaultNextLayerName (session: ProvenanceSession) =
+            $"Layer {session.LayerOrder.Length + 1}"
+
+        let isAddLayerOpen, setIsAddLayerOpen = React.useState false
+        let layerName, setLayerName = React.useState (defaultNextLayerName session)
+
+        React.useEffect ((fun () -> setLayerName (defaultNextLayerName session)), [| box session.LayerOrder.Length |])
+
+        let submitLayerName () =
+            let trimmed = if isNull layerName then "" else layerName.Trim()
+
+            if not (String.IsNullOrWhiteSpace trimmed) then
+                onAddLayer trimmed
+                setLayerName (defaultNextLayerName session)
+                setIsAddLayerOpen false
+
+        let addLayerContent =
+            Html.form [
+                prop.className "swt:flex swt:min-w-56 swt:flex-col swt:gap-2"
+                prop.onSubmit (fun event ->
+                    event.preventDefault ()
+                    submitLayerName ()
+                )
+                prop.children [
+                    Html.label [ prop.className "swt:label"; prop.text "Layer name" ]
+                    Html.input [
+                        prop.ariaLabel "Layer name"
+                        prop.className "swt:input swt:input-bordered swt:input-sm"
+                        prop.required true
+                        prop.value layerName
+                        prop.onChange setLayerName
+                    ]
+                    Html.button [
+                        prop.type'.submit
+                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                        prop.text "Create layer"
+                    ]
+                ]
+            ]
+
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
             prop.children [
                 for layerId in session.LayerOrder do
                     let layer = Session.layerById layerId session
 
-                    let layerColor =
-                        layerColors |> Option.bind (fun colors -> colors |> Map.tryFind layer.Id)
+                    let sourceColor =
+                        sourceColors
+                        |> Option.bind (fun colors -> colors |> Map.tryFind layer.Model.Source.Id)
 
                     let layerButtonClasses = [
                         "swt:btn swt:btn-sm swt:join-item"
@@ -266,12 +307,12 @@ type Controls =
                     Html.div [
                         prop.className "swt:join"
                         prop.children [
-                            match onSetLayerColor with
-                            | Some setLayerColor ->
+                            match onSetSourceColor with
+                            | Some setSourceColor ->
                                 Controls.LayerColorButton(
-                                    layer.Id,
-                                    layerColor,
-                                    setLayerColor layer.Id,
+                                    layer.Model.Source.Id,
+                                    sourceColor,
+                                    setSourceColor layer.Model.Source.Id,
                                     triggerClassName = swatchButtonClass
                                 )
                             | None ->
@@ -280,42 +321,64 @@ type Controls =
                                         yield! layerButtonClasses
                                         "swt:min-h-8 swt:w-8 swt:px-0"
                                     ]
-                                    match layerColor with
+                                    match sourceColor with
                                     | Some color when color <> "" -> prop.style [ style.backgroundColor color ]
                                     | _ -> ()
                                 ]
                             Html.button [
-                                prop.title $"View provenance layer {layer.Label}"
+                                prop.title $"View provenance layer {layer.Model.Source.Name}"
                                 prop.className layerButtonClasses
-                                prop.ariaLabel $"View provenance layer {layer.Label}"
+                                prop.ariaLabel $"View provenance layer {layer.Model.Source.Name}"
                                 if defaultArg debug false then
                                     prop.testId $"provenance-layer-{layerId}"
-                                    prop.custom ("data-provenance-layer-color", layerColor |> Option.defaultValue "")
+                                    prop.custom ("data-provenance-layer-color", sourceColor |> Option.defaultValue "")
                                 prop.onClick (fun _ -> onSelect layerId)
-                                prop.children [ Html.span layer.Label ]
+                                prop.children [ Html.span layer.Model.Source.Name ]
                             ]
                         ]
                     ]
-                Html.button [
-                    prop.title "Add layer"
-                    prop.className "swt:btn swt:btn-sm swt:btn-primary"
-                    if defaultArg debug false then
-                        prop.testId "provenance-add-layer"
-                    prop.onClick (fun _ -> onAddLayer ())
-                    prop.children [
-                        Html.i [
-                            prop.className "swt:iconify swt:fluent--add-square-multiple-20-regular swt:size-4"
+                Popover.Popover(
+                    isOpen = isAddLayerOpen,
+                    onOpenChange = setIsAddLayerOpen,
+                    ?debug =
+                        (if defaultArg debug false then
+                             Some "provenance-add-layer-popover"
+                         else
+                             None),
+                    children =
+                        React.Fragment [
+                            Popover.Trigger(
+                                Html.button [
+                                    prop.title "Add layer"
+                                    prop.type'.button
+                                    prop.className "swt:btn swt:btn-sm swt:btn-primary"
+                                    if defaultArg debug false then
+                                        prop.testId "provenance-add-layer"
+                                    prop.children [
+                                        Html.i [
+                                            prop.className
+                                                "swt:iconify swt:fluent--add-square-multiple-20-regular swt:size-4"
+                                        ]
+                                        Html.span "Layer"
+                                    ]
+                                ]
+                            )
+                            Popover.Content(
+                                children =
+                                    Html.div [
+                                        prop.className "swt:p-2"
+                                        prop.children [ addLayerContent ]
+                                    ]
+                            )
                         ]
-                        Html.span "Layer"
-                    ]
-                ]
+                )
             ]
         ]
 
     [<ReactComponent>]
     static member LayerColorButton
         (
-            layerId: ProvenanceLayerId,
+            sourceId: ProvenanceSourceId,
             currentColor: ProvenanceColor option,
             onSetColor: ProvenanceColor option -> unit,
             ?triggerClassName: string
@@ -338,9 +401,9 @@ type Controls =
                     match currentColor with
                     | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
                     | _ -> ()
-                    prop.ariaLabel $"Set color for layer {layerId}"
+                    prop.ariaLabel $"Set color for source {sourceId}"
                 ],
-            content = ColorPicker.content $"Choose color for layer {layerId}" draftColor setDraftColor onSetColor
+            content = ColorPicker.content $"Choose color for source {sourceId}" draftColor setDraftColor onSetColor
         )
 
     [<ReactComponent>]

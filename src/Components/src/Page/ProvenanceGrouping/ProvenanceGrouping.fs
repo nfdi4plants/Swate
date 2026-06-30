@@ -405,8 +405,8 @@ module private AssignmentErrors =
 /// Session-changing actions that publish patches back to the host component.
 module private EditorActions =
 
-    let addLayer session layerId inputGroups outputGroups uiState publish =
-        Display.layerCommand layerId inputGroups outputGroups uiState
+    let addLayer session layerId inputGroups outputGroups uiState name publish =
+        Display.layerCommand name layerId inputGroups outputGroups uiState
         |> fun command -> Session.addLayer command session
         |> publish
 
@@ -1456,7 +1456,7 @@ type ProvenanceGrouping =
             EditorActions.createSet session publish command
 
         let addPaletteValue side header value unit =
-            applyUiState (State.Palette.addValue layer.Id side header value unit)
+            applyUiState (State.Palette.addValue layer.Id layer.Model.Source side header value unit)
 
         let toggleSideGrouping layerId side header =
             applyUiState (State.GroupingAssignments.toggleSide layerId side header)
@@ -1474,18 +1474,20 @@ type ProvenanceGrouping =
             Session.propertyValueSourceInfo layer value
 
         let setPropertyColor header color =
+            let colorContext = State.PropertyColors.visibleColorContextForLayer session layer
+
             let update =
                 match color with
-                | Some selectedColor -> State.PropertyColors.setColor header selectedColor
-                | None -> State.PropertyColors.clearColor header
+                | Some selectedColor -> State.PropertyColors.setColor colorContext.Id header selectedColor
+                | None -> State.PropertyColors.clearColor colorContext.Id header
 
             applyUiState update
 
-        let setLayerColor layerId color =
+        let setSourceColor sourceId color =
             let update =
                 match color with
-                | Some selectedColor -> State.PropertyColors.setLayerColor layerId selectedColor
-                | None -> State.PropertyColors.clearLayerColor layerId
+                | Some selectedColor -> State.PropertyColors.setSourceColor sourceId selectedColor
+                | None -> State.PropertyColors.clearSourceColor sourceId
 
             applyUiState update
 
@@ -1918,17 +1920,18 @@ type ProvenanceGrouping =
                                     Controls.LayerTabs(
                                         session,
                                         (fun layerId -> Session.selectLayer layerId session |> publish),
-                                        (fun () ->
+                                        (fun name ->
                                             EditorActions.addLayer
                                                 session
                                                 layer.Id
                                                 inputGroups
                                                 outputGroups
                                                 uiState
+                                                name
                                                 publish
                                         ),
-                                        layerColors = uiState.PropertyColors.LayerColors,
-                                        onSetLayerColor = setLayerColor,
+                                        sourceColors = uiState.PropertyColors.SourceColors,
+                                        onSetSourceColor = setSourceColor,
                                         debug = debug
                                     )
                                     Html.div [

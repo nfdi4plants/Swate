@@ -913,7 +913,7 @@ module Display =
         )
         |> List.distinct
 
-    let layerCommand layerId inputGroups outputGroups uiState =
+    let layerCommand name layerId inputGroups outputGroups uiState =
         let inputs =
             setsInGroups layerId inputGroups uiState.SelectedInputs
             |> List.map (fun id -> ProvenanceSide.Input, id)
@@ -923,6 +923,7 @@ module Display =
             |> List.map (fun id -> ProvenanceSide.Output, id)
 
         {
+            AddLayerCommand.Name = name
             AddLayerCommand.SelectedSets = inputs @ outputs
         }
 
@@ -1108,7 +1109,7 @@ module Exports =
             State.init session
             |> State.Sides.ensure session
             |> State.PropertyPlacement.place layer.Id side header
-            |> State.PropertyColors.setLayerColor layer.Id layerColor
+            |> State.PropertyColors.setSourceColor layer.Model.Source.Id layerColor
 
         let projection =
             PropertyProjection.railProjectionWithFilters session layer.Id side layer.Model uiState
