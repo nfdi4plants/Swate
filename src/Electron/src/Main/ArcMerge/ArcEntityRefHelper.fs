@@ -1,5 +1,6 @@
 namespace Main.ArcMerge
 
+open ARCtrl
 open Swate.Components.Shared
 
 [<AutoOpen>]

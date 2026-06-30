@@ -24,7 +24,7 @@
     "start": "npm run fable -- --watch --run vite",
     "dev": "npm run start",
     "test": "npm run clean && npm run fable -- --watch --run npx vitest --project=storybook",
-    "test:run": "npm run clean && npm run fable -- --run npx vitest run --project=storybook",
+    "test:run": "npm run clean && npm run fable -- --noCache && npx vitest run --project=storybook",
     "prelink": "npm run build",
     "storybook": "npm run fable -- --watch --run storybook dev -p 6006",
     "storybook:no-compile": "storybook dev -p 6006",

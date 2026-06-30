@@ -923,7 +923,8 @@ export const ConnectionDetailsDoNotExposePropertyCreation: Story = {
     const canvas = within(canvasElement);
 
     const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
-    await userEvent.click(connector);
+    connector.focus();
+    await userEvent.keyboard('{Enter}');
 
     const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
     expect(details).toHaveTextContent('Connection IDs');

@@ -3,8 +3,9 @@ namespace Main.ARCtrlExtensions
 open System
 open ARCtrl
 open ARCtrl.Contract
-open Main.Bindings.Filesystem
 open Main.Bindings.Path
+open Main.Bindings.Filesystem
+open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOHelper
 
 [<AutoOpen>]
@@ -48,26 +49,30 @@ module ArcLoadExtensions =
         CreateContracts: string -> Contract[]
     }
 
+    let private createDefaultArcFileContracts (fileType: ArcFilesDiscriminate) (identifier: string) =
+        ARCtrlHelper.ArcFileDefaults.createDefaultArcFile fileType identifier
+        |> ArcFileCreateContracts.createContracts false
+
     let private canonicalArcFileRepairSpecs = [|
         {
             CollectionFolder = "assays"
             FileName = "isa.assay.xlsx"
-            CreateContracts = fun identifier -> (ArcAssay.init identifier).ToCreateContract(false)
+            CreateContracts = createDefaultArcFileContracts ArcFilesDiscriminate.Assay
         }
         {
             CollectionFolder = "studies"
             FileName = "isa.study.xlsx"
-            CreateContracts = fun identifier -> (ArcStudy.init identifier).ToCreateContract(false)
+            CreateContracts = createDefaultArcFileContracts ArcFilesDiscriminate.Study
         }
         {
             CollectionFolder = "workflows"
             FileName = "isa.workflow.xlsx"
-            CreateContracts = fun identifier -> (ArcWorkflow.init identifier).ToCreateContract(false)
+            CreateContracts = createDefaultArcFileContracts ArcFilesDiscriminate.Workflow
         }
         {
             CollectionFolder = "runs"
             FileName = "isa.run.xlsx"
-            CreateContracts = fun identifier -> (ArcRun.init identifier).ToCreateContract(false)
+            CreateContracts = createDefaultArcFileContracts ArcFilesDiscriminate.Run
         }
     |]
 
