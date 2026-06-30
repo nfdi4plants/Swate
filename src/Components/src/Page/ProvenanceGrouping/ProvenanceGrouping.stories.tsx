@@ -748,6 +748,30 @@ export const RendersMeasuredConnections: Story = {
   },
 };
 
+export const ConnectorOverlayDoesNotMeasureConnectionNodesWhileIdle: Story = {
+  render: () => {
+    activeMeasurementCounter?.restore();
+    activeMeasurementCounter = installConnectionNodeMeasurementCounter();
+    return <Harness />;
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    try {
+      await waitFor(() => expect(canvas.getAllByTestId('provenance-connection').length).toBeGreaterThan(0));
+      await waitForStableConnectionMeasurements();
+
+      const baseline = activeMeasurementCounter!.count();
+
+      await waitForMilliseconds(180);
+
+      expect(activeMeasurementCounter!.count()).toBe(baseline);
+    } finally {
+      activeMeasurementCounter?.restore();
+    }
+  },
+};
+
 export const RemeasuresConnectionsAfterGroupExpansion: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -1380,6 +1404,48 @@ async function moveDragPointerTo(target: Element) {
 
 function escapeRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+type ConnectionNodeMeasurementCounter = {
+  count: () => number;
+  restore: () => void;
+};
+
+let activeMeasurementCounter: ConnectionNodeMeasurementCounter | null = null;
+
+function waitForMilliseconds(milliseconds: number) {
+  return new Promise<void>((resolve) => {
+    window.setTimeout(resolve, milliseconds);
+  });
+}
+
+function installConnectionNodeMeasurementCounter(): ConnectionNodeMeasurementCounter {
+  const originalGetBoundingClientRect = Element.prototype.getBoundingClientRect;
+  let measurementCount = 0;
+
+  Element.prototype.getBoundingClientRect = function getBoundingClientRectWithCounter(this: Element) {
+    if (this instanceof HTMLElement && this.hasAttribute('data-provenance-connection-node')) {
+      measurementCount += 1;
+    }
+
+    return originalGetBoundingClientRect.call(this);
+  };
+
+  return {
+    count: () => measurementCount,
+    restore: () => {
+      Element.prototype.getBoundingClientRect = originalGetBoundingClientRect;
+      activeMeasurementCounter = null;
+    },
+  };
+}
+
+async function waitForStableConnectionMeasurements() {
+  await waitFor(async () => {
+    const before = activeMeasurementCounter!.count();
+    await waitForMilliseconds(80);
+    expect(activeMeasurementCounter!.count()).toBe(before);
+  }, { timeout: 1600 });
 }
 
 function shelfFolders(canvas: ReturnType<typeof within>) {
