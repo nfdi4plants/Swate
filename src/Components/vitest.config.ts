@@ -33,6 +33,7 @@ export default mergeConfig(
           test: {
             name: 'storybook',
             fileParallelism: false,
+            maxConcurrency: 1,
             // Enable browser mode
             browser: {
               enabled: true,

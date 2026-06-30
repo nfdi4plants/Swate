@@ -664,6 +664,17 @@ module private ConnectorObserver =
     [<Emit("$0.disconnect()")>]
     let disconnect (observer: obj) : unit = jsNative
 
+module private ConnectorMutationObserver =
+
+    [<Emit("new MutationObserver(() => $0())")>]
+    let create (callback: unit -> unit) : obj = jsNative
+
+    [<Emit("$0.observe($1, { childList: true, subtree: true, attributes: true, attributeFilter: ['class', 'style'] })")>]
+    let observe (observer: obj) (target: HTMLElement) : unit = jsNative
+
+    [<Emit("$0.disconnect()")>]
+    let disconnect (observer: obj) : unit = jsNative
+
 module private AnimationFrame =
 
     [<Emit("requestAnimationFrame($0)")>]
@@ -671,51 +682,6 @@ module private AnimationFrame =
 
     [<Emit("cancelAnimationFrame($0)")>]
     let cancel (_handle: float) : unit = jsNative
-
-module private ConnectorPositionObserver =
-
-    let private rounded (value: float) = System.Math.Round(value, 2)
-
-    let private signature (container: HTMLElement) =
-        let origin = container.getBoundingClientRect ()
-
-        ConnectorDom.querySelectorAll container "[data-provenance-connection-node]"
-        |> Array.choose (fun node ->
-            let id = node.getAttribute "data-provenance-connection-node"
-
-            if isNull id then
-                None
-            else
-                let rect = node.getBoundingClientRect ()
-
-                let centerX = rect.left - origin.left + float container.scrollLeft + rect.width / 2.
-
-                let centerY = rect.top - origin.top + float container.scrollTop + rect.height / 2.
-
-                Some $"{id}:{rounded centerX}:{rounded centerY}:{rounded rect.width}:{rounded rect.height}"
-        )
-        |> Array.sort
-        |> String.concat "|"
-
-    let watch (container: HTMLElement) (onChange: unit -> unit) =
-        let lastSignature = ref (signature container)
-        let frame = ref None
-
-        let rec tick () =
-            let nextSignature = signature container
-
-            if nextSignature <> lastSignature.Value then
-                lastSignature.Value <- nextSignature
-                onChange ()
-
-            frame.Value <- Some(AnimationFrame.request tick)
-
-        frame.Value <- Some(AnimationFrame.request tick)
-
-        fun () ->
-            match frame.Value with
-            | Some handle -> AnimationFrame.cancel handle
-            | None -> ()
 
 [<Erase; Mangle(false)>]
 type ConnectorOverlay =
@@ -756,6 +722,7 @@ type ConnectorOverlay =
             inputRailProjection: PropertyRails.RailProjection,
             outputRailProjection: PropertyRails.RailProjection,
             overlayState: ConnectorOverlayState,
+            layoutSignature: string,
             showPropertyHeaderConnectors: bool,
             liveDragStore: LiveDrag.Store,
             onSelect: DisplayConnection -> unit,
@@ -816,22 +783,51 @@ type ConnectorOverlay =
                     let onLayout = fun (_: Event) -> scheduleMeasure ()
                     container.addEventListener ("scroll", onLayout)
                     Browser.Dom.window.addEventListener ("resize", onLayout)
+
                     let observer = ConnectorObserver.create scheduleMeasure
-                    let stopPositionObserver = ConnectorPositionObserver.watch container scheduleMeasure
-                    ConnectorObserver.observeNode observer container
-                    // Resize nodes are the content-sized boxes (property headers, value
-                    // chips); their handles move when the box grows, without the handle
-                    // itself changing size, so the boxes must be observed directly.
-                    ConnectorObserver.observeMatching
-                        container
-                        "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
-                        observer
+
+                    let observeCurrentNodes () =
+                        ConnectorObserver.observeNode observer container
+
+                        ConnectorObserver.observeMatching
+                            container
+                            "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
+                            observer
+
+                    let mutationFrame = ref (None: float option)
+
+                    let cancelMutationFrame () =
+                        match mutationFrame.Value with
+                        | Some handle ->
+                            AnimationFrame.cancel handle
+                            mutationFrame.Value <- None
+                        | None -> ()
+
+                    let scheduleMutationMeasure () =
+                        match mutationFrame.Value with
+                        | Some _ -> ()
+                        | None ->
+                            mutationFrame.Value <-
+                                Some(
+                                    AnimationFrame.request (fun () ->
+                                        mutationFrame.Value <- None
+                                        observeCurrentNodes ()
+                                        scheduleMeasure ()
+                                    )
+                                )
+
+                    let mutationObserver =
+                        ConnectorMutationObserver.create (fun () -> scheduleMutationMeasure ())
+
+                    observeCurrentNodes ()
+                    ConnectorMutationObserver.observe mutationObserver container
 
                     FsReact.createDisposable (fun () ->
                         container.removeEventListener ("scroll", onLayout)
                         Browser.Dom.window.removeEventListener ("resize", onLayout)
                         ConnectorObserver.disconnect observer
-                        stopPositionObserver ()
+                        ConnectorMutationObserver.disconnect mutationObserver
+                        cancelMutationFrame ()
                         cancelPendingFrame ()
                     )
             ),
@@ -848,6 +844,8 @@ type ConnectorOverlay =
                 box showPropertyHeaderConnectors
             |]
         )
+
+        React.useEffect ((fun () -> scheduleMeasure ()), [| box layoutSignature |])
 
         let selectedConnectionId = overlayState.SelectedConnectionId
 

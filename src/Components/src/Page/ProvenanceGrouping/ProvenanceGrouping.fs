@@ -1806,6 +1806,18 @@ type ProvenanceGrouping =
                 ]
             ]
 
+        let connectorLayoutSignature =
+            [
+                string tier
+                string openRail
+                string density
+                string isPropertyShelfExpanded
+                string panelRatios.Left
+                string panelRatios.Middle
+                string panelRatios.Right
+            ]
+            |> String.concat "|"
+
         let connectorOverlay =
             ConnectorOverlay.Main(
                 surfaceRef,
@@ -1817,6 +1829,7 @@ type ProvenanceGrouping =
                 activeInputRailProjection,
                 activeOutputRailProjection,
                 ConnectorOverlayState.fromUiState uiState,
+                connectorLayoutSignature,
                 showPropertyHeaderConnectors,
                 liveDragStore.current,
                 (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),

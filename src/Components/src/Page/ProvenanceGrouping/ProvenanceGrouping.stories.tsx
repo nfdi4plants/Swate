@@ -431,8 +431,8 @@ export const SingleSidedShelfPropertiesCannotDropOnOppositeSide: Story = {
     const source = await shelfProperty(canvas, 'Analysis');
     const inputRail = canvas.getByTestId('provenance-property-rail-Input');
 
-    await startDragByPointer(source);
-    const pointer = await moveDragPointerTo(inputRail);
+    const pointer = await startDragByPointer(source);
+    await moveDragPointerTo(inputRail, pointer.pointerId);
     await waitFor(() => {
       expect(inputRail).toHaveAttribute('data-provenance-drop-state', 'rejecting');
       expect(inputRail).toHaveClass('swt:border-warning');
@@ -444,7 +444,7 @@ export const SingleSidedShelfPropertiesCannotDropOnOppositeSide: Story = {
       button: 0,
       buttons: 0,
       isPrimary: true,
-      pointerId: 1,
+      pointerId: pointer.pointerId,
     });
     await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument());
 
@@ -627,7 +627,7 @@ export const RailValueShowsDragIndicatorWhileDragging: Story = {
     const canvas = within(canvasElement);
     const source = await railValue(canvas, 'Output', 'Analysis', 'Mass Spectrometry');
 
-    await startDragByPointer(source);
+    const pointer = await startDragByPointer(source);
 
     await waitFor(() => expect(source).toHaveClass('swt:ring-2'));
     await waitFor(() => expect(screen.getByTestId('provenance-drag-overlay-value')).toHaveTextContent('Mass Spectrometry'));
@@ -637,7 +637,7 @@ export const RailValueShowsDragIndicatorWhileDragging: Story = {
       button: 0,
       buttons: 0,
       isPrimary: true,
-      pointerId: 1,
+      pointerId: pointer.pointerId,
     });
   },
 };
@@ -795,6 +795,54 @@ export const RemeasuresConnectionsAfterGroupExpansion: Story = {
   },
 };
 
+export const ConnectorPathsUpdateAfterPanelResize: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const surface = canvas.getByTestId('provenance-surface');
+
+    await waitFor(() => expect(canvas.getAllByTestId('provenance-connection').length).toBeGreaterThan(0));
+
+    const path = firstMeasuredConnectorPath(canvasElement);
+    const before = path.getAttribute('d');
+    expect(before).not.toBeNull();
+
+    const splitter = canvas.getByTestId('provenance-left-splitter');
+    const surfaceRect = surface.getBoundingClientRect();
+    const splitterRect = splitter.getBoundingClientRect();
+    const pointerId = 41;
+
+    fireEvent.pointerDown(splitter, {
+      clientX: splitterRect.left + 2,
+      clientY: splitterRect.top + 8,
+      button: 0,
+      buttons: 1,
+      isPrimary: true,
+      pointerId,
+    });
+
+    fireEvent.pointerMove(document, {
+      clientX: surfaceRect.left + surfaceRect.width * 0.36,
+      clientY: splitterRect.top + 8,
+      button: 0,
+      buttons: 1,
+      isPrimary: true,
+      pointerId,
+    });
+
+    fireEvent.pointerUp(document, {
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId,
+    });
+
+    await waitFor(() => expect(firstMeasuredConnectorPath(canvasElement).getAttribute('d')).not.toBe(before), {
+      timeout: 1200,
+    });
+  },
+};
+
 export const RendersConnectionsForQuotedGroupingValues: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -820,14 +868,14 @@ export const ShowsLiveConnectionPreviewWhileDraggingHandle: Story = {
     const input = canvas.getByText('Input C').closest('article')!;
     const handle = within(input).getByTestId('provenance-connection-handle-Input-GroupCard');
 
-    await startDragByPointer(handle);
+    const pointer = await startDragByPointer(handle);
 
     await waitFor(() => {
       const preview = canvas.getByTestId('provenance-live-connection');
       expect(preview.getAttribute('d')).toMatch(/^M\s+\d/);
     });
 
-    fireEvent.pointerUp(document, { button: 0, buttons: 0, isPrimary: true, pointerId: 1 });
+    fireEvent.pointerUp(document, { button: 0, buttons: 0, isPrimary: true, pointerId: pointer.pointerId });
     await waitFor(() => expect(canvas.queryByTestId('provenance-live-connection')).not.toBeInTheDocument());
   },
 };
@@ -934,6 +982,27 @@ export const CollapsedPropertiesConnectToMatchingGroupsAutomatically: Story = {
     // from the values they contain.
     expect(canvas.queryByTestId('provenance-connection-handle-Input-PropertyHeader')).not.toBeInTheDocument();
     expect(canvas.queryByTestId('provenance-connection-handle-Output-PropertyHeader')).not.toBeInTheDocument();
+  },
+};
+
+export const PropertyConnectorPathsUpdateWhenRailControlsAppear: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
+
+    const before = await waitFor(() => {
+      const path = firstPropertyConnectorPath(canvasElement, 'Species');
+      expect(path.getAttribute('d')).not.toBeNull();
+      return path.getAttribute('d');
+    });
+
+    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Species'));
+
+    await waitFor(() => expect(firstPropertyConnectorPath(canvasElement, 'Species').getAttribute('d')).not.toBe(before), {
+      timeout: 1200,
+    });
   },
 };
 
@@ -1304,7 +1373,35 @@ export const AddsNewPropertyFromRail: Story = {
   },
 };
 
+let nextPointerId = 100;
+
+function allocatePointerId() {
+  nextPointerId += 1;
+  return nextPointerId;
+}
+
+function nextFrame() {
+  return new Promise((resolve) => requestAnimationFrame(resolve));
+}
+
+function activeDragElement() {
+  return document.body.querySelector(
+    [
+      '[data-testid="foldered-draggable-drag-overlay"]',
+      '[data-testid="provenance-drag-overlay-property"]',
+      '[data-testid="provenance-drag-overlay-value"]',
+      '[data-testid="provenance-live-connection"]',
+    ].join(','),
+  );
+}
+
+async function waitForDragActivation() {
+  await waitFor(() => expect(activeDragElement()).not.toBeNull(), { timeout: 2000 });
+  await nextFrame();
+}
+
 async function dragByPointer(source: Element, target: Element) {
+  const pointerId = allocatePointerId();
   const from = source.getBoundingClientRect();
   const to = target.getBoundingClientRect();
   const fromX = from.left + from.width / 2;
@@ -1316,14 +1413,13 @@ async function dragByPointer(source: Element, target: Element) {
   const distance = Math.hypot(deltaX, deltaY) || 1;
   const activationX = fromX + (deltaX / distance) * 8;
   const activationY = fromY + (deltaY / distance) * 8;
-  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
   fireEvent.pointerDown(source, {
     clientX: fromX,
     clientY: fromY,
     button: 0,
     buttons: 1,
     isPrimary: true,
-    pointerId: 1,
+    pointerId,
   });
   await nextFrame();
   fireEvent.pointerMove(target, {
@@ -1332,16 +1428,16 @@ async function dragByPointer(source: Element, target: Element) {
     button: 0,
     buttons: 1,
     isPrimary: true,
-    pointerId: 1,
+    pointerId,
   });
-  await nextFrame();
+  await waitForDragActivation();
   fireEvent.pointerMove(document, {
     clientX: toX,
     clientY: toY,
     button: 0,
     buttons: 1,
     isPrimary: true,
-    pointerId: 1,
+    pointerId,
   });
   await nextFrame();
   fireEvent.pointerUp(target, {
@@ -1350,25 +1446,25 @@ async function dragByPointer(source: Element, target: Element) {
     button: 0,
     buttons: 0,
     isPrimary: true,
-    pointerId: 1,
+    pointerId,
   });
   await nextFrame();
 }
 
 async function startDragByPointer(source: Element) {
+  const pointerId = allocatePointerId();
   const from = source.getBoundingClientRect();
   const fromX = from.left + from.width / 2;
   const fromY = from.top + from.height / 2;
   const activationX = fromX + 8;
   const activationY = fromY;
-  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
   fireEvent.pointerDown(source, {
     clientX: fromX,
     clientY: fromY,
     button: 0,
     buttons: 1,
     isPrimary: true,
-    pointerId: 1,
+    pointerId,
   });
   await nextFrame();
   fireEvent.pointerMove(document, {
@@ -1377,25 +1473,24 @@ async function startDragByPointer(source: Element) {
     button: 0,
     buttons: 1,
     isPrimary: true,
-    pointerId: 1,
+    pointerId,
   });
-  await nextFrame();
+  await waitForDragActivation();
 
-  return { x: activationX, y: activationY };
+  return { x: activationX, y: activationY, pointerId };
 }
 
-async function moveDragPointerTo(target: Element) {
+async function moveDragPointerTo(target: Element, pointerId: number) {
   const to = target.getBoundingClientRect();
   const toX = to.left + to.width / 2;
   const toY = to.top + to.height / 2;
-  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
   fireEvent.pointerMove(document, {
     clientX: toX,
     clientY: toY,
     button: 0,
     buttons: 1,
     isPrimary: true,
-    pointerId: 1,
+    pointerId,
   });
   await nextFrame();
 
@@ -1446,6 +1541,25 @@ async function waitForStableConnectionMeasurements() {
     await waitForMilliseconds(80);
     expect(activeMeasurementCounter!.count()).toBe(before);
   }, { timeout: 1600 });
+}
+
+function firstMeasuredConnectorPath(canvasElement: HTMLElement): SVGPathElement {
+  const path = canvasElement.querySelector<SVGPathElement>('[data-testid="provenance-connection"]');
+  if (!(path instanceof SVGPathElement)) {
+    throw new Error('Expected a measured provenance connector path.');
+  }
+  return path;
+}
+
+function firstPropertyConnectorPath(canvasElement: HTMLElement, propertyName: string): SVGPathElement {
+  const path = Array.from(canvasElement.querySelectorAll<SVGPathElement>('[data-testid="provenance-property-connection"]'))
+    .find((candidate) => candidate.getAttribute('data-provenance-connection-key')?.includes(propertyName));
+
+  if (!path) {
+    throw new Error(`Expected a measured property connector path for "${propertyName}".`);
+  }
+
+  return path;
 }
 
 function shelfFolders(canvas: ReturnType<typeof within>) {
