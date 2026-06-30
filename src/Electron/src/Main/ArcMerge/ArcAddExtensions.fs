@@ -45,7 +45,7 @@ module ArcAddExtensions =
                 assay.Identifier
                 (sourceArc.ContainsAssay assay.Identifier)
                 (fun arc -> arc.AddAssay assayCopy)
-                (fun () -> assayCopy.ToCreateContract(true))
+                (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Assay assayCopy))
                 includeUpdateContractsFlag
         | ArcFiles.Study(study, _) ->
             let studyCopy = study.Copy()
@@ -56,7 +56,7 @@ module ArcAddExtensions =
                 study.Identifier
                 (sourceArc.ContainsStudy study.Identifier)
                 (fun arc -> arc.AddStudy studyCopy)
-                (fun () -> studyCopy.ToCreateContract(true))
+                (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Study(studyCopy, [])))
                 includeUpdateContractsFlag
         | ArcFiles.Run run ->
             let runCopy = run.Copy()
@@ -67,7 +67,7 @@ module ArcAddExtensions =
                 run.Identifier
                 (sourceArc.ContainsRun run.Identifier)
                 (fun arc -> arc.AddRun runCopy)
-                (fun () -> runCopy.ToCreateContract(true))
+                (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Run runCopy))
                 includeUpdateContractsFlag
         | ArcFiles.Workflow workflow ->
             let workflowCopy = workflow.Copy()
@@ -78,7 +78,7 @@ module ArcAddExtensions =
                 workflow.Identifier
                 (sourceArc.ContainsWorkflow workflow.Identifier)
                 (fun arc -> arc.AddWorkflow workflowCopy)
-                (fun () -> workflowCopy.ToCreateContract(true))
+                (fun () -> ArcFileCreateContracts.createContracts true (ArcFiles.Workflow workflowCopy))
                 includeUpdateContractsFlag
         | ArcFiles.Investigation _ -> failwith "Adding investigation files is not supported."
         | ArcFiles.DataMap _ -> failwith "Adding datamap files is not supported."

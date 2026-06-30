@@ -161,6 +161,36 @@ Vitest.describe (
     "FileTreeContextMenu",
     fun () ->
         Vitest.test (
+            "ARC create drafts include a basic identifier-named annotation table when supported",
+            fun () ->
+                let tableCapableKinds = [|
+                    ArcExplorerNodeKind.Study
+                    ArcExplorerNodeKind.Assay
+                    ArcExplorerNodeKind.Run
+                |]
+
+                for kind in tableCapableKinds do
+                    let identifier = $"Default {ArcExplorerNodeKind.label kind}"
+
+                    match tryCreateArcFile kind identifier with
+                    | Ok arcFile ->
+                        let tables = arcFile.Tables()
+                        Vitest.expect(tables.Count).toBe (1)
+                        let table = tables.[0]
+                        Vitest.expect(table.Name).toBe ($"{identifier} Table")
+                        Vitest.expect(table.ColumnCount).toBe (3)
+                        Vitest.expect(table.RowCount).toBe (ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount)
+                        Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
+                        Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
+                        Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")
+                    | Error error -> failwith error
+
+                match tryCreateArcFile ArcExplorerNodeKind.Workflow "Default Workflow" with
+                | Ok arcFile -> Vitest.expect(arcFile.Tables().Count).toBe (0)
+                | Error error -> failwith error
+        )
+
+        Vitest.test (
             "folder path actions reveal the folder location only",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")

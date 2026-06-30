@@ -86,6 +86,19 @@ module ARCtrlHelper =
 
             combineMany [| folderName; dmpi.ParentId; DatamapFileName |]
 
+    let createNewTableName (tables: seq<ArcTable>) =
+        let existingNames = tables |> Seq.map _.Name |> Set.ofSeq
+
+        let rec loop index =
+            let name = $"New Table {index}"
+
+            if existingNames.Contains name then
+                loop (index + 1)
+            else
+                name
+
+        loop 0
+
     type ArcFiles =
         | Template of Template
         | Investigation of ArcInvestigation
@@ -182,6 +195,36 @@ module ARCtrlHelper =
             | ArcFiles.Workflow workflow -> ArcFiles.Workflow <| workflow.Copy()
             | ArcFiles.DataMap(parent, dataMap) -> ArcFiles.DataMap(parent, dataMap.Copy())
             | ArcFiles.Template template -> ArcFiles.Template <| template.Copy()
+
+    [<RequireQualifiedAccess>]
+    module ArcFileDefaults =
+
+        [<Literal>]
+        let BasicAnnotationTableRowCount = 3
+
+        let createBasicAnnotationTable (tableName: string) =
+            let table = ArcTable.init tableName
+
+            table.AddColumns [|
+                CompositeColumn.create (CompositeHeader.Input IOType.Source)
+                CompositeColumn.create CompositeHeader.ProtocolUri
+                CompositeColumn.create (CompositeHeader.Output IOType.Sample)
+            |]
+
+            table.AddRowsEmpty BasicAnnotationTableRowCount
+            table
+
+        let private withInitialTable (identifier: string) (arcFile: ArcFiles) =
+            arcFile.ArcTables().AddTable(createBasicAnnotationTable $"{identifier} Table")
+            arcFile
+
+        let createDefaultArcFile (fileType: ArcFilesDiscriminate) (identifier: string) =
+            match fileType with
+            | ArcFilesDiscriminate.Study -> ArcFiles.Study(ArcStudy.init identifier, []) |> withInitialTable identifier
+            | ArcFilesDiscriminate.Assay -> ArcFiles.Assay(ArcAssay.init identifier) |> withInitialTable identifier
+            | ArcFilesDiscriminate.Workflow -> ArcFiles.Workflow(ArcWorkflow.init identifier)
+            | ArcFilesDiscriminate.Run -> ArcFiles.Run(ArcRun.init identifier) |> withInitialTable identifier
+            | unsupportedFileType -> failwithf "Cannot create default ARC file for %A." unsupportedFileType
 
     [<RequireQualifiedAccess>]
     type JsonExportFormat =
