@@ -1758,7 +1758,7 @@ export const ExpandedGroupedCardsDoNotExpandConnectedSingleCards: Story = {
   },
 };
 
-export const LayerTabsUseConceptualLayerColorsAndSideRails: Story = {
+export const LayerTabsUseSourceColorsAndSideRails: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
