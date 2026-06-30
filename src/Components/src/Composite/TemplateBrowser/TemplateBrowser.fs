@@ -41,7 +41,7 @@ type TemplateBrowser =
         else
             Html.none
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member TemplateBrowser
         (
             templates: Template[],

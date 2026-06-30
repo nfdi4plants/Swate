@@ -92,7 +92,7 @@ type ArcSelector =
             prop.onClick (fun _ -> onClick (arcPointer))
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (
             recentARCs: ARCPointer[],

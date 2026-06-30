@@ -166,7 +166,7 @@ type Actionbar =
                 ]
             ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (
             buttons: ButtonInfo[],

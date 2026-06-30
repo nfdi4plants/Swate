@@ -30,7 +30,7 @@ type TemplateImportModalPreview =
             ]
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member TemplateImportModalPreview(templates: Template[], callbacks: TemplateTypes.TemplatePreviewCallbacks) =
         if templates.Length = 0 then
             Html.div [

@@ -5,4 +5,4 @@ open Fable.Core.JsInterop
 
 [<Erase>]
 type SwateStyle =
-    static member import = importSideEffects "./swateBundleStyle.css"
+    static member import = importSideEffects "./swate-components.css"

@@ -36,7 +36,7 @@ type ContextMenu =
     /// state and can be accessed in context menu item onClick handlers. By default stores just the
     /// event target. Only if Some is returned context menu is opened.</param>
     /// <returns></returns>
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member ContextMenu
         (
             childInfo: obj -> ContextMenuItem list,

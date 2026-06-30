@@ -169,14 +169,9 @@ let updateRelease (token: string) (version: Changelog.Version) (fn: ReleaseRespo
         Http.Request(endpoint, httpMethod = "PATCH", headers = mkHeaders token, body = TextRequest json)
         |> Ok
 
-/// Replaces if asset of the same name exists
-let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: string) =
-
-    let release =
-        tryGetLatestRelease token version
-        |> Option.defaultWith (fun () -> failwithf "Release for version %O not found" version.Version)
-
+let private uploadAssetToRelease (token: string) (release: ReleaseResponse) (filePath: string) =
     let fileName = Path.GetFileName(filePath)
+    let fileBytes = File.ReadAllBytes(filePath)
 
     let existingAsset = release.assets |> Array.tryFind (fun a -> a.name = fileName)
 
@@ -194,14 +189,10 @@ let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: s
             query = [ "name", fileName; "label", fileName ]
         )
         |> ignore
-
-        ()
     | None -> printGreenfn "[GitHub] Uploading asset %s..." fileName
 
     let endpoint =
         $"https://uploads.github.com/repos/{ProjectInfo.gitOwner}/{ProjectInfo.project}/releases/{release.id}/assets"
-
-    let fileBytes = File.ReadAllBytes(filePath)
 
     Http.Request(
         endpoint,
@@ -210,3 +201,33 @@ let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: s
         query = [ "name", fileName; "label", fileName ],
         body = BinaryUpload fileBytes
     )
+    |> ignore
+
+/// Replaces if asset of the same name exists
+let uploadReleaseAsset (token: string) (version: Changelog.Version) (filePath: string) =
+
+    let release =
+        tryGetLatestRelease token version
+        |> Option.defaultWith (fun () -> failwithf "Release for version %O not found" version.Version)
+
+    uploadAssetToRelease token release filePath
+
+/// Uploads all files in a directory (recursively) as release assets
+let uploadReleaseAssets (token: string) (version: Changelog.Version) (dir: string) =
+    if not (Directory.Exists(dir)) then
+        printRedfn "[GitHub] Directory not found: %s" dir
+        exit 1
+
+    let release =
+        tryGetLatestRelease token version
+        |> Option.defaultWith (fun () -> failwithf "Release for version %O not found" version.Version)
+
+    let files = Directory.GetFiles(dir, "*", SearchOption.AllDirectories)
+
+    if files.Length = 0 then
+        printGreenfn "[GitHub] No assets found in %s, skipping upload." dir
+    else
+        for file in files do
+            uploadAssetToRelease token release file |> ignore
+
+        printGreenfn "[GitHub] Uploaded %d assets to release %O" files.Length version.Version

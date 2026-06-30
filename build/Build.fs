@@ -1,4 +1,5 @@
 open System
+open System.IO
 open ProjectInfo
 
 [<EntryPoint>]
@@ -65,7 +66,7 @@ let main args =
         let isDryRun = otherArgs |> List.contains "--dry-run"
         let isCi = otherArgs |> List.contains "--ci"
 
-        if not isCi then
+        if not isCi && not isDryRun then
             printRedfn "Currently the worklow only supports CI releases!"
             exit 1
 
@@ -104,10 +105,24 @@ let main args =
 
             printGreenfn ("Release docker!")
             0
-        | "electron" ->
-            let GithubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
-            Release.electron latestVersion GithubToken isDryRun
-            printGreenfn ("Release electron!")
+        // electron-web builds the prebundled web client frontend,
+        // historically used as an iframe in an external Electron app.
+        | "electron-web" ->
+            Release.electron ()
+            printGreenfn ("Release electron-web!")
+            0
+        | "electron-bin" ->
+            let arch =
+                otherArgs
+                |> List.tryFind (fun x -> x.StartsWith "--arch=")
+                |> Option.map (fun x -> x.Substring 7)
+                |> Option.defaultWith (fun () ->
+                    printRedfn "No --arch provided for electron-bin target!"
+                    exit 1
+                )
+
+            Release.electronBinaries arch
+            printGreenfn "Release electron-bin for arch %s!" arch
             0
         | "storybook" ->
             printfn "Starting Storybook release!"
@@ -124,6 +139,8 @@ let main args =
         let tags = Git.getTags () |> Array.toList |> List.distinct
 
         let nextTag = latestVersion.Version.ToString()
+
+        GHActions.setVersion nextTag
 
         let releaseAlreadyExists = tags |> List.contains (nextTag)
 
@@ -143,10 +160,13 @@ let main args =
             | None -> GitHub.mkRelease GitHubToken latestVersion |> ignore
 
             0
-    | "postrelease" :: _ ->
+    | "postrelease" :: dir :: _ ->
 
         let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
         let latestVersion = Changelog.getLatestVersion ()
+
+        GitHub.uploadReleaseAssets GitHubToken latestVersion dir
+
         let isPrerelease = latestVersion.Version.IsPrerelease
 
         GitHub.updateRelease
@@ -159,6 +179,14 @@ let main args =
                     make_latest = Some "true"
             })
         |> ignore
+
+        0
+    | "upload-release-assets" :: dir :: _ ->
+
+        let GitHubToken = getEnvironementVariableOrFail "GITHUB_TOKEN"
+        let latestVersion = Changelog.getLatestVersion ()
+
+        GitHub.uploadReleaseAssets GitHubToken latestVersion dir
 
         0
     | "dev" :: a ->
