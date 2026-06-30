@@ -8,6 +8,10 @@ open Swate.Components.Primitive.ErrorModal.Types
 
 let mutable private gitVersionCheckStarted = false
 
+let private isLfsUploadProgress (progress: Swate.Components.Page.GitSidebarTypes.GitSidebarProgress) =
+    progress.Method = Some "lfs"
+    && progress.Stage = Some "Uploading Git LFS objects"
+
 [<ReactComponent>]
 let Main () =
 
@@ -89,6 +93,9 @@ let Main () =
             }
         )
     | Some _ ->
+        let canCancelOperation =
+            gitStateCtx.state.CurrentProgress |> Option.exists isLfsUploadProgress
+
         Swate.Components.Page.GitSidebar.Main(
             status = gitStateCtx.state.Status,
             changedFiles = gitStateCtx.state.ChangedFiles,
@@ -124,10 +131,12 @@ let Main () =
                 OnSelectChange = gitStateCtx.selectChange
                 OnPruneLfsCache = gitStateCtx.pruneLfsCache
                 OnDedupLfsStorage = gitStateCtx.dedupLfsStorage
+                OnCancelOperation = gitStateCtx.cancelOperation
             },
             downloadLargeFiles = gitStateCtx.state.DownloadLargeFiles,
             lfsAutoTrackThresholdMb = gitStateCtx.state.LfsAutoTrackThresholdMb,
             remoteActionsEnabled = remoteActionsEnabled,
+            canCancelOperation = canCancelOperation,
             canOpenRemoteRepository = gitStateCtx.state.OriginRemoteRepositoryWebUrl.IsSome,
             onSubmitPublishRename = gitStateCtx.submitPublishRename,
             onCancelPublishRename = gitStateCtx.cancelPublishRename,

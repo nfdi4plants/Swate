@@ -12,7 +12,7 @@ type ProvenanceEditorChange = {
     Patches: ProvenanceTablePatch list
 }
 
-type LayerViewState = {
+type SideViewState = {
     GroupingAssignments: GroupingAssignment list
 }
 
@@ -45,6 +45,17 @@ type ValueAssignmentError =
     | MixedPropertyValueCounts of ProvenancePropertyHeader
     | MultiplePropertyValues of ProvenancePropertyHeader * ProvenanceSetId list
 
+type PropertyAssignmentBatch = {
+    Adds: CreateLoadedPropertyValueCommand list
+    Overwrites: ValueAssignmentWarning list
+}
+
+type PendingAssignmentBatch = {
+    Batch: PropertyAssignmentBatch
+    AffectedSideCount: int
+    AffectedValueCount: int
+}
+
 type PanelRatios = { Left: int; Middle: int; Right: int }
 
 [<RequireQualifiedAccess>]
@@ -73,32 +84,84 @@ type LiveConnectionDrag = {
 }
 
 type PendingMemberResolution = {
-    PairId: ProvenancePairId
+    LayerId: ProvenanceLayerId
     InputGroupId: string
     OutputGroupId: string
     InputMemberCount: int
     OutputMemberCount: int
 }
 
-type ManualResolutionPair = {
-    PairId: ProvenancePairId
-    InputGroupId: string
-    OutputGroupId: string
+type ProvenanceColor = string
+
+type PropertyColorSettings = {
+    ManualPropertyColors: Map<GroupingKey, ProvenanceColor>
+    LayerColors: Map<ProvenanceLayerId, ProvenanceColor>
+    FolderColors: Map<string, ProvenanceColor>
 }
 
+[<RequireQualifiedAccess>]
+type PropertySort =
+    | ValueCountDesc
+    | NameAsc
+    | ConnectionCountDesc
+
+[<RequireQualifiedAccess>]
+type GroupSort =
+    | NameAsc
+    | MemberCountDesc
+    | ConnectionCountDesc
+
+[<RequireQualifiedAccess>]
+type PropertyValueCountFilter =
+    | Any
+    | Singleton
+    | Multiple
+    | CoverageGap
+
+[<RequireQualifiedAccess>]
+type PropertyOriginFilter =
+    | AnyOrigin
+    | CurrentOnly
+    | AnyUpstream
+    | UpstreamLayer of ProvenanceLayerId
+    | PreviousContext of tableName: ProvenanceTableName * processName: ProvenanceProcessName option
+
+type FilterState = {
+    SearchText: string
+    PropertySort: PropertySort
+    GroupSort: GroupSort
+    ValueCountFilter: PropertyValueCountFilter
+    OriginFilter: PropertyOriginFilter
+}
+
+type PropertyStats = {
+    Header: ProvenancePropertyHeader
+    DistinctValueCount: int
+    SetsWithValueCount: int
+    TotalSetCount: int
+}
+
+type PropertyCountBadge =
+    | Hide
+    | DistinctValues of int
+    | Coverage of setsWithValueCount: int * totalSetCount: int
+
 type UiState = {
-    LayerStates: Map<ProvenanceLayerId, LayerViewState>
-    PropertyRailPlacements: Map<ProvenancePairId * GroupingKey, ProvenanceSide>
-    ExpandedProperties: Set<ProvenancePairId * ProvenanceSide * GroupingKey>
-    PaletteValues: Map<ProvenancePairId * ProvenanceSide, ProvenancePropertyValue list>
-    PendingOverwrite: ValueAssignmentWarning option
-    PanelRatios: Map<ProvenancePairId, PanelRatios>
+    SideStates: Map<ProvenanceLayerSideId, SideViewState>
+    PropertyRailPlacements: Map<ProvenanceLayerId * GroupingKey, ProvenanceSide>
+    PropertyRailOrders: Map<ProvenanceLayerId * ProvenanceSide, ProvenancePropertyHeader list>
+    ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
+    PaletteValues: Map<ProvenanceLayerId * ProvenanceSide, ProvenancePropertyValue list>
+    PendingAssignmentBatch: PendingAssignmentBatch option
+    PanelRatios: Map<ProvenanceLayerId, PanelRatios>
     PendingMemberResolution: PendingMemberResolution option
-    ManualResolutionPairs: ManualResolutionPair list
-    SelectedInputs: Set<ProvenancePairId * string>
-    SelectedOutputs: Set<ProvenancePairId * string>
+    SelectedInputs: Set<ProvenanceLayerId * string>
+    SelectedOutputs: Set<ProvenanceLayerId * string>
+    ExpandedGroup: (ProvenanceSide * string) option
     Detail: ProvenanceDetail option
     Error: string option
+    PropertyColors: PropertyColorSettings
+    Filters: FilterState
 }
 
 /// Builds demo sessions used by ProvenanceGrouping stories and browser tests.

@@ -16,6 +16,7 @@ type GitSpawnRequest = {
     Arguments: string[]
     Environment: obj option
     StandardInput: string option
+    CancelCheck: (unit -> bool) option
     TimeoutMs: int option
 }
 
@@ -52,10 +53,36 @@ let private runGitProcess (captureStdout: bool) (request: GitSpawnRequest) : Pro
             let stderrChunks = ResizeArray<string>()
             let mutable finished = false
             let mutable timedOut = false
+            let mutable cancelRequested = false
+            let mutable timeoutId: int option = None
+
+            let clearIdleTimer () =
+                timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                timeoutId <- None
+
+            let resetIdleTimer () =
+                clearIdleTimer ()
+
+                match request.TimeoutMs with
+                | Some timeoutMs when timeoutMs > 0 ->
+                    timeoutId <-
+                        Some(
+                            Fable.Core.JS.setTimeout
+                                (fun () ->
+                                    if not finished then
+                                        timedOut <- true
+                                        stderrChunks.Add $"Git command timed out after no output for {timeoutMs} ms."
+                                        proc?kill ("SIGTERM") |> ignore
+                                )
+                                timeoutMs
+                        )
+                | _ -> ()
 
             let finish exitCode =
                 if not finished then
                     finished <- true
+                    clearIdleTimer ()
+                    let effectiveExitCode = if cancelRequested && exitCode = 0 then -1 else exitCode
 
                     let stdoutBuffer =
                         if captureStdout then
@@ -64,7 +91,7 @@ let private runGitProcess (captureStdout: bool) (request: GitSpawnRequest) : Pro
                             bufferConcat [||]
 
                     resolve {
-                        ExitCode = exitCode
+                        ExitCode = effectiveExitCode
                         StdoutBuffer = stdoutBuffer
                         StdoutText = bufferToUtf8String stdoutBuffer
                         StderrText = String.Concat(stderrChunks.ToArray())
@@ -74,31 +101,40 @@ let private runGitProcess (captureStdout: bool) (request: GitSpawnRequest) : Pro
             proc?stdout?on (
                 "data",
                 fun d ->
+                    resetIdleTimer ()
+
                     if captureStdout then
                         stdoutChunks.Add d
             )
             |> ignore
 
-            proc?stderr?on ("data", fun d -> stderrChunks.Add(d?toString ("utf8") |> unbox<string>))
+            proc?stderr?on (
+                "data",
+                fun d ->
+                    resetIdleTimer ()
+                    stderrChunks.Add(d?toString ("utf8") |> unbox<string>)
+            )
             |> ignore
 
-            let timeoutId =
-                request.TimeoutMs
-                |> Option.map (fun timeoutMs ->
-                    Fable.Core.JS.setTimeout
+            resetIdleTimer ()
+
+            let cancelInterval =
+                request.CancelCheck
+                |> Option.map (fun cancelCheck ->
+                    Fable.Core.JS.setInterval
                         (fun () ->
-                            if not finished then
-                                timedOut <- true
-                                stderrChunks.Add $"Git command timed out after {timeoutMs} ms."
+                            if not finished && not cancelRequested && cancelCheck () then
+                                cancelRequested <- true
+                                stderrChunks.Add "Git command cancelled."
                                 proc?kill ("SIGTERM") |> ignore
                         )
-                        timeoutMs
+                        300
                 )
 
             proc?on (
                 "close",
                 fun code ->
-                    timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                    cancelInterval |> Option.iter Fable.Core.JS.clearInterval
                     finish (if isNull code then -1 else int (unbox<float> code))
             )
             |> ignore
@@ -106,7 +142,7 @@ let private runGitProcess (captureStdout: bool) (request: GitSpawnRequest) : Pro
             proc?on (
                 "error",
                 fun error ->
-                    timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                    cancelInterval |> Option.iter Fable.Core.JS.clearInterval
 
                     stderrChunks.Add(
                         error
@@ -139,35 +175,20 @@ let runGitDiscardingStdout (request: GitSpawnRequest) : Promise<GitSpawnResult> 
 /// Runs a small git command and returns stdout text, or None on command failure.
 /// Used for feature probes where failure should not surface as a user-facing Git error.
 let tryExecGitText (workingDirectory: string option) (timeoutMs: int) (args: string[]) : Promise<string option> = promise {
-    let! output =
-        Fable.Core.JS.Constructors.Promise.Create(fun resolve _reject ->
-            let options =
-                createObj [
-                    "encoding" ==> "utf8"
-                    "stdio" ==> "pipe"
-                    "shell" ==> false
-                    "timeout" ==> timeoutMs
-                    "env" ==> createNonInteractiveEnv ()
+    let! result =
+        runGitCaptured {
+            WorkingDirectory = workingDirectory
+            Arguments = args
+            Environment = None
+            StandardInput = None
+            CancelCheck = None
+            TimeoutMs = Some timeoutMs
+        }
 
-                    match workingDirectory with
-                    | Some value -> "cwd" ==> value
-                    | None -> ()
-                ]
-
-            childProcessDynamic?execFile (
-                "git",
-                args,
-                options,
-                fun (error: obj) (stdout: obj) (_stderr: obj) ->
-                    if error |> Option.ofObj |> Option.isSome then
-                        resolve None
-                    else
-                        stdout |> Option.ofObj |> Option.map string |> resolve
-            )
-            |> ignore
-        )
-
-    return output
+    if result.ExitCode = 0 && not result.TimedOut then
+        return Some result.StdoutText
+    else
+        return None
 }
 
 
@@ -271,10 +292,40 @@ type NodeGitLfsAdapter() =
                             let mutable output = ""
                             let mutable errorOut = ""
                             let mutable finished = false
+                            let mutable timedOut = false
+                            let mutable cancelRequested = false
+                            let mutable timeoutId: int option = None
+
+                            let clearIdleTimer () =
+                                timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                                timeoutId <- None
+
+                            let resetIdleTimer () =
+                                clearIdleTimer ()
+
+                                match timeoutMs with
+                                | Some ms when ms > 0 ->
+                                    timeoutId <-
+                                        Some(
+                                            Fable.Core.JS.setTimeout
+                                                (fun () ->
+                                                    if not finished then
+                                                        timedOut <- true
+
+                                                        errorOut <-
+                                                            errorOut
+                                                            + $"Git LFS command timed out after no output for {ms} ms."
+
+                                                        proc?kill ("SIGTERM") |> ignore
+                                                )
+                                                ms
+                                        )
+                                | _ -> ()
 
                             proc?stdout?on (
                                 "data",
                                 fun d ->
+                                    resetIdleTimer ()
                                     let msg = string d
                                     output <- output + msg
                                     onProgress msg
@@ -284,27 +335,21 @@ type NodeGitLfsAdapter() =
                             proc?stderr?on (
                                 "data",
                                 fun d ->
+                                    resetIdleTimer ()
                                     let msg = string d
                                     errorOut <- errorOut + msg
                                     onProgress msg
                             )
                             |> ignore
 
-                            let timeoutId =
-                                timeoutMs
-                                |> Option.map (fun ms ->
-                                    Fable.Core.JS.setTimeout
-                                        (fun () ->
-                                            if not finished then
-                                                proc?kill ("SIGTERM") |> ignore
-                                        )
-                                        ms
-                                )
+                            resetIdleTimer ()
 
                             let cancelInterval =
                                 Fable.Core.JS.setInterval
                                     (fun () ->
-                                        if not finished && cancelCheck () then
+                                        if not finished && not cancelRequested && cancelCheck () then
+                                            cancelRequested <- true
+                                            errorOut <- errorOut + "Git LFS command cancelled."
                                             proc?kill ("SIGTERM") |> ignore
                                     )
                                     300
@@ -313,10 +358,13 @@ type NodeGitLfsAdapter() =
                                 "close",
                                 fun code ->
                                     finished <- true
-                                    timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                                    clearIdleTimer ()
                                     Fable.Core.JS.clearInterval cancelInterval
 
-                                    let success = if isNull code then false else (unbox<float> code) = 0.
+                                    let success =
+                                        (not timedOut)
+                                        && (not cancelRequested)
+                                        && if isNull code then false else (unbox<float> code) = 0.
 
                                     resolve {
                                         Success = success
@@ -330,7 +378,7 @@ type NodeGitLfsAdapter() =
                                 "error",
                                 fun err ->
                                     finished <- true
-                                    timeoutId |> Option.iter Fable.Core.JS.clearTimeout
+                                    clearIdleTimer ()
                                     Fable.Core.JS.clearInterval cancelInterval
 
                                     resolve {

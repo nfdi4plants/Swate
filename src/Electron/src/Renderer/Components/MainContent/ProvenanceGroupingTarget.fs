@@ -236,11 +236,15 @@ let ProvenanceGroupingTarget () =
                                     prop.text "Loading provenance..."
                                 ]
                             | Some session, false ->
-                                Swate.Components.Page.ProvenanceGrouping.ProvenanceGrouping.Main(
-                                    session,
-                                    onChange,
-                                    height = 760
-                                )
+                                Html.div [
+                                    prop.className "swt:flex-1 swt:min-h-0 swt:min-w-0 swt:overflow-hidden"
+                                    prop.children [
+                                        Swate.Components.Page.ProvenanceGrouping.ProvenanceGrouping.Main(
+                                            session,
+                                            onChange
+                                        )
+                                    ]
+                                ]
                             | None, false ->
                                 Html.div [
                                     prop.className
