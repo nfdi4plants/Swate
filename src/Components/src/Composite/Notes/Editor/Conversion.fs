@@ -226,8 +226,7 @@ type PayloadRequirements =
 
         match resolveRelativePath dateCreated protocolName with
         | None -> Error unsafePathMessage
-        | Some relativePath ->
-            Ok(PayloadRequirements.createPayloadWithDate (target, relativePath, dateCreated, draft))
+        | Some relativePath -> Ok(PayloadRequirements.createPayloadWithDate (target, relativePath, dateCreated, draft))
 
     static member tryCreateExistingTargetPayload
         (targetRef: ExistingTargetRef, dateCreated: DateTime, protocolName: string, draft: NotesDraft)
