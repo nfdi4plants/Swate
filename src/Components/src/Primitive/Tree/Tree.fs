@@ -110,15 +110,17 @@ type Tree =
         let renderRow row =
             let node = row.Node
             let loadState = NodeState.loadStateFor node.id treeState.LoadedChildren
+            let isExpanded = treeState.ExpandedIds.Contains node.id
+            let canExpand = NodeState.canExpand dataSource node
 
             TreeNode.Row {
                 Row = row
-                IsExpanded = treeState.ExpandedIds.Contains node.id
+                IsExpanded = isExpanded
                 IsSelected = effectiveSelectedIds.Contains node.id
                 IsFocused = focusedId = Some node.id
                 IsLoading = loadState.Status = TreeLazyLoadStatus.Loading
                 Error = loadState.Error
-                CanExpand = NodeState.canExpand dataSource node
+                CanExpand = canExpand
                 CanSelect = not isSelectionDisabled && isNodeSelectable node
                 RenderNode = renderNode
                 Leading = leading
@@ -129,6 +131,10 @@ type Tree =
                     fun event ->
                         event.preventDefault ()
                         event.stopPropagation ()
+
+                        if canExpand && not isExpanded then
+                            actions.ExpandNode node
+
                         actions.SelectNode node
                 OnFocus = fun () -> treeState.SetFocusedId(Some node.id)
                 OnKeyDown = actions.OnNodeKeyDown node
@@ -136,7 +142,6 @@ type Tree =
             }
 
         let rows = lookup.VisibleNodes
-        let animatedRows = useAnimatedVisibleRows rows (not enableVirtualization)
 
         let treeContent =
             if TreeHelper.shouldUseVirtualization enableVirtualization rows.Length then
@@ -183,13 +188,8 @@ type Tree =
                 Html.div [
                     prop.custom ("data-tree-virtualized", "false")
                     prop.children [
-                        for item in animatedRows do
-                            Html.div [
-                                prop.key item.Row.Node.id
-                                prop.custom ("data-tree-row-exiting", item.IsExiting)
-                                prop.className (NodeHelper.rowAnimationClasses item.IsExiting)
-                                prop.children [ renderRow item.Row ]
-                            ]
+                        for row in rows do
+                            Html.div [ prop.key row.Node.id; prop.children [ renderRow row ] ]
                     ]
                 ]
 

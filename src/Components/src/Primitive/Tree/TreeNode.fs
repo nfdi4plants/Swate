@@ -51,7 +51,7 @@ type TreeNode =
                         ]
                     else
                         Html.i [
-                            prop.className (NodeHelper.chevronClasses props.IsExpanded)
+                            prop.className $"swt:iconify {NodeHelper.chevronIcon props.IsExpanded} swt:size-4"
                         ]
                 ]
             ]

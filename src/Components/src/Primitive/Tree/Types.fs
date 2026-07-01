@@ -67,12 +67,6 @@ type TreeVisibleNode<'T> = {
     ParentId: string option
 }
 
-type TreeAnimatedVisibleNode<'T> = {
-    Row: TreeVisibleNode<'T>
-    IsExiting: bool
-    AnchorId: string option
-}
-
 type TreeLoadState<'T> = {
     Status: TreeLazyLoadStatus
     Children: TreeItem<'T>[] option

@@ -88,6 +88,10 @@ export const BasicExpansionAndSelection: Story = {
 
     await userEvent.click(canvas.getByRole("button", { name: "Collapse Project" }));
     await waitFor(() => expect(canvas.queryByText("Readme")).not.toBeInTheDocument());
+
+    await userEvent.click(canvas.getByText("Project"));
+    await expect(await canvas.findByText("Readme")).toBeVisible();
+    await expect(canvas.getByTestId("selected-node")).toHaveTextContent("project");
   },
 };
 
@@ -226,12 +230,12 @@ const UnknownCountBranchTree = () => {
   );
 };
 
-export const DataSourceBranchCaretExpandsUnknownChildren: Story = {
+export const DataSourceBranchClickExpandsUnknownChildren: Story = {
   render: () => <UnknownCountBranchTree />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByRole("button", { name: "Expand Unknown count branch" }));
+    await userEvent.click(canvas.getByText("Unknown count branch"));
     await expect(await canvas.findByText("Child discovered on expand")).toBeVisible();
     await expect(canvas.getByTestId("unknown-count-load-log")).toHaveTextContent("unknown-count");
   },
