@@ -177,7 +177,7 @@ type AnnotationTableContextMenuUtil =
                 let cell = table.GetCellAt((cellIndex.x - 1, cellIndex.y - 1))
                 cell.ToTabStr()
 
-        Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText result
+        Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText result
 
     static member cut(cellIndex: CellCoordinate, table: ArcTable, setTable, selectHandle: SelectHandle) = promise {
         do! AnnotationTableContextMenuUtil.copy (cellIndex, table, selectHandle)
@@ -199,7 +199,7 @@ type AnnotationTableContextMenuUtil =
         loop startIndex length
 
     static member getCopiedCells() = promise {
-        let! copiedValue = Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.readText ()
+        let! copiedValue = Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.readText ()
 
         let rows =
             copiedValue.Split([| System.Environment.NewLine |], System.StringSplitOptions.RemoveEmptyEntries)

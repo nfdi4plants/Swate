@@ -106,7 +106,7 @@ type Main =
         let copyArcPathToClipboard path =
             promise {
                 try
-                    do! Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText path
+                    do! Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText path
                 with ex ->
                     errorModalCtx.enqueue (
                         ErrorModalRequest.create ($"Failed to copy path: {ex.Message}", title = "Copy path failed")

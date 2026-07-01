@@ -18,7 +18,6 @@
 
   <ItemGroup>
     <Content Include="@(Compile)" Pack="true" PackagePath="fable/%(RelativeDir)%(Filename)%(Extension)" />
-    <Compile Include="JsBindings\Clipboard.fs" />
     <Compile Include="PathHelpers.fs" />
     <Compile Include="Database.fs" />
     <Compile Include="ARCtrl.Helper.fs" />
@@ -49,5 +48,9 @@
     <!-- Include all files that are compiled with this project -->
     <!-- Include the project file itself as well -->
     <Content Include="$(MSBuildThisFileFullPath)" Pack="true" PackagePath="fable/" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Folder Include="JsBindings\" />
   </ItemGroup>
 </Project>

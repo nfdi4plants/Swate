@@ -51,7 +51,9 @@ module private FileExplorerHelper =
                         (fun () ->
                             promise {
                                 try
-                                    do! Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText path
+                                    do!
+                                        Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText
+                                            path
                                 with ex ->
                                     Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
                             }
@@ -67,7 +69,9 @@ module private FileExplorerHelper =
                         (fun () ->
                             promise {
                                 try
-                                    do! Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText path
+                                    do!
+                                        Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText
+                                            path
                                 with ex ->
                                     Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
                             }

@@ -99,7 +99,7 @@ let copyPathContextMenuItems (arcRootPath: string option) (item: FileItem) = [
             (fun () ->
                 promise {
                     try
-                        do! Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText relativePath
+                        do! Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText relativePath
                     with ex ->
                         Browser.Dom.console.warn ($"Could not copy filetree path: {relativePath}", ex)
                 }
@@ -115,7 +115,7 @@ let copyPathContextMenuItems (arcRootPath: string option) (item: FileItem) = [
             (fun () ->
                 promise {
                     try
-                        do! Swate.Components.Shared.JsBindings.Clipboard.navigator.clipboard.writeText fullPath
+                        do! Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText fullPath
                     with ex ->
                         Browser.Dom.console.warn ($"Could not copy filetree path: {fullPath}", ex)
                 }
