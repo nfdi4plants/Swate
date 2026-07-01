@@ -56,15 +56,21 @@ let useControlledSelection
     effectiveSelectedIds, setSelection
 
 [<Hook>]
-let useTreeApi (apiRef: IRefValue<TreeApi option> option) (setLoadedChildren) =
+let useTreeApi (apiRef: IRefValue<TreeApi option> option) setLoadedChildren setExpandedIds =
     React.useEffect (
         (fun () ->
             apiRef
             |> Option.iter (fun ref ->
                 ref.current <-
                     Some {
-                        InvalidateNode = fun nodeId -> setLoadedChildren (NodeState.invalidateNode nodeId)
-                        InvalidateAll = fun () -> setLoadedChildren (fun _ -> Map.empty)
+                        InvalidateNode =
+                            fun nodeId ->
+                                setLoadedChildren (NodeState.invalidateNode nodeId)
+                                setExpandedIds (fun current -> current |> Set.remove nodeId)
+                        InvalidateAll =
+                            fun () ->
+                                setLoadedChildren (fun _ -> Map.empty)
+                                setExpandedIds (fun _ -> Set.empty)
                     }
             )
 

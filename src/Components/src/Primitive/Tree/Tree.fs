@@ -53,7 +53,7 @@ type Tree =
         let effectiveSelectedIds, setSelection =
             useControlledSelection selectedIds onSelectionChange treeState
 
-        useTreeApi apiRef treeState.SetLoadedChildren
+        useTreeApi apiRef treeState.SetLoadedChildren treeState.SetExpandedIds
 
         let lookup =
             React.useMemo (

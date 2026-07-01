@@ -197,7 +197,7 @@ export const LazyLoadingCachesChildren: Story = {
     await expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 1");
 
     await userEvent.click(canvas.getByRole("button", { name: "Invalidate lazy branch" }));
-    await userEvent.click(canvas.getByRole("button", { name: "Collapse Lazy branch" }));
+    await expect(canvas.getByRole("button", { name: "Expand Lazy branch" })).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "Expand Lazy branch" }));
     await waitFor(() => expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 2"));
   },
@@ -308,7 +308,7 @@ export const DataSourceInvalidateAllCache: Story = {
     await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 1");
 
     await userEvent.click(canvas.getByRole("button", { name: "Invalidate all datasource cache" }));
-    await userEvent.click(canvas.getByRole("button", { name: "Collapse Invalidate-all branch" }));
+    await expect(canvas.getByRole("button", { name: "Expand Invalidate-all branch" })).toBeVisible();
     await userEvent.click(canvas.getByRole("button", { name: "Expand Invalidate-all branch" }));
     await expect(await canvas.findByText("Loaded version 2")).toBeVisible();
     await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 2");
