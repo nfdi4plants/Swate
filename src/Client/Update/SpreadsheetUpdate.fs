@@ -11,6 +11,13 @@ open ARCtrl.Spreadsheet
 
 module Spreadsheet =
 
+    let private clipboardTableApi: Swate.Components.JsBindings.Clipboard.ClipboardTableApi<Spreadsheet.Model> = {
+        GetCell = fun index state -> Controller.Generic.getCell (index.x, index.y) state
+        SetCell = fun index cell state -> Controller.Generic.setCell (index.x, index.y) cell state
+        GetHeader = fun columnIndex state -> Controller.Generic.getHeader columnIndex state
+        SetCells = fun cells state -> Controller.Generic.setCells cells state
+    }
+
     let update
         (state: Spreadsheet.Model)
         (model: Model)
@@ -180,7 +187,7 @@ module Spreadsheet =
             | CopyCell index ->
                 let cmd =
                     Cmd.OfPromise.attempt
-                        (Controller.Clipboard.copyCellByIndex index)
+                        (Swate.Components.JsBindings.Clipboard.copyCellByIndex clipboardTableApi index)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
 
@@ -188,18 +195,18 @@ module Spreadsheet =
             | CopyCells indices ->
                 let cmd =
                     Cmd.OfPromise.attempt
-                        (Controller.Clipboard.copyCellsByIndex indices)
+                        (Swate.Components.JsBindings.Clipboard.copyCellsByIndex clipboardTableApi indices)
                         state
                         (curry GenericError Cmd.none >> DevMsg)
 
                 state, model, cmd
             | CutCell index ->
-                let nextState = Controller.Clipboard.cutCellByIndex index state
+                let nextState = Swate.Components.JsBindings.Clipboard.cutCellByIndex clipboardTableApi index state
                 nextState, model, Cmd.none
             | PasteCell index ->
                 let cmd =
                     Cmd.OfPromise.either
-                        (Controller.Clipboard.pasteCellByIndex index)
+                        (Swate.Components.JsBindings.Clipboard.pasteCellByIndex clipboardTableApi index)
                         state
                         (UpdateState >> SpreadsheetMsg)
                         (curry GenericError Cmd.none >> DevMsg)
@@ -208,7 +215,7 @@ module Spreadsheet =
             | PasteCellsExtend index ->
                 let cmd =
                     Cmd.OfPromise.either
-                        (Controller.Clipboard.pasteCellsByIndexExtend index)
+                        (Swate.Components.JsBindings.Clipboard.pasteCellsByIndexExtend clipboardTableApi index)
                         state
                         (UpdateState >> SpreadsheetMsg)
                         (curry GenericError Cmd.none >> DevMsg)

@@ -53,7 +53,6 @@
     <Compile Include="Spreadsheet\Controller\Generic.fs" />
     <Compile Include="Spreadsheet\Controller\BuildingBlocks.fs" />
     <Compile Include="Spreadsheet\Controller\Table.fs" />
-    <Compile Include="Spreadsheet\Controller\Clipboard.fs" />
     <Compile Include="Spreadsheet\Controller\DataMap.fs" />
     <Compile Include="SharedComponents\Logo.fs" />
     <Compile Include="SharedComponents\BaseDropdown.fs" />

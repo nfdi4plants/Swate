@@ -83,6 +83,7 @@
     <Compile Include="ARCtrl\Extensions\OntologyAnnotation.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeHeader.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeCell.fs" />
+    <Compile Include="JsBindings\Clipboard.fs" />
     <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
     <Compile Include="ARCtrl\Extensions\DataFile.fs" />
     <Compile Include="ARCtrl\Extensions\DataMap.fs" />
