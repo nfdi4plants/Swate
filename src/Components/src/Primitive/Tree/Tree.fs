@@ -181,7 +181,10 @@ type Tree =
             else
                 Html.div [
                     prop.custom ("data-tree-virtualized", "false")
-                    prop.children [ for row in rows -> renderRow row ]
+                    prop.children [
+                        for row in rows do
+                            Html.div [ prop.key row.Node.id; prop.children [ renderRow row ] ]
+                    ]
                 ]
 
         Html.div [

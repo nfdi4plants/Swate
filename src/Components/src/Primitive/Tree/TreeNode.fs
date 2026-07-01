@@ -8,7 +8,7 @@ open Swate.Components.Primitive.Tree.Types
 [<Erase; Mangle(false)>]
 type TreeNode =
 
-    [<ReactComponent>]
+    [<ReactMemoComponent(AreEqualFn.FsEqualsButFunctions)>]
     static member Row<'T>(props: TreeNodeProps<'T>) =
         let node = props.Row.Node
 

@@ -80,6 +80,9 @@ export const BasicExpansionAndSelection: Story = {
     await expect(canvas.getByRole("tree")).toBeVisible();
     await expect(canvas.getByText("Person schema")).toBeVisible();
 
+    await userEvent.click(canvas.getByText("Project"));
+    await expect(canvas.getByTestId("selected-node")).toHaveTextContent("project");
+
     await userEvent.click(canvas.getByText("Readme"));
     await expect(canvas.getByTestId("selected-node")).toHaveTextContent("project/readme");
 
@@ -121,6 +124,34 @@ export const MultiSelectionWithoutCheckboxes: Story = {
     await expect(canvas.getByTestId("multi-selected")).toHaveTextContent("project/readme");
     await expect(canvas.getByTestId("multi-selected")).toHaveTextContent("data/raw");
     await expect(canvas.getByTestId("tree-node-data/raw")).toHaveFocus();
+  },
+};
+
+const DisabledSelectionTree = () => {
+  const [selected, setSelected] = React.useState<string[]>([]);
+
+  return (
+    <div className="swt:w-96">
+      <Tree
+        items={baseItems}
+        defaultExpandedIds={["project"]}
+        isSelectionDisabled
+        selectedIds={selected}
+        onSelectionChange={setSelected}
+        debug
+      />
+      <div data-testid="disabled-selected">{selected.join(",") || "none"}</div>
+    </div>
+  );
+};
+
+export const DisabledSelection: Story = {
+  render: () => <DisabledSelectionTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("Readme"));
+    await expect(canvas.getByTestId("disabled-selected")).toHaveTextContent("none");
   },
 };
 
@@ -169,6 +200,39 @@ export const LazyLoadingCachesChildren: Story = {
     await userEvent.click(canvas.getByRole("button", { name: "Collapse Lazy branch" }));
     await userEvent.click(canvas.getByRole("button", { name: "Expand Lazy branch" }));
     await waitFor(() => expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 2"));
+  },
+};
+
+const LazyErrorTree = () => {
+  const [errorMessage, setErrorMessage] = React.useState("none");
+  const items = React.useMemo(() => [branch("lazy-error", "Broken lazy branch", undefined)], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      GetChildrenCount: () => 1,
+      GetTreeItems: async () => {
+        throw new Error("Lazy load failed");
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} dataSource={dataSource as any} onError={(error) => setErrorMessage(error.message)} debug />
+      <div data-testid="lazy-error-message">Error: {errorMessage}</div>
+    </div>
+  );
+};
+
+export const LazyLoadingErrorState: Story = {
+  render: () => <LazyErrorTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Broken lazy branch" }));
+    await expect(await canvas.findByText("Error")).toBeVisible();
+    await expect(canvas.getByTestId("lazy-error-message")).toHaveTextContent("Lazy load failed");
   },
 };
 
@@ -250,7 +314,12 @@ const CustomTree = () => {
           props.Node.data?.badge ? <span className="swt:badge swt:badge-primary swt:badge-sm">{props.Node.data.badge}</span> : null
         }
         renderNode={(props) => <strong>{props.Node.label}</strong>}
-        styleFn={(_, node, classes) => (node?.id === "custom/a" ? [...classes, "swt:text-accent"] : classes)}
+        styleFn={(kind, node, classes) => {
+          if (!kind) return [...classes, "swt:border", "swt:border-info"];
+          if (node?.id === "custom") return [...classes, "swt:text-primary"];
+          if (node?.id === "custom/a") return [...classes, "swt:text-accent"];
+          return classes;
+        }}
         debug
       />
     </div>
@@ -263,7 +332,85 @@ export const CustomRenderingAndStyling: Story = {
     const canvas = within(canvasElement);
     await expect(canvas.getByText("Alpha")).toBeVisible();
     await expect(canvas.getByText("A")).toBeVisible();
+    await expect(canvas.getByTestId("generic-tree")).toHaveClass("swt:border-info");
+    await expect(canvas.getByTestId("tree-node-custom")).toHaveClass("swt:text-primary");
     await expect(canvas.getByTestId("tree-node-custom/a")).toHaveClass("swt:text-accent");
+  },
+};
+
+const RenderCounterLabel = ({ label, onRender }: { label: string; onRender: () => void }) => {
+  React.useEffect(() => {
+    onRender();
+  });
+
+  return <span>{label}</span>;
+};
+
+const RenderCounterTree = () => {
+  const countRef = React.useRef(0);
+  const countElementRef = React.useRef<HTMLDivElement | null>(null);
+  const [items, setItems] = React.useState<DemoNode[]>(() => [
+    branch("memo/root", "Root", [leaf("memo/alpha", "Alpha"), leaf("memo/beta", "Beta"), leaf("memo/gamma", "Gamma")]),
+  ]);
+
+  const onRender = React.useCallback(() => {
+    countRef.current += 1;
+
+    if (countElementRef.current) {
+      countElementRef.current.textContent = `Renders: ${countRef.current}`;
+    }
+  }, []);
+
+  const renameBeta = React.useCallback(() => {
+    setItems((current) =>
+      current.map((node) =>
+        node.id === "memo/root"
+          ? ({
+              ...node,
+              children: node.children?.map((child) =>
+                child.id === "memo/beta" ? ({ ...child, label: "Beta renamed" } as DemoNode) : child,
+              ),
+            } as DemoNode)
+          : node,
+      ),
+    );
+  }, []);
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree
+        items={items}
+        defaultExpandedIds={["memo/root"]}
+        renderNode={(props) => <RenderCounterLabel label={props.Node.label} onRender={onRender} />}
+        debug
+      />
+      <button type="button" className="swt:btn swt:btn-sm" onClick={renameBeta}>
+        Rename Beta
+      </button>
+      <div data-testid="render-count" ref={countElementRef}>
+        Renders: 0
+      </div>
+    </div>
+  );
+};
+
+const readRenderCount = (canvas: ReturnType<typeof within>) =>
+  Number(canvas.getByTestId("render-count").textContent?.replace("Renders: ", "") ?? "0");
+
+export const EfficientRenameRerendersAffectedNodes: Story = {
+  render: () => <RenderCounterTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await waitFor(() => expect(readRenderCount(canvas)).toBeGreaterThan(0));
+    const beforeRename = readRenderCount(canvas);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Rename Beta" }));
+    await expect(canvas.getByText("Beta renamed")).toBeVisible();
+    await waitFor(() => expect(readRenderCount(canvas)).toBeGreaterThan(beforeRename));
+
+    const rerenderedLabels = readRenderCount(canvas) - beforeRename;
+    expect(rerenderedLabels).toBeLessThanOrEqual(4);
   },
 };
 
