@@ -2,7 +2,7 @@ import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fireEvent, screen, userEvent, waitFor, within } from 'storybook/test';
 import { Main as ProvenanceGrouping } from './ProvenanceGrouping.fs.js';
-import { Exports_sampleDroppedPropertyRailColor as sampleDroppedPropertyRailColor } from './Helper.fs.js';
+import { sampleDroppedPropertyRailColor } from './Helper.fs.js';
 import {
   Exports_createSampleSession as createSampleSession,
   Exports_createInputOnlySession as createInputOnlySession,
