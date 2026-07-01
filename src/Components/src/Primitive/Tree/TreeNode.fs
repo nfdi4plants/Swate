@@ -67,7 +67,9 @@ type TreeNode =
                     | Some icon -> icon
                     | None ->
                         Html.i [
-                            prop.className $"swt:iconify {NodeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
+                            prop.className [
+                                $"swt:iconify {NodeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
+                            ]
                         ]
 
         let nodeContent =
@@ -123,7 +125,11 @@ type TreeNode =
             prop.onKeyDown props.OnKeyDown
             prop.children [
                 Html.div [
-                    prop.className "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2"
+                    prop.className [
+                        "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2"
+                        if node.kind = TreeNodeKind.Branch then
+                            "swt:pl-4"
+                    ]
                     prop.children [ leadingContent; nodeContent ]
                 ]
 
