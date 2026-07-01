@@ -203,6 +203,40 @@ export const LazyLoadingCachesChildren: Story = {
   },
 };
 
+const UnknownCountBranchTree = () => {
+  const [loadLog, setLoadLog] = React.useState<string[]>([]);
+  const items = React.useMemo(() => [branch("unknown-count", "Unknown count branch", undefined)], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      GetChildrenCount: () => 0,
+      GetTreeItems: async (item: DemoNode | null | undefined) => {
+        setLoadLog((current) => [...current, item?.id ?? "root"]);
+        return [leaf("unknown-count/child", "Child discovered on expand")];
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} dataSource={dataSource as any} debug />
+      <div data-testid="unknown-count-load-log">Loaded: {loadLog.join("|") || "none"}</div>
+    </div>
+  );
+};
+
+export const DataSourceBranchCaretExpandsUnknownChildren: Story = {
+  render: () => <UnknownCountBranchTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Unknown count branch" }));
+    await expect(await canvas.findByText("Child discovered on expand")).toBeVisible();
+    await expect(canvas.getByTestId("unknown-count-load-log")).toHaveTextContent("unknown-count");
+  },
+};
+
 const ParentAwareDataSourceTree = () => {
   const [loadLog, setLoadLog] = React.useState<string[]>([]);
   const items = React.useMemo(() => [branch("remote/arc", "Remote ARC", undefined)], []);
@@ -540,4 +574,3 @@ export const KeyboardNavigation: Story = {
     await waitFor(() => expect(canvas.getByText("Person schema")).toBeVisible());
   },
 };
-

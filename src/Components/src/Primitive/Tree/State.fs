@@ -58,7 +58,14 @@ module NodeState =
             | None, None -> 0
 
     let canExpand dataSource node =
-        isBranch node && childCount dataSource node > 0
+        if not (isBranch node) then
+            false
+        else
+            match node.children, node.childrenCount, dataSource with
+            | Some children, _, _ -> children.Length > 0
+            | None, Some count, _ -> count > 0
+            | None, None, Some _ -> true
+            | None, None, None -> false
 
     let flattenVisible dataSource loadedChildren expandedIds items =
         let nodes = ResizeArray<TreeVisibleNode<'T>>()

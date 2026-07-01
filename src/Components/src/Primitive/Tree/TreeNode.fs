@@ -24,6 +24,83 @@ type TreeNode =
             Select = props.OnSelect
         }
 
+        let expandButton =
+            Html.button [
+                prop.type'.button
+                prop.className [
+                    "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:min-h-0 swt:size-6 swt:shrink-0"
+                    if not props.CanExpand then
+                        "swt:invisible"
+                ]
+                prop.tabIndex -1
+                prop.ariaLabel (
+                    if props.IsExpanded then
+                        $"Collapse {node.label}"
+                    else
+                        $"Expand {node.label}"
+                )
+                prop.onClick (fun e ->
+                    e.preventDefault ()
+                    e.stopPropagation ()
+                    props.OnToggle()
+                )
+                prop.children [
+                    if props.IsLoading then
+                        Html.span [
+                            prop.className "swt:loading swt:loading-spinner swt:loading-xs"
+                        ]
+                    else
+                        Html.i [
+                            prop.className (NodeHelper.chevronClasses props.IsExpanded)
+                        ]
+                ]
+            ]
+
+        let leadingContent =
+            match props.Leading with
+            | Some leading -> leading renderProps
+            | None ->
+                match node.leading with
+                | Some leading -> leading
+                | None ->
+                    match node.icon with
+                    | Some icon -> icon
+                    | None ->
+                        Html.i [
+                            prop.className $"swt:iconify {NodeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
+                        ]
+
+        let nodeContent =
+            match props.RenderNode with
+            | Some renderNode ->
+                Html.div [
+                    prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
+                    prop.children [ renderNode renderProps ]
+                ]
+            | None ->
+                Html.span [
+                    prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
+                    prop.text node.label
+                ]
+
+        let errorContent =
+            match props.Error with
+            | Some error ->
+                Html.span [
+                    prop.className "swt:badge swt:badge-error swt:badge-sm swt:shrink-0"
+                    prop.title error
+                    prop.text "Error"
+                ]
+            | None -> Html.none
+
+        let trailingContent =
+            match props.Trailing with
+            | Some trailing -> trailing renderProps
+            | None ->
+                match node.trailing with
+                | Some trailing -> trailing
+                | None -> Html.none
+
         Html.div [
             prop.role "treeitem"
             prop.tabIndex (if props.IsFocused then 0 else -1)
@@ -45,72 +122,14 @@ type TreeNode =
             prop.onFocus (fun _ -> props.OnFocus())
             prop.onKeyDown props.OnKeyDown
             prop.children [
-                Html.button [
-                    prop.type'.button
-                    prop.className [
-                        "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:min-h-0 swt:size-6 swt:shrink-0"
-                        if not props.CanExpand then
-                            "swt:invisible"
-                    ]
-                    prop.tabIndex -1
-                    prop.ariaLabel (
-                        if props.IsExpanded then
-                            $"Collapse {node.label}"
-                        else
-                            $"Expand {node.label}"
-                    )
-                    prop.onClick (fun e ->
-                        e.preventDefault ()
-                        e.stopPropagation ()
-                        props.OnToggle()
-                    )
-                    prop.children [
-                        if props.IsLoading then
-                            Html.span [
-                                prop.className "swt:loading swt:loading-spinner swt:loading-xs"
-                            ]
-                        else
-                            Html.i [
-                                prop.className $"swt:iconify {NodeHelper.chevronIcon props.IsExpanded} swt:size-4"
-                            ]
-                    ]
+                Html.div [
+                    prop.className "swt:flex swt:min-w-0 swt:flex-1 swt:items-center swt:gap-2"
+                    prop.children [ leadingContent; nodeContent ]
                 ]
 
-                match props.Leading with
-                | Some leading -> leading renderProps
-                | None ->
-                    match node.leading with
-                    | Some leading -> leading
-                    | None ->
-                        match node.icon with
-                        | Some icon -> icon
-                        | None ->
-                            Html.i [
-                                prop.className $"swt:iconify {NodeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
-                            ]
-
-                match props.RenderNode with
-                | Some renderNode -> renderNode renderProps
-                | None ->
-                    Html.span [
-                        prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
-                        prop.text node.label
-                    ]
-
-                match props.Error with
-                | Some error ->
-                    Html.span [
-                        prop.className "swt:badge swt:badge-error swt:badge-sm swt:shrink-0"
-                        prop.title error
-                        prop.text "Error"
-                    ]
-                | None -> ()
-
-                match props.Trailing with
-                | Some trailing -> trailing renderProps
-                | None ->
-                    match node.trailing with
-                    | Some trailing -> trailing
-                    | None -> Html.none
+                Html.div [
+                    prop.className "swt:ml-auto swt:flex swt:shrink-0 swt:items-center swt:justify-end swt:gap-2"
+                    prop.children [ trailingContent; errorContent; expandButton ]
+                ]
             ]
         ]

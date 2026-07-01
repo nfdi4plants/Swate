@@ -43,6 +43,35 @@ module NodeHelper =
         else
             "swt:fluent--chevron-right-20-regular"
 
+    let chevronClasses isExpanded = [
+        "swt:iconify"
+        "swt:fluent--chevron-right-20-regular"
+        "swt:size-4"
+        "swt:transition-transform"
+        "swt:duration-150"
+        "swt:ease-out"
+        "swt:motion-reduce:transition-none"
+        if isExpanded then
+            "swt:rotate-90"
+    ]
+
+    let rowAnimationClasses isExiting = [
+        "swt:overflow-hidden"
+        "swt:transition-[max-height,opacity,transform]"
+        "swt:duration-150"
+        "swt:ease-out"
+        "swt:motion-reduce:transition-none"
+        if isExiting then
+            "swt:max-h-0"
+            "swt:-translate-y-1"
+            "swt:opacity-0"
+            "swt:pointer-events-none"
+        else
+            "swt:max-h-24"
+            "swt:translate-y-0"
+            "swt:opacity-100"
+    ]
+
     let defaultIcon (node: TreeItem<'T>) =
         match node.kind with
         | TreeNodeKind.Branch -> "swt:fluent--folder-24-regular"

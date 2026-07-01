@@ -55,6 +55,108 @@ let useControlledSelection
 
     effectiveSelectedIds, setSelection
 
+let private animatedVisibleNode row anchorId isExiting = {
+    Row = row
+    IsExiting = isExiting
+    AnchorId = anchorId
+}
+
+[<Hook>]
+let useAnimatedVisibleRows (rows: TreeVisibleNode<'T>[]) enableAnimation =
+    let exitingRows, setExitingRows =
+        React.useStateWithUpdater<TreeAnimatedVisibleNode<'T>[]> [||]
+
+    let previousRowsRef = React.useRef rows
+    let exitingRowsRef = React.useRef exitingRows
+
+    React.useEffect ((fun () -> exitingRowsRef.current <- exitingRows), [| box exitingRows |])
+
+    React.useEffect (
+        (fun () ->
+            let previousRows = previousRowsRef.current
+            previousRowsRef.current <- rows
+
+            if not enableAnimation then
+                if exitingRowsRef.current.Length > 0 then
+                    setExitingRows (fun _ -> [||])
+
+                fun () -> ()
+            else
+                let nextIds = rows |> Array.map (fun row -> row.Node.id) |> Set.ofArray
+
+                let previousRowsById =
+                    previousRows |> Array.map (fun row -> row.Node.id, row) |> Map.ofArray
+
+                let rec nearestRetainedAncestor (row: TreeVisibleNode<'T>) =
+                    match row.ParentId with
+                    | Some parentId when nextIds.Contains parentId -> Some parentId
+                    | Some parentId -> previousRowsById |> Map.tryFind parentId |> Option.bind nearestRetainedAncestor
+                    | None -> None
+
+                let removedRows =
+                    previousRows
+                    |> Array.choose (fun row ->
+                        if nextIds.Contains row.Node.id then
+                            None
+                        else
+                            Some(animatedVisibleNode row (nearestRetainedAncestor row) true)
+                    )
+
+                if removedRows.Length > 0 then
+                    setExitingRows (fun current ->
+                        Array.append current removedRows
+                        |> Array.distinctBy (fun item -> item.Row.Node.id)
+                    )
+
+                    let timeoutId =
+                        Fable.Core.JS.setTimeout
+                            (fun () ->
+                                setExitingRows (fun current ->
+                                    current |> Array.filter (fun item -> not item.IsExiting)
+                                )
+                            )
+                            180
+
+                    fun () -> Fable.Core.JS.clearTimeout timeoutId
+                else
+                    let currentVisibleExitingRows =
+                        exitingRowsRef.current
+                        |> Array.filter (fun item -> not (nextIds.Contains item.Row.Node.id))
+
+                    if currentVisibleExitingRows.Length <> exitingRowsRef.current.Length then
+                        setExitingRows (fun _ -> currentVisibleExitingRows)
+
+                    fun () -> ()
+        ),
+        [| box rows; box enableAnimation |]
+    )
+
+    let nextIds = rows |> Array.map (fun row -> row.Node.id) |> Set.ofArray
+
+    let activeRows = rows |> Array.map (fun row -> animatedVisibleNode row None false)
+
+    let visibleExitingRows =
+        exitingRows
+        |> Array.filter (fun item -> not (nextIds.Contains item.Row.Node.id))
+
+    let exitingByAnchor = visibleExitingRows |> Array.groupBy _.AnchorId |> Map.ofArray
+
+    let mergedRows = ResizeArray<TreeAnimatedVisibleNode<'T>>()
+
+    let addExitingRows anchor =
+        exitingByAnchor
+        |> Map.tryFind anchor
+        |> Option.iter (fun rows -> rows |> Array.iter (fun row -> mergedRows.Add row))
+
+    activeRows
+    |> Array.iter (fun item ->
+        mergedRows.Add item
+        addExitingRows (Some item.Row.Node.id)
+    )
+
+    addExitingRows None
+    mergedRows.ToArray()
+
 [<Hook>]
 let useTreeApi (apiRef: IRefValue<TreeApi option> option) setLoadedChildren setExpandedIds =
     React.useEffect (
