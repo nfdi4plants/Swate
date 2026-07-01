@@ -203,6 +203,118 @@ export const LazyLoadingCachesChildren: Story = {
   },
 };
 
+const ParentAwareDataSourceTree = () => {
+  const [loadLog, setLoadLog] = React.useState<string[]>([]);
+  const items = React.useMemo(() => [branch("remote/arc", "Remote ARC", undefined)], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      GetChildrenCount: (item: DemoNode | null | undefined) => {
+        switch (item?.id) {
+          case "remote/arc":
+            return 2;
+          case "remote/arc/studies":
+            return 1;
+          default:
+            return 0;
+        }
+      },
+      GetTreeItems: async (item: DemoNode | null | undefined) => {
+        const parentId = item?.id ?? "root";
+        setLoadLog((current) => [...current, parentId]);
+
+        switch (parentId) {
+          case "remote/arc":
+            return [branch("remote/arc/studies", "Studies", undefined), leaf("remote/arc/readme", "Readme")];
+          case "remote/arc/studies":
+            return [leaf("remote/arc/studies/study-1", "Study One")];
+          default:
+            return [];
+        }
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} dataSource={dataSource as any} debug />
+      <div data-testid="datasource-load-log">Loaded: {loadLog.join("|") || "none"}</div>
+    </div>
+  );
+};
+
+export const DataSourceLoadsChildrenForExpandedBranch: Story = {
+  render: () => <ParentAwareDataSourceTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Remote ARC" }));
+    await expect(await canvas.findByText("Readme")).toBeVisible();
+    await expect(canvas.getByText("Studies")).toBeVisible();
+    await expect(canvas.getByTestId("datasource-load-log")).toHaveTextContent("remote/arc");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Studies" }));
+    await expect(await canvas.findByText("Study One")).toBeVisible();
+    await expect(canvas.getByTestId("datasource-load-log")).toHaveTextContent("remote/arc|remote/arc/studies");
+  },
+};
+
+const DataSourceInvalidateAllTree = () => {
+  const [loadCount, setLoadCount] = React.useState(0);
+  const versionRef = React.useRef(1);
+  const apiRef = React.useRef<TreeApi | null>(null);
+  const items = React.useMemo(() => [branch("invalidate/all", "Invalidate-all branch", undefined)], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      GetChildrenCount: () => 1,
+      GetTreeItems: async () => {
+        const version = versionRef.current;
+        setLoadCount((count) => count + 1);
+        return [leaf(`invalidate/all/child-${version}`, `Loaded version ${version}`)];
+      },
+    }),
+    [],
+  );
+
+  const invalidateAll = React.useCallback(() => {
+    versionRef.current += 1;
+    apiRef.current?.InvalidateAll();
+  }, []);
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} dataSource={dataSource as any} apiRef={apiRef as any} debug />
+      <button type="button" className="swt:btn swt:btn-sm" onClick={invalidateAll}>
+        Invalidate all datasource cache
+      </button>
+      <div data-testid="datasource-invalidate-loads">Loads: {loadCount}</div>
+    </div>
+  );
+};
+
+export const DataSourceInvalidateAllCache: Story = {
+  render: () => <DataSourceInvalidateAllTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Invalidate-all branch" }));
+    await expect(await canvas.findByText("Loaded version 1")).toBeVisible();
+    await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 1");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Collapse Invalidate-all branch" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Invalidate-all branch" }));
+    await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 1");
+
+    await userEvent.click(canvas.getByRole("button", { name: "Invalidate all datasource cache" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Collapse Invalidate-all branch" }));
+    await userEvent.click(canvas.getByRole("button", { name: "Expand Invalidate-all branch" }));
+    await expect(await canvas.findByText("Loaded version 2")).toBeVisible();
+    await expect(canvas.getByTestId("datasource-invalidate-loads")).toHaveTextContent("Loads: 2");
+  },
+};
+
 const LazyErrorTree = () => {
   const [errorMessage, setErrorMessage] = React.useState("none");
   const items = React.useMemo(() => [branch("lazy-error", "Broken lazy branch", undefined)], []);
