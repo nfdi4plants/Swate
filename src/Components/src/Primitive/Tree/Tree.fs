@@ -132,7 +132,7 @@ type Tree =
                         event.preventDefault ()
                         event.stopPropagation ()
 
-                        if canExpand && not isExpanded then
+                        if canExpand then
                             actions.ExpandNode node
 
                         actions.SelectNode node

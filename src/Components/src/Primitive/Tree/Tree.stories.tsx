@@ -81,7 +81,11 @@ export const BasicExpansionAndSelection: Story = {
     await expect(canvas.getByText("Person schema")).toBeVisible();
 
     await userEvent.click(canvas.getByText("Project"));
+    await waitFor(() => expect(canvas.queryByText("Readme")).not.toBeInTheDocument());
     await expect(canvas.getByTestId("selected-node")).toHaveTextContent("project");
+
+    await userEvent.click(canvas.getByText("Project"));
+    await expect(await canvas.findByText("Readme")).toBeVisible();
 
     await userEvent.click(canvas.getByText("Readme"));
     await expect(canvas.getByTestId("selected-node")).toHaveTextContent("project/readme");
@@ -122,6 +126,10 @@ export const MultiSelectionWithoutCheckboxes: Story = {
     await expect(canvas.queryByRole("checkbox")).not.toBeInTheDocument();
     await userEvent.click(canvas.getByText("Project"));
     await expect(canvas.getByTestId("multi-selected")).toHaveTextContent("none");
+    await waitFor(() => expect(canvas.queryByText("Readme")).not.toBeInTheDocument());
+
+    await userEvent.click(canvas.getByText("Project"));
+    await expect(await canvas.findByText("Readme")).toBeVisible();
 
     await userEvent.click(canvas.getByText("Readme"));
     await userEvent.click(canvas.getByText("Raw data"));
