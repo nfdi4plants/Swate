@@ -110,6 +110,16 @@
     <Compile Include="Primitive\CardGrid\CardGrid.fs" />
     <Compile Include="Primitive\ContextMenu\Types.fs" />
     <Compile Include="Primitive\ContextMenu\ContextMenu.fs" />
+    <Compile Include="Primitive\Tree\Types.fs" />
+    <Compile Include="Primitive\Tree\Helper.fs" />
+    <Compile Include="Primitive\Tree\State.fs" />
+    <Compile Include="Primitive\Tree\Dom.fs" />
+    <Compile Include="Primitive\Tree\Context.fs" />
+    <Compile Include="Primitive\Tree\TreeController.fs" />
+    <Compile Include="Primitive\Tree\Hooks.fs" />
+    <Compile Include="Primitive\Tree\ContextMenuAdapter.fs" />
+    <Compile Include="Primitive\Tree\TreeNode.fs" />
+    <Compile Include="Primitive\Tree\Tree.fs" />
     <Compile Include="Primitive\Actionbar\Types.fs" />
     <Compile Include="Primitive\Actionbar\Actionbar.fs" />
     <Compile Include="Primitive\ComboBox\Types.fs" />
