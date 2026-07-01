@@ -95,12 +95,18 @@ let createRequest
     (filePath: string option)
     (timeoutMs: int option)
     : GitLfsRequest =
+    let effectiveTimeout =
+        match command with
+        | Pull
+        | Fetch -> None
+        | _ -> Some(defaultArg timeoutMs DefaultTimeoutMs)
+
     {
         RequestId = Guid.NewGuid().ToString()
         RepoPath = repoPath
         Command = command
         FilePath = filePath
-        TimeoutMs = Some(defaultArg timeoutMs DefaultTimeoutMs)
+        TimeoutMs = effectiveTimeout
     }
 
 /// Runs a Git LFS adapter request and normalizes unsuccessful adapter results to Result.Error.
@@ -220,6 +226,7 @@ let private readLsFilesByRelativePath
                     Arguments = buildLsFilesJsonArgs ()
                     Environment = None
                     StandardInput = None
+                    CancelCheck = None
                     TimeoutMs = Some lfsLsFilesTimeoutMs
                 }
 
@@ -626,6 +633,87 @@ let private extractSpawnFailureMessage (result: GitSpawnResult) =
 
 let private spawnFailure (result: GitSpawnResult) = exn (extractSpawnFailureMessage result)
 
+let private isHttpExtraHeaderConfigArg (configArg: string) =
+    let trimmed = configArg.Trim()
+    let equalsIndex = trimmed.IndexOf("=")
+
+    let key =
+        if equalsIndex >= 0 then
+            trimmed.Substring(0, equalsIndex)
+        else
+            trimmed
+
+    let normalizedKey = key.Trim().ToLowerInvariant()
+
+    normalizedKey.Equals("http.extraheader", StringComparison.Ordinal)
+    || (normalizedKey.StartsWith("http.", StringComparison.Ordinal)
+        && normalizedKey.EndsWith(".extraheader", StringComparison.Ordinal))
+
+let private lfsTransferConfigArgs (configArgs: string[]) =
+    let filtered = ResizeArray<string>()
+    let mutable index = 0
+
+    while index < configArgs.Length do
+        if
+            configArgs.[index] = "-c"
+            && index + 1 < configArgs.Length
+            && isHttpExtraHeaderConfigArg configArgs.[index + 1]
+        then
+            index <- index + 2
+        else
+            filtered.Add configArgs.[index]
+            index <- index + 1
+
+    filtered.ToArray()
+
+let runAuthenticatedTransferWith
+    (runSpawnedGit: GitSpawnRequest -> JS.Promise<GitSpawnResult>)
+    (commandAuth: GitCommandAuthentication)
+    (repoPath: string)
+    (arguments: string[])
+    (cancelCheck: (unit -> bool) option)
+    : JS.Promise<Result<unit, exn>> =
+    promise {
+        let! result =
+            runSpawnedGit {
+                WorkingDirectory = Some repoPath
+                Arguments = [|
+                    yield! lfsTransferConfigArgs commandAuth.ConfigArgs
+                    yield! arguments
+                |]
+                Environment = Some commandAuth.Environment
+                StandardInput = None
+                CancelCheck = cancelCheck
+                TimeoutMs = None
+            }
+
+        return
+            if result.ExitCode = 0 && not result.TimedOut then
+                Ok()
+            else
+                Error(exn (extractSpawnFailureMessage result))
+    }
+
+let pullAll
+    (repoPath: string)
+    (commandAuth: GitCommandAuthentication)
+    (cancelCheck: (unit -> bool) option)
+    : JS.Promise<Result<unit, exn>> =
+    runAuthenticatedTransferWith runGitDiscardingStdout commandAuth repoPath [| "lfs"; "pull" |] cancelCheck
+
+let fetchRefetchForPath
+    (repoPath: string)
+    (commandAuth: GitCommandAuthentication)
+    (relativePath: string)
+    (cancelCheck: (unit -> bool) option)
+    : JS.Promise<Result<unit, exn>> =
+    runAuthenticatedTransferWith
+        runGitDiscardingStdout
+        commandAuth
+        repoPath
+        (buildFetchRefetchArgs relativePath)
+        cancelCheck
+
 let private buildPointerInput (listing: GitLfsLsFileInfo) =
     let sizeText = listing.size |> int64 |> string
 
@@ -644,12 +732,13 @@ let downloadObjectFromListing
             runGitDiscardingStdout {
                 WorkingDirectory = Some repoPath
                 Arguments = [|
-                    yield! commandAuth.ConfigArgs
+                    yield! lfsTransferConfigArgs commandAuth.ConfigArgs
                     yield! buildSmudgePointerArgs relativePath
                 |]
                 Environment = Some commandAuth.Environment
                 StandardInput = Some(buildPointerInput listing)
-                TimeoutMs = Some DefaultTimeoutMs
+                CancelCheck = None
+                TimeoutMs = None
             }
 
         return
@@ -685,6 +774,7 @@ let private filterResolvableRemoteTipIds
                     Arguments = [| "cat-file"; "--batch-check" |]
                     Environment = None
                     StandardInput = Some(String.concat "\n" [| yield! distinctRemoteTipIds; yield "" |])
+                    CancelCheck = None
                     TimeoutMs = Some DefaultTimeoutMs
                 }
 
@@ -783,6 +873,7 @@ let private tryGetOptimizedLfsObjectIds
                 |]
                 Environment = None
                 StandardInput = Some(buildRevListStandardInput refSpec remoteTipIds)
+                CancelCheck = None
                 TimeoutMs = Some DefaultTimeoutMs
             }
 
@@ -805,6 +896,7 @@ let private tryGetOptimizedLfsObjectIds
                         Arguments = [| "cat-file"; "--batch"; "--buffer" |]
                         Environment = None
                         StandardInput = Some(String.concat "\n" [| yield! candidateBlobIds; yield "" |])
+                        CancelCheck = None
                         TimeoutMs = Some DefaultTimeoutMs
                     }
 
@@ -841,6 +933,7 @@ let private getOutboundObjectIdsFromRemoteTips
                 |]
                 Environment = None
                 StandardInput = Some(buildRevListStandardInput refSpec remoteTipIds)
+                CancelCheck = None
                 TimeoutMs = Some DefaultTimeoutMs
             }
 
@@ -872,7 +965,9 @@ let planOutboundPush
         let! dryRunResult =
             runSimpleGitRaw
                 (fun currentGit ->
-                    currentGit.raw [|
+                    let dryRunGit = currentGit.env ("GIT_LFS_SKIP_PUSH", "1")
+
+                    dryRunGit.raw [|
                         "push"
                         "--porcelain"
                         "--dry-run"
@@ -954,6 +1049,7 @@ let planOutboundPush
 let uploadObjects
     (runSpawnedGit: GitSpawnRequest -> JS.Promise<GitSpawnResult>)
     (commandAuth: GitCommandAuthentication)
+    (cancelCheck: unit -> bool)
     (repoPath: string)
     (remoteName: string)
     (refSpec: string)
@@ -962,12 +1058,14 @@ let uploadObjects
     promise {
         if lfsObjectIds.Length = 0 then
             return Ok()
+        elif cancelCheck () then
+            return Error(exn "Git LFS upload cancelled.")
         else
             let! exactUploadResult =
                 runSpawnedGit {
                     WorkingDirectory = Some repoPath
                     Arguments = [|
-                        yield! commandAuth.ConfigArgs
+                        yield! lfsTransferConfigArgs commandAuth.ConfigArgs
                         "lfs"
                         "push"
                         "--object-id"
@@ -976,32 +1074,37 @@ let uploadObjects
                     |]
                     Environment = Some commandAuth.Environment
                     StandardInput = Some(String.concat "\n" [| yield! lfsObjectIds; yield "" |])
-                    TimeoutMs = Some DefaultTimeoutMs
+                    CancelCheck = Some cancelCheck
+                    TimeoutMs = None
                 }
 
             if exactUploadResult.ExitCode = 0 then
                 return Ok()
             elif isUnsupportedOptionFailure exactUploadResult then
-                let! fallbackResult =
-                    runSpawnedGit {
-                        WorkingDirectory = Some repoPath
-                        Arguments = [|
-                            yield! commandAuth.ConfigArgs
-                            "lfs"
-                            "push"
-                            remoteName
-                            refSpec
-                        |]
-                        Environment = Some commandAuth.Environment
-                        StandardInput = None
-                        TimeoutMs = Some DefaultTimeoutMs
-                    }
+                if cancelCheck () then
+                    return Error(exn "Git LFS upload cancelled.")
+                else
+                    let! fallbackResult =
+                        runSpawnedGit {
+                            WorkingDirectory = Some repoPath
+                            Arguments = [|
+                                yield! lfsTransferConfigArgs commandAuth.ConfigArgs
+                                "lfs"
+                                "push"
+                                remoteName
+                                refSpec
+                            |]
+                            Environment = Some commandAuth.Environment
+                            StandardInput = None
+                            CancelCheck = Some cancelCheck
+                            TimeoutMs = None
+                        }
 
-                return
-                    if fallbackResult.ExitCode = 0 then
-                        Ok()
-                    else
-                        Error(exn (extractSpawnFailureMessage fallbackResult))
+                    return
+                        if fallbackResult.ExitCode = 0 then
+                            Ok()
+                        else
+                            Error(exn (extractSpawnFailureMessage fallbackResult))
             else
                 return Error(exn (extractSpawnFailureMessage exactUploadResult))
     }

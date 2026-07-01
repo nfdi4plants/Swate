@@ -1,15 +1,15 @@
-namespace Renderer.Components.LeftSidebar.FileExplorer.Modals
+namespace Swate.Components.Page.FileExplorer.Modals
 
 open Fable.Core
 open Feliz
 open Swate.Components.Primitive.BaseModal
-open Renderer.Components.LeftSidebar.FileExplorer.Types
+open Swate.Components.Page.FileExplorer.Types
 
 [<Erase; Mangle(false)>]
-type FileTreeAssignNoteModal =
+type AssignNoteModal =
 
     [<ReactComponent>]
-    static member Main
+    static member AssignNoteModal
         (
             isOpen: bool,
             itemName: string option,
@@ -66,13 +66,13 @@ type FileTreeAssignNoteModal =
                 prop.className "swt:flex swt:gap-2 swt:justify-end swt:w-full"
                 prop.children [
                     Html.button [
-                        prop.className "swt:btn swt:btn-ghost"
+                        prop.className "swt:btn swt:btn-ghost swt:btn-sm"
                         prop.disabled isAssigning
                         prop.onClick (fun _ -> close ())
                         prop.text "Cancel"
                     ]
                     Html.button [
-                        prop.className "swt:btn swt:btn-primary"
+                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
                         prop.disabled (isAssigning || selectedNote.IsNone)
                         prop.onClick (fun _ -> submit ())
                         prop.text (if isAssigning then "Assigning..." else "Assign")
@@ -80,25 +80,40 @@ type FileTreeAssignNoteModal =
                 ]
             ]
 
+        let modalActions =
+            Html.div [
+                prop.className "swt:flex swt:flex-col swt:gap-4 swt:w-full"
+                prop.children [
+                    noteSelector
+                    AssignNoteAssetSelector.Header(
+                        availableAssets,
+                        availableAssetDestinations,
+                        assetDestinations,
+                        setAssetDestination,
+                        isAssigning
+                    )
+                ]
+            ]
+
+        let assetRows =
+            AssignNoteAssetSelector.Rows(
+                availableAssets,
+                availableAssetDestinations,
+                assetDestinations,
+                setAssetDestination,
+                isAssigning
+            )
+
         BaseModal.Modal(
             isOpen = isOpen,
             setIsOpen = setClose,
             header = Html.text "Assign Note",
             description = Html.text $"Assign a note to '{displayName}'.",
-            children =
-                Html.div [
-                    prop.className "swt:flex swt:flex-col swt:gap-4"
-                    prop.children [
-                        noteSelector
-                        FileTreeAssignNoteAssetSelector.Main(
-                            availableAssets,
-                            availableAssetDestinations,
-                            assetDestinations,
-                            setAssetDestination,
-                            isAssigning
-                        )
-                    ]
-                ],
+            modalActions = modalActions,
+            modalActionsClassName =
+                "swt:w-full swt:flex swt:flex-col swt:items-stretch swt:justify-start swt:gap-4 swt:p-2",
+            children = assetRows,
             footer = footer,
-            debug = "arc-assign-note"
+            debug = "arc-assign-note",
+            className = "swt:!flex swt:flex-col swt:max-h-[calc(100vh_-_5rem)] swt:!overflow-hidden"
         )

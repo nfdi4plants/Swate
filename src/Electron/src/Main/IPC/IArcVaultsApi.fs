@@ -115,6 +115,31 @@ let private notifyGitRepositoryInitialized (arcPath: string) =
         |> fun rendererApi -> rendererApi.gitRepositoryInitialized arcPath
     )
 
+let private normalizeDialogFilterExtension (extension: string) =
+    extension
+    |> Option.ofObj
+    |> Option.map (fun value -> value.Trim())
+    |> Option.bind (fun value ->
+        let normalizedValue = if value.StartsWith(".") then value.Substring(1) else value
+
+        if String.IsNullOrWhiteSpace normalizedValue then
+            None
+        else
+            Some normalizedValue
+    )
+
+let private openDialogFiltersFromExtensions (filterExtensions: string[] option) =
+    let normalizedExtensions =
+        filterExtensions
+        |> Option.defaultValue [||]
+        |> Array.choose normalizeDialogFilterExtension
+        |> Array.distinct
+
+    if normalizedExtensions.Length = 0 then
+        None
+    else
+        Some [| FileFilter("Supported files", normalizedExtensions) |]
+
 /// This depends on the types in this file, but the types on this file must call this to bind IPC calls :/
 let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
     openARC =
@@ -307,7 +332,6 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 |]
 
                 let window = dialogParentFromIpcEvent event
-
                 let! result = dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then
@@ -315,84 +339,33 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
                 elif result.filePaths.Length <> 1 then
                     return Error(exn "Not exactly one path")
                 else
-                    return Ok(result.filePaths |> Array.exactlyOne)
+                    return Ok(result.filePaths |> Array.exactlyOne |> PathHelpers.normalizePath)
             with e ->
                 return Error(exn $"Could not pick directory: {e.Message}")
         }
-    pickImagePaths =
-        fun () -> promise {
+    pickExternalFilePaths =
+        fun (request: PickExternalFilePathsRequest) -> promise {
             try
                 let properties = [|
                     Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
                     Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
                 |]
 
-                let filters = [|
-                    FileFilter(
-                        "Images",
-                        [|
-                            "apng"
-                            "avif"
-                            "bmp"
-                            "gif"
-                            "heic"
-                            "heif"
-                            "ico"
-                            "jpeg"
-                            "jpg"
-                            "png"
-                            "svg"
-                            "tif"
-                            "tiff"
-                            "webp"
-                        |]
-                    )
-                |]
-
+                let filters = openDialogFiltersFromExtensions request.filterExtensions
                 let window = dialogParentFromIpcEvent event
 
-                let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
+                let! result =
+                    match filters with
+                    | Some filters ->
+                        dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
+                    | None -> dialog.showOpenDialog (?window = window, properties = properties)
 
                 if result.canceled then
                     return Error(exn "Cancelled")
                 else
-                    return Ok result.filePaths
+                    return Ok(result.filePaths |> Array.map PathHelpers.normalizePath)
             with e ->
-                return Error(exn $"Could not pick image files: {e.Message}")
-        }
-    pickExternalTextFiles =
-        fun _ -> promise {
-            try
-                let properties = [|
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.OpenFile
-                    Enums.Dialog.ShowOpenDialog.Options.Properties.MultiSelections
-                |]
-
-                let filters = [|
-                    FileFilter("Delimited text files", [| "csv"; "tsv"; "txt" |])
-                |]
-
-                let window = dialogParentFromIpcEvent event
-
-                let! result = dialog.showOpenDialog (?window = window, properties = properties, filters = filters)
-
-                if result.canceled then
-                    return Error(exn "Cancelled")
-                else
-                    let importedFiles = ResizeArray<ImportedTextFile>()
-
-                    for filePath in result.filePaths do
-                        let absolutePath = resolveAbsolutePath filePath
-                        let! content = ARCtrl.FileSystemHelper.readFileTextAsync absolutePath
-
-                        importedFiles.Add {
-                            Name = path.basename absolutePath
-                            Content = content
-                        }
-
-                    return Ok(importedFiles.ToArray())
-            with e ->
-                return Error(exn $"Could not import external text files: {e.Message}")
+                return Error(exn $"Could not pick files: {e.Message}")
         }
     getFileTree =
         fun () -> promise {
@@ -513,6 +486,7 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
+    // Copies one or more files from the host filesystem into the ARC's filesystem.
     copyExternalFilesToArc =
         fun (requests: CopyExternalFileRequest[]) -> promise {
             try
@@ -656,8 +630,9 @@ let api (event: IpcMainInvokeEvent) : IPCTypes.IArcVaultsApi = {
             with e ->
                 return Error e
         }
-    copyPath =
-        fun (request: CopyPathRequest) -> promise {
+    // Copies a file or folder from one location to another within the ARC's filesystem.
+    copyFileSystemItem =
+        fun (request: CopyFileSystemItemRequest) -> promise {
             try
                 return!
                     withLoadedArcVault

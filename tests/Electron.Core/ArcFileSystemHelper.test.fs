@@ -2,14 +2,13 @@ module ElectronCore.ArcFileSystemHelperTests
 
 open System
 open Fable.Core
-open Fable.Core.JsInterop
 open Main.Bindings.Path
 open Main.IPC.FileSystemIO
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
 open Vitest
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
+module Fs = Main.Bindings.Filesystem
 
 [<Emit("Object.assign(new Error($0), { code: $1 })")>]
 let private nodeError (message: string) (code: string) : exn = jsNative
@@ -31,7 +30,7 @@ let private moveRequest sourcePath targetPath overwrite : MovePathRequest = {
     overwrite = overwrite
 }
 
-let private copyPathRequest sourcePath targetPath overwrite : CopyPathRequest = {
+let private copyFileSystemItemRequest sourcePath targetPath overwrite : CopyFileSystemItemRequest = {
     sourceRelativePath = sourcePath
     targetRelativePath = targetPath
     overwrite = overwrite
@@ -74,7 +73,7 @@ let private moveItemOrFail arcPath (request: MovePathRequest) = promise {
     | Ok() -> return ()
 }
 
-let private copyItemOrFail arcPath (request: CopyPathRequest) = promise {
+let private copyItemOrFail arcPath (request: CopyFileSystemItemRequest) = promise {
     match! ArcFileSystemHelper.copyGenericFileSystemItemOnDisk arcPath request with
     | Error error -> return failwith error.Message
     | Ok() -> return ()
@@ -101,25 +100,15 @@ let private expectPathExistsRequest arcPath relativePath expected = promise {
 
 let private writeRelativeFileAsync arcPath relativePath content = promise {
     let absolutePath = absoluteArcPath arcPath relativePath
-
-    let! _ =
-        fsPromisesDynamic?writeFile (absolutePath, content, "utf8")
-        |> unbox<JS.Promise<obj>>
-
-    return ()
+    do! Fs.writeFileAsync absolutePath content Fs.TextEncoding.Utf8
 }
 
 let private readRelativeFileAsync arcPath relativePath =
-    fsPromisesDynamic?readFile (absoluteArcPath arcPath relativePath, "utf8")
-    |> unbox<JS.Promise<string>>
+    Fs.readFileAsync (absoluteArcPath arcPath relativePath) Fs.TextEncoding.Utf8
 
 let private createRelativeDirectoryAsync arcPath relativePath = promise {
     let absolutePath = absoluteArcPath arcPath relativePath
-
-    let! _ =
-        fsPromisesDynamic?mkdir (absolutePath, createObj [ "recursive" ==> true ])
-        |> unbox<JS.Promise<obj>>
-
+    let! _ = Fs.mkdirAsync absolutePath (Fs.MkdirOptions(recursive = true))
     return ()
 }
 
@@ -326,7 +315,7 @@ Vitest.describe (
                     do! writeRelativeFileAsync arcPath $"{sourceFolder}/Field_observations.md" "source"
                     do! writeRelativeFileAsync arcPath $"{sourceFolder}/assets/image.txt" "asset"
 
-                    do! copyItemOrFail arcPath (copyPathRequest sourceFolder targetFolder false)
+                    do! copyItemOrFail arcPath (copyFileSystemItemRequest sourceFolder targetFolder false)
 
                     do! expectRelativePathExists arcPath sourceFolder true
                     do! expectRelativePathExists arcPath $"{sourceFolder}/Field_observations.md" true
@@ -336,7 +325,7 @@ Vitest.describe (
                     match!
                         ArcFileSystemHelper.copyGenericFileSystemItemOnDisk
                             arcPath
-                            (copyPathRequest sourceFolder targetFolder false)
+                            (copyFileSystemItemRequest sourceFolder targetFolder false)
                     with
                     | Ok() -> failwith "Expected copy without overwrite to reject an existing target."
                     | Error error -> Vitest.expect(error.Message).toContain ("destination already exists")
@@ -344,7 +333,7 @@ Vitest.describe (
                     do! writeRelativeFileAsync arcPath $"{sourceFolder}/Field_observations.md" "replacement"
                     do! writeRelativeFileAsync arcPath $"{targetFolder}/stale.txt" "stale"
 
-                    do! copyItemOrFail arcPath (copyPathRequest sourceFolder targetFolder true)
+                    do! copyItemOrFail arcPath (copyFileSystemItemRequest sourceFolder targetFolder true)
 
                     let! copiedContent = readRelativeFileAsync arcPath $"{targetFolder}/Field_observations.md"
                     Vitest.expect(copiedContent).toBe ("replacement")
@@ -360,9 +349,7 @@ Vitest.describe (
                     let sourcePath = absoluteArcPath arcPath "../external-diagram.png"
                     let targetPath = "notes/2026-06-15/Field_observations/assets/external-diagram.png"
 
-                    let! _ =
-                        fsPromisesDynamic?writeFile (sourcePath, "image-content", "utf8")
-                        |> unbox<JS.Promise<obj>>
+                    do! Fs.writeFileAsync sourcePath "image-content" Fs.TextEncoding.Utf8
 
                     match!
                         ArcFileSystemHelper.copyExternalFileToArcOnDisk

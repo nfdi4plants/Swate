@@ -1,5 +1,6 @@
 namespace Swate.Components.Page.FileExplorer
 
+open Swate.Components
 open Swate.Components.Page.FileExplorer.Types
 open Fable.Core
 open Fable.Core.JsInterop
@@ -22,16 +23,6 @@ module private FileExplorerHelper =
                 Some(unbox<Browser.Types.Element> parentElement)
         else
             Some(unbox<Browser.Types.Element> targetObj)
-
-    let private copyPathToClipboard (path: string) =
-        promise {
-            try
-                let windowObj: obj = Browser.Dom.window
-                do! windowObj?navigator?clipboard?writeText (path)
-            with ex ->
-                Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
-        }
-        |> Promise.start
 
     let private defaultContextMenuItems
         (item: FileItem)
@@ -57,7 +48,17 @@ module private FileExplorerHelper =
                     ContextMenuItem.create
                         "Copy Path"
                         "swt:fluent--copy-24-regular"
-                        (fun () -> copyPathToClipboard path)
+                        (fun () ->
+                            promise {
+                                try
+                                    do!
+                                        Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText
+                                            path
+                                with ex ->
+                                    Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
+                            }
+                            |> Promise.start
+                        )
                 | None -> ()
 
                 match getCopyRelativePath item with
@@ -65,7 +66,17 @@ module private FileExplorerHelper =
                     ContextMenuItem.create
                         "Copy Relative Path"
                         "swt:fluent--copy-24-regular"
-                        (fun () -> copyPathToClipboard path)
+                        (fun () ->
+                            promise {
+                                try
+                                    do!
+                                        Swate.Components.JsBindings.Clipboard.Clipboard.navigator.clipboard.writeText
+                                            path
+                                with ex ->
+                                    Browser.Dom.console.warn ($"Could not copy file path: {path}", ex)
+                            }
+                            |> Promise.start
+                        )
                 | None -> ()
             | None -> ()
 

@@ -124,6 +124,22 @@ let tryGetItemRelativePath (item: FileItem) =
     |> Option.map PathHelpers.normalizeRelativePath
     |> Option.map PathHelpers.normalizePath
 
+let tryGetNonEmptyItemRelativePath (item: FileItem) =
+    tryGetItemRelativePath item |> Option.filter (String.IsNullOrWhiteSpace >> not)
+
+let tryGetItemAbsolutePath (arcRootPath: string option) (item: FileItem) =
+    match arcRootPath, tryGetItemRelativePath item with
+    | Some rootPath, Some relativePath ->
+        let normalizedRootPath = PathHelpers.normalizePath rootPath
+
+        if String.IsNullOrWhiteSpace normalizedRootPath then
+            None
+        elif String.IsNullOrWhiteSpace relativePath then
+            Some normalizedRootPath
+        else
+            Some(PathHelpers.normalizePath $"{normalizedRootPath}/{relativePath}")
+    | _ -> None
+
 let canCreateFileSystemItemIn (item: FileItem) =
     item.IsDirectory
     && (tryGetItemRelativePath item
@@ -209,19 +225,12 @@ let arcCreateIdentifierError =
 
 let tryCreateArcFile kind identifier =
     match kind with
-    | ArcExplorerNodeKind.Study ->
-        let study = ArcStudy.init identifier
-        study.InitTable($"{identifier} Table") |> ignore
-        Ok(ArcFiles.Study(study, []))
-    | ArcExplorerNodeKind.Assay ->
-        let assay = ArcAssay.init identifier
-        assay.InitTable($"{identifier} Table") |> ignore
-        Ok(ArcFiles.Assay assay)
-    | ArcExplorerNodeKind.Workflow -> ArcWorkflow.init identifier |> ArcFiles.Workflow |> Ok
-    | ArcExplorerNodeKind.Run ->
-        let run = ArcRun.init identifier
-        run.InitTable($"{identifier} Table") |> ignore
-        Ok(ArcFiles.Run run)
+    | ArcExplorerNodeKind.Study -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Study identifier |> Ok
+    | ArcExplorerNodeKind.Assay -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Assay identifier |> Ok
+    | ArcExplorerNodeKind.Workflow ->
+        ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Workflow identifier
+        |> Ok
+    | ArcExplorerNodeKind.Run -> ArcFileDefaults.createDefaultArcFile ArcFilesDiscriminate.Run identifier |> Ok
     | kind -> Error $"Creating {ArcExplorerNodeKind.label kind} files is not supported from the file explorer."
 
 let tryGetInlineArcCreateKind (rootPath: string) (item: FileItem) =

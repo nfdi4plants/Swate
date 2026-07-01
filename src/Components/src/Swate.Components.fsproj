@@ -83,6 +83,7 @@
     <Compile Include="ARCtrl\Extensions\OntologyAnnotation.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeHeader.fs" />
     <Compile Include="ARCtrl\Extensions\CompositeCell.fs" />
+    <Compile Include="JsBindings\Clipboard.fs" />
     <Compile Include="ARCtrl\Extensions\ArcTable.fs" />
     <Compile Include="ARCtrl\Extensions\DataFile.fs" />
     <Compile Include="ARCtrl\Extensions\DataMap.fs" />
@@ -126,6 +127,8 @@
     <Compile Include="Composite\ThemeSelector\Context.fs" />
     <Compile Include="Composite\ThemeSelector\ThemeProvider.fs" />
     <Compile Include="Composite\ThemeSelector\ThemeSelector.fs" />
+    <Compile Include="Composite\FolderedDraggableList\Types.fs" />
+    <Compile Include="Composite\FolderedDraggableList\FolderedDraggableList.fs" />
     <Compile Include="Composite\TermSearch\Types.fs" />
     <Compile Include="Composite\TermSearch\Context\ActiveKeysContext.fs" />
     <Compile Include="Composite\TermSearch\Context\AllKeysContext.fs" />
@@ -255,6 +258,8 @@
     <Compile Include="Page\FileExplorer\Helper.fs" />
     <Compile Include="Page\FileExplorer\FileExplorerGitLfsHelper.fs" />
     <Compile Include="Page\FileExplorer\FileExplorerItem.fs" />
+    <Compile Include="Page\FileExplorer\Modals\AssignNoteAssetSelector.fs" />
+    <Compile Include="Page\FileExplorer\Modals\AssignNoteModal.fs" />
     <Compile Include="Page\FileExplorer\FileExplorer.fs" />
     <Compile Include="Page\DataHubBrowser\Types.fs" />
     <Compile Include="Page\DataHubBrowser\MockData.fs" />

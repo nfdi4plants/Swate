@@ -209,6 +209,8 @@ type Msg =
     | FetchRequested
     | PullRequested
     | PushRequested
+    | CancelCurrentOperationRequested
+    | CancelCurrentOperationCompleted of Result<GitOperationResult, string>
     | UpdateFromOnlineRequested
     | UpdatePreflightCompleted of sessionId: int * Result<GitPullPreflightResult, string>
     | CloneRequested of GitCloneRepositoryRequest * Reply<string>
@@ -245,6 +247,7 @@ type GitDependencies = {
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, string>>
+    gitCancelPush: unit -> JS.Promise<Result<GitOperationResult, string>>
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, string>>
     createBranch: GitCreateBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
     checkoutBranch: GitCheckoutBranchRequest -> JS.Promise<Result<GitOperationResult, string>>
@@ -1328,6 +1331,31 @@ let update
     | FetchRequested -> model, Cmd.ofMsg (WriteRequested Fetch)
     | PullRequested -> model, Cmd.ofMsg (WriteRequested Pull)
     | PushRequested -> model, Cmd.ofMsg (WriteRequested Push)
+    | CancelCurrentOperationRequested ->
+        let nextModel = {
+            model with
+                WarningNotice = Some "Canceling push..."
+        }
+
+        let cmd =
+            Cmd.OfPromise.either
+                deps.gitCancelPush
+                ()
+                CancelCurrentOperationCompleted
+                (fun err -> CancelCurrentOperationCompleted(Error(string err)))
+
+        nextModel, cmd
+    | CancelCurrentOperationCompleted(Ok operationResult) when not operationResult.Success ->
+        let message =
+            operationResult.Message |> Option.defaultValue "Could not cancel push."
+
+        {
+            model with
+                ErrorNotice = Some message
+                WarningNotice = None
+        },
+        reportErrorCmd deps "Could not cancel push" message
+    | CancelCurrentOperationCompleted _ -> model, Cmd.none
     | UpdateFromOnlineRequested when model.CurrentArcPath.IsNone -> model, Cmd.none
     | UpdateFromOnlineRequested ->
         let nextModel =

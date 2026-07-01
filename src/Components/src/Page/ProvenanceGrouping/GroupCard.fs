@@ -4,10 +4,10 @@ open Fable.Core
 open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
-open Swate.Components.Primitive.Buttons
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Edit
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
+open Swate.Components.Shared.ProvenanceGrouping.Session
 open Swate.Components.Page.ProvenanceGrouping.Types
 
 /// Maps loaded endpoint kinds (Source, Sample, Data, ...) to a display label and icon.
@@ -129,6 +129,20 @@ module private TabText =
         if trimmed.Length = 0 then "", ""
         elif trimmed.Length = 1 then trimmed, ""
         else trimmed.Substring(0, 1), trimmed.Substring(1)
+
+module private SelectionSurface =
+
+    [<Emit("$0.closest($1)")>]
+    let private closest (_element: Browser.Types.Element) (_selector: string) : Browser.Types.Element = jsNative
+
+    let shouldSelect (event: Browser.Types.MouseEvent) =
+        let targetObj: obj = box event.target
+
+        if isNull targetObj then
+            false
+        else
+            let target = unbox<Browser.Types.Element> targetObj
+            isNull (closest target "button,[role='button'],a,input,select,textarea")
 
 type private OrganizerTabMode =
     | Responsive
@@ -290,6 +304,7 @@ type GroupCard =
             onExpand: unit -> unit,
             isValueChipDragging: bool,
             ?connectionCount: int,
+            ?sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
             ?debug: bool,
             ?key: string
         ) =
@@ -324,24 +339,6 @@ type GroupCard =
             articleRef.current <- (if isNull element then None else Some(unbox element))
             droppable.setNodeRef element
 
-        // let dnd = DndKit.use()
-
-        // let isValueChipDragging =
-        //     match dnd.active with
-        //     | Some active ->
-        //         active.data.current?type = DragDrop.PropertyValue
-        //     | None ->
-        //         false
-
-        // let dnd = DndKit.use()
-
-        // let isValueChipDragging =
-        //     match dnd.active with
-        //     | Some active ->
-        //         active.data.current?type = DragDrop.PropertyValue
-        //     | None ->
-        //         false
-
         // Two anchors at opposite card edges: the group-facing edge carries the draggable
         // group connection handle, the property-facing edge is measurement-only and is
         // where property/value connectors from the same-side rail attach.
@@ -372,6 +369,10 @@ type GroupCard =
             match side with
             | ProvenanceSide.Input -> "swt:left-full swt:ml-2"
             | ProvenanceSide.Output -> "swt:right-full swt:mr-2"
+
+        let handleSelectionClick (event: Browser.Types.MouseEvent) =
+            if SelectionSurface.shouldSelect event then
+                onSelect ()
 
         Html.article [
             match key with
@@ -419,21 +420,15 @@ type GroupCard =
                         ]
                     | _ -> Html.none
 
-                let selectButton =
-                    Buttons.QuickAccessButton(
-                        Html.i [
-                            prop.className "swt:iconify swt:fluent--checkmark-circle-20-regular swt:size-4"
-                        ],
-                        "Select group",
-                        (fun _ -> onSelect ())
-                    )
-
                 match tabs with
                 | [] ->
                     // A card without grouping values is always a single loaded endpoint,
                     // so the type line sits above its name to mirror the expanded member rows.
                     Html.div [
-                        prop.className "swt:flex swt:items-start swt:gap-2"
+                        prop.className "swt:flex swt:cursor-pointer swt:items-start swt:gap-2"
+                        prop.onClick handleSelectionClick
+                        if defaultArg debug false then
+                            prop.testId $"provenance-group-select-surface-{side}-{group.Id}"
                         prop.children [
                             Html.div [
                                 prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5"
@@ -449,7 +444,6 @@ type GroupCard =
                                 ]
                             ]
                             connectionBadge
-                            selectButton
                         ]
                     ]
                 | tabs ->
@@ -499,7 +493,10 @@ type GroupCard =
                     |]
 
                     Html.div [
-                        prop.className "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
+                        prop.className "swt:flex swt:min-w-0 swt:cursor-pointer swt:flex-col swt:gap-2"
+                        prop.onClick handleSelectionClick
+                        if defaultArg debug false then
+                            prop.testId $"provenance-group-select-surface-{side}-{group.Id}"
                         prop.children [
                             Html.div [
                                 prop.className [
@@ -548,7 +545,8 @@ type GroupCard =
                                         prop.ariaLabel "Show members"
                                         prop.title "Show members"
                                         prop.onClick (fun _ -> onExpand ())
-                                        prop.className "swt:group swt:relative swt:min-w-0 swt:grow swt:cursor-pointer"
+                                        prop.className
+                                            "swt:group swt:relative swt:w-fit swt:max-w-full swt:cursor-pointer"
                                         prop.children [
                                             Html.span [
                                                 prop.ariaHidden true
@@ -593,7 +591,6 @@ type GroupCard =
                                         ]
                                     ]
                                     connectionBadge
-                                    selectButton
                                 ]
                             ]
                         ]
@@ -682,8 +679,13 @@ type GroupCard =
                                                             prop.className "swt:flex swt:flex-wrap swt:gap-1"
                                                             prop.children [
                                                                 for value in memberValues do
+                                                                    let sourceInfo =
+                                                                        sourceInfoForValue
+                                                                        |> Option.bind (fun resolver -> resolver value)
+
                                                                     Controls.ValueLabel(
                                                                         value,
+                                                                        ?sourceInfo = sourceInfo,
                                                                         key =
                                                                             $"member:{member'.SetId}:{DragDrop.propertyValueIdentity value}"
                                                                     )

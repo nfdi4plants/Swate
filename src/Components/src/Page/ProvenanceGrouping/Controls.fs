@@ -7,6 +7,7 @@ open Feliz
 open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Primitive.Buttons
+open Swate.Components.Primitive.Dropdown
 open Swate.Components.Primitive.Popover
 open Swate.Components.Shared.ProvenanceGrouping.Types
 open Swate.Components.Shared.ProvenanceGrouping.Grouping
@@ -29,6 +30,69 @@ module private SideLabels =
         match side with
         | ProvenanceSide.Input -> "input"
         | ProvenanceSide.Output -> "output"
+
+module private ColorPicker =
+
+    let fallbackColor =
+        State.PropertyColors.palette |> Array.tryHead |> Option.defaultValue "#2563eb"
+
+    let currentOrFallback color =
+        match color with
+        | Some c when c <> "" -> c
+        | _ -> fallbackColor
+
+    let content ariaLabel (draftColor: string) (setDraftColor: string -> unit) onSetColor =
+        Html.div [
+            prop.className "swt:flex swt:items-center swt:gap-2 swt:p-2"
+            prop.children [
+                Html.input [
+                    prop.custom ("type", "color")
+                    prop.className "swt:h-8 swt:w-10 swt:cursor-pointer swt:rounded swt:border swt:border-base-300"
+                    prop.value draftColor
+                    prop.ariaLabel ariaLabel
+                    prop.onChange (fun (color: string) -> setDraftColor color)
+                ]
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-xs swt:btn-primary swt:min-h-0 swt:py-0"
+                    prop.text "Select"
+                    prop.onClick (fun _ -> onSetColor (Some draftColor))
+                ]
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:min-h-0 swt:py-0"
+                    prop.text "Clear"
+                    prop.onClick (fun _ ->
+                        setDraftColor fallbackColor
+                        onSetColor None
+                    )
+                ]
+            ]
+        ]
+
+module private OriginSymbols =
+
+    let upstreamIcon size =
+        Html.i [
+            prop.className [ "swt:iconify swt:fluent--arrow-up-20-regular"; size ]
+        ]
+
+    let currentIcon size =
+        Html.i [
+            prop.className [ "swt:iconify swt:fluent--circle-20-filled"; size ]
+        ]
+
+    let bothIcons size =
+        Html.span [
+            prop.className "swt:inline-flex swt:items-center swt:gap-1"
+            prop.children [
+                upstreamIcon size
+                Html.span [
+                    prop.className "swt:h-4 swt:w-px swt:bg-current swt:opacity-60"
+                ]
+                currentIcon size
+            ]
+        ]
 
 /// Converts between draft form state and typed provenance values.
 module private ValueDrafts =
@@ -167,30 +231,70 @@ type Controls =
 
     [<ReactComponent>]
     static member LayerTabs
-        (session: ProvenanceSession, onSelect: ProvenancePairId -> unit, onAddLayer: unit -> unit, ?debug: bool)
-        =
+        (
+            session: ProvenanceSession,
+            onSelect: ProvenanceLayerId -> unit,
+            onAddLayer: unit -> unit,
+            ?debug: bool,
+            ?layerColors: Map<ProvenanceLayerId, ProvenanceColor>,
+            ?onSetLayerColor: ProvenanceLayerId -> ProvenanceColor option -> unit
+        ) =
         Html.div [
             prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
             prop.children [
-                for pairId in session.PairOrder do
-                    let pair = session.Pairs.[pairId]
-                    let left = session.Layers |> List.find (fun layer -> layer.Id = pair.LeftLayerId)
-                    let right = session.Layers |> List.find (fun layer -> layer.Id = pair.RightLayerId)
+                for layerId in session.LayerOrder do
+                    let layer = Session.layerById layerId session
 
-                    Html.button [
-                        prop.title $"View provenance for {left.Label} and {right.Label}"
-                        prop.className [
-                            "swt:btn swt:btn-sm"
-                            if pairId = session.ActivePairId then
-                                "swt:btn-primary"
-                            else
-                                "swt:btn-outline"
+                    let layerColor =
+                        layerColors |> Option.bind (fun colors -> colors |> Map.tryFind layer.Id)
+
+                    let layerButtonClasses = [
+                        "swt:btn swt:btn-sm swt:join-item"
+                        if layerId = session.ActiveLayerId then
+                            "swt:btn-primary"
+                        else
+                            "swt:btn-outline"
+                    ]
+
+                    let swatchButtonClass =
+                        [
+                            yield! layerButtonClasses
+                            "swt:min-h-8 swt:w-8 swt:px-0"
                         ]
-                        prop.ariaLabel $"View provenance for {left.Label} and {right.Label}"
-                        if defaultArg debug false then
-                            prop.testId $"provenance-pair-{pairId}"
-                        prop.onClick (fun _ -> onSelect pairId)
-                        prop.text $"{left.Label} -> {right.Label}"
+                        |> String.concat " "
+
+                    Html.div [
+                        prop.className "swt:join"
+                        prop.children [
+                            match onSetLayerColor with
+                            | Some setLayerColor ->
+                                Controls.LayerColorButton(
+                                    layer.Id,
+                                    layerColor,
+                                    setLayerColor layer.Id,
+                                    triggerClassName = swatchButtonClass
+                                )
+                            | None ->
+                                Html.span [
+                                    prop.className [
+                                        yield! layerButtonClasses
+                                        "swt:min-h-8 swt:w-8 swt:px-0"
+                                    ]
+                                    match layerColor with
+                                    | Some color when color <> "" -> prop.style [ style.backgroundColor color ]
+                                    | _ -> ()
+                                ]
+                            Html.button [
+                                prop.title $"View provenance layer {layer.Label}"
+                                prop.className layerButtonClasses
+                                prop.ariaLabel $"View provenance layer {layer.Label}"
+                                if defaultArg debug false then
+                                    prop.testId $"provenance-layer-{layerId}"
+                                    prop.custom ("data-provenance-layer-color", layerColor |> Option.defaultValue "")
+                                prop.onClick (fun _ -> onSelect layerId)
+                                prop.children [ Html.span layer.Label ]
+                            ]
+                        ]
                     ]
                 Html.button [
                     prop.title "Add layer"
@@ -209,6 +313,37 @@ type Controls =
         ]
 
     [<ReactComponent>]
+    static member LayerColorButton
+        (
+            layerId: ProvenanceLayerId,
+            currentColor: ProvenanceColor option,
+            onSetColor: ProvenanceColor option -> unit,
+            ?triggerClassName: string
+        ) : ReactElement =
+        let draftColor, setDraftColor =
+            React.useState (ColorPicker.currentOrFallback currentColor)
+
+        React.useEffect ((fun () -> setDraftColor (ColorPicker.currentOrFallback currentColor)), [| box currentColor |])
+
+        let triggerClassName =
+            defaultArg
+                triggerClassName
+                "swt:size-4 swt:shrink-0 swt:rounded swt:border swt:border-base-300 swt:cursor-pointer swt:align-middle"
+
+        Popover.Simple(
+            trigger =
+                Html.button [
+                    prop.type'.button
+                    prop.className triggerClassName
+                    match currentColor with
+                    | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
+                    | _ -> ()
+                    prop.ariaLabel $"Set color for layer {layerId}"
+                ],
+            content = ColorPicker.content $"Choose color for layer {layerId}" draftColor setDraftColor onSetColor
+        )
+
+    [<ReactComponent>]
     static member private PropertySwapButton
         (
             side: ProvenanceSide,
@@ -221,7 +356,7 @@ type Controls =
         Html.button [
             prop.title $"Move {header.Category.Name} grouping from {sideName}"
             prop.type'.button
-            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:btn-outline swt:z-10"
+            prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:btn-outline swt:z-10 swt:bg-base-100/90"
             prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
             if defaultArg debug false then
                 prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
@@ -250,12 +385,19 @@ type Controls =
             onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             setIsValueChipDragging: bool -> unit,
             ?debug: bool,
-            ?key: string
+            ?key: string,
+            ?stats: PropertyStats,
+            ?badge: PropertyCountBadge,
+            ?color: ProvenanceColor,
+            ?origins: Set<PropertyOrigin>,
+            ?onSetColor: ProvenanceColor option -> unit,
+            ?sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option
         ) =
         let draggable =
             DndKit.useDraggable (
                 {|
                     id = DragDrop.propertyDragId side header
+                    data = {| label = header.Category.Name |}
                 |}
             )
 
@@ -318,6 +460,8 @@ type Controls =
                         "swt:btn-primary"
                     else
                         "swt:btn-outline"
+                    if not sideSelected then
+                        "swt:bg-base-100/90"
                     if canSwitch then
                         yield! Styles.draggableButtonClasses draggable.isDragging
 
@@ -328,10 +472,72 @@ type Controls =
                 prop.onClick (fun _ -> onToggleSide header)
                 prop.children [
                     propertyAnchor
+                    match color with
+                    | Some c when c <> "" ->
+                        Html.span [
+                            prop.className "swt:size-2.5 swt:shrink-0 swt:rounded"
+                            prop.style [ style.backgroundColor c ]
+                        ]
+                    | _ -> Html.none
                     Html.span [
                         prop.className "swt:min-w-0 swt:truncate swt:text-left"
                         prop.text header.Category.Name
                     ]
+                    match badge with
+                    | Some badge ->
+                        match badge with
+                        | PropertyCountBadge.Hide -> Html.none
+                        | PropertyCountBadge.DistinctValues n ->
+                            Html.span [
+                                prop.className "swt:badge swt:badge-xs swt:shrink-0"
+                                prop.text (string n)
+                            ]
+                        | PropertyCountBadge.Coverage(setsWithValue, total) ->
+                            Html.span [
+                                prop.className "swt:badge swt:badge-xs swt:badge-warning swt:shrink-0"
+                                prop.text $"{setsWithValue}/{total}"
+                            ]
+                    | None -> Html.none
+                    match origins with
+                    | Some origins ->
+                        let hasCurrent =
+                            origins
+                            |> Set.exists (
+                                function
+                                | PropertyOrigin.Current _ -> true
+                                | _ -> false
+                            )
+
+                        let hasUpstream =
+                            origins
+                            |> Set.exists (
+                                function
+                                | PropertyOrigin.UpstreamLayer _
+                                | PropertyOrigin.PreviousContext _ -> true
+                                | _ -> false
+                            )
+
+                        if hasCurrent && hasUpstream then
+                            Html.span [
+                                prop.className "swt:shrink-0 swt:text-base-content/60"
+                                prop.title "Current and upstream"
+                                prop.children [ OriginSymbols.bothIcons "swt:size-3" ]
+                            ]
+                        elif hasCurrent then
+                            Html.span [
+                                prop.className "swt:shrink-0 swt:text-base-content/60"
+                                prop.title "Current"
+                                prop.children [ OriginSymbols.currentIcon "swt:size-3" ]
+                            ]
+                        elif hasUpstream then
+                            Html.span [
+                                prop.className "swt:shrink-0 swt:text-base-content/60"
+                                prop.title "Upstream"
+                                prop.children [ OriginSymbols.upstreamIcon "swt:size-3" ]
+                            ]
+                        else
+                            Html.none
+                    | None -> Html.none
                 ]
             ]
 
@@ -339,7 +545,7 @@ type Controls =
             Html.button [
                 prop.type'.button
                 prop.className [
-                    "swt:btn swt:btn-xs swt:btn-square swt:z-10 swt:btn-outline"
+                    "swt:btn swt:btn-xs swt:btn-square swt:z-10 swt:btn-outline swt:bg-base-100/90"
 
                     match side with
                     | ProvenanceSide.Input -> " swt:rounded-r-none swt:border-r-0"
@@ -394,6 +600,8 @@ type Controls =
                         "swt:btn-primary"
                     else
                         "swt:btn-outline"
+                    if not bothSelected then
+                        "swt:bg-base-100/90"
                 ]
                 if defaultArg debug false then
                     prop.testId $"provenance-property-both-{side}-{header.Category.Name}"
@@ -414,7 +622,7 @@ type Controls =
                     prop.type'.button
                     prop.disabled true
                     prop.className
-                        "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:z-10 swt:btn-outline swt:border-white"
+                        "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:z-10 swt:btn-outline swt:border-white swt:bg-base-100/90"
                     prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
                     if defaultArg debug false then
                         prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
@@ -424,6 +632,11 @@ type Controls =
                         ]
                     ]
                 ]
+
+        let colorButton =
+            match onSetColor with
+            | Some setColor -> Controls.PropertyColorButton(header, color, setColor)
+            | None -> Html.none
 
         // The secondary controls leave the layout entirely until their row is
         // hovered or holds focus, so idle rows are only as wide as their label.
@@ -437,12 +650,14 @@ type Controls =
                 prop.children [
                     match side with
                     | ProvenanceSide.Input ->
+                        colorButton
                         swapButton
                         bothButton
 
                     | ProvenanceSide.Output ->
                         bothButton
                         swapButton
+                        colorButton
                 ]
             ]
 
@@ -498,6 +713,9 @@ type Controls =
                             prop.testId $"provenance-property-values-{side}-{header.Category.Name}"
                         prop.children [
                             for propertyValue in propertyValues do
+                                let sourceInfo =
+                                    sourceInfoForValue |> Option.bind (fun resolver -> resolver propertyValue)
+
                                 Controls.ValueChip(
                                     propertyValue,
                                     onDragChanged = setIsValueChipDragging,
@@ -505,6 +723,7 @@ type Controls =
                                     showHeader = false,
                                     anchorSide = side,
                                     ?debug = debug,
+                                    ?sourceInfo = sourceInfo,
                                     key = DragDrop.propertyValueIdentity propertyValue
                                 )
                             Controls.AddValuePopover(
@@ -536,7 +755,15 @@ type Controls =
             onToggleExpanded: ProvenancePropertyHeader -> unit,
             onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             canSwitch: ProvenancePropertyHeader -> bool,
+            isDropRejected: bool,
             setIsValueChipDragging: bool -> unit,
+            statsForHeader: ProvenancePropertyHeader -> PropertyStats option,
+            badgeForHeader: ProvenancePropertyHeader -> PropertyCountBadge option,
+            colorForHeader: ProvenancePropertyHeader -> ProvenanceColor option,
+            originsForHeader: ProvenancePropertyHeader -> Set<PropertyOrigin> option,
+            onSetColor: ProvenancePropertyHeader -> ProvenanceColor option -> unit,
+            sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
+            ?sideId: ProvenanceLayerSideId,
             ?debug: bool
         ) =
         let droppable =
@@ -572,69 +799,105 @@ type Controls =
 
         let hiddenHeaderCount = headers.Length - visibleHeaders.Length
 
+        let dropState =
+            if droppable.isOver && isDropRejected then "rejecting"
+            elif droppable.isOver then "over"
+            else "idle"
+
         Html.aside [
             prop.ref droppable.setNodeRef
             prop.className [
-                "swt:flex swt:min-w-0 swt:flex-col swt:gap-2"
-                if droppable.isOver then
-                    "swt:ring-2 swt:ring-primary swt:rounded"
+                "swt:flex swt:min-w-0 swt:flex-col swt:gap-2 swt:rounded swt:border swt:border-dashed swt:border-base-content/25 swt:border-2 swt:p-3 swt:transition-colors"
+                if dropState = "rejecting" then
+                    "swt:border-warning swt:bg-warning/10 swt:ring-2 swt:ring-warning/30"
+                elif droppable.isOver then
+                    "swt:border-primary swt:bg-primary/10"
+                if headers.IsEmpty then
+                    "swt:items-center swt:justify-center"
             ]
+            prop.custom ("data-provenance-drop-state", dropState)
             if defaultArg debug false then
                 prop.testId $"provenance-property-rail-{side}"
+
+                match sideId with
+                | Some sideId -> prop.custom ("data-provenance-side-id", sideId)
+                | None -> ()
             prop.children [
-                Html.h3 [
-                    prop.className [
-                        "swt:text-sm swt:font-semibold swt:text-primary"
-                        if side = ProvenanceSide.Output then
-                            "swt:self-end"
+                if headers.IsEmpty then
+                    Html.p [
+                        prop.className "swt:text-sm swt:text-base-content/60 swt:text-center swt:py-8"
+                        prop.text "Drag Properties here to use them for grouping"
                     ]
-                    prop.text "Properties"
-                ]
-                for header in visibleHeaders do
-                    Controls.PropertyRailItem(
-                        side,
-                        header,
-                        valuesForHeader header,
-                        active,
-                        canSwitch header,
-                        isExpanded header,
-                        onToggleSide,
-                        onToggleBoth,
-                        onSwitch,
-                        onToggleExpanded,
-                        onAddValue,
-                        setIsValueChipDragging,
-                        debug = defaultArg debug false,
-                        key = DragDrop.propertyHeaderIdentity header
-                    )
-                if hiddenHeaderCount > 0 || showAllHeaders && headers.Length > collapseThreshold then
-                    Html.button [
-                        prop.type'.button
+
+                    Html.div [
+                        prop.className "swt:w-fit"
+                        prop.children [
+                            Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                        ]
+                    ]
+                else
+                    Html.h3 [
                         prop.className [
-                            "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
+                            "swt:text-sm swt:font-semibold swt:text-primary"
                             if side = ProvenanceSide.Output then
                                 "swt:self-end"
                         ]
-                        if defaultArg debug false then
-                            prop.testId $"provenance-property-overflow-{side}"
-                        prop.onClick (fun _ -> setShowAllHeaders (not showAllHeaders))
-                        prop.text (
-                            if showAllHeaders then
-                                "Show fewer"
-                            else
-                                $"+{hiddenHeaderCount} more"
+                        prop.text "Properties"
+                    ]
+
+                    for header in visibleHeaders do
+                        Controls.PropertyRailItem(
+                            side,
+                            header,
+                            valuesForHeader header,
+                            active,
+                            canSwitch header,
+                            isExpanded header,
+                            onToggleSide,
+                            onToggleBoth,
+                            onSwitch,
+                            onToggleExpanded,
+                            onAddValue,
+                            setIsValueChipDragging,
+                            ?stats = statsForHeader header,
+                            ?badge = badgeForHeader header,
+                            ?color = colorForHeader header,
+                            ?origins = originsForHeader header,
+                            onSetColor = onSetColor header,
+                            sourceInfoForValue = sourceInfoForValue,
+                            debug = defaultArg debug false,
+                            key = DragDrop.propertyHeaderIdentity header
                         )
+
+                    if hiddenHeaderCount > 0 || showAllHeaders && headers.Length > collapseThreshold then
+                        Html.button [
+                            prop.type'.button
+                            prop.className [
+                                "swt:btn swt:btn-ghost swt:btn-xs swt:w-fit"
+                                if side = ProvenanceSide.Output then
+                                    "swt:self-end"
+                            ]
+                            if defaultArg debug false then
+                                prop.testId $"provenance-property-overflow-{side}"
+                            prop.onClick (fun _ -> setShowAllHeaders (not showAllHeaders))
+                            prop.text (
+                                if showAllHeaders then
+                                    "Show fewer"
+                                else
+                                    $"+{hiddenHeaderCount} more"
+                            )
+                        ]
+
+                    Html.div [
+                        prop.className [
+                            "swt:w-fit"
+                            if side = ProvenanceSide.Output then
+                                "swt:self-end"
+                        ]
+                        prop.children [
+                            Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
+                        ]
                     ]
-                Html.div [
-                    prop.className [
-                        "swt:w-fit"
-                        if side = ProvenanceSide.Output then
-                            "swt:self-end"
-                    ]
-                    prop.children [
-                        Controls.AddValuePopover(None, onAddValue, label = "Add property", ?debug = debug)
-                    ]
-                ]
             ]
         ]
 
@@ -843,19 +1106,54 @@ type Controls =
         )
 
     [<ReactComponent>]
-    static member ValueLabel(propertyValue: ProvenancePropertyValue, ?debug: bool, ?key: string) : ReactElement =
+    static member ValueLabel
+        (propertyValue: ProvenancePropertyValue, ?debug: bool, ?key: string, ?sourceInfo: PropertyValueSourceInfo)
+        : ReactElement =
         let label =
             $"{propertyValue.Header.Category.Name}: {Formatting.formatValue propertyValue.Value propertyValue.Unit}"
+
+        let sourceTitle =
+            match sourceInfo with
+            | Some info ->
+                let parts = [
+                    match info.TableName with
+                    | Some tn -> $"Table: {tn}"
+                    | None -> ()
+                    match info.ProcessName with
+                    | Some pn -> $"Process: {pn}"
+                    | None -> ()
+                    if info.IsCurrentTable then
+                        "Current table"
+                ]
+
+                if parts.IsEmpty then
+                    None
+                else
+                    Some(System.String.Join("; ", parts))
+            | _ -> None
 
         Html.div [
             match key with
             | Some key -> prop.key key
             | None -> ()
             prop.className
-                "swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"
+                "swt:group swt:relative swt:flex swt:items-center swt:gap-1 swt:rounded swt:bg-base-200 swt:px-2 swt:py-1 swt:text-xs"
+            match sourceTitle with
+            | Some title -> prop.title title
+            | None -> ()
             if defaultArg debug false then
                 prop.testId $"provenance-value-{propertyValue.Id}"
-            prop.children [ Html.span [ prop.text label ] ]
+            prop.children [
+                Html.span [ prop.text label ]
+                match sourceInfo with
+                | Some info ->
+                    Html.div [
+                        prop.className
+                            "swt:pointer-events-none swt:absolute swt:left-0 swt:top-full swt:z-30 swt:mt-1 swt:hidden swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg group-hover:swt:block group-focus-within:swt:block"
+                        prop.children [ Controls.SourceInfoPopover(Some info) ]
+                    ]
+                | None -> Html.none
+            ]
         ]
 
     [<ReactComponent>]
@@ -867,7 +1165,8 @@ type Controls =
             ?showHeader: bool,
             ?anchorSide: ProvenanceSide,
             ?debug: bool,
-            ?key: string
+            ?key: string,
+            ?sourceInfo: PropertyValueSourceInfo
         ) : ReactElement =
         let canDrag = defaultArg draggable true
         let showHeader = defaultArg showHeader true
@@ -890,9 +1189,6 @@ type Controls =
             ),
             [| box drag.isDragging |]
         )
-
-        // let isdragging = setIsValueChipDragging drag.isDragging
-
 
         let text = Formatting.formatValue propertyValue.Value propertyValue.Unit
 
@@ -930,7 +1226,7 @@ type Controls =
                 yield! prop.spread (!!drag.attributes)
                 yield! prop.spread (!!drag.listeners)
             prop.className [
-                "swt:relative"
+                "swt:group swt:relative"
                 yield! Styles.propertyValueButtonClasses density drag.isDragging
                 if not canDrag then
                     "swt:cursor-default"
@@ -939,6 +1235,22 @@ type Controls =
             if defaultArg debug false then
                 prop.testId $"provenance-value-{propertyValue.Id}"
             prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"
+            match sourceInfo with
+            | Some info ->
+                let parts = [
+                    match info.TableName with
+                    | Some tn -> $"Table: {tn}"
+                    | None -> ()
+                    match info.ProcessName with
+                    | Some pn -> $"Process: {pn}"
+                    | None -> ()
+                    if info.IsCurrentTable then
+                        "Current table"
+                ]
+
+                if not parts.IsEmpty then
+                    prop.title (System.String.Join("; ", parts))
+            | _ -> ()
             prop.children [
                 match valueAnchor with
                 | Some anchor -> anchor
@@ -947,6 +1259,14 @@ type Controls =
                     prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-left"
                     prop.text label
                 ]
+                match sourceInfo with
+                | Some info ->
+                    Html.div [
+                        prop.className
+                            "swt:pointer-events-none swt:absolute swt:left-0 swt:top-full swt:z-30 swt:mt-1 swt:hidden swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg group-hover:swt:block group-focus-within:swt:block"
+                        prop.children [ Controls.SourceInfoPopover(Some info) ]
+                    ]
+                | None -> Html.none
             ]
         ]
 
@@ -986,6 +1306,7 @@ type Controls =
             ?key: string
         ) =
         let sideName = SideLabels.sideName side
+        let isOpen, setIsOpen = React.useState false
         let name, setName = React.useState ""
 
         let availableKinds =
@@ -1017,81 +1338,331 @@ type Controls =
             else
                 None
 
-        Popover.Simple(
-            trigger =
-                Html.button [
-                    prop.type'.button
-                    prop.className Styles.addPropertyValueButtonClasses
-                    if defaultArg debug false then
-                        prop.testId $"provenance-add-{sideName}-trigger"
-                    prop.ariaLabel $"Add {sideName}"
-                    prop.children [
-                        Html.i [
-                            prop.className "swt:iconify swt:fluent--add-20-regular swt:size-5 swt:shrink-0"
-                        ]
-                        Html.span [ prop.text $"Add {sideName}" ]
-                    ]
-                ],
-            content =
-                Html.form [
-                    prop.className "swt:flex swt:flex-col swt:gap-2"
-                    prop.onSubmit (fun event ->
-                        event.preventDefault ()
+        let content =
+            Html.form [
+                prop.className "swt:flex swt:flex-col swt:gap-2"
+                prop.onSubmit (fun event ->
+                    event.preventDefault ()
 
-                        if nameError.IsNone then
-                            onCreate {
-                                Side = side
-                                Header = selectedKind |> Endpoints.endpointHeader side
-                                Name = trimmedName
-                            }
-                    )
-                    prop.children [
-                        Html.label [ prop.className "swt:label"; prop.text "Endpoint name" ]
-                        Html.input [
-                            prop.ariaLabel "Endpoint name"
-                            prop.className [
-                                "swt:input swt:input-bordered swt:input-sm"
-                                if nameError.IsSome then
-                                    "swt:input-error"
-                            ]
-                            prop.required true
-                            prop.value name
-                            prop.onChange setName
+                    onCreate {
+                        Side = side
+                        Header = selectedKind |> Endpoints.endpointHeader side
+                        Name = trimmedName
+                    }
+
+                    setName ""
+                    setSelectedKindId availableKinds.Head.Id
+                    setIsOpen false
+                )
+                prop.children [
+                    Html.label [ prop.className "swt:label"; prop.text "Endpoint name" ]
+                    Html.input [
+                        prop.ariaLabel "Endpoint name"
+                        prop.className [
+                            "swt:input swt:input-bordered swt:input-sm"
+                            if nameError.IsSome then
+                                "swt:input-error"
                         ]
-                        match nameError with
-                        | Some error ->
-                            Html.p [
-                                prop.className "swt:text-xs swt:text-error"
-                                prop.text error
-                            ]
-                        | None -> Html.none
-                        Html.label [ prop.className "swt:label"; prop.text "Endpoint kind" ]
-                        Html.select [
-                            prop.ariaLabel "Endpoint kind"
-                            prop.className "swt:select swt:select-bordered swt:select-sm"
-                            prop.value selectedKind.Id
-                            prop.onChange setSelectedKindId
-                            prop.children [
-                                for kind in availableKinds do
-                                    Html.option [
-                                        prop.value kind.Id
-                                        prop.text (ProvenanceKind.displayName kind)
-                                    ]
-                            ]
+                        prop.required true
+                        prop.value name
+                        prop.onChange setName
+                    ]
+                    match nameError with
+                    | Some error ->
+                        Html.p [
+                            prop.className "swt:text-xs swt:text-error"
+                            prop.text error
                         ]
-                        Html.button [
-                            prop.type'.submit
-                            prop.className "swt:btn swt:btn-primary swt:btn-sm"
-                            prop.disabled nameError.IsSome
-                            if defaultArg debug false then
-                                prop.testId $"provenance-create-{sideName}"
-                            prop.text "Create endpoint"
+                    | None -> Html.none
+                    Html.label [ prop.className "swt:label"; prop.text "Endpoint kind" ]
+                    Html.select [
+                        prop.ariaLabel "Endpoint kind"
+                        prop.className "swt:select swt:select-bordered swt:select-sm"
+                        prop.value selectedKind.Id
+                        prop.onChange setSelectedKindId
+                        prop.children [
+                            for kind in availableKinds do
+                                Html.option [
+                                    prop.value kind.Id
+                                    prop.text (ProvenanceKind.displayName kind)
+                                ]
                         ]
                     ]
-                ],
+                    Html.button [
+                        prop.type'.submit
+                        prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                        prop.disabled nameError.IsSome
+                        if defaultArg debug false then
+                            prop.testId $"provenance-create-{sideName}"
+                        prop.text "Create endpoint"
+                    ]
+                ]
+            ]
+
+        Popover.Popover(
+            isOpen = isOpen,
+            onOpenChange = setIsOpen,
             ?debug =
                 (if defaultArg debug false then
                      Some $"provenance-add-{sideName}"
                  else
-                     None)
+                     None),
+            children =
+                React.Fragment [
+                    Popover.Trigger(
+                        Html.button [
+                            prop.type'.button
+                            prop.className Styles.addPropertyValueButtonClasses
+                            if defaultArg debug false then
+                                prop.testId $"provenance-add-{sideName}-trigger"
+                            prop.ariaLabel $"Add {sideName}"
+                            prop.children [
+                                Html.i [
+                                    prop.className "swt:iconify swt:fluent--add-20-regular swt:size-5 swt:shrink-0"
+                                ]
+                                Html.span [ prop.text $"Add {sideName}" ]
+                            ]
+                        ]
+                    )
+                    Popover.Content(
+                        children =
+                            Html.div [
+                                prop.className "swt:flex swt:flex-col swt:gap-2"
+                                prop.children [
+                                    Html.div [
+                                        prop.className "swt:flex swt:items-start swt:justify-between swt:gap-2"
+                                        prop.children [
+                                            Html.div [ prop.className "swt:flex-1"; prop.children content ]
+                                            Popover.Close()
+                                        ]
+                                    ]
+                                ]
+                            ]
+                    )
+                ]
         )
+
+    [<ReactComponent>]
+    static member FilterToolbar
+        (
+            filters: FilterState,
+            onSearch: string -> unit,
+            onPropertySort: PropertySort -> unit,
+            _onGroupSort: GroupSort -> unit,
+            onValueCountFilter: PropertyValueCountFilter -> unit,
+            onOriginFilter: PropertyOriginFilter -> unit,
+            ?debug: bool
+        ) =
+        let sortOpen, setSortOpen = React.useState false
+
+        let propertySortOption sort label =
+            let active = filters.PropertySort = sort
+
+            Html.li [
+                Html.button [
+                    prop.type'.button
+                    prop.className [
+                        "swt:btn swt:btn-sm swt:w-full swt:justify-start"
+                        if active then "swt:btn-primary" else "swt:btn-ghost"
+                    ]
+                    prop.ariaLabel label
+                    prop.onClick (fun _ -> onPropertySort sort)
+                    prop.children [ Html.span label ]
+                ]
+            ]
+
+        let originActive filter =
+            match filter, filters.OriginFilter with
+            | PropertyOriginFilter.AnyOrigin, PropertyOriginFilter.AnyOrigin -> true
+            | PropertyOriginFilter.CurrentOnly, PropertyOriginFilter.CurrentOnly -> true
+            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.AnyUpstream
+            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.UpstreamLayer _
+            | PropertyOriginFilter.AnyUpstream, PropertyOriginFilter.PreviousContext _ -> true
+            | _ -> false
+
+        let originButton filter label icon =
+            Html.button [
+                prop.type'.button
+                prop.className [
+                    "swt:btn swt:btn-sm swt:join-item swt:w-11 swt:px-0"
+                    if originActive filter then
+                        "swt:btn-primary"
+                    else
+                        "swt:btn-outline"
+                ]
+                prop.ariaLabel label
+                prop.title label
+                prop.onClick (fun _ -> onOriginFilter filter)
+                prop.children [ icon ]
+            ]
+
+        Html.div [
+            prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2 swt:p-2"
+            if defaultArg debug false then
+                prop.testId "provenance-filter-toolbar"
+            prop.children [
+                Html.div [
+                    prop.className "swt:relative swt:flex swt:items-center"
+                    prop.children [
+                        Html.i [
+                            prop.className
+                                "swt:iconify swt:fluent--search-20-regular swt:absolute swt:left-2 swt:size-4 swt:text-base-content/50"
+                        ]
+                        Html.input [
+                            prop.className "swt:input swt:input-bordered swt:input-sm swt:pl-8"
+                            prop.placeholder "Search properties & values..."
+                            prop.value filters.SearchText
+                            prop.onChange onSearch
+                        ]
+                    ]
+                ]
+                Dropdown.Main(
+                    sortOpen,
+                    setSortOpen,
+                    Html.button [
+                        prop.type'.button
+                        prop.className "swt:btn swt:btn-sm swt:btn-outline"
+                        prop.ariaLabel "Sort By"
+                        prop.custom ("aria-expanded", sortOpen)
+                        prop.onClick (fun _ -> setSortOpen (not sortOpen))
+                        prop.children [
+                            Html.i [
+                                prop.className "swt:iconify swt:fluent--arrow-sort-20-regular swt:size-4"
+                            ]
+                            Html.span "Sort By"
+                        ]
+                    ],
+                    React.Fragment [
+                        propertySortOption PropertySort.ValueCountDesc "Property Value Count"
+                        propertySortOption PropertySort.NameAsc "Name"
+                        propertySortOption PropertySort.ConnectionCountDesc "Connection Count"
+                    ],
+                    contentClassName =
+                        "swt:w-52 swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110%"
+                )
+                Html.select [
+                    prop.className "swt:select swt:select-bordered swt:select-sm"
+                    prop.ariaLabel "Filter by property value count"
+                    prop.value (
+                        match filters.ValueCountFilter with
+                        | PropertyValueCountFilter.Any -> "Any"
+                        | PropertyValueCountFilter.Singleton -> "Singleton"
+                        | PropertyValueCountFilter.Multiple -> "Multiple"
+                        | PropertyValueCountFilter.CoverageGap -> "CoverageGap"
+                    )
+                    prop.onChange (fun v ->
+                        match v with
+                        | "Any" -> onValueCountFilter PropertyValueCountFilter.Any
+                        | "Singleton" -> onValueCountFilter PropertyValueCountFilter.Singleton
+                        | "Multiple" -> onValueCountFilter PropertyValueCountFilter.Multiple
+                        | "CoverageGap" -> onValueCountFilter PropertyValueCountFilter.CoverageGap
+                        | _ -> ()
+                    )
+                    prop.children [
+                        Html.option [ prop.value "Any"; prop.text "Any" ]
+                        Html.option [ prop.value "Singleton"; prop.text "1 value" ]
+                        Html.option [ prop.value "Multiple"; prop.text "2+ values" ]
+                        Html.option [ prop.value "CoverageGap"; prop.text "Coverage gap" ]
+                    ]
+                ]
+                Html.div [
+                    prop.className "swt:join"
+                    prop.children [
+                        originButton
+                            PropertyOriginFilter.AnyUpstream
+                            "Show upstream properties"
+                            (OriginSymbols.upstreamIcon "swt:size-4")
+                        originButton
+                            PropertyOriginFilter.CurrentOnly
+                            "Show current properties"
+                            (OriginSymbols.currentIcon "swt:size-4")
+                        originButton
+                            PropertyOriginFilter.AnyOrigin
+                            "Show current and upstream properties"
+                            (OriginSymbols.bothIcons "swt:size-4")
+                    ]
+                ]
+            ]
+        ]
+
+    [<ReactComponent>]
+    static member PropertyColorButton
+        (
+            header: ProvenancePropertyHeader,
+            currentColor: ProvenanceColor option,
+            onSetColor: ProvenanceColor option -> unit
+        ) =
+        let draftColor, setDraftColor =
+            React.useState (ColorPicker.currentOrFallback currentColor)
+
+        React.useEffect ((fun () -> setDraftColor (ColorPicker.currentOrFallback currentColor)), [| box currentColor |])
+
+        Popover.Simple(
+            trigger =
+                Html.button [
+                    prop.type'.button
+                    prop.className
+                        "swt:btn swt:btn-xs swt:btn-square swt:z-10 swt:btn-outline swt:shrink-0 swt:bg-base-100/90"
+                    match currentColor with
+                    | Some c when c <> "" -> prop.style [ style.backgroundColor c ]
+                    | _ -> ()
+                    prop.ariaLabel $"Set color for property {header.Category.Name}"
+                ],
+            content =
+                ColorPicker.content
+                    $"Choose color for property {header.Category.Name}"
+                    draftColor
+                    setDraftColor
+                    onSetColor,
+            triggerClassName = "swt:relative swt:z-10 swt:shrink-0"
+        )
+
+    [<ReactComponent>]
+    static member SourceInfoPopover(sourceInfo: PropertyValueSourceInfo option) =
+        match sourceInfo with
+        | None -> Html.none
+        | Some info ->
+            Html.div [
+                prop.className "swt:text-xs swt:space-y-1 swt:p-1"
+                prop.children [
+                    if info.IsCurrentTable then
+                        Html.span [
+                            prop.className "swt:font-semibold"
+                            prop.text "Current table"
+                        ]
+                    else
+                        match info.TableName with
+                        | Some tableName ->
+                            Html.span [
+                                prop.className "swt:font-semibold"
+                                prop.text $"Table: {tableName}"
+                            ]
+                        | None -> Html.none
+
+                    match info.ProcessName with
+                    | Some processName -> Html.span [ prop.text $"Process: {processName}" ]
+                    | None -> Html.none
+
+                    if not info.InputNames.IsEmpty then
+                        Html.div [
+                            prop.children [
+                                Html.span [ prop.className "swt:font-medium"; prop.text "Inputs:" ]
+                                for inputName in info.InputNames do
+                                    Html.span [ prop.text $" {inputName}" ]
+                            ]
+                        ]
+                    else
+                        Html.none
+
+                    if not info.OutputNames.IsEmpty then
+                        Html.div [
+                            prop.children [
+                                Html.span [ prop.className "swt:font-medium"; prop.text "Outputs:" ]
+                                for outputName in info.OutputNames do
+                                    Html.span [ prop.text $" {outputName}" ]
+                            ]
+                        ]
+                    else
+                        Html.none
+                ]
+            ]

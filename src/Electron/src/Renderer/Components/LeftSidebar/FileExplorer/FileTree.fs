@@ -5,6 +5,7 @@ open Renderer.Components.FileExplorerDeleteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.Modals
 open Swate.Components
 open Swate.Components.Composite.Notes.Editor
+open Swate.Components.Page.FileExplorer.Modals
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Primitive.ErrorModal.Types
 open Swate.Components.Primitive.ErrorModal.Context
@@ -464,7 +465,6 @@ type FileTree =
 
         let contextMenuConfig: FileTreeContextMenu.ContextMenuConfig = {
             openItem = openPreview
-            arcRootPath = appStateCtx
             openCreateModal = openCreateModal
             openFileSystemCreateModal = openFileSystemCreateModal
             requestAssignNoteItem = requestAssignNoteItem
@@ -535,7 +535,7 @@ type FileTree =
                             closeDialog = closeDialog
                             setIsAssigning = setIsDialogBusy
                             refreshGitStatus = gitStateCtx.refresh
-                            copyPath = Api.ipcArcVaultApi.copyPath
+                            copyFileSystemItem = Api.ipcArcVaultApi.copyFileSystemItem
                             movePath = Api.ipcArcVaultApi.movePath
                             enqueueError = errorModal.enqueue
                         }
@@ -591,7 +591,7 @@ type FileTree =
             )
 
         let assignNoteModal =
-            FileTreeAssignNoteModal.Main(
+            AssignNoteModal.AssignNoteModal(
                 isOpen = assignNoteDialogState.Target.IsSome,
                 itemName = (assignNoteDialogState.Target |> Option.map _.Name),
                 selectedNote = selectedAssignableNote,

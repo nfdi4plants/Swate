@@ -3,20 +3,18 @@ module Main.ArcVaultHelper
 
 open System
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
 open Swate.Electron.Shared.FileIOTypes
+open Swate.Electron.Shared.FileIOHelper
 open ARCtrl
 open Fable.Electron
 open Fable.Core
 open Fable.Core.JsInterop
 open Main
-open Main.ARCtrlExtensions
 open Main.Bindings
+open Main.ARCtrlExtensions
 open Node.Api
 open Swate.Electron.Shared.RenamePathRules
 
-let private fsPromisesDynamic: obj = importAll "fs/promises"
-let private pathDynamic: obj = importAll "path"
 
 /// This function mutably sets the datamap on the correct parent based on the datamap parent info included in the file content DTO.
 /// It also ensures that the static hash is preserved to avoid unnecessary changes to the ARC when saving a datamap.
@@ -171,13 +169,7 @@ type OpenArcRootRenamePlan = {
 }
 
 let private resolveAbsolutePath (pathValue: string) =
-    pathDynamic?resolve (pathValue) |> unbox<string> |> PathHelpers.normalizePath
-
-let private tryGetNodeErrorCode (error: exn) : string option =
-    try
-        error?code |> unbox<string> |> Option.ofObj
-    with _ ->
-        None
+    Main.Bindings.Path.resolve [| pathValue |] |> PathHelpers.normalizePath
 
 let private pathExistsAsync (absolutePath: string) : JS.Promise<bool> = promise {
     let! fileExists = ARCtrl.FileSystemHelper.fileExistsAsync absolutePath
@@ -206,13 +198,10 @@ let private renameWithRetriesAsync
             do! Promise.sleep retryDelaysMs.[attemptIndex]
 
         try
-            let! _ =
-                fsPromisesDynamic?rename (sourceAbsolutePath, targetAbsolutePath)
-                |> unbox<JS.Promise<obj>>
-
+            do! Main.Bindings.Filesystem.renameAsync sourceAbsolutePath targetAbsolutePath
             return Ok()
         with renameError ->
-            let errorCode = tryGetNodeErrorCode renameError
+            let errorCode = Main.Bindings.Node.tryGetErrorCode renameError
 
             if attemptIndex < retryDelaysMs.Length - 1 && isTransientRenameError errorCode then
                 return! attempt (attemptIndex + 1)
@@ -223,7 +212,7 @@ let private renameWithRetriesAsync
     attempt 0
 
 let private mapArcRootRenameDiskError (sourcePath: string) (targetPath: string) (renameError: exn) =
-    match tryGetNodeErrorCode renameError with
+    match Main.Bindings.Node.tryGetErrorCode renameError with
     | Some "EPERM"
     | Some "EACCES" ->
         exn
@@ -240,17 +229,16 @@ let tryBuildOpenArcRootRenamePlan arcPath newName : Result<OpenArcRootRenamePlan
     | Error validationError -> Error(exn validationError)
     | Ok normalizedName ->
         if
-            (pathDynamic?isAbsolute (normalizedName) |> unbox<bool>)
+            (Main.Bindings.Path.isAbsolute normalizedName)
             || PathHelpers.containsPathTraversalSegments normalizedName
         then
             Error(exn "ARC folder name must be a single folder name without path separators or traversal segments.")
         else
             let sourcePath = resolveAbsolutePath arcPath
-            let parentPath = pathDynamic?dirname (sourcePath) |> unbox<string>
+            let parentPath = Main.Bindings.Path.dirname sourcePath
 
             let targetPath =
-                pathDynamic?resolve (parentPath, normalizedName)
-                |> unbox<string>
+                Main.Bindings.Path.resolve [| parentPath; normalizedName |]
                 |> PathHelpers.normalizePath
 
             if

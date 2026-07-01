@@ -5,13 +5,15 @@ open ARCtrl
 open Swate.Components
 open Swate.Components.Shared
 
+module BrowserClipboard = Swate.Components.JsBindings.Clipboard.Clipboard
+
 let copyCell (cell: CompositeCell) : JS.Promise<unit> =
     let tab = cell.ToTabStr()
-    navigator.clipboard.writeText (tab)
+    BrowserClipboard.navigator.clipboard.writeText tab
 
 let copyCells (cells: CompositeCell[]) : JS.Promise<unit> =
     let tab = CompositeCell.ToTabTxt cells
-    navigator.clipboard.writeText (tab)
+    BrowserClipboard.navigator.clipboard.writeText tab
 
 let copyCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<unit> =
     let cell = Generic.getCell (index.x, index.y) state
@@ -27,7 +29,6 @@ let copyCellsByIndex (indices: CellCoordinate[]) (state: Spreadsheet.Model) : JS
 
 let cutCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : Spreadsheet.Model =
     let cell = Generic.getCell (index.x, index.y) state
-    // Remove selected cell value
     let emptyCell = cell.GetEmptyCellFixed()
     Generic.setCell (index.x, index.y) emptyCell state
     copyCell cell |> Promise.start
@@ -38,7 +39,6 @@ let cutCellsByIndices (indices: CellCoordinate[]) (state: Spreadsheet.Model) : S
 
     for index in indices do
         let cell = Generic.getCell (index.x, index.y) state
-        // Remove selected cell value
         let emptyCell = cell.GetEmptyCellFixed()
         Generic.setCell (index.x, index.y) emptyCell state
         cells.Add(cell)
@@ -47,7 +47,7 @@ let cutCellsByIndices (indices: CellCoordinate[]) (state: Spreadsheet.Model) : S
     state
 
 let pasteCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
-    let! tab = navigator.clipboard.readText ()
+    let! tab = BrowserClipboard.navigator.clipboard.readText ()
     let header = Generic.getHeader index.x state
     let cell = CompositeCell.fromTabTxt tab header |> Array.head
     Generic.setCell (index.x, index.y) cell state
@@ -55,7 +55,7 @@ let pasteCellByIndex (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Pro
 }
 
 let pasteCellsByIndexExtend (index: CellCoordinate) (state: Spreadsheet.Model) : JS.Promise<Spreadsheet.Model> = promise {
-    let! tab = navigator.clipboard.readText ()
+    let! tab = BrowserClipboard.navigator.clipboard.readText ()
     let header = Generic.getHeader index.x state
     let cells = CompositeCell.fromTabTxt tab header
 

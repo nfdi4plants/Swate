@@ -2,6 +2,7 @@ import React from 'react';
 import type { Meta, StoryObj } from '@storybook/react-vite';
 import { expect, fireEvent, screen, userEvent, waitFor, within } from 'storybook/test';
 import { Main as ProvenanceGrouping } from './ProvenanceGrouping.fs.js';
+import { Exports_sampleDroppedPropertyRailColor as sampleDroppedPropertyRailColor } from './Helper.fs.js';
 import {
   Exports_createSampleSession as createSampleSession,
   Exports_createInputOnlySession as createInputOnlySession,
@@ -48,6 +49,30 @@ function Harness({
   allowEndpointReplacement?: boolean;
 }) {
   const selected = inputOnly ? 'inputOnly' : outputOnly ? 'outputOnly' : fixture;
+  const id = React.useId();
+
+  return (
+    <HarnessState
+      key={`${selected}:${id}`}
+      selected={selected}
+      debug={debug}
+      allowTermReplacement={allowTermReplacement}
+      allowEndpointReplacement={allowEndpointReplacement}
+    />
+  );
+}
+
+function HarnessState({
+  selected,
+  debug,
+  allowTermReplacement,
+  allowEndpointReplacement,
+}: {
+  selected: Fixture;
+  debug: boolean;
+  allowTermReplacement: boolean;
+  allowEndpointReplacement: boolean;
+}) {
   const [session, setSession] = React.useState(() => createSessionForFixture(selected));
   const [patches, setPatches] = React.useState<string[]>([]);
 
@@ -117,16 +142,16 @@ export const GroupsByPropertiesAndShowsMembers: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
-    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
-    expect(canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas')).toBeInTheDocument();
+    await groupByProperty(canvas, 'Output', 'Species');
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
+    expect(canvas.getByTestId('provenance-group-Output-output:Species=Chlamydomonas')).toBeInTheDocument();
 
     // The grouping shows as an organizer tab "Category: Value" on top of the member folder.
-    const tab = within(grouped).getByTestId('provenance-group-tab-Input-input:Species=Arabidopsis-0');
+    const tab = within(grouped).getByTestId('provenance-group-tab-Output-output:Species=Arabidopsis-0');
     expect(tab).toHaveTextContent('Species: Arabidopsis');
 
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
-    await waitFor(() => expect(grouped).toHaveTextContent('Input A'));
+    await waitFor(() => expect(grouped).toHaveTextContent('Output A'));
   },
 };
 
@@ -135,22 +160,22 @@ export const ExpandedGroupsShowMemberHoverValues: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    expect(within(canvas.getByText('Input A').closest('article')!).queryByRole('button', { name: 'Show members' }))
+    expect(within(canvas.getByText('Output A').closest('article')!).queryByRole('button', { name: 'Show members' }))
       .not.toBeInTheDocument();
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
-    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    await groupByProperty(canvas, 'Output', 'Species');
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
 
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
-    const member = within(grouped).getByTestId('provenance-group-member-Input-input-a');
+    const member = within(grouped).getByTestId('provenance-group-member-Output-output-a');
 
-    expect(within(grouped).queryByTestId('provenance-member-values-Input-input-a')).not.toBeInTheDocument();
+    expect(within(grouped).queryByTestId('provenance-member-values-Output-output-a')).not.toBeInTheDocument();
     await userEvent.hover(member);
 
     await waitFor(() => {
-      const details = within(grouped).getByTestId('provenance-member-values-Input-input-a');
+      const details = within(grouped).getByTestId('provenance-member-values-Output-output-a');
       expect(details).toHaveTextContent('Species: Arabidopsis');
-      expect(details).toHaveTextContent('Temperature: 12 C');
+      expect(details).toHaveTextContent('Analysis: Mass Spectrometry');
     });
 
     await userEvent.unhover(member);
@@ -162,19 +187,19 @@ export const ShowsEntityTypesAndCollapsedSymbols: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
-    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    await groupByProperty(canvas, 'Output', 'Species');
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
 
     // The collapsed card previews its member types as symbols instead of a bare "×3" count.
-    expect(within(grouped).getByTestId('provenance-group-symbols-Input-input:Species=Arabidopsis'))
+    expect(within(grouped).getByTestId('provenance-group-symbols-Output-output:Species=Arabidopsis'))
       .toBeInTheDocument();
     expect(grouped).not.toHaveTextContent('×3');
 
     // Expanding shows each member with its endpoint type ("Sample") above the name.
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
-    const member = within(grouped).getByTestId('provenance-group-member-Input-input-a');
+    const member = within(grouped).getByTestId('provenance-group-member-Output-output-a');
     expect(member).toHaveTextContent('Sample');
-    expect(member).toHaveTextContent('Input A');
+    expect(member).toHaveTextContent('Output A');
   },
 };
 
@@ -183,16 +208,16 @@ export const HoveringGroupTabHighlightsItAndKeepsFolderPreview: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
-    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
-    const tab = within(grouped).getByTestId('provenance-group-tab-Input-input:Species=Arabidopsis-0');
+    await groupByProperty(canvas, 'Output', 'Species');
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
+    const tab = within(grouped).getByTestId('provenance-group-tab-Output-output:Species=Arabidopsis-0');
 
     expect(tab).toHaveAttribute('data-hovered', 'false');
 
     // Hovering the tab highlights it and the folder previews that tab's members.
     await userEvent.hover(tab);
     await waitFor(() => expect(tab).toHaveAttribute('data-hovered', 'true'));
-    expect(within(grouped).getByTestId('provenance-group-symbols-Input-input:Species=Arabidopsis'))
+    expect(within(grouped).getByTestId('provenance-group-symbols-Output-output:Species=Arabidopsis'))
       .toBeInTheDocument();
 
     await userEvent.unhover(tab);
@@ -211,19 +236,61 @@ export const ShowsFileTypeForDataEndpoints: Story = {
   },
 };
 
+export const GroupCardsSelectFromCardSurface: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputA = canvas.getByText('Output A').closest('article')!;
+
+    expect(within(outputA).queryByRole('button', { name: 'Select group' })).not.toBeInTheDocument();
+
+    const selectionSurface = outputA.querySelector<HTMLElement>('[data-testid^="provenance-group-select-surface-"]')!;
+    await userEvent.click(selectionSurface);
+    await waitFor(() => expect(outputA).toHaveClass('swt:border-primary'));
+  },
+};
+
 export const GroupsBothSidesFromOutputProperty: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Replicate'));
-    await userEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
+    for (
+      let attempt = 0;
+      attempt < 3 && !canvas.queryByTestId('provenance-group-Input-input:Replicate=1 | 2');
+      attempt += 1
+    ) {
+      await showPropertyControls(canvas, 'Output', 'Replicate');
+      fireEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
+      await waitFor(() => expect(canvas.queryByTestId('provenance-group-Input-input:Replicate=1 | 2')).toBeInTheDocument(), {
+        timeout: 1000,
+      }).catch(() => undefined);
+    }
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-group-Input-input:Replicate=1 | 2')).toBeInTheDocument();
       expect(canvas.getByTestId('provenance-group-Output-output:Replicate=1 | 2')).toBeInTheDocument();
       expect(canvas.queryByTestId('provenance-group-Input-input:Replicate=1')).not.toBeInTheDocument();
       expect(canvas.queryByTestId('provenance-group-Output-output:Replicate=2')).not.toBeInTheDocument();
+    }, { timeout: 6000 });
+  },
+};
+
+export const MissingSecondGroupingKeyKeepsAvailableGroupingKeys: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await groupByProperty(canvas, 'Input', 'Species');
+    await groupByProperty(canvas, 'Input', 'Temperature');
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis|Temperature=12 C'))
+        .toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis|Temperature=24 C'))
+        .toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas')).toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Input-input:input-d')).not.toBeInTheDocument();
     });
   },
 };
@@ -242,22 +309,247 @@ export const ConnectedOutputsKeepPropertiesInRailsAndConnections: Story = {
   },
 };
 
-export const GroupingPropertiesStayOnOwningSide: Story = {
+export const PropertiesStartInOriginFoldersAndSideDropZonesAreEmpty: Story = {
   render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    expect(canvas.getByTestId('foldered-draggable-list')).toBeInTheDocument();
+    expect(canvas.getByTestId('foldered-draggable-folder-layer-layer-1')).toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-property-rail-Input').querySelector('[data-testid^="provenance-property-Input-"]'))
+      .not.toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-property-rail-Output').querySelector('[data-testid^="provenance-property-Output-"]'))
+      .not.toBeInTheDocument();
+    expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
+      .toBeVisible();
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Minimize property folders' }));
+    await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-list')).not.toBeInTheDocument());
+
+    await userEvent.click(canvas.getByRole('button', { name: 'Expand property folders' }));
+    await waitFor(() => expect(canvas.getByTestId('foldered-draggable-list')).toBeInTheDocument());
+    expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
+      .toBeVisible();
+
+    const species = await shelfProperty(canvas, 'Species');
+    expect(species).toBeInTheDocument();
+    expect(species).toHaveTextContent('Species');
+  },
+};
+
+export const DroppedShelfPropertyLeavesFolders: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
+
+    expect(canvas.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
+    const currentLayerShelf = await openShelfFolder(canvas, canvas.getByTestId('foldered-draggable-folder-layer-layer-1'));
+    expect(currentLayerShelf.queryByRole('button', { name: /^Drag Species$/ })).not.toBeInTheDocument();
+  },
+};
+
+export const DroppedShelfPropertyKeepsLayerColorAndSyncsUpdates: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const initialLayerColor = canvas.getByTestId('provenance-layer-layer-1').getAttribute('data-provenance-layer-color') ?? '';
+
+    const property = await ensurePropertyInRail(canvas, 'Output', 'Species');
+    expect(propertyColorSwatch(property)).toHaveStyle({ backgroundColor: initialLayerColor });
+
+    expect(sampleDroppedPropertyRailColor('Output', 'Species', '#dc2626')).toBe('#dc2626');
+  },
+};
+
+export const FolderColorPreviewSyncsLayerTabAndRailProperty: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await setFolderPreviewColor(canvas.getByTestId('foldered-draggable-folder-layer-layer-1'), '#be185d');
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveAttribute(
+        'data-provenance-layer-color',
+        '#be185d',
+      );
+    });
+
+    const property = await ensurePropertyInRail(canvas, 'Output', 'Species');
+    expect(propertyColorSwatch(property)).toHaveStyle({ backgroundColor: '#be185d' });
+  },
+};
+
+export const NonLayerFolderColorAppliesToShelfAndRailProperties: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const previousContextFolder = canvas.getByTestId(
+      'foldered-draggable-folder-context-previous-process-previous-study-table',
+    );
+
+    await setFolderPreviewColor(previousContextFolder, '#0891b2');
+
+    const previousContextShelf = await openShelfFolder(canvas, previousContextFolder);
+    const shelfPropertyButton = previousContextShelf.getByRole('button', { name: /^Drag Previous Treatment$/ });
+    const shelfSwatch = shelfPropertyButton.querySelector<HTMLElement>('[data-foldered-color-swatch="true"]');
+
+    expect(shelfSwatch).not.toBeNull();
+    expect(shelfSwatch!).toHaveStyle({ backgroundColor: '#0891b2' });
+
+    const property = await ensurePropertyInRail(canvas, 'Input', 'Previous Treatment');
+    expect(propertyColorSwatch(property)).toHaveStyle({ backgroundColor: '#0891b2' });
+  },
+};
+
+export const RejectedShelfPropertyDropRestoresFolderItem: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const source = await shelfProperty(canvas, 'Species');
+    const target = canvas.getByText('Input A').closest('article')!;
+
+    await dragByPointer(source, target);
+
+    await waitFor(() => {
+      expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument();
+      expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
+        .toBeVisible();
+    });
+  },
+};
+
+export const SingleSidedShelfPropertiesCannotDropOnOppositeSide: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const source = await shelfProperty(canvas, 'Analysis');
+    const inputRail = canvas.getByTestId('provenance-property-rail-Input');
+
+    await startDragByPointer(source);
+    const pointer = await moveDragPointerTo(inputRail);
+    await waitFor(() => {
+      expect(inputRail).toHaveAttribute('data-provenance-drop-state', 'rejecting');
+      expect(inputRail).toHaveClass('swt:border-warning');
+    });
+
+    fireEvent.pointerUp(inputRail, {
+      clientX: pointer.x,
+      clientY: pointer.y,
+      button: 0,
+      buttons: 0,
+      isPrimary: true,
+      pointerId: 1,
+    });
+    await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument());
+
+    expect(canvas.queryByTestId('provenance-property-Input-Analysis')).not.toBeInTheDocument();
+    await waitFor(() => {
+      expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Analysis$/ }))
+        .toBeVisible();
+    });
+  },
+};
+
+export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
+
+    expect(toolbar.getByPlaceholderText('Search properties & values...')).toBeInTheDocument();
+
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
+    expect(toolbar.getByRole('button', { name: /^Property Value Count$/i })).toBeInTheDocument();
+    expect(toolbar.getByRole('button', { name: /^Name$/i })).toBeInTheDocument();
+    expect(toolbar.getAllByRole('button', { name: /^Connection Count$/i })).toHaveLength(1);
+
+    expect(toolbar.getByRole('button', { name: /^Show upstream properties$/i }).querySelector('[class*="fluent--arrow-up-20"]'))
+      .toBeInTheDocument();
+    expect(toolbar.getByRole('button', { name: /^Show current properties$/i }).querySelector('[class*="fluent--circle-20-filled"]'))
+      .toBeInTheDocument();
+    const both = toolbar.getByRole('button', { name: /^Show current and upstream properties$/i });
+    expect(both.querySelector('[class*="fluent--arrow-up-20"]')).toBeInTheDocument();
+    expect(both.querySelector('[class*="fluent--circle-20-filled"]')).toBeInTheDocument();
+  },
+};
+
+export const SortsPropertiesByNameAndConnectionCount: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
+
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Name$/i }));
+
+    await waitFor(async () => {
+      expect((await shelfPropertyOrder(canvas)).slice(0, 4)).toEqual([
+        'Analysis',
+        'Replicate',
+        'Species',
+        'Temperature',
+      ]);
+    });
+
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Connection Count$/i }));
+
+    await waitFor(async () => {
+      expect((await shelfPropertyOrder(canvas)).slice(0, 4)).toEqual([
+        'Species',
+        'Analysis',
+        'Temperature',
+        'Replicate',
+      ]);
+    });
+  },
+};
+
+export const AddedRailPropertiesAreCurrentAndPinnedToTheirSide: Story = {
+  render: () => <Harness inputOnly />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
-    expect(inputRail.getByTestId('provenance-property-Input-Species')).toBeInTheDocument();
-    expect(inputRail.getByTestId('provenance-property-Input-Temperature')).toBeInTheDocument();
-    expect(inputRail.queryByTestId('provenance-property-Input-Analysis')).not.toBeInTheDocument();
-    expect(inputRail.queryByTestId('provenance-property-Input-Replicate')).not.toBeInTheDocument();
+    const source = await addRailProperty(canvas, 'Input', 'Treatment', 'Drought');
+    expect(inputRail.getByTestId('provenance-property-Input-Treatment')).toBeInTheDocument();
+    expect(within(inputRail.getByTestId('provenance-property-Input-Treatment')).getByTitle('Current')).toBeInTheDocument();
+    expect(outputRail.queryByTestId('provenance-property-Output-Treatment')).not.toBeInTheDocument();
 
-    expect(outputRail.getByTestId('provenance-property-Output-Analysis')).toBeInTheDocument();
-    expect(outputRail.getByTestId('provenance-property-Output-Replicate')).toBeInTheDocument();
-    expect(outputRail.queryByTestId('provenance-property-Output-Species')).not.toBeInTheDocument();
-    expect(outputRail.queryByTestId('provenance-property-Output-Temperature')).not.toBeInTheDocument();
+    await userEvent.click(within(canvas.getByTestId('provenance-filter-toolbar')).getByRole('button', { name: /^Show current properties$/i }));
+    await waitFor(() => expect(inputRail.getByTestId('provenance-property-Input-Treatment')).toBeInTheDocument());
+    expect(outputRail.queryByTestId('provenance-property-Output-Treatment')).not.toBeInTheDocument();
+
+    const target = canvas.getByText('Input Only A').closest('article')!;
+    await dragByPointer(source, target);
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue'),
+    );
+  },
+};
+
+export const LayerFocusDoesNotResortInitializedRails: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const initialOutputOrder = (await shelfPropertyOrder(canvas)).slice(0, 4);
+
+    await selectGroup(canvas.getByText('Output A').closest('article')!);
+    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    await waitFor(() => expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary'));
+
+    const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort By$/i }));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Connection Count$/i }));
+
+    await userEvent.click(canvas.getByTestId('provenance-layer-layer-1'));
+    await waitFor(() => expect(canvas.getByTestId('provenance-layer-layer-1')).toHaveClass('swt:btn-primary'));
+    expect((await shelfPropertyOrder(canvas)).slice(0, 4)).toEqual(initialOutputOrder);
   },
 };
 
@@ -265,12 +557,12 @@ export const PropertyRailExpandsValuesAndAddControls: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
+    const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
-    expect(inputRail.queryByText('Arabidopsis')).not.toBeInTheDocument();
-    expect(inputRail.getByText('Add property')).toBeInTheDocument();
+    expect(outputRail.queryByText('Arabidopsis')).not.toBeInTheDocument();
+    expect(outputRail.getByText('Add property')).toBeInTheDocument();
 
-    const panel = await expandProperty(canvas, 'Input', 'Species');
+    const panel = await expandProperty(canvas, 'Output', 'Species');
     const arabidopsis = panel.getByText('Arabidopsis').closest('button, div')!;
     expect(arabidopsis).toBeInTheDocument();
     expect(arabidopsis).toHaveClass('swt:btn');
@@ -292,10 +584,10 @@ export const ExpandsPropertyValuesWithoutGrouping: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await expandProperty(canvas, 'Input', 'Species');
+    await expandProperty(canvas, 'Output', 'Species');
 
-    expect(canvas.getByTestId('provenance-group-Input-input:input-a')).toBeInTheDocument();
-    expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-group-Output-output:output-a')).toBeInTheDocument();
+    expect(canvas.queryByTestId('provenance-group-Output-output:Species=Arabidopsis')).not.toBeInTheDocument();
   },
 };
 
@@ -325,6 +617,8 @@ export const SingleSidedPropertiesCannotSwitchSides: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    await ensurePropertyInRail(canvas, 'Output', 'Analysis');
+    await ensurePropertyInRail(canvas, 'Output', 'Replicate');
     expect(canvas.getByTestId('provenance-property-drag-Output-Analysis')).toBeDisabled();
     expect(canvas.getByTestId('provenance-property-drag-Output-Replicate')).toBeDisabled();
   },
@@ -335,45 +629,43 @@ export const SwitchesPropertyGroupingSideByDrag: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Input-Batch'));
-    await waitFor(() => {
-      expect(canvas.getByTestId('provenance-group-Input-input:Batch=A')).toBeInTheDocument();
-      expect(canvas.queryByTestId('provenance-group-Output-output:Batch=A')).not.toBeInTheDocument();
-    });
+    await groupByProperty(canvas, 'Output', 'Batch');
+    expect(canvas.queryByTestId('provenance-group-Input-input:Batch=A')).not.toBeInTheDocument();
 
     await dragByPointer(
-      canvas.getByTestId('provenance-property-Input-Batch'),
-      canvas.getByTestId('provenance-property-rail-Output'),
+      canvas.getByTestId('provenance-property-Output-Batch'),
+      canvas.getByTestId('provenance-property-rail-Input'),
     );
 
     await waitFor(() => {
-      expect(canvas.queryByTestId('provenance-group-Input-input:Batch=A')).not.toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Input-input:input-a')).toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Output-output:Batch=A')).toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Output-output:Batch=B')).toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Output-output:Batch=A')).not.toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Output-output:output-a')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Batch=A')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:input-b')).toBeInTheDocument();
     });
   },
 };
 
-export const SwitchesInheritedInputPropertyGroupingToOutputSide: Story = {
+export const SwitchesInheritedPropertyGroupingToInputSide: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
     const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
-    expect(canvas.getByTestId('provenance-property-drag-Input-Species')).not.toBeDisabled();
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
+    expect(canvas.getByTestId('provenance-property-drag-Output-Species')).not.toBeDisabled();
     await dragByPointer(
-      canvas.getByTestId('provenance-property-Input-Species'),
-      canvas.getByTestId('provenance-property-rail-Output'),
+      canvas.getByTestId('provenance-property-Output-Species'),
+      canvas.getByTestId('provenance-property-rail-Input'),
     );
 
     await waitFor(() => {
-      expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis')).toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Output-output:Species=Chlamydomonas')).toBeInTheDocument();
-      expect(outputRail.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
-      expect(inputRail.queryByTestId('provenance-property-Input-Species')).not.toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Output-output:Species=Arabidopsis')).not.toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis')).toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas')).toBeInTheDocument();
+      expect(inputRail.getByTestId('provenance-property-Input-Species')).toBeInTheDocument();
+      expect(outputRail.queryByTestId('provenance-property-Output-Species')).not.toBeInTheDocument();
     });
   },
 };
@@ -385,14 +677,15 @@ export const ClicksSwapHandleToSwitchGroupingSide: Story = {
     const inputRail = within(canvas.getByTestId('provenance-property-rail-Input'));
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
-    await userEvent.hover(canvas.getByTestId('provenance-property-Input-Species'));
-    await userEvent.click(canvas.getByTestId('provenance-property-drag-Input-Species'));
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
+    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Species'));
+    await userEvent.click(canvas.getByTestId('provenance-property-drag-Output-Species'));
 
     await waitFor(() => {
-      expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis')).toBeInTheDocument();
-      expect(outputRail.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
-      expect(inputRail.queryByTestId('provenance-property-Input-Species')).not.toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-group-Output-output:Species=Arabidopsis')).not.toBeInTheDocument();
+      expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis')).toBeInTheDocument();
+      expect(inputRail.getByTestId('provenance-property-Input-Species')).toBeInTheDocument();
+      expect(outputRail.queryByTestId('provenance-property-Output-Species')).not.toBeInTheDocument();
     });
   },
 };
@@ -402,9 +695,9 @@ export const RegroupedValuesAreReadOnlyOnCards: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
-    await userEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    await groupByProperty(canvas, 'Output', 'Species');
     const grouped = await waitFor(
-      () => canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas'),
+      () => canvas.getByTestId('provenance-group-Output-output:Species=Chlamydomonas'),
       { timeout: 3000 },
     );
 
@@ -429,9 +722,9 @@ export const RemeasuresConnectionsAfterGroupExpansion: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    fireEvent.click(canvas.getByTestId('provenance-property-Input-Species'));
+    await groupByProperty(canvas, 'Output', 'Species');
 
-    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
 
     const before = await waitFor(() => {
       const paths = canvas.getAllByTestId('provenance-connection').map((connector) => connector.getAttribute('d'));
@@ -489,9 +782,9 @@ export const ExpandedGroupsRenderMemberLevelConnections: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await groupByProperty(canvas, 'Input', 'Species');
+    await groupByProperty(canvas, 'Output', 'Species');
 
-    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
 
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
 
@@ -507,19 +800,19 @@ export const ExpandedGroupsHideGroupConnectionAnchors: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await groupByProperty(canvas, 'Input', 'Species');
+    await groupByProperty(canvas, 'Output', 'Species');
 
-    const groupId = 'input:Species=Arabidopsis';
-    const grouped = await waitFor(() => canvas.getByTestId(`provenance-group-Input-${groupId}`));
-    expect(within(grouped).getByTestId('provenance-connection-handle-Input-GroupCard')).toBeInTheDocument();
+    const groupId = 'output:Species=Arabidopsis';
+    const grouped = await waitFor(() => canvas.getByTestId(`provenance-group-Output-${groupId}`));
+    expect(within(grouped).getByTestId('provenance-connection-handle-Output-GroupCard')).toBeInTheDocument();
     expect(connectionKeys(canvas.getAllByTestId('provenance-connection')).some((key) => key.includes(groupId))).toBe(true);
 
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
 
     await waitFor(() => {
-      const expanded = canvas.getByTestId(`provenance-group-Input-${groupId}`);
-      expect(within(expanded).queryByTestId('provenance-connection-handle-Input-GroupCard')).not.toBeInTheDocument();
-      expect(within(expanded).getAllByTestId('provenance-connection-handle-Input-GroupMember').length).toBeGreaterThan(0);
+      const expanded = canvas.getByTestId(`provenance-group-Output-${groupId}`);
+      expect(within(expanded).queryByTestId('provenance-connection-handle-Output-GroupCard')).not.toBeInTheDocument();
+      expect(within(expanded).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
       expect(connectionKeys(canvas.queryAllByTestId('provenance-connection')).some((key) => key.includes(groupId))).toBe(false);
       expect(connectionKeys(canvas.getAllByTestId('provenance-member-connection')).some((key) => key.includes(groupId))).toBe(true);
     });
@@ -534,12 +827,13 @@ export const ExpandedPropertyValuesConnectValueChipsToMatchingGroups: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
     await waitFor(() => {
       const headerKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'));
       expect(headerKeys.some((key) => key.includes('Species'))).toBe(true);
     });
 
-    const panel = await expandProperty(canvas, 'Input', 'Species');
+    const panel = await expandProperty(canvas, 'Output', 'Species');
 
     await waitFor(() => {
       const headerKeys = connectionKeys(canvas.queryAllByTestId('provenance-property-connection'));
@@ -551,15 +845,15 @@ export const ExpandedPropertyValuesConnectValueChipsToMatchingGroups: Story = {
       expect(canvas.getAllByTestId('provenance-value-connection').every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
     });
 
-    expect(panel.queryByTestId('provenance-connection-handle-Input-PropertyValue')).not.toBeInTheDocument();
+    expect(panel.queryByTestId('provenance-connection-handle-Output-PropertyValue')).not.toBeInTheDocument();
 
     // Collapsing again must restore header connectors and drop value connectors,
     // so the expanded-header filter cannot become a one-way switch.
-    await userEvent.hover(canvas.getByTestId('provenance-property-Input-Species'));
-    await userEvent.click(canvas.getByTestId('provenance-property-expand-Input-Species'));
+    await userEvent.hover(canvas.getByTestId('provenance-property-Output-Species'));
+    await userEvent.click(canvas.getByTestId('provenance-property-expand-Output-Species'));
 
     await waitFor(() => {
-      expect(canvas.queryByTestId('provenance-property-values-Input-Species')).not.toBeInTheDocument();
+      expect(canvas.queryByTestId('provenance-property-values-Output-Species')).not.toBeInTheDocument();
       const headerKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'));
       expect(headerKeys.some((key) => key.includes('Species'))).toBe(true);
       expect(canvas.queryByTestId('provenance-value-connection')).not.toBeInTheDocument();
@@ -572,6 +866,7 @@ export const CollapsedPropertiesConnectToMatchingGroupsAutomatically: Story = {
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
+    await ensurePropertyInRail(canvas, 'Output', 'Species');
     await waitFor(() => {
       const paths = canvas.getAllByTestId('provenance-property-connection');
       expect(paths.every((path) => path.getAttribute('d')?.startsWith('M '))).toBe(true);
@@ -628,7 +923,8 @@ export const ConnectionDetailsDoNotExposePropertyCreation: Story = {
     const canvas = within(canvasElement);
 
     const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
-    await userEvent.click(connector);
+    connector.focus();
+    await userEvent.keyboard('{Enter}');
 
     const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
     expect(details).toHaveTextContent('Connection IDs');
@@ -690,28 +986,40 @@ export const RemovesExpandedMemberConnectionFromContextMenu: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await groupByProperty(canvas, 'Input', 'Species');
+    await groupByProperty(canvas, 'Output', 'Species');
 
-    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    const grouped = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
     await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
 
     const connector = await waitFor(() => {
       const memberConnector = canvas
         .getAllByTestId('provenance-member-connection')
-        .find((path) => path.getAttribute('data-provenance-connection-key')?.includes('input:Species=Arabidopsis'));
+        .find((path) => path.getAttribute('data-provenance-connection-key')?.includes('output:Species=Arabidopsis'));
       expect(memberConnector).toBeTruthy();
       expect(memberConnector).toHaveAttribute('role', 'button');
       return memberConnector!;
     });
 
     const removedKey = connector.getAttribute('data-provenance-connection-key');
-    fireEvent.contextMenu(connector, { clientX: 360, clientY: 280, bubbles: true });
+    await userEvent.click(connector);
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-connection-details')).toBeInTheDocument();
+      expect(within(grouped).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
+    });
+
+    const selectedConnector = canvas
+      .getAllByTestId('provenance-member-connection')
+      .find((path) => path.getAttribute('data-provenance-connection-key') === removedKey);
+    expect(selectedConnector).toBeTruthy();
+    fireEvent.contextMenu(selectedConnector!, { clientX: 360, clientY: 280, bubbles: true });
     const menu = await screen.findByTestId('context_menu');
     await userEvent.click(within(menu).getByRole('button', { name: /delete/i }));
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('RemoveLoadedConnection');
       expect(connectionKeys(canvas.queryAllByTestId('provenance-member-connection'))).not.toContain(removedKey);
+      expect(within(grouped).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
     });
   },
 };
@@ -737,9 +1045,9 @@ export const WarnsBeforeOverwritingSingleValueFromRail: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    const source = await railValue(canvas, 'Input', 'Species', 'Arabidopsis');
-    await groupByProperty(canvas, 'Input', 'Species');
-    const target = canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas');
+    const source = await railValue(canvas, 'Output', 'Species', 'Arabidopsis');
+    await groupByProperty(canvas, 'Output', 'Species');
+    const target = canvas.getByTestId('provenance-group-Output-output:Species=Chlamydomonas');
 
     await dragByPointer(source, target);
 
@@ -874,7 +1182,7 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await waitFor(() => {
-      expect(canvas.getByTestId('provenance-pair-pair-2')).toHaveClass('swt:btn-primary');
+      expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
       expect(canvasElement).toHaveTextContent('Output A');
     });
 
@@ -884,13 +1192,13 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
     await dragByPointer(source, carried);
     await userEvent.click(canvas.getByTestId('provenance-confirm-overwrite'));
 
-    await userEvent.click(canvas.getByTestId('provenance-pair-pair-1'));
+    await userEvent.click(canvas.getByTestId('provenance-layer-layer-1'));
     await waitFor(() => expect(canvasElement).toHaveTextContent('Imaging'));
     expect(canvas.getByTestId('provenance-patch-preview')).not.toHaveTextContent('No patches emitted.');
   },
 };
 
-export const CompletesAnInputOnlyPair: Story = {
+export const CompletesAnInputOnlyLayer: Story = {
   render: () => <Harness inputOnly />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -998,6 +1306,8 @@ async function startDragByPointer(source: Element) {
   const from = source.getBoundingClientRect();
   const fromX = from.left + from.width / 2;
   const fromY = from.top + from.height / 2;
+  const activationX = fromX + 8;
+  const activationY = fromY;
   const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
   fireEvent.pointerDown(source, {
     clientX: fromX,
@@ -1009,19 +1319,148 @@ async function startDragByPointer(source: Element) {
   });
   await nextFrame();
   fireEvent.pointerMove(document, {
-    clientX: fromX + 8,
-    clientY: fromY,
+    clientX: activationX,
+    clientY: activationY,
     button: 0,
     buttons: 1,
     isPrimary: true,
     pointerId: 1,
   });
   await nextFrame();
+
+  return { x: activationX, y: activationY };
+}
+
+async function moveDragPointerTo(target: Element) {
+  const to = target.getBoundingClientRect();
+  const toX = to.left + to.width / 2;
+  const toY = to.top + to.height / 2;
+  const nextFrame = () => new Promise((resolve) => requestAnimationFrame(resolve));
+  fireEvent.pointerMove(document, {
+    clientX: toX,
+    clientY: toY,
+    button: 0,
+    buttons: 1,
+    isPrimary: true,
+    pointerId: 1,
+  });
+  await nextFrame();
+
+  return { x: toX, y: toY };
+}
+
+function escapeRegExp(value: string) {
+  return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+}
+
+function shelfFolders(canvas: ReturnType<typeof within>) {
+  return Array.from(
+    canvas
+      .getByTestId('foldered-draggable-folder-row')
+      .querySelectorAll<HTMLElement>('[data-testid^="foldered-draggable-folder-"]'),
+  );
+}
+
+async function openShelfFolder(canvas: ReturnType<typeof within>, folder: HTMLElement) {
+  const folderTestId = folder.getAttribute('data-testid')!;
+  const currentFolder = () => canvas.getByTestId(folderTestId);
+
+  if (currentFolder().getAttribute('aria-expanded') !== 'true') {
+    await userEvent.click(within(currentFolder()).getByRole('button', { name: /^Expand / }));
+  }
+
+  await waitFor(() => expect(currentFolder()).toHaveAttribute('aria-expanded', 'true'));
+  return within(canvas.getByTestId('foldered-draggable-item-row'));
+}
+
+async function shelfProperty(canvas: ReturnType<typeof within>, propertyName: string) {
+  const name = new RegExp(`^Drag ${escapeRegExp(propertyName)}$`);
+
+  for (const folder of shelfFolders(canvas)) {
+    const row = await openShelfFolder(canvas, folder);
+    const item = row.queryByRole('button', { name });
+
+    if (item) {
+      return item;
+    }
+  }
+
+  throw new Error(`Could not find shelf property "${propertyName}".`);
+}
+
+async function ensurePropertyInRail(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  propertyName: string,
+) {
+  const propertyId = `provenance-property-${side}-${propertyName}`;
+  const existing = canvas.queryByTestId(propertyId);
+
+  if (existing) {
+    return existing;
+  }
+
+  const source = await shelfProperty(canvas, propertyName);
+  await dragByPointer(source, canvas.getByTestId(`provenance-property-rail-${side}`));
+
+  await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument());
+  return waitFor(() => canvas.getByTestId(propertyId));
+}
+
+function propertyColorSwatch(property: HTMLElement) {
+  const swatch = property.querySelector<HTMLElement>('span[style*="background-color"]');
+
+  if (!swatch) {
+    throw new Error(`Property "${property.getAttribute('aria-label') ?? property.textContent}" has no color swatch.`);
+  }
+
+  return swatch;
+}
+
+async function setFolderPreviewColor(folder: HTMLElement, color: string) {
+  const trigger = within(folder).getByRole('button', { name: /^Set color for folder / });
+  const triggerLabel = trigger.getAttribute('aria-label') ?? '';
+  const inputLabel = triggerLabel.replace(/^Set /, 'Choose ');
+
+  await userEvent.click(trigger);
+  const body = within(document.body);
+  const colorInput = await waitFor(() => body.getByLabelText(inputLabel));
+  fireEvent.change(colorInput, { target: { value: color } });
+  await userEvent.click(body.getByRole('button', { name: 'Select' }));
+
+  await waitFor(() => expect(trigger).toHaveStyle({ backgroundColor: color }));
+}
+
+async function showPropertyControls(
+  canvas: ReturnType<typeof within>,
+  side: 'Input' | 'Output',
+  propertyName: string,
+) {
+  const property = await ensurePropertyInRail(canvas, side, propertyName);
+  property.focus();
+  await userEvent.hover(property);
+
+  const controls = canvas.getByTestId(`provenance-property-both-${side}-${propertyName}`).parentElement!;
+  await waitFor(() => expect(controls).not.toHaveClass('swt:hidden'));
+
+  return property;
+}
+
+async function shelfPropertyOrder(canvas: ReturnType<typeof within>) {
+  const folder = canvas.getByTestId('foldered-draggable-folder-layer-layer-1');
+  await openShelfFolder(canvas, folder);
+
+  return Array.from(
+    canvas
+      .getByTestId('foldered-draggable-item-row')
+      .querySelectorAll<HTMLElement>('[data-testid^="foldered-draggable-item-"]'),
+  ).map((element) => (element.getAttribute('aria-label') ?? '').replace(/^Drag\s+/, ''));
 }
 
 async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
   const panelId = `provenance-property-values-${side}-${propertyName}`;
   const triggerId = `provenance-property-expand-${side}-${propertyName}`;
+  await ensurePropertyInRail(canvas, side, propertyName);
   // The row controls only enter the layout while the row is hovered or focused.
   await userEvent.hover(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
   for (let attempt = 0; attempt < 3 && !canvas.queryByTestId(panelId); attempt += 1) {
@@ -1038,6 +1477,7 @@ async function expandProperty(canvas: ReturnType<typeof within>, side: 'Input' |
 
 async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' | 'Output', propertyName: string) {
   const groupedPattern = new RegExp(`^provenance-group-${side}-${side.toLowerCase()}:.*${propertyName}=`);
+  await ensurePropertyInRail(canvas, side, propertyName);
 
   for (let attempt = 0; attempt < 3 && canvas.queryAllByTestId(groupedPattern).length === 0; attempt += 1) {
     fireEvent.click(canvas.getByTestId(`provenance-property-${side}-${propertyName}`));
@@ -1059,7 +1499,8 @@ async function groupByProperty(canvas: ReturnType<typeof within>, side: 'Input' 
 
 async function selectGroup(groupCard: HTMLElement) {
   for (let attempt = 0; attempt < 3 && !groupCard.classList.contains('swt:border-primary'); attempt += 1) {
-    await userEvent.click(within(groupCard).getByRole('button', { name: 'Select group' }));
+    const selectionSurface = groupCard.querySelector<HTMLElement>('[data-testid^="provenance-group-select-surface-"]');
+    await userEvent.click(selectionSurface ?? groupCard);
     await waitFor(() => expect(groupCard).toHaveClass('swt:border-primary'), { timeout: 1000 }).catch(() => undefined);
   }
 
@@ -1242,10 +1683,10 @@ export const MismatchedGroupConnectionPromptsForResolution: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await groupByProperty(canvas, 'Input', 'Species');
+    await groupByProperty(canvas, 'Output', 'Species');
 
-    const inputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
-    const outputGroup = canvas.getByText('Output E').closest('article')!;
+    const inputGroup = canvas.getByText('Input D').closest('article')!;
+    const outputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
     const outputHandle = within(outputGroup).getByTestId('provenance-connection-handle-Output-GroupCard');
 
     await dragByPointer(
@@ -1254,8 +1695,8 @@ export const MismatchedGroupConnectionPromptsForResolution: Story = {
     );
 
     await waitFor(() => expect(canvas.getByTestId('provenance-member-resolution-prompt')).toBeInTheDocument());
-    expect(canvas.getByTestId('provenance-member-resolution-prompt')).toHaveTextContent('3 input members');
-    expect(canvas.getByTestId('provenance-member-resolution-prompt')).toHaveTextContent('1 output member');
+    expect(canvas.getByTestId('provenance-member-resolution-prompt')).toHaveTextContent('1 input member');
+    expect(canvas.getByTestId('provenance-member-resolution-prompt')).toHaveTextContent('3 output members');
   },
 };
 
@@ -1263,10 +1704,10 @@ export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
-    await groupByProperty(canvas, 'Input', 'Species');
+    await groupByProperty(canvas, 'Output', 'Species');
 
-    const inputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
-    const outputGroup = canvas.getByText('Output E').closest('article')!;
+    const inputGroup = canvas.getByText('Input D').closest('article')!;
+    const outputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
     const outputHandle = within(outputGroup).getByTestId('provenance-connection-handle-Output-GroupCard');
 
     await dragByPointer(
@@ -1277,12 +1718,55 @@ export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
     await userEvent.click(canvas.getByTestId('provenance-member-resolution-manual'));
 
     await waitFor(() => {
-      const currentInputGroup = canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis');
-      const currentOutputGroup = canvas.getByTestId('provenance-group-Output-output:output-e');
-      expect(within(currentInputGroup).getAllByTestId('provenance-connection-handle-Input-GroupMember').length).toBeGreaterThan(0);
+      const currentInputGroup = canvas.getByTestId('provenance-group-Input-input:input-d');
+      const currentOutputGroup = canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis');
+      expect(within(currentInputGroup).queryByTestId('provenance-connection-handle-Input-GroupMember')).not.toBeInTheDocument();
       expect(within(currentOutputGroup).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
     });
+    expect(canvas.queryByTestId('provenance-member-resolution-prompt')).not.toBeInTheDocument();
     expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
+  },
+};
+
+export const ExpandedGroupedCardsDoNotExpandConnectedSingleCards: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await groupByProperty(canvas, 'Output', 'Species');
+
+    const inputA = canvas.getByText('Input A').closest('article')!;
+    const outputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
+
+    await userEvent.click(within(outputGroup).getByRole('button', { name: 'Show members' }));
+
+    await waitFor(() => {
+      expect(within(outputGroup).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
+      expect(within(inputA).queryByTestId('provenance-group-member-Input-input-a')).not.toBeInTheDocument();
+      expect(within(inputA).queryByTestId('provenance-connection-handle-Input-GroupMember')).not.toBeInTheDocument();
+    });
+  },
+};
+
+export const LayerTabsUseConceptualLayerColorsAndSideRails: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const layer1 = canvas.getByTestId('provenance-layer-layer-1');
+    const layerColor = layer1.getAttribute('data-provenance-layer-color') ?? '';
+
+    expect(layer1).toHaveClass('swt:btn-primary');
+    expect(layerColor).toMatch(/^#/);
+    expect(layerColor).not.toContain('|');
+
+    expect(canvas.getByTestId('provenance-property-rail-Input')).toHaveAttribute(
+      'data-provenance-side-id',
+      'layer-1-input',
+    );
+    expect(canvas.getByTestId('provenance-property-rail-Output')).toHaveAttribute(
+      'data-provenance-side-id',
+      'layer-1-output',
+    );
   },
 };
 
@@ -1298,15 +1782,14 @@ export const AddsLayerFromMixedSelection: Story = {
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await waitFor(() => {
-      expect(canvas.getByTestId('provenance-pair-pair-2')).toHaveClass('swt:btn-primary');
-      expect(canvasElement).toHaveTextContent('Selection 3');
+      expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
       expect(canvasElement).toHaveTextContent('Input A');
       expect(canvasElement).toHaveTextContent('Output B');
     });
   },
 };
 
-export const DoesNotReuseSelectionForEqualGroupIdsInDifferentPairs: Story = {
+export const DoesNotReuseSelectionForEqualGroupIdsInDifferentLayers: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -1316,18 +1799,18 @@ export const DoesNotReuseSelectionForEqualGroupIdsInDifferentPairs: Story = {
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Pair 2 Output');
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Layer 2 Output');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
-    const pair2Output = await waitFor(() => canvas.getByText('Pair 2 Output').closest('article')!);
+    const layer2Output = await waitFor(() => canvas.getByText('Layer 2 Output').closest('article')!);
 
-    await selectGroup(pair2Output);
+    await selectGroup(layer2Output);
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
 
     await userEvent.click(canvas.getByTestId('popover_trigger_provenance-add-output'));
-    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Pair 3 Output');
+    await userEvent.type(screen.getByRole('textbox', { name: /Endpoint name/i }), 'Layer 3 Output');
     await userEvent.click(screen.getByRole('button', { name: /Create endpoint/i }));
-    const pair3Output = await waitFor(() => canvas.getByText('Pair 3 Output').closest('article')!);
+    const layer3Output = await waitFor(() => canvas.getByText('Layer 3 Output').closest('article')!);
 
-    expect(pair3Output).not.toHaveClass('swt:border-primary');
+    expect(layer3Output).not.toHaveClass('swt:border-primary');
   },
 };

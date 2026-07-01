@@ -93,7 +93,7 @@ type MovePathRequest = {
     overwrite: bool
 }
 
-type CopyPathRequest = {
+type CopyFileSystemItemRequest = {
     sourceRelativePath: string
     targetRelativePath: string
     overwrite: bool
@@ -109,6 +109,8 @@ type CreateFileSystemItemRequest = {
     name: string
     kind: FileSystemItemKind
 }
+
+type PickExternalFilePathsRequest = { filterExtensions: string[] option }
 
 type CopyExternalFileRequest = {
     sourceAbsolutePath: string

@@ -46,6 +46,7 @@ type ProvenanceValueDto = {
 
 type ProvenanceWritebackAnchorDto = {
     TableName: ProvenanceTableName
+    ProcessId: ProvenanceProcessId option
     ProcessName: ProvenanceProcessName option
     Header: ProvenancePropertyHeaderDto
     InputNames: string[]
@@ -72,6 +73,7 @@ type ProvenanceSetDto = {
 type ProvenanceConnectionDto = {
     Id: ProvenanceConnectionId
     TableName: ProvenanceTableName
+    ProcessId: ProvenanceProcessId option
     ProcessName: ProvenanceProcessName option
     InputSetId: ProvenanceSetId
     OutputSetId: ProvenanceSetId
@@ -194,6 +196,7 @@ module ProvenanceWritebackAnchorDto =
 
     let ofModel (source: ProvenanceWritebackAnchor) = {
         TableName = source.TableName
+        ProcessId = source.ProcessId
         ProcessName = source.ProcessName
         Header = ProvenancePropertyHeaderDto.ofModel source.Header
         InputNames = source.InputNames |> List.toArray
@@ -202,6 +205,7 @@ module ProvenanceWritebackAnchorDto =
 
     let toModel (source: ProvenanceWritebackAnchorDto) : ProvenanceWritebackAnchor = {
         TableName = source.TableName
+        ProcessId = source.ProcessId
         ProcessName = source.ProcessName
         Header = ProvenancePropertyHeaderDto.toModel source.Header
         InputNames = source.InputNames |> Array.toList
@@ -251,6 +255,7 @@ module ProvenanceConnectionDto =
     let ofModel (connection: ProvenanceConnection) = {
         Id = connection.Id
         TableName = connection.TableName
+        ProcessId = connection.ProcessId
         ProcessName = connection.ProcessName
         InputSetId = connection.InputSetId
         OutputSetId = connection.OutputSetId
@@ -259,6 +264,7 @@ module ProvenanceConnectionDto =
     let toModel (connection: ProvenanceConnectionDto) : ProvenanceConnection = {
         Id = connection.Id
         TableName = connection.TableName
+        ProcessId = connection.ProcessId
         ProcessName = connection.ProcessName
         InputSetId = connection.InputSetId
         OutputSetId = connection.OutputSetId

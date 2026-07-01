@@ -46,8 +46,7 @@ type IArcVaultsApi = {
 
     pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
     pickDirectory: unit -> JS.Promise<Result<string, exn>>
-    pickImagePaths: unit -> JS.Promise<Result<string[], exn>>
-    pickExternalTextFiles: unit -> JS.Promise<Result<ImportedTextFile[], exn>>
+    pickExternalFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
@@ -72,7 +71,7 @@ type IArcVaultsApi = {
     deletePath: string -> JS.Promise<Result<unit, exn>>
     renamePath: RenamePathRequest -> JS.Promise<Result<unit, exn>>
     movePath: MovePathRequest -> JS.Promise<Result<unit, exn>>
-    copyPath: CopyPathRequest -> JS.Promise<Result<unit, exn>>
+    copyFileSystemItem: CopyFileSystemItemRequest -> JS.Promise<Result<unit, exn>>
     renameOpenArcRoot: string -> JS.Promise<Result<string, exn>>
     writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>
     runGitLfs: GitLfsRequest -> JS.Promise<Result<GitLfsResult, exn>>
@@ -96,6 +95,7 @@ type IGitApi = {
     gitFetch: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPull: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitPush: GitRemoteOperationRequest -> JS.Promise<Result<GitOperationResult, exn>>
+    gitCancelPush: unit -> JS.Promise<Result<GitOperationResult, exn>>
     gitInitRepository: string -> JS.Promise<Result<GitOperationResult, exn>>
     gitAddRemote: GitRemoteConfigRequest -> JS.Promise<Result<GitOperationResult, exn>>
     gitCloneRepository: GitCloneRepositoryRequest -> JS.Promise<Result<GitOperationResult, exn>>

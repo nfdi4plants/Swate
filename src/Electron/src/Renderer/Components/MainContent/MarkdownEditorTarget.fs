@@ -4,6 +4,7 @@ open Feliz
 open Renderer.Context.UnsavedChangesContext
 open Swate.Components.Composite.MarkdownText
 open Swate.Components.Composite.MarkdownText.Types
+open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
 open Renderer.Components.Helper.FileSystemHelper
 
@@ -33,7 +34,15 @@ let MarkdownEditorTarget (content: string) =
     )
 
     let imageFilePickerAdapter =
-        Renderer.Components.MainContent.Helper.useNoteImageFilePickerAdapter pendingImageAssetsRef
+        React.useMemo (
+            (fun _ ->
+                createAssetFilePickerAdapter
+                    Api.ipcArcVaultApi.pickExternalFilePaths
+                    NoteConversion.noteAssetsFolderName
+                    (fun asset -> pendingImageAssetsRef.current <- pendingImageAssetsRef.current @ [ asset ])
+            ),
+            [||]
+        )
 
     let saveMarkdownAsync () =
         match selectedPath with

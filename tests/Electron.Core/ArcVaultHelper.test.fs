@@ -6,6 +6,7 @@ open Main.ArcVault
 open Main.ArcVaultHelper
 open Main.Bindings.Filesystem
 open Main.Bindings.Path
+open Main.Notes.NoteConstants
 open Swate.Components.Shared
 open Vitest
 
@@ -16,6 +17,11 @@ let private mkdirRecursiveAsync (directoryPath: string) = promise {
 
 let private writeTextFileAsync (filePath: string) (content: string) =
     writeFileAsync filePath content TextEncoding.Utf8
+
+let private arctrlDefaultGitignoreContent () =
+    match ARCtrl.Contract.Git.gitignoreContract.DTO with
+    | Some(ARCtrl.Contract.DTO.Text content) -> content
+    | _ -> failwith "ARCtrl default .gitignore contract does not contain text content."
 
 let private addDataMapToAllEntityTypes (arc: ARC) =
     let study = ArcStudy("Study With DataMap")
@@ -58,7 +64,7 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "Swate write contracts contain only targeted ARC files",
+            "Swate write contracts contain only targeted scaffold and ARC files",
             fun () ->
                 let arc = ARC("TargetedWriteArc")
                 addDataMapToAllEntityTypes arc
@@ -77,11 +83,13 @@ Vitest.describe (
 
                 let expectedPaths =
                     [|
+                        ".gitignore"
                         "LICENSE"
                         "assays/.gitkeep"
                         "assays/Assay With DataMap/isa.assay.xlsx"
                         "assays/Assay With DataMap/isa.datamap.xlsx"
                         "isa.investigation.xlsx"
+                        "notes/README.md"
                         "runs/.gitkeep"
                         "runs/Run With DataMap/isa.datamap.xlsx"
                         "runs/Run With DataMap/isa.run.xlsx"
@@ -95,6 +103,34 @@ Vitest.describe (
                     |> Array.sort
 
                 Vitest.expect(actualPaths).toEqual (expectedPaths)
+        )
+
+        Vitest.test (
+            "TryWriteAsyncSwate writes the default gitignore and notes README into an ARC root",
+            fun () -> promise {
+                let! rootPath = TestHelpers.createTempDirectoryAsync "swate-default-gitignore-"
+                let arcPath = join [| rootPath; "arc" |]
+                let gitignorePath = join [| arcPath; ".gitignore" |]
+                let notesReadmePath = join [| arcPath; NotesRootFolderName; NotesReadmeFileName |]
+
+                try
+                    do! mkdirRecursiveAsync arcPath
+
+                    let arc = ARC("ScaffoldArc")
+
+                    match! arc.TryWriteAsyncSwate(arcPath) with
+                    | Error errors -> failwith (String.concat "\n" errors)
+                    | Ok _ -> ()
+
+                    let! gitignoreContent = readFileAsync gitignorePath TextEncoding.Utf8
+                    let! notesReadmeContent = readFileAsync notesReadmePath TextEncoding.Utf8
+                    Vitest.expect(gitignoreContent).toBe (arctrlDefaultGitignoreContent ())
+                    Vitest.expect(notesReadmeContent).toBe (NotesReadmeContent)
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                with error ->
+                    do! TestHelpers.removeDirectoryAsync rootPath
+                    return raise error
+            }
         )
 
         Vitest.test (

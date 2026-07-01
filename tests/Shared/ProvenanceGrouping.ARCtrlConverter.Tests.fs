@@ -87,6 +87,36 @@ let private outputOnlyAssayTable () =
         [ term "23"; text "extract-b"; term "R2" ]
     ]
 
+let private repeatedMetaboliteExtractionTable () =
+    table "metabolite_extraction" [
+        CompositeHeader.Input IOType.Sample
+        CompositeHeader.Parameter(oa "Extraction buffer")
+        CompositeHeader.Parameter(oa "Biosource amount")
+        CompositeHeader.Output IOType.Sample
+    ] [
+        [
+            text "CAM_01"
+            term "water:methanol:chloroform"
+            term "6.1"
+            text "DB23"
+        ]
+        [
+            text "CAM_02"
+            term "water:methanol:chloroform"
+            term "5.2"
+            text "DB24"
+        ]
+    ]
+
+let private gasChromatographyLoadedTable () =
+    table "gas_chromatography" [
+        CompositeHeader.Input IOType.Sample
+        CompositeHeader.Output IOType.Data
+    ] [
+        [ text "DB23"; text "raw-a" ]
+        [ text "DB24"; text "raw-b" ]
+    ]
+
 let private previousStudyTableWithDuplicateOrganismColumns () =
     table "study-table" [
         CompositeHeader.Input IOType.Source
@@ -120,6 +150,19 @@ let private arcFixtureWithDuplicateTemperatureColumns () =
         ArcAssay.create (
             identifier = "assay-1",
             tables = ResizeArray [ loadedAssayTableWithDuplicateTemperatureColumns () ]
+        )
+
+    ARC(identifier = "arc-1", studies = ResizeArray [], assays = ResizeArray [ assay ])
+
+let private arcFixtureWithRepeatedPreviousProcessRows () =
+    let assay =
+        ArcAssay.create (
+            identifier = "assay-1",
+            tables =
+                ResizeArray [
+                    repeatedMetaboliteExtractionTable ()
+                    gasChromatographyLoadedTable ()
+                ]
         )
 
     ARC(identifier = "arc-1", studies = ResizeArray [], assays = ResizeArray [ assay ])
@@ -178,6 +221,12 @@ let private loadedTable: ArcTableLocation = {
     Scope = ArcTableScope.Assay
     ParentIdentifier = "assay-1"
     TableName = "assay-table"
+}
+
+let private gasChromatographyLoadedTableLocation: ArcTableLocation = {
+    Scope = ArcTableScope.Assay
+    ParentIdentifier = "assay-1"
+    TableName = "gas_chromatography"
 }
 
 let private convertWithPreviousContext () =
@@ -252,17 +301,18 @@ let tests =
                 |> List.map (fun (_, connection) ->
                     result.Model.InputSets.[connection.InputSetId].Name,
                     result.Model.OutputSets.[connection.OutputSetId].Name,
-                    connection.ProcessName
+                    connection.ProcessName,
+                    connection.ProcessId
                 )
                 |> List.sort
 
             Expect.equal
                 connectionPairs
                 [
-                    ("sample-a", "extract-a", Some "assay-table_0")
-                    ("sample-b", "extract-b", Some "assay-table_1")
+                    ("sample-a", "extract-a", Some "assay-table", Some "assay-table_0")
+                    ("sample-b", "extract-b", Some "assay-table", Some "assay-table_1")
                 ]
-                "Each loaded row should produce a loaded input/output connection."
+                "Each loaded row should produce a loaded input/output connection with a logical process name and row process id."
 
         testCase "attaches loaded property values to loaded sets"
         <| fun _ ->
@@ -412,6 +462,131 @@ let tests =
                 writebackLocation.Table.TableName
                 "assay-table"
                 "A representative writeback location should still be preserved."
+
+        testCase "reuses identical loaded values across generated row process names"
+        <| fun _ ->
+            let assay =
+                ArcAssay.create (identifier = "assay-1", tables = ResizeArray [ repeatedMetaboliteExtractionTable () ])
+
+            let arc =
+                ARC(identifier = "arc-1", studies = ResizeArray [], assays = ResizeArray [ assay ])
+
+            let location: ArcTableLocation = {
+                Scope = ArcTableScope.Assay
+                ParentIdentifier = "assay-1"
+                TableName = "metabolite_extraction"
+            }
+
+            let result =
+                fromLoadedArc
+                    {
+                        LoadedTable = location
+                        IncludePreviousContext = false
+                    }
+                    arc
+
+            let inputByName name =
+                result.Model.InputSets
+                |> Map.toSeq
+                |> Seq.map snd
+                |> Seq.find (fun set -> set.Name = name)
+
+            let valueIdsForHeader headerName set =
+                set.PropertyValueIds
+                |> List.filter (fun id -> result.Model.PropertyValues.[id].Header.Category.Name = headerName)
+
+            let cam01 = inputByName "CAM_01"
+            let cam02 = inputByName "CAM_02"
+            let cam01BufferIds = valueIdsForHeader "Extraction buffer" cam01
+            let cam02BufferIds = valueIdsForHeader "Extraction buffer" cam02
+            let cam01AmountIds = valueIdsForHeader "Biosource amount" cam01
+            let cam02AmountIds = valueIdsForHeader "Biosource amount" cam02
+
+            Expect.equal cam01BufferIds.Length 1 "The first row should reference one extraction buffer value."
+            Expect.equal cam02BufferIds.Length 1 "The second row should reference one extraction buffer value."
+
+            Expect.equal
+                cam01BufferIds.Head
+                cam02BufferIds.Head
+                "Equal loaded values from generated row process names should share one property value id."
+
+            Expect.equal cam01AmountIds.Length 1 "The first row should reference one biosource amount value."
+            Expect.equal cam02AmountIds.Length 1 "The second row should reference one biosource amount value."
+
+            Expect.isFalse
+                (cam01AmountIds.Head = cam02AmountIds.Head)
+                "Different values for the same property header should remain distinct property values."
+
+            let sharedBuffer = result.Model.PropertyValues.[cam01BufferIds.Head]
+
+            Expect.equal
+                (sharedBuffer.Source |> Option.bind (fun source -> source.ProcessName))
+                (Some "metabolite_extraction")
+                "Generated row process suffixes should not leak into the normalized property source process."
+
+            Expect.equal
+                (sharedBuffer.Source |> Option.bind (fun source -> source.ProcessId))
+                (Some "metabolite_extraction_0")
+                "The representative ARCtrl row process identity should be preserved separately from the process name."
+
+        testCase "reuses identical previous-context values across generated row process names"
+        <| fun _ ->
+            let result =
+                fromLoadedArc
+                    {
+                        LoadedTable = gasChromatographyLoadedTableLocation
+                        IncludePreviousContext = true
+                    }
+                    (arcFixtureWithRepeatedPreviousProcessRows ())
+
+            let inputByName name =
+                result.Model.InputSets
+                |> Map.toSeq
+                |> Seq.map snd
+                |> Seq.find (fun set -> set.Name = name)
+
+            let valueIdsForHeader headerName set =
+                set.PropertyValueIds
+                |> List.filter (fun id -> result.Model.PropertyValues.[id].Header.Category.Name = headerName)
+
+            let db23 = inputByName "DB23"
+            let db24 = inputByName "DB24"
+            let db23BufferIds = valueIdsForHeader "Extraction buffer" db23
+            let db24BufferIds = valueIdsForHeader "Extraction buffer" db24
+            let db23AmountIds = valueIdsForHeader "Biosource amount" db23
+            let db24AmountIds = valueIdsForHeader "Biosource amount" db24
+
+            Expect.equal db23BufferIds.Length 1 "The first loaded input should inherit one extraction buffer value."
+            Expect.equal db24BufferIds.Length 1 "The second loaded input should inherit one extraction buffer value."
+
+            Expect.equal
+                db23BufferIds.Head
+                db24BufferIds.Head
+                "Equal previous-context values should share one property value id across loaded inputs."
+
+            Expect.equal db23AmountIds.Length 1 "The first loaded input should inherit one biosource amount value."
+            Expect.equal db24AmountIds.Length 1 "The second loaded input should inherit one biosource amount value."
+
+            Expect.isFalse
+                (db23AmountIds.Head = db24AmountIds.Head)
+                "Different previous-context values for the same property header should remain distinct."
+
+            let sharedBuffer = result.Model.PropertyValues.[db23BufferIds.Head]
+
+            Expect.equal
+                (sharedBuffer.Source |> Option.bind (fun source -> source.ProcessName))
+                (Some "metabolite_extraction")
+                "Previous-context folders should group by the logical source process, not row process suffixes."
+
+            Expect.equal
+                (sharedBuffer.Source |> Option.bind (fun source -> source.ProcessId))
+                (Some "metabolite_extraction_0")
+                "A representative ARCtrl row process id should remain available without being appended to the process name."
+
+            Expect.equal
+                (sharedBuffer.Source |> Option.map (fun source -> source.OutputNames))
+                (Some [ "DB23"; "DB24" ])
+                "A shared previous-context value should remember every loaded input it was attached through."
 
         testCase "collapsed previous-context duplicates keep one representative writeback slot"
         <| fun _ ->

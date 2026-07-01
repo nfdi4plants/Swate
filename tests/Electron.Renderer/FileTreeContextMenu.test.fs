@@ -8,7 +8,7 @@ open Renderer.Components.LeftSidebar.FileExplorer.Helper
 open Renderer.Components.LeftSidebar.FileExplorer.Types
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeAssignNoteHelper
 open Renderer.Components.LeftSidebar.FileExplorer.FileTreeContextMenu
-open Renderer.Components.LeftSidebar.FileExplorer.Modals
+open Swate.Components.Page.FileExplorer.Modals
 open Swate.Components.Page.FileExplorer.Types
 open Swate.Components.Shared
 open Swate.Electron.Shared.FileIOTypes
@@ -22,7 +22,6 @@ let private createConfig () : PathActionConfig = {
 
 let private createContextMenuConfig () : ContextMenuConfig = {
     openItem = ignore
-    arcRootPath = Some "C:\\arc-root"
     openCreateModal = ignore
     openFileSystemCreateModal = fun _ _ -> ()
     requestAssignNoteItem = ignore
@@ -35,7 +34,8 @@ let private createContextMenuConfig () : ContextMenuConfig = {
     runFreeLocalLfsCopy = fun _ -> promise { return Ok() }
 }
 
-let private createComposedContextMenuItems config item = createContextMenuItems config None item
+let private createComposedContextMenuItems config item =
+    createContextMenuItems config (Some "C:/Arc") item
 
 let private createFileItem (name: string) (path: string option) = {
     FileTree.createFile name path FileItemIcon.Document with
@@ -161,6 +161,36 @@ Vitest.describe (
     "FileTreeContextMenu",
     fun () ->
         Vitest.test (
+            "ARC create drafts include a basic identifier-named annotation table when supported",
+            fun () ->
+                let tableCapableKinds = [|
+                    ArcExplorerNodeKind.Study
+                    ArcExplorerNodeKind.Assay
+                    ArcExplorerNodeKind.Run
+                |]
+
+                for kind in tableCapableKinds do
+                    let identifier = $"Default {ArcExplorerNodeKind.label kind}"
+
+                    match tryCreateArcFile kind identifier with
+                    | Ok arcFile ->
+                        let tables = arcFile.Tables()
+                        Vitest.expect(tables.Count).toBe (1)
+                        let table = tables.[0]
+                        Vitest.expect(table.Name).toBe ($"{identifier} Table")
+                        Vitest.expect(table.ColumnCount).toBe (3)
+                        Vitest.expect(table.RowCount).toBe (ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount)
+                        Vitest.expect(table.Headers.[0].ToString()).toBe ("Input [Source Name]")
+                        Vitest.expect(table.Headers.[1].ToString()).toBe ("Protocol Uri")
+                        Vitest.expect(table.Headers.[2].ToString()).toBe ("Output [Sample Name]")
+                    | Error error -> failwith error
+
+                match tryCreateArcFile ArcExplorerNodeKind.Workflow "Default Workflow" with
+                | Ok arcFile -> Vitest.expect(arcFile.Tables().Count).toBe (0)
+                | Error error -> failwith error
+        )
+
+        Vitest.test (
             "folder path actions reveal the folder location only",
             fun () ->
                 let item = createFolderItem "AssayA" (Some "assays/AssayA")
@@ -195,21 +225,11 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "absolute copy path resolver combines the active ARC root with filetree paths",
-            fun () ->
-                let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
-
-                Vitest
-                    .expect(tryGetAbsoluteItemPath (Some "C:\\arc-root") item)
-                    .toEqual (Some "C:/arc-root/assays/AssayA/protocol.md")
-        )
-
-        Vitest.test (
             "relative copy path resolver keeps filetree paths relative",
             fun () ->
                 let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
 
-                Vitest.expect(tryGetRelativeItemPath item).toEqual (Some "assays/AssayA/protocol.md")
+                Vitest.expect(tryGetNonEmptyItemRelativePath item).toEqual (Some "assays/AssayA/protocol.md")
         )
 
         Vitest.test (
@@ -217,7 +237,17 @@ Vitest.describe (
             fun () ->
                 let item = createFileItem "virtual.md" None
 
-                Vitest.expect(tryGetRelativeItemPath item).toEqual (None)
+                Vitest.expect(tryGetNonEmptyItemRelativePath item).toEqual (None)
+        )
+
+        Vitest.test (
+            "full path copy resolver combines the renderer ARC root and relative path",
+            fun () ->
+                let item = createFileItem "protocol.md" (Some "assays/AssayA/protocol.md")
+
+                Vitest
+                    .expect(tryGetItemAbsolutePath (Some "C:/Arc") item)
+                    .toEqual (Some "C:/Arc/assays/AssayA/protocol.md")
         )
 
         Vitest.test (
@@ -604,7 +634,7 @@ Vitest.describe (
                 let! assayContainer, assayCleanup =
                     let availableDestinations = assignableAssetDestinationsForTarget assayTarget
 
-                    FileTreeAssignNoteAssetSelector.Main(
+                    AssignNoteAssetSelector.AssignNoteAssetSelector(
                         assets,
                         availableDestinations,
                         createDefaultAssetDestinations availableDestinations assets,
@@ -630,7 +660,7 @@ Vitest.describe (
                 let! studyContainer, studyCleanup =
                     let availableDestinations = assignableAssetDestinationsForTarget studyTarget
 
-                    FileTreeAssignNoteAssetSelector.Main(
+                    AssignNoteAssetSelector.AssignNoteAssetSelector(
                         assets,
                         availableDestinations,
                         createDefaultAssetDestinations availableDestinations assets,
@@ -679,7 +709,7 @@ Vitest.describe (
                 let updates = ResizeArray<string * AssignNoteAssetDestination option>()
 
                 let! container, cleanup =
-                    FileTreeAssignNoteAssetSelector.Main(
+                    AssignNoteAssetSelector.AssignNoteAssetSelector(
                         assets,
                         availableDestinations,
                         assetDestinations,
@@ -755,7 +785,7 @@ Vitest.describe (
 
                 let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
 
-                let copyRequests = ResizeArray<CopyPathRequest>()
+                let copyRequests = ResizeArray<CopyFileSystemItemRequest>()
                 let moveRequests = ResizeArray<MovePathRequest>()
                 let mutable closed = false
 
@@ -763,7 +793,7 @@ Vitest.describe (
                     closeDialog = fun () -> closed <- true
                     setIsAssigning = ignore
                     refreshGitStatus = ignore
-                    copyPath =
+                    copyFileSystemItem =
                         fun request -> promise {
                             copyRequests.Add request
                             return Ok()
@@ -799,6 +829,7 @@ Vitest.describe (
 
                 Vitest.expect(copyRequests.[0].sourceRelativePath).toBe ("notes/2026-06-15/Sampling_protocol")
                 Vitest.expect(copyRequests.[0].targetRelativePath).toBe ("assays/AssayA/protocols/Sampling_protocol")
+                Vitest.expect(copyRequests.[0].overwrite).toBe (true)
 
                 Vitest
                     .expect(moveRequests.[0].sourceRelativePath)
@@ -808,7 +839,71 @@ Vitest.describe (
                     .expect(moveRequests.[0].targetRelativePath)
                     .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
 
+                Vitest.expect(moveRequests.[0].overwrite).toBe (true)
                 Vitest.expect(moveRequests.Count).toBe (1)
+            }
+        )
+
+        Vitest.test (
+            "assignNoteToTarget refreshes the assigned note folder before moving selected assets",
+            fun () -> promise {
+                let target = {
+                    Name = "AssayA"
+                    Kind = NotesTargetKind.Assay
+                }
+
+                let note = assignableNote "notes/2026-06-15/Sampling_protocol" "Sampling_protocol"
+
+                let copyRequests = ResizeArray<CopyFileSystemItemRequest>()
+                let moveRequests = ResizeArray<MovePathRequest>()
+
+                let errors =
+                    ResizeArray<Swate.Components.Primitive.ErrorModal.Types.ErrorModalRequest>()
+
+                let mutable closed = false
+
+                let config: AssignNoteConfig = {
+                    closeDialog = fun () -> closed <- true
+                    setIsAssigning = ignore
+                    refreshGitStatus = ignore
+                    copyFileSystemItem =
+                        fun request -> promise {
+                            copyRequests.Add request
+                            return Ok()
+                        }
+                    movePath =
+                        fun request -> promise {
+                            moveRequests.Add request
+                            return Ok()
+                        }
+                    enqueueError = errors.Add
+                }
+
+                let assets = [
+                    assignableAsset "notes/2026-06-15/Sampling_protocol/assets/data.csv" "data.csv"
+                ]
+
+                let selectedDestinations =
+                    [
+                        "notes/2026-06-15/Sampling_protocol/assets/data.csv", AssignNoteAssetDestination.Dataset
+                    ]
+                    |> Map.ofList
+
+                assignNoteToTarget config target note assets selectedDestinations
+                do! waitUntil ((fun () -> closed && copyRequests.Count = 1 && moveRequests.Count = 1), 50)
+
+                Vitest.expect(errors.Count).toBe (0)
+                Vitest.expect(copyRequests.[0].overwrite).toBe (true)
+
+                Vitest
+                    .expect(moveRequests.[0].sourceRelativePath)
+                    .toBe ("assays/AssayA/protocols/Sampling_protocol/assets/data.csv")
+
+                Vitest
+                    .expect(moveRequests.[0].targetRelativePath)
+                    .toBe ("assays/AssayA/dataset/Sampling_protocol/assets/data.csv")
+
+                Vitest.expect(moveRequests.[0].overwrite).toBe (true)
             }
         )
 

@@ -56,7 +56,7 @@ let useNoteImageFilePickerAdapter (pendingImageAssetsRef: IRefValue<ExternalAsse
     React.useMemo (
         (fun _ ->
             createAssetFilePickerAdapter
-                Api.ipcArcVaultApi.pickImagePaths
+                Api.ipcArcVaultApi.pickExternalFilePaths
                 NoteConversion.noteAssetsFolderName
                 (fun asset -> pendingImageAssetsRef.current <- pendingImageAssetsRef.current @ [ asset ])
         ),

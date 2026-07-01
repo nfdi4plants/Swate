@@ -71,28 +71,12 @@ let CreateARCitectNavbar
         ]
     )
 
-[<Literal>]
-let private NewTablePrefix = "NewTable"
-
 let private canCreateTables (arcFile: ArcFiles) =
     match arcFile with
     | ArcFiles.Assay _
     | ArcFiles.Study _
     | ArcFiles.Run _ -> true
     | _ -> false
-
-let private createNewTableName (tables: ResizeArray<ArcTable>) =
-    let existingNames = tables |> Seq.map (fun t -> t.Name)
-
-    let rec loop ind =
-        let name = NewTablePrefix + string ind
-
-        if Seq.contains name existingNames then
-            loop (ind + 1)
-        else
-            name
-
-    loop 0
 
 [<ReactComponent>]
 let CreateAddRowsFooter (arcFile: ArcFiles) (activeView: PreviewActiveView) (setArcFile: ArcFiles -> unit) =

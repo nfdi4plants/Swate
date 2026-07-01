@@ -44,8 +44,8 @@ module PluginTextInputHelpers =
             | Some lastFile -> [ lastFile ]
             | None -> []
 
-    let private acceptedTypeTokens (activePrompt: MarkdownPromptPlugin option) =
-        activePromptAcceptTypes activePrompt
+    let acceptTypeTokens (acceptTypes: string option) =
+        acceptTypes
         |> Option.defaultValue ""
         |> fun accept ->
             accept.Split(',')
@@ -72,7 +72,7 @@ module PluginTextInputHelpers =
             not (String.IsNullOrWhiteSpace mimeLower) && mimeLower = token
 
     let partitionFilesByAccept (activePrompt: MarkdownPromptPlugin option) (files: MarkdownPromptFile list) =
-        let tokens = acceptedTypeTokens activePrompt
+        let tokens = activePromptAcceptTypes activePrompt |> acceptTypeTokens
 
         if List.isEmpty tokens then
             files, []
@@ -109,17 +109,12 @@ module PluginTextInputHelpers =
                 None
             else
                 Some file.``type``
-        // Browser fallback cannot reliably resolve host filesystem paths.
-        HostPath = None
+        SourceId = None
         BrowserFile = Some file
     }
 
     let resolvePromptFilePath (filePickerAdapter: MarkdownFilePickerAdapter option) (file: MarkdownPromptFile) = promise {
-        // Fallback path strategy when no host resolver is provided.
-        let fallbackPath =
-            match file.HostPath with
-            | Some hostPath when not (String.IsNullOrWhiteSpace hostPath) -> normalizePath hostPath
-            | _ -> file.Name
+        let fallbackPath = file.Name
 
         match filePickerAdapter with
         | Some adapter ->
