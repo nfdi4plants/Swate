@@ -370,6 +370,11 @@ type GroupCard =
             | ProvenanceSide.Input -> "swt:left-full swt:ml-2"
             | ProvenanceSide.Output -> "swt:right-full swt:mr-2"
 
+        let memberPropertyAnchorEdge =
+            match side with
+            | ProvenanceSide.Input -> "swt:top-1/2 swt:left-0 swt:-translate-x-1/2 swt:-translate-y-1/2"
+            | ProvenanceSide.Output -> "swt:top-1/2 swt:right-0 swt:translate-x-1/2 swt:-translate-y-1/2"
+
         let handleSelectionClick (event: Browser.Types.MouseEvent) =
             if SelectionSurface.shouldSelect event then
                 onSelect ()
@@ -616,9 +621,21 @@ type GroupCard =
                                     ParentGroupId = Some group.Id
                                 }
 
+                                let memberPropertyAnchor: ConnectionHandleRef = {
+                                    Kind = ConnectionHandleKind.GroupMemberPropertyAnchor
+                                    Side = side
+                                    Id = member'.SetId
+                                    ParentGroupId = Some group.Id
+                                }
+
                                 Html.li [
                                     prop.className "swt:relative"
                                     prop.children [
+                                        Controls.ConnectionAnchor(
+                                            memberPropertyAnchor,
+                                            memberPropertyAnchorEdge,
+                                            ?debug = debug
+                                        )
                                         Html.div [
                                             prop.className "swt:flex swt:items-center swt:gap-2"
                                             prop.children [

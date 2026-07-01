@@ -119,6 +119,7 @@ module DragDrop =
         match kind with
         | ConnectionHandleKind.GroupCard -> "GroupCard"
         | ConnectionHandleKind.GroupMember -> "GroupMember"
+        | ConnectionHandleKind.GroupMemberPropertyAnchor -> "GroupMemberPropertyAnchor"
         | ConnectionHandleKind.PropertyHeader -> "PropertyHeader"
         | ConnectionHandleKind.PropertyValue -> "PropertyValue"
         | ConnectionHandleKind.GroupPropertyAnchor -> "GroupPropertyAnchor"
@@ -127,6 +128,7 @@ module DragDrop =
         match value with
         | "GroupCard" -> Some ConnectionHandleKind.GroupCard
         | "GroupMember" -> Some ConnectionHandleKind.GroupMember
+        | "GroupMemberPropertyAnchor" -> Some ConnectionHandleKind.GroupMemberPropertyAnchor
         | "PropertyHeader" -> Some ConnectionHandleKind.PropertyHeader
         | "PropertyValue" -> Some ConnectionHandleKind.PropertyValue
         | "GroupPropertyAnchor" -> Some ConnectionHandleKind.GroupPropertyAnchor

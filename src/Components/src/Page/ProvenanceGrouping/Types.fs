@@ -62,6 +62,7 @@ type PanelRatios = { Left: int; Middle: int; Right: int }
 type ConnectionHandleKind =
     | GroupCard
     | GroupMember
+    | GroupMemberPropertyAnchor
     | PropertyHeader
     | PropertyValue
     /// Measurement-only anchor on the property-facing edge of a group card.

@@ -963,6 +963,80 @@ export const ExpandedPropertyValuesConnectValueChipsToMatchingGroups: Story = {
   },
 };
 
+export const ExpandedGroupPropertyConnectorsTargetMatchingMembers: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const groupId = 'output:Species=Arabidopsis';
+
+    await groupByProperty(canvas, 'Output', 'Species');
+
+    const grouped = await waitFor(() => canvas.getByTestId(`provenance-group-Output-${groupId}`));
+    await userEvent.click(within(grouped).getByRole('button', { name: 'Show members' }));
+
+    await waitFor(() => {
+      const speciesKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'))
+        .filter((key) => key.includes('Species') && key.includes('Arabidopsis'));
+
+      expect(speciesKeys.some((key) => key.includes('output-a'))).toBe(true);
+      expect(speciesKeys.some((key) => key.includes('output-b'))).toBe(true);
+      expect(speciesKeys.some((key) => key.includes('output-c'))).toBe(true);
+      expect(speciesKeys.some((key) => key.endsWith(`:${groupId}`))).toBe(false);
+    });
+
+    await expandProperty(canvas, 'Output', 'Species');
+
+    await waitFor(() => {
+      const arabidopsisKeys = connectionKeys(canvas.getAllByTestId('provenance-value-connection'))
+        .filter((key) => key.includes('Species') && key.includes('Arabidopsis'));
+
+      expect(arabidopsisKeys.some((key) => key.includes('output-a'))).toBe(true);
+      expect(arabidopsisKeys.some((key) => key.includes('output-b'))).toBe(true);
+      expect(arabidopsisKeys.some((key) => key.includes('output-c'))).toBe(true);
+      expect(arabidopsisKeys.some((key) => key.endsWith(`:${groupId}`))).toBe(false);
+    });
+  },
+};
+
+export const ConnectedExpandedGroupPropertyConnectorsTargetMatchingMembers: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const inputGroupId = 'input:Replicate=1 | 2';
+    const outputGroupId = 'output:Replicate=1 | 2';
+
+    for (let attempt = 0; attempt < 3 && !canvas.queryByTestId(`provenance-group-Input-${inputGroupId}`); attempt += 1) {
+      await showPropertyControls(canvas, 'Output', 'Replicate');
+      fireEvent.click(canvas.getByTestId('provenance-property-both-Output-Replicate'));
+      await waitFor(() => expect(canvas.queryByTestId(`provenance-group-Input-${inputGroupId}`)).toBeInTheDocument(), {
+        timeout: 1000,
+      }).catch(() => undefined);
+    }
+
+    await waitFor(() => {
+      expect(canvas.getByTestId(`provenance-group-Input-${inputGroupId}`)).toBeInTheDocument();
+      expect(canvas.getByTestId(`provenance-group-Output-${outputGroupId}`)).toBeInTheDocument();
+    }, { timeout: 6000 });
+
+    const inputGroup = await waitFor(() => canvas.getByTestId(`provenance-group-Input-${inputGroupId}`));
+
+    await userEvent.click(within(inputGroup).getByRole('button', { name: 'Show members' }));
+
+    await waitFor(() => {
+      const outputGroup = canvas.getByTestId(`provenance-group-Output-${outputGroupId}`);
+      expect(within(outputGroup).getByTestId('provenance-group-member-Output-output-b')).toBeInTheDocument();
+    });
+
+    await waitFor(() => {
+      const replicateKeys = connectionKeys(canvas.getAllByTestId('provenance-property-connection'))
+        .filter((key) => key.includes('Output') && key.includes('Replicate') && key.includes('1 | 2'));
+
+      expect(replicateKeys.some((key) => key.includes('output-b'))).toBe(true);
+      expect(replicateKeys.some((key) => key.endsWith(`:${outputGroupId}`))).toBe(false);
+    });
+  },
+};
+
 export const CollapsedPropertiesConnectToMatchingGroupsAutomatically: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

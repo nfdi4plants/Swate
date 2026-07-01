@@ -142,6 +142,13 @@ module private ConnectorHandles =
         ParentGroupId = Some groupId
     }
 
+    let memberPropertyAnchor side groupId setId : ConnectionHandleRef = {
+        Kind = ConnectionHandleKind.GroupMemberPropertyAnchor
+        Side = side
+        Id = setId
+        ParentGroupId = Some groupId
+    }
+
     let propertyHeader side header : ConnectionHandleRef = {
         Kind = ConnectionHandleKind.PropertyHeader
         Side = side
@@ -353,11 +360,41 @@ module private ConnectorPaths =
         member'.PropertyValueIds
         |> List.exists (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId |> Option.exists predicate)
 
-    let private groupsMatching model predicate groups =
-        groups
-        |> List.filter (fun (group: DisplayGroup) ->
-            group.Members |> List.exists (memberHasMatchingValue model predicate)
-        )
+    type private RailConnectionTarget = {
+        KeySuffix: string
+        Handle: ConnectionHandleRef
+    }
+
+    let private matchingMembers model predicate (group: DisplayGroup) =
+        group.Members |> List.filter (memberHasMatchingValue model predicate)
+
+    let private railConnectionTargets
+        model
+        inputGroups
+        outputGroups
+        connections
+        predicate
+        side
+        overlayState
+        (group: DisplayGroup)
+        =
+        let members = matchingMembers model predicate group
+
+        if members.IsEmpty then
+            []
+        elif isGroupExpanded inputGroups outputGroups connections side group.Id overlayState then
+            members
+            |> List.map (fun member' -> {
+                KeySuffix = $"{group.Id}:{member'.SetId}"
+                Handle = ConnectorHandles.memberPropertyAnchor side group.Id member'.SetId
+            })
+        else
+            [
+                {
+                    KeySuffix = group.Id
+                    Handle = ConnectorHandles.propertyAnchor side group.Id
+                }
+            ]
 
     /// Dashed rail connectors derived from model data only: collapsed properties
     /// draw one line per same-side group containing any value for that property.
@@ -365,6 +402,9 @@ module private ConnectorPaths =
         context
         layerId
         (model: ProvenanceModel)
+        inputGroups
+        outputGroups
+        connections
         side
         groups
         (railProjection: PropertyRails.RailProjection)
@@ -380,15 +420,25 @@ module private ConnectorPaths =
                 |> Option.bind id
                 |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
 
-            groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
-            |> List.choose (fun group ->
+            groups
+            |> List.collect (
+                railConnectionTargets
+                    model
+                    inputGroups
+                    outputGroups
+                    connections
+                    (fun propertyValue -> propertyValue.Header = header)
+                    side
+                    overlayState
+            )
+            |> List.choose (fun target ->
                 ConnectorMeasure.pathBetweenDistantHandles
                     context
                     (ConnectorHandles.propertyHeader side header)
-                    (ConnectorHandles.propertyAnchor side group.Id)
+                    target.Handle
                 |> Option.map (
                     measured
-                        $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{group.Id}"
+                        $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{target.KeySuffix}"
                         "provenance-property-connection"
                         "swt:text-secondary swt:pointer-events-none"
                         1.75
@@ -409,6 +459,9 @@ module private ConnectorPaths =
         context
         layerId
         (model: ProvenanceModel)
+        inputGroups
+        outputGroups
+        connections
         side
         groups
         (railProjection: PropertyRails.RailProjection)
@@ -428,15 +481,25 @@ module private ConnectorPaths =
             |> Map.tryFind header
             |> Option.defaultValue []
             |> List.collect (fun propertyValue ->
-                groupsMatching model (propertyValueMatches header propertyValue.Value propertyValue.Unit) groups
-                |> List.choose (fun group ->
+                groups
+                |> List.collect (
+                    railConnectionTargets
+                        model
+                        inputGroups
+                        outputGroups
+                        connections
+                        (propertyValueMatches header propertyValue.Value propertyValue.Unit)
+                        side
+                        overlayState
+                )
+                |> List.choose (fun target ->
                     ConnectorMeasure.pathBetweenDistantHandles
                         context
                         (ConnectorHandles.propertyValue side propertyValue.Id)
-                        (ConnectorHandles.propertyAnchor side group.Id)
+                        target.Handle
                     |> Option.map (
                         measured
-                            $"value:{side}:{DragDrop.propertyHeaderIdentity header}:{Formatting.formatValue propertyValue.Value propertyValue.Unit}:{group.Id}"
+                            $"value:{side}:{DragDrop.propertyHeaderIdentity header}:{Formatting.formatValue propertyValue.Value propertyValue.Unit}:{target.KeySuffix}"
                             "provenance-value-connection"
                             "swt:text-accent swt:pointer-events-none"
                             2.0
@@ -455,6 +518,7 @@ module private ConnectorPaths =
         model
         inputGroups
         outputGroups
+        connections
         inputRailProjection
         outputRailProjection
         (colorByHeader: Map<ProvenancePropertyHeader, string option>)
@@ -468,6 +532,9 @@ module private ConnectorPaths =
                         context
                         layerId
                         model
+                        inputGroups
+                        outputGroups
+                        connections
                         ProvenanceSide.Input
                         inputGroups
                         inputRailProjection
@@ -479,6 +546,9 @@ module private ConnectorPaths =
                         context
                         layerId
                         model
+                        inputGroups
+                        outputGroups
+                        connections
                         ProvenanceSide.Output
                         outputGroups
                         outputRailProjection
@@ -489,6 +559,9 @@ module private ConnectorPaths =
                     context
                     layerId
                     model
+                    inputGroups
+                    outputGroups
+                    connections
                     ProvenanceSide.Input
                     inputGroups
                     inputRailProjection
@@ -499,6 +572,9 @@ module private ConnectorPaths =
                     context
                     layerId
                     model
+                    inputGroups
+                    outputGroups
+                    connections
                     ProvenanceSide.Output
                     outputGroups
                     outputRailProjection
@@ -544,6 +620,7 @@ module private ConnectorPaths =
                     model
                     inputGroups
                     outputGroups
+                    connections
                     inputRailProjection
                     outputRailProjection
                     colorByHeader
