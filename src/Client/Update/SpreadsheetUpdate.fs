@@ -201,7 +201,9 @@ module Spreadsheet =
 
                 state, model, cmd
             | CutCell index ->
-                let nextState = Swate.Components.JsBindings.Clipboard.cutCellByIndex clipboardTableApi index state
+                let nextState =
+                    Swate.Components.JsBindings.Clipboard.cutCellByIndex clipboardTableApi index state
+
                 nextState, model, Cmd.none
             | PasteCell index ->
                 let cmd =
