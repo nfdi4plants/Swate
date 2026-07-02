@@ -19,7 +19,21 @@ module ConnectorSvg =
             svg.custom ("data-provenance-connection-key", measured.Key)
     ]
 
-    let strokeElements (measured: MeasuredConnector) strokeWidth strokeOpacity debug =
+    /// Paths are also written as the CSS `d` property so discrete layout changes can
+    /// morph the curve instead of snapping; continuous tracking (scroll, drags) keeps
+    /// `animate = false` and snaps per frame. Browsers without CSS `d` fall back to
+    /// the attribute and simply skip the morph.
+    let pathStyle (path: string) (animate: bool) =
+        createObj [
+            "d" ==> $"path('{path}')"
+            "transition"
+            ==> (if animate then
+                     "d 160ms ease, stroke-width 120ms ease, stroke-opacity 120ms ease"
+                 else
+                     "stroke-width 120ms ease, stroke-opacity 120ms ease")
+        ]
+
+    let strokeElements (measured: MeasuredConnector) strokeWidth strokeOpacity animate debug =
         let strokeColor = measured.Color |> Option.defaultValue "currentColor"
         let debugAttributes = debugAttributes debug measured
 
@@ -27,6 +41,7 @@ module ConnectorSvg =
             // A surface-colored halo keeps crossing connectors readable.
             Svg.path [
                 svg.d measured.Path
+                svg.custom ("style", pathStyle measured.Path animate)
                 svg.fill "none"
                 svg.stroke "currentColor"
                 svg.strokeWidth (strokeWidth + 2.5)
@@ -38,6 +53,7 @@ module ConnectorSvg =
             ]
             Svg.path [
                 svg.d measured.Path
+                svg.custom ("style", pathStyle measured.Path animate)
                 svg.fill "none"
                 svg.stroke strokeColor
                 svg.strokeWidth strokeWidth

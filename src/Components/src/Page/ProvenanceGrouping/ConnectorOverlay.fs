@@ -33,7 +33,7 @@ type ConnectorOverlay =
             Svg.svg [
                 svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
                 svg.children [
-                    yield! ConnectorSvg.strokeElements measured measured.StrokeWidth 1.0 (defaultArg debug false)
+                    yield! ConnectorSvg.strokeElements measured measured.StrokeWidth 1.0 false (defaultArg debug false)
                 ]
             ]
         | None -> Html.none
@@ -58,9 +58,15 @@ type ConnectorOverlay =
             ?debug: bool,
             ?railColorByHeader: Map<ProvenancePropertyHeader, string option>
         ) =
-        let paths, setPaths = React.useStateWithUpdater ([]: MeasuredConnector list)
+        let measuredState, setMeasuredState =
+            React.useStateWithUpdater ((([]: MeasuredConnector list), false))
+
         let hoveredKey, setHoveredKey = React.useState<string option> None
         let pendingFrame = React.useRef (None: float option)
+
+        // Discrete data/layout changes morph paths to their new shape; continuous
+        // sources (scroll, resize, drag-driven mutations) snap per frame instead.
+        let animateNextMeasure = React.useRef false
         let debugEnabled = defaultArg debug false
 
         let colorByHeader =
@@ -102,17 +108,25 @@ type ConnectorOverlay =
         let latestSpecs = React.useRef specs
         latestSpecs.current <- specs
 
-        let setMeasuredPaths next =
-            setPaths (fun current -> if current = next then current else next)
+        let setMeasuredPaths animate next =
+            setMeasuredState (fun (current, currentAnimate) ->
+                if current = next then
+                    (current, currentAnimate)
+                else
+                    (next, animate)
+            )
 
         let measureNow () =
             pendingFrame.current <- None
+            let animate = animateNextMeasure.current
+            animateNextMeasure.current <- false
 
             match containerRef.current with
-            | None -> setMeasuredPaths []
+            | None -> setMeasuredPaths false []
             | Some container ->
                 let context = ConnectorMeasure.createContext container
-                ConnectorPaths.measure context latestSpecs.current |> setMeasuredPaths
+
+                ConnectorPaths.measure context latestSpecs.current |> setMeasuredPaths animate
 
         let scheduleMeasure () =
             match pendingFrame.current with
@@ -191,11 +205,25 @@ type ConnectorOverlay =
 
         // Spec changes measure synchronously so connectors track data edits within
         // the same committed frame, exactly like the previous effect did.
-        React.useEffect (measureNow, [| box specs |])
+        React.useEffect (
+            (fun () ->
+                animateNextMeasure.current <- true
+                measureNow ()
+            ),
+            [| box specs |]
+        )
 
-        React.useEffect ((fun () -> scheduleMeasure ()), [| box layoutSignature |])
+        React.useEffect (
+            (fun () ->
+                animateNextMeasure.current <- true
+                scheduleMeasure ()
+            ),
+            [| box layoutSignature |]
+        )
 
         let selectedConnectionId = overlayState.SelectedConnectionId
+        let paths, measuredWithAnimation = measuredState
+        let animatePaths = measuredWithAnimation && not (Motion.prefersReduced ())
 
         React.Fragment [
             Svg.svg [
@@ -244,13 +272,20 @@ type ConnectorOverlay =
                         Svg.g [
                             svg.key measured.Key
                             svg.children [
-                                yield! ConnectorSvg.strokeElements measured strokeWidth strokeOpacity debugEnabled
+                                yield!
+                                    ConnectorSvg.strokeElements
+                                        measured
+                                        strokeWidth
+                                        strokeOpacity
+                                        animatePaths
+                                        debugEnabled
                                 // A wide transparent stroke is the actual pointer/keyboard target,
                                 // so selecting a thin curve no longer needs pixel accuracy.
                                 match measured.InteractiveConnection with
                                 | Some connection ->
                                     Svg.path [
                                         svg.d measured.Path
+                                        svg.custom ("style", ConnectorSvg.pathStyle measured.Path animatePaths)
                                         svg.fill "none"
                                         svg.stroke "transparent"
                                         svg.strokeWidth 14
