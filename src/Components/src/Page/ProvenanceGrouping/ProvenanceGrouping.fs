@@ -1114,12 +1114,15 @@ type ProvenanceGrouping =
                 |]
             )
 
+        // Keying the surface by layer remounts it on layer switches, so the change
+        // fades in as one deliberate transition instead of flashing in place.
         let surface =
             match tier with
             | LayoutTier.Wide ->
                 Html.div [
+                    prop.key layer.Id
                     prop.ref surfaceRef
-                    prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start"
+                    prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start swt:motion-fade-in"
                     prop.style [
                         style.custom ("gridTemplateColumns", Splitter.template panelRatios)
                     ]
@@ -1171,8 +1174,10 @@ type ProvenanceGrouping =
                         "auto"
 
                 Html.div [
+                    prop.key layer.Id
                     prop.ref surfaceRef
-                    prop.className "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start swt:gap-x-8"
+                    prop.className
+                        "swt:relative swt:mx-4 swt:grid swt:min-w-0 swt:items-start swt:gap-x-8 swt:motion-fade-in"
                     prop.style [
                         style.custom (
                             "gridTemplateColumns",
@@ -1199,8 +1204,10 @@ type ProvenanceGrouping =
                 // Stacked cards cannot host readable connector curves; connection
                 // badges on the cards carry that information instead.
                 Html.div [
+                    prop.key layer.Id
                     prop.ref surfaceRef
-                    prop.className "swt:relative swt:mx-4 swt:flex swt:min-w-0 swt:flex-col swt:gap-4"
+                    prop.className
+                        "swt:relative swt:mx-4 swt:flex swt:min-w-0 swt:flex-col swt:gap-4 swt:motion-fade-in"
                     if debug then
                         prop.testId "provenance-surface"
                     prop.children [
