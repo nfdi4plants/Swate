@@ -55,13 +55,19 @@ module EditorLookups =
 
             groups |> List.tryFind (fun (group: DisplayGroup) -> group.Id = groupId)
 
+        // Built lazily and at most once per lookups instance; drag handlers call
+        // FindHeader repeatedly and must not rescan the whole model each time.
+        let knownHeaders =
+            lazy
+                ([
+                    yield! PropertyRails.headersForModel layer.Model
+                    yield! State.Palette.headersForSide layer.Id ProvenanceSide.Input uiState
+                    yield! State.Palette.headersForSide layer.Id ProvenanceSide.Output uiState
+                 ]
+                 |> List.distinct)
+
         let findHeader headerId =
-            [
-                yield! PropertyRails.headersForModel layer.Model
-                yield! State.Palette.headersForSide layer.Id ProvenanceSide.Input uiState
-                yield! State.Palette.headersForSide layer.Id ProvenanceSide.Output uiState
-            ]
-            |> List.distinct
+            knownHeaders.Value
             |> List.tryFind (fun header -> DragDrop.propertyHeaderIdentity header = headerId)
 
         let findPropertyValue propertyValueId =

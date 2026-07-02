@@ -105,31 +105,6 @@ module PropertyRails =
     let private railPlacement layerId header (uiState: UiState) =
         uiState.PropertyRailPlacements |> Map.tryFind (layerId, { Header = header })
 
-    let private hasPaletteHeaderForSide layerId side header uiState =
-        State.Palette.headersForSide layerId side uiState |> List.contains header
-
-    let private hasPaletteHeader layerId header uiState =
-        hasPaletteHeaderForSide layerId ProvenanceSide.Input header uiState
-        || hasPaletteHeaderForSide layerId ProvenanceSide.Output header uiState
-
-    let private defaultRailSide header model =
-        if hasHeaderForSide ProvenanceSide.Output header model then
-            Some ProvenanceSide.Output
-        elif hasHeaderForSide ProvenanceSide.Input header model then
-            Some ProvenanceSide.Input
-        else
-            None
-
-    let private referencedPropertyValuesForHeader header model =
-        [
-            yield! setsForSide ProvenanceSide.Input model |> Map.toList
-            yield! setsForSide ProvenanceSide.Output model |> Map.toList
-        ]
-        |> List.collect (fun (_, set) -> ProvenanceSet.effectivePropertyValueIds set)
-        |> List.distinct
-        |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
-        |> List.filter (fun propertyValue -> propertyValue.Header = header)
-
     let private anchorOfOrigin =
         function
         | ProvenancePropertyOrigin.Real anchor -> anchor
@@ -137,49 +112,170 @@ module PropertyRails =
 
     let private sourceOfOrigin origin = (anchorOfOrigin origin).Source
 
-    let private hasPreviousOrigin _session _layerId header model =
-        referencedPropertyValuesForHeader header model
-        |> List.exists (fun propertyValue -> (sourceOfOrigin propertyValue.Origin).Id <> model.Source.Id)
+    /// One-pass caches over a side's sets. Rail projection asks per-header questions
+    /// (values, stats, origins, connection counts) for every header, so the shared
+    /// scans are hoisted here instead of re-reading all sets per header.
+    type SideIndex = {
+        SetCount: int
+        /// Id-distinct property values for the side, in set iteration order.
+        Values: ProvenancePropertyValue list
+        ValuesByHeader: Map<ProvenancePropertyHeader, ProvenancePropertyValue list>
+        HeaderSet: Set<ProvenancePropertyHeader>
+        DistinctValueCountByHeader: Map<ProvenancePropertyHeader, int>
+        SetsWithValueCountByHeader: Map<ProvenancePropertyHeader, int>
+        HeadersBySetId: Map<ProvenanceSetId, Set<ProvenancePropertyHeader>>
+    }
 
-    let private defaultRailSideInSession session layerId header model =
-        if hasPreviousOrigin session layerId header model then
-            Some ProvenanceSide.Input
-        else
-            defaultRailSide header model
+    let buildSideIndex side (model: ProvenanceModel) : SideIndex =
+        let sets = setsForSide side model |> Map.toList
 
-    let private isValidRailSide layerId side header model uiState =
-        headersForModel model |> List.contains header
-        || hasPaletteHeader layerId header uiState
+        let resolvedBySet =
+            sets
+            |> List.map (fun (setId, set) ->
+                setId,
+                ProvenanceSet.effectivePropertyValueIds set
+                |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
+            )
 
-    let private propertyRailHeadersForSideUsing defaultSideForHeader layerId side model uiState =
+        let values =
+            sets
+            |> List.collect (fun (_, set) -> ProvenanceSet.effectivePropertyValueIds set)
+            |> List.distinct
+            |> List.choose (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId)
+
+        let valuesByHeader =
+            values |> List.groupBy (fun propertyValue -> propertyValue.Header) |> Map.ofList
+
+        let distinctValueCountByHeader =
+            resolvedBySet
+            |> List.collect (fun (_, resolved) ->
+                resolved
+                |> List.map (fun propertyValue -> propertyValue.Header, (propertyValue.Value, propertyValue.Unit))
+            )
+            |> List.distinct
+            |> List.countBy fst
+            |> Map.ofList
+
+        let setsWithValueCountByHeader =
+            resolvedBySet
+            |> List.collect (fun (_, resolved) ->
+                resolved
+                |> List.map (fun propertyValue -> propertyValue.Header)
+                |> List.distinct
+            )
+            |> List.countBy id
+            |> Map.ofList
+
+        let headersBySetId =
+            resolvedBySet
+            |> List.map (fun (setId, resolved) ->
+                setId, resolved |> List.map (fun propertyValue -> propertyValue.Header) |> Set.ofList
+            )
+            |> Map.ofList
+
+        {
+            SetCount = sets.Length
+            Values = values
+            ValuesByHeader = valuesByHeader
+            HeaderSet = valuesByHeader |> Map.toList |> List.map fst |> Set.ofList
+            DistinctValueCountByHeader = distinctValueCountByHeader
+            SetsWithValueCountByHeader = setsWithValueCountByHeader
+            HeadersBySetId = headersBySetId
+        }
+
+    /// Same result as headersForSide, read from a prebuilt index.
+    let headersFromIndex (index: SideIndex) =
+        index.Values
+        |> List.map (fun propertyValue -> propertyValue.Header)
+        |> List.distinct
+        |> List.sortBy (fun header -> header.Category.Name)
+
+    /// Same rail-side selection as before, but every per-header question is answered
+    /// from the prebuilt side indexes instead of rescanning the model.
+    let propertyRailHeadersFromIndexes
+        (inputIndex: SideIndex)
+        (outputIndex: SideIndex)
+        layerId
+        side
+        (model: ProvenanceModel)
+        uiState
+        =
+        let modelHeaders =
+            [
+                yield! headersFromIndex inputIndex
+                yield! headersFromIndex outputIndex
+            ]
+            |> List.distinct
+            |> List.sortBy (fun header -> header.Category.Name)
+
+        let modelHeaderSet = Set.ofList modelHeaders
+
+        let paletteInputSet =
+            State.Palette.headersForSide layerId ProvenanceSide.Input uiState |> Set.ofList
+
+        let paletteOutputSet =
+            State.Palette.headersForSide layerId ProvenanceSide.Output uiState |> Set.ofList
+
         let paletteHeaders = State.Palette.headersForSide layerId side uiState
 
+        let paletteSetFor paletteSide =
+            if paletteSide = ProvenanceSide.Input then
+                paletteInputSet
+            else
+                paletteOutputSet
+
+        let hasPalette header =
+            paletteInputSet.Contains header || paletteOutputSet.Contains header
+
+        let currentSourceId = model.Source.Id
+
+        let hasPreviousOriginIndexed header =
+            let hasUpstream (index: SideIndex) =
+                index.ValuesByHeader
+                |> Map.tryFind header
+                |> Option.exists (
+                    List.exists (fun propertyValue -> (sourceOfOrigin propertyValue.Origin).Id <> currentSourceId)
+                )
+
+            hasUpstream inputIndex || hasUpstream outputIndex
+
+        let defaultSideForHeader header =
+            if hasPreviousOriginIndexed header then
+                Some ProvenanceSide.Input
+            elif outputIndex.HeaderSet.Contains header then
+                Some ProvenanceSide.Output
+            elif inputIndex.HeaderSet.Contains header then
+                Some ProvenanceSide.Input
+            else
+                None
+
         let knownHeaders =
-            [ yield! headersForModel model; yield! paletteHeaders ] |> List.distinct
+            [ yield! modelHeaders; yield! paletteHeaders ] |> List.distinct |> Set.ofList
+
+        let isValidRailSide header =
+            modelHeaderSet.Contains header || hasPalette header
 
         [
-            yield! headersForModel model
+            yield! modelHeaders
             yield! placedHeadersForSide layerId side uiState
             yield! paletteHeaders
         ]
         |> List.distinct
-        |> List.filter (fun header -> knownHeaders |> List.contains header)
+        |> List.filter (fun header -> knownHeaders.Contains header)
         |> List.filter (fun header ->
             match railPlacement layerId header uiState with
-            | Some targetSide when isValidRailSide layerId targetSide header model uiState -> targetSide = side
-            | Some _ ->
-                defaultSideForHeader header = Some side
-                || hasPaletteHeaderForSide layerId side header uiState
+            | Some targetSide when isValidRailSide header -> targetSide = side
+            | Some _ -> defaultSideForHeader header = Some side || (paletteSetFor side).Contains header
             | None ->
                 defaultSideForHeader header = Some side
-                || (defaultSideForHeader header).IsNone
-                   && hasPaletteHeaderForSide layerId side header uiState
+                || (defaultSideForHeader header).IsNone && (paletteSetFor side).Contains header
         )
         |> List.sortBy (fun header -> header.Category.Name)
 
-    let propertyRailHeadersForSideInSession session layerId side model uiState =
-        propertyRailHeadersForSideUsing
-            (fun header -> defaultRailSideInSession session layerId header model)
+    let propertyRailHeadersForSideInSession _session layerId side model uiState =
+        propertyRailHeadersFromIndexes
+            (buildSideIndex ProvenanceSide.Input model)
+            (buildSideIndex ProvenanceSide.Output model)
             layerId
             side
             model
@@ -415,30 +511,97 @@ module PropertyProjection =
         : PropertyRails.RailProjection =
         let filters = uiState.Filters
 
+        let inputIndex = PropertyRails.buildSideIndex ProvenanceSide.Input model
+        let outputIndex = PropertyRails.buildSideIndex ProvenanceSide.Output model
+
+        let sideIndex =
+            if side = ProvenanceSide.Input then
+                inputIndex
+            else
+                outputIndex
+
         let headers =
-            PropertyRails.propertyRailHeadersForSideInSession session layerId side model uiState
+            PropertyRails.propertyRailHeadersFromIndexes inputIndex outputIndex layerId side model uiState
+
+        let modelValuesForHeader header =
+            sideIndex.ValuesByHeader |> Map.tryFind header |> Option.defaultValue []
+
+        let paletteValuesForHeader header =
+            State.Palette.valuesForHeader layerId side header uiState
 
         let valuesByHeader =
             headers
             |> List.map (fun header ->
-                header, PropertyRails.propertyValuesForSideHeader layerId side header model uiState
+                let merged = [
+                    yield! modelValuesForHeader header
+                    yield! paletteValuesForHeader header
+                ]
+
+                header,
+                merged
+                |> List.groupBy (fun propertyValue -> propertyValue.Value, propertyValue.Unit)
+                |> List.map (fun (_, values) -> values |> List.sortBy (fun value -> value.Id) |> List.head)
+                |> List.sortBy (fun propertyValue -> Formatting.formatValue propertyValue.Value propertyValue.Unit)
             )
             |> Map.ofList
 
         let statsByHeader =
             headers
-            |> List.map (fun header -> header, propertyStatsForSide side header model)
+            |> List.map (fun header ->
+                header,
+                {
+                    Header = header
+                    DistinctValueCount =
+                        sideIndex.DistinctValueCountByHeader
+                        |> Map.tryFind header
+                        |> Option.defaultValue 0
+                    SetsWithValueCount =
+                        sideIndex.SetsWithValueCountByHeader
+                        |> Map.tryFind header
+                        |> Option.defaultValue 0
+                    TotalSetCount = sideIndex.SetCount
+                }
+            )
             |> Map.ofList
 
         let connectionCountsByHeader =
+            let countedHeaders =
+                model.Connections
+                |> Map.toList
+                |> List.collect (fun (_, connection) ->
+                    if connection.Source.Id <> model.Source.Id then
+                        []
+                    else
+                        let setId =
+                            match side with
+                            | ProvenanceSide.Input -> connection.InputSetId
+                            | ProvenanceSide.Output -> connection.OutputSetId
+
+                        sideIndex.HeadersBySetId
+                        |> Map.tryFind setId
+                        |> Option.map Set.toList
+                        |> Option.defaultValue []
+                )
+                |> List.countBy id
+                |> Map.ofList
+
             headers
-            |> List.map (fun header -> header, connectionCountForSideHeader side header model)
+            |> List.map (fun header -> header, countedHeaders |> Map.tryFind header |> Option.defaultValue 0)
             |> Map.ofList
 
         let originByHeader =
             headers
             |> List.map (fun header ->
-                header, PropertyRails.propertyOriginsForSideHeader layerId side header model uiState
+                let origins = [
+                    yield!
+                        modelValuesForHeader header
+                        |> List.map (fun propertyValue -> propertyValue.Origin)
+                    yield!
+                        paletteValuesForHeader header
+                        |> List.map (fun propertyValue -> propertyValue.Origin)
+                ]
+
+                header, Set.ofList origins
             )
             |> Map.ofList
 
@@ -516,7 +679,7 @@ module PropertyProjection =
 
         let canSwitchHeaders =
             sorted
-            |> List.filter (fun header -> PropertyRails.canSwitchHeader header model)
+            |> List.filter (fun header -> inputIndex.HeaderSet.Contains header && outputIndex.HeaderSet.Contains header)
             |> Set.ofList
 
         {
