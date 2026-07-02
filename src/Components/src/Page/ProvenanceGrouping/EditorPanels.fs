@@ -161,7 +161,7 @@ module EditorPanels =
             | Some conn ->
                 Html.div [
                     prop.className
-                        "swt:mx-4 swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3"
+                        "swt:mx-4 swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3 swt:motion-pop-in"
                     if debug then
                         prop.testId "provenance-connection-details"
                     prop.children [

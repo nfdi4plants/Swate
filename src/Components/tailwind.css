@@ -256,6 +256,13 @@
     }
 }
 
+@keyframes swt-motion-pop-in {
+    from {
+        opacity: 0;
+        transform: translateY(-4px);
+    }
+}
+
 @layer swt-utilities {
     .swt\:connector-draw-in {
         stroke-dasharray: 1;
@@ -271,10 +278,23 @@
         animation: swt-connector-flow 450ms linear infinite;
     }
 
+    /* Entry animations for expanding editor content. fade-in is opacity-only and is
+       used for containers holding connector anchors, so measured positions stay
+       truthful; pop-in adds a small slide for anchor-free content. */
+    .swt\:motion-fade-in {
+        animation: swt-motion-fade-in 180ms ease-out;
+    }
+
+    .swt\:motion-pop-in {
+        animation: swt-motion-pop-in 180ms ease-out;
+    }
+
     @media (prefers-reduced-motion: reduce) {
         .swt\:connector-draw-in,
         .swt\:connector-fade-in,
-        .swt\:connector-flow {
+        .swt\:connector-flow,
+        .swt\:motion-fade-in,
+        .swt\:motion-pop-in {
             animation: none;
         }
 

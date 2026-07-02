@@ -312,7 +312,7 @@ type ProvenanceGrouping =
                                     expandedFolderIds = propertyShelfExpandedFolderIds,
                                     onExpandedFolderIdsChange = setPropertyShelfExpandedFolderIds,
                                     onSetFolderColor = setPropertyShelfFolderColor,
-                                    className = "swt:min-w-0",
+                                    className = "swt:min-w-0 swt:motion-pop-in",
                                     debug = debug
                                 )
                         ]

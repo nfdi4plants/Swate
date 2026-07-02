@@ -630,7 +630,9 @@ type Controls =
                 if expanded then
                     Html.div [
                         prop.className [
-                            "swt:flex swt:flex-col swt:gap-1 swt:z-20"
+                            // fade-in only: the chips carry connector anchors, so a slide
+                            // would put the measured positions off during entry.
+                            "swt:flex swt:flex-col swt:gap-1 swt:z-20 swt:motion-fade-in"
                             match side with
                             | ProvenanceSide.Input -> "swt:items-start swt:pl-2"
                             | ProvenanceSide.Output -> "swt:items-end swt:pr-2"
@@ -1084,7 +1086,7 @@ type Controls =
                 | Some info ->
                     Html.div [
                         prop.className
-                            "swt:pointer-events-none swt:absolute swt:left-0 swt:top-full swt:z-30 swt:mt-1 swt:hidden swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg group-hover:swt:block group-focus-within:swt:block"
+                            "swt:pointer-events-none swt:absolute swt:left-0 swt:top-full swt:z-30 swt:mt-1 swt:hidden swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg swt:motion-pop-in group-hover:swt:block group-focus-within:swt:block"
                         prop.children [ Controls.SourceInfoPopover(Some info) ]
                     ]
                 | None -> Html.none
@@ -1198,7 +1200,7 @@ type Controls =
                 | Some info ->
                     Html.div [
                         prop.className
-                            "swt:pointer-events-none swt:absolute swt:left-0 swt:top-full swt:z-30 swt:mt-1 swt:hidden swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg group-hover:swt:block group-focus-within:swt:block"
+                            "swt:pointer-events-none swt:absolute swt:left-0 swt:top-full swt:z-30 swt:mt-1 swt:hidden swt:w-72 swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg swt:motion-pop-in group-hover:swt:block group-focus-within:swt:block"
                         prop.children [ Controls.SourceInfoPopover(Some info) ]
                     ]
                 | None -> Html.none

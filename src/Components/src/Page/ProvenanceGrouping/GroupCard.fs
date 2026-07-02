@@ -608,7 +608,9 @@ type GroupCard =
                 if expanded then
                     Html.ul [
                         prop.className [
-                            "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2"
+                            // fade-in only: the member rows carry connector anchors, so a
+                            // slide would put the measured positions off during entry.
+                            "swt:space-y-1 swt:border-t swt:border-base-300 swt:pt-2 swt:motion-fade-in"
                             match density with
                             | Density.EditorDensity.Compact -> "swt:text-xs"
                             | _ -> "swt:text-sm"
@@ -684,7 +686,7 @@ type GroupCard =
                                                 prop.className [
                                                     // The viewport cap keeps the popover readable when the
                                                     // editor itself is narrower than the preferred width.
-                                                    "swt:absolute swt:top-0 swt:z-30 swt:w-72 swt:max-w-[60vw] swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg"
+                                                    "swt:absolute swt:top-0 swt:z-30 swt:w-72 swt:max-w-[60vw] swt:rounded-md swt:border swt:border-base-300 swt:bg-base-100 swt:p-2 swt:shadow-lg swt:motion-pop-in"
                                                     memberDetailsPosition
                                                 ]
                                                 if defaultArg debug false then
