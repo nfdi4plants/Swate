@@ -125,8 +125,8 @@ module EditorSurface =
         let endpointKindsKey =
             endpointKinds |> List.map Endpoints.endpointKindIdentity |> String.concat "|"
 
-        Html.div [
-            prop.className [
+        let columnClasses =
+            [
                 "swt:@container/provenancePanel swt:flex swt:min-w-0 swt:flex-col swt:gap-3"
                 // Fit-content cards hug the column edge facing their property rail, so
                 // the space between the two card columns stays free for group connectors.
@@ -134,7 +134,14 @@ module EditorSurface =
                 | ProvenanceSide.Input -> "swt:items-start"
                 | ProvenanceSide.Output -> "swt:items-end"
             ]
-            prop.children [
+            |> String.concat " "
+
+        // The FLIP wrapper animates cards to their new positions when grouping,
+        // sorting, or membership changes rearrange the column.
+        FlipColumn.View(
+            columnClasses,
+            "data-provenance-group-node",
+            [
                 Controls.AddEndpointPopover(
                     side,
                     endpointKinds,
@@ -163,9 +170,8 @@ module EditorSurface =
                         prop.className "swt:text-sm swt:text-base-content/60"
                         prop.text "No entries in this layer"
                     ]
-
             ]
-        ]
+        )
 
     let dragOverlay findPropertyValue debug (activeDrag: ActiveDrag option) =
         match activeDrag with
