@@ -62,7 +62,45 @@ type ConnectorOverlay =
         let hoveredKey, setHoveredKey = React.useState<string option> None
         let pendingFrame = React.useRef (None: float option)
         let debugEnabled = defaultArg debug false
-        let colorByHeader = defaultArg railColorByHeader Map.empty
+
+        let colorByHeader =
+            React.useMemo ((fun () -> defaultArg railColorByHeader Map.empty), [| box railColorByHeader |])
+
+        // The logical connector list is pure model/UI derivation; recomputing it on
+        // every observer-driven remeasure made scroll and resize expensive on large
+        // models, so it is memoized here and only the DOM rect reads happen per frame.
+        let specs =
+            React.useMemo (
+                (fun () ->
+                    ConnectorPaths.specs
+                        layerId
+                        model
+                        inputGroups
+                        outputGroups
+                        connections
+                        inputRailProjection
+                        outputRailProjection
+                        colorByHeader
+                        overlayState
+                        showPropertyHeaderConnectors
+                ),
+                [|
+                    box layerId
+                    box model
+                    box inputGroups
+                    box outputGroups
+                    box connections
+                    box inputRailProjection
+                    box outputRailProjection
+                    box colorByHeader
+                    box overlayState.ExpandedGroup
+                    box overlayState.ExpandedProperties
+                    box showPropertyHeaderConnectors
+                |]
+            )
+
+        let latestSpecs = React.useRef specs
+        latestSpecs.current <- specs
 
         let setMeasuredPaths next =
             setPaths (fun current -> if current = next then current else next)
@@ -74,20 +112,7 @@ type ConnectorOverlay =
             | None -> setMeasuredPaths []
             | Some container ->
                 let context = ConnectorMeasure.createContext container
-
-                ConnectorPaths.all
-                    context
-                    layerId
-                    model
-                    inputGroups
-                    outputGroups
-                    connections
-                    inputRailProjection
-                    outputRailProjection
-                    colorByHeader
-                    overlayState
-                    showPropertyHeaderConnectors
-                |> setMeasuredPaths
+                ConnectorPaths.measure context latestSpecs.current |> setMeasuredPaths
 
         let scheduleMeasure () =
             match pendingFrame.current with
@@ -101,77 +126,72 @@ type ConnectorOverlay =
                 pendingFrame.current <- None
             | None -> ()
 
-        React.useEffect (
-            (fun () ->
-                measureNow ()
+        // Layout plumbing is bound once per mount: the surface element identity is
+        // stable across renders, and node churn inside it is picked up by the
+        // mutation observer rather than by re-binding the observers.
+        React.useEffectOnce (fun () ->
+            match containerRef.current with
+            | None -> FsReact.createDisposable cancelPendingFrame
+            | Some container ->
+                let onLayout = fun (_: Event) -> scheduleMeasure ()
+                container.addEventListener ("scroll", onLayout)
+                Browser.Dom.window.addEventListener ("resize", onLayout)
 
-                match containerRef.current with
-                | None -> FsReact.createDisposable cancelPendingFrame
-                | Some container ->
-                    let onLayout = fun (_: Event) -> scheduleMeasure ()
-                    container.addEventListener ("scroll", onLayout)
-                    Browser.Dom.window.addEventListener ("resize", onLayout)
+                let observer = ConnectorObserver.create scheduleMeasure
 
-                    let observer = ConnectorObserver.create scheduleMeasure
+                let observeCurrentNodes () =
+                    ConnectorObserver.observeNode observer container
 
-                    let observeCurrentNodes () =
-                        ConnectorObserver.observeNode observer container
+                    ConnectorObserver.observeMatching
+                        container
+                        "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
+                        observer
 
-                        ConnectorObserver.observeMatching
-                            container
-                            "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
-                            observer
+                let mutationFrame = ref (None: float option)
 
-                    let mutationFrame = ref (None: float option)
+                let cancelMutationFrame () =
+                    match mutationFrame.Value with
+                    | Some handle ->
+                        AnimationFrame.cancel handle
+                        mutationFrame.Value <- None
+                    | None -> ()
 
-                    let cancelMutationFrame () =
-                        match mutationFrame.Value with
-                        | Some handle ->
-                            AnimationFrame.cancel handle
-                            mutationFrame.Value <- None
-                        | None -> ()
-
-                    let scheduleMutationMeasure () =
-                        match mutationFrame.Value with
-                        | Some _ -> ()
-                        | None ->
-                            mutationFrame.Value <-
-                                Some(
-                                    AnimationFrame.request (fun () ->
-                                        mutationFrame.Value <- None
-                                        observeCurrentNodes ()
-                                        scheduleMeasure ()
-                                    )
+                let scheduleMutationMeasure () =
+                    match mutationFrame.Value with
+                    | Some _ -> ()
+                    | None ->
+                        mutationFrame.Value <-
+                            Some(
+                                AnimationFrame.request (fun () ->
+                                    mutationFrame.Value <- None
+                                    observeCurrentNodes ()
+                                    // Measure in the same frame instead of scheduling
+                                    // another one; live panel resizes flow through this
+                                    // path and should trail the layout by one frame at
+                                    // most.
+                                    measureNow ()
                                 )
+                            )
 
-                    let mutationObserver =
-                        ConnectorMutationObserver.create (fun () -> scheduleMutationMeasure ())
+                let mutationObserver =
+                    ConnectorMutationObserver.create (fun () -> scheduleMutationMeasure ())
 
-                    observeCurrentNodes ()
-                    ConnectorMutationObserver.observe mutationObserver container
+                observeCurrentNodes ()
+                ConnectorMutationObserver.observe mutationObserver container
 
-                    FsReact.createDisposable (fun () ->
-                        container.removeEventListener ("scroll", onLayout)
-                        Browser.Dom.window.removeEventListener ("resize", onLayout)
-                        ConnectorObserver.disconnect observer
-                        ConnectorMutationObserver.disconnect mutationObserver
-                        cancelMutationFrame ()
-                        cancelPendingFrame ()
-                    )
-            ),
-            [|
-                box layerId
-                box model
-                box inputGroups
-                box outputGroups
-                box connections
-                box inputRailProjection
-                box outputRailProjection
-                box overlayState.ExpandedGroup
-                box overlayState.ExpandedProperties
-                box showPropertyHeaderConnectors
-            |]
+                FsReact.createDisposable (fun () ->
+                    container.removeEventListener ("scroll", onLayout)
+                    Browser.Dom.window.removeEventListener ("resize", onLayout)
+                    ConnectorObserver.disconnect observer
+                    ConnectorMutationObserver.disconnect mutationObserver
+                    cancelMutationFrame ()
+                    cancelPendingFrame ()
+                )
         )
+
+        // Spec changes measure synchronously so connectors track data edits within
+        // the same committed frame, exactly like the previous effect did.
+        React.useEffect (measureNow, [| box specs |])
 
         React.useEffect ((fun () -> scheduleMeasure ()), [| box layoutSignature |])
 

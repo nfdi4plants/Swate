@@ -11,20 +11,37 @@ open Swate.Components.Primitive.ContextMenu
 open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Page.ProvenanceGrouping.Types
 
-/// Projects model/UI state into concrete connector path definitions.
+/// Projects model/UI state into logical connector specs, and measures specs into
+/// concrete SVG paths. Spec derivation is pure and memoizable; only the measure
+/// step reads the DOM, so layout observers can remeasure cheaply.
 module ConnectorPaths =
 
-    let private measured key testId className strokeWidth strokeDasharray interactiveConnection ariaLabel color path = {
-        Key = key
-        Path = path
-        TestId = testId
-        ClassName = className
-        StrokeWidth = strokeWidth
-        StrokeDasharray = strokeDasharray
-        InteractiveConnection = interactiveConnection
-        AriaLabel = ariaLabel
-        Color = color
-    }
+    let private spec
+        key
+        testId
+        className
+        strokeWidth
+        strokeDasharray
+        interactiveConnection
+        ariaLabel
+        color
+        skipWhenClose
+        source
+        target
+        : ConnectorSpec =
+        {
+            Key = key
+            TestId = testId
+            ClassName = className
+            StrokeWidth = strokeWidth
+            StrokeDasharray = strokeDasharray
+            InteractiveConnection = interactiveConnection
+            AriaLabel = ariaLabel
+            Color = color
+            Source = source
+            Target = target
+            SkipWhenClose = skipWhenClose
+        }
 
     let private groupById (inputGroups: DisplayGroup list) (outputGroups: DisplayGroup list) side groupId =
         let groups =
@@ -72,8 +89,7 @@ module ConnectorPaths =
         ConnectorOverlayState.isGroupExpanded side groupId overlayState
         || isConnectedToExpanded inputGroups outputGroups connections side groupId overlayState
 
-    let groupConnections
-        context
+    let groupConnectionSpecs
         (inputGroups: DisplayGroup list)
         (outputGroups: DisplayGroup list)
         connections
@@ -103,26 +119,22 @@ module ConnectorPaths =
                     overlayState
             )
         )
-        |> List.choose (fun connection ->
-            ConnectorMeasure.pathBetweenHandles
-                context
+        |> List.map (fun connection ->
+            spec
+                $"connection:{connection.Id}"
+                "provenance-connection"
+                "swt:text-primary"
+                2.25
+                None
+                (Some connection)
+                (Some $"Select connection {connection.Id}")
+                None
+                false
                 (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
                 (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
-            |> Option.map (
-                measured
-                    $"connection:{connection.Id}"
-                    "provenance-connection"
-                    "swt:text-primary"
-                    2.25
-                    None
-                    (Some connection)
-                    (Some $"Select connection {connection.Id}")
-                    None
-            )
         )
 
-    let memberConnections
-        context
+    let memberConnectionSpecs
         (model: ProvenanceModel)
         (inputGroups: DisplayGroup list)
         (outputGroups: DisplayGroup list)
@@ -155,7 +167,7 @@ module ConnectorPaths =
                 displayConnection.ConnectionIds
                 |> List.choose (fun connectionId ->
                     model.Connections.TryFind connectionId
-                    |> Option.bind (fun connection ->
+                    |> Option.map (fun connection ->
                         let source =
                             if inputExpanded then
                                 ConnectorHandles.member'
@@ -179,18 +191,18 @@ module ConnectorPaths =
                                 ConnectionIds = [ connectionId ]
                         }
 
-                        ConnectorMeasure.pathBetweenHandles context source target
-                        |> Option.map (
-                            measured
-                                $"member:{displayConnection.Id}:{connectionId}"
-                                "provenance-member-connection"
-                                "swt:text-primary/70 swt:pointer-events-none"
-                                2.0
-                                None
-                                (Some singleConnection)
-                                (Some $"Select connection {displayConnection.Id}")
-                                None
-                        )
+                        spec
+                            $"member:{displayConnection.Id}:{connectionId}"
+                            "provenance-member-connection"
+                            "swt:text-primary/70 swt:pointer-events-none"
+                            2.0
+                            None
+                            (Some singleConnection)
+                            (Some $"Select connection {displayConnection.Id}")
+                            None
+                            false
+                            source
+                            target
                     )
                 )
         )
@@ -237,8 +249,7 @@ module ConnectorPaths =
 
     /// Dashed rail connectors derived from model data only: collapsed properties
     /// draw one line per same-side group containing any value for that property.
-    let private railConnectionsForSide
-        context
+    let private railConnectionSpecsForSide
         layerId
         (model: ProvenanceModel)
         inputGroups
@@ -270,22 +281,19 @@ module ConnectorPaths =
                     side
                     overlayState
             )
-            |> List.choose (fun target ->
-                ConnectorMeasure.pathBetweenDistantHandles
-                    context
+            |> List.map (fun target ->
+                spec
+                    $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{target.KeySuffix}"
+                    "provenance-property-connection"
+                    "swt:text-secondary swt:pointer-events-none"
+                    1.75
+                    (Some "4 4")
+                    None
+                    None
+                    color
+                    true
                     (ConnectorHandles.propertyHeader side header)
                     target.Handle
-                |> Option.map (
-                    measured
-                        $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{target.KeySuffix}"
-                        "provenance-property-connection"
-                        "swt:text-secondary swt:pointer-events-none"
-                        1.75
-                        (Some "4 4")
-                        None
-                        None
-                        color
-                )
             )
         )
 
@@ -294,8 +302,7 @@ module ConnectorPaths =
         && propertyValue.Value = value
         && propertyValue.Unit = unit'
 
-    let private valueRailConnectionsForSide
-        context
+    let private valueRailConnectionSpecsForSide
         layerId
         (model: ProvenanceModel)
         inputGroups
@@ -331,28 +338,24 @@ module ConnectorPaths =
                         side
                         overlayState
                 )
-                |> List.choose (fun target ->
-                    ConnectorMeasure.pathBetweenDistantHandles
-                        context
+                |> List.map (fun target ->
+                    spec
+                        $"value:{side}:{DragDrop.propertyHeaderIdentity header}:{Formatting.formatValue propertyValue.Value propertyValue.Unit}:{target.KeySuffix}"
+                        "provenance-value-connection"
+                        "swt:text-accent swt:pointer-events-none"
+                        2.0
+                        (Some "4 4")
+                        None
+                        None
+                        color
+                        true
                         (ConnectorHandles.propertyValue side propertyValue.Id)
                         target.Handle
-                    |> Option.map (
-                        measured
-                            $"value:{side}:{DragDrop.propertyHeaderIdentity header}:{Formatting.formatValue propertyValue.Value propertyValue.Unit}:{target.KeySuffix}"
-                            "provenance-value-connection"
-                            "swt:text-accent swt:pointer-events-none"
-                            2.0
-                            (Some "4 4")
-                            None
-                            None
-                            color
-                    )
                 )
             )
         )
 
-    let railConnections
-        context
+    let railConnectionSpecs
         layerId
         model
         inputGroups
@@ -367,8 +370,7 @@ module ConnectorPaths =
         [
             if showPropertyHeaderConnectors then
                 yield!
-                    railConnectionsForSide
-                        context
+                    railConnectionSpecsForSide
                         layerId
                         model
                         inputGroups
@@ -381,8 +383,7 @@ module ConnectorPaths =
                         overlayState
 
                 yield!
-                    railConnectionsForSide
-                        context
+                    railConnectionSpecsForSide
                         layerId
                         model
                         inputGroups
@@ -394,8 +395,7 @@ module ConnectorPaths =
                         colorByHeader
                         overlayState
             yield!
-                valueRailConnectionsForSide
-                    context
+                valueRailConnectionSpecsForSide
                     layerId
                     model
                     inputGroups
@@ -407,8 +407,7 @@ module ConnectorPaths =
                     colorByHeader
                     overlayState
             yield!
-                valueRailConnectionsForSide
-                    context
+                valueRailConnectionSpecsForSide
                     layerId
                     model
                     inputGroups
@@ -425,21 +424,21 @@ module ConnectorPaths =
         liveConnectionDrag
         |> Option.bind (fun live ->
             ConnectorMeasure.pathBetweenPoints live.Start live.Current
-            |> Option.map (
-                measured
-                    "live"
-                    "provenance-live-connection"
-                    "swt:text-primary swt:pointer-events-none swt:opacity-80"
-                    2.25
-                    (Some "6 4")
-                    None
-                    None
-                    None
-            )
+            |> Option.map (fun path -> {
+                Key = "live"
+                Path = path
+                TestId = "provenance-live-connection"
+                ClassName = "swt:text-primary swt:pointer-events-none swt:opacity-80"
+                StrokeWidth = 2.25
+                StrokeDasharray = Some "6 4"
+                InteractiveConnection = None
+                AriaLabel = None
+                Color = None
+            })
         )
 
-    let all
-        context
+    /// All logical connectors for the current editor state, in paint order.
+    let specs
         layerId
         model
         inputGroups
@@ -450,11 +449,10 @@ module ConnectorPaths =
         (colorByHeader: Map<ProvenancePropertyHeader, string option>)
         overlayState
         showPropertyHeaderConnectors
-        =
+        : ConnectorSpec list =
         [
             yield!
-                railConnections
-                    context
+                railConnectionSpecs
                     layerId
                     model
                     inputGroups
@@ -465,6 +463,31 @@ module ConnectorPaths =
                     colorByHeader
                     overlayState
                     showPropertyHeaderConnectors
-            yield! groupConnections context inputGroups outputGroups connections overlayState
-            yield! memberConnections context model inputGroups outputGroups connections overlayState
+            yield! groupConnectionSpecs inputGroups outputGroups connections overlayState
+            yield! memberConnectionSpecs model inputGroups outputGroups connections overlayState
         ]
+
+    /// Resolves specs against the measured DOM; specs whose handles are missing or
+    /// (for rail connectors) too close together are dropped.
+    let measure context (specs: ConnectorSpec list) : MeasuredConnector list =
+        specs
+        |> List.choose (fun spec ->
+            let path =
+                if spec.SkipWhenClose then
+                    ConnectorMeasure.pathBetweenDistantHandles context spec.Source spec.Target
+                else
+                    ConnectorMeasure.pathBetweenHandles context spec.Source spec.Target
+
+            path
+            |> Option.map (fun path -> {
+                Key = spec.Key
+                Path = path
+                TestId = spec.TestId
+                ClassName = spec.ClassName
+                StrokeWidth = spec.StrokeWidth
+                StrokeDasharray = spec.StrokeDasharray
+                InteractiveConnection = spec.InteractiveConnection
+                AriaLabel = spec.AriaLabel
+                Color = spec.Color
+            })
+        )

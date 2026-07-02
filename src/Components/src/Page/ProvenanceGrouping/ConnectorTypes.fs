@@ -23,6 +23,25 @@ type MeasuredConnector = {
     Color: string option
 }
 
+/// Logical connector between two handles, derived purely from model/UI state.
+/// Measuring specs against the DOM produces MeasuredConnector values; keeping the
+/// derivation out of the measure path lets observers remeasure without re-scanning
+/// the model.
+type ConnectorSpec = {
+    Key: string
+    TestId: string
+    ClassName: string
+    StrokeWidth: float
+    StrokeDasharray: string option
+    InteractiveConnection: DisplayConnection option
+    AriaLabel: string option
+    Color: string option
+    Source: ConnectionHandleRef
+    Target: ConnectionHandleRef
+    /// Rail connectors drop out entirely when their endpoints are too close.
+    SkipWhenClose: bool
+}
+
 type ConnectorOverlayState = {
     ExpandedGroup: (ProvenanceSide * string) option
     SelectedConnectionId: string option
