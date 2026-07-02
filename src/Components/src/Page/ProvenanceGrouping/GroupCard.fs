@@ -400,6 +400,10 @@ type GroupCard =
                     "swt:border-base-300"
                 if droppable.isOver && isValueChipDragging then
                     "swt:ring-2 swt:ring-primary"
+                // While a value chip is in flight every card is a legal target, so
+                // they all pick up a faint ring instead of staying inert until hover.
+                elif isValueChipDragging then
+                    "swt:ring-1 swt:ring-primary/25"
             ]
             if defaultArg debug false then
                 prop.testId $"provenance-group-{side}-{group.Id}"
