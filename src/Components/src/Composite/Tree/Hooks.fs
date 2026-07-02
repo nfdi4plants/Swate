@@ -1,11 +1,11 @@
-module Swate.Components.Primitive.Tree.Hooks
+module Swate.Components.Composite.Tree.Hooks
 
 open Browser.Types
 open Fable.Core
 open Feliz
-open Swate.Components.Primitive.Tree.Dom
-open Swate.Components.Primitive.Tree.State
-open Swate.Components.Primitive.Tree.Types
+open Swate.Components.Composite.Tree.Dom
+open Swate.Components.Composite.Tree.State
+open Swate.Components.Composite.Tree.Types
 
 let private toSet (values: string[] option) =
     values |> Option.map Set.ofArray |> Option.defaultValue Set.empty
@@ -82,6 +82,7 @@ let useTreeApi (apiRef: IRefValue<TreeApi option> option) setLoadedChildren setE
 [<Hook>]
 let useTreeNodeActions
     (treeRef: IRefValue<HTMLElement option>)
+    scrollToIndex
     (dataSource: TreeDataSource<'T> option)
     selectionMode
     isSelectionDisabled
@@ -94,10 +95,10 @@ let useTreeNodeActions
     setSelection
     onError
     =
-    let focusDom = TreeDom.focusNode treeRef
+    let focusDom = TreeDom.focusNodeAfterRender treeRef
 
     let focusById nodeId =
-        TreeController.tryFocusById lookup treeState.SetFocusedId focusDom nodeId
+        TreeController.tryFocusById lookup treeState.SetFocusedId scrollToIndex focusDom nodeId
 
     let expandNode (node: TreeItem<'T>) =
         TreeController.expandNode
@@ -110,9 +111,13 @@ let useTreeNodeActions
             onError
             node
 
-    let selectNode (node: TreeItem<'T>) =
-        TreeController.focusNode treeState.SetFocusedId focusDom node.id
+    let hasMouseSelectionModifier (event: MouseEvent) =
+        event.shiftKey || event.ctrlKey || event.metaKey
 
+    let hasKeyboardSelectionModifier (event: KeyboardEvent) =
+        event.shiftKey || event.ctrlKey || event.metaKey
+
+    let selectNode (node: TreeItem<'T>) extendSelection =
         TreeController.selectNode
             selectionMode
             isSelectionDisabled
@@ -120,27 +125,29 @@ let useTreeNodeActions
             effectiveSelectedIds
             setSelection
             node
+            extendSelection
 
     let onNodeKeyDown (node: TreeItem<'T>) (event: KeyboardEvent) =
         match event.key with
         | "ArrowDown" ->
             event.preventDefault ()
-            TreeController.focusByDelta lookup focusedId treeState.SetFocusedId focusDom 1
+            TreeController.focusByDelta lookup focusedId treeState.SetFocusedId scrollToIndex focusDom 1
         | "ArrowUp" ->
             event.preventDefault ()
-            TreeController.focusByDelta lookup focusedId treeState.SetFocusedId focusDom -1
+            TreeController.focusByDelta lookup focusedId treeState.SetFocusedId scrollToIndex focusDom -1
+        // "Home" and "End" are KeyboardEvent.key values for jumping to the first or last visible node.
         | "Home" ->
             event.preventDefault ()
-            TreeController.focusFirst lookup treeState.SetFocusedId focusDom
+            TreeController.focusFirst lookup treeState.SetFocusedId scrollToIndex focusDom
         | "End" ->
             event.preventDefault ()
-            TreeController.focusLast lookup treeState.SetFocusedId focusDom
+            TreeController.focusLast lookup treeState.SetFocusedId scrollToIndex focusDom
         | "ArrowRight" ->
             event.preventDefault ()
 
-            if NodeState.canExpand dataSource node then
+            if NodeState.canExpand dataSource treeState.LoadedChildren node then
                 if treeState.ExpandedIds.Contains node.id then
-                    TreeController.focusFirstChild lookup treeState.SetFocusedId focusDom node.id
+                    TreeController.focusFirstChild lookup treeState.SetFocusedId scrollToIndex focusDom node.id
                 else
                     expandNode node
         | "ArrowLeft" ->
@@ -151,16 +158,17 @@ let useTreeNodeActions
                 treeState.ExpandedIds
                 treeState.SetExpandedIds
                 treeState.SetFocusedId
+                scrollToIndex
                 focusDom
                 node.id
         | "Enter"
         | " " ->
             event.preventDefault ()
 
-            if NodeState.canExpand dataSource node then
+            if NodeState.canExpand dataSource treeState.LoadedChildren node then
                 expandNode node
 
-            selectNode node
+            selectNode node (hasKeyboardSelectionModifier event)
         | _ -> ()
 
     {

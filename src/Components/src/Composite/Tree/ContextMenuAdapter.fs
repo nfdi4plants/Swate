@@ -1,12 +1,12 @@
-module Swate.Components.Primitive.Tree.ContextMenuAdapter
+module Swate.Components.Composite.Tree.ContextMenuAdapter
 
 open Browser.Types
 open Feliz
 open Swate.Components.Primitive.ContextMenu
 open Swate.Components.Primitive.ContextMenu.Types
-open Swate.Components.Primitive.Tree.Dom
-open Swate.Components.Primitive.Tree.State
-open Swate.Components.Primitive.Tree.Types
+open Swate.Components.Composite.Tree.Dom
+open Swate.Components.Composite.Tree.State
+open Swate.Components.Composite.Tree.Types
 
 let tryGetTarget (lookup: TreeRowLookup<'T>) (event: MouseEvent) =
     match TreeDom.tryGetNodeId event with

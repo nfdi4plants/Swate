@@ -1,13 +1,12 @@
-namespace Swate.Components.Primitive.Tree
+namespace Swate.Components.Composite.Tree
 
 open Fable.Core
 open Feliz
 open Swate.Components
-open Swate.Components.Primitive.Tree.Context
-open Swate.Components.Primitive.Tree.Helper
-open Swate.Components.Primitive.Tree.Hooks
-open Swate.Components.Primitive.Tree.State
-open Swate.Components.Primitive.Tree.Types
+open Swate.Components.Composite.Tree.Context
+open Swate.Components.Composite.Tree.Hooks
+open Swate.Components.Composite.Tree.State
+open Swate.Components.Composite.Tree.Types
 
 [<Erase; Mangle(false)>]
 type Tree =
@@ -68,17 +67,33 @@ type Tree =
 
         let focusedId = NodeState.focusedOrFirst treeState.FocusedId lookup.VisibleNodes
 
-        React.useEffect (
-            (fun () ->
-                if focusedId <> treeState.FocusedId then
-                    treeState.SetFocusedId focusedId
-            ),
-            [| box focusedId |]
-        )
+        let rows = lookup.VisibleNodes
+
+        let shouldUseVirtualization =
+            TreeHelper.shouldUseVirtualization enableVirtualization rows.Length
+
+        let virtualizer =
+            Virtual.useVirtualizer (
+                count = rows.Length,
+                getScrollElement = (fun () -> scrollRef.current),
+                estimateSize = (fun _ -> estimateNodeHeight),
+                overscan = 8
+            )
+
+        let scrollToIndex index =
+            if shouldUseVirtualization then
+                virtualizer.scrollToIndex (
+                    index,
+                    {|
+                        align = Some Virtual.AlignOption.Auto
+                        behavior = Some Virtual.ScrollBehavior.Auto
+                    |}
+                )
 
         let actions =
             useTreeNodeActions
                 treeRef
+                scrollToIndex
                 dataSource
                 selectionMode
                 isSelectionDisabled
@@ -108,51 +123,45 @@ type Tree =
         }
 
         let renderRow row =
-            let node = row.Node
-            let loadState = NodeState.loadStateFor node.id treeState.LoadedChildren
-            let isExpanded = treeState.ExpandedIds.Contains node.id
-            let canExpand = NodeState.canExpand dataSource node
+            let loadState = NodeState.loadStateFor row.Node.id treeState.LoadedChildren
+            let isExpanded = treeState.ExpandedIds.Contains row.Node.id
+            let canExpand = NodeState.canExpand dataSource treeState.LoadedChildren row.Node
 
             TreeNode.Row {
                 Row = row
                 IsExpanded = isExpanded
-                IsSelected = effectiveSelectedIds.Contains node.id
-                IsFocused = focusedId = Some node.id
+                IsSelected = effectiveSelectedIds.Contains row.Node.id
+                IsFocused = focusedId = Some row.Node.id
                 IsLoading = loadState.Status = TreeLazyLoadStatus.Loading
                 Error = loadState.Error
                 CanExpand = canExpand
-                CanSelect = not isSelectionDisabled && isNodeSelectable node
+                CanSelect = not isSelectionDisabled && isNodeSelectable row.Node
                 RenderNode = renderNode
                 Leading = leading
                 Trailing = trailing
                 StyleFn = styleFn
-                OnToggle = fun () -> actions.ExpandNode node
+                OnToggle = fun () -> actions.ExpandNode row.Node
                 OnSelect =
                     fun event ->
                         event.preventDefault ()
                         event.stopPropagation ()
 
                         if canExpand then
-                            actions.ExpandNode node
+                            actions.ExpandNode row.Node
 
-                        actions.SelectNode node
-                OnFocus = fun () -> treeState.SetFocusedId(Some node.id)
-                OnKeyDown = actions.OnNodeKeyDown node
+                        let extendSelection = event.shiftKey || event.ctrlKey || event.metaKey
+
+                        actions.SelectNode row.Node extendSelection
+                OnFocus =
+                    fun () ->
+                        if treeState.FocusedId <> Some row.Node.id then
+                            treeState.SetFocusedId(Some row.Node.id)
+                OnKeyDown = actions.OnNodeKeyDown row.Node
                 Debug = debug
             }
 
-        let rows = lookup.VisibleNodes
-
         let treeContent =
-            if TreeHelper.shouldUseVirtualization enableVirtualization rows.Length then
-                let virtualizer =
-                    Virtual.useVirtualizer (
-                        count = rows.Length,
-                        getScrollElement = (fun () -> scrollRef.current),
-                        estimateSize = (fun _ -> estimateNodeHeight),
-                        overscan = 8
-                    )
-
+            if shouldUseVirtualization then
                 Html.div [
                     prop.ref scrollRef
                     prop.className "swt:max-h-96 swt:overflow-auto"

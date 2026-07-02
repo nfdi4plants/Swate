@@ -1,9 +1,8 @@
-namespace Swate.Components.Primitive.Tree
+namespace Swate.Components.Composite.Tree
 
 open Fable.Core
 open Feliz
-open Swate.Components.Primitive.Tree.Helper
-open Swate.Components.Primitive.Tree.Types
+open Swate.Components.Composite.Tree.Types
 
 [<Erase; Mangle(false)>]
 type TreeNode =
@@ -25,36 +24,38 @@ type TreeNode =
         }
 
         let expandButton =
-            Html.button [
-                prop.type'.button
-                prop.className [
-                    "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:min-h-0 swt:size-6 swt:shrink-0"
-                    if not props.CanExpand then
-                        "swt:invisible"
+            if props.CanExpand then
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-ghost swt:btn-square swt:btn-xs swt:min-h-0 swt:size-6 swt:shrink-0"
+                    prop.tabIndex -1
+                    prop.ariaLabel (
+                        if props.IsExpanded then
+                            $"Collapse {node.label}"
+                        else
+                            $"Expand {node.label}"
+                    )
+                    prop.onClick (fun e ->
+                        e.preventDefault ()
+                        e.stopPropagation ()
+                        props.OnToggle()
+                    )
+                    prop.children [
+                        if props.IsLoading then
+                            Html.span [
+                                prop.className "swt:loading swt:loading-spinner swt:loading-xs"
+                            ]
+                        else
+                            Html.i [
+                                prop.className $"swt:iconify {TreeHelper.chevronIcon props.IsExpanded} swt:size-4"
+                            ]
+                    ]
                 ]
-                prop.tabIndex -1
-                prop.ariaLabel (
-                    if props.IsExpanded then
-                        $"Collapse {node.label}"
-                    else
-                        $"Expand {node.label}"
-                )
-                prop.onClick (fun e ->
-                    e.preventDefault ()
-                    e.stopPropagation ()
-                    props.OnToggle()
-                )
-                prop.children [
-                    if props.IsLoading then
-                        Html.span [
-                            prop.className "swt:loading swt:loading-spinner swt:loading-xs"
-                        ]
-                    else
-                        Html.i [
-                            prop.className $"swt:iconify {NodeHelper.chevronIcon props.IsExpanded} swt:size-4"
-                        ]
+            else
+                Html.span [
+                    prop.ariaHidden true
+                    prop.className "swt:size-6 swt:shrink-0"
                 ]
-            ]
 
         let leadingContent =
             match props.Leading with
@@ -68,22 +69,36 @@ type TreeNode =
                     | None ->
                         Html.i [
                             prop.className [
-                                $"swt:iconify {NodeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
+                                $"swt:iconify {TreeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
                             ]
                         ]
 
         let nodeContent =
-            match props.RenderNode with
-            | Some renderNode ->
-                Html.div [
-                    prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
-                    prop.children [ renderNode renderProps ]
-                ]
-            | None ->
-                Html.span [
-                    prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
-                    prop.text node.label
-                ]
+            React.useMemo (
+                (fun () ->
+                    match props.RenderNode with
+                    | Some renderNode ->
+                        Html.div [
+                            prop.className "swt:min-w-0 swt:flex-1 swt:text-left"
+                            prop.children [ renderNode renderProps ]
+                        ]
+                    | None ->
+                        Html.span [
+                            prop.className "swt:min-w-0 swt:flex-1 swt:truncate swt:text-left"
+                            prop.text node.label
+                        ]
+                ),
+                [|
+                    box props.RenderNode
+                    box node
+                    box props.Row.Depth
+                    box props.IsExpanded
+                    box props.IsSelected
+                    box props.IsFocused
+                    box props.IsLoading
+                    box props.Error
+                |]
+            )
 
         let errorContent =
             match props.Error with
@@ -109,13 +124,13 @@ type TreeNode =
             prop.custom ("aria-selected", props.IsSelected)
             prop.custom ("aria-disabled", not props.CanSelect)
             prop.custom ("aria-level", props.Row.Depth + 1)
-            if node.kind = TreeNodeKind.Branch then
+            if props.CanExpand then
                 prop.custom ("aria-expanded", props.IsExpanded)
             prop.custom ("data-tree-node-id", node.id)
             prop.custom ("data-tree-node-kind", string node.kind)
             if props.Debug then
                 prop.testId $"tree-node-{node.id}"
-            prop.className (NodeHelper.nodeContainerClasses props)
+            prop.className (TreeHelper.nodeContainerClasses props)
             prop.style [
                 style.paddingLeft (length.rem (float props.Row.Depth * 1.25))
             ]

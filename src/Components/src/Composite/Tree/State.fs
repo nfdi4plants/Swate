@@ -1,6 +1,6 @@
-module Swate.Components.Primitive.Tree.State
+module Swate.Components.Composite.Tree.State
 
-open Swate.Components.Primitive.Tree.Types
+open Swate.Components.Composite.Tree.Types
 
 module NodeState =
 
@@ -13,8 +13,15 @@ module NodeState =
     let loadStateFor nodeId loadedChildren =
         loadedChildren |> Map.tryFind nodeId |> Option.defaultValue emptyLoadState
 
-    let hasCachedChildren nodeId loadedChildren =
-        loadedChildren |> Map.tryFind nodeId |> Option.bind _.Children |> Option.isSome
+    let hasActiveOrLoadedChildren nodeId loadedChildren =
+        match loadedChildren |> Map.tryFind nodeId with
+        | Some state ->
+            match state.Status with
+            | TreeLazyLoadStatus.Loading
+            | TreeLazyLoadStatus.Loaded -> true
+            | TreeLazyLoadStatus.Idle
+            | TreeLazyLoadStatus.Error -> false
+        | None -> false
 
     let withLoading nodeId loadedChildren =
         loadedChildren
@@ -48,8 +55,8 @@ module NodeState =
         | Some children -> Some children
         | None -> node.children
 
-    let childCount (dataSource: TreeDataSource<'T> option) (node: TreeItem<'T>) =
-        match node.children with
+    let childCount (dataSource: TreeDataSource<'T> option) loadedChildren (node: TreeItem<'T>) =
+        match directChildren loadedChildren node with
         | Some children -> children.Length
         | None ->
             match node.childrenCount, dataSource with
@@ -57,14 +64,14 @@ module NodeState =
             | None, Some source -> source.GetChildrenCount(Some node)
             | None, None -> 0
 
-    let canExpand dataSource node =
+    let canExpand dataSource loadedChildren node =
         if not (isBranch node) then
             false
         else
-            match node.children, node.childrenCount, dataSource with
+            match directChildren loadedChildren node, node.childrenCount, dataSource with
             | Some children, _, _ -> children.Length > 0
             | None, Some count, _ -> count > 0
-            | None, None, Some _ -> true
+            | None, None, Some source -> source.GetChildrenCount(Some node) > 0
             | None, None, None -> false
 
     let flattenVisible dataSource loadedChildren expandedIds items =
@@ -87,7 +94,7 @@ module NodeState =
                     match directChildren loadedChildren item with
                     | Some children -> loop (Some item.id) (depth + 1) children
                     | None ->
-                        if canExpand dataSource item then
+                        if canExpand dataSource loadedChildren item then
                             ()
 
         loop None 0 items
@@ -126,6 +133,11 @@ module NodeState =
         match mode with
         | TreeSelectionMode.Single -> Set.singleton nodeId
         | TreeSelectionMode.Multiple -> Set.singleton nodeId
+
+    let nextSelection mode extendSelection nodeId selectedIds =
+        match mode, extendSelection with
+        | TreeSelectionMode.Multiple, true -> toggleSelection mode nodeId selectedIds
+        | _ -> replaceSelection mode nodeId
 
     let focusedOrFirst focusedId visibleNodes =
         focusedId

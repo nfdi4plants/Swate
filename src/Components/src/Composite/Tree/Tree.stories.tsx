@@ -53,7 +53,7 @@ const menuItem = (label: string, onClick: () => void) =>
   }) as any;
 
 const meta = {
-  title: "Primitive Components/Tree",
+  title: "Composite Components/Tree",
   tags: ["autodocs"],
   component: Tree,
   parameters: {
@@ -143,9 +143,13 @@ export const MultiSelectionWithoutCheckboxes: Story = {
 
     await userEvent.click(canvas.getByText("isa.study.xlsx"));
     await userEvent.click(canvas.getByText("isa.assay.xlsx"));
+    await expect(canvas.getByTestId("multi-selected")).toHaveTextContent("arc/assays/assay_01/isa.assay.xlsx");
+    await expect(canvas.getByTestId("multi-selected")).not.toHaveTextContent("arc/studies/study_01/isa.study.xlsx");
+    await expect(canvas.getByTestId("tree-node-arc/assays/assay_01/isa.assay.xlsx")).toHaveFocus();
+
+    fireEvent.click(canvas.getByText("isa.study.xlsx"), { ctrlKey: true, bubbles: true });
     await expect(canvas.getByTestId("multi-selected")).toHaveTextContent("arc/studies/study_01/isa.study.xlsx");
     await expect(canvas.getByTestId("multi-selected")).toHaveTextContent("arc/assays/assay_01/isa.assay.xlsx");
-    await expect(canvas.getByTestId("tree-node-arc/assays/assay_01/isa.assay.xlsx")).toHaveFocus();
   },
 };
 
@@ -225,13 +229,13 @@ export const LazyLoadingCachesChildren: Story = {
   },
 };
 
-const UnknownCountBranchTree = () => {
+const CountedDataSourceBranchTree = () => {
   const [loadLog, setLoadLog] = React.useState<string[]>([]);
   const items = React.useMemo(() => [branch("arc/assays", "assays", undefined)], []);
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: () => 0,
+      GetChildrenCount: () => 1,
       GetTreeItems: async (item: DemoNode | null | undefined) => {
         setLoadLog((current) => [...current, item?.id ?? "root"]);
         return [branch("arc/assays/assay_02", "Assay 02", [leaf("arc/assays/assay_02/isa.assay.xlsx", "isa.assay.xlsx")])];
@@ -248,14 +252,50 @@ const UnknownCountBranchTree = () => {
   );
 };
 
-export const DataSourceBranchClickExpandsUnknownChildren: Story = {
-  render: () => <UnknownCountBranchTree />,
+export const DataSourceBranchClickExpandsCountedChildren: Story = {
+  render: () => <CountedDataSourceBranchTree />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
 
     await userEvent.click(canvas.getByText("assays"));
     await expect(await canvas.findByText("Assay 02")).toBeVisible();
     await expect(canvas.getByTestId("unknown-count-load-log")).toHaveTextContent("arc/assays");
+  },
+};
+
+const KnownEmptyDataSourceBranchTree = () => {
+  const [loadLog, setLoadLog] = React.useState<string[]>([]);
+  const items = React.useMemo(() => [branch("arc/empty-folder", "empty folder", undefined)], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      GetChildrenCount: () => 0,
+      GetTreeItems: async (item: DemoNode | null | undefined) => {
+        setLoadLog((current) => [...current, item?.id ?? "root"]);
+        return [];
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} dataSource={dataSource as any} debug />
+      <div data-testid="empty-load-log">Loaded: {loadLog.join("|") || "none"}</div>
+    </div>
+  );
+};
+
+export const DataSourceKnownEmptyBranchDoesNotExposeExpandAction: Story = {
+  render: () => <KnownEmptyDataSourceBranchTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByText("empty folder")).toBeVisible();
+    await expect(canvas.queryByRole("button", { name: "Expand empty folder" })).not.toBeInTheDocument();
+
+    await userEvent.click(canvas.getByText("empty folder"));
+    await expect(canvas.getByTestId("empty-load-log")).toHaveTextContent("Loaded: none");
   },
 };
 
@@ -609,6 +649,13 @@ export const EfficientRenameRerendersAffectedNodes: Story = {
 
     const rerenderedLabels = readRenderCount(canvas) - beforeRename;
     expect(rerenderedLabels).toBeLessThanOrEqual(4);
+
+    const beforeSelection = readRenderCount(canvas);
+    await userEvent.click(canvas.getByText("raw-data.tsv"));
+    await waitFor(() => expect(readRenderCount(canvas)).toBeGreaterThan(beforeSelection));
+
+    const rerenderedLabelsAfterSelection = readRenderCount(canvas) - beforeSelection;
+    expect(rerenderedLabelsAfterSelection).toBeLessThanOrEqual(3);
   },
 };
 

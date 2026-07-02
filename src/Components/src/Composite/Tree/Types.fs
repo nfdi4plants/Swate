@@ -1,4 +1,4 @@
-module Swate.Components.Primitive.Tree.Types
+module Swate.Components.Composite.Tree.Types
 
 open Browser.Types
 open Fable.Core
@@ -120,7 +120,7 @@ type TreeState<'T> = {
 
 type TreeNodeActions<'T> = {
     ExpandNode: TreeItem<'T> -> unit
-    SelectNode: TreeItem<'T> -> unit
+    SelectNode: TreeItem<'T> -> bool -> unit
     FocusById: string -> unit
     OnNodeKeyDown: TreeItem<'T> -> KeyboardEvent -> unit
 }
