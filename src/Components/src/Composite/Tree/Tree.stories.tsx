@@ -623,9 +623,7 @@ export const CustomRenderingAndStyling: Story = {
 };
 
 const RenderCounterLabel = ({ label, onRender }: { label: string; onRender: () => void }) => {
-  React.useEffect(() => {
-    onRender();
-  });
+  onRender();
 
   return <span>{label}</span>;
 };
@@ -644,9 +642,11 @@ const RenderCounterTree = () => {
   const onRender = React.useCallback(() => {
     countRef.current += 1;
 
-    if (countElementRef.current) {
-      countElementRef.current.textContent = `Renders: ${countRef.current}`;
-    }
+    queueMicrotask(() => {
+      if (countElementRef.current) {
+        countElementRef.current.textContent = `Renders: ${countRef.current}`;
+      }
+    });
   }, []);
 
   const renameDatamap = React.useCallback(() => {
@@ -698,14 +698,14 @@ export const EfficientRenameRerendersAffectedNodes: Story = {
     await waitFor(() => expect(readRenderCount(canvas)).toBeGreaterThan(beforeRename));
 
     const rerenderedLabels = readRenderCount(canvas) - beforeRename;
-    expect(rerenderedLabels).toBeLessThanOrEqual(4);
+    expect(rerenderedLabels).toBeLessThanOrEqual(1);
 
     const beforeSelection = readRenderCount(canvas);
     await userEvent.click(canvas.getByText("raw-data.tsv"));
     await waitFor(() => expect(readRenderCount(canvas)).toBeGreaterThan(beforeSelection));
 
     const rerenderedLabelsAfterSelection = readRenderCount(canvas) - beforeSelection;
-    expect(rerenderedLabelsAfterSelection).toBeLessThanOrEqual(3);
+    expect(rerenderedLabelsAfterSelection).toBeLessThanOrEqual(1);
   },
 };
 

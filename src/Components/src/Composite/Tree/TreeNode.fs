@@ -58,20 +58,30 @@ type TreeNode =
                 ]
 
         let leadingContent =
-            match props.Leading with
-            | Some leading -> leading renderProps
-            | None ->
-                match node.leading with
-                | Some leading -> leading
-                | None ->
-                    match node.icon with
-                    | Some icon -> icon
+            React.useMemo (
+                (fun () ->
+                    match props.Leading with
+                    | Some leading -> leading renderProps
                     | None ->
-                        Html.i [
-                            prop.className [
-                                $"swt:iconify {TreeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
-                            ]
-                        ]
+                        match node.leading with
+                        | Some leading -> leading
+                        | None ->
+                            match node.icon with
+                            | Some icon -> icon
+                            | None ->
+                                Html.i [
+                                    prop.className [
+                                        $"swt:iconify {TreeHelper.defaultIcon node} swt:size-4 swt:shrink-0"
+                                    ]
+                                ]
+                ),
+                [|
+                    box props.Leading
+                    box node.leading
+                    box node.icon
+                    box node.kind
+                |]
+            )
 
         let nodeContent =
             React.useMemo (
@@ -90,11 +100,19 @@ type TreeNode =
                 ),
                 [|
                     box props.RenderNode
-                    box node
+                    box node.id
+                    box node.label
+                    box node.kind
+                    box node.data
+                    box node.childrenCount
+                    box node.icon
+                    box node.tooltip
+                    box node.leading
+                    box node.trailing
+                    box node.className
                     box props.Row.Depth
                     box props.IsExpanded
                     box props.IsSelected
-                    box props.IsFocused
                     box props.IsLoading
                     box props.Error
                 |]
@@ -111,12 +129,17 @@ type TreeNode =
             | None -> Html.none
 
         let trailingContent =
-            match props.Trailing with
-            | Some trailing -> trailing renderProps
-            | None ->
-                match node.trailing with
-                | Some trailing -> trailing
-                | None -> Html.none
+            React.useMemo (
+                (fun () ->
+                    match props.Trailing with
+                    | Some trailing -> trailing renderProps
+                    | None ->
+                        match node.trailing with
+                        | Some trailing -> trailing
+                        | None -> Html.none
+                ),
+                [| box props.Trailing; box node.trailing |]
+            )
 
         Html.div [
             prop.role "treeitem"
