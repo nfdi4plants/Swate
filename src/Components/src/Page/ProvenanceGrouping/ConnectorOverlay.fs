@@ -33,7 +33,14 @@ type ConnectorOverlay =
             Svg.svg [
                 svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
                 svg.children [
-                    yield! ConnectorSvg.strokeElements measured measured.StrokeWidth 1.0 false (defaultArg debug false)
+                    yield!
+                        ConnectorSvg.strokeElements
+                            measured
+                            measured.StrokeWidth
+                            1.0
+                            false
+                            false
+                            (defaultArg debug false)
                 ]
             ]
         | None -> Html.none
@@ -225,6 +232,13 @@ type ConnectorOverlay =
         let paths, measuredWithAnimation = measuredState
         let animatePaths = measuredWithAnimation && not (Motion.prefersReduced ())
 
+        // Keys seen in the previous committed render; connectors not in this set are
+        // freshly created and get their entrance animation.
+        let renderedKeys = React.useRef (Set.empty: Set<string>)
+        let previousKeys = renderedKeys.current
+
+        React.useEffect (fun () -> renderedKeys.current <- paths |> List.map (fun m -> m.Key) |> Set.ofList)
+
         React.Fragment [
             Svg.svg [
                 svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
@@ -278,6 +292,7 @@ type ConnectorOverlay =
                                         strokeWidth
                                         strokeOpacity
                                         animatePaths
+                                        (not (previousKeys.Contains measured.Key))
                                         debugEnabled
                                 // A wide transparent stroke is the actual pointer/keyboard target,
                                 // so selecting a thin curve no longer needs pixel accuracy.

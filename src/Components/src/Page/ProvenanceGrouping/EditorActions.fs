@@ -298,6 +298,21 @@ module DragHandlers =
         | ProvenanceSide.Input -> layer.InputSideId
         | ProvenanceSide.Output -> layer.OutputSideId
 
+    /// Pulses the card a value was just dropped on. Scheduled one frame after the
+    /// publish so it targets the re-rendered card; if the assignment regrouped the
+    /// card away, the pulse is silently skipped.
+    let private pulseDropTarget side groupId =
+        Motion.requestFrame (fun () ->
+            let node: Browser.Types.HTMLElement =
+                !!
+                    Browser.Dom.document.querySelector
+                    ($"[data-provenance-group-node='{DragDrop.groupNodeId side groupId}']")
+
+            if not (isNull node) then
+                Motion.pulse node
+        )
+        |> ignore
+
     let private routePropertyValueDrop context side groupId propertyValueId =
         match context.Lookups.FindPropertyValue propertyValueId with
         | Some propertyValue ->
@@ -338,17 +353,23 @@ module DragHandlers =
 
                 if batch.Overwrites.IsEmpty then
                     if not batch.Adds.IsEmpty then
-                        batch.Adds
-                        |> List.fold
-                            (fun (result: SessionResult) cmd ->
-                                match result with
-                                | Ok(current, patches) ->
-                                    Session.createCurrentLoadedPropertyValue cmd current
-                                    |> Result.map (fun (next, added) -> next, patches @ added)
-                                | Error _ -> result
-                            )
-                            (Ok(context.Session, []))
-                        |> context.Publish
+                        let result =
+                            batch.Adds
+                            |> List.fold
+                                (fun (result: SessionResult) cmd ->
+                                    match result with
+                                    | Ok(current, patches) ->
+                                        Session.createCurrentLoadedPropertyValue cmd current
+                                        |> Result.map (fun (next, added) -> next, patches @ added)
+                                    | Error _ -> result
+                                )
+                                (Ok(context.Session, []))
+
+                        context.Publish result
+
+                        match result with
+                        | Ok _ -> pulseDropTarget side groupId
+                        | Error _ -> ()
                 else
                     let pendingBatch = {
                         Batch = batch

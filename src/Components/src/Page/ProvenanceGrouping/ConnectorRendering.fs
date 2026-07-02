@@ -33,9 +33,30 @@ module ConnectorSvg =
                      "stroke-width 120ms ease, stroke-opacity 120ms ease")
         ]
 
-    let strokeElements (measured: MeasuredConnector) strokeWidth strokeOpacity animate debug =
+    let strokeElements (measured: MeasuredConnector) strokeWidth strokeOpacity animate isNew debug =
         let strokeColor = measured.Color |> Option.defaultValue "currentColor"
         let debugAttributes = debugAttributes debug measured
+
+        // Freshly created solid connectors draw themselves in along the curve; new
+        // dashed rail connectors fade in instead, because a dash offset animation
+        // would fight their dash pattern.
+        let isSolid = measured.StrokeDasharray.IsNone
+
+        let entranceClass =
+            if isNew then
+                if isSolid then
+                    " swt:connector-draw-in"
+                else
+                    " swt:connector-fade-in"
+            else
+                ""
+
+        let entranceAttributes = [
+            if isNew && isSolid then
+                // Normalizes the path length so the draw-in dash math needs no
+                // getTotalLength measurement.
+                svg.custom ("pathLength", 1)
+        ]
 
         [
             // A surface-colored halo keeps crossing connectors readable.
@@ -46,7 +67,8 @@ module ConnectorSvg =
                 svg.stroke "currentColor"
                 svg.strokeWidth (strokeWidth + 2.5)
                 svg.strokeLineCap "round"
-                svg.className "swt:text-base-200"
+                svg.className ("swt:text-base-200" + entranceClass)
+                yield! entranceAttributes
                 match measured.StrokeDasharray with
                 | Some dash -> svg.custom ("strokeDasharray", dash)
                 | None -> ()
@@ -59,7 +81,8 @@ module ConnectorSvg =
                 svg.strokeWidth strokeWidth
                 svg.strokeLineCap "round"
                 svg.custom ("strokeOpacity", strokeOpacity)
-                svg.className measured.ClassName
+                svg.className (measured.ClassName + entranceClass)
+                yield! entranceAttributes
                 match measured.StrokeDasharray with
                 | Some dash -> svg.custom ("strokeDasharray", dash)
                 | None -> ()

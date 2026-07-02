@@ -428,7 +428,8 @@ module ConnectorPaths =
                 Key = "live"
                 Path = path
                 TestId = "provenance-live-connection"
-                ClassName = "swt:text-primary swt:pointer-events-none swt:opacity-80"
+                // connector-flow marches the dashes toward the pointer while aiming.
+                ClassName = "swt:text-primary swt:pointer-events-none swt:opacity-80 swt:connector-flow"
                 StrokeWidth = 2.25
                 StrokeDasharray = Some "6 4"
                 InteractiveConnection = None

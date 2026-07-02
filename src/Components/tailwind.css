@@ -234,6 +234,57 @@
     }
 }
 
+/* ProvenanceGrouping connector motion: draw-in for new solid connectors (paired
+   with pathLength="1" so no measurement is needed), fade-in for new dashed rail
+   connectors, and a marching-ants flow on the live connection drag line. */
+@keyframes swt-connector-draw {
+    to {
+        stroke-dashoffset: 0;
+    }
+}
+
+@keyframes swt-connector-flow {
+    to {
+        /* One dash period (6 + 4), so the loop is seamless. */
+        stroke-dashoffset: -10;
+    }
+}
+
+@keyframes swt-motion-fade-in {
+    from {
+        opacity: 0;
+    }
+}
+
+@layer swt-utilities {
+    .swt\:connector-draw-in {
+        stroke-dasharray: 1;
+        stroke-dashoffset: 1;
+        animation: swt-connector-draw 320ms ease-out forwards;
+    }
+
+    .swt\:connector-fade-in {
+        animation: swt-motion-fade-in 240ms ease-out;
+    }
+
+    .swt\:connector-flow {
+        animation: swt-connector-flow 450ms linear infinite;
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+        .swt\:connector-draw-in,
+        .swt\:connector-fade-in,
+        .swt\:connector-flow {
+            animation: none;
+        }
+
+        .swt\:connector-draw-in {
+            stroke-dasharray: none;
+            stroke-dashoffset: 0;
+        }
+    }
+}
+
 @layer swt-utilities {
     /* Scrollbar utilities: keep constant width, fade thumb on hover (no layout shift) */
     .swt\:scrollbar-fade {
