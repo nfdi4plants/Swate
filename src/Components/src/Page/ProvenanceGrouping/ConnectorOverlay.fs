@@ -71,6 +71,24 @@ type ConnectorOverlay =
         let hoveredKey, setHoveredKey = React.useState<string option> None
         let pendingFrame = React.useRef (None: float option)
 
+        // Hovering a group card (published through the store) emphasizes the
+        // connectors attached to it; only this overlay re-renders on hover changes.
+        let hoverStore = React.useContext HoverHighlight.context
+        let _, bumpHover = React.useStateWithUpdater 0
+
+        React.useEffect (
+            (fun () ->
+                let unsubscribe =
+                    hoverStore
+                    |> HoverHighlight.subscribe (fun () -> bumpHover (fun version -> version + 1))
+
+                FsReact.createDisposable unsubscribe
+            ),
+            [| box hoverStore |]
+        )
+
+        let hoveredGroup = hoverStore.Current
+
         // Discrete data/layout changes morph paths to their new shape; continuous
         // sources (scroll, resize, drag-driven mutations) snap per frame instead.
         let animateNextMeasure = React.useRef false
@@ -265,7 +283,14 @@ type ConnectorOverlay =
                             | Some connection, Some selectedId -> connection.Id = selectedId
                             | _ -> false
 
-                        let isEmphasized = isSelected || hoveredKey = Some measured.Key
+                        let isHoverRelated =
+                            match measured.InteractiveConnection, hoveredGroup with
+                            | Some connection, Some target ->
+                                (target.Side = ProvenanceSide.Input && connection.SourceGroupId = target.GroupId)
+                                || (target.Side = ProvenanceSide.Output && connection.TargetGroupId = target.GroupId)
+                            | _ -> false
+
+                        let isEmphasized = isSelected || hoveredKey = Some measured.Key || isHoverRelated
 
                         let strokeWidth =
                             if isEmphasized then

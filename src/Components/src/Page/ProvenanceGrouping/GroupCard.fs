@@ -315,6 +315,18 @@ type GroupCard =
         let focusedTabIndex, setFocusedTabIndex = React.useStateWithUpdater<int option> None
         let articleRef = React.useElementRef ()
         let density = React.useContext Density.context
+        let hoverStore = React.useContext HoverHighlight.context
+        let connectionDragSide = React.useContext ConnectionDragHints.context
+
+        // Hovering a card lights up its connectors and the connected opposite cards.
+        // Suppressed while dragging so the highlight cannot fight drop feedback.
+        let publishHover () =
+            if connectionDragSide.IsNone && not isValueChipDragging then
+                HoverHighlight.set { Side = side; GroupId = group.Id } hoverStore
+
+        let clearHover () = HoverHighlight.clear hoverStore
+
+        React.useEffectOnce (fun () -> FsReact.createDisposable (fun () -> HoverHighlight.clear hoverStore))
 
         let droppable =
             DndKit.useDroppable (
@@ -386,11 +398,17 @@ type GroupCard =
             prop.ref setArticleRef
             prop.custom ("data-provenance-group-node", DragDrop.groupNodeId side group.Id)
             prop.custom ("data-provenance-group-drop-id", DragDrop.groupDropId side group.Id)
+            prop.onMouseEnter (fun _ -> publishHover ())
+            prop.onMouseLeave (fun _ -> clearHover ())
             prop.className [
                 // Cards size to their content (the column aligns them toward their rail),
                 // so the gap between the two card columns grows for group connectors. The
                 // edge handles are positioned on the card border and move with its width.
                 "swt:relative swt:flex swt:w-fit swt:max-w-full swt:flex-col swt:rounded-box swt:border swt:bg-base-100 swt:shadow-sm"
+                "swt:transition-shadow swt:duration-150 hover:swt:shadow-md"
+                // Cards connected to the hovered opposite card are marked imperatively
+                // through this data attribute; see the hover-highlight store.
+                "data-[provenance-related=true]:swt:ring-2 data-[provenance-related=true]:swt:ring-primary/35"
                 match density with
                 | Density.EditorDensity.Compact -> "swt:gap-1 swt:p-1.5"
                 | _ -> "swt:gap-1.5 swt:p-2.5"

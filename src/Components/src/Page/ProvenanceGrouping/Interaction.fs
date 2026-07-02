@@ -185,6 +185,60 @@ module LiveDrag =
             store.Current <- None
             notify store
 
+/// Tracks the hovered group card outside editor state, LiveDrag-style: hovering a
+/// card emphasizes its connectors and marks the connected opposite cards without
+/// re-rendering the editor tree.
+module HoverHighlight =
+
+    open Fable.Core
+    open Fable.Core.JsInterop
+    open Feliz
+    open Swate.Components.Shared.ProvenanceGrouping.Types
+
+    type Target = {
+        Side: ProvenanceSide
+        GroupId: string
+    }
+
+    type Store = {
+        mutable Current: Target option
+        mutable Listeners: (unit -> unit) list
+    }
+
+    let create () : Store = { Current = None; Listeners = [] }
+
+    let private notify store =
+        for listener in store.Listeners do
+            listener ()
+
+    let subscribe listener store =
+        store.Listeners <- listener :: store.Listeners
+
+        fun () ->
+            store.Listeners <-
+                store.Listeners
+                |> List.filter (fun current -> not (System.Object.ReferenceEquals(current, listener)))
+
+    let set target store =
+        if store.Current <> Some target then
+            store.Current <- Some target
+            notify store
+
+    let clear store =
+        if store.Current.IsSome then
+            store.Current <- None
+            notify store
+
+    /// The store instance itself is the (stable) context value; consumers subscribe
+    /// for changes instead of re-rendering through context updates.
+    let context = React.createContext (defaultValue = create ())
+
+    [<Fable.Core.ImportMember("react")>]
+    let private createElement (comp: obj) (props: obj) (children: ReactElement) : ReactElement = jsNative
+
+    let provider (store: Store) (children: ReactElement) : ReactElement =
+        createElement !!context?Provider {| value = store |} children
+
 /// Validates edge-handle drag/drop pairs and returns the editor action they imply.
 module ConnectionRouting =
 

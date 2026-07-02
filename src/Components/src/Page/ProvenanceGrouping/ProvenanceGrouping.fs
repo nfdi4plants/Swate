@@ -39,6 +39,7 @@ type ProvenanceGrouping =
             React.useState true
 
         let liveDragStore = React.useRef (LiveDrag.create ())
+        let hoverStore = React.useRef (HoverHighlight.create ())
         let isValueChipDragging, setIsValueChipDragging = React.useState false
 
         React.useEffectOnce (fun () ->
@@ -70,10 +71,51 @@ type ProvenanceGrouping =
         let latestSession = React.useRef session
         let latestLayer = React.useRef layer
         let latestOnChange = React.useRef onChange
+        let latestConnections = React.useRef connections
         latestUiState.current <- uiState
         latestSession.current <- session
         latestLayer.current <- layer
         latestOnChange.current <- onChange
+        latestConnections.current <- connections
+
+        // Marks the cards connected to the hovered card with a data attribute, styled
+        // by the cards' CSS; imperative on purpose so hovering never re-renders the
+        // editor tree.
+        React.useEffectOnce (fun () ->
+            let markRelated () =
+                match surfaceRef.current with
+                | None -> ()
+                | Some surface ->
+                    Motion.queryAll surface "[data-provenance-related]"
+                    |> Array.iter (fun node -> node.removeAttribute "data-provenance-related")
+
+                    match hoverStore.current.Current with
+                    | None -> ()
+                    | Some target ->
+                        let related =
+                            latestConnections.current
+                            |> List.choose (fun connection ->
+                                match target.Side with
+                                | ProvenanceSide.Input when connection.SourceGroupId = target.GroupId ->
+                                    Some(ProvenanceSide.Output, connection.TargetGroupId)
+                                | ProvenanceSide.Output when connection.TargetGroupId = target.GroupId ->
+                                    Some(ProvenanceSide.Input, connection.SourceGroupId)
+                                | _ -> None
+                            )
+                            |> List.distinct
+
+                        for relatedSide, groupId in related do
+                            let node: Browser.Types.HTMLElement =
+                                !!
+                                    surface.querySelector
+                                    ($"[data-provenance-group-node='{DragDrop.groupNodeId relatedSide groupId}']")
+
+                            if not (isNull node) then
+                                node.setAttribute ("data-provenance-related", "true")
+
+            let unsubscribe = hoverStore.current |> HoverHighlight.subscribe markRelated
+            FsReact.createDisposable unsubscribe
+        )
 
         let commitUiState =
             React.useCallback (
@@ -1271,7 +1313,11 @@ type ProvenanceGrouping =
         DndKit.DndContext(
             sensors = sensors,
             collisionDetection = DndKit.pointerWithin,
-            onDragStart = DragHandlers.handleStart surfaceRef setActiveDrag liveDragStore.current,
+            onDragStart =
+                (fun event ->
+                    HoverHighlight.clear hoverStore.current
+                    DragHandlers.handleStart surfaceRef setActiveDrag liveDragStore.current event
+                ),
             onDragMove = DragHandlers.handleMove liveDragStore.current,
             onDragCancel =
                 (fun _ ->
@@ -1289,12 +1335,14 @@ type ProvenanceGrouping =
                     density
                     (ConnectionDragHints.provider
                         connectionDragSide
-                        (React.Fragment [
-                            content
-                            DndKit.DragOverlay(
-                                children = EditorSurface.dragOverlay lookups.FindPropertyValue debug activeDrag
-                            )
-                        ]))
+                        (HoverHighlight.provider
+                            hoverStore.current
+                            (React.Fragment [
+                                content
+                                DndKit.DragOverlay(
+                                    children = EditorSurface.dragOverlay lookups.FindPropertyValue debug activeDrag
+                                )
+                            ])))
         )
 
     [<ReactComponent>]
