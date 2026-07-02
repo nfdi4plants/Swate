@@ -190,9 +190,11 @@ const LazyTree = () => {
   const dataSource = React.useMemo(
     () => ({
       GetChildrenCount: () => 1,
-      GetTreeItems: async () => {
+      GetTreeItems: async (item: DemoNode | null | undefined) => {
         setLoadCount((count) => count + 1);
-        return [branch("arc/lazy-studies/study_02", "Study 02", [leaf("arc/lazy-studies/study_02/isa.study.xlsx", "isa.study.xlsx")])];
+        return item?.id === "arc/lazy-studies"
+          ? [branch("arc/lazy-studies/study_02", "Study 02", [leaf("arc/lazy-studies/study_02/isa.study.xlsx", "isa.study.xlsx")])]
+          : [];
       },
     }),
     [],
@@ -235,10 +237,12 @@ const CountedDataSourceBranchTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: () => 1,
+      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/assays" ? 1 : 0),
       GetTreeItems: async (item: DemoNode | null | undefined) => {
         setLoadLog((current) => [...current, item?.id ?? "root"]);
-        return [branch("arc/assays/assay_02", "Assay 02", [leaf("arc/assays/assay_02/isa.assay.xlsx", "isa.assay.xlsx")])];
+        return item?.id === "arc/assays"
+          ? [branch("arc/assays/assay_02", "Assay 02", [leaf("arc/assays/assay_02/isa.assay.xlsx", "isa.assay.xlsx")])]
+          : [];
       },
     }),
     [],
@@ -260,6 +264,42 @@ export const DataSourceBranchClickExpandsCountedChildren: Story = {
     await userEvent.click(canvas.getByText("assays"));
     await expect(await canvas.findByText("Assay 02")).toBeVisible();
     await expect(canvas.getByTestId("unknown-count-load-log")).toHaveTextContent("arc/assays");
+  },
+};
+
+const UnknownCountDataSourceBranchTree = () => {
+  const [loadLog, setLoadLog] = React.useState<string[]>([]);
+  const items = React.useMemo(() => [branch("arc/runs", "runs", undefined)], []);
+
+  const dataSource = React.useMemo(
+    () => ({
+      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/runs" ? -1 : 0),
+      GetTreeItems: async (item: DemoNode | null | undefined) => {
+        setLoadLog((current) => [...current, item?.id ?? "root"]);
+        return item?.id === "arc/runs"
+          ? [branch("arc/runs/run_01", "Run 01", [leaf("arc/runs/run_01/isa.run.xlsx", "isa.run.xlsx")])]
+          : [];
+      },
+    }),
+    [],
+  );
+
+  return (
+    <div className="swt:w-96 swt:space-y-2">
+      <Tree items={items} dataSource={dataSource as any} debug />
+      <div data-testid="unknown-count-load-log">Loaded: {loadLog.join("|") || "none"}</div>
+    </div>
+  );
+};
+
+export const DataSourceBranchClickExpandsUnknownChildren: Story = {
+  render: () => <UnknownCountDataSourceBranchTree />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByText("runs"));
+    await expect(await canvas.findByText("Run 01")).toBeVisible();
+    await expect(canvas.getByTestId("unknown-count-load-log")).toHaveTextContent("arc/runs");
   },
 };
 
@@ -364,11 +404,13 @@ const DataSourceInvalidateAllTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: () => 1,
-      GetTreeItems: async () => {
+      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/workflows" ? 1 : 0),
+      GetTreeItems: async (item: DemoNode | null | undefined) => {
         const version = versionRef.current;
         setLoadCount((count) => count + 1);
-        return [branch(`arc/workflows/workflow_${version}`, `Workflow ${version}`, [leaf(`arc/workflows/workflow_${version}/workflow.xlsx`, "workflow.xlsx")])];
+        return item?.id === "arc/workflows"
+          ? [branch(`arc/workflows/workflow_${version}`, `Workflow ${version}`, [leaf(`arc/workflows/workflow_${version}/workflow.xlsx`, "workflow.xlsx")])]
+          : [];
       },
     }),
     [],
@@ -417,8 +459,9 @@ const LazyErrorTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: () => 1,
-      GetTreeItems: async () => {
+      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/runs" ? 1 : 0),
+      GetTreeItems: async (item: DemoNode | null | undefined) => {
+        if (item?.id !== "arc/runs") return [];
         throw new Error("Run metadata could not be loaded");
       },
     }),

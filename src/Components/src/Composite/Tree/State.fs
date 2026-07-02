@@ -64,14 +64,16 @@ module NodeState =
             | None, Some source -> source.GetChildrenCount(Some node)
             | None, None -> 0
 
+    let private hasExpandableChildCount count = count <> 0
+
     let canExpand dataSource loadedChildren node =
         if not (isBranch node) then
             false
         else
             match directChildren loadedChildren node, node.childrenCount, dataSource with
             | Some children, _, _ -> children.Length > 0
-            | None, Some count, _ -> count > 0
-            | None, None, Some source -> source.GetChildrenCount(Some node) > 0
+            | None, Some count, _ -> hasExpandableChildCount count
+            | None, None, Some source -> source.GetChildrenCount(Some node) |> hasExpandableChildCount
             | None, None, None -> false
 
     let flattenVisible dataSource loadedChildren expandedIds items =
@@ -79,25 +81,26 @@ module NodeState =
         let nodeMap = ResizeArray<string * TreeItem<'T>>()
         let parentMap = ResizeArray<string * string option>()
 
-        let rec loop parentId depth (items: TreeItem<'T>[]) =
+        let rec loop ancestors parentId depth (items: TreeItem<'T>[]) =
             for item in items do
-                nodes.Add {
-                    Node = item
-                    Depth = depth
-                    ParentId = parentId
-                }
+                if not (ancestors |> Set.contains item.id) then
+                    nodes.Add {
+                        Node = item
+                        Depth = depth
+                        ParentId = parentId
+                    }
 
-                nodeMap.Add(item.id, item)
-                parentMap.Add(item.id, parentId)
+                    nodeMap.Add(item.id, item)
+                    parentMap.Add(item.id, parentId)
 
-                if expandedIds |> Set.contains item.id then
-                    match directChildren loadedChildren item with
-                    | Some children -> loop (Some item.id) (depth + 1) children
-                    | None ->
-                        if canExpand dataSource loadedChildren item then
-                            ()
+                    if expandedIds |> Set.contains item.id then
+                        match directChildren loadedChildren item with
+                        | Some children -> loop (ancestors |> Set.add item.id) (Some item.id) (depth + 1) children
+                        | None ->
+                            if canExpand dataSource loadedChildren item then
+                                ()
 
-        loop None 0 items
+        loop Set.empty None 0 items
 
         {
             Nodes = nodeMap |> Seq.distinctBy fst |> Map.ofSeq
