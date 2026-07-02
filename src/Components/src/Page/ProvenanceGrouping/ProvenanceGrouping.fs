@@ -1343,26 +1343,55 @@ type ProvenanceGrouping =
                                 (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),
                                 debug = debug
                             )
-                            match uiState.Error with
-                            | Some error -> EditorPanels.errorAlert error
-                            | None -> Html.none
-                            match uiState.PendingAssignmentBatch with
-                            | Some batch ->
-                                EditorPanels.assignmentBatchWarning
-                                    debug
-                                    batch
-                                    confirmBatch
-                                    (fun () -> applyUiState State.AssignmentBatch.clear)
-                            | None -> Html.none
-                            match uiState.PendingMemberResolution with
-                            | Some pending ->
-                                EditorPanels.memberResolutionPrompt
-                                    debug
-                                    pending
-                                    resolveAllToAll
-                                    (fun pending -> applyUiState (State.MemberResolution.chooseManual pending))
-                                    (fun () -> applyUiState State.MemberResolution.clearPending)
-                            | None -> Html.none
+                            // Alerts and prompts float over the surface from a zero-height
+                            // anchor: showing them no longer pushes the whole editor down
+                            // (which also forced a full connector remeasure).
+                            Html.div [
+                                prop.className "swt:relative swt:z-30 swt:h-0"
+                                prop.children [
+                                    Html.div [
+                                        prop.className
+                                            "swt:pointer-events-none swt:absolute swt:inset-x-0 swt:top-2 swt:mx-auto swt:flex swt:w-full swt:max-w-3xl swt:flex-col swt:gap-2 swt:px-4"
+                                        prop.children [
+                                            let floatingPanel content =
+                                                Html.div [
+                                                    prop.className
+                                                        "swt:pointer-events-auto swt:rounded-box swt:shadow-lg swt:motion-pop-in"
+                                                    prop.children [ content ]
+                                                ]
+
+                                            match uiState.Error with
+                                            | Some error -> floatingPanel (EditorPanels.errorAlert error)
+                                            | None -> Html.none
+
+                                            match uiState.PendingAssignmentBatch with
+                                            | Some batch ->
+                                                floatingPanel (
+                                                    EditorPanels.assignmentBatchWarning
+                                                        debug
+                                                        batch
+                                                        confirmBatch
+                                                        (fun () -> applyUiState State.AssignmentBatch.clear)
+                                                )
+                                            | None -> Html.none
+
+                                            match uiState.PendingMemberResolution with
+                                            | Some pending ->
+                                                floatingPanel (
+                                                    EditorPanels.memberResolutionPrompt
+                                                        debug
+                                                        pending
+                                                        resolveAllToAll
+                                                        (fun pending ->
+                                                            applyUiState (State.MemberResolution.chooseManual pending)
+                                                        )
+                                                        (fun () -> applyUiState State.MemberResolution.clearPending)
+                                                )
+                                            | None -> Html.none
+                                        ]
+                                    ]
+                                ]
+                            ]
                         ]
                     ]
                     surface
