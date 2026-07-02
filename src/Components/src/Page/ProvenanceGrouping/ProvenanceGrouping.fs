@@ -57,35 +57,64 @@ type ProvenanceGrouping =
             FsReact.createDisposable (fun () -> TierObserver.disconnect observer)
         )
 
-        let uiState = State.Sides.ensure session rawUiState
+        let uiState =
+            React.useMemo ((fun () -> State.Sides.ensure session rawUiState), [| box session; box rawUiState |])
 
         let layer, inputGroups, outputGroups, connections =
             React.useMemo ((fun () -> Display.displayLayer session uiState), [| box session; box uiState.SideStates |])
 
+        // Event handlers below read these refs instead of closing over render values,
+        // so their identities stay stable and memoized subtrees never act on stale
+        // sessions or UI state.
         let latestUiState = React.useRef uiState
-        let activeLayerId = React.useRef layer.Id
+        let latestSession = React.useRef session
+        let latestLayer = React.useRef layer
+        let latestOnChange = React.useRef onChange
         latestUiState.current <- uiState
-        activeLayerId.current <- layer.Id
+        latestSession.current <- session
+        latestLayer.current <- layer
+        latestOnChange.current <- onChange
 
-        let applyUiState update =
-            let next = update latestUiState.current
-            latestUiState.current <- next
-            setUiState next
+        let commitUiState =
+            React.useCallback (
+                (fun next ->
+                    latestUiState.current <- next
+                    setUiState next
+                ),
+                [||]
+            )
+
+        let applyUiState: (UiState -> UiState) -> unit =
+            React.useCallback ((fun update -> commitUiState (update latestUiState.current)), [||])
 
         let panelRatios = State.PanelLayout.get layer.Id uiState
 
-        let endpointKinds = Endpoints.endpointKindOptions ()
+        let endpointKinds =
+            React.useMemo ((fun () -> Endpoints.endpointKindOptions ()), [||])
 
-        let existingEndpointNames = [
-            yield!
-                inputGroups
-                |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
-            yield!
-                outputGroups
-                |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
-        ]
+        let existingEndpointNames =
+            React.useMemo (
+                (fun () -> [
+                    yield!
+                        inputGroups
+                        |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
+                    yield!
+                        outputGroups
+                        |> List.collect (fun group -> group.Members |> List.map (fun member' -> member'.Name))
+                ]),
+                [| box inputGroups; box outputGroups |]
+            )
 
-        let lookups = EditorLookups.create layer uiState inputGroups outputGroups
+        let lookups =
+            React.useMemo (
+                (fun () -> EditorLookups.create layer uiState inputGroups outputGroups),
+                [|
+                    box layer
+                    box uiState.PaletteValues
+                    box inputGroups
+                    box outputGroups
+                |]
+            )
 
         let inputRailProjection =
             React.useMemo (
@@ -137,29 +166,65 @@ type ProvenanceGrouping =
         let outputSideState = State.Sides.get layer.OutputSideId uiState
 
         let activeInputRailProjection =
-            EditorSurface.dropZoneProjection
-                layer.Id
-                ProvenanceSide.Input
-                uiState
-                inputSideState.GroupingAssignments
-                inputRailProjection
+            React.useMemo (
+                (fun () ->
+                    EditorSurface.dropZoneProjection
+                        layer.Id
+                        ProvenanceSide.Input
+                        uiState
+                        inputSideState.GroupingAssignments
+                        inputRailProjection
+                ),
+                [|
+                    box layer.Id
+                    box uiState.PropertyRailPlacements
+                    box inputSideState
+                    box inputRailProjection
+                |]
+            )
 
         let activeOutputRailProjection =
-            EditorSurface.dropZoneProjection
-                layer.Id
-                ProvenanceSide.Output
-                uiState
-                outputSideState.GroupingAssignments
-                outputRailProjection
+            React.useMemo (
+                (fun () ->
+                    EditorSurface.dropZoneProjection
+                        layer.Id
+                        ProvenanceSide.Output
+                        uiState
+                        outputSideState.GroupingAssignments
+                        outputRailProjection
+                ),
+                [|
+                    box layer.Id
+                    box uiState.PropertyRailPlacements
+                    box outputSideState
+                    box outputRailProjection
+                |]
+            )
 
         let propertyShelfFolders =
-            PropertyShelf.folders session layer uiState inputRailProjection outputRailProjection
+            React.useMemo (
+                (fun () -> PropertyShelf.folders session layer uiState inputRailProjection outputRailProjection),
+                [|
+                    box session
+                    box layer
+                    box uiState.PropertyRailPlacements
+                    box uiState.PropertyColors
+                    box uiState.SideStates
+                    box inputRailProjection
+                    box outputRailProjection
+                |]
+            )
 
         let defaultPropertyShelfFolderIds =
-            propertyShelfFolders
-            |> List.tryHead
-            |> Option.map (fun folder -> Set.singleton folder.Id)
-            |> Option.defaultValue Set.empty
+            React.useMemo (
+                (fun () ->
+                    propertyShelfFolders
+                    |> List.tryHead
+                    |> Option.map (fun folder -> Set.singleton folder.Id)
+                    |> Option.defaultValue Set.empty
+                ),
+                [| box propertyShelfFolders |]
+            )
 
         let propertyShelfExpandedFolderIds =
             match propertyShelfFolderExpansion with
@@ -167,89 +232,98 @@ type ProvenanceGrouping =
             | _ -> defaultPropertyShelfFolderIds
 
         let setPropertyShelfExpandedFolderIds folderIds =
-            setPropertyShelfFolderExpansion (Some(layer.Id, folderIds))
+            setPropertyShelfFolderExpansion (Some(latestLayer.current.Id, folderIds))
 
         let setPropertyShelfFolderColor folderId color =
-            applyUiState (PropertyShelf.setFolderColor session folderId color)
+            applyUiState (PropertyShelf.setFolderColor latestSession.current folderId color)
 
         let propertyShelf =
-            Html.section [
-                prop.className
-                    "swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100/80 swt:p-3 swt:shadow-sm"
-                if debug then
-                    prop.testId "provenance-property-shelf"
-                prop.children [
-                    Html.div [
-                        prop.className "swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2"
+            React.useMemo (
+                (fun () ->
+                    Html.section [
+                        prop.className
+                            "swt:flex swt:min-w-0 swt:flex-col swt:gap-3 swt:rounded-lg swt:border swt:border-base-300 swt:bg-base-100/80 swt:p-3 swt:shadow-sm"
+                        if debug then
+                            prop.testId "provenance-property-shelf"
                         prop.children [
                             Html.div [
-                                prop.className
-                                    "swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-sm swt:font-medium"
+                                prop.className "swt:flex swt:min-w-0 swt:items-center swt:justify-between swt:gap-2"
                                 prop.children [
-                                    Html.i [
-                                        prop.className [
-                                            "swt:iconify swt:size-5 swt:shrink-0"
-                                            if isPropertyShelfExpanded then
-                                                "swt:fluent--folder-open-24-regular"
-                                            else
-                                                "swt:fluent--folder-24-regular"
+                                    Html.div [
+                                        prop.className
+                                            "swt:flex swt:min-w-0 swt:items-center swt:gap-2 swt:text-sm swt:font-medium"
+                                        prop.children [
+                                            Html.i [
+                                                prop.className [
+                                                    "swt:iconify swt:size-5 swt:shrink-0"
+                                                    if isPropertyShelfExpanded then
+                                                        "swt:fluent--folder-open-24-regular"
+                                                    else
+                                                        "swt:fluent--folder-24-regular"
+                                                ]
+                                            ]
+                                            Html.span [
+                                                prop.className "swt:min-w-0 swt:truncate"
+                                                prop.text "Available properties"
+                                            ]
                                         ]
                                     ]
-                                    Html.span [
-                                        prop.className "swt:min-w-0 swt:truncate"
-                                        prop.text "Available properties"
+                                    Html.button [
+                                        prop.title (
+                                            if isPropertyShelfExpanded then
+                                                "Minimize property folders"
+                                            else
+                                                "Expand property folders"
+                                        )
+                                        prop.type'.button
+                                        prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:size-8 swt:p-0"
+                                        prop.custom ("aria-expanded", isPropertyShelfExpanded)
+                                        prop.ariaLabel (
+                                            if isPropertyShelfExpanded then
+                                                "Minimize property folders"
+                                            else
+                                                "Expand property folders"
+                                        )
+                                        if debug then
+                                            prop.testId "provenance-property-shelf-toggle"
+                                        prop.onClick (fun _ ->
+                                            setIsPropertyShelfExpanded (not isPropertyShelfExpanded)
+                                        )
+                                        prop.children [
+                                            Html.i [
+                                                prop.className [
+                                                    "swt:iconify swt:size-4"
+                                                    if isPropertyShelfExpanded then
+                                                        "swt:fluent--chevron-up-20-regular"
+                                                    else
+                                                        "swt:fluent--chevron-down-20-regular"
+                                                ]
+                                            ]
+                                        ]
                                     ]
                                 ]
                             ]
-                            Html.button [
-                                prop.title (
-                                    if isPropertyShelfExpanded then
-                                        "Minimize property folders"
-                                    else
-                                        "Expand property folders"
+                            if isPropertyShelfExpanded then
+                                FolderedDraggableList.FolderedDraggableList<PropertyShelfItemPayload>(
+                                    propertyShelfFolders,
+                                    (fun _ item ->
+                                        DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header
+                                    ),
+                                    expandedFolderIds = propertyShelfExpandedFolderIds,
+                                    onExpandedFolderIdsChange = setPropertyShelfExpandedFolderIds,
+                                    onSetFolderColor = setPropertyShelfFolderColor,
+                                    className = "swt:min-w-0",
+                                    debug = debug
                                 )
-                                prop.type'.button
-                                prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:size-8 swt:p-0"
-                                prop.custom ("aria-expanded", isPropertyShelfExpanded)
-                                prop.ariaLabel (
-                                    if isPropertyShelfExpanded then
-                                        "Minimize property folders"
-                                    else
-                                        "Expand property folders"
-                                )
-                                if debug then
-                                    prop.testId "provenance-property-shelf-toggle"
-                                prop.onClick (fun _ -> setIsPropertyShelfExpanded (not isPropertyShelfExpanded))
-                                prop.children [
-                                    Html.i [
-                                        prop.className [
-                                            "swt:iconify swt:size-4"
-                                            if isPropertyShelfExpanded then
-                                                "swt:fluent--chevron-up-20-regular"
-                                            else
-                                                "swt:fluent--chevron-down-20-regular"
-                                        ]
-                                    ]
-                                ]
-                            ]
                         ]
                     ]
-                    if isPropertyShelfExpanded then
-                        FolderedDraggableList.FolderedDraggableList<PropertyShelfItemPayload>(
-                            propertyShelfFolders,
-                            (fun _ item -> DragDrop.folderPropertyDragId item.Payload.SourceSide item.Payload.Header),
-                            expandedFolderIds = propertyShelfExpandedFolderIds,
-                            onExpandedFolderIdsChange = setPropertyShelfExpandedFolderIds,
-                            onSetFolderColor = setPropertyShelfFolderColor,
-                            className = "swt:min-w-0",
-                            debug = debug
-                        )
-                ]
-            ]
-
-        let commitUiState next =
-            latestUiState.current <- next
-            setUiState next
+                ),
+                [|
+                    box propertyShelfFolders
+                    box isPropertyShelfExpanded
+                    box propertyShelfExpandedFolderIds
+                |]
+            )
 
         React.useEffect (
             (fun () ->
@@ -268,38 +342,93 @@ type ProvenanceGrouping =
             |]
         )
 
-        let commitPanelRatio side clientX =
-            match surfaceRef.current with
-            | None -> ()
-            | Some surface ->
-                let rect = surface.getBoundingClientRect ()
+        // Splitter drags write the grid template straight to the DOM per animation
+        // frame and commit the ratios to state once on release; committing per
+        // pointermove re-rendered the entire editor for every mouse step.
+        let liveSplitRatios = React.useRef (None: PanelRatios option)
+        let splitFrame = React.useRef (None: float option)
+        let activeSplit, setActiveSplit = React.useState<Splitter.SplitterSide option> None
 
-                let rawPercent =
-                    if rect.width <= 0. then
-                        0.
-                    else
-                        ((clientX - rect.left) / rect.width) * 100.
+        let applyLiveSplitTemplate =
+            React.useCallback (
+                (fun () ->
+                    splitFrame.current <- None
 
-                let splitPercent = rawPercent |> max 0. |> min 100. |> round |> int
+                    match surfaceRef.current, liveSplitRatios.current with
+                    | Some surface, Some ratios -> Splitter.applyTemplate surface (Splitter.template ratios)
+                    | _ -> ()
+                ),
+                [||]
+            )
 
-                let current = latestUiState.current
+        let updateLiveSplit =
+            React.useCallback (
+                (fun (side, clientX) ->
+                    match surfaceRef.current with
+                    | None -> ()
+                    | Some surface ->
+                        let rect = surface.getBoundingClientRect ()
 
-                let next =
-                    match side with
-                    | Splitter.Left -> State.PanelLayout.setLeft activeLayerId.current splitPercent current
-                    | Splitter.Right -> State.PanelLayout.setRight activeLayerId.current (100 - splitPercent) current
+                        let rawPercent =
+                            if rect.width <= 0. then
+                                0.
+                            else
+                                ((clientX - rect.left) / rect.width) * 100.
 
-                latestUiState.current <- next
-                setUiState next
+                        let splitPercent = rawPercent |> max 0. |> min 100. |> round |> int
+
+                        let current =
+                            liveSplitRatios.current
+                            |> Option.defaultWith (fun () ->
+                                State.PanelLayout.get latestLayer.current.Id latestUiState.current
+                            )
+
+                        let next =
+                            match side with
+                            | Splitter.Left -> State.PanelLayout.clamped splitPercent current.Right
+                            | Splitter.Right -> State.PanelLayout.clamped current.Left (100 - splitPercent)
+
+                        liveSplitRatios.current <- Some next
+
+                        match splitFrame.current with
+                        | Some _ -> ()
+                        | None -> splitFrame.current <- Some(AnimationFrame.request applyLiveSplitTemplate)
+                ),
+                [||]
+            )
+
+        let finishSplitDrag =
+            React.useCallback (
+                (fun () ->
+                    match splitDrag.current with
+                    | None -> ()
+                    | Some _ ->
+                        splitDrag.current <- None
+
+                        match splitFrame.current with
+                        | Some handle ->
+                            AnimationFrame.cancel handle
+                            splitFrame.current <- None
+                        | None -> ()
+
+                        match liveSplitRatios.current with
+                        | Some ratios -> applyUiState (State.PanelLayout.set latestLayer.current.Id ratios)
+                        | None -> ()
+
+                        liveSplitRatios.current <- None
+                        setActiveSplit None
+                ),
+                [||]
+            )
 
         React.useEffectOnce (fun () ->
             let onMove =
                 fun (event: Browser.Types.PointerEvent) ->
                     match splitDrag.current with
-                    | Some side -> commitPanelRatio side event.clientX
+                    | Some side -> updateLiveSplit (side, event.clientX)
                     | None -> ()
 
-            let stopDragging = fun (_: Browser.Types.PointerEvent) -> splitDrag.current <- None
+            let stopDragging = fun (_: Browser.Types.PointerEvent) -> finishSplitDrag ()
 
             Browser.Dom.document.addEventListener ("pointermove", unbox onMove)
             Browser.Dom.document.addEventListener ("pointerup", unbox stopDragging)
@@ -315,7 +444,22 @@ type ProvenanceGrouping =
         let startPanelDrag side (event: Browser.Types.PointerEvent) =
             event.preventDefault ()
             splitDrag.current <- Some side
-            commitPanelRatio side event.clientX
+            liveSplitRatios.current <- Some(State.PanelLayout.get latestLayer.current.Id latestUiState.current)
+            setActiveSplit (Some side)
+            updateLiveSplit (side, event.clientX)
+
+        let nudgeSplit side delta =
+            applyUiState (fun state ->
+                let layerId = latestLayer.current.Id
+                let current = State.PanelLayout.get layerId state
+
+                match side with
+                | Splitter.Left -> State.PanelLayout.setLeft layerId (current.Left + delta) state
+                | Splitter.Right -> State.PanelLayout.setRight layerId (current.Right - delta) state
+            )
+
+        let resetSplit () =
+            applyUiState (State.PanelLayout.set latestLayer.current.Id State.PanelLayout.defaultRatios)
 
         let pointerSensor =
             DndKit.useSensor (
@@ -327,43 +471,52 @@ type ProvenanceGrouping =
 
         let sensors = DndKit.useSensors [| pointerSensor |]
 
-        let publish result =
-            match result with
-            | Ok(next, patches) ->
-                LiveDrag.clear liveDragStore.current
+        // publish and the actions below read session/layer/UI state through the
+        // latest refs so that memoized subtrees never fire an action against a
+        // session that has since been replaced.
+        let publish =
+            React.useCallback (
+                (fun (result: SessionResult) ->
+                    match result with
+                    | Ok(next, patches) ->
+                        LiveDrag.clear liveDragStore.current
 
-                let nextUiState = latestUiState.current |> State.Sides.ensure next
+                        let nextUiState = latestUiState.current |> State.Sides.ensure next
 
-                commitUiState {
-                    nextUiState with
-                        Error = None
-                        PendingAssignmentBatch = None
-                        PendingMemberResolution = None
-                }
+                        commitUiState {
+                            nextUiState with
+                                Error = None
+                                PendingAssignmentBatch = None
+                                PendingMemberResolution = None
+                        }
 
-                onChange { Session = next; Patches = patches }
-            | Error error ->
-                LiveDrag.clear liveDragStore.current
+                        latestOnChange.current { Session = next; Patches = patches }
+                    | Error error ->
+                        LiveDrag.clear liveDragStore.current
 
-                commitUiState {
-                    latestUiState.current with
-                        Error = Some(string error)
-                }
+                        commitUiState {
+                            latestUiState.current with
+                                Error = Some(string error)
+                        }
+                ),
+                [||]
+            )
 
-        let createSet command =
-            EditorActions.createSet session publish command
+        let createSet =
+            React.useCallback ((fun command -> EditorActions.createSet latestSession.current publish command), [||])
 
         let addPaletteValue side header value unit =
+            let layer = latestLayer.current
             applyUiState (State.Palette.addValue layer.Id layer.Model.Source side header value unit)
 
-        let toggleSideGrouping layerId side header =
-            applyUiState (State.GroupingAssignments.toggleSide layerId side header)
+        let toggleSideGrouping sideId side header =
+            applyUiState (State.GroupingAssignments.toggleSide sideId side header)
 
         let togglePropertyExpanded side header =
-            applyUiState (State.PropertyExpansion.toggle layer.Id side header)
+            applyUiState (State.PropertyExpansion.toggle latestLayer.current.Id side header)
 
         let toggleSelection side groupId =
-            applyUiState (State.Selection.toggle layer.Id side groupId)
+            applyUiState (State.Selection.toggle latestLayer.current.Id side groupId)
 
         let toggleGroupDetail side groupId =
             applyUiState (State.Detail.toggleGroup side groupId)
@@ -372,7 +525,8 @@ type ProvenanceGrouping =
             Session.propertyValueSourceInfo layer value
 
         let setPropertyColor header color =
-            let colorContext = State.PropertyColors.visibleColorContextForLayer session layer
+            let colorContext =
+                State.PropertyColors.visibleColorContextForLayer latestSession.current latestLayer.current
 
             let update =
                 match color with
@@ -411,33 +565,39 @@ type ProvenanceGrouping =
             )
 
         let confirmBatch (pending: PendingAssignmentBatch) =
-            EditorActions.applyAssignmentBatch session publish pending.Batch
+            EditorActions.applyAssignmentBatch latestSession.current publish pending.Batch
 
-        let connectSetPairs = EditorActions.connectSetPairs session publish
+        let connectSetPairs pairs =
+            EditorActions.connectSetPairs latestSession.current publish pairs
 
-        let removeDisplayConnection (connection: DisplayConnection) =
-            match Session.removeConnections connection.ConnectionIds session with
-            | Ok(next, patches) ->
-                LiveDrag.clear liveDragStore.current
+        let removeDisplayConnection =
+            React.useCallback (
+                (fun (connection: DisplayConnection) ->
+                    match Session.removeConnections connection.ConnectionIds latestSession.current with
+                    | Ok(next, patches) ->
+                        LiveDrag.clear liveDragStore.current
 
-                let nextUiState = latestUiState.current |> State.Sides.ensure next
+                        let nextUiState = latestUiState.current |> State.Sides.ensure next
 
-                commitUiState {
-                    nextUiState with
-                        Error = None
-                        PendingAssignmentBatch = None
-                        PendingMemberResolution = None
-                        Detail = None
-                }
+                        commitUiState {
+                            nextUiState with
+                                Error = None
+                                PendingAssignmentBatch = None
+                                PendingMemberResolution = None
+                                Detail = None
+                        }
 
-                onChange { Session = next; Patches = patches }
-            | Error error ->
-                LiveDrag.clear liveDragStore.current
+                        latestOnChange.current { Session = next; Patches = patches }
+                    | Error error ->
+                        LiveDrag.clear liveDragStore.current
 
-                commitUiState {
-                    latestUiState.current with
-                        Error = Some(string error)
-                }
+                        commitUiState {
+                            latestUiState.current with
+                                Error = Some(string error)
+                        }
+                ),
+                [||]
+            )
 
         let resolveAllToAll (pending: PendingMemberResolution) =
             match
@@ -446,7 +606,7 @@ type ProvenanceGrouping =
             with
             | Some inputGroup, Some outputGroup ->
                 EditorActions.allMemberPairs inputGroup outputGroup |> connectSetPairs
-            | _ -> State.MemberResolution.clearPending uiState |> setUiState
+            | _ -> applyUiState State.MemberResolution.clearPending
 
         let isGroupedCard side groupId =
             lookups.FindGroup side groupId
@@ -503,9 +663,27 @@ type ProvenanceGrouping =
                    } -> headerCannotSwitch sourceSide headerId
             | _ -> false
 
-        let railPanel side =
-            let layer = Session.activeLayer session
+        let isPropertyDragActive =
+            match activeDrag with
+            | Some {
+                       Payload = DragDrop.Payload.FolderPropertyHeader _
+                   }
+            | Some {
+                       Payload = DragDrop.Payload.PropertyHeader _
+                   } -> true
+            | _ -> false
 
+        let connectionDragSide =
+            match activeDrag with
+            | Some {
+                       Payload = DragDrop.Payload.ConnectionHandle handle
+                   } -> Some handle.Side
+            | _ -> None
+
+        let inputRailDropRejected = isRejectedPropertyRailDrop ProvenanceSide.Input
+        let outputRailDropRejected = isRejectedPropertyRailDrop ProvenanceSide.Output
+
+        let buildRailPanel side isDropRejected =
             let sideId, oppositeSideId, targetSide =
                 match side with
                 | ProvenanceSide.Input -> layer.InputSideId, layer.OutputSideId, ProvenanceSide.Output
@@ -532,9 +710,39 @@ type ProvenanceGrouping =
                 (fun header value unit -> addPaletteValue side header value unit)
                 setPropertyColor
                 sourceInfoForValue
-                (isRejectedPropertyRailDrop side)
+                isDropRejected
+                (isPropertyDragActive && not isDropRejected)
                 debug
                 setIsValueChipDragging
+
+        let inputRailPanel =
+            React.useMemo (
+                (fun () -> buildRailPanel ProvenanceSide.Input inputRailDropRejected),
+                [|
+                    box layer
+                    box activeInputRailProjection
+                    box inputSideState
+                    box inputRailDropRejected
+                    box isPropertyDragActive
+                |]
+            )
+
+        let outputRailPanel =
+            React.useMemo (
+                (fun () -> buildRailPanel ProvenanceSide.Output outputRailDropRejected),
+                [|
+                    box layer
+                    box activeOutputRailProjection
+                    box outputSideState
+                    box outputRailDropRejected
+                    box isPropertyDragActive
+                |]
+            )
+
+        let railPanel side =
+            match side with
+            | ProvenanceSide.Input -> inputRailPanel
+            | ProvenanceSide.Output -> outputRailPanel
 
         let railColumn side =
             Html.div [
@@ -560,14 +768,24 @@ type ProvenanceGrouping =
         let connectionCountFor side groupId =
             connectionCounts |> Map.tryFind (side, groupId) |> Option.defaultValue 0
 
-        let groupColumnFor side withConnectionBadges =
-            let unsorted =
-                match side with
-                | ProvenanceSide.Input -> inputGroups
-                | ProvenanceSide.Output -> outputGroups
+        let sortedInputGroups =
+            React.useMemo (
+                (fun () -> Display.sortGroups uiState.Filters.GroupSort connections inputGroups),
+                [| box uiState.Filters; box connections; box inputGroups |]
+            )
 
-            let groups = Display.sortGroups uiState.Filters.GroupSort connections unsorted
+        let sortedOutputGroups =
+            React.useMemo (
+                (fun () -> Display.sortGroups uiState.Filters.GroupSort connections outputGroups),
+                [| box uiState.Filters; box connections; box outputGroups |]
+            )
 
+        // Group columns carry one card per display group; memoizing the rendered
+        // columns keeps unrelated state changes (search text, rail expansion, panel
+        // toggles) from reconciling hundreds of cards on large models.
+        let withConnectionBadges = tier = LayoutTier.Narrow
+
+        let buildGroupColumn side groups =
             let counts groupId =
                 if withConnectionBadges then
                     Some(connectionCountFor side groupId)
@@ -590,6 +808,45 @@ type ProvenanceGrouping =
                 sourceInfoForValue
                 debug
                 isValueChipDragging
+
+        let inputGroupColumn =
+            React.useMemo (
+                (fun () -> buildGroupColumn ProvenanceSide.Input sortedInputGroups),
+                [|
+                    box layer
+                    box sortedInputGroups
+                    box existingEndpointNames
+                    box uiState.SelectedInputs
+                    box uiState.ExpandedGroup
+                    box connections
+                    box lookups
+                    box connectionCounts
+                    box withConnectionBadges
+                    box isValueChipDragging
+                |]
+            )
+
+        let outputGroupColumn =
+            React.useMemo (
+                (fun () -> buildGroupColumn ProvenanceSide.Output sortedOutputGroups),
+                [|
+                    box layer
+                    box sortedOutputGroups
+                    box existingEndpointNames
+                    box uiState.SelectedOutputs
+                    box uiState.ExpandedGroup
+                    box connections
+                    box lookups
+                    box connectionCounts
+                    box withConnectionBadges
+                    box isValueChipDragging
+                |]
+            )
+
+        let groupColumnFor side =
+            match side with
+            | ProvenanceSide.Input -> inputGroupColumn
+            | ProvenanceSide.Output -> outputGroupColumn
 
         // Medium tier: rails fold into slim vertical strips, one open at a time.
         let mediumRailColumn side =
@@ -705,23 +962,54 @@ type ProvenanceGrouping =
             ]
             |> String.concat "|"
 
+        let connectorOverlayState =
+            React.useMemo (
+                (fun () -> ConnectorOverlayState.fromUiState uiState),
+                [|
+                    box uiState.ExpandedGroup
+                    box uiState.Detail
+                    box uiState.ExpandedProperties
+                |]
+            )
+
+        let selectConnection =
+            React.useCallback (
+                (fun (connection: DisplayConnection) -> applyUiState (State.Detail.showConnection connection.Id)),
+                [||]
+            )
+
         let connectorOverlay =
-            ConnectorOverlay.Main(
-                surfaceRef,
-                layer.Id,
-                layer.Model,
-                inputGroups,
-                outputGroups,
-                connections,
-                activeInputRailProjection,
-                activeOutputRailProjection,
-                ConnectorOverlayState.fromUiState uiState,
-                connectorLayoutSignature,
-                showPropertyHeaderConnectors,
-                liveDragStore.current,
-                (fun connection -> State.Detail.showConnection connection.Id uiState |> setUiState),
-                onRemove = removeDisplayConnection,
-                debug = debug
+            React.useMemo (
+                (fun () ->
+                    ConnectorOverlay.Main(
+                        surfaceRef,
+                        layer.Id,
+                        layer.Model,
+                        inputGroups,
+                        outputGroups,
+                        connections,
+                        activeInputRailProjection,
+                        activeOutputRailProjection,
+                        connectorOverlayState,
+                        connectorLayoutSignature,
+                        showPropertyHeaderConnectors,
+                        liveDragStore.current,
+                        selectConnection,
+                        onRemove = removeDisplayConnection,
+                        debug = debug
+                    )
+                ),
+                [|
+                    box layer
+                    box inputGroups
+                    box outputGroups
+                    box connections
+                    box activeInputRailProjection
+                    box activeOutputRailProjection
+                    box connectorOverlayState
+                    box connectorLayoutSignature
+                    box showPropertyHeaderConnectors
+                |]
             )
 
         let surface =
@@ -738,7 +1026,15 @@ type ProvenanceGrouping =
                     prop.children [
                         connectorOverlay
                         railColumn ProvenanceSide.Input
-                        Splitter.handle Splitter.Left (startPanelDrag Splitter.Left) debug
+
+                        Splitter.handle
+                            Splitter.Left
+                            (activeSplit = Some Splitter.Left)
+                            panelRatios.Left
+                            (startPanelDrag Splitter.Left)
+                            (nudgeSplit Splitter.Left)
+                            resetSplit
+                            debug
                         Html.div [
                             // The wide column gap is the gutter the group-to-group
                             // connectors are drawn in.
@@ -749,11 +1045,19 @@ type ProvenanceGrouping =
                                 | _ -> "swt:gap-16"
                             ]
                             prop.children [
-                                groupColumnFor ProvenanceSide.Input false
-                                groupColumnFor ProvenanceSide.Output false
+                                groupColumnFor ProvenanceSide.Input
+                                groupColumnFor ProvenanceSide.Output
                             ]
                         ]
-                        Splitter.handle Splitter.Right (startPanelDrag Splitter.Right) debug
+                        Splitter.handle
+                            Splitter.Right
+                            (activeSplit = Some Splitter.Right)
+                            (100 - panelRatios.Right)
+                            (startPanelDrag Splitter.Right)
+                            (nudgeSplit Splitter.Right)
+                            resetSplit
+                            debug
+
                         railColumn ProvenanceSide.Output
                     ]
                 ]
@@ -782,8 +1086,8 @@ type ProvenanceGrouping =
                             prop.className
                                 "swt:grid swt:min-w-0 swt:grid-cols-[minmax(0,1fr)_minmax(0,1fr)] swt:items-start swt:gap-8"
                             prop.children [
-                                groupColumnFor ProvenanceSide.Input false
-                                groupColumnFor ProvenanceSide.Output false
+                                groupColumnFor ProvenanceSide.Input
+                                groupColumnFor ProvenanceSide.Output
                             ]
                         ]
                         mediumRailColumn ProvenanceSide.Output
@@ -799,8 +1103,8 @@ type ProvenanceGrouping =
                         prop.testId "provenance-surface"
                     prop.children [
                         narrowRailSection ProvenanceSide.Input
-                        groupColumnFor ProvenanceSide.Input true
-                        groupColumnFor ProvenanceSide.Output true
+                        groupColumnFor ProvenanceSide.Input
+                        groupColumnFor ProvenanceSide.Output
                         narrowRailSection ProvenanceSide.Output
                     ]
                 ]
@@ -946,7 +1250,7 @@ type ProvenanceGrouping =
                                     debug
                                     batch
                                     confirmBatch
-                                    (fun () -> State.AssignmentBatch.clear uiState |> setUiState)
+                                    (fun () -> applyUiState State.AssignmentBatch.clear)
                             | None -> Html.none
                             match uiState.PendingMemberResolution with
                             | Some pending ->
@@ -983,12 +1287,14 @@ type ProvenanceGrouping =
             children =
                 Density.provider
                     density
-                    (React.Fragment [
-                        content
-                        DndKit.DragOverlay(
-                            children = EditorSurface.dragOverlay lookups.FindPropertyValue debug activeDrag
-                        )
-                    ])
+                    (ConnectionDragHints.provider
+                        connectionDragSide
+                        (React.Fragment [
+                            content
+                            DndKit.DragOverlay(
+                                children = EditorSurface.dragOverlay lookups.FindPropertyValue debug activeDrag
+                            )
+                        ]))
         )
 
     [<ReactComponent>]

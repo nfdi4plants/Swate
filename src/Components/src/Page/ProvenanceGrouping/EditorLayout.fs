@@ -29,26 +29,69 @@ module Splitter =
         // keeps readable space between the rails and the cards their connectors attach to.
         $"minmax(10rem, {left}fr) 4rem minmax(28rem, {middle}fr) 4rem minmax(10rem, {right}fr)"
 
+    /// Writes the grid template directly to the surface element for live drag
+    /// preview frames; the ratios are committed to state when the drag ends.
+    [<Emit("$0.style.setProperty('grid-template-columns', $1)")>]
+    let applyTemplate (_surface: Browser.Types.HTMLElement) (_template: string) : unit = jsNative
+
     let testId side =
         match side with
         | Left -> "provenance-left-splitter"
         | Right -> "provenance-right-splitter"
 
-    let handle side onPointerDown debug =
+    /// Keyboard resize step in whole percent of the surface width.
+    let keyboardStep = 2
+
+    let handle
+        side
+        (isActive: bool)
+        (valueNow: int)
+        (onPointerDown: Browser.Types.PointerEvent -> unit)
+        (onNudge: int -> unit)
+        (onReset: unit -> unit)
+        debug
+        =
         Html.div [
-            prop.className
-                "swt:group swt:flex swt:min-h-full swt:cursor-col-resize swt:items-stretch swt:justify-center swt:rounded hover:swt:bg-base-300/60"
+            prop.className [
+                "swt:group swt:flex swt:min-h-full swt:cursor-col-resize swt:items-stretch swt:justify-center swt:rounded swt:outline-none hover:swt:bg-base-300/60 focus-visible:swt:bg-base-300/60"
+                if isActive then
+                    "swt:bg-base-300/60"
+            ]
             prop.onPointerDown onPointerDown
+            prop.onDoubleClick (fun _ -> onReset ())
+            prop.onKeyDown (fun event ->
+                match event.key with
+                | "ArrowLeft" ->
+                    event.preventDefault ()
+                    onNudge (-keyboardStep)
+                | "ArrowRight" ->
+                    event.preventDefault ()
+                    onNudge keyboardStep
+                | "Enter" ->
+                    event.preventDefault ()
+                    onReset ()
+                | _ -> ()
+            )
             prop.style [ style.custom ("touchAction", "none") ]
+            prop.tabIndex 0
             prop.custom ("role", "separator")
             prop.custom ("aria-orientation", "vertical")
+            prop.custom ("aria-valuenow", valueNow)
+            prop.custom ("aria-valuemin", 0)
+            prop.custom ("aria-valuemax", 100)
             prop.ariaLabel "Resize provenance panels"
+            prop.title "Drag or use arrow keys to resize; double-click to reset"
             if debug then
                 prop.testId (testId side)
             prop.children [
                 Html.div [
-                    prop.className
-                        "swt:my-2 swt:w-1 swt:rounded-full swt:bg-base-content/15 swt:transition-colors group-hover:swt:bg-base-content/35"
+                    prop.className [
+                        "swt:my-2 swt:w-1 swt:rounded-full swt:transition-colors group-hover:swt:bg-base-content/35"
+                        if isActive then
+                            "swt:bg-primary"
+                        else
+                            "swt:bg-base-content/15 group-focus-visible:swt:bg-primary/60"
+                    ]
                 ]
             ]
         ]

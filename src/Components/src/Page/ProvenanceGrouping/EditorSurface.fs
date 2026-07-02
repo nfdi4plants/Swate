@@ -69,6 +69,7 @@ module EditorSurface =
         setPropertyColor
         sourceInfoForValue
         isDropRejected
+        isDropAvailable
         debug
         setIsValueChipDragging
 
@@ -87,6 +88,7 @@ module EditorSurface =
             addPaletteValue,
             (fun header -> projection.CanSwitchHeaders.Contains header),
             isDropRejected,
+            isDropAvailable,
             setIsValueChipDragging,
             (fun header -> projection.StatsByHeader |> Map.tryFind header),
             (fun header -> projection.BadgeByHeader |> Map.tryFind header),

@@ -30,6 +30,24 @@ module Density =
     let provider (value: EditorDensity) (children: ReactElement) : ReactElement =
         createElement !!context?Provider {| value = value |} children
 
+/// Publishes which side a live connection drag started from, so opposite-side
+/// connection handles can advertise themselves as drop targets while dragging.
+module ConnectionDragHints =
+
+    open Fable.Core
+    open Fable.Core.JsInterop
+    open Feliz
+    open Swate.Components.Shared.ProvenanceGrouping.Types
+
+    let context = React.createContext (defaultValue = (None: ProvenanceSide option))
+
+    [<ImportMember("react")>]
+    let private createElement (comp: obj) (props: obj) (children: ReactElement) : ReactElement = jsNative
+
+    /// Feliz 3 ships no contextProvider helper, so render the provider directly.
+    let provider (value: ProvenanceSide option) (children: ReactElement) : ReactElement =
+        createElement !!context?Provider {| value = value |} children
+
 /// CSS class builders shared by ProvenanceGrouping draggable cards, buttons, chips, and overlay previews.
 module Styles =
 

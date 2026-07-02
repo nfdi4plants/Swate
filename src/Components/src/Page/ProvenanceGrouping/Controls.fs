@@ -38,6 +38,15 @@ type Controls =
                 |}
             )
 
+        // While a connection drag is running, handles on the opposite side surface
+        // themselves as valid targets instead of waiting for a hover to reveal them.
+        let activeConnectionDragSide = React.useContext ConnectionDragHints.context
+
+        let isEligibleTarget =
+            match activeConnectionDragSide with
+            | Some sourceSide -> sourceSide <> handle.Side && not draggable.isDragging
+            | None -> false
+
         let setNodeRef node =
             draggable.setNodeRef node
             droppable.setNodeRef node
@@ -59,6 +68,8 @@ type Controls =
                 "hover:swt:opacity-100 focus:swt:opacity-100 focus:swt:outline-none focus:swt:ring-2 focus:swt:ring-primary/40"
                 if droppable.isOver then
                     "swt:opacity-100 swt:ring-2 swt:ring-primary"
+                elif isEligibleTarget then
+                    "swt:opacity-100 swt:scale-125 swt:ring-2 swt:ring-primary/50 swt:ring-offset-1 swt:ring-offset-base-100"
                 if draggable.isDragging then
                     "swt:opacity-100 swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
                 match className with
@@ -672,6 +683,7 @@ type Controls =
             onAddValue: ProvenancePropertyHeader -> ProvenanceValue -> ProvenanceTerm option -> unit,
             canSwitch: ProvenancePropertyHeader -> bool,
             isDropRejected: bool,
+            isDropAvailable: bool,
             setIsValueChipDragging: bool -> unit,
             statsForHeader: ProvenancePropertyHeader -> PropertyStats option,
             badgeForHeader: ProvenancePropertyHeader -> PropertyCountBadge option,
@@ -728,6 +740,12 @@ type Controls =
                     "swt:border-warning swt:bg-warning/10 swt:ring-2 swt:ring-warning/30"
                 elif droppable.isOver then
                     "swt:border-primary swt:bg-primary/10"
+                // While a property drag is under way, the rails announce early whether
+                // they would accept or reject the drop, before the pointer arrives.
+                elif isDropRejected then
+                    "swt:border-warning/50"
+                elif isDropAvailable then
+                    "swt:border-primary/50"
                 if headers.IsEmpty then
                     "swt:items-center swt:justify-center"
             ]

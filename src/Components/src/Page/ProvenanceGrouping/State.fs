@@ -35,6 +35,10 @@ module PanelLayout =
             Right = right
         }
 
+    /// Clamps raw percentages with the same rules the stored ratios use, so live
+    /// drag previews land exactly where the committed state will.
+    let clamped left right = clamp left right
+
     let get layerId state =
         state.PanelRatios |> Map.tryFind layerId |> Option.defaultValue defaultRatios
 
