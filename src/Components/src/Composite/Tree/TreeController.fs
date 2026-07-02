@@ -1,27 +1,48 @@
 module Swate.Components.Composite.Tree.TreeController
 
 open Fable.Core.JsInterop
+open Feliz
 open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
+
+let private isLoadActive (loadingNodeIdsRef: IRefValue<Set<string>>) nodeId loadedChildren =
+    NodeState.hasActiveOrLoadedChildren nodeId loadedChildren
+    || loadingNodeIdsRef.current.Contains nodeId
+
+let private markLoadStarted (loadingNodeIdsRef: IRefValue<Set<string>>) nodeId =
+    loadingNodeIdsRef.current <- loadingNodeIdsRef.current |> Set.add nodeId
+
+let private markLoadFinished (loadingNodeIdsRef: IRefValue<Set<string>>) nodeId =
+    loadingNodeIdsRef.current <- loadingNodeIdsRef.current |> Set.remove nodeId
 
 let loadBranchChildren
     (dataSource: TreeDataSource<'T> option)
     enableLazyLoading
+    (loadingNodeIdsRef: IRefValue<Set<string>>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
     (setLoadedChildren: (Map<string, TreeLoadState<'T>> -> Map<string, TreeLoadState<'T>>) -> unit)
     (onError: exn -> unit)
     (node: TreeItem<'T>)
     =
     promise {
-        match dataSource, enableLazyLoading, NodeState.hasActiveOrLoadedChildren node.id loadedChildren with
+        match dataSource, enableLazyLoading, isLoadActive loadingNodeIdsRef node.id loadedChildren with
         | Some source, true, false ->
-            setLoadedChildren (NodeState.withLoading node.id)
+            markLoadStarted loadingNodeIdsRef node.id
+
+            setLoadedChildren (fun current ->
+                if NodeState.hasActiveOrLoadedChildren node.id current then
+                    current
+                else
+                    NodeState.withLoading node.id current
+            )
 
             try
                 let! children = source.GetTreeItems(Some node)
                 setLoadedChildren (NodeState.withLoaded node.id children)
+                markLoadFinished loadingNodeIdsRef node.id
             with ex ->
                 setLoadedChildren (NodeState.withLoadError node.id ex.Message)
+                markLoadFinished loadingNodeIdsRef node.id
                 onError ex
         | _ -> ()
     }
@@ -29,6 +50,7 @@ let loadBranchChildren
 let expandNode
     (dataSource: TreeDataSource<'T> option)
     enableLazyLoading
+    (loadingNodeIdsRef: IRefValue<Set<string>>)
     (loadedChildren: Map<string, TreeLoadState<'T>>)
     (expandedIds: Set<string>)
     (setExpandedIds: (Set<string> -> Set<string>) -> unit)
@@ -40,7 +62,14 @@ let expandNode
         setExpandedIds (NodeState.toggleExpanded node.id)
 
         if not (expandedIds |> Set.contains node.id) then
-            loadBranchChildren dataSource enableLazyLoading loadedChildren setLoadedChildren onError node
+            loadBranchChildren
+                dataSource
+                enableLazyLoading
+                loadingNodeIdsRef
+                loadedChildren
+                setLoadedChildren
+                onError
+                node
             |> Promise.start
 
 let selectNode

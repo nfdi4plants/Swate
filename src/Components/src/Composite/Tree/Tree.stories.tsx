@@ -189,9 +189,10 @@ const LazyTree = () => {
 
   const dataSource = React.useMemo(
     () => ({
-      GetChildrenCount: () => 1,
+      GetChildrenCount: (item: DemoNode | null | undefined) => (item?.id === "arc/lazy-studies" ? 1 : 0),
       GetTreeItems: async (item: DemoNode | null | undefined) => {
         setLoadCount((count) => count + 1);
+        await new Promise<void>((resolve) => setTimeout(resolve, 20));
         return item?.id === "arc/lazy-studies"
           ? [branch("arc/lazy-studies/study_02", "Study 02", [leaf("arc/lazy-studies/study_02/isa.study.xlsx", "isa.study.xlsx")])]
           : [];
@@ -215,6 +216,12 @@ export const LazyLoadingCachesChildren: Story = {
   render: () => <LazyTree />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
+
+    const initialExpandButton = canvas.getByRole("button", { name: "Expand studies" });
+
+    fireEvent.click(initialExpandButton);
+    fireEvent.click(initialExpandButton);
+    await waitFor(() => expect(canvas.getByTestId("load-count")).toHaveTextContent("Loads: 1"));
 
     await userEvent.click(canvas.getByRole("button", { name: "Expand studies" }));
     await waitFor(() => expect(canvas.getByText("Study 02")).toBeVisible());

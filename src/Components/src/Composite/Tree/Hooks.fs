@@ -96,6 +96,7 @@ let useTreeNodeActions
     onError
     =
     let focusDom = TreeDom.focusNodeAfterRender treeRef
+    let loadingNodeIdsRef = React.useRef<Set<string>> (Set.empty)
 
     let focusById nodeId =
         TreeController.tryFocusById lookup treeState.SetFocusedId scrollToIndex focusDom nodeId
@@ -104,6 +105,7 @@ let useTreeNodeActions
         TreeController.expandNode
             dataSource
             enableLazyLoading
+            loadingNodeIdsRef
             treeState.LoadedChildren
             treeState.ExpandedIds
             treeState.SetExpandedIds
