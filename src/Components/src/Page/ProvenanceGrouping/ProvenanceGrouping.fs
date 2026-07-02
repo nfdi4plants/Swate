@@ -42,6 +42,52 @@ type ProvenanceGrouping =
         let hoverStore = React.useRef (HoverHighlight.create ())
         let isValueChipDragging, setIsValueChipDragging = React.useState false
 
+        // Click-to-connect: a tapped handle stays armed until a target handle is
+        // tapped, Escape is pressed, or the pointer goes down elsewhere.
+        let armedHandle, setArmedHandle = React.useState<ConnectionHandleRef option> None
+        let latestArmedHandle = React.useRef armedHandle
+        latestArmedHandle.current <- armedHandle
+        let latestDragContext = React.useRef (None: DragContext option)
+
+        React.useEffectOnce (fun () ->
+            let onPointerDown =
+                fun (event: Browser.Types.Event) ->
+                    if latestArmedHandle.current.IsSome then
+                        let onHandle =
+                            not (isNull event.target)
+                            && not (isNull (Motion.closest event.target "[data-provenance-connection-drop-id]"))
+
+                        if not onHandle then
+                            setArmedHandle None
+
+            let onKeyDown =
+                fun (event: Browser.Types.KeyboardEvent) ->
+                    if event.key = "Escape" && latestArmedHandle.current.IsSome then
+                        setArmedHandle None
+
+            Browser.Dom.document.addEventListener ("pointerdown", unbox onPointerDown)
+            Browser.Dom.document.addEventListener ("keydown", unbox onKeyDown)
+
+            FsReact.createDisposable (fun () ->
+                Browser.Dom.document.removeEventListener ("pointerdown", unbox onPointerDown)
+                Browser.Dom.document.removeEventListener ("keydown", unbox onKeyDown)
+            )
+        )
+
+        let handleTap (handle: ConnectionHandleRef) =
+            match latestArmedHandle.current with
+            | Some armed when armed = handle -> setArmedHandle None
+            | Some armed ->
+                match ConnectionRouting.action armed handle with
+                | Some _ ->
+                    latestDragContext.current
+                    |> Option.iter (fun context -> DragHandlers.routeConnectionHandle context armed handle)
+
+                    setArmedHandle None
+                // A tap on an incompatible handle re-arms from there instead.
+                | None -> setArmedHandle (Some handle)
+            | None -> setArmedHandle (Some handle)
+
         React.useEffectOnce (fun () ->
             let applyTier () =
                 match rootRef.current with
@@ -682,6 +728,8 @@ type ProvenanceGrouping =
             ConnectSetPairs = connectSetPairs
         }
 
+        latestDragContext.current <- Some dragContext
+
         let railSideLabel side =
             match side with
             | ProvenanceSide.Input -> "input"
@@ -721,6 +769,18 @@ type ProvenanceGrouping =
                        Payload = DragDrop.Payload.ConnectionHandle handle
                    } -> Some handle.Side
             | _ -> None
+
+        let connectionInteraction: ConnectionDragHints.Interaction =
+            React.useMemo (
+                (fun () -> {
+                    SourceSide =
+                        connectionDragSide
+                        |> Option.orElse (armedHandle |> Option.map (fun handle -> handle.Side))
+                    Armed = armedHandle
+                    OnHandleTap = handleTap
+                }),
+                [| box connectionDragSide; box armedHandle |]
+            )
 
         let inputRailDropRejected = isRejectedPropertyRailDrop ProvenanceSide.Input
         let outputRailDropRejected = isRejectedPropertyRailDrop ProvenanceSide.Output
@@ -1322,11 +1382,13 @@ type ProvenanceGrouping =
             onDragCancel =
                 (fun _ ->
                     setActiveDrag None
+                    setArmedHandle None
                     LiveDrag.clear liveDragStore.current
                 ),
             onDragEnd =
                 (fun event ->
                     setActiveDrag None
+                    setArmedHandle None
                     LiveDrag.clear liveDragStore.current
                     DragHandlers.handleEnd dragContext event
                 ),
@@ -1334,7 +1396,7 @@ type ProvenanceGrouping =
                 Density.provider
                     density
                     (ConnectionDragHints.provider
-                        connectionDragSide
+                        connectionInteraction
                         (HoverHighlight.provider
                             hoverStore.current
                             (React.Fragment [

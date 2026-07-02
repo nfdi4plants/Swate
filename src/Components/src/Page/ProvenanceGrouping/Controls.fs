@@ -38,13 +38,14 @@ type Controls =
                 |}
             )
 
-        // While a connection drag is running, handles on the opposite side surface
-        // themselves as valid targets instead of waiting for a hover to reveal them.
-        let activeConnectionDragSide = React.useContext ConnectionDragHints.context
+        // While a connection drag runs or a handle is armed, handles on the opposite
+        // side surface themselves as valid targets instead of waiting for a hover.
+        let interaction = React.useContext ConnectionDragHints.context
+        let isArmed = interaction.Armed = Some handle
 
         let isEligibleTarget =
-            match activeConnectionDragSide with
-            | Some sourceSide -> sourceSide <> handle.Side && not draggable.isDragging
+            match interaction.SourceSide with
+            | Some sourceSide -> sourceSide <> handle.Side && not draggable.isDragging && not isArmed
             | None -> false
 
         let setNodeRef node =
@@ -61,8 +62,18 @@ type Controls =
             prop.role.button
             prop.tabIndex 0
             prop.ariaLabel (label |> Option.defaultValue "Connect")
+            prop.title "Drag or click to connect"
+            prop.custom ("aria-pressed", isArmed)
             prop.custom ("data-provenance-connection-node", DragDrop.connectionHandleNodeId handle)
             prop.custom ("data-provenance-connection-drop-id", DragDrop.connectionHandleDropId handle)
+            // Click-to-connect: tapping arms this handle, tapping a valid opposite
+            // handle completes the connection. Keyboard users get the same flow.
+            prop.onClick (fun _ -> interaction.OnHandleTap handle)
+            prop.onKeyDown (fun event ->
+                if event.key = "Enter" || event.key = " " then
+                    event.preventDefault ()
+                    interaction.OnHandleTap handle
+            )
             prop.className [
                 "swt:inline-flex swt:size-3 swt:shrink-0 swt:cursor-crosshair swt:items-center swt:justify-center swt:rounded-full swt:border swt:border-primary swt:bg-primary/70 swt:align-middle swt:opacity-55 swt:transition"
                 "hover:swt:opacity-100 focus:swt:opacity-100 focus:swt:outline-none focus:swt:ring-2 focus:swt:ring-primary/40"
@@ -70,7 +81,7 @@ type Controls =
                     "swt:opacity-100 swt:ring-2 swt:ring-primary"
                 elif isEligibleTarget then
                     "swt:opacity-100 swt:scale-125 swt:ring-2 swt:ring-primary/50 swt:ring-offset-1 swt:ring-offset-base-100"
-                if draggable.isDragging then
+                if draggable.isDragging || isArmed then
                     "swt:opacity-100 swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
                 match className with
                 | Some className -> className

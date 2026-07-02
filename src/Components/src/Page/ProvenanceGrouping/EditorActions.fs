@@ -420,7 +420,9 @@ module DragHandlers =
             context.ConnectSetPairs pairs
         | _ -> ()
 
-    let private routeConnectionHandle context source target =
+    /// Routes a source/target handle pair to the connection action it implies; also
+    /// used by click-to-connect, which pairs handles without a drag.
+    let routeConnectionHandle context source target =
         match ConnectionRouting.action source target with
         | Some(ConnectionRouting.ConnectionAction.ConnectGroups(inputGroupId, outputGroupId)) ->
             routeGroupConnection context inputGroupId outputGroupId

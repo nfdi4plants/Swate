@@ -30,22 +30,39 @@ module Density =
     let provider (value: EditorDensity) (children: ReactElement) : ReactElement =
         createElement !!context?Provider {| value = value |} children
 
-/// Publishes which side a live connection drag started from, so opposite-side
-/// connection handles can advertise themselves as drop targets while dragging.
+/// Publishes the connection interaction in flight — a live handle drag or an armed
+/// click-to-connect handle — so opposite-side handles can advertise themselves as
+/// valid targets, and every handle can route its taps to the editor.
 module ConnectionDragHints =
 
     open Fable.Core
     open Fable.Core.JsInterop
     open Feliz
     open Swate.Components.Shared.ProvenanceGrouping.Types
+    open Swate.Components.Page.ProvenanceGrouping.Types
 
-    let context = React.createContext (defaultValue = (None: ProvenanceSide option))
+    type Interaction = {
+        /// Side the active connection gesture started from (drag or armed click).
+        SourceSide: ProvenanceSide option
+        /// Handle armed by click/keyboard, waiting for a target tap.
+        Armed: ConnectionHandleRef option
+        /// Invoked when a handle is clicked or activated with the keyboard.
+        OnHandleTap: ConnectionHandleRef -> unit
+    }
+
+    let idle = {
+        SourceSide = None
+        Armed = None
+        OnHandleTap = ignore
+    }
+
+    let context = React.createContext (defaultValue = idle)
 
     [<ImportMember("react")>]
     let private createElement (comp: obj) (props: obj) (children: ReactElement) : ReactElement = jsNative
 
     /// Feliz 3 ships no contextProvider helper, so render the provider directly.
-    let provider (value: ProvenanceSide option) (children: ReactElement) : ReactElement =
+    let provider (value: Interaction) (children: ReactElement) : ReactElement =
         createElement !!context?Provider {| value = value |} children
 
 /// Shared motion primitives: reduced-motion detection, an imperative pulse, and a
@@ -64,6 +81,9 @@ module Motion =
 
     [<Emit("Array.from($0.querySelectorAll($1))")>]
     let queryAll (_container: HTMLElement) (_selector: string) : HTMLElement[] = jsNative
+
+    [<Emit("$0.closest ? $0.closest($1) : null")>]
+    let closest (_element: obj) (_selector: string) : Element = jsNative
 
     [<Emit("$0.style.transform = $1")>]
     let setTransform (_node: HTMLElement) (_value: string) : unit = jsNative

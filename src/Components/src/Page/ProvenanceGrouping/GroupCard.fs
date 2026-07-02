@@ -316,12 +316,12 @@ type GroupCard =
         let articleRef = React.useElementRef ()
         let density = React.useContext Density.context
         let hoverStore = React.useContext HoverHighlight.context
-        let connectionDragSide = React.useContext ConnectionDragHints.context
+        let connectionInteraction = React.useContext ConnectionDragHints.context
 
         // Hovering a card lights up its connectors and the connected opposite cards.
-        // Suppressed while dragging so the highlight cannot fight drop feedback.
+        // Suppressed while connecting so the highlight cannot fight drop feedback.
         let publishHover () =
-            if connectionDragSide.IsNone && not isValueChipDragging then
+            if connectionInteraction.SourceSide.IsNone && not isValueChipDragging then
                 HoverHighlight.set { Side = side; GroupId = group.Id } hoverStore
 
         let clearHover () = HoverHighlight.clear hoverStore
