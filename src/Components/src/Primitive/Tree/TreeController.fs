@@ -79,6 +79,11 @@ let focusLast lookup setFocusedId focusDom =
     |> Array.tryLast
     |> Option.iter (fun row -> tryFocusById lookup setFocusedId focusDom row.Node.id)
 
+let focusFirstChild lookup setFocusedId focusDom nodeId =
+    lookup.VisibleNodes
+    |> Array.tryFind (fun row -> row.ParentId = Some nodeId)
+    |> Option.iter (fun row -> tryFocusById lookup setFocusedId focusDom row.Node.id)
+
 let collapseOrFocusParent lookup expandedIds setExpandedIds setFocusedId focusDom nodeId =
     if expandedIds |> Set.contains nodeId then
         setExpandedIds (fun current -> current |> Set.remove nodeId)

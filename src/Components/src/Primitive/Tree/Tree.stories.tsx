@@ -623,6 +623,18 @@ export const KeyboardNavigation: Story = {
     await expect(canvas.getByTestId("tree-node-arc/studies")).toHaveFocus();
 
     fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies"), { key: "ArrowRight" });
-    await waitFor(() => expect(canvas.getByText("isa.study.xlsx")).toBeVisible());
+    await expect(canvas.getByTestId("tree-node-arc/studies/study_01")).toHaveFocus();
+
+    fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: "ArrowRight" });
+    await expect(canvas.getByTestId("tree-node-arc/studies/study_01/isa.study.xlsx")).toHaveFocus();
+
+    fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01/isa.study.xlsx"), { key: "ArrowLeft" });
+    await expect(canvas.getByTestId("tree-node-arc/studies/study_01")).toHaveFocus();
+
+    fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: "Enter" });
+    await waitFor(() => expect(canvas.queryByText("isa.study.xlsx")).not.toBeInTheDocument());
+
+    fireEvent.keyDown(canvas.getByTestId("tree-node-arc/studies/study_01"), { key: " " });
+    await expect(await canvas.findByText("isa.study.xlsx")).toBeVisible();
   },
 };

@@ -138,11 +138,11 @@ let useTreeNodeActions
         | "ArrowRight" ->
             event.preventDefault ()
 
-            if
-                NodeState.canExpand dataSource node
-                && not (treeState.ExpandedIds.Contains node.id)
-            then
-                expandNode node
+            if NodeState.canExpand dataSource node then
+                if treeState.ExpandedIds.Contains node.id then
+                    TreeController.focusFirstChild lookup treeState.SetFocusedId focusDom node.id
+                else
+                    expandNode node
         | "ArrowLeft" ->
             event.preventDefault ()
 
@@ -156,6 +156,10 @@ let useTreeNodeActions
         | "Enter"
         | " " ->
             event.preventDefault ()
+
+            if NodeState.canExpand dataSource node then
+                expandNode node
+
             selectNode node
         | _ -> ()
 
