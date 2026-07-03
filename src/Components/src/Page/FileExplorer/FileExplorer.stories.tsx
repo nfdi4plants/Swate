@@ -362,6 +362,46 @@ const TruncatedOverflowFileExplorer = () => {
   );
 };
 
+const StickyParentsFileExplorer = () => {
+  const items = React.useMemo(() => {
+    const measurements = Array.from({ length: 36 }, (_, index) =>
+      createStableFile(
+        `measurement-${String(index + 1).padStart(2, "0")}.tsv`,
+        `studies/Study A/assays/Assay A/data/measurement-${index + 1}.tsv`,
+        `sticky-measurement-${index + 1}`,
+      ),
+    );
+
+    const dataFolder = Object.assign(
+      createStableFolder("data", "studies/Study A/assays/Assay A/data", "sticky-data", measurements),
+      { IsExpanded: true },
+    );
+    const assayFolder = Object.assign(
+      createStableFolder("Assay A", "studies/Study A/assays/Assay A", "sticky-assay", [dataFolder]),
+      { IsExpanded: true },
+    );
+    const studyFolder = Object.assign(
+      createStableFolder("Study A", "studies/Study A", "sticky-study", [assayFolder]),
+      { IsExpanded: true },
+    );
+
+    return ofArray([studyFolder]);
+  }, []);
+
+  return (
+    <div
+      data-testid="sticky-file-explorer-viewport"
+      className="swt:h-40 swt:overflow-y-auto swt:overflow-x-auto"
+    >
+      <FileExplorer
+        initialItems={items}
+        delegateHorizontalScrollToParent={true}
+        truncateOverflowingItemNames={true}
+      />
+    </div>
+  );
+};
+
 const installClipboardMock = () => {
   const writeText = fn(async () => undefined);
   Object.defineProperty(navigator, "clipboard", {
@@ -371,6 +411,30 @@ const installClipboardMock = () => {
   });
 
   return writeText;
+};
+
+const expectStickyParentRowsToStayVisible = async (canvasElement: HTMLElement) => {
+  const canvas = within(canvasElement);
+  const viewport = await canvas.findByTestId("sticky-file-explorer-viewport");
+  const parentToggles = await Promise.all(
+    ["Collapse Study A", "Collapse Assay A", "Collapse data"].map((name) =>
+      canvas.findByRole("button", { name }),
+    ),
+  );
+
+  viewport.scrollTop = 360;
+  fireEvent.scroll(viewport);
+
+  await waitFor(() => {
+    const viewportRect = viewport.getBoundingClientRect();
+
+    for (const toggle of parentToggles) {
+      const rect = toggle.getBoundingClientRect();
+
+      expect(rect.top).toBeGreaterThanOrEqual(viewportRect.top - 1);
+      expect(rect.bottom).toBeLessThanOrEqual(viewportRect.bottom + 1);
+    }
+  });
 };
 
 const expectContextMenuCopy = async (
@@ -729,5 +793,13 @@ export const LongNamesKeepInlineControlsVisible: StoryObj<typeof TruncatedOverfl
   play: async ({ canvasElement }) => {
     await expectLongNameControlsToStayVisible(canvasElement, veryLongFolderName);
     await expectLongNameControlsToStayVisible(canvasElement, veryLongFileName);
+  },
+};
+
+export const ExpandedDirectoryParentsStayVisibleWhileScrolling: StoryObj<typeof StickyParentsFileExplorer> = {
+  render: () => <StickyParentsFileExplorer />,
+
+  play: async ({ canvasElement }) => {
+    await expectStickyParentRowsToStayVisible(canvasElement);
   },
 };
