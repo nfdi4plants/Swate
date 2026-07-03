@@ -699,6 +699,16 @@ module GroupingAssignments =
 /// Tracks selected input/output groups for layer creation.
 module Selection =
 
+    let clearLayer layerId state =
+        let retain (selected: Set<ProvenanceLayerId * string>) =
+            selected |> Set.filter (fun (currentLayerId, _) -> currentLayerId <> layerId)
+
+        {
+            state with
+                SelectedInputs = retain state.SelectedInputs
+                SelectedOutputs = retain state.SelectedOutputs
+        }
+
     let contains layerId side groupId state =
         let identity = Keys.selectedGroup layerId groupId
 

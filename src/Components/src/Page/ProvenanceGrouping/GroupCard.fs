@@ -135,7 +135,9 @@ module private SelectionSurface =
     [<Emit("$0.closest($1)")>]
     let private closest (_element: Browser.Types.Element) (_selector: string) : Browser.Types.Element = jsNative
 
-    let shouldSelect (event: Browser.Types.MouseEvent) =
+    /// True when the click hit the card body itself rather than one of the
+    /// interactive controls (buttons, checkboxes, handles) hosted on it.
+    let shouldActivate (event: Browser.Types.MouseEvent) =
         let targetObj: obj = box event.target
 
         if isNull targetObj then
@@ -390,9 +392,28 @@ type GroupCard =
             | ProvenanceSide.Input -> "swt:top-1/2 swt:left-0 swt:-translate-x-1/2 swt:-translate-y-1/2"
             | ProvenanceSide.Output -> "swt:top-1/2 swt:right-0 swt:translate-x-1/2 swt:-translate-y-1/2"
 
-        let handleSelectionClick (event: Browser.Types.MouseEvent) =
-            if SelectionSurface.shouldSelect event then
-                onSelect ()
+        // The card body is the expand surface; selection lives on an explicit
+        // checkbox so the most common click (open the group) is the default one.
+        let handleExpandClick (event: Browser.Types.MouseEvent) =
+            if SelectionSurface.shouldActivate event then
+                onExpand ()
+
+        let selectionCheckbox =
+            Html.input [
+                prop.type'.checkbox
+                prop.className "swt:checkbox swt:checkbox-xs swt:checkbox-primary swt:shrink-0"
+                prop.isChecked selected
+                prop.onChange (fun (_: bool) -> onSelect ())
+                prop.ariaLabel (
+                    if selected then
+                        $"Deselect group {title}"
+                    else
+                        $"Select group {title}"
+                )
+                prop.title "Select this group: dropped values and new layers apply to all selected groups"
+                if defaultArg debug false then
+                    prop.testId $"provenance-group-select-{side}-{group.Id}"
+            ]
 
         Html.article [
             match key with
@@ -456,10 +477,11 @@ type GroupCard =
                     // so the type line sits above its name to mirror the expanded member rows.
                     Html.div [
                         prop.className "swt:flex swt:cursor-pointer swt:items-start swt:gap-2"
-                        prop.onClick handleSelectionClick
+                        prop.onClick handleExpandClick
                         if defaultArg debug false then
-                            prop.testId $"provenance-group-select-surface-{side}-{group.Id}"
+                            prop.testId $"provenance-group-expand-surface-{side}-{group.Id}"
                         prop.children [
+                            selectionCheckbox
                             Html.div [
                                 prop.className "swt:flex swt:min-w-0 swt:grow swt:flex-col swt:gap-0.5"
                                 prop.title title
@@ -524,9 +546,9 @@ type GroupCard =
 
                     Html.div [
                         prop.className "swt:flex swt:min-w-0 swt:cursor-pointer swt:flex-col swt:gap-2"
-                        prop.onClick handleSelectionClick
+                        prop.onClick handleExpandClick
                         if defaultArg debug false then
-                            prop.testId $"provenance-group-select-surface-{side}-{group.Id}"
+                            prop.testId $"provenance-group-expand-surface-{side}-{group.Id}"
                         prop.children [
                             Html.div [
                                 prop.className [
@@ -569,8 +591,9 @@ type GroupCard =
                                 ]
                             ]
                             Html.div [
-                                prop.className "swt:flex swt:items-center swt:gap-1"
+                                prop.className "swt:flex swt:items-center swt:gap-2"
                                 prop.children [
+                                    selectionCheckbox
                                     // The expand trigger is drawn as a folder: a clipped back
                                     // panel with its own index tab, the members' type symbols
                                     // resting inside, and a front pocket they tuck behind.

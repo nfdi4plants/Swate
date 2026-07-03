@@ -882,6 +882,32 @@ type ProvenanceGrouping =
                 [| box uiState.Filters; box connections; box outputGroups |]
             )
 
+        let selectedInputGroups =
+            inputGroups
+            |> List.filter (fun group -> State.Selection.contains layer.Id ProvenanceSide.Input group.Id uiState)
+
+        let selectedOutputGroups =
+            outputGroups
+            |> List.filter (fun group -> State.Selection.contains layer.Id ProvenanceSide.Output group.Id uiState)
+
+        let selectedGroupCount = selectedInputGroups.Length + selectedOutputGroups.Length
+
+        let selectedEntityCount =
+            [
+                yield!
+                    selectedInputGroups
+                    |> List.collect (fun group ->
+                        group.Members |> List.map (fun member' -> ProvenanceSide.Input, member'.SetId)
+                    )
+                yield!
+                    selectedOutputGroups
+                    |> List.collect (fun group ->
+                        group.Members |> List.map (fun member' -> ProvenanceSide.Output, member'.SetId)
+                    )
+            ]
+            |> List.distinct
+            |> List.length
+
         // Group columns carry one card per display group; memoizing the rendered
         // columns keeps unrelated state changes (search text, rail expansion, panel
         // toggles) from reconciling hundreds of cards on large models.
@@ -1350,6 +1376,40 @@ type ProvenanceGrouping =
                                 (fun filter -> applyUiState (State.Filters.setOriginFilter filter)),
                                 debug = debug
                             )
+                            // The selection bar keeps the otherwise invisible group
+                            // selection visible: it drives fan-out drops and layer seeding.
+                            if selectedGroupCount > 0 then
+                                Html.div [
+                                    prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2 swt:px-2"
+                                    if debug then
+                                        prop.testId "provenance-selection-bar"
+                                    prop.children [
+                                        Html.span [
+                                            prop.className "swt:badge swt:badge-primary swt:badge-sm"
+                                            prop.text (
+                                                if selectedGroupCount = 1 then
+                                                    "1 group selected"
+                                                else
+                                                    $"{selectedGroupCount} groups selected"
+                                            )
+                                        ]
+                                        Html.span [
+                                            prop.className "swt:text-xs swt:text-base-content/60"
+                                            prop.text
+                                                $"Dropped values apply to all {selectedEntityCount} selected entities; a new layer starts from the selection."
+                                        ]
+                                        Html.button [
+                                            prop.type'.button
+                                            prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                                            if debug then
+                                                prop.testId "provenance-clear-selection"
+                                            prop.onClick (fun _ ->
+                                                applyUiState (State.Selection.clearLayer latestLayer.current.Id)
+                                            )
+                                            prop.text "Clear selection"
+                                        ]
+                                    ]
+                                ]
                             // Alerts and prompts float over the surface from a zero-height
                             // anchor: showing them no longer pushes the whole editor down
                             // (which also forced a full connector remeasure).
