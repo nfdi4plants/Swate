@@ -224,20 +224,8 @@ type AnnotationTableContextMenuUtil =
                             index
 
                     match header with
-                    | x when x.IsSingleColumn ->
+                    | x when x.IsSingleColumn || x.IsDataColumn || x.IsTermColumn ->
                         let cell = CompositeCell.fromContentValid (row.[newIndex], header)
-                        loop (index + 1) (cell :: result)
-                    | x when x.IsDataColumn ->
-                        let cell = CompositeCell.fromContentValid (row.[newIndex], header)
-                        loop (index + 1) (cell :: result)
-                    | x when x.IsTermColumn ->
-                        let value =
-                            if row.[newIndex].Length = 2 then
-                                [| row.[newIndex].[0] |]
-                            else
-                                row.[newIndex]
-
-                        let cell = CompositeCell.fromContentValid (value, header)
                         loop (index + 1) (cell :: result)
                     | anyElse -> failwith $"Error-fitColumnsToTarget: Encountered unsupported case: {anyElse}"
 
@@ -433,16 +421,27 @@ type AnnotationTableContextMenuUtil =
 
                 let value, unit = currentCell.AsUnitized
 
-                if targetCell.isUnitized && unit.isEmpty () then
-                    let _, targetUnit = targetCell.AsUnitized
-                    let newTarget = CompositeCell.createUnitized (value, targetUnit)
-                    newTarget
-                elif targetCell.isTerm && unit.isEmpty () then
-                    let targetTerm = targetCell.AsTerm
-                    let newTarget = CompositeCell.createUnitized (value, targetTerm)
-                    newTarget
-                else
-                    currentCell
+                let unitNeedsMetadata =
+                    unit.isEmpty()
+                    || Option.forall String.IsNullOrWhiteSpace unit.TermSourceREF
+                    || Option.forall String.IsNullOrWhiteSpace unit.TermAccessionNumber
+
+                let hasSameUnitName (targetTerm: OntologyAnnotation) =
+                    unit.isEmpty()
+                    || String.Equals(unit.NameText, targetTerm.NameText, StringComparison.OrdinalIgnoreCase)
+
+                let targetUnit =
+                    if targetCell.isUnitized then
+                        targetCell.AsUnitized |> snd |> Some
+                    elif targetCell.isTerm then
+                        targetCell.AsTerm |> Some
+                    else
+                        None
+
+                match targetUnit with
+                | Some targetUnit when unitNeedsMetadata && hasSameUnitName targetUnit ->
+                    CompositeCell.createUnitized (value, targetUnit)
+                | _ -> currentCell
             else
                 currentCell
 

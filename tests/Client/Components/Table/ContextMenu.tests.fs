@@ -216,6 +216,48 @@ type TestCases =
             Expect.equal arcTableIndex.y 0 "Move column target should stay on header row"
         | _ -> failwith "Move column menu entry should open move-column modal"
 
+    static member PasteCompactUnitsIntoParameterColumn() =
+        let table = Fixture.mkTable ()
+        let selectHandle = Fixture.mkSelectHandle (1, 2, 4, 4)
+        let clickedCell: CellCoordinate = {| x = 4; y = 1 |}
+
+        let pasteData = [|
+            [| "4"; "Degree Celsius" |]
+            [| "5"; "Degree Celsius" |]
+        |]
+
+        let pasteBehavior =
+            AnnotationTableContextMenuUtil.predictPasteBehaviour (clickedCell, table, selectHandle, pasteData)
+
+        match pasteBehavior with
+        | PasteCases.PasteCells pasteColumns ->
+            let firstCell = pasteColumns.data.[0].Cells.[0]
+            let firstValue, firstUnit = firstCell.AsUnitized
+
+            Expect.equal firstValue "4" "Compact unit paste should preserve the numeric value"
+            Expect.equal firstUnit.NameText "Degree Celsius" "Compact unit paste should preserve the unit name"
+
+            let mutable updatedTable = table
+
+            AnnotationTableContextMenuUtil.pasteCells (
+                pasteColumns,
+                clickedCell,
+                selectHandle,
+                table,
+                (fun nextTable -> updatedTable <- nextTable)
+            )
+
+            Expect.equal
+                (updatedTable.GetCellAt(3, 0).ToTabStr())
+                "4\tDegree Celsius\tUO\tUO:000000001"
+                "Pasting into an existing unitized column should enrich the compact unit with target metadata"
+
+            Expect.equal
+                (updatedTable.GetCellAt(3, 1).ToTabStr())
+                "5\tDegree Celsius\tUO\tUO:000000001"
+                "Pasting multiple compact unit rows should preserve units for each row"
+        | _ -> failwith "Compact unit paste should be predicted as PasteCells"
+
 let Main =
 
     testList "Context Menu" [
@@ -312,5 +354,7 @@ let Main =
             <| fun _ -> TestCases.IndexDeleteFirstRow()
             testCase "Header move column keeps 1-based header index"
             <| fun _ -> TestCases.HeaderMoveColumnUsesSelectedHeaderIndex()
+            testCase "Compact value-unit TSV paste preserves units"
+            <| fun _ -> TestCases.PasteCompactUnitsIntoParameterColumn()
         ]
     ]
