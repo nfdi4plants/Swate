@@ -80,6 +80,7 @@ module AnnotationTableMemo =
                     oa,
                     (fun t -> setHeader (CompositeHeader.Parameter t)),
                     isStickyHeader = true,
+                    activateFirstTermSearchResultOnInput = false,
                     ?debug = debug
                 )
             | CompositeHeader.Characteristic oa ->
@@ -88,6 +89,7 @@ module AnnotationTableMemo =
                     oa,
                     (fun t -> setHeader (CompositeHeader.Characteristic t)),
                     isStickyHeader = true,
+                    activateFirstTermSearchResultOnInput = false,
                     ?debug = debug
                 )
             | CompositeHeader.Component oa ->
@@ -96,6 +98,7 @@ module AnnotationTableMemo =
                     oa,
                     (fun t -> setHeader (CompositeHeader.Component t)),
                     isStickyHeader = true,
+                    activateFirstTermSearchResultOnInput = false,
                     ?debug = debug
                 )
             | CompositeHeader.Factor oa ->
@@ -104,6 +107,7 @@ module AnnotationTableMemo =
                     oa,
                     (fun t -> setHeader (CompositeHeader.Factor t)),
                     isStickyHeader = true,
+                    activateFirstTermSearchResultOnInput = false,
                     ?debug = debug
                 )
             | CompositeHeader.Performer
@@ -273,7 +277,13 @@ module AnnotationTableMemo =
                         setCell: CompositeCell -> unit
                         debug: bool option
                     |}) ->
-                TableCell.CompositeCellActiveCell(props.index, props.cell, props.setCell, ?debug = props.debug)
+                TableCell.CompositeCellActiveCell(
+                    props.index,
+                    props.cell,
+                    props.setCell,
+                    activateFirstTermSearchResultOnInput = false,
+                    ?debug = props.debug
+                )
             ),
             areEqual =
                 (fun props nextProps ->

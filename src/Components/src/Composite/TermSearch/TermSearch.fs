@@ -786,10 +786,12 @@ type TermSearch =
             ?disableDefaultParentSearch: bool,
             ?disableDefaultAllChildrenSearch: bool,
             ?autoFocus: bool,
+            ?activateFirstResultOnInput: bool,
             ?classNames: TermSearchStyle
         ) =
 
         let autoFocus = defaultArg autoFocus false
+        let activateFirstResultOnInput = defaultArg activateFirstResultOnInput true
 
         let (searchResults: SearchState), setSearchResults =
             React.useStateWithUpdater (SearchState.init ())
@@ -1264,6 +1266,7 @@ type TermSearch =
                 onBlur = (fun (e: Browser.Types.FocusEvent) -> onBlur |> Option.iter (fun fn -> fn e)),
                 onOpen = (fun o -> if o then startSearch input else cancel ()),
                 comboBoxRef = comboBoxRef,
+                activateFirstItemOnInput = activateFirstResultOnInput,
                 onKeyDown =
                     (fun kbe ->
                         match kbe.code with

@@ -207,8 +207,10 @@ type TableCell =
             ?isStickyHeader: bool,
             ?debug: bool,
             ?parentId: string,
+            ?activateFirstTermSearchResultOnInput: bool,
             ?key: string
         ) =
+        let activateFirstTermSearchResultOnInput = defaultArg activateFirstTermSearchResultOnInput true
 
         let term =
             if oa.isEmpty () then
@@ -236,7 +238,8 @@ type TableCell =
                     classNames =
                         TermSearchStyle(!^"swt:rounded-none swt:w-full swt:h-full swt:!outline-0 swt:!border-0"),
                     onTermSelect = (fun term -> props.setDataForce (Some term)),
-                    autoFocus = true
+                    autoFocus = true,
+                    activateFirstResultOnInput = activateFirstTermSearchResultOnInput
                 )
 
         TableCell.BaseActiveCell<Term option>(
@@ -287,6 +290,7 @@ type TableCell =
             cell: CompositeCell,
             setCell: CompositeCell -> unit,
             ?parentId: string,
+            ?activateFirstTermSearchResultOnInput: bool,
             ?debug,
             ?key: string
         ) =
@@ -298,6 +302,7 @@ type TableCell =
                 oa,
                 (fun t -> setCell (CompositeCell.Term t)),
                 ?parentId = parentId,
+                ?activateFirstTermSearchResultOnInput = activateFirstTermSearchResultOnInput,
                 ?debug = debug,
                 ?key = key
             )

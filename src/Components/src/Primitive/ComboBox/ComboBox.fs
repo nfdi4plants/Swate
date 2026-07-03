@@ -61,6 +61,7 @@ type ComboBox =
             ?onFocus: Browser.Types.FocusEvent -> unit,
             ?onBlur: Browser.Types.FocusEvent -> unit,
             ?onOpen: bool -> unit,
+            ?activateFirstItemOnInput: bool,
             ?onClick:
                 Browser.Types.MouseEvent
                     -> {|
@@ -78,6 +79,8 @@ type ComboBox =
                     |}
                     -> unit
         ) : ReactElement =
+        let activateFirstItemOnInput = defaultArg activateFirstItemOnInput true
+
         let isOpen, setOpen = React.useState (false)
 
         let activeIndex, setActiveIndex = React.useState (None: int option)
@@ -133,7 +136,10 @@ type ComboBox =
 
             if System.String.IsNullOrWhiteSpace value |> not then
                 setOpen true
-                setActiveIndex (Some 0)
+                if activateFirstItemOnInput then
+                    setActiveIndex (Some 0)
+                else
+                    setActiveIndex None
             else
                 close ()
 
