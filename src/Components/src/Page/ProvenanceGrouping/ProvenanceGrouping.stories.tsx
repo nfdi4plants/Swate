@@ -600,7 +600,9 @@ export const PropertyRailExpandsValuesAndAddControls: Story = {
     const arabidopsis = panel.getByText('Arabidopsis').closest('button, div')!;
     expect(arabidopsis).toBeInTheDocument();
     expect(arabidopsis).toHaveClass('swt:btn');
-    expect(arabidopsis).toHaveClass('swt:btn-primary');
+    // Outline, not primary: value chips share the ungrouped header button look so
+    // they stay distinguishable from their header, which turns primary when grouped.
+    expect(arabidopsis).toHaveClass('swt:btn-outline');
     expect(arabidopsis).toHaveClass('swt:w-fit');
     expect(arabidopsis).toHaveClass('swt:cursor-grab');
     expect(arabidopsis.querySelector('[class*="re-order-dots"]')).not.toBeInTheDocument();

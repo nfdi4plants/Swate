@@ -198,9 +198,11 @@ module Styles =
     ]
 
     /// Value chips hug their content up to the property-header cap; the cap yields to
-    /// the panel width when the rail gets narrow.
+    /// the panel width when the rail gets narrow. The quiet outline (the ungrouped
+    /// header button look) keeps them from competing with the header button, which
+    /// turns primary while the property is grouped.
     let propertyValueButtonClasses density isDragging = [
-        "swt:btn swt:btn-sm swt:btn-primary swt:w-fit swt:max-w-[min(18rem,100%)] swt:h-auto swt:justify-start swt:normal-case swt:font-medium swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
+        "swt:btn swt:btn-sm swt:btn-outline swt:bg-base-100/90 swt:w-fit swt:max-w-[min(18rem,100%)] swt:h-auto swt:justify-start swt:normal-case swt:font-medium swt:@max-xs/provenancePanel:px-2 swt:@max-xs/provenancePanel:text-[0.7rem]"
         match density with
         | Density.EditorDensity.Compact -> "swt:min-h-6 swt:px-2 swt:py-1 swt:text-[0.7rem]"
         | _ -> "swt:min-h-8 swt:px-3 swt:py-1.5 swt:text-xs"
@@ -208,7 +210,7 @@ module Styles =
     ]
 
     let propertyValueOverlayClasses = [
-        "swt:btn swt:btn-sm swt:btn-primary swt:w-fit swt:max-w-[18rem] swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium swt:pointer-events-none swt:shadow-lg swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
+        "swt:btn swt:btn-sm swt:btn-outline swt:bg-base-100 swt:w-fit swt:max-w-[18rem] swt:min-h-8 swt:h-auto swt:justify-start swt:normal-case swt:px-3 swt:py-1.5 swt:text-xs swt:font-medium swt:pointer-events-none swt:shadow-lg swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
     ]
 
     let addPropertyValueButtonClasses = [
