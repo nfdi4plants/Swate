@@ -130,7 +130,29 @@ module EditorPanels =
             ]
         ]
 
-    let memberResolutionPrompt debug (pending: PendingMemberResolution) onAllToAll onManual onCancel =
+    let hintPanel debug (hint: string) onDismiss =
+        Html.div [
+            prop.className "swt:alert swt:alert-info"
+            if debug then
+                prop.testId "provenance-hint"
+            prop.children [
+                Html.i [
+                    prop.className "swt:iconify swt:fluent--lightbulb-20-regular swt:size-5"
+                ]
+                Html.span [ prop.className "swt:text-sm"; prop.text hint ]
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:ml-auto"
+                    prop.ariaLabel "Dismiss hint"
+                    if debug then
+                        prop.testId "provenance-hint-dismiss"
+                    prop.onClick (fun _ -> onDismiss ())
+                    prop.text "Dismiss"
+                ]
+            ]
+        ]
+
+    let memberResolutionPrompt debug (pending: PendingMemberResolution) onPairByOrder onAllToAll onManual onCancel =
         let memberText count side =
             if count = 1 then
                 $"{count} {side} member"
@@ -139,6 +161,10 @@ module EditorPanels =
 
         let inputMemberText = memberText pending.InputMemberCount "input"
         let outputMemberText = memberText pending.OutputMemberCount "output"
+
+        let canPairByOrder =
+            pending.InputMemberCount = pending.OutputMemberCount
+            && pending.InputMemberCount > 0
 
         Html.div [
             prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
@@ -151,7 +177,7 @@ module EditorPanels =
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
                     prop.children [
-                        Html.strong "Resolve member mismatch"
+                        Html.strong "Choose how to connect the members"
                         Html.span [
                             prop.className "swt:text-sm"
                             prop.text $"This connection has {inputMemberText} and {outputMemberText}."
@@ -159,12 +185,25 @@ module EditorPanels =
                     ]
                 ]
                 Html.div [
-                    prop.className "swt:ml-auto swt:flex swt:gap-2"
+                    prop.className "swt:ml-auto swt:flex swt:flex-wrap swt:gap-2"
                     prop.children [
+                        if canPairByOrder then
+                            Html.button [
+                                prop.type'.button
+                                prop.className "swt:btn swt:btn-primary swt:btn-sm"
+                                prop.ariaLabel "Pair members by order"
+                                prop.title
+                                    "Connect members pairwise in name order (first with first, second with second, …)"
+                                if debug then
+                                    prop.testId "provenance-member-resolution-pair-by-order"
+                                prop.onClick (fun _ -> onPairByOrder pending)
+                                prop.text "Pair by order"
+                            ]
                         Html.button [
                             prop.type'.button
                             prop.className "swt:btn swt:btn-warning swt:btn-sm"
                             prop.ariaLabel "Create all-to-all connections"
+                            prop.title "Connect every input member with every output member"
                             if debug then
                                 prop.testId "provenance-member-resolution-all-to-all"
                             prop.onClick (fun _ -> onAllToAll pending)

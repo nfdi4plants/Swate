@@ -435,9 +435,13 @@ module DragHandlers =
             context.Lookups.FindGroup ProvenanceSide.Output outputGroupId
         with
         | Some inputGroup, Some outputGroup ->
-            match EditorActions.orderedMemberPairs inputGroup outputGroup with
-            | Some pairs -> context.ConnectSetPairs pairs
-            | None ->
+            // Only a 1×1 connection is unambiguous. Equal counts could be paired by
+            // order, but that is a guess about intent, so the user picks the mapping.
+            if inputGroup.Members.Length = 1 && outputGroup.Members.Length = 1 then
+                match EditorActions.orderedMemberPairs inputGroup outputGroup with
+                | Some pairs -> context.ConnectSetPairs pairs
+                | None -> ()
+            else
                 State.MemberResolution.request
                     {
                         LayerId = context.Layer.Id

@@ -574,6 +574,7 @@ type ProvenanceGrouping =
                         commitUiState {
                             nextUiState with
                                 Error = None
+                                Hint = None
                                 PendingAssignmentBatch = None
                                 PendingMemberResolution = None
                         }
@@ -670,6 +671,7 @@ type ProvenanceGrouping =
                         commitUiState {
                             nextUiState with
                                 Error = None
+                                Hint = None
                                 PendingAssignmentBatch = None
                                 PendingMemberResolution = None
                                 Detail = None
@@ -694,6 +696,17 @@ type ProvenanceGrouping =
             with
             | Some inputGroup, Some outputGroup ->
                 EditorActions.allMemberPairs inputGroup outputGroup |> connectSetPairs
+            | _ -> applyUiState State.MemberResolution.clearPending
+
+        let resolvePairByOrder (pending: PendingMemberResolution) =
+            match
+                lookups.FindGroup ProvenanceSide.Input pending.InputGroupId,
+                lookups.FindGroup ProvenanceSide.Output pending.OutputGroupId
+            with
+            | Some inputGroup, Some outputGroup ->
+                match EditorActions.orderedMemberPairs inputGroup outputGroup with
+                | Some pairs -> connectSetPairs pairs
+                | None -> applyUiState State.MemberResolution.clearPending
             | _ -> applyUiState State.MemberResolution.clearPending
 
         let isGroupedCard side groupId =
@@ -1470,11 +1483,22 @@ type ProvenanceGrouping =
                                                     EditorPanels.memberResolutionPrompt
                                                         debug
                                                         pending
+                                                        resolvePairByOrder
                                                         resolveAllToAll
                                                         (fun pending ->
                                                             applyUiState (State.MemberResolution.chooseManual pending)
                                                         )
                                                         (fun () -> applyUiState State.MemberResolution.clearPending)
+                                                )
+                                            | None -> Html.none
+
+                                            match uiState.Hint with
+                                            | Some hint ->
+                                                floatingPanel (
+                                                    EditorPanels.hintPanel
+                                                        debug
+                                                        hint
+                                                        (fun () -> applyUiState State.Hint.clear)
                                                 )
                                             | None -> Html.none
                                         ]

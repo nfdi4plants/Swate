@@ -83,7 +83,15 @@ module MemberResolution =
                 PendingMemberResolution = None
                 ExpandedGroup = expandedGroup
                 Detail = None
+                Hint =
+                    Some
+                        "Drag from a member's connection handle to a member or group on the other side (or tap both handles) to connect them individually."
         }
+
+/// One-line follow-up guidance shown after actions that need a next step.
+module Hint =
+
+    let clear state = { state with Hint = None }
 
 module PropertyColors =
 
@@ -789,6 +797,7 @@ let init (session: ProvenanceSession) = {
     ExpandedGroup = None
     Detail = None
     Error = None
+    Hint = None
     PropertyColors = PropertyColors.empty
     Filters = Filters.defaultState
 }

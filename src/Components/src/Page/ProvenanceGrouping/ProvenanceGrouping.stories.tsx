@@ -2040,6 +2040,46 @@ export const MismatchedGroupConnectionPromptsForResolution: Story = {
   },
 };
 
+export const EqualCountGroupConnectionOffersPairByOrder: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Grouping Species on both sides yields two 3-member Arabidopsis groups.
+    for (
+      let attempt = 0;
+      attempt < 3 && !canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis');
+      attempt += 1
+    ) {
+      await showPropertyControls(canvas, 'Output', 'Species');
+      fireEvent.click(canvas.getByTestId('provenance-property-both-Output-Species'));
+      await waitFor(() => expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).toBeInTheDocument(), {
+        timeout: 1000,
+      }).catch(() => undefined);
+    }
+
+    const inputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis'));
+    const outputGroup = await waitFor(() => canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis'));
+
+    await dragByPointer(
+      within(inputGroup).getByTestId('provenance-connection-handle-Input-GroupCard'),
+      within(outputGroup).getByTestId('provenance-connection-handle-Output-GroupCard'),
+    );
+
+    // Equal counts are not connected silently; the prompt offers order pairing.
+    const prompt = await waitFor(() => canvas.getByTestId('provenance-member-resolution-prompt'));
+    expect(prompt).toHaveTextContent('3 input members');
+    expect(prompt).toHaveTextContent('3 output members');
+
+    await userEvent.click(canvas.getByTestId('provenance-member-resolution-pair-by-order'));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedConnection');
+    });
+    expect(canvas.queryByTestId('provenance-member-resolution-prompt')).not.toBeInTheDocument();
+  },
+};
+
 export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
@@ -2065,6 +2105,12 @@ export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
     });
     expect(canvas.queryByTestId('provenance-member-resolution-prompt')).not.toBeInTheDocument();
     expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
+
+    // A follow-up hint explains how to connect members individually.
+    const hint = canvas.getByTestId('provenance-hint');
+    expect(hint).toHaveTextContent(/connection handle/i);
+    await userEvent.click(canvas.getByTestId('provenance-hint-dismiss'));
+    await waitFor(() => expect(canvas.queryByTestId('provenance-hint')).not.toBeInTheDocument());
   },
 };
 

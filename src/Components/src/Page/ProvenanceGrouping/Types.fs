@@ -175,6 +175,7 @@ type UiState = {
     ExpandedGroup: (ProvenanceSide * string) option
     Detail: ProvenanceDetail option
     Error: string option
+    Hint: string option
     PropertyColors: PropertyColorSettings
     Filters: FilterState
 }
