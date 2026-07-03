@@ -27,17 +27,32 @@ module EditorPanels =
         let overwriteCount = pending.AffectedValueCount
         let sideCount = pending.AffectedSideCount
 
-        let headerText =
+        let headers =
             pending.Batch.Overwrites
-            |> List.tryHead
-            |> Option.map (fun w -> w.Header.Category.Name)
-            |> Option.defaultValue "property"
+            |> List.map (fun w -> w.Header.Category.Name)
+            |> List.distinct
+
+        let headerText = headers |> List.tryHead |> Option.defaultValue "property"
 
         let valueText =
             pending.Batch.Overwrites
             |> List.tryHead
             |> Option.map (fun w -> Formatting.formatValue w.Value w.Unit)
             |> Option.defaultValue "new value"
+
+        let heading =
+            match headers with
+            | _ :: _ :: _ -> $"Overwrite {overwriteCount} values across {headers.Length} properties?"
+            | _ when overwriteCount > 1 -> $"Overwrite {overwriteCount} {headerText} values?"
+            | _ -> $"Overwrite {headerText} value?"
+
+        let body =
+            match headers with
+            | _ :: _ :: _ ->
+                let headerList = headers |> String.concat ", "
+                $"The selected targets already have values for {headerList}. Confirm to replace them across {sideCount} side(s)."
+            | _ ->
+                $"The selected targets already have a {headerText} value. Confirm to replace it with {valueText} across {sideCount} side(s)."
 
         Html.div [
             prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
@@ -50,19 +65,8 @@ module EditorPanels =
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
                     prop.children [
-                        Html.strong [
-                            prop.text (
-                                if overwriteCount > 1 then
-                                    $"Overwrite {overwriteCount} {headerText} values?"
-                                else
-                                    $"Overwrite {headerText} value?"
-                            )
-                        ]
-                        Html.span [
-                            prop.className "swt:text-sm"
-                            prop.text
-                                $"The selected targets already have {headerText}. Confirm to replace with {valueText} across {sideCount} side(s) using the existing edit path."
-                        ]
+                        Html.strong [ prop.text heading ]
+                        Html.span [ prop.className "swt:text-sm"; prop.text body ]
                     ]
                 ]
                 Html.div [
