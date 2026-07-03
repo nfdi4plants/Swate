@@ -682,7 +682,7 @@ export const SwitchesPropertyGroupingSideByDrag: Story = {
   },
 };
 
-export const SwitchesInheritedPropertyGroupingToInputSide: Story = {
+export const SwitchesInheritedPropertyToInputSideWithoutGrouping: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -697,16 +697,18 @@ export const SwitchesInheritedPropertyGroupingToInputSide: Story = {
     );
 
     await waitFor(() => {
-      expect(canvas.queryByTestId('provenance-group-Output-output:Species=Arabidopsis')).not.toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis')).toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Input-input:Species=Chlamydomonas')).toBeInTheDocument();
       expect(inputRail.getByTestId('provenance-property-Input-Species')).toBeInTheDocument();
       expect(outputRail.queryByTestId('provenance-property-Output-Species')).not.toBeInTheDocument();
     });
+
+    // Switching an ungrouped property only moves it; it must not group either side.
+    expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
+    expect(canvas.queryByTestId('provenance-group-Output-output:Species=Arabidopsis')).not.toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-group-Input-input:input-d')).toBeInTheDocument();
   },
 };
 
-export const ClicksSwapHandleToSwitchGroupingSide: Story = {
+export const ClicksSwapHandleToSwitchSideWithoutGrouping: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -718,11 +720,13 @@ export const ClicksSwapHandleToSwitchGroupingSide: Story = {
     await userEvent.click(canvas.getByTestId('provenance-property-drag-Output-Species'));
 
     await waitFor(() => {
-      expect(canvas.queryByTestId('provenance-group-Output-output:Species=Arabidopsis')).not.toBeInTheDocument();
-      expect(canvas.getByTestId('provenance-group-Input-input:Species=Arabidopsis')).toBeInTheDocument();
       expect(inputRail.getByTestId('provenance-property-Input-Species')).toBeInTheDocument();
       expect(outputRail.queryByTestId('provenance-property-Output-Species')).not.toBeInTheDocument();
     });
+
+    // Switching an ungrouped property only moves it; it must not group either side.
+    expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
+    expect(canvas.queryByTestId('provenance-group-Output-output:Species=Arabidopsis')).not.toBeInTheDocument();
   },
 };
 

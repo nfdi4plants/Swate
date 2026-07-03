@@ -294,10 +294,10 @@ type Controls =
         let sideName = SideLabels.sideName side
 
         Html.button [
-            prop.title $"Move {header.Category.Name} grouping from {sideName}"
+            prop.title $"Move {header.Category.Name} from {sideName}"
             prop.type'.button
             prop.className "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:btn-outline swt:z-10 swt:bg-base-100/90"
-            prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
+            prop.ariaLabel $"Move {header.Category.Name} from {sideName}"
             if defaultArg debug false then
                 prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
             prop.onPointerUp (fun _ -> onSwitch header)
@@ -560,7 +560,7 @@ type Controls =
                     prop.disabled true
                     prop.className
                         "swt:btn swt:btn-xs swt:btn-ghost swt:btn-square swt:z-10 swt:btn-outline swt:border-white swt:bg-base-100/90"
-                    prop.ariaLabel $"Move {header.Category.Name} grouping from {sideName}"
+                    prop.ariaLabel $"Move {header.Category.Name} from {sideName}"
                     if defaultArg debug false then
                         prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
                     prop.children [

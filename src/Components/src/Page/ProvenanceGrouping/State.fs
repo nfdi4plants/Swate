@@ -657,10 +657,11 @@ module GroupingAssignments =
             | ProvenanceSide.Input -> ProvenanceSide.Output
             | ProvenanceSide.Output -> ProvenanceSide.Input
 
-        let targetAssignment: GroupingAssignment = {
-            Key = key
-            Scope = scopeForSide targetSide
-        }
+        // Switching sides moves the rail control; grouping state travels with the
+        // header instead of being force-enabled on the target side.
+        let wasGrouped =
+            (Sides.get sourceSideId state).GroupingAssignments
+            |> List.exists (fun assignment -> assignment.Key = key)
 
         let withoutSource =
             Sides.update
@@ -672,12 +673,20 @@ module GroupingAssignments =
                 state
 
         let withTarget =
-            Sides.update
-                targetSideId
-                (fun current -> {
-                    current with
-                        GroupingAssignments = upsert targetAssignment current.GroupingAssignments
-                })
+            if wasGrouped then
+                let targetAssignment: GroupingAssignment = {
+                    Key = key
+                    Scope = scopeForSide targetSide
+                }
+
+                Sides.update
+                    targetSideId
+                    (fun current -> {
+                        current with
+                            GroupingAssignments = upsert targetAssignment current.GroupingAssignments
+                    })
+                    withoutSource
+            else
                 withoutSource
 
         {
