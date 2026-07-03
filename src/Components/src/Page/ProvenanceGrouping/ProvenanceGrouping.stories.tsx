@@ -2129,6 +2129,30 @@ export const AddsLayerFromMixedSelection: Story = {
   },
 };
 
+export const AddLayerPopoverAnnouncesSeedEntities: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Without a selection the new layer continues from all outputs by default.
+    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    const dialog = within(document.body);
+    await waitFor(() =>
+      expect(dialog.getByTestId('provenance-layer-seed-summary')).toHaveTextContent(/Starts from all \d+ outputs \(default\)/),
+    );
+    await userEvent.keyboard('{Escape}');
+
+    // With a selection the popover names the selected groups and entity count.
+    const outputA = canvas.getByText('Output A').closest('article')!;
+    await selectGroup(outputA);
+    await userEvent.click(canvas.getByTestId('provenance-add-layer'));
+    await waitFor(() =>
+      expect(dialog.getByTestId('provenance-layer-seed-summary')).toHaveTextContent('Starts from 1 selected group (1 entity).'),
+    );
+    await userEvent.keyboard('{Escape}');
+  },
+};
+
 export const CreatesNamedLayer: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

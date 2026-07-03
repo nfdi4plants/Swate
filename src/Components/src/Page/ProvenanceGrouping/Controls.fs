@@ -117,7 +117,8 @@ type Controls =
             onAddLayer: ProvenanceSourceName -> unit,
             ?debug: bool,
             ?sourceColors: Map<ProvenanceSourceId, ProvenanceColor>,
-            ?onSetSourceColor: ProvenanceSourceId -> ProvenanceColor option -> unit
+            ?onSetSourceColor: ProvenanceSourceId -> ProvenanceColor option -> unit,
+            ?seedSummary: string
         ) =
         let defaultNextLayerName (session: ProvenanceSession) =
             $"Layer {session.LayerOrder.Length + 1}"
@@ -143,6 +144,18 @@ type Controls =
                     submitLayerName ()
                 )
                 prop.children [
+                    // Announces which entities will seed the new layer's inputs, so
+                    // the effect of the current selection (or its absence) is visible
+                    // before the layer is created.
+                    match seedSummary with
+                    | Some summary ->
+                        Html.p [
+                            prop.className "swt:max-w-56 swt:text-xs swt:text-base-content/70"
+                            if defaultArg debug false then
+                                prop.testId "provenance-layer-seed-summary"
+                            prop.text summary
+                        ]
+                    | None -> ()
                     Html.label [ prop.className "swt:label"; prop.text "Layer name" ]
                     Html.input [
                         prop.ariaLabel "Layer name"

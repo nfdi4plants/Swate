@@ -908,6 +908,27 @@ type ProvenanceGrouping =
             |> List.distinct
             |> List.length
 
+        let layerSeedSummary =
+            if selectedGroupCount > 0 then
+                let groupText =
+                    if selectedGroupCount = 1 then
+                        "1 selected group"
+                    else
+                        $"{selectedGroupCount} selected groups"
+
+                let entityText =
+                    if selectedEntityCount = 1 then
+                        "1 entity"
+                    else
+                        $"{selectedEntityCount} entities"
+
+                $"Starts from {groupText} ({entityText})."
+            else
+                match layer.Model.OutputSets.Count with
+                | 0 -> "Starts empty: this layer has no outputs and nothing is selected."
+                | 1 -> "Starts from the single output of this layer (default)."
+                | outputCount -> $"Starts from all {outputCount} outputs of this layer (default)."
+
         // Group columns carry one card per display group; memoizing the rendered
         // columns keeps unrelated state changes (search text, rail expansion, panel
         // toggles) from reconciling hundreds of cards on large models.
@@ -1283,6 +1304,7 @@ type ProvenanceGrouping =
                                         ),
                                         sourceColors = uiState.PropertyColors.SourceColors,
                                         onSetSourceColor = setSourceColor,
+                                        seedSummary = layerSeedSummary,
                                         debug = debug
                                     )
                                     Html.div [
