@@ -55,9 +55,32 @@ module ConnectorMeasure =
         let secondControlX = finish.X - direction * bend
         Some $"M {start.X} {start.Y} C {firstControlX} {start.Y}, {secondControlX} {finish.Y}, {finish.X} {finish.Y}"
 
+    /// Cubic-bezier midpoint of the same control points pathBetweenPoints uses.
+    let midpointBetweenPoints start finish =
+        let deltaX = finish.X - start.X
+        let direction = if deltaX >= 0. then 1. else -1.
+        let bend = max 8. (abs deltaX / 2.)
+        let firstControlX = start.X + direction * bend
+        let secondControlX = finish.X - direction * bend
+
+        {
+            X = (start.X + 3. * firstControlX + 3. * secondControlX + finish.X) / 8.
+            Y = (start.Y + finish.Y) / 2.
+        }
+
     let pathBetweenHandles context source target =
         match tryHandle context source, tryHandle context target with
         | Some sourceNode, Some targetNode -> pathBetweenPoints (center context sourceNode) (center context targetNode)
+        | _ -> None
+
+    let pathWithMidpointBetweenHandles context source target =
+        match tryHandle context source, tryHandle context target with
+        | Some sourceNode, Some targetNode ->
+            let start = center context sourceNode
+            let finish = center context targetNode
+
+            pathBetweenPoints start finish
+            |> Option.map (fun path -> path, midpointBetweenPoints start finish)
         | _ -> None
 
     /// Rail connectors shorter than this are skipped entirely so dense layouts do not

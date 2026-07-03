@@ -319,6 +319,42 @@ type ConnectorOverlay =
                                         animatePaths
                                         (not (previousKeys.Contains measured.Key))
                                         debugEnabled
+                                // A collapsed group connector summarizes several underlying
+                                // connections; the midpoint badge makes that multiplicity
+                                // visible without expanding the groups.
+                                match measured.InteractiveConnection, measured.Midpoint with
+                                | Some connection, Some midpoint when connection.ConnectionIds.Length > 1 ->
+                                    let countText = string connection.ConnectionIds.Length
+                                    let radius = if countText.Length > 2 then 12. else 9.
+
+                                    Svg.g [
+                                        svg.className "swt:pointer-events-none"
+                                        svg.custom ("opacity", strokeOpacity)
+                                        if debugEnabled then
+                                            svg.custom ("data-testid", "provenance-connection-count")
+                                            svg.custom ("data-provenance-connection-key", measured.Key)
+                                        svg.children [
+                                            Svg.circle [
+                                                svg.cx midpoint.X
+                                                svg.cy midpoint.Y
+                                                svg.r radius
+                                                svg.custom ("fill", "var(--color-base-100)")
+                                                svg.custom ("stroke", "var(--color-primary)")
+                                                svg.custom ("strokeWidth", 1.5)
+                                            ]
+                                            Svg.text [
+                                                svg.x midpoint.X
+                                                svg.y midpoint.Y
+                                                svg.custom ("textAnchor", "middle")
+                                                svg.custom ("dominantBaseline", "central")
+                                                svg.custom ("fill", "var(--color-primary)")
+                                                svg.custom ("fontSize", 10)
+                                                svg.custom ("fontWeight", 600)
+                                                svg.text countText
+                                            ]
+                                        ]
+                                    ]
+                                | _ -> ()
                                 // A wide transparent stroke is the actual pointer/keyboard target,
                                 // so selecting a thin curve no longer needs pixel accuracy.
                                 match measured.InteractiveConnection with

@@ -435,6 +435,7 @@ module ConnectorPaths =
                 InteractiveConnection = None
                 AriaLabel = None
                 Color = None
+                Midpoint = None
             })
         )
 
@@ -473,14 +474,16 @@ module ConnectorPaths =
     let measure context (specs: ConnectorSpec list) : MeasuredConnector list =
         specs
         |> List.choose (fun spec ->
-            let path =
+            let measured =
                 if spec.SkipWhenClose then
                     ConnectorMeasure.pathBetweenDistantHandles context spec.Source spec.Target
+                    |> Option.map (fun path -> path, None)
                 else
-                    ConnectorMeasure.pathBetweenHandles context spec.Source spec.Target
+                    ConnectorMeasure.pathWithMidpointBetweenHandles context spec.Source spec.Target
+                    |> Option.map (fun (path, midpoint) -> path, Some midpoint)
 
-            path
-            |> Option.map (fun path -> {
+            measured
+            |> Option.map (fun (path, midpoint) -> {
                 Key = spec.Key
                 Path = path
                 TestId = spec.TestId
@@ -490,5 +493,6 @@ module ConnectorPaths =
                 InteractiveConnection = spec.InteractiveConnection
                 AriaLabel = spec.AriaLabel
                 Color = spec.Color
+                Midpoint = midpoint
             })
         )

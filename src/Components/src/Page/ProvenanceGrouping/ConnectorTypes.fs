@@ -21,6 +21,9 @@ type MeasuredConnector = {
     InteractiveConnection: DisplayConnection option
     AriaLabel: string option
     Color: string option
+    /// Curve midpoint, measured so summary badges (e.g. underlying-connection
+    /// counts) can sit on the line without re-deriving the bezier.
+    Midpoint: ConnectionPoint option
 }
 
 /// Logical connector between two handles, derived purely from model/UI state.
