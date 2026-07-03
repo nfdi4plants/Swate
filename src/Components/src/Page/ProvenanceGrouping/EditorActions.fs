@@ -369,6 +369,12 @@ module DragHandlers =
                     | ProvenancePropertyTarget.OutputSets _ -> Some ProvenanceSide.Output
                     | ProvenancePropertyTarget.Connections _ -> None
 
+                let setIdsForTarget target =
+                    match target with
+                    | ProvenancePropertyTarget.InputSets ids -> ids |> List.map (fun id -> ProvenanceSide.Input, id)
+                    | ProvenancePropertyTarget.OutputSets ids -> ids |> List.map (fun id -> ProvenanceSide.Output, id)
+                    | ProvenancePropertyTarget.Connections _ -> []
+
                 let affectedSideCount =
                     [
                         yield! batch.Adds |> List.choose (fun command -> sideForTarget command.Target)
@@ -377,7 +383,25 @@ module DragHandlers =
                     |> List.distinct
                     |> List.length
 
-                if batch.Overwrites.IsEmpty then
+                let affectedEntityCount =
+                    [
+                        yield! batch.Adds |> List.collect (fun command -> setIdsForTarget command.Target)
+                        yield! batch.Overwrites |> List.collect (fun warning -> setIdsForTarget warning.Target)
+                    ]
+                    |> List.distinct
+                    |> List.length
+
+                let pendingBatch = {
+                    Batch = batch
+                    AffectedSideCount = affectedSideCount
+                    AffectedValueCount = affectedValueCount
+                    AffectedGroupCount = targetGroups.Length
+                    AffectedEntityCount = affectedEntityCount
+                }
+
+                // A drop that fans out beyond the card under the pointer (via selected
+                // groups) is confirmed first, even when nothing would be overwritten.
+                if batch.Overwrites.IsEmpty && targetGroups.Length <= 1 then
                     if not batch.Adds.IsEmpty then
                         let result =
                             batch.Adds
@@ -397,12 +421,6 @@ module DragHandlers =
                         | Ok _ -> pulseDropTarget side groupId propertyValue
                         | Error _ -> ()
                 else
-                    let pendingBatch = {
-                        Batch = batch
-                        AffectedSideCount = affectedSideCount
-                        AffectedValueCount = affectedValueCount
-                    }
-
                     State.AssignmentBatch.set pendingBatch uiState |> context.SetUiState
             | Error error ->
                 context.SetUiState {

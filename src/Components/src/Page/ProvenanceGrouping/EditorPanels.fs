@@ -26,10 +26,13 @@ module EditorPanels =
     let assignmentBatchWarning debug (pending: PendingAssignmentBatch) onConfirm onCancel =
         let overwriteCount = pending.AffectedValueCount
         let sideCount = pending.AffectedSideCount
+        let isFanOutApply = pending.Batch.Overwrites.IsEmpty
 
         let headers =
-            pending.Batch.Overwrites
-            |> List.map (fun w -> w.Header.Category.Name)
+            [
+                yield! pending.Batch.Overwrites |> List.map (fun w -> w.Header.Category.Name)
+                yield! pending.Batch.Adds |> List.map (fun a -> a.Header.Category.Name)
+            ]
             |> List.distinct
 
         let headerText = headers |> List.tryHead |> Option.defaultValue "property"
@@ -38,29 +41,55 @@ module EditorPanels =
             pending.Batch.Overwrites
             |> List.tryHead
             |> Option.map (fun w -> Formatting.formatValue w.Value w.Unit)
+            |> Option.orElse (
+                pending.Batch.Adds
+                |> List.tryHead
+                |> Option.map (fun a -> Formatting.formatValue a.Value a.Unit)
+            )
             |> Option.defaultValue "new value"
 
         let heading =
-            match headers with
-            | _ :: _ :: _ -> $"Overwrite {overwriteCount} values across {headers.Length} properties?"
-            | _ when overwriteCount > 1 -> $"Overwrite {overwriteCount} {headerText} values?"
-            | _ -> $"Overwrite {headerText} value?"
+            if isFanOutApply then
+                $"Apply {headerText} value to {pending.AffectedGroupCount} selected groups?"
+            else
+                match headers with
+                | _ :: _ :: _ -> $"Overwrite {overwriteCount} values across {headers.Length} properties?"
+                | _ when overwriteCount > 1 -> $"Overwrite {overwriteCount} {headerText} values?"
+                | _ -> $"Overwrite {headerText} value?"
 
         let body =
-            match headers with
-            | _ :: _ :: _ ->
-                let headerList = headers |> String.concat ", "
-                $"The selected targets already have values for {headerList}. Confirm to replace them across {sideCount} side(s)."
-            | _ ->
-                $"The selected targets already have a {headerText} value. Confirm to replace it with {valueText} across {sideCount} side(s)."
+            if isFanOutApply then
+                $"Adds {valueText} to {pending.AffectedEntityCount} entities across the selected groups."
+            else
+                match headers with
+                | _ :: _ :: _ ->
+                    let headerList = headers |> String.concat ", "
+                    $"The selected targets already have values for {headerList}. Confirm to replace them across {sideCount} side(s)."
+                | _ ->
+                    $"The selected targets already have a {headerText} value. Confirm to replace it with {valueText} across {sideCount} side(s)."
 
         Html.div [
-            prop.className "swt:alert swt:alert-warning swt:flex-wrap swt:items-start"
+            prop.className [
+                "swt:alert swt:flex-wrap swt:items-start"
+                if isFanOutApply then
+                    "swt:alert-info"
+                else
+                    "swt:alert-warning"
+            ]
             if debug then
-                prop.testId "provenance-overwrite-warning"
+                if isFanOutApply then
+                    prop.testId "provenance-apply-batch-prompt"
+                else
+                    prop.testId "provenance-overwrite-warning"
             prop.children [
                 Html.i [
-                    prop.className "swt:iconify swt:fluent--warning-20-regular swt:size-5"
+                    prop.className [
+                        "swt:iconify swt:size-5"
+                        if isFanOutApply then
+                            "swt:fluent--info-20-regular"
+                        else
+                            "swt:fluent--warning-20-regular"
+                    ]
                 ]
                 Html.div [
                     prop.className "swt:flex swt:flex-col swt:gap-1"
@@ -74,12 +103,21 @@ module EditorPanels =
                     prop.children [
                         Html.button [
                             prop.type'.button
-                            prop.className "swt:btn swt:btn-warning swt:btn-sm"
+                            prop.className [
+                                "swt:btn swt:btn-sm"
+                                if isFanOutApply then
+                                    "swt:btn-primary"
+                                else
+                                    "swt:btn-warning"
+                            ]
                             if debug then
-                                prop.testId "provenance-confirm-overwrite"
+                                if isFanOutApply then
+                                    prop.testId "provenance-confirm-apply"
+                                else
+                                    prop.testId "provenance-confirm-overwrite"
                             prop.onPointerUp (fun _ -> onConfirm pending)
                             prop.onClick (fun _ -> onConfirm pending)
-                            prop.text "Overwrite"
+                            prop.text (if isFanOutApply then "Apply" else "Overwrite")
                         ]
                         Html.button [
                             prop.type'.button

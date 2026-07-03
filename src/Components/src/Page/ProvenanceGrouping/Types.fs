@@ -54,6 +54,8 @@ type PendingAssignmentBatch = {
     Batch: PropertyAssignmentBatch
     AffectedSideCount: int
     AffectedValueCount: int
+    AffectedGroupCount: int
+    AffectedEntityCount: int
 }
 
 type PanelRatios = { Left: int; Middle: int; Right: int }
