@@ -210,7 +210,8 @@ type TableCell =
             ?activateFirstTermSearchResultOnInput: bool,
             ?key: string
         ) =
-        let activateFirstTermSearchResultOnInput = defaultArg activateFirstTermSearchResultOnInput true
+        let activateFirstTermSearchResultOnInput =
+            defaultArg activateFirstTermSearchResultOnInput true
 
         let term =
             if oa.isEmpty () then

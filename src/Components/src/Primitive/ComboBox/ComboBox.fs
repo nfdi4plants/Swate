@@ -136,6 +136,7 @@ type ComboBox =
 
             if System.String.IsNullOrWhiteSpace value |> not then
                 setOpen true
+
                 if activateFirstItemOnInput then
                     setActiveIndex (Some 0)
                 else
