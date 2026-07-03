@@ -75,14 +75,17 @@ type Controls =
                     interaction.OnHandleTap handle
             )
             prop.className [
-                "swt:inline-flex swt:size-3 swt:shrink-0 swt:cursor-crosshair swt:items-center swt:justify-center swt:rounded-full swt:border swt:border-primary swt:bg-primary/70 swt:align-middle swt:opacity-55 swt:transition"
-                "hover:swt:opacity-100 focus:swt:opacity-100 focus:swt:outline-none focus:swt:ring-2 focus:swt:ring-primary/40"
+                // Opaque theme-mixed fills instead of element opacity: connector lines
+                // end underneath the handle, and a translucent dot let them (and their
+                // halo) bleed through as a blotchy overlap.
+                "swt:inline-flex swt:size-3 swt:shrink-0 swt:cursor-crosshair swt:items-center swt:justify-center swt:rounded-full swt:border swt:connector-handle swt:align-middle swt:transition"
+                "focus:swt:outline-none focus:swt:ring-2 focus:swt:ring-primary/40"
                 if droppable.isOver then
-                    "swt:opacity-100 swt:ring-2 swt:ring-primary"
+                    "swt:connector-handle-strong swt:ring-2 swt:ring-primary"
                 elif isEligibleTarget then
-                    "swt:opacity-100 swt:scale-125 swt:ring-2 swt:ring-primary/50 swt:ring-offset-1 swt:ring-offset-base-100"
+                    "swt:connector-handle-strong swt:scale-125 swt:ring-2 swt:ring-primary/50 swt:ring-offset-1 swt:ring-offset-base-100"
                 if draggable.isDragging || isArmed then
-                    "swt:opacity-100 swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
+                    "swt:connector-handle-strong swt:ring-2 swt:ring-primary swt:ring-offset-2 swt:ring-offset-base-100"
                 match className with
                 | Some className -> className
                 | None -> ()

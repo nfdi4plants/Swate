@@ -278,6 +278,22 @@
         animation: swt-connector-flow 450ms linear infinite;
     }
 
+    /* Connection handles: opaque equivalents of the old translucent fills, so the
+       connector lines ending underneath cannot bleed through the dot. Idle matches
+       the old dimmed look (70% primary at 55% element opacity); the strong states
+       match the fully opted-in look. */
+    .swt\:connector-handle {
+        background-color: color-mix(in oklch, var(--color-primary) 40%, var(--color-base-100));
+        border-color: color-mix(in oklch, var(--color-primary) 55%, var(--color-base-100));
+    }
+
+    .swt\:connector-handle:hover,
+    .swt\:connector-handle:focus-visible,
+    .swt\:connector-handle-strong {
+        background-color: color-mix(in oklch, var(--color-primary) 70%, var(--color-base-100));
+        border-color: var(--color-primary);
+    }
+
     /* Entry animations for expanding editor content. fade-in is opacity-only and is
        used for containers holding connector anchors, so measured positions stay
        truthful; pop-in adds a small slide for anchor-free content. */
