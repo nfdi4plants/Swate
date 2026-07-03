@@ -28,6 +28,26 @@ module DragDrop =
         let unit = propertyValue.Unit |> Option.map termIdentity |> Option.defaultValue ""
         $"{propertyValue.Id}:{value}:Unit:{unit}"
 
+    /// Id-free identity for one grouping value, so a freshly dropped value can be
+    /// found again on the card it regrouped into (the model assigns it a new id
+    /// there). Quote-safe for use inside quoted attribute selectors.
+    let groupingValueIdentity
+        (header: ProvenancePropertyHeader)
+        (value: ProvenanceValue)
+        (unit: ProvenanceTerm option)
+        =
+        let valueText =
+            match value with
+            | ProvenanceValue.Text text -> $"Text:{encode text}"
+            | ProvenanceValue.Integer integer -> $"Integer:{integer}"
+            | ProvenanceValue.Float float -> $"Float:{float}"
+            | ProvenanceValue.Term term -> $"Term:{termIdentity term}"
+
+        let unitText = unit |> Option.map termIdentity |> Option.defaultValue ""
+
+        // encode maps to encodeURIComponent, which leaves apostrophes alone.
+        $"{propertyHeaderIdentity header}:{valueText}:Unit:{unitText}".Replace("'", "%27")
+
     let valueDragId propertyValueId =
         $"provenance-value|{encode propertyValueId}"
 

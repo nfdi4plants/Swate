@@ -123,6 +123,18 @@ module Motion =
                 |]
                 (createObj [ "duration" ==> 500; "easing" ==> "ease-out" ])
 
+    /// Brief brightness flash that points out a chip or tab that just appeared or
+    /// changed. Same WAAPI approach as pulse, so re-renders cannot strip it.
+    let flash (node: HTMLElement) =
+        if not (prefersReduced ()) then
+            animateNode
+                node
+                [|
+                    createObj [ "filter" ==> "brightness(1.9)" ]
+                    createObj [ "filter" ==> "brightness(1)" ]
+                |]
+                (createObj [ "duration" ==> 600; "easing" ==> "ease-out" ])
+
 /// FLIP (First-Last-Invert-Play) animation state for one card column. Transforms are
 /// stepped per animation frame with inline styles instead of WAAPI, because the
 /// connector overlay's mutation observer only sees style-attribute writes — this is

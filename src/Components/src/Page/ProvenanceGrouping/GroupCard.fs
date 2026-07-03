@@ -160,6 +160,7 @@ type GroupCard =
         (
             category: string,
             valueText: string,
+            valueIdentity: string,
             paletteClasses: string,
             isHighlighted: bool,
             setHighlighted: bool -> unit,
@@ -200,6 +201,8 @@ type GroupCard =
             prop.ariaLabel label
             prop.custom ("aria-pressed", isFocused)
             prop.custom ("data-hovered", isHighlighted)
+            // Lets the drop feedback find and flash the tab a dropped value created.
+            prop.custom ("data-provenance-grouping-value", valueIdentity)
             match testId with
             | Some testId -> prop.testId testId
             | None -> ()
@@ -545,6 +548,10 @@ type GroupCard =
                                         GroupCard.OrganizerTab(
                                             category,
                                             valueText,
+                                            DragDrop.groupingValueIdentity
+                                                groupingValue.Key.Header
+                                                groupingValue.Value
+                                                groupingValue.Unit,
                                             tabPalette.[index % tabPalette.Length],
                                             (hoveredTabIndex = Some index || focusedTabIndex = Some index),
                                             (fun highlighted ->

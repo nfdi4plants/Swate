@@ -298,18 +298,44 @@ module DragHandlers =
         | ProvenanceSide.Input -> layer.InputSideId
         | ProvenanceSide.Output -> layer.OutputSideId
 
-    /// Pulses the card a value was just dropped on. Scheduled one frame after the
-    /// publish so it targets the re-rendered card; if the assignment regrouped the
-    /// card away, the pulse is silently skipped.
-    let private pulseDropTarget side groupId =
+    /// Pulses the card a value was just dropped on and flashes the organizer tab the
+    /// value produced. Scheduled one frame after the publish so it targets the
+    /// re-rendered DOM. Dropping a grouping value usually moves the members into a
+    /// differently-keyed card, so when the original card is gone the tab lookup finds
+    /// (and pulses) their new home instead.
+    let private pulseDropTarget side groupId (propertyValue: ProvenancePropertyValue) =
         Motion.requestFrame (fun () ->
-            let node: Browser.Types.HTMLElement =
+            let cardNode: Browser.Types.HTMLElement =
                 !!
                     Browser.Dom.document.querySelector
                     ($"[data-provenance-group-node='{DragDrop.groupNodeId side groupId}']")
 
-            if not (isNull node) then
-                Motion.pulse node
+            let mutable pulsedCard = false
+
+            if not (isNull cardNode) then
+                Motion.pulse cardNode
+                pulsedCard <- true
+
+            let identity =
+                DragDrop.groupingValueIdentity propertyValue.Header propertyValue.Value propertyValue.Unit
+
+            let sidePrefix = $"provenance-node::{side}::"
+
+            let tabs =
+                Motion.queryAll Browser.Dom.document.body ($"[data-provenance-grouping-value='{identity}']")
+
+            for tab in tabs do
+                let card = Motion.closest tab "[data-provenance-group-node]"
+
+                if
+                    not (isNull card)
+                    && (card.getAttribute "data-provenance-group-node").StartsWith sidePrefix
+                then
+                    Motion.flash tab
+
+                    if not pulsedCard then
+                        Motion.pulse (unbox card)
+                        pulsedCard <- true
         )
         |> ignore
 
@@ -368,7 +394,7 @@ module DragHandlers =
                         context.Publish result
 
                         match result with
-                        | Ok _ -> pulseDropTarget side groupId
+                        | Ok _ -> pulseDropTarget side groupId propertyValue
                         | Error _ -> ()
                 else
                     let pendingBatch = {
