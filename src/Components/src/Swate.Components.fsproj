@@ -144,6 +144,7 @@
     <Compile Include="Composite\AnnotationTable\Types.fs" />
     <Compile Include="Composite\AnnotationTable\Context.fs" />
     <Compile Include="Composite\AnnotationTable\ContextProvider.fs" />
+    <Compile Include="Composite\AnnotationTable\AnnotationTableClipboard.fs" />
     <Compile Include="Composite\AnnotationTable\ContextMenu.fs" />
     <Compile Include="Composite\AnnotationTable\Modals.fs" />
     <Compile Include="Composite\AnnotationTable\AnnotationTable.fs" />

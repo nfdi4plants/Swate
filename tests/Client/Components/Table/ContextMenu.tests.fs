@@ -48,7 +48,7 @@ type TestCases =
             |> Array.map (fun (_, row) -> row)
 
         let pasteBehavior =
-            AnnotationTableContextMenuUtil.predictPasteBehaviour (clickedCell, currentTable, selectHandle, pasteData)
+            AnnotationTableClipboard.predictPasteBehaviour (clickedCell, currentTable, selectHandle, pasteData)
 
         Expect.equal
             pasteBehavior
@@ -67,7 +67,7 @@ type TestCases =
         let selectHandle: SelectHandle = Fixture.mkSelectHandle (1, 1, 1, 1)
 
         let pasteBehavior =
-            AnnotationTableContextMenuUtil.predictPasteBehaviour (clickedCell, currentTable, selectHandle, pasteData)
+            AnnotationTableClipboard.predictPasteBehaviour (clickedCell, currentTable, selectHandle, pasteData)
 
         Expect.equal
             pasteBehavior
@@ -86,7 +86,7 @@ type TestCases =
         let clickedCell: CellCoordinate = {| x = 1; y = 1 |}
 
         let pasteBehavior =
-            AnnotationTableContextMenuUtil.predictPasteBehaviour (clickedCell, currentTable, selectHandle, pasteData)
+            AnnotationTableClipboard.predictPasteBehaviour (clickedCell, currentTable, selectHandle, pasteData)
 
         Expect.equal
             pasteBehavior
@@ -105,7 +105,7 @@ type TestCases =
         let clickedCell: CellCoordinate = {| x = 3; y = 1 |}
 
         let pasteBehavior =
-            AnnotationTableContextMenuUtil.predictPasteBehaviour (clickedCell, currentTable, selectHandle, pasteData)
+            AnnotationTableClipboard.predictPasteBehaviour (clickedCell, currentTable, selectHandle, pasteData)
 
         Expect.equal
             pasteBehavior
@@ -133,7 +133,7 @@ type TestCases =
         let adaptedData = pasteData |> Array.map (fun item -> item)
 
         let pasteBehavior =
-            AnnotationTableContextMenuUtil.predictPasteBehaviour (clickedCell, currentTable, selectHandle, adaptedData)
+            AnnotationTableClipboard.predictPasteBehaviour (clickedCell, currentTable, selectHandle, adaptedData)
 
         Expect.equal
             pasteBehavior
@@ -227,7 +227,7 @@ type TestCases =
         |]
 
         let pasteBehavior =
-            AnnotationTableContextMenuUtil.predictPasteBehaviour (clickedCell, table, selectHandle, pasteData)
+            AnnotationTableClipboard.predictPasteBehaviour (clickedCell, table, selectHandle, pasteData)
 
         match pasteBehavior with
         | PasteCases.PasteCells pasteColumns ->
@@ -239,7 +239,7 @@ type TestCases =
 
             let mutable updatedTable = table
 
-            AnnotationTableContextMenuUtil.pasteCells (
+            AnnotationTableClipboard.pasteCells (
                 pasteColumns,
                 clickedCell,
                 selectHandle,

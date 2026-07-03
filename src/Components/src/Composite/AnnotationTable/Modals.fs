@@ -598,7 +598,7 @@ type ContextMenuModals =
                         coordinates = coordinates
                     |}
 
-                    AnnotationTableContextMenuUtil.pasteCells (
+                    AnnotationTableClipboard.pasteCells (
                         pasteColumns,
                         coordinate,
                         selectHandle,

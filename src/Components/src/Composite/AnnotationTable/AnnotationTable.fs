@@ -676,7 +676,7 @@ type AnnotationTable =
                                 arcTable.ClearSelectedCells(tableRef.current.SelectHandle)
                                 arcTable.Copy() |> setArcTable
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlV ->
-                                AnnotationTableContextMenuUtil.tryPasteCopiedCells (
+                                AnnotationTableClipboard.tryPasteCopiedCells (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
                                     tableRef.current.SelectHandle,
@@ -685,14 +685,14 @@ type AnnotationTable =
                                 )
                                 |> Promise.start
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlC ->
-                                AnnotationTableContextMenuUtil.copy (
+                                AnnotationTableClipboard.copy (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
                                     tableRef.current.SelectHandle
                                 )
                                 |> Promise.start
                             | AnnotationTableHelper.KbdShortcutTrigger kbd_CtrlX ->
-                                AnnotationTableContextMenuUtil.cut (
+                                AnnotationTableClipboard.cut (
                                     selectedCells.selectedCellsReducedSet.MinimumElement,
                                     arcTable,
                                     setArcTable,
