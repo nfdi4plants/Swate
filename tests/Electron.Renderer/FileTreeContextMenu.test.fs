@@ -127,6 +127,7 @@ Vitest.describe (
                 }
 
                 let menuItems = pathActionContextMenuItems config item
+
                 let openFolderLocationItem =
                     menuItems |> List.find (fun menuItem -> menuItem.Label = "Open Folder Location")
 
