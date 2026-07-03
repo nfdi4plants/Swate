@@ -68,6 +68,7 @@ module EditorSurface =
         addPaletteValue
         setPropertyColor
         sourceInfoForValue
+        (isUnassignedValue: Swate.Components.Shared.ProvenanceGrouping.Types.ProvenancePropertyValue -> bool)
         isDropRejected
         isDropAvailable
         debug
@@ -97,6 +98,7 @@ module EditorSurface =
             setPropertyColor,
             sourceInfoForValue,
             sideId = sideId,
+            isUnassignedValue = isUnassignedValue,
             debug = debug
         )
 

@@ -472,7 +472,8 @@ type Controls =
             ?color: ProvenanceColor,
             ?origins: Set<ProvenancePropertyOrigin>,
             ?onSetColor: ProvenanceColor option -> unit,
-            ?sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option
+            ?sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
+            ?isUnassignedValue: ProvenancePropertyValue -> bool
         ) =
         let draggable =
             DndKit.useDraggable (
@@ -802,6 +803,11 @@ type Controls =
                                 let sourceInfo =
                                     sourceInfoForValue |> Option.bind (fun resolver -> resolver propertyValue)
 
+                                let unassigned =
+                                    isUnassignedValue
+                                    |> Option.map (fun isUnassigned -> isUnassigned propertyValue)
+                                    |> Option.defaultValue false
+
                                 Controls.ValueChip(
                                     propertyValue,
                                     onDragChanged = setIsValueChipDragging,
@@ -810,6 +816,7 @@ type Controls =
                                     anchorSide = side,
                                     ?debug = debug,
                                     ?sourceInfo = sourceInfo,
+                                    unassigned = unassigned,
                                     key = DragDrop.propertyValueIdentity propertyValue
                                 )
                             Controls.AddValuePopover(
@@ -852,6 +859,7 @@ type Controls =
             onSetColor: ProvenancePropertyHeader -> ProvenanceColor option -> unit,
             sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
             ?sideId: ProvenanceLayerSideId,
+            ?isUnassignedValue: ProvenancePropertyValue -> bool,
             ?debug: bool
         ) =
         let droppable =
@@ -961,6 +969,7 @@ type Controls =
                             ?origins = originsForHeader header,
                             onSetColor = onSetColor header,
                             sourceInfoForValue = sourceInfoForValue,
+                            ?isUnassignedValue = isUnassignedValue,
                             debug = defaultArg debug false,
                             key = DragDrop.propertyHeaderIdentity header
                         )
@@ -1262,10 +1271,12 @@ type Controls =
             ?anchorSide: ProvenanceSide,
             ?debug: bool,
             ?key: string,
-            ?sourceInfo: PropertyValueSourceInfo
+            ?sourceInfo: PropertyValueSourceInfo,
+            ?unassigned: bool
         ) : ReactElement =
         let canDrag = defaultArg draggable true
         let showHeader = defaultArg showHeader true
+        let unassigned = defaultArg unassigned false
         let density = React.useContext Density.context
 
         let drag =
@@ -1326,27 +1337,36 @@ type Controls =
                 yield! Styles.propertyValueButtonClasses density drag.isDragging
                 if not canDrag then
                     "swt:cursor-default"
+                // Values that exist only in the rail palette look tentative until
+                // they are dropped onto a group.
+                if unassigned then
+                    "swt:border-dashed"
             ]
             prop.custom ("data-provenance-resize-node", "true")
+            if unassigned then
+                prop.custom ("data-provenance-unassigned", "true")
             if defaultArg debug false then
                 prop.testId $"provenance-value-{propertyValue.Id}"
             prop.ariaLabel $"Drag {propertyValue.Header.Category.Name} value"
-            match sourceInfo with
-            | Some info ->
-                let parts = [
-                    match info.TableName with
-                    | Some tn -> $"Table: {tn}"
-                    | None -> ()
-                    match info.ProcessName with
-                    | Some pn -> $"Process: {pn}"
-                    | None -> ()
-                    if info.IsCurrentTable then
-                        "Current table"
-                ]
+            if unassigned then
+                prop.title "Not assigned to any entity yet — drag onto a group card to apply."
+            else
+                match sourceInfo with
+                | Some info ->
+                    let parts = [
+                        match info.TableName with
+                        | Some tn -> $"Table: {tn}"
+                        | None -> ()
+                        match info.ProcessName with
+                        | Some pn -> $"Process: {pn}"
+                        | None -> ()
+                        if info.IsCurrentTable then
+                            "Current table"
+                    ]
 
-                if not parts.IsEmpty then
-                    prop.title (System.String.Join("; ", parts))
-            | _ -> ()
+                    if not parts.IsEmpty then
+                        prop.title (System.String.Join("; ", parts))
+                | _ -> ()
             prop.children [
                 match valueAnchor with
                 | Some anchor -> anchor

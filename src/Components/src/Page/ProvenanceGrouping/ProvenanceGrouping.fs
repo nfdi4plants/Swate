@@ -825,6 +825,18 @@ type ProvenanceGrouping =
                 (fun header value unit -> addPaletteValue side header value unit)
                 setPropertyColor
                 sourceInfoForValue
+                // A rail value is tentative until the same header/value/unit exists on
+                // some entity; the palette copy keeps rendering after a drop, so the
+                // check must look at value identity rather than the chip's own id.
+                (fun propertyValue ->
+                    layer.Model.PropertyValues
+                    |> Map.exists (fun _ existing ->
+                        existing.Header = propertyValue.Header
+                        && existing.Value = propertyValue.Value
+                        && existing.Unit = propertyValue.Unit
+                    )
+                    |> not
+                )
                 isDropRejected
                 (isPropertyDragActive && not isDropRejected)
                 debug

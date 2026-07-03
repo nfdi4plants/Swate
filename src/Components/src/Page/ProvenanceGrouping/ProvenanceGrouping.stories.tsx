@@ -1177,6 +1177,26 @@ export const CreatesPropertyValueFromRail: Story = {
   },
 };
 
+export const PaletteValuesLookTentativeUntilAssigned: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const source = await addRailValue(canvas, 'Output', 'Analysis', 'Sequencing');
+
+    // A value created in the rail is only a palette entry until it is dropped.
+    expect(source).toHaveAttribute('data-provenance-unassigned', 'true');
+    expect(source).toHaveClass('swt:border-dashed');
+
+    const outputD = canvas.getByText('Output D').closest('article')!;
+    await dragByPointer(source, outputD);
+
+    await waitFor(async () => {
+      const assigned = await railValue(canvas, 'Output', 'Analysis', 'Sequencing');
+      expect(assigned).not.toHaveAttribute('data-provenance-unassigned');
+    });
+  },
+};
+
 export const ConnectionDetailsShowEntityPairsWithoutPropertyCreation: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
