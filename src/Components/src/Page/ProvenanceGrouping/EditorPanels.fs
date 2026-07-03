@@ -194,16 +194,69 @@ module EditorPanels =
             ]
         ]
 
-    let connectionDetails debug (connections: DisplayConnection list) detail =
+    let private groupTitle (groups: DisplayGroup list) groupId =
+        groups
+        |> List.tryFind (fun group -> group.Id = groupId)
+        |> Option.map (fun group ->
+            match group.GroupingValues with
+            | [] ->
+                group.Members
+                |> List.tryHead
+                |> Option.map (fun member' -> member'.Name)
+                |> Option.defaultValue groupId
+            | values ->
+                values
+                |> List.map (fun value ->
+                    $"{value.Key.Header.Category.Name}: {Formatting.formatValue value.Value value.Unit}"
+                )
+                |> String.concat ", "
+        )
+        |> Option.defaultValue groupId
+
+    let connectionDetails
+        debug
+        (model: ProvenanceModel)
+        (inputGroups: DisplayGroup list)
+        (outputGroups: DisplayGroup list)
+        (connections: DisplayConnection list)
+        detail
+        (onRemove: DisplayConnection -> unit)
+        =
         match detail with
         | Some(ProvenanceDetail.Connection connectionId) ->
             let resolved = connections |> List.tryFind (fun c -> c.Id = connectionId)
 
             match resolved with
             | Some conn ->
+                let underlying =
+                    conn.ConnectionIds |> List.choose (fun id -> model.Connections.TryFind id)
+
+                let inputCount =
+                    underlying
+                    |> List.map (fun connection -> connection.InputSetId)
+                    |> List.distinct
+                    |> List.length
+
+                let outputCount =
+                    underlying
+                    |> List.map (fun connection -> connection.OutputSetId)
+                    |> List.distinct
+                    |> List.length
+
+                let setName (sets: Map<ProvenanceSetId, ProvenanceSet>) setId =
+                    sets.TryFind setId
+                    |> Option.map (fun set -> set.Name)
+                    |> Option.defaultValue setId
+
+                let shapeText =
+                    match underlying.Length with
+                    | 1 -> "1 connection"
+                    | count -> $"{count} connections: {inputCount} inputs × {outputCount} outputs"
+
                 Html.div [
                     prop.className
-                        "swt:mx-4 swt:mt-4 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3 swt:motion-pop-in"
+                        "swt:mx-4 swt:mt-4 swt:flex swt:flex-col swt:gap-2 swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-3 swt:motion-pop-in"
+                    prop.custom ("data-connection-id", conn.Id)
                     if debug then
                         prop.testId "provenance-connection-details"
                     prop.children [
@@ -212,23 +265,50 @@ module EditorPanels =
                             prop.children [
                                 Html.h3 [
                                     prop.className "swt:grow swt:font-semibold swt:text-primary"
-                                    prop.text $"Connection: {connectionId}"
+                                    prop.text
+                                        $"{groupTitle inputGroups conn.SourceGroupId} → {groupTitle outputGroups conn.TargetGroupId}"
+                                ]
+                                Html.button [
+                                    prop.type'.button
+                                    prop.className "swt:btn swt:btn-outline swt:btn-error swt:btn-sm"
+                                    prop.ariaLabel "Remove connection"
+                                    if debug then
+                                        prop.testId "provenance-connection-remove"
+                                    prop.onClick (fun _ -> onRemove conn)
+                                    prop.children [
+                                        Html.i [
+                                            prop.className "swt:iconify swt:fluent--delete-20-regular swt:size-4"
+                                        ]
+                                        Html.span "Remove connection"
+                                    ]
                                 ]
                             ]
                         ]
-                        Html.p [
-                            prop.className "swt:text-sm"
-                            prop.text $"Source: {conn.SourceGroupId}"
-                        ]
-                        Html.p [
-                            prop.className "swt:text-sm"
-                            prop.text $"Target: {conn.TargetGroupId}"
-                        ]
-                        let connectionIds = conn.ConnectionIds |> String.concat ", "
-
-                        Html.p [
-                            prop.className "swt:text-sm"
-                            prop.text $"Connection IDs: {connectionIds}"
+                        Html.p [ prop.className "swt:text-sm"; prop.text shapeText ]
+                        Html.ul [
+                            prop.className "swt:flex swt:flex-col swt:gap-0.5 swt:text-sm"
+                            if debug then
+                                prop.testId "provenance-connection-pairs"
+                            prop.children [
+                                for connection in underlying do
+                                    Html.li [
+                                        prop.children [
+                                            Html.span (setName model.InputSets connection.InputSetId)
+                                            Html.span [
+                                                prop.className "swt:px-1 swt:text-base-content/60"
+                                                prop.text "→"
+                                            ]
+                                            Html.span (setName model.OutputSets connection.OutputSetId)
+                                            match connection.ProcessName with
+                                            | Some processName ->
+                                                Html.span [
+                                                    prop.className "swt:pl-2 swt:text-xs swt:text-base-content/60"
+                                                    prop.text processName
+                                                ]
+                                            | None -> Html.none
+                                        ]
+                                    ]
+                            ]
                         ]
                     ]
                 ]

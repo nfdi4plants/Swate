@@ -1402,7 +1402,15 @@ type ProvenanceGrouping =
                         ]
                     ]
                     surface
-                    EditorPanels.connectionDetails debug connections uiState.Detail
+
+                    EditorPanels.connectionDetails
+                        debug
+                        layer.Model
+                        inputGroups
+                        outputGroups
+                        connections
+                        uiState.Detail
+                        removeDisplayConnection
                 ]
             ]
 

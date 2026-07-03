@@ -1124,7 +1124,7 @@ export const CreatesPropertyValueFromRail: Story = {
   },
 };
 
-export const ConnectionDetailsDoNotExposePropertyCreation: Story = {
+export const ConnectionDetailsShowEntityPairsWithoutPropertyCreation: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
     const canvas = within(canvasElement);
@@ -1133,10 +1133,34 @@ export const ConnectionDetailsDoNotExposePropertyCreation: Story = {
     await userEvent.click(connector);
 
     const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
-    expect(details).toHaveTextContent('Connection IDs');
+    // Underlying connections are listed as readable entity name pairs.
+    expect(within(details).getByTestId('provenance-connection-pairs')).toHaveTextContent('→');
+    expect(details).toHaveTextContent(/connection/i);
     expect(within(details).queryByText(/Add value/i)).not.toBeInTheDocument();
     expect(within(details).queryByText(/Add property/i)).not.toBeInTheDocument();
-    expect(within(details).queryByRole('button', { name: /remove connection/i })).not.toBeInTheDocument();
+    expect(within(details).getByRole('button', { name: /remove connection/i })).toBeInTheDocument();
+  },
+};
+
+export const RemovesConnectionFromDetailsPanel: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const initialCount = (await waitFor(() => {
+      const connectors = canvas.getAllByTestId('provenance-connection');
+      expect(connectors.length).toBeGreaterThan(0);
+      return connectors;
+    })).length;
+
+    await userEvent.click(canvas.getAllByTestId('provenance-connection')[0]);
+    const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
+    await userEvent.click(within(details).getByTestId('provenance-connection-remove'));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('RemoveLoadedConnection');
+      expect(canvas.queryAllByTestId('provenance-connection').length).toBeLessThan(initialCount);
+    });
+    expect(canvas.queryByTestId('provenance-connection-details')).not.toBeInTheDocument();
   },
 };
 
@@ -1160,7 +1184,7 @@ export const SelectsConnectionWithKeyboard: Story = {
     await userEvent.keyboard(' ');
 
     await waitFor(() =>
-      expect(canvas.getByTestId('provenance-connection-details')).toHaveTextContent(`Connection: ${secondLabel}`),
+      expect(canvas.getByTestId('provenance-connection-details')).toHaveAttribute('data-connection-id', secondLabel),
     );
   },
 };
