@@ -1544,12 +1544,13 @@ type Controls =
             filters: FilterState,
             onSearch: string -> unit,
             onPropertySort: PropertySort -> unit,
-            _onGroupSort: GroupSort -> unit,
+            onGroupSort: GroupSort -> unit,
             onValueCountFilter: PropertyValueCountFilter -> unit,
             onOriginFilter: PropertyOriginFilter -> unit,
             ?debug: bool
         ) =
         let sortOpen, setSortOpen = React.useState false
+        let groupSortOpen, setGroupSortOpen = React.useState false
         let searchDraft, setSearchDraft = React.useState filters.SearchText
         let latestSearchText = React.useRef filters.SearchText
         let latestOnSearch = React.useRef onSearch
@@ -1580,6 +1581,22 @@ type Controls =
                     ]
                     prop.ariaLabel label
                     prop.onClick (fun _ -> onPropertySort sort)
+                    prop.children [ Html.span label ]
+                ]
+            ]
+
+        let groupSortOption sort label =
+            let active = filters.GroupSort = sort
+
+            Html.li [
+                Html.button [
+                    prop.type'.button
+                    prop.className [
+                        "swt:btn swt:btn-sm swt:w-full swt:justify-start"
+                        if active then "swt:btn-primary" else "swt:btn-ghost"
+                    ]
+                    prop.ariaLabel label
+                    prop.onClick (fun _ -> onGroupSort sort)
                     prop.children [ Html.span label ]
                 ]
             ]
@@ -1647,6 +1664,32 @@ type Controls =
                         propertySortOption PropertySort.ValueCountDesc "Property Value Count"
                         propertySortOption PropertySort.NameAsc "Name"
                         propertySortOption PropertySort.ConnectionCountDesc "Connection Count"
+                    ],
+                    contentClassName =
+                        "swt:w-52 swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110%"
+                )
+                Dropdown.Main(
+                    groupSortOpen,
+                    setGroupSortOpen,
+                    Html.button [
+                        prop.type'.button
+                        prop.className "swt:btn swt:btn-sm swt:btn-outline"
+                        prop.ariaLabel "Sort Groups"
+                        prop.custom ("aria-expanded", groupSortOpen)
+                        if defaultArg debug false then
+                            prop.testId "provenance-group-sort"
+                        prop.onClick (fun _ -> setGroupSortOpen (not groupSortOpen))
+                        prop.children [
+                            Html.i [
+                                prop.className "swt:iconify swt:fluent--arrow-sort-20-regular swt:size-4"
+                            ]
+                            Html.span "Sort Groups"
+                        ]
+                    ],
+                    React.Fragment [
+                        groupSortOption GroupSort.NameAsc "Name"
+                        groupSortOption GroupSort.MemberCountDesc "Member Count"
+                        groupSortOption GroupSort.ConnectionCountDesc "Connection Count"
                     ],
                     contentClassName =
                         "swt:w-52 swt:max-w-none swt:menu swt:bg-base-200 swt:rounded-box swt:z-99 swt:p-2 swt:shadow-sm swt:top-110%"

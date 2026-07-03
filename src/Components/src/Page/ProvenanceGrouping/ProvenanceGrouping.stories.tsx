@@ -573,6 +573,28 @@ export const SortsPropertiesByNameAndConnectionCount: Story = {
   },
 };
 
+export const SortsGroupsByMemberCount: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    await groupByProperty(canvas, 'Output', 'Species');
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis')).toBeInTheDocument(),
+    );
+
+    const toolbar = within(canvas.getByTestId('provenance-filter-toolbar'));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Sort Groups$/i }));
+    await userEvent.click(toolbar.getByRole('button', { name: /^Member Count$/i }));
+
+    await waitFor(() => {
+      const cards = Array.from(
+        canvasElement.querySelectorAll<HTMLElement>('[data-testid^="provenance-group-Output-"]'),
+      );
+      expect(cards[0].getAttribute('data-testid')).toBe('provenance-group-Output-output:Species=Arabidopsis');
+    });
+  },
+};
+
 export const AddedRailPropertiesAreCurrentAndPinnedToTheirSide: Story = {
   render: () => <Harness inputOnly />,
   play: async ({ canvasElement }) => {
