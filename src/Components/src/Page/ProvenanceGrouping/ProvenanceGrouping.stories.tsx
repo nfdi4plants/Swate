@@ -474,6 +474,23 @@ export const SingleSidedShelfPropertiesCannotDropOnOppositeSide: Story = {
   },
 };
 
+export const HelpLegendExplainsWorkflowAndSymbols: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await userEvent.click(canvas.getByTestId('provenance-help-trigger'));
+    const content = await waitFor(() => within(document.body).getByTestId('provenance-help-content'));
+
+    expect(content).toHaveTextContent('Group');
+    expect(content).toHaveTextContent('Annotate');
+    expect(content).toHaveTextContent('Connect');
+    expect(content).toHaveTextContent('Continue');
+    expect(content).toHaveTextContent(/upstream table/i);
+    await userEvent.keyboard('{Escape}');
+  },
+};
+
 export const ToolbarUsesSinglePropertySortAndOriginButtons: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

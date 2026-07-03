@@ -109,6 +109,130 @@ type Controls =
                 prop.testId $"provenance-connection-anchor-{handle.Side}-{handle.Kind}"
         ]
 
+    /// Compact "how this editor works" popover: the four-step workflow plus a
+    /// legend for the origin symbols and connector styles.
+    [<ReactComponent>]
+    static member HelpLegend(?debug: bool) =
+        let step (index: int) (title: string) (text: string) =
+            Html.li [
+                prop.className "swt:flex swt:gap-2"
+                prop.children [
+                    Html.span [
+                        prop.className
+                            "swt:flex swt:size-5 swt:shrink-0 swt:items-center swt:justify-center swt:rounded-full swt:bg-primary swt:text-xs swt:font-semibold swt:text-primary-content"
+                        prop.text (string index)
+                    ]
+                    Html.span [
+                        prop.className "swt:text-sm"
+                        prop.children [
+                            Html.span [ prop.className "swt:font-medium"; prop.text $"{title}: " ]
+                            Html.span text
+                        ]
+                    ]
+                ]
+            ]
+
+        let legendRow (symbol: ReactElement) (text: string) =
+            Html.li [
+                prop.className "swt:flex swt:items-center swt:gap-2 swt:text-sm"
+                prop.children [
+                    Html.span [
+                        prop.className "swt:flex swt:w-8 swt:shrink-0 swt:justify-center"
+                        prop.children [ symbol ]
+                    ]
+                    Html.span text
+                ]
+            ]
+
+        let lineSample dashed =
+            Svg.svg [
+                svg.viewBox (0, 0, 32, 8)
+                svg.className "swt:h-2 swt:w-8"
+                svg.children [
+                    Svg.line [
+                        svg.x1 1
+                        svg.y1 4
+                        svg.x2 31
+                        svg.y2 4
+                        svg.custom ("stroke", "currentColor")
+                        svg.strokeWidth 2
+                        if dashed then
+                            svg.custom ("strokeDasharray", "4 4")
+                    ]
+                ]
+            ]
+
+        Popover.Simple(
+            ?debug =
+                (if defaultArg debug false then
+                     Some "provenance-help"
+                 else
+                     None),
+            trigger =
+                Html.button [
+                    prop.type'.button
+                    prop.className "swt:btn swt:btn-ghost swt:btn-xs"
+                    prop.title "How this editor works"
+                    prop.ariaLabel "How this editor works"
+                    if defaultArg debug false then
+                        prop.testId "provenance-help-trigger"
+                    prop.children [
+                        Html.i [
+                            prop.className "swt:iconify swt:fluent--question-circle-20-regular swt:size-4"
+                        ]
+                        Html.span "Help"
+                    ]
+                ],
+            content =
+                Html.div [
+                    prop.className "swt:flex swt:w-80 swt:flex-col swt:gap-2 swt:p-1"
+                    if defaultArg debug false then
+                        prop.testId "provenance-help-content"
+                    prop.children [
+                        Html.h3 [
+                            prop.className "swt:text-sm swt:font-semibold swt:text-primary"
+                            prop.text "How this editor works"
+                        ]
+                        Html.ol [
+                            prop.className "swt:flex swt:flex-col swt:gap-1.5"
+                            prop.children [
+                                step
+                                    1
+                                    "Group"
+                                    "Click a property in a side rail to merge entities sharing its values into one card."
+                                step
+                                    2
+                                    "Annotate"
+                                    "Expand a property's values and drag a value chip onto a card to set it for every member at once."
+                                step
+                                    3
+                                    "Connect"
+                                    "Drag between the round handles on opposite card edges (or tap one, then the other) to link inputs to outputs."
+                                step
+                                    4
+                                    "Continue"
+                                    "Select cards with their checkboxes and add a layer; the selection carries over as the new layer's inputs."
+                            ]
+                        ]
+                        Html.h4 [
+                            prop.className "swt:pt-1 swt:text-sm swt:font-semibold swt:text-primary"
+                            prop.text "Symbols"
+                        ]
+                        Html.ul [
+                            prop.className "swt:flex swt:flex-col swt:gap-1"
+                            prop.children [
+                                legendRow (OriginSymbols.currentIcon "swt:size-4") "Value from the current table"
+                                legendRow
+                                    (OriginSymbols.upstreamIcon "swt:size-4")
+                                    "Value inherited from an upstream table"
+                                legendRow (lineSample false) "Input–output connection"
+                                legendRow (lineSample true) "Where a property or value occurs"
+                            ]
+                        ]
+                    ]
+                ]
+        )
+
     [<ReactComponent>]
     static member LayerTabs
         (
@@ -397,6 +521,12 @@ type Controls =
         let propertyButton =
             Html.button [
                 prop.type'.button
+                prop.title (
+                    if sideSelected then
+                        $"Stop grouping by {header.Category.Name}"
+                    else
+                        $"Group {sideName} entities by {header.Category.Name}"
+                )
                 if canSwitch then
                     prop.ref draggable.setNodeRef
                     yield! prop.spread (!!draggable.attributes)
@@ -546,7 +676,8 @@ type Controls =
         let bothButton =
             Html.button [
                 prop.type'.button
-                prop.title $"Group {header.Category.Name} on both sides"
+                prop.title
+                    $"Group both sides by {header.Category.Name}. Inputs without their own value use values inherited from connected outputs."
                 prop.className [
                     "swt:btn swt:btn-xs swt:btn-square swt:z-10"
                     if bothSelected then
@@ -789,7 +920,7 @@ type Controls =
                 if headers.IsEmpty then
                     Html.p [
                         prop.className "swt:text-sm swt:text-base-content/60 swt:text-center swt:py-8"
-                        prop.text "Drag Properties here to use them for grouping"
+                        prop.text "Drag properties here, then click one to group by it"
                     ]
 
                     Html.div [
@@ -805,7 +936,8 @@ type Controls =
                             if side = ProvenanceSide.Output then
                                 "swt:self-end"
                         ]
-                        prop.text "Properties"
+                        prop.title "Click a property to group this side's entities by its values"
+                        prop.text "Group by"
                     ]
 
                     for header in visibleHeaders do

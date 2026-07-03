@@ -352,7 +352,7 @@ type ProvenanceGrouping =
                                             ]
                                             Html.span [
                                                 prop.className "swt:min-w-0 swt:truncate"
-                                                prop.text "Available properties"
+                                                prop.text "Available properties by source"
                                             ]
                                         ]
                                     ]
@@ -1397,6 +1397,7 @@ type ProvenanceGrouping =
                                                 )
                                                 prop.text "Compact"
                                             ]
+                                            Controls.HelpLegend(debug = debug)
                                         ]
                                     ]
                                 ]
