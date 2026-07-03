@@ -320,16 +320,20 @@ export const PropertiesStartInOriginFoldersAndSideDropZonesAreEmpty: Story = {
       .not.toBeInTheDocument();
     expect(canvas.getByTestId('provenance-property-rail-Output').querySelector('[data-testid^="provenance-property-Output-"]'))
       .not.toBeInTheDocument();
-    expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
-      .toBeVisible();
+    // waitFor: the shelf pops in with a brief opacity animation on mount, and
+    // toBeVisible treats the first opacity-0 frame as hidden.
+    await waitFor(() =>
+      expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
+        .toBeVisible());
 
     await userEvent.click(canvas.getByRole('button', { name: 'Minimize property folders' }));
     await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-list')).not.toBeInTheDocument());
 
     await userEvent.click(canvas.getByRole('button', { name: 'Expand property folders' }));
     await waitFor(() => expect(canvas.getByTestId('foldered-draggable-list')).toBeInTheDocument());
-    expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
-      .toBeVisible();
+    await waitFor(() =>
+      expect(within(canvas.getByTestId('foldered-draggable-item-row')).getByRole('button', { name: /^Drag Species$/ }))
+        .toBeVisible());
 
     const species = await shelfProperty(canvas, 'Species');
     expect(species).toBeInTheDocument();
