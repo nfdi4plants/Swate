@@ -62,7 +62,12 @@ type CompositeCell with
                 && not (System.String.IsNullOrWhiteSpace unit)
                 ->
                 CompositeCell.createUnitized (value, OntologyAnnotation.create unit)
-            | arr when arr.Length > 0 && arr.Length < 4 && header.IsTermColumn && CompositeCell.isNumber arr.[0] ->
+            | arr when
+                arr.Length > 0
+                && arr.Length < 4
+                && header.IsTermColumn
+                && CompositeCell.isNumber arr.[0]
+                ->
                 CompositeCell.createUnitizedFromString (arr.[0]) |> _.ConvertToValidCell(header)
             | [| value; _ |] when header.IsTermColumn ->
                 CompositeCell.createFreeText value |> _.ConvertToValidCell(header)

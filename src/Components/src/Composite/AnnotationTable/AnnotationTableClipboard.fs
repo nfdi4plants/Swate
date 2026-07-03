@@ -85,8 +85,7 @@ type AnnotationTableClipboard =
     static member cut(cellIndex: CellCoordinate, table: ArcTable, setTable, selectHandle: SelectHandle) = promise {
         do! AnnotationTableClipboard.copy (cellIndex, table, selectHandle)
 
-        let nextTable =
-            AnnotationTableClipboard.clear (cellIndex, table, selectHandle)
+        let nextTable = AnnotationTableClipboard.clear (cellIndex, table, selectHandle)
 
         nextTable |> setTable
     }
@@ -249,10 +248,7 @@ type AnnotationTableClipboard =
 
             let areHeaders =
                 headers
-                |> Array.collect (fun _ ->
-                    row
-                    |> Array.map (fun cell -> AnnotationTableClipboard.checkForHeader cell)
-                )
+                |> Array.collect (fun _ -> row |> Array.map (fun cell -> AnnotationTableClipboard.checkForHeader cell))
 
             Array.contains true areHeaders
 
@@ -353,12 +349,12 @@ type AnnotationTableClipboard =
                 let value, unit = currentCell.AsUnitized
 
                 let unitNeedsMetadata =
-                    unit.isEmpty()
+                    unit.isEmpty ()
                     || Option.forall String.IsNullOrWhiteSpace unit.TermSourceREF
                     || Option.forall String.IsNullOrWhiteSpace unit.TermAccessionNumber
 
                 let hasSameUnitName (targetTerm: OntologyAnnotation) =
-                    unit.isEmpty()
+                    unit.isEmpty ()
                     || String.Equals(unit.NameText, targetTerm.NameText, StringComparison.OrdinalIgnoreCase)
 
                 let targetUnit =
@@ -501,14 +497,7 @@ type AnnotationTableClipboard =
                 let prediction =
                     AnnotationTableClipboard.predictPasteBehaviour (cellIndex, arcTable, selectHandle, data)
 
-                AnnotationTableClipboard.paste (
-                    prediction,
-                    cellIndex,
-                    arcTable,
-                    selectHandle,
-                    setModal,
-                    setArcTable
-                )
+                AnnotationTableClipboard.paste (prediction, cellIndex, arcTable, selectHandle, setModal, setArcTable)
             with exn ->
                 setModal (AnnotationTable.ModalTypes.Error(exn.Message) |> Some)
         }

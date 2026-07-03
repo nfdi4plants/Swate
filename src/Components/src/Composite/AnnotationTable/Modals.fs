@@ -598,13 +598,7 @@ type ContextMenuModals =
                         coordinates = coordinates
                     |}
 
-                    AnnotationTableClipboard.pasteCells (
-                        pasteColumns,
-                        coordinate,
-                        selectHandle,
-                        arcTable,
-                        setArcTable
-                    )
+                    AnnotationTableClipboard.pasteCells (pasteColumns, coordinate, selectHandle, arcTable, setArcTable)
 
                     arcTable.Copy() |> setArcTable
                     rmv ()
