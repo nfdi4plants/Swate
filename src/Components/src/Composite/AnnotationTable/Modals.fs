@@ -1029,7 +1029,9 @@ type CompositeCellEditModal =
         =
         match compositeCell with
         | CompositeCell.Term _ ->
-            let setUnit = fun term -> setCell (CompositeCell.Unitized(compositeCell.AsTerm.NameText, term))
+            let setUnit =
+                fun term -> setCell (CompositeCell.Unitized(compositeCell.AsTerm.NameText, term))
+
             CompositeCellEditModal.AddUnit(compositeCell, header, setUnit, rmv)
         | CompositeCell.Unitized _ ->
             let setTerm = fun unit -> setCell (CompositeCell.Term unit)
@@ -1051,7 +1053,9 @@ type CompositeCellEditModal =
 
         match compositeCell with
         | CompositeCell.Term _ ->
-            let setUnit = fun term -> setCell (CompositeCell.Unitized(compositeCell.AsTerm.NameText, term))
+            let setUnit =
+                fun term -> setCell (CompositeCell.Unitized(compositeCell.AsTerm.NameText, term))
+
             CompositeCellEditModal.AddUnit(compositeCell, header, setUnit, rmv)
         | CompositeCell.Unitized _ ->
             let setTerm = fun unit -> setCell (CompositeCell.Term unit)
