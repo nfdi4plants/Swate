@@ -585,7 +585,7 @@ type ProvenanceGrouping =
 
                         commitUiState {
                             latestUiState.current with
-                                Error = Some(string error)
+                                Error = Some(SessionErrors.text error)
                         }
                 ),
                 [||]
@@ -683,7 +683,7 @@ type ProvenanceGrouping =
 
                         commitUiState {
                             latestUiState.current with
-                                Error = Some(string error)
+                                Error = Some(SessionErrors.text error)
                         }
                 ),
                 [||]

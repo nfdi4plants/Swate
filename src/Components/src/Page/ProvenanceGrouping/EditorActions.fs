@@ -92,6 +92,32 @@ module EditorLookups =
             SourceForValue = sourceForValue
         }
 
+/// User-facing messages for session and edit failures shown in the error alert,
+/// instead of raw union case dumps.
+module SessionErrors =
+
+    let private editText error =
+        match error with
+        | EditError.PropertyNotFound _ ->
+            "This property value no longer exists. It may have been changed by a newer edit."
+        | EditError.SetNotFound setId -> $"The entity '{setId}' no longer exists in this layer."
+        | EditError.ConnectionNotFound _ -> "This connection no longer exists."
+        | EditError.TableNotLoaded tableName -> $"The table '{tableName}' is not loaded."
+        | EditError.MissingSourceAnchor _ ->
+            "This value cannot be edited because its location in the source table is unknown."
+        | EditError.DuplicateHeader(tableName, header) ->
+            $"'{header.Category.Name}' already exists in table '{tableName}'."
+        | EditError.PreviousContextCreationNotAllowed tableName ->
+            $"Entries from the upstream table '{tableName}' are read-only here; edit them in their own table."
+        | EditError.PreviousContextConnectionCreationNotAllowed tableName ->
+            $"Connections cannot be created on the upstream table '{tableName}' from here."
+
+    let text error =
+        match error with
+        | SessionError.LayerNotFound layerId -> $"The layer '{layerId}' no longer exists."
+        | SessionError.SetNotFound reference -> $"The entity '{reference.SetId}' no longer exists in this layer."
+        | SessionError.EditFailed editError -> editText editError
+
 /// User-facing messages for value assignment planning failures.
 module AssignmentErrors =
 
