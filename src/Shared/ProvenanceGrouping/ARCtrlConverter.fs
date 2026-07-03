@@ -735,9 +735,6 @@ module internal LoadedTable =
             )
         )
 
-    let outputFactorCandidates pair targetOutputSetIds output =
-        outputFactorCandidatesForTargets pair [] targetOutputSetIds output
-
     let previousOutputFactorCandidates pair targetInputSetIds output =
         outputFactorCandidatesForTargets pair targetInputSetIds [] output
 
@@ -813,7 +810,7 @@ module internal LoadedTable =
 
         inputCharacteristicCandidates pair inputValueTargetIds input
         @ outputCharacteristicCandidates pair outputValueTargetIds output
-        @ outputFactorCandidates pair outputValueTargetIds output
+        @ outputFactorCandidatesForTargets pair parameterInputTargetIds parameterOutputTargetIds output
         @ processParameterCandidates pair parameterInputTargetIds parameterOutputTargetIds proc
         @ processComponentCandidates pair parameterInputTargetIds parameterOutputTargetIds proc
 

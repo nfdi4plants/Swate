@@ -375,13 +375,18 @@ let tests =
                 |> List.find (fun value -> value.Header.Category.Name = "Temperature")
 
             let replicate =
-                extractA.PropertyValueIds
+                sampleA.PropertyValueIds
+                |> List.append extractA.PropertyValueIds
                 |> List.map (fun id -> result.Model.PropertyValues.[id])
                 |> List.find (fun value -> value.Header.Category.Name = "Replicate")
 
             expectText "Arabidopsis" species.Value
             expectText "22" temperature.Value
             expectText "R1" replicate.Value
+
+            Expect.isTrue
+                (sampleA.PropertyValueIds |> List.contains replicate.Id)
+                "Factor values should also connect to the loaded input set, like parameter values do, when the row directly connects input and output."
 
         testCase "collapses previous table context into property values on loaded inputs"
         <| fun _ ->
