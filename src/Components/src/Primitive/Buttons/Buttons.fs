@@ -153,3 +153,24 @@ type Buttons =
                 yield! props.Value
             prop.children children
         ]
+
+    [<ReactComponent>]
+    static member SegmentedButton
+        (label: string, isActive: bool, onClick: unit -> unit, ?className: string, ?props: IReactProperty list)
+        =
+        Html.button [
+            prop.type'.button
+            prop.className [
+                "swt:btn swt:join-item"
+                if isActive then
+                    "swt:btn-primary"
+                else
+                    "swt:btn-outline"
+                if className.IsSome then
+                    className.Value
+            ]
+            prop.onClick (fun _ -> onClick ())
+            if props.IsSome then
+                yield! props.Value
+            prop.text label
+        ]

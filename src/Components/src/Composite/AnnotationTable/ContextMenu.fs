@@ -614,8 +614,8 @@ type AnnotationTableContextMenu =
 
         let transformName =
             match cell with
-            | CompositeCell.Term _ -> "Transform to Unit"
-            | CompositeCell.Unitized _ -> "Transform to Term"
+            | CompositeCell.Term _ -> "Add Unit"
+            | CompositeCell.Unitized _ -> "Remove Unit"
             | CompositeCell.Data _ -> "Transform to Text"
             | CompositeCell.FreeText _ -> if header.IsDataColumn then "Transform to Data" else ""
 
