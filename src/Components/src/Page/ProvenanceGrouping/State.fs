@@ -69,24 +69,21 @@ module MemberResolution =
             PendingMemberResolution = None
     }
 
-    let chooseManual (pending: PendingMemberResolution) state =
-        let expandedGroup =
-            if pending.OutputMemberCount > 1 then
-                Some(ProvenanceSide.Output, pending.OutputGroupId)
-            elif pending.InputMemberCount > 1 then
-                Some(ProvenanceSide.Input, pending.InputGroupId)
-            else
-                None
-
-        {
-            state with
-                PendingMemberResolution = None
-                ExpandedGroup = expandedGroup
-                Detail = None
-                Hint =
-                    Some
-                        "Drag from a member's connection handle to a member or group on the other side (or tap both handles) to connect them individually."
-        }
+    let chooseManual (pending: PendingMemberResolution) state = {
+        state with
+            PendingMemberResolution = None
+            // Exactly the two cards that were about to be connected open, so the
+            // member handles the user needs next are the ones on screen.
+            ExpandedGroups =
+                Set.ofList [
+                    ProvenanceSide.Input, pending.InputGroupId
+                    ProvenanceSide.Output, pending.OutputGroupId
+                ]
+            Detail = None
+            Hint =
+                Some
+                    "Drag from a member's connection handle to a member or group on the other side (or tap both handles) to connect them individually."
+    }
 
 /// One-line follow-up guidance shown after actions that need a next step.
 module Hint =
@@ -752,18 +749,20 @@ module Selection =
 module Detail =
 
     let isGroupExpanded side groupId state =
-        state.ExpandedGroup = Some(side, groupId)
+        state.ExpandedGroups |> Set.contains (side, groupId)
 
     let toggleGroup side groupId state =
+        // Collapsing removes just this card; expanding replaces the set so manual
+        // toggling keeps the familiar one-open-card behavior.
         let next =
             if isGroupExpanded side groupId state then
-                None
+                state.ExpandedGroups |> Set.remove (side, groupId)
             else
-                Some(side, groupId)
+                Set.singleton (side, groupId)
 
         {
             state with
-                ExpandedGroup = next
+                ExpandedGroups = next
                 Detail = None
         }
 
@@ -794,7 +793,7 @@ let init (session: ProvenanceSession) = {
     PendingMemberResolution = None
     SelectedInputs = Set.empty
     SelectedOutputs = Set.empty
-    ExpandedGroup = None
+    ExpandedGroups = Set.empty
     Detail = None
     Error = None
     Hint = None

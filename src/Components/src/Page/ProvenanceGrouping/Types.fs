@@ -172,7 +172,9 @@ type UiState = {
     PendingMemberResolution: PendingMemberResolution option
     SelectedInputs: Set<ProvenanceLayerId * string>
     SelectedOutputs: Set<ProvenanceLayerId * string>
-    ExpandedGroup: (ProvenanceSide * string) option
+    /// Explicitly expanded group cards. Manual toggling keeps at most one entry;
+    /// manual connection resolution expands the two pending cards together.
+    ExpandedGroups: Set<ProvenanceSide * string>
     Detail: ProvenanceDetail option
     Error: string option
     Hint: string option

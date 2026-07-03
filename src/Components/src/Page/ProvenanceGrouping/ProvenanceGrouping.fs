@@ -714,7 +714,11 @@ type ProvenanceGrouping =
             |> Option.exists (fun group -> group.GroupingValues |> List.isEmpty |> not)
 
         let isConnectedToExpanded side groupId =
-            isGroupedCard side groupId
+            // Only a single manually expanded card pulls its connected grouped cards
+            // open with it; explicit multi-card expansion (manual connection
+            // resolution) opens exactly the requested cards.
+            uiState.ExpandedGroups.Count = 1
+            && isGroupedCard side groupId
             && (connections
                 |> List.exists (fun connection ->
                     match side with
@@ -991,7 +995,7 @@ type ProvenanceGrouping =
                     box sortedInputGroups
                     box existingEndpointNames
                     box uiState.SelectedInputs
-                    box uiState.ExpandedGroup
+                    box uiState.ExpandedGroups
                     box connections
                     box lookups
                     box connectionCounts
@@ -1008,7 +1012,7 @@ type ProvenanceGrouping =
                     box sortedOutputGroups
                     box existingEndpointNames
                     box uiState.SelectedOutputs
-                    box uiState.ExpandedGroup
+                    box uiState.ExpandedGroups
                     box connections
                     box lookups
                     box connectionCounts
@@ -1140,7 +1144,7 @@ type ProvenanceGrouping =
             React.useMemo (
                 (fun () -> ConnectorOverlayState.fromUiState uiState),
                 [|
-                    box uiState.ExpandedGroup
+                    box uiState.ExpandedGroups
                     box uiState.Detail
                     box uiState.ExpandedProperties
                 |]

@@ -46,7 +46,7 @@ type ConnectorSpec = {
 }
 
 type ConnectorOverlayState = {
-    ExpandedGroup: (ProvenanceSide * string) option
+    ExpandedGroups: Set<ProvenanceSide * string>
     SelectedConnectionId: string option
     ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
 }
@@ -60,13 +60,18 @@ module ConnectorOverlayState =
             | _ -> None
 
         {
-            ExpandedGroup = uiState.ExpandedGroup
+            ExpandedGroups = uiState.ExpandedGroups
             SelectedConnectionId = selectedConnectionId
             ExpandedProperties = uiState.ExpandedProperties
         }
 
     let isGroupExpanded side groupId state =
-        state.ExpandedGroup = Some(side, groupId)
+        state.ExpandedGroups |> Set.contains (side, groupId)
+
+    /// Connected cards only follow a single manually expanded card. When several
+    /// cards are expanded explicitly (manual connection resolution), only those
+    /// exact cards open.
+    let followsExpandedNeighbors state = state.ExpandedGroups.Count = 1
 
     let isPropertyExpanded layerId side header state =
         state.ExpandedProperties.Contains(layerId, side, { Header = header })

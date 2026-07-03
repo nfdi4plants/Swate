@@ -2156,12 +2156,17 @@ export const ManualMismatchResolutionExpandsMembersWithoutPatches: Story = {
     await waitFor(() => expect(canvas.getByTestId('provenance-member-resolution-prompt')).toBeInTheDocument());
     await userEvent.click(canvas.getByTestId('provenance-member-resolution-manual'));
 
+    // Exactly the two cards that were about to be connected open with their
+    // member handles; other groups connected to them stay collapsed.
     await waitFor(() => {
       const currentInputGroup = canvas.getByTestId('provenance-group-Input-input:input-d');
       const currentOutputGroup = canvas.getByTestId('provenance-group-Output-output:Species=Arabidopsis');
-      expect(within(currentInputGroup).queryByTestId('provenance-connection-handle-Input-GroupMember')).not.toBeInTheDocument();
+      expect(within(currentInputGroup).getAllByTestId('provenance-connection-handle-Input-GroupMember').length).toBeGreaterThan(0);
       expect(within(currentOutputGroup).getAllByTestId('provenance-connection-handle-Output-GroupMember').length).toBeGreaterThan(0);
     });
+
+    const otherOutputGroup = canvas.getByTestId('provenance-group-Output-output:Species=Chlamydomonas');
+    expect(within(otherOutputGroup).queryByTestId('provenance-connection-handle-Output-GroupMember')).not.toBeInTheDocument();
     expect(canvas.queryByTestId('provenance-member-resolution-prompt')).not.toBeInTheDocument();
     expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
 

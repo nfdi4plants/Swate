@@ -63,7 +63,8 @@ module ConnectorPaths =
         groupId
         overlayState
         =
-        isGroupedCard inputGroups outputGroups side groupId
+        ConnectorOverlayState.followsExpandedNeighbors overlayState
+        && isGroupedCard inputGroups outputGroups side groupId
         && (connections
             |> List.exists (fun connection ->
                 match side with

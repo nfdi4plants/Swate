@@ -124,7 +124,7 @@ type ConnectorOverlay =
                     box inputRailProjection
                     box outputRailProjection
                     box colorByHeader
-                    box overlayState.ExpandedGroup
+                    box overlayState.ExpandedGroups
                     box overlayState.ExpandedProperties
                     box showPropertyHeaderConnectors
                 |]
