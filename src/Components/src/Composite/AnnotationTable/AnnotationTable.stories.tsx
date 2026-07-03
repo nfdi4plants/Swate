@@ -43,6 +43,27 @@ export default meta;
 
 type Story = StoryObj<typeof meta>;
 
+async function openTransformAction(
+  canvasElement: HTMLElement,
+  cellTestId: string,
+  actionName: RegExp,
+) {
+  const canvas = within(canvasElement);
+  const cell = await canvas.findByTestId(cellTestId);
+
+  await fireEvent.contextMenu(cell);
+
+  const contextMenu = await screen.findByTestId("context_menu");
+  await expect(contextMenu).toBeVisible();
+
+  const transformAction = within(contextMenu).getByRole("button", {
+    name: actionName,
+  });
+  await expect(transformAction).toBeVisible();
+
+  await userEvent.click(transformAction);
+}
+
 export const Default: Story = {
   render: renderTable,
   args: {
@@ -372,6 +393,65 @@ export const UnitizedDetails: Story = {
       },
       { timeout: 5000 },
     );
+  },
+};
+
+export const AddUnitTransform: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    debug: true,
+  },
+  play: async ({ canvasElement }) => {
+    await openTransformAction(canvasElement, "cell-1-3", /^Add Unit\b/i);
+
+    const modal = await screen.findByRole("dialog", { name: /Add Unit/i });
+    expect(modal).toHaveAttribute("data-testid", "modal_Transform_AddUnit");
+    expect(modal).toHaveTextContent("Add Unit");
+    expect(within(modal).getByText("Unit")).toBeInTheDocument();
+    expect(within(modal).getByTestId("term-search-input")).toBeInTheDocument();
+
+    expect(within(modal).queryByText(/Use cell term/i)).not.toBeInTheDocument();
+    expect(within(modal).queryByText(/Keep value/i)).not.toBeInTheDocument();
+    expect(within(modal).queryByText(/Keep unit/i)).not.toBeInTheDocument();
+  },
+};
+
+export const RemoveUnitTransform: Story = {
+  render: renderTable,
+  args: {
+    height: 600,
+    debug: true,
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await openTransformAction(canvasElement, "cell-1-5", /^Remove Unit\b/i);
+
+    const modal = await screen.findByRole("dialog", { name: /Remove Unit/i });
+    expect(modal).toHaveAttribute("data-testid", "modal_Transform_RemoveUnit");
+    expect(modal).toHaveTextContent("Remove Unit");
+    expect(within(modal).getByText("Current cell")).toBeInTheDocument();
+    expect(within(modal).getByText("Result")).toBeInTheDocument();
+    expect(within(modal).getByText("Value")).toBeInTheDocument();
+    expect(within(modal).getByText("Unit name")).toBeInTheDocument();
+    expect(within(modal).getByText("Term name")).toBeInTheDocument();
+    expect(within(modal).getByText("degree celsius")).toBeInTheDocument();
+    expect(within(modal).getAllByText("0").length).toBeGreaterThan(0);
+
+    expect(within(modal).queryByText(/Keep value/i)).not.toBeInTheDocument();
+    expect(within(modal).queryByText(/Keep unit/i)).not.toBeInTheDocument();
+
+    const submitButton = within(modal).getByRole("button", {
+      name: /^Submit$/i,
+    });
+    await userEvent.click(submitButton);
+
+    await waitFor(() => {
+      const updatedCell = canvas.getByTestId("cell-1-5");
+      expect(updatedCell).toHaveTextContent("0");
+      expect(updatedCell).not.toHaveTextContent(/degree celsius/i);
+    });
   },
 };
 

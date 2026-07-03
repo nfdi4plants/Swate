@@ -10,7 +10,6 @@ open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Composite.Table.Types
 open Swate.Components.Composite.AnnotationTable.Types
 open Swate.Components.Shared
-open Swate.Components.Primitive.Buttons
 open Swate.Components.Primitive.BaseModal
 open Swate.Components.Primitive.LayoutComponents
 
@@ -872,52 +871,10 @@ type TransformConfig =
 type CompositeCellEditModal =
 
     [<ReactComponent>]
-    static member UnitToTerm(cell: CompositeCell, header: CompositeHeader, setTerm: OntologyAnnotation -> unit, rmv) =
-
-        let _, oa = cell.AsUnitized
-        let term = Term.fromOntologyAnnotation oa
-
-        let submit =
-            fun () ->
-                term |> Term.toOntologyAnnotation |> setTerm
-                rmv ()
-
-        let termHeader = header.ToTerm()
-
-        let tHeaders = [|
-            Html.th (header.ToString())
-            Html.th ($"Term Source REF: {termHeader.TermSourceREF}")
-            Html.th ($"Term Accession Number {termHeader.TermAccessionNumber}")
-        |]
-
-        let tBody = [|
-            Html.td ($"{oa.Name}")
-            Html.td ($"{oa.TermSourceREF}")
-            Html.td ($"{oa.TermAccessionNumber}")
-        |]
-
-        BaseModal.Modal(
-            true,
-            (fun _ -> rmv ()),
-            Html.div "Unit to Term",
-            React.Fragment [
-                TransformConfig.ConvertCellType(tHeaders, tBody, CompositeCellDiscriminate.Term)
-            ],
-            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ]
-        //contentClassInfo = CompositeCellEditModal.BaseModalContentClassOverride
-        )
-
-    [<ReactComponent>]
     static member RemoveUnit(cell: CompositeCell, header: CompositeHeader, setTerm: OntologyAnnotation -> unit, rmv) =
 
         let value, unit = cell.AsUnitized
-        let keepValueAsTerm, setKeepValueAsTerm = React.useState true
-
-        let term =
-            if keepValueAsTerm then
-                OntologyAnnotation.create value
-            else
-                unit
+        let term = OntologyAnnotation.create value
 
         let submit =
             fun () ->
@@ -929,23 +886,6 @@ type CompositeCellEditModal =
             (fun _ -> rmv ()),
             Html.div "Remove Unit",
             React.Fragment [
-                Html.div [
-                    prop.className "swt:join swt:w-full"
-                    prop.children [
-                        Buttons.SegmentedButton(
-                            "Keep value as term",
-                            keepValueAsTerm,
-                            (fun () -> setKeepValueAsTerm true),
-                            className = "swt:flex-1"
-                        )
-                        Buttons.SegmentedButton(
-                            "Keep unit as term",
-                            not keepValueAsTerm,
-                            (fun () -> setKeepValueAsTerm false),
-                            className = "swt:flex-1"
-                        )
-                    ]
-                ]
                 Html.div [
                     prop.className "swt:grid swt:grid-cols-1 swt:gap-4 swt:md:grid-cols-2"
                     prop.children [
@@ -970,6 +910,7 @@ type CompositeCellEditModal =
                 ]
             ],
             footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
+            debug = "Transform_RemoveUnit",
             className = "swt:w-11/12 swt:max-w-4xl"
         )
 
@@ -989,11 +930,6 @@ type CompositeCellEditModal =
                 unitTerm
             | _ -> failwith "AddUnit can only be used with term or unitized cells."
 
-        let existingCellTerm =
-            match cell with
-            | CompositeCell.Term oa when oa.isEmpty () |> not -> Term.fromOntologyAnnotation oa |> Some
-            | _ -> None
-
         let unitTerm, setUnitTerm = React.useState initUnit
 
         let submit =
@@ -1010,23 +946,10 @@ type CompositeCellEditModal =
             (fun _ -> rmv ()),
             Html.div "Add Unit",
             React.Fragment [
-                match existingCellTerm with
-                | Some term ->
-                    Html.button [
-                        prop.type'.button
-                        prop.className "swt:btn swt:btn-outline swt:w-full"
-                        prop.onClick (fun _ -> setUnitTerm (Some term))
-                        prop.children [
-                            Html.i [
-                                prop.className "swt:iconify swt:fluent--copy-24-regular swt:size-4"
-                            ]
-                            Html.span "Use cell term"
-                        ]
-                    ]
-                | None -> Html.none
                 InputField.TermCombi(unitTerm, setUnitTerm, "Unit", rmv, submit, autofocus = true)
             ],
-            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ]
+            footer = React.Fragment [ FooterButtons.Cancel(rmv); FooterButtons.Submit(submit) ],
+            debug = "Transform_AddUnit"
         )
 
     [<ReactComponent>]
@@ -1110,7 +1033,7 @@ type CompositeCellEditModal =
             CompositeCellEditModal.AddUnit(compositeCell, header, setUnit, rmv)
         | CompositeCell.Unitized _ ->
             let setTerm = fun unit -> setCell (CompositeCell.Term unit)
-            CompositeCellEditModal.UnitToTerm(compositeCell, header, setTerm, rmv)
+            CompositeCellEditModal.RemoveUnit(compositeCell, header, setTerm, rmv)
         | CompositeCell.Data _ ->
             let setText = fun text -> setCell (CompositeCell.FreeText text)
             CompositeCellEditModal.DataToFreeText(compositeCell, header, setText, rmv)
