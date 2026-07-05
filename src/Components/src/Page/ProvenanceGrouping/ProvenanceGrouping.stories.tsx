@@ -2064,6 +2064,37 @@ export const ConnectsGroups: Story = {
   },
 };
 
+export const UndoRevertsLastChange: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByTestId('provenance-undo')).toBeDisabled();
+
+    const input = canvas.getByText('Input C').closest('article')!;
+    const output = canvas.getByText('Output E').closest('article')!;
+    const before = (await waitFor(() => {
+      const connectors = canvas.getAllByTestId('provenance-connection');
+      expect(connectors.length).toBeGreaterThan(0);
+      return connectors;
+    })).length;
+
+    await dragByPointer(
+      within(input).getByTestId('provenance-connection-handle-Input-GroupCard'),
+      within(output).getByTestId('provenance-connection-handle-Output-GroupCard'),
+    );
+    await waitFor(() => expect(canvas.getAllByTestId('provenance-connection').length).toBeGreaterThan(before));
+
+    const undo = canvas.getByTestId('provenance-undo');
+    expect(undo).not.toBeDisabled();
+    await userEvent.click(undo);
+
+    await waitFor(() => {
+      expect(canvas.queryAllByTestId('provenance-connection')).toHaveLength(before);
+      expect(canvas.getByTestId('provenance-undo')).toBeDisabled();
+    });
+  },
+};
+
 export const IgnoresConnectionHandleDroppedOnCardBody: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

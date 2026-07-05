@@ -559,37 +559,63 @@ type ProvenanceGrouping =
 
         let sensors = DndKit.useSensors [| pointerSensor |]
 
+        // Single-step undo: the session as it was before the last published edit.
+        // Layer switches deliberately do not overwrite this slot, so an edit stays
+        // undoable across navigation.
+        let undoSession = React.useRef (None: ProvenanceSession option)
+
         // publish and the actions below read session/layer/UI state through the
         // latest refs so that memoized subtrees never fire an action against a
         // session that has since been replaced.
+        let publishResult recordUndo (result: SessionResult) =
+            match result with
+            | Ok(next, patches) ->
+                LiveDrag.clear liveDragStore.current
+
+                if recordUndo then
+                    undoSession.current <- Some latestSession.current
+
+                let nextUiState = latestUiState.current |> State.Sides.ensure next
+
+                commitUiState {
+                    nextUiState with
+                        Error = None
+                        Hint = None
+                        PendingAssignmentBatch = None
+                        PendingMemberResolution = None
+                }
+
+                latestOnChange.current { Session = next; Patches = patches }
+            | Error error ->
+                LiveDrag.clear liveDragStore.current
+
+                commitUiState {
+                    latestUiState.current with
+                        Error = Some(SessionErrors.text error)
+                }
+
         let publish =
-            React.useCallback (
-                (fun (result: SessionResult) ->
-                    match result with
-                    | Ok(next, patches) ->
-                        LiveDrag.clear liveDragStore.current
+            React.useCallback ((fun (result: SessionResult) -> publishResult true result), [||])
 
-                        let nextUiState = latestUiState.current |> State.Sides.ensure next
+        let undoLast () =
+            match undoSession.current with
+            | Some previous ->
+                undoSession.current <- None
+                LiveDrag.clear liveDragStore.current
 
-                        commitUiState {
-                            nextUiState with
-                                Error = None
-                                Hint = None
-                                PendingAssignmentBatch = None
-                                PendingMemberResolution = None
-                        }
+                let nextUiState = latestUiState.current |> State.Sides.ensure previous
 
-                        latestOnChange.current { Session = next; Patches = patches }
-                    | Error error ->
-                        LiveDrag.clear liveDragStore.current
+                commitUiState {
+                    nextUiState with
+                        Error = None
+                        Hint = None
+                        PendingAssignmentBatch = None
+                        PendingMemberResolution = None
+                        Detail = None
+                }
 
-                        commitUiState {
-                            latestUiState.current with
-                                Error = Some(SessionErrors.text error)
-                        }
-                ),
-                [||]
-            )
+                latestOnChange.current { Session = previous; Patches = [] }
+            | None -> ()
 
         let createSet =
             React.useCallback ((fun command -> EditorActions.createSet latestSession.current publish command), [||])
@@ -665,6 +691,7 @@ type ProvenanceGrouping =
                     match Session.removeConnections connection.ConnectionIds latestSession.current with
                     | Ok(next, patches) ->
                         LiveDrag.clear liveDragStore.current
+                        undoSession.current <- Some latestSession.current
 
                         let nextUiState = latestUiState.current |> State.Sides.ensure next
 
@@ -1338,7 +1365,7 @@ type ProvenanceGrouping =
                                 prop.children [
                                     Controls.LayerTabs(
                                         session,
-                                        (fun layerId -> Session.selectLayer layerId session |> publish),
+                                        (fun layerId -> Session.selectLayer layerId session |> publishResult false),
                                         (fun name ->
                                             EditorActions.addLayer
                                                 session
@@ -1357,6 +1384,23 @@ type ProvenanceGrouping =
                                     Html.div [
                                         prop.className "swt:flex swt:flex-wrap swt:items-center swt:gap-2"
                                         prop.children [
+                                            Html.button [
+                                                prop.type'.button
+                                                prop.className "swt:btn swt:btn-xs swt:btn-ghost"
+                                                prop.title "Undo last change"
+                                                prop.ariaLabel "Undo last change"
+                                                prop.disabled undoSession.current.IsNone
+                                                if debug then
+                                                    prop.testId "provenance-undo"
+                                                prop.onClick (fun _ -> undoLast ())
+                                                prop.children [
+                                                    Html.i [
+                                                        prop.className
+                                                            "swt:iconify swt:fluent--arrow-undo-20-regular swt:size-4"
+                                                    ]
+                                                    Html.span "Undo"
+                                                ]
+                                            ]
                                             Html.button [
                                                 prop.title (
                                                     if showPropertyHeaderConnectors then
