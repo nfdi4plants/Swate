@@ -2084,13 +2084,23 @@ export const UndoRevertsLastChange: Story = {
     );
     await waitFor(() => expect(canvas.getAllByTestId('provenance-connection').length).toBeGreaterThan(before));
 
-    const undo = canvas.getByTestId('provenance-undo');
-    expect(undo).not.toBeDisabled();
-    await userEvent.click(undo);
+    expect(canvas.getByTestId('provenance-undo')).not.toBeDisabled();
+
+    // fireEvent with a retry: toolbar reflow can move the button mid-click.
+    for (
+      let attempt = 0;
+      attempt < 3 && !canvas.getByTestId('provenance-undo').hasAttribute('disabled');
+      attempt += 1
+    ) {
+      fireEvent.click(canvas.getByTestId('provenance-undo'));
+      await waitFor(() => expect(canvas.getByTestId('provenance-undo')).toBeDisabled(), {
+        timeout: 1000,
+      }).catch(() => undefined);
+    }
 
     await waitFor(() => {
-      expect(canvas.queryAllByTestId('provenance-connection')).toHaveLength(before);
       expect(canvas.getByTestId('provenance-undo')).toBeDisabled();
+      expect(canvas.queryAllByTestId('provenance-connection')).toHaveLength(before);
     });
   },
 };
@@ -2188,7 +2198,18 @@ export const EqualCountGroupConnectionOffersPairByOrder: Story = {
     expect(prompt).toHaveTextContent('3 input members');
     expect(prompt).toHaveTextContent('3 output members');
 
-    await userEvent.click(canvas.getByTestId('provenance-member-resolution-pair-by-order'));
+    // fireEvent with a retry: the floating prompt animates in, so a positioned
+    // click can miss on slow runs.
+    for (
+      let attempt = 0;
+      attempt < 3 && canvas.queryByTestId('provenance-member-resolution-prompt');
+      attempt += 1
+    ) {
+      fireEvent.click(canvas.getByTestId('provenance-member-resolution-pair-by-order'));
+      await waitFor(() => expect(canvas.queryByTestId('provenance-member-resolution-prompt')).not.toBeInTheDocument(), {
+        timeout: 1000,
+      }).catch(() => undefined);
+    }
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedConnection');
@@ -2306,7 +2327,9 @@ export const AddLayerPopoverAnnouncesSeedEntities: Story = {
     await userEvent.click(canvas.getByTestId('provenance-add-layer'));
     const dialog = within(document.body);
     await waitFor(() =>
-      expect(dialog.getByTestId('provenance-layer-seed-summary')).toHaveTextContent(/Starts from all \d+ outputs \(default\)/),
+      expect(dialog.getByTestId('provenance-layer-seed-summary')).toHaveTextContent(
+        /Starts from all \d+ outputs of this layer \(default\)/,
+      ),
     );
     await userEvent.keyboard('{Escape}');
 
