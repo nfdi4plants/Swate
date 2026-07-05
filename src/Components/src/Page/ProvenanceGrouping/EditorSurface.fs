@@ -69,6 +69,9 @@ module EditorSurface =
         setPropertyColor
         sourceInfoForValue
         (isUnassignedValue: Swate.Components.Shared.ProvenanceGrouping.Types.ProvenancePropertyValue -> bool)
+        (onApplyValueToSelection:
+            (Swate.Components.Shared.ProvenanceGrouping.Types.ProvenancePropertyValue -> unit) option)
+        (applySelectionLabel: string)
         isDropRejected
         isDropAvailable
         debug
@@ -99,6 +102,8 @@ module EditorSurface =
             sourceInfoForValue,
             sideId = sideId,
             isUnassignedValue = isUnassignedValue,
+            ?onApplyValueToSelection = onApplyValueToSelection,
+            applySelectionLabel = applySelectionLabel,
             debug = debug
         )
 

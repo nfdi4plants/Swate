@@ -799,118 +799,6 @@ type ProvenanceGrouping =
                 [| box connectionDragSide; box armedHandle |]
             )
 
-        let inputRailDropRejected = isRejectedPropertyRailDrop ProvenanceSide.Input
-        let outputRailDropRejected = isRejectedPropertyRailDrop ProvenanceSide.Output
-
-        let buildRailPanel side isDropRejected =
-            let sideId, oppositeSideId, targetSide =
-                match side with
-                | ProvenanceSide.Input -> layer.InputSideId, layer.OutputSideId, ProvenanceSide.Output
-                | ProvenanceSide.Output -> layer.OutputSideId, layer.InputSideId, ProvenanceSide.Input
-
-            EditorSurface.propertyRail
-                side
-                layer.Model.Source.Id
-                sideId
-                (match side with
-                 | ProvenanceSide.Input -> activeInputRailProjection
-                 | ProvenanceSide.Output -> activeOutputRailProjection)
-                (match side with
-                 | ProvenanceSide.Input -> inputSideState.GroupingAssignments
-                 | ProvenanceSide.Output -> outputSideState.GroupingAssignments)
-                (fun header -> toggleSideGrouping sideId side header)
-                (fun header ->
-                    applyUiState (State.GroupingAssignments.toggleBoth layer.InputSideId layer.OutputSideId header)
-                )
-                (fun header ->
-                    applyUiState (State.GroupingAssignments.move layer.Id sideId oppositeSideId targetSide header)
-                )
-                (fun header -> togglePropertyExpanded side header)
-                (fun header value unit -> addPaletteValue side header value unit)
-                setPropertyColor
-                sourceInfoForValue
-                // A rail value is tentative until the same header/value/unit exists on
-                // some entity; the palette copy keeps rendering after a drop, so the
-                // check must look at value identity rather than the chip's own id.
-                (fun propertyValue ->
-                    layer.Model.PropertyValues
-                    |> Map.exists (fun _ existing ->
-                        existing.Header = propertyValue.Header
-                        && existing.Value = propertyValue.Value
-                        && existing.Unit = propertyValue.Unit
-                    )
-                    |> not
-                )
-                isDropRejected
-                (isPropertyDragActive && not isDropRejected)
-                debug
-                setIsValueChipDragging
-
-        let inputRailPanel =
-            React.useMemo (
-                (fun () -> buildRailPanel ProvenanceSide.Input inputRailDropRejected),
-                [|
-                    box layer
-                    box activeInputRailProjection
-                    box inputSideState
-                    box inputRailDropRejected
-                    box isPropertyDragActive
-                |]
-            )
-
-        let outputRailPanel =
-            React.useMemo (
-                (fun () -> buildRailPanel ProvenanceSide.Output outputRailDropRejected),
-                [|
-                    box layer
-                    box activeOutputRailProjection
-                    box outputSideState
-                    box outputRailDropRejected
-                    box isPropertyDragActive
-                |]
-            )
-
-        let railPanel side =
-            match side with
-            | ProvenanceSide.Input -> inputRailPanel
-            | ProvenanceSide.Output -> outputRailPanel
-
-        let railColumn side =
-            Html.div [
-                prop.className "swt:@container/provenancePanel swt:min-w-0 swt:overflow-hidden"
-                prop.children [ railPanel side ]
-            ]
-
-        let connectionCounts =
-            React.useMemo (
-                (fun () ->
-                    connections
-                    |> List.collect (fun connection -> [
-                        (ProvenanceSide.Input, connection.SourceGroupId), connection.ConnectionIds.Length
-                        (ProvenanceSide.Output, connection.TargetGroupId), connection.ConnectionIds.Length
-                    ])
-                    |> List.groupBy fst
-                    |> List.map (fun (key, grouped) -> key, grouped |> List.sumBy snd)
-                    |> Map.ofList
-                ),
-                [| box connections |]
-            )
-
-        let connectionCountFor side groupId =
-            connectionCounts |> Map.tryFind (side, groupId) |> Option.defaultValue 0
-
-        let sortedInputGroups =
-            React.useMemo (
-                (fun () -> Display.sortGroups uiState.Filters.GroupSort connections inputGroups),
-                [| box uiState.Filters; box connections; box inputGroups |]
-            )
-
-        let sortedOutputGroups =
-            React.useMemo (
-                (fun () -> Display.sortGroups uiState.Filters.GroupSort connections outputGroups),
-                [| box uiState.Filters; box connections; box outputGroups |]
-            )
-
         let selectedInputGroups =
             inputGroups
             |> List.filter (fun group -> State.Selection.contains layer.Id ProvenanceSide.Input group.Id uiState)
@@ -957,6 +845,136 @@ type ProvenanceGrouping =
                 | 0 -> "Starts empty: this layer has no outputs and nothing is selected."
                 | 1 -> "Starts from the single output of this layer (default)."
                 | outputCount -> $"Starts from all {outputCount} outputs of this layer (default)."
+
+        let applyValueToSelection =
+            fun (propertyValue: ProvenancePropertyValue) ->
+                latestDragContext.current
+                |> Option.iter (fun context -> DragHandlers.applyPropertyValueToSelection context propertyValue.Id)
+
+        let applySelectionLabel =
+            if selectedGroupCount = 1 then
+                "Apply to 1 selected group"
+            else
+                $"Apply to {selectedGroupCount} selected groups"
+
+        let inputRailDropRejected = isRejectedPropertyRailDrop ProvenanceSide.Input
+        let outputRailDropRejected = isRejectedPropertyRailDrop ProvenanceSide.Output
+
+        let buildRailPanel side isDropRejected =
+            let sideId, oppositeSideId, targetSide =
+                match side with
+                | ProvenanceSide.Input -> layer.InputSideId, layer.OutputSideId, ProvenanceSide.Output
+                | ProvenanceSide.Output -> layer.OutputSideId, layer.InputSideId, ProvenanceSide.Input
+
+            EditorSurface.propertyRail
+                side
+                layer.Model.Source.Id
+                sideId
+                (match side with
+                 | ProvenanceSide.Input -> activeInputRailProjection
+                 | ProvenanceSide.Output -> activeOutputRailProjection)
+                (match side with
+                 | ProvenanceSide.Input -> inputSideState.GroupingAssignments
+                 | ProvenanceSide.Output -> outputSideState.GroupingAssignments)
+                (fun header -> toggleSideGrouping sideId side header)
+                (fun header ->
+                    applyUiState (State.GroupingAssignments.toggleBoth layer.InputSideId layer.OutputSideId header)
+                )
+                (fun header ->
+                    applyUiState (State.GroupingAssignments.move layer.Id sideId oppositeSideId targetSide header)
+                )
+                (fun header -> togglePropertyExpanded side header)
+                (fun header value unit -> addPaletteValue side header value unit)
+                setPropertyColor
+                sourceInfoForValue
+                // A rail value is tentative until the same header/value/unit exists on
+                // some entity; the palette copy keeps rendering after a drop, so the
+                // check must look at value identity rather than the chip's own id.
+                (fun propertyValue ->
+                    layer.Model.PropertyValues
+                    |> Map.exists (fun _ existing ->
+                        existing.Header = propertyValue.Header
+                        && existing.Value = propertyValue.Value
+                        && existing.Unit = propertyValue.Unit
+                    )
+                    |> not
+                )
+                (if selectedGroupCount > 0 then
+                     Some applyValueToSelection
+                 else
+                     None)
+                applySelectionLabel
+                isDropRejected
+                (isPropertyDragActive && not isDropRejected)
+                debug
+                setIsValueChipDragging
+
+        let inputRailPanel =
+            React.useMemo (
+                (fun () -> buildRailPanel ProvenanceSide.Input inputRailDropRejected),
+                [|
+                    box layer
+                    box activeInputRailProjection
+                    box inputSideState
+                    box inputRailDropRejected
+                    box isPropertyDragActive
+                    box selectedGroupCount
+                |]
+            )
+
+        let outputRailPanel =
+            React.useMemo (
+                (fun () -> buildRailPanel ProvenanceSide.Output outputRailDropRejected),
+                [|
+                    box layer
+                    box activeOutputRailProjection
+                    box outputSideState
+                    box outputRailDropRejected
+                    box isPropertyDragActive
+                    box selectedGroupCount
+                |]
+            )
+
+        let railPanel side =
+            match side with
+            | ProvenanceSide.Input -> inputRailPanel
+            | ProvenanceSide.Output -> outputRailPanel
+
+        let railColumn side =
+            Html.div [
+                prop.className "swt:@container/provenancePanel swt:min-w-0 swt:overflow-hidden"
+                prop.children [ railPanel side ]
+            ]
+
+        let connectionCounts =
+            React.useMemo (
+                (fun () ->
+                    connections
+                    |> List.collect (fun connection -> [
+                        (ProvenanceSide.Input, connection.SourceGroupId), connection.ConnectionIds.Length
+                        (ProvenanceSide.Output, connection.TargetGroupId), connection.ConnectionIds.Length
+                    ])
+                    |> List.groupBy fst
+                    |> List.map (fun (key, grouped) -> key, grouped |> List.sumBy snd)
+                    |> Map.ofList
+                ),
+                [| box connections |]
+            )
+
+        let connectionCountFor side groupId =
+            connectionCounts |> Map.tryFind (side, groupId) |> Option.defaultValue 0
+
+        let sortedInputGroups =
+            React.useMemo (
+                (fun () -> Display.sortGroups uiState.Filters.GroupSort connections inputGroups),
+                [| box uiState.Filters; box connections; box inputGroups |]
+            )
+
+        let sortedOutputGroups =
+            React.useMemo (
+                (fun () -> Display.sortGroups uiState.Filters.GroupSort connections outputGroups),
+                [| box uiState.Filters; box connections; box outputGroups |]
+            )
 
         // Group columns carry one card per display group; memoizing the rendered
         // columns keeps unrelated state changes (search text, rail expansion, panel

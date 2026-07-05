@@ -473,7 +473,9 @@ type Controls =
             ?origins: Set<ProvenancePropertyOrigin>,
             ?onSetColor: ProvenanceColor option -> unit,
             ?sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
-            ?isUnassignedValue: ProvenancePropertyValue -> bool
+            ?isUnassignedValue: ProvenancePropertyValue -> bool,
+            ?onApplyValueToSelection: ProvenancePropertyValue -> unit,
+            ?applySelectionLabel: string
         ) =
         let draggable =
             DndKit.useDraggable (
@@ -817,6 +819,10 @@ type Controls =
                                     ?debug = debug,
                                     ?sourceInfo = sourceInfo,
                                     unassigned = unassigned,
+                                    ?onApplyToSelection =
+                                        (onApplyValueToSelection
+                                         |> Option.map (fun apply -> fun () -> apply propertyValue)),
+                                    ?applySelectionLabel = applySelectionLabel,
                                     key = DragDrop.propertyValueIdentity propertyValue
                                 )
                             Controls.AddValuePopover(
@@ -860,6 +866,8 @@ type Controls =
             sourceInfoForValue: ProvenancePropertyValue -> PropertyValueSourceInfo option,
             ?sideId: ProvenanceLayerSideId,
             ?isUnassignedValue: ProvenancePropertyValue -> bool,
+            ?onApplyValueToSelection: ProvenancePropertyValue -> unit,
+            ?applySelectionLabel: string,
             ?debug: bool
         ) =
         let droppable =
@@ -970,6 +978,8 @@ type Controls =
                             onSetColor = onSetColor header,
                             sourceInfoForValue = sourceInfoForValue,
                             ?isUnassignedValue = isUnassignedValue,
+                            ?onApplyValueToSelection = onApplyValueToSelection,
+                            ?applySelectionLabel = applySelectionLabel,
                             debug = defaultArg debug false,
                             key = DragDrop.propertyHeaderIdentity header
                         )
@@ -1272,7 +1282,9 @@ type Controls =
             ?debug: bool,
             ?key: string,
             ?sourceInfo: PropertyValueSourceInfo,
-            ?unassigned: bool
+            ?unassigned: bool,
+            ?onApplyToSelection: unit -> unit,
+            ?applySelectionLabel: string
         ) : ReactElement =
         let canDrag = defaultArg draggable true
         let showHeader = defaultArg showHeader true
@@ -1375,6 +1387,33 @@ type Controls =
                     prop.className "swt:grow swt:min-w-0 swt:truncate swt:text-left"
                     prop.text label
                 ]
+                // Click alternative to dragging: applies this value to the groups
+                // currently selected on the surface.
+                match onApplyToSelection with
+                | Some apply ->
+                    let applyLabel = defaultArg applySelectionLabel "Apply to selected groups"
+
+                    Html.button [
+                        prop.type'.button
+                        prop.className "swt:btn swt:btn-ghost swt:btn-xs swt:btn-square swt:z-10 swt:shrink-0"
+                        prop.title applyLabel
+                        prop.ariaLabel applyLabel
+                        if defaultArg debug false then
+                            prop.testId $"provenance-value-apply-{propertyValue.Id}"
+                        // The chip root carries the drag listeners; the button keeps its
+                        // pointer events to itself so a click never starts a drag.
+                        prop.onPointerDown (fun event -> event.stopPropagation ())
+                        prop.onClick (fun event ->
+                            event.stopPropagation ()
+                            apply ()
+                        )
+                        prop.children [
+                            Html.i [
+                                prop.className "swt:iconify swt:fluent--checkmark-circle-20-regular swt:size-4"
+                            ]
+                        ]
+                    ]
+                | None -> Html.none
                 match sourceInfo with
                 | Some info ->
                     Html.div [

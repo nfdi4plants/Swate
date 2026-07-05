@@ -1965,6 +1965,33 @@ async function addRailProperty(
   return railValue(canvas, side, propertyName, valueText);
 }
 
+export const AppliesRailValueToSelectedGroupsByClick: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    // Without a selection the chips offer no click-apply action.
+    const before = await railValue(canvas, 'Output', 'Analysis', 'Mass Spectrometry');
+    expect(within(before as HTMLElement).queryByRole('button', { name: /apply to/i })).not.toBeInTheDocument();
+
+    await selectGroup(canvas.getByText('Output D').closest('article')!);
+    await selectGroup(canvas.getByText('Output E').closest('article')!);
+
+    const source = await railValue(canvas, 'Output', 'Analysis', 'Mass Spectrometry');
+    await userEvent.click(
+      within(source as HTMLElement).getByRole('button', { name: /apply to 2 selected groups/i }),
+    );
+
+    // Applying to more than one group goes through the fan-out confirmation.
+    await waitFor(() => expect(canvas.getByTestId('provenance-apply-batch-prompt')).toBeInTheDocument());
+    await userEvent.click(canvas.getByTestId('provenance-confirm-apply'));
+
+    await waitFor(() =>
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue'),
+    );
+  },
+};
+
 export const CopiesValueOntoAGroup: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {

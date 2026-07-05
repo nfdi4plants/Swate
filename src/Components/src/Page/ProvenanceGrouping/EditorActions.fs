@@ -365,6 +365,92 @@ module DragHandlers =
         )
         |> ignore
 
+    /// Plans and applies one property value against explicit target groups; drops
+    /// and click-to-apply share this path so both get the same confirmations.
+    let private applyPropertyValueToGroups
+        context
+        (propertyValue: ProvenancePropertyValue)
+        propertyValueId
+        (targetGroups: DisplayGroup list)
+        (pulseTarget: (ProvenanceSide * string) option)
+        =
+        let uiState = context.GetUiState()
+
+        match
+            ValueAssignment.planPropertyValueDropToGroups
+                (context.Lookups.SourceForValue propertyValueId propertyValue)
+                targetGroups
+                context.Layer.Model
+        with
+        | Ok batch ->
+            let affectedValueCount =
+                batch.Overwrites |> List.sumBy (fun w -> w.ExistingValueIds.Length)
+
+            let sideForTarget target =
+                match target with
+                | ProvenancePropertyTarget.InputSets _ -> Some ProvenanceSide.Input
+                | ProvenancePropertyTarget.OutputSets _ -> Some ProvenanceSide.Output
+                | ProvenancePropertyTarget.Connections _ -> None
+
+            let setIdsForTarget target =
+                match target with
+                | ProvenancePropertyTarget.InputSets ids -> ids |> List.map (fun id -> ProvenanceSide.Input, id)
+                | ProvenancePropertyTarget.OutputSets ids -> ids |> List.map (fun id -> ProvenanceSide.Output, id)
+                | ProvenancePropertyTarget.Connections _ -> []
+
+            let affectedSideCount =
+                [
+                    yield! batch.Adds |> List.choose (fun command -> sideForTarget command.Target)
+                    yield! batch.Overwrites |> List.choose (fun warning -> sideForTarget warning.Target)
+                ]
+                |> List.distinct
+                |> List.length
+
+            let affectedEntityCount =
+                [
+                    yield! batch.Adds |> List.collect (fun command -> setIdsForTarget command.Target)
+                    yield! batch.Overwrites |> List.collect (fun warning -> setIdsForTarget warning.Target)
+                ]
+                |> List.distinct
+                |> List.length
+
+            let pendingBatch = {
+                Batch = batch
+                AffectedSideCount = affectedSideCount
+                AffectedValueCount = affectedValueCount
+                AffectedGroupCount = targetGroups.Length
+                AffectedEntityCount = affectedEntityCount
+            }
+
+            // A drop that fans out beyond the card under the pointer (via selected
+            // groups) is confirmed first, even when nothing would be overwritten.
+            if batch.Overwrites.IsEmpty && targetGroups.Length <= 1 then
+                if not batch.Adds.IsEmpty then
+                    let result =
+                        batch.Adds
+                        |> List.fold
+                            (fun (result: SessionResult) cmd ->
+                                match result with
+                                | Ok(current, patches) ->
+                                    Session.createCurrentLoadedPropertyValue cmd current
+                                    |> Result.map (fun (next, added) -> next, patches @ added)
+                                | Error _ -> result
+                            )
+                            (Ok(context.Session, []))
+
+                    context.Publish result
+
+                    match result, pulseTarget with
+                    | Ok _, Some(side, groupId) -> pulseDropTarget side groupId propertyValue
+                    | _ -> ()
+            else
+                State.AssignmentBatch.set pendingBatch uiState |> context.SetUiState
+        | Error error ->
+            context.SetUiState {
+                uiState with
+                    Error = Some(AssignmentErrors.text error)
+            }
+
     let private routePropertyValueDrop context side groupId propertyValueId =
         match context.Lookups.FindPropertyValue propertyValueId with
         | Some propertyValue ->
@@ -379,81 +465,35 @@ module DragHandlers =
                     uiState.SelectedOutputs
                     context.Lookups.FindGroup
 
-            match
-                ValueAssignment.planPropertyValueDropToGroups
-                    (context.Lookups.SourceForValue propertyValueId propertyValue)
-                    targetGroups
-                    context.Layer.Model
-            with
-            | Ok batch ->
-                let affectedValueCount =
-                    batch.Overwrites |> List.sumBy (fun w -> w.ExistingValueIds.Length)
-
-                let sideForTarget target =
-                    match target with
-                    | ProvenancePropertyTarget.InputSets _ -> Some ProvenanceSide.Input
-                    | ProvenancePropertyTarget.OutputSets _ -> Some ProvenanceSide.Output
-                    | ProvenancePropertyTarget.Connections _ -> None
-
-                let setIdsForTarget target =
-                    match target with
-                    | ProvenancePropertyTarget.InputSets ids -> ids |> List.map (fun id -> ProvenanceSide.Input, id)
-                    | ProvenancePropertyTarget.OutputSets ids -> ids |> List.map (fun id -> ProvenanceSide.Output, id)
-                    | ProvenancePropertyTarget.Connections _ -> []
-
-                let affectedSideCount =
-                    [
-                        yield! batch.Adds |> List.choose (fun command -> sideForTarget command.Target)
-                        yield! batch.Overwrites |> List.choose (fun warning -> sideForTarget warning.Target)
-                    ]
-                    |> List.distinct
-                    |> List.length
-
-                let affectedEntityCount =
-                    [
-                        yield! batch.Adds |> List.collect (fun command -> setIdsForTarget command.Target)
-                        yield! batch.Overwrites |> List.collect (fun warning -> setIdsForTarget warning.Target)
-                    ]
-                    |> List.distinct
-                    |> List.length
-
-                let pendingBatch = {
-                    Batch = batch
-                    AffectedSideCount = affectedSideCount
-                    AffectedValueCount = affectedValueCount
-                    AffectedGroupCount = targetGroups.Length
-                    AffectedEntityCount = affectedEntityCount
-                }
-
-                // A drop that fans out beyond the card under the pointer (via selected
-                // groups) is confirmed first, even when nothing would be overwritten.
-                if batch.Overwrites.IsEmpty && targetGroups.Length <= 1 then
-                    if not batch.Adds.IsEmpty then
-                        let result =
-                            batch.Adds
-                            |> List.fold
-                                (fun (result: SessionResult) cmd ->
-                                    match result with
-                                    | Ok(current, patches) ->
-                                        Session.createCurrentLoadedPropertyValue cmd current
-                                        |> Result.map (fun (next, added) -> next, patches @ added)
-                                    | Error _ -> result
-                                )
-                                (Ok(context.Session, []))
-
-                        context.Publish result
-
-                        match result with
-                        | Ok _ -> pulseDropTarget side groupId propertyValue
-                        | Error _ -> ()
-                else
-                    State.AssignmentBatch.set pendingBatch uiState |> context.SetUiState
-            | Error error ->
-                context.SetUiState {
-                    uiState with
-                        Error = Some(AssignmentErrors.text error)
-                }
+            applyPropertyValueToGroups context propertyValue propertyValueId targetGroups (Some(side, groupId))
         | _ -> ()
+
+    /// Click-to-apply alternative to dropping a value chip: applies the value to
+    /// every group currently selected on the active layer.
+    let applyPropertyValueToSelection context propertyValueId =
+        match context.Lookups.FindPropertyValue propertyValueId with
+        | Some propertyValue ->
+            let uiState = context.GetUiState()
+            let layerId = context.Layer.Id
+
+            let groupsFor side (selected: Set<ProvenanceLayerId * string>) =
+                selected
+                |> Set.toList
+                |> List.choose (fun (currentLayerId, id) ->
+                    if currentLayerId = layerId then
+                        context.Lookups.FindGroup side id
+                    else
+                        None
+                )
+
+            let targetGroups = [
+                yield! groupsFor ProvenanceSide.Input uiState.SelectedInputs
+                yield! groupsFor ProvenanceSide.Output uiState.SelectedOutputs
+            ]
+
+            if not targetGroups.IsEmpty then
+                applyPropertyValueToGroups context propertyValue propertyValueId targetGroups None
+        | None -> ()
 
     let private routeGroupConnection context inputGroupId outputGroupId =
         match
