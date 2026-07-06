@@ -115,7 +115,6 @@ module EditorPanels =
                                     prop.testId "provenance-confirm-apply"
                                 else
                                     prop.testId "provenance-confirm-overwrite"
-                            prop.onPointerUp (fun _ -> onConfirm pending)
                             prop.onClick (fun _ -> onConfirm pending)
                             prop.text (if isFanOutApply then "Apply" else "Overwrite")
                         ]
@@ -215,7 +214,6 @@ module EditorPanels =
                             prop.ariaLabel "Resolve manually"
                             if debug then
                                 prop.testId "provenance-member-resolution-manual"
-                            prop.onPointerUp (fun _ -> onManual pending)
                             prop.onClick (fun _ -> onManual pending)
                             prop.text "Resolve manually"
                         ]

@@ -662,8 +662,13 @@ type ProvenanceGrouping =
                 >> State.RailOrder.reorderVisible layer.Id ProvenanceSide.Output sortedOutputHeaders
             )
 
+        // Defensive against double-fire regressions (e.g. a stray onPointerUp
+        // reintroduced next to onClick): a second invocation for a batch that
+        // was already confirmed and cleared is a no-op rather than reapplying
+        // the batch to whatever session happens to be current.
         let confirmBatch (pending: PendingAssignmentBatch) =
-            EditorActions.applyAssignmentBatch latestSession.current publish pending.Batch
+            if latestUiState.current.PendingAssignmentBatch.IsSome then
+                EditorActions.applyAssignmentBatch latestSession.current publish pending.Batch
 
         let connectSetPairs pairs =
             EditorActions.connectSetPairs latestSession.current publish pairs

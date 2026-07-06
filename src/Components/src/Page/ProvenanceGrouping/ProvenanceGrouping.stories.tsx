@@ -1385,10 +1385,16 @@ export const WarnsBeforeOverwritingSingleValueFromRail: Story = {
 
     await waitFor(() => expect(canvas.getByTestId('provenance-overwrite-warning')).toBeInTheDocument());
     expect(canvas.getByTestId('provenance-overwrite-warning')).toHaveTextContent('Overwrite Species value?');
+    // userEvent.click emits the full pointerdown/pointerup/click sequence, so a
+    // stray onPointerUp bound next to onClick would double-fire the confirm
+    // here - the exact-one-line assertion below is what catches that.
     await userEvent.click(canvas.getByTestId('provenance-confirm-overwrite'));
 
     await waitFor(() => {
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('UpdatePropertyValue:Text:none');
+      const preview = canvas.getByTestId('provenance-patch-preview').textContent ?? '';
+      expect(preview).toContain('UpdatePropertyValue:Text:none');
+      const updateLines = preview.split('\n').filter((line) => line.startsWith('UpdatePropertyValue:'));
+      expect(updateLines).toHaveLength(1);
     });
   },
 };
