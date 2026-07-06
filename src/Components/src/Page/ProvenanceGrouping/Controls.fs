@@ -440,6 +440,7 @@ type Controls =
             prop.ariaLabel $"Move {header.Category.Name} from {sideName}"
             if defaultArg debug false then
                 prop.testId $"provenance-property-drag-{side}-{header.Category.Name}"
+            prop.onPointerUp (fun _ -> onSwitch header)
             prop.onClick (fun _ -> onSwitch header)
             prop.children [
                 Html.i [
