@@ -3,9 +3,9 @@ namespace Swate.Components.Page.ArcFileEditor
 open Feliz
 open Fable.Core
 open ARCtrl
+open Swate.Components
 open Swate.Components.Page.ArcFileEditor.Types
 open Swate.Components.Shared
-open Swate.Components
 open Swate.Components.JsBindings
 open Swate.Components.Primitive.ContextMenu.Types
 open Fable.Core.JsInterop
@@ -269,7 +269,7 @@ type ArcFileFooterTabs =
         )
 
     [<ReactComponent>]
-    static member DragAndDropContainer(tableIds: ResizeArray<string>, handleDragEnd, children: ReactElement) =
+    static member private DragAndDropContainer(tableIds: ResizeArray<string>, handleDragEnd, children: ReactElement) =
 
         let pointerSensor =
             DndKit.useSensor (
@@ -293,7 +293,7 @@ type ArcFileFooterTabs =
                 )
         )
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (arcFile: ArcFiles, activeView: ActiveView, setActiveView: ActiveView -> unit, setArcFile: ArcFiles -> unit)
         =
@@ -357,7 +357,7 @@ type ArcFileFooterTabs =
                 closeEditorMode ()
 
                 if canAddTable then
-                    let nextName = Helper.createNewTableName tables.Tables
+                    let nextName = createNewTableName tables.Tables
                     let nextTable = ArcTable.init nextName
 
                     arcFile.ArcTables().AddTable nextTable

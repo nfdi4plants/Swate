@@ -59,6 +59,7 @@ jobs:
     needs: test
     outputs:
       should_skip: ${{ steps.buildscript.outputs.should_skip }}
+      version: ${{ steps.buildscript.outputs.version }}
     steps:
       - uses: actions/checkout@v5
 
@@ -83,7 +84,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [nuget, npm, docker, electron, storybook]
+        target: [nuget, npm, docker, electron-web, storybook]
     steps:
       # Checkout the repository
       - name: Checkout code
@@ -114,8 +115,13 @@ jobs:
           NUGET_KEY: ${{ secrets.NUGET_KEY }}
           NPM_KEY: ${{ secrets.NPM_KEY }}
           DOCKER_KEY: ${{ secrets.GITHUB_TOKEN }} # or your docker/personal token
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: dotnet run --project ./build/Build.fsproj release ${{ matrix.target }} --ci --user=${{ github.actor }}
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ matrix.target == 'electron-web' }}
+        with:
+          name: release-assets-client
+          path: SwateClient.zip
 
       # This publishes storybook folder to gh-pages. Only run on matrix.target == 'storybook'
       - name: Publish Storybook to GitHub Pages
@@ -127,9 +133,72 @@ jobs:
           path: src/Components/storybook-static # default: dist/storybook
           checkout: false # default: true
 
+  release_electron_binaries:
+    needs: verify_release
+    if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: windows-latest
+            arch: x64
+
+          # - os: windows-latest
+          #   arch: arm64
+
+          - os: macos-latest
+            arch: x64
+
+          - os: macos-latest
+            arch: arm64
+
+          - os: ubuntu-latest
+            arch: x64
+
+    runs-on: ${{ matrix.os }}
+    steps:
+      # Checkout the repository
+      - name: Checkout code
+        uses: actions/checkout@v5
+
+      # Set up .NET
+      - name: Set up .NET
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: 10.x.x
+
+      # Restore .NET tools
+      - name: Restore .NET dependencies
+        run: dotnet tool restore
+
+      # Install Node.js
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: "npm"
+
+      # Install npm dependencies
+      - name: Install root dependencies
+        run: npm i
+
+      - name: Build Electron binaries
+        run: dotnet run --project ./build/Build.fsproj release electron-bin --ci --arch=${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: release-assets-electron-${{ runner.os }}-${{ matrix.arch }}
+          path: |
+            src/Electron/out/make/**/*.exe
+            src/Electron/out/make/**/*.nupkg
+            src/Electron/out/make/**/*.zip
+            src/Electron/out/make/**/*.dmg
+            src/Electron/out/make/**/*.deb
+            src/Electron/out/make/**/*.rpm
+
   post_release:
-    needs: [release, verify_release]
-    runs-on: windows-latest
+    needs: [release, release_electron_binaries, verify_release]
+    runs-on: ubuntu-latest
     if: ${{ needs.verify_release.outputs.should_skip != 'true' }}
 
     steps:
@@ -143,7 +212,12 @@ jobs:
         with:
           dotnet-version: 10.x.x
 
-      - name: Finalize GitHub Release
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: release-assets-*
+          path: release-assets
+
+      - name: Upload assets and finalize release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: dotnet run --project ./build/Build.fsproj postrelease
+        run: dotnet run --project ./build/Build.fsproj postrelease release-assets

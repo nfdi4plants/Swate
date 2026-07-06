@@ -3,6 +3,7 @@ module Release
 
 open SimpleExec
 open ProjectInfo
+open System.IO
 
 let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
 
@@ -37,7 +38,8 @@ let npm (key: string) (version: Changelog.Version) (isDryRun: bool) =
                 ]
                 ProjectPaths.componentsPath
 
-        let cssFilePath = @"src/Components/dist/swate-components.css"
+        let cssFilePath =
+            Path.Combine(ProjectPaths.componentsPath, "dist", "assets", "swate-components.css")
 
         if not (System.IO.File.Exists(cssFilePath)) then
             failwithf "CSS file not found at %s" cssFilePath
@@ -159,8 +161,8 @@ let docker (username: string) (key: string) (version: Changelog.Version) (isDryR
 open System.IO
 open System.IO.Compression
 
-/// This currently builds the frontend, zips it to add it as asset to github release
-let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
+/// Builds the frontend and zips it for the GitHub release
+let electron () =
 
     let sourceDir = Path.Combine(ProjectPaths.deployPath, "public")
     let targetZip = "./SwateClient.zip"
@@ -172,7 +174,13 @@ let electron (version: Changelog.Version) (token: string) (isDryRun: bool) =
 
     ZipFile.CreateFromDirectory(sourceDir, targetZip, CompressionLevel.Optimal, includeBaseDirectory = false)
 
-    let response = GitHub.uploadReleaseAsset token version targetZip
+    ()
+
+let electronBinaries (arch: string) =
+
+    run "npm" [ "run"; "fable" ] ProjectPaths.electronPath
+
+    run "npx" [ "electron-forge"; "make"; sprintf "--arch=%s" arch ] ProjectPaths.electronPath
 
     ()
 

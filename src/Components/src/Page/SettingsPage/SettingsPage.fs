@@ -118,7 +118,7 @@ type SettingsPage =
 
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Entry(?onAutoCreateNotesFolderEnabled: unit -> unit) =
         let onAutoCreateNotesFolderEnabled =
             defaultArg onAutoCreateNotesFolderEnabled ignore

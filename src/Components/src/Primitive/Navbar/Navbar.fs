@@ -38,7 +38,7 @@ type Navbar =
             ]
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Entry(?debug: bool) =
 
         Navbar.Main(Html.div [], ?debug = debug)

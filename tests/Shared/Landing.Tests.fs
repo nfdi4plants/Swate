@@ -18,6 +18,27 @@ let private mkComment (name: string) (value: string) = Comment(name, value)
 let private mkDescriptor (name: string) (accession: string) =
     OntologyAnnotation.create (name, "MS", accession)
 
+let private expectBasicAnnotationTable (table: ArcTable) (expectedName: string) =
+    Expect.equal table.Name expectedName "The default table should use the identifier name."
+    Expect.equal table.ColumnCount 3 "The default table should create basic starter columns."
+
+    Expect.equal
+        table.RowCount
+        ARCtrlHelper.ArcFileDefaults.BasicAnnotationTableRowCount
+        "The default table should create starter rows."
+
+    Expect.equal
+        (table.Headers.[0].ToString())
+        "Input [Source Name]"
+        "The default table should start with an input column."
+
+    Expect.equal (table.Headers.[1].ToString()) "Protocol Uri" "The default table should include a protocol column."
+
+    Expect.equal
+        (table.Headers.[2].ToString())
+        "Output [Sample Name]"
+        "The default table should end with an output column."
+
 let private mkBaseDraft () = {
     LandingDraft.init with
         Identifier = "study_01"
@@ -108,7 +129,7 @@ let tests =
                 ({ baseDraft with Description = "" } |> Validation.isRequiredDataValid)
                 "Empty description should fail."
 
-        testCase "Conversion.toArcFile maps study fields and initializes first table input rows"
+        testCase "Conversion.toArcFile maps study fields and initializes a basic identifier-named annotation table"
         <| fun _ ->
             let draft = mkBaseDraft ()
             let identifier, arcFile = Conversion.toArcFile draft LandingTarget.Study
@@ -131,16 +152,10 @@ let tests =
                 Expect.equal study.SubmissionDate (Some "2026-01-10T13:45") "Submission date should be trimmed."
                 Expect.equal study.PublicReleaseDate (Some "2026-02-11T08:30") "Public release date should be trimmed."
 
-                let firstTable = study.Tables.[0]
-
-                Expect.isTrue
-                    (firstTable.TryGetInputColumn().IsSome)
-                    "Input column should exist when files were provided."
-
-                Expect.equal firstTable.RowCount 2 "Only non-empty normalized files should be added as rows."
+                expectBasicAnnotationTable study.Tables.[0] "study_01 Table"
             | _ -> failwith "Expected ArcFiles.Study"
 
-        testCase "Conversion.toArcFile maps assay fields and initializes first table input rows"
+        testCase "Conversion.toArcFile maps assay fields and initializes a basic identifier-named annotation table"
         <| fun _ ->
             let draft = {
                 mkBaseDraft () with
@@ -167,13 +182,7 @@ let tests =
                 Expect.equal assay.TechnologyType draft.TechnologyType "Technology type should be copied."
                 Expect.equal assay.TechnologyPlatform draft.TechnologyPlatform "Technology platform should be copied."
 
-                let firstTable = assay.Tables.[0]
-
-                Expect.isTrue
-                    (firstTable.TryGetInputColumn().IsSome)
-                    "Input column should exist when files were provided."
-
-                Expect.equal firstTable.RowCount 2 "Only non-empty normalized files should be added as rows."
+                expectBasicAnnotationTable assay.Tables.[0] "assay_01 Table"
             | _ -> failwith "Expected ArcFiles.Assay"
 
         testCase "Conversion.toSubmitPayload includes protocol intent when main text is present"

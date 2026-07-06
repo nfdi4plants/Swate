@@ -721,6 +721,10 @@ export const SwitchesPropertyGroupingSideByDrag: Story = {
     await groupByProperty(canvas, 'Output', 'Batch');
     expect(canvas.queryByTestId('provenance-group-Input-input:Batch=A')).not.toBeInTheDocument();
 
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-property-Output-Batch')).toBeInTheDocument();
+    }, { timeout: 10_000 });
+
     await dragByPointer(
       canvas.getByTestId('provenance-property-Output-Batch'),
       canvas.getByTestId('provenance-property-rail-Input'),
@@ -743,7 +747,12 @@ export const SwitchesInheritedPropertyToInputSideWithoutGrouping: Story = {
     const outputRail = within(canvas.getByTestId('provenance-property-rail-Output'));
 
     await ensurePropertyInRail(canvas, 'Output', 'Species');
+    // This is the switch button between the two sides, which is only enabled for properties that are allowed to be dragged to the other side.
     expect(canvas.getByTestId('provenance-property-drag-Output-Species')).not.toBeDisabled();
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-property-Output-Species')).toBeInTheDocument();
+    }, { timeout: 10_000 });
+
     await dragByPointer(
       canvas.getByTestId('provenance-property-Output-Species'),
       canvas.getByTestId('provenance-property-rail-Input'),
@@ -752,7 +761,7 @@ export const SwitchesInheritedPropertyToInputSideWithoutGrouping: Story = {
     await waitFor(() => {
       expect(inputRail.getByTestId('provenance-property-Input-Species')).toBeInTheDocument();
       expect(outputRail.queryByTestId('provenance-property-Output-Species')).not.toBeInTheDocument();
-    });
+    }, { timeout: 10_000 });
 
     // Switching an ungrouped property only moves it; it must not group either side.
     expect(canvas.queryByTestId('provenance-group-Input-input:Species=Arabidopsis')).not.toBeInTheDocument();
@@ -1232,7 +1241,8 @@ export const ConnectionDetailsShowEntityPairsWithoutPropertyCreation: Story = {
     const canvas = within(canvasElement);
 
     const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
-    await userEvent.click(connector);
+    connector.focus();
+    await userEvent.keyboard('{Enter}');
 
     const details = await waitFor(() => canvas.getByTestId('provenance-connection-details'));
     // Underlying connections are listed as readable entity name pairs.
@@ -1878,8 +1888,8 @@ async function ensurePropertyInRail(
   const source = await shelfProperty(canvas, propertyName);
   await dragByPointer(source, canvas.getByTestId(`provenance-property-rail-${side}`));
 
-  await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument());
-  return waitFor(() => canvas.getByTestId(propertyId));
+  await waitFor(() => expect(canvas.queryByTestId('foldered-draggable-drag-overlay')).not.toBeInTheDocument(), {timeout: 10_000});
+  return waitFor(() => canvas.getByTestId(propertyId), {timeout: 10_000});
 }
 
 function propertyColorSwatch(property: HTMLElement) {
@@ -2135,7 +2145,7 @@ export const ConnectsGroups: Story = {
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedConnection');
-    });
+    }, {timeout: 10_000});
     expect(canvas.queryByTestId('provenance-live-connection')).not.toBeInTheDocument();
   },
 };

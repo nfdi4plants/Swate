@@ -112,7 +112,7 @@ open TemplateCacheProviderHelper
 [<Erase; Mangle(false)>]
 type TemplateCacheProvider =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member TemplateCacheProvider
         (loadTemplates: unit -> JS.Promise<Result<Template[], string>>, children: ReactElement)
         =

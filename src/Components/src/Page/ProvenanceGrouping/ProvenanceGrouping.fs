@@ -17,7 +17,7 @@ open Swate.Components.Page.ProvenanceGrouping.Types
 [<Erase; Mangle(false)>]
 type ProvenanceGrouping =
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member Main
         (session: ProvenanceSession, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
         =

@@ -48,7 +48,7 @@ type CardGrid =
             ]
         ]
 
-    [<ReactComponent>]
+    [<ReactComponent(true)>]
     static member CardGrid
         (children: ReactElement, ?gridTitle: string, ?leadingElements: ReactElement, ?gridClassName: string)
         =
