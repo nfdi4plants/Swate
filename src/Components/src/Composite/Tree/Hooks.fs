@@ -3,9 +3,11 @@ module Swate.Components.Composite.Tree.Hooks
 open Browser.Types
 open Fable.Core
 open Feliz
+open Swate.Components
 open Swate.Components.Composite.Tree.Dom
 open Swate.Components.Composite.Tree.State
 open Swate.Components.Composite.Tree.Types
+
 
 let private toSet (values: string[] option) =
     values |> Option.map Set.ofArray |> Option.defaultValue Set.empty
@@ -131,20 +133,20 @@ let useTreeNodeActions
 
     let onNodeKeyDown (node: TreeItem<'T>) (event: KeyboardEvent) =
         match event.key with
-        | "ArrowDown" ->
+        | kbdEventCode.arrowDown ->
             event.preventDefault ()
             TreeController.focusByDelta lookup focusedId treeState.SetFocusedId scrollToIndex focusDom 1
-        | "ArrowUp" ->
+        | kbdEventCode.arrowUp ->
             event.preventDefault ()
             TreeController.focusByDelta lookup focusedId treeState.SetFocusedId scrollToIndex focusDom -1
         // "Home" and "End" are KeyboardEvent.key values for jumping to the first or last visible node.
-        | "Home" ->
+        | kbdEventCode.home ->
             event.preventDefault ()
             TreeController.focusFirst lookup treeState.SetFocusedId scrollToIndex focusDom
-        | "End" ->
+        | kbdEventCode.End ->
             event.preventDefault ()
             TreeController.focusLast lookup treeState.SetFocusedId scrollToIndex focusDom
-        | "ArrowRight" ->
+        | kbdEventCode.arrowRight ->
             event.preventDefault ()
 
             if NodeState.canExpand dataSource treeState.LoadedChildren node then
@@ -152,7 +154,7 @@ let useTreeNodeActions
                     TreeController.focusFirstChild lookup treeState.SetFocusedId scrollToIndex focusDom node.id
                 else
                     expandNode node
-        | "ArrowLeft" ->
+        | kbdEventCode.arrowLeft ->
             event.preventDefault ()
 
             TreeController.collapseOrFocusParent
@@ -163,8 +165,8 @@ let useTreeNodeActions
                 scrollToIndex
                 focusDom
                 node.id
-        | "Enter"
-        | " " ->
+        | kbdEventCode.enter
+        | kbdEventCode.space ->
             event.preventDefault ()
 
             if NodeState.canExpand dataSource treeState.LoadedChildren node then

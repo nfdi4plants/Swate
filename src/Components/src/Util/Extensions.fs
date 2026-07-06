@@ -72,6 +72,15 @@ module kbdEventCode =
     [<Literal>]
     let f2 = "F2"
 
+    [<Literal>]
+    let home = "Home"
+
+    [<Literal>]
+    let End = "End"
+
+    [<Literal>]
+    let space = " "
+
     let key (key: string) = key.ToUpper() |> sprintf "Key%s"
 
 open Fable.Core
