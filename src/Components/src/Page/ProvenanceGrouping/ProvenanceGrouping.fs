@@ -121,6 +121,7 @@ type ProvenanceGrouping =
         let latestLayer = React.useRef layer
         let latestOnChange = React.useRef onChange
         let latestConnections = React.useRef connections
+        let latestGroups = React.useRef (inputGroups, outputGroups)
 
         // Marks the cards connected to the hovered card with a data attribute, styled
         // by the cards' CSS; imperative on purpose so hovering never re-renders the
@@ -201,6 +202,8 @@ type ProvenanceGrouping =
                     box outputGroups
                 |]
             )
+
+        let latestLookups = React.useRef lookups
 
         let inputRailProjection =
             React.useMemo (
@@ -722,8 +725,8 @@ type ProvenanceGrouping =
 
         let resolveAllToAll (pending: PendingMemberResolution) =
             match
-                lookups.FindGroup ProvenanceSide.Input pending.InputGroupId,
-                lookups.FindGroup ProvenanceSide.Output pending.OutputGroupId
+                latestLookups.current.FindGroup ProvenanceSide.Input pending.InputGroupId,
+                latestLookups.current.FindGroup ProvenanceSide.Output pending.OutputGroupId
             with
             | Some inputGroup, Some outputGroup ->
                 EditorActions.allMemberPairs inputGroup outputGroup |> connectSetPairs
@@ -731,8 +734,8 @@ type ProvenanceGrouping =
 
         let resolvePairByOrder (pending: PendingMemberResolution) =
             match
-                lookups.FindGroup ProvenanceSide.Input pending.InputGroupId,
-                lookups.FindGroup ProvenanceSide.Output pending.OutputGroupId
+                latestLookups.current.FindGroup ProvenanceSide.Input pending.InputGroupId,
+                latestLookups.current.FindGroup ProvenanceSide.Output pending.OutputGroupId
             with
             | Some inputGroup, Some outputGroup ->
                 match EditorActions.orderedMemberPairs inputGroup outputGroup with
@@ -765,6 +768,15 @@ type ProvenanceGrouping =
             State.Detail.isGroupExpanded side groupId uiState
             || isConnectedToExpanded side groupId
 
+        // Rule: any handler that can publish (or that reads session/uiState/
+        // lookups from a callback that might fire after further renders, e.g.
+        // layer select, add layer, member-resolution actions) must read
+        // through a `latest*` ref, never close over a render-scope value.
+        // Render values (session, uiState, lookups, layer, ...) are only for
+        // this render's JSX output. React 18 currently flushes discrete events
+        // synchronously so a stale closure usually "gets away with it", but
+        // batching across a transition or a memoized subtree (React.memo)
+        // would turn a stale read into a real lost-update race.
         let dragContext = {
             Session = session
             Layer = layer
@@ -786,6 +798,8 @@ type ProvenanceGrouping =
             latestLayer.current <- layer
             latestOnChange.current <- onChange
             latestConnections.current <- connections
+            latestGroups.current <- inputGroups, outputGroups
+            latestLookups.current <- lookups
             latestArmedHandle.current <- armedHandle
             latestDragContext.current <- Some dragContext
         )
@@ -1381,14 +1395,18 @@ type ProvenanceGrouping =
                                 prop.children [
                                     Controls.LayerTabs(
                                         session,
-                                        (fun layerId -> Session.selectLayer layerId session |> publishResult false),
+                                        (fun layerId ->
+                                            Session.selectLayer layerId latestSession.current |> publishResult false
+                                        ),
                                         (fun name ->
+                                            let currentInputGroups, currentOutputGroups = latestGroups.current
+
                                             EditorActions.addLayer
-                                                session
-                                                layer.Id
-                                                inputGroups
-                                                outputGroups
-                                                uiState
+                                                latestSession.current
+                                                latestLayer.current.Id
+                                                currentInputGroups
+                                                currentOutputGroups
+                                                latestUiState.current
                                                 name
                                                 publish
                                         ),

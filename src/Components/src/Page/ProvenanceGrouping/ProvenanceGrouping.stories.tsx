@@ -1536,6 +1536,47 @@ export const CreatesNextLayerAndKeepsBoundaryEditsSynchronized: Story = {
   },
 };
 
+export const RapidEditThenLayerSwitchKeepsEdit: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    const outputA = canvas.getByText('Output A').closest('article')!;
+    await selectGroup(outputA);
+    await createLayer(canvas, 'Layer 2');
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-layer-layer-2')).toHaveClass('swt:btn-primary');
+      expect(canvasElement).toHaveTextContent('Output A');
+    });
+
+    // Output A has no Species value in the fixture, so this drop just adds -
+    // no overwrite-confirm step, keeping the setup free of unrelated flake.
+    const source = await addRailValue(canvas, 'Input', 'Species', 'Arabidopsis');
+    const carried = canvas.getByText('Output A').closest('article')!;
+    await dragByPointer(source, carried);
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
+    });
+
+    // fireEvent (not userEvent, which adds its own settle delay): switch away
+    // from and immediately back to layer 2 right after the publish above,
+    // without awaiting the UI in between. A handler that closed over a
+    // render-scope session instead of reading a `latest*` ref could fire
+    // against a session from before this edit, dropping or duplicating it.
+    fireEvent.click(canvas.getByTestId('provenance-layer-layer-1'));
+    fireEvent.click(canvas.getByTestId('provenance-layer-layer-2'));
+
+    await waitFor(() => {
+      expect(canvasElement).toHaveTextContent('Arabidopsis');
+      const preview = canvas.getByTestId('provenance-patch-preview').textContent ?? '';
+      const addLines = preview.split('\n').filter((line) => line.startsWith('AddLoadedPropertyValue:'));
+      expect(addLines).toHaveLength(1);
+    });
+  },
+};
+
 export const CompletesAnInputOnlyLayer: Story = {
   render: () => <Harness inputOnly />,
   play: async ({ canvasElement }) => {
