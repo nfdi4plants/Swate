@@ -2648,6 +2648,65 @@ let uiStateTests =
 
             Expect.equal manual.Detail None "Choosing manual should clear the detail panel."
 
+        testCase "publish error clears pending prompts but keeps the error"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+            let layer = Session.activeLayer session
+
+            let pendingBatch: Types.PendingAssignmentBatch = {
+                Batch = { Adds = []; Overwrites = [] }
+                AffectedSideCount = 1
+                AffectedValueCount = 1
+                AffectedGroupCount = 1
+                AffectedEntityCount = 1
+            }
+
+            let pendingResolution: Types.PendingMemberResolution = {
+                LayerId = layer.Id
+                InputGroupId = "input:Species=Arabidopsis"
+                OutputGroupId = "output:Analysis=Mass Spectrometry"
+                InputMemberCount = 1
+                OutputMemberCount = 1
+            }
+
+            let state =
+                State.init session
+                |> State.AssignmentBatch.set pendingBatch
+                |> State.MemberResolution.request pendingResolution
+
+            let next = State.Publish.onError "boom" state
+
+            Expect.isNone next.PendingAssignmentBatch "An assignment-batch prompt must not survive a failed publish."
+            Expect.isNone next.PendingMemberResolution "A member-resolution prompt must not survive a failed publish."
+            Expect.equal next.Error (Some "boom") "The error message itself must still be shown."
+
+        testCase "publish success clears pending prompts and re-syncs derived state"
+        <| fun _ ->
+            let session = Session.init (sampleModel ())
+
+            let pendingBatch: Types.PendingAssignmentBatch = {
+                Batch = { Adds = []; Overwrites = [] }
+                AffectedSideCount = 1
+                AffectedValueCount = 1
+                AffectedGroupCount = 1
+                AffectedEntityCount = 1
+            }
+
+            let state =
+                State.init session
+                |> State.AssignmentBatch.set pendingBatch
+                |> fun state -> {
+                    state with
+                        Error = Some "stale"
+                        Hint = Some "stale"
+                }
+
+            let next = State.Publish.onSuccess session state
+
+            Expect.isNone next.PendingAssignmentBatch "A confirmed batch must not remain pending after success."
+            Expect.isNone next.Error "A successful publish must clear a previous error."
+            Expect.isNone next.Hint "A successful publish must clear a previous hint."
+
         testCase "property value drop plan adds only when every group member has no value for the property"
         <| fun _ ->
             let species = propertyHeader FixtureKinds.characteristicProperty "Species"

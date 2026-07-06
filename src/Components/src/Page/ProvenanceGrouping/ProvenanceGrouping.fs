@@ -575,24 +575,13 @@ type ProvenanceGrouping =
                 if recordUndo then
                     undoSession.current <- Some latestSession.current
 
-                let nextUiState = latestUiState.current |> State.Sides.ensure next
-
-                commitUiState {
-                    nextUiState with
-                        Error = None
-                        Hint = None
-                        PendingAssignmentBatch = None
-                        PendingMemberResolution = None
-                }
+                commitUiState (State.Publish.onSuccess next latestUiState.current)
 
                 latestOnChange.current { Session = next; Patches = patches }
             | Error error ->
                 LiveDrag.clear liveDragStore.current
 
-                commitUiState {
-                    latestUiState.current with
-                        Error = Some(SessionErrors.text error)
-                }
+                commitUiState (State.Publish.onError (SessionErrors.text error) latestUiState.current)
 
         let publish =
             React.useCallback ((fun (result: SessionResult) -> publishResult true result), [||])
@@ -603,14 +592,8 @@ type ProvenanceGrouping =
                 undoSession.current <- None
                 LiveDrag.clear liveDragStore.current
 
-                let nextUiState = latestUiState.current |> State.Sides.ensure previous
-
                 commitUiState {
-                    nextUiState with
-                        Error = None
-                        Hint = None
-                        PendingAssignmentBatch = None
-                        PendingMemberResolution = None
+                    State.Publish.onSuccess previous latestUiState.current with
                         Detail = None
                 }
 
@@ -693,14 +676,8 @@ type ProvenanceGrouping =
                         LiveDrag.clear liveDragStore.current
                         undoSession.current <- Some latestSession.current
 
-                        let nextUiState = latestUiState.current |> State.Sides.ensure next
-
                         commitUiState {
-                            nextUiState with
-                                Error = None
-                                Hint = None
-                                PendingAssignmentBatch = None
-                                PendingMemberResolution = None
+                            State.Publish.onSuccess next latestUiState.current with
                                 Detail = None
                         }
 
@@ -708,10 +685,7 @@ type ProvenanceGrouping =
                     | Error error ->
                         LiveDrag.clear liveDragStore.current
 
-                        commitUiState {
-                            latestUiState.current with
-                                Error = Some(SessionErrors.text error)
-                        }
+                        commitUiState (State.Publish.onError (SessionErrors.text error) latestUiState.current)
                 ),
                 [||]
             )

@@ -387,6 +387,29 @@ module Sides =
                 SideStates = state.SideStates |> Map.add sideId next
         }
 
+/// Pure success/error state transitions shared by every session-publishing
+/// action (publishResult, removeDisplayConnection, undoLast). Extracted so the
+/// error path is unit-testable and guaranteed to clear pending prompts exactly
+/// like the success path does - previously the error branch only set `Error`,
+/// leaving a stale confirmation prompt (e.g. an overwrite batch) mounted after
+/// a failed publish.
+module Publish =
+
+    let onSuccess (nextSession: ProvenanceSession) state = {
+        Sides.ensure nextSession state with
+            Error = None
+            Hint = None
+            PendingAssignmentBatch = None
+            PendingMemberResolution = None
+    }
+
+    let onError (message: string) state = {
+        state with
+            Error = Some message
+            PendingAssignmentBatch = None
+            PendingMemberResolution = None
+    }
+
 /// Stores visual rail order separately from filtering and writeback state.
 module RailOrder =
 
