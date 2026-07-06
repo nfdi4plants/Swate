@@ -97,13 +97,6 @@ module OriginSymbols =
 /// Converts between draft form state and typed provenance values.
 module ValueDrafts =
 
-    let kindForValue value =
-        match value with
-        | ProvenanceValue.Text _ -> DraftText
-        | ProvenanceValue.Integer _ -> DraftInteger
-        | ProvenanceValue.Float _ -> DraftFloat
-        | ProvenanceValue.Term _ -> DraftTerm
-
     let kindName kind =
         match kind with
         | DraftText -> "Text"
@@ -117,18 +110,6 @@ module ValueDrafts =
         | "Float" -> DraftFloat
         | "Term" -> DraftTerm
         | _ -> DraftText
-
-    let textForValue value =
-        match value with
-        | ProvenanceValue.Text text -> text
-        | ProvenanceValue.Integer value -> string value
-        | ProvenanceValue.Float value -> string value
-        | ProvenanceValue.Term term -> term.Name
-
-    let termForValue value =
-        match value with
-        | ProvenanceValue.Term term -> Some term
-        | _ -> None
 
     let tryValue kind (text: string) term =
         match kind with

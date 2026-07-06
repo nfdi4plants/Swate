@@ -22,7 +22,7 @@ type ProvenanceGrouping =
         (session: ProvenanceSession, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
         =
         let debug = defaultArg debug false
-        let rawUiState, setUiState = React.useState (State.init session)
+        let rawUiState, setUiState = React.useState (fun () -> State.init session)
         let activeDrag, setActiveDrag = React.useState<ActiveDrag option> None
         let surfaceRef = React.useElementRef ()
         let splitDrag = React.useRef (None: Splitter.SplitterSide option)
@@ -1674,7 +1674,7 @@ type ProvenanceGrouping =
     static member Editor
         (initialModel: ProvenanceModel, onChange: ProvenanceEditorChange -> unit, ?height: int, ?debug: bool)
         =
-        let session, setSession = React.useState (Session.init initialModel)
+        let session, setSession = React.useState (fun () -> Session.init initialModel)
 
         let change (next: ProvenanceEditorChange) =
             setSession next.Session
