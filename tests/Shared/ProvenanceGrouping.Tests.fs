@@ -1344,11 +1344,54 @@ let sessionTests =
                 let projected = layer.Model.InputSets |> Map.toList |> List.exactlyOne |> snd
 
                 Expect.equal layer.Label "Extraction" "Layer label should use the entered source name."
-                Expect.equal layer.Model.Source.Id "Extraction" "Temporary source id should use the entered name."
+
+                Expect.equal
+                    layer.Model.Source.Id
+                    $"{layer.Id}:Extraction"
+                    "Temporary source id should be namespaced with the layer id so same-named layers cannot collide."
+
                 Expect.equal layer.Model.Source.Name "Extraction" "Temporary source name should use the entered name."
                 Expect.equal projected.Source layer.Model.Source "Projected sets should belong to the new source."
                 Expect.isEmpty patches "Layer naming is view/session state only."
             | Error error -> failwithf "Expected named layer addition success, got %A" error
+
+        testCase "two added layers with the same name get distinct source ids"
+        <| fun _ ->
+            let withLayerTwo =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Processing"
+                            SelectedSets = []
+                        }
+                        (Session.init (sampleModel ()))
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let onLayerOne =
+                match Session.selectLayer "layer-1" withLayerTwo with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let withLayerThree =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Processing"
+                            SelectedSets = []
+                        }
+                        onLayerOne
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let ids =
+                withLayerThree.Layers
+                |> List.map (fun layer -> layer.Model.Source.Id)
+                |> List.distinct
+
+            Expect.hasLength ids withLayerThree.Layers.Length "Every layer must own a unique Source.Id."
 
         testCase "addLayer treats selected active inputs as new layer inputs"
         <| fun _ ->
@@ -2012,6 +2055,178 @@ let sessionTests =
             | Error(SessionError.EditFailed(EditError.ConnectionNotFound connectionId)) ->
                 Expect.equal connectionId "missing-connection" "Removed target identity should be returned."
             | other -> failwithf "Expected missing-connection session error, got %A" other
+
+        testCase "freshly created property value ids never collide with other layers"
+        <| fun _ ->
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+
+            let createValue target value session =
+                match
+                    Session.createCurrentLoadedPropertyValue
+                        {
+                            Target = target
+                            CopiedFrom = None
+                            Header = analysis
+                            Value = value
+                            Unit = None
+                        }
+                        session
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected createCurrentLoadedPropertyValue error: %A" error
+
+            let built =
+                model "assay-table" [] [] [
+                    outputSet "output-a" "assay-table" outputHeader "Output A" []
+                    outputSet "output-b" "assay-table" outputHeader "Output B" []
+                ] []
+
+            // Layer 1 gets two generated values (one per output); layer 2 is seeded
+            // from output-a only, so it starts out knowing about only the first one.
+            let withLayerOneValues =
+                Session.init built
+                |> createValue (ProvenancePropertyTarget.OutputSets [ "output-a" ]) (ProvenanceValue.Text "First")
+                |> createValue (ProvenancePropertyTarget.OutputSets [ "output-b" ]) (ProvenanceValue.Text "Second")
+
+            let layered =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Layer 2"
+                            SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                        }
+                        withLayerOneValues
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let projectedId =
+                (Session.activeLayer layered).Model.InputSets
+                |> Map.toList
+                |> List.exactlyOne
+                |> fst
+
+            let withNewValue =
+                layered
+                |> createValue
+                    (ProvenancePropertyTarget.InputSets [ projectedId ])
+                    (ProvenanceValue.Text "LayerTwoOwnValue")
+
+            let newId =
+                (Session.activeLayer withNewValue).Model.PropertyValues
+                |> Map.toList
+                |> List.pick (fun (id, value) ->
+                    if value.Value = ProvenanceValue.Text "LayerTwoOwnValue" then
+                        Some id
+                    else
+                        None
+                )
+
+            let layerOneIds =
+                (Session.layerById "layer-1" withNewValue).Model.PropertyValues
+                |> Map.toList
+                |> List.map fst
+                |> Set.ofList
+
+            Expect.isFalse
+                (layerOneIds.Contains newId)
+                $"Fresh id '{newId}' collides with an unrelated layer-1 property value."
+
+        testCase "layer switch never overwrites an unrelated same-id value in another layer"
+        <| fun _ ->
+            let outputHeader = ioHeader FixtureKinds.sampleEndpoint "Output [Sample Name]"
+            let analysis = propertyHeader FixtureKinds.parameterProperty "Analysis"
+
+            let createValue target value session =
+                match
+                    Session.createCurrentLoadedPropertyValue
+                        {
+                            Target = target
+                            CopiedFrom = None
+                            Header = analysis
+                            Value = value
+                            Unit = None
+                        }
+                        session
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected createCurrentLoadedPropertyValue error: %A" error
+
+            let built =
+                model "assay-table" [] [] [
+                    outputSet "output-a" "assay-table" outputHeader "Output A" []
+                    outputSet "output-b" "assay-table" outputHeader "Output B" []
+                ] []
+
+            let withLayerOneValues =
+                Session.init built
+                |> createValue (ProvenancePropertyTarget.OutputSets [ "output-a" ]) (ProvenanceValue.Text "First")
+                |> createValue (ProvenancePropertyTarget.OutputSets [ "output-b" ]) (ProvenanceValue.Text "Second")
+
+            let outputBValueId =
+                (Session.layerById "layer-1" withLayerOneValues).Model.OutputSets.["output-b"].PropertyValueIds
+                |> List.exactlyOne
+
+            let layered =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Layer 2"
+                            SelectedSets = [ ProvenanceSide.Output, "output-a" ]
+                        }
+                        withLayerOneValues
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let projectedId =
+                (Session.activeLayer layered).Model.InputSets
+                |> Map.toList
+                |> List.exactlyOne
+                |> fst
+
+            let withNewValue =
+                layered
+                |> createValue
+                    (ProvenancePropertyTarget.InputSets [ projectedId ])
+                    (ProvenanceValue.Text "LayerTwoOwnValue")
+
+            let onLayerOne =
+                match Session.selectLayer "layer-1" withNewValue with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let dirtied =
+                match
+                    Session.updatePropertyValue outputBValueId (ProvenanceValue.Text "EditedOnLayerOne") None onLayerOne
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected updatePropertyValue error: %A" error
+
+            let backOnLayerTwo =
+                match Session.selectLayer "layer-2" dirtied with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            // The corruption does not overwrite the value record in place (that would
+            // be too easy to spot) - it silently drops newId from the projected set's
+            // own reference list, because copySetData's "is this id local to me"
+            // check keys purely on string identity and an unrelated layer-1 value
+            // happens to share that identity. So the real observable is whether the
+            // set can still reach its own value at all, not just whether an orphaned
+            // entry remains sitting in the PropertyValues map.
+            let hasLayerTwoOwnValue session =
+                let layer2 = Session.layerById "layer-2" session
+                let projectedSet = layer2.Model.InputSets.[projectedId]
+
+                ProvenanceSet.effectivePropertyValueIds projectedSet
+                |> List.choose (fun id -> layer2.Model.PropertyValues.TryFind id)
+                |> List.exists (fun value -> value.Value = ProvenanceValue.Text "LayerTwoOwnValue")
+
+            Expect.isTrue
+                (hasLayerTwoOwnValue backOnLayerTwo)
+                "Layer-2's own value must remain attached to its set after an unrelated layer-1 edit and focus switch."
     ]
 
 let uiStateTests =
@@ -2613,6 +2828,65 @@ let uiStateTests =
             Expect.isFalse
                 (afterEnsure.SourceColorSetOrder.ContainsKey "nonexistent")
                 "Stale source color order should be removed."
+
+        testCase "setting a shelf folder color for one duplicate-named layer leaves the other alone"
+        <| fun _ ->
+            let withLayerTwo =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Processing"
+                            SelectedSets = []
+                        }
+                        (Session.init (sampleModel ()))
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let onLayerOne =
+                match Session.selectLayer "layer-1" withLayerTwo with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected selectLayer error: %A" error
+
+            let session =
+                match
+                    Session.addLayer
+                        {
+                            Name = "Processing"
+                            SelectedSets = []
+                        }
+                        onLayerOne
+                with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected addLayer error: %A" error
+
+            let layerTwo = Session.layerById "layer-2" session
+            let layerThree = Session.layerById "layer-3" session
+
+            // Sides.ensure auto-assigns every live source a distinct default color;
+            // capture layer-3's before recoloring layer-2 so the assertion below
+            // catches the two layers sharing one color slot, not just a `None`.
+            let uiState = State.init session |> State.Sides.ensure session
+
+            let colorOf (state: Types.UiState) sourceId =
+                state.PropertyColors.SourceColors |> Map.tryFind sourceId
+
+            let layerThreeColorBefore = colorOf uiState layerThree.Model.Source.Id
+
+            let folderId = PropertyFolders.sourceFolderId layerTwo.Model.Source
+
+            let recolored =
+                PropertyShelf.setFolderColor session folderId (Some "#ff0000") uiState
+
+            Expect.equal
+                (colorOf recolored layerTwo.Model.Source.Id)
+                (Some "#ff0000")
+                "The targeted duplicate-named layer's folder should receive the color."
+
+            Expect.equal
+                (colorOf recolored layerThree.Model.Source.Id)
+                layerThreeColorBefore
+                "The other same-named layer's automatic color must not change."
 
         testCase "default filter state uses Any filter and ValueCountDesc sort"
         <| fun _ ->

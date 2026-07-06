@@ -63,9 +63,12 @@ type CreateLoadedSetCommand = {
 
 type EditResult = Result<ProvenanceModel * ProvenanceTablePatch list, EditError>
 
+// IDs are namespaced with the owning model's Source.Id because propagation
+// (Session.refreshDirtyProperties / copySetData) treats these IDs as globally
+// unique identities across every layer in a session, not just this model.
 let private nextPropertyValueId (model: ProvenanceModel) =
     let rec loop index =
-        let id = sprintf "property-value-%i" index
+        let id = sprintf "%s::property-value-%i" model.Source.Id index
 
         if model.PropertyValues.ContainsKey id then
             loop (index + 1)
@@ -76,7 +79,7 @@ let private nextPropertyValueId (model: ProvenanceModel) =
 
 let private nextConnectionId (model: ProvenanceModel) =
     let rec loop index =
-        let id = sprintf "connection-%i" index
+        let id = sprintf "%s::connection-%i" model.Source.Id index
 
         if model.Connections.ContainsKey id then
             loop (index + 1)
@@ -92,7 +95,7 @@ let private nextSetId side (model: ProvenanceModel) =
         | ProvenanceSide.Output -> "output-set", model.OutputSets
 
     let rec loop index =
-        let id = $"{prefix}-{index}"
+        let id = $"{model.Source.Id}::{prefix}-{index}"
         if sets.ContainsKey id then loop (index + 1) else id
 
     loop 1

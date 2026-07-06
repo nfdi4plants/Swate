@@ -166,8 +166,12 @@ module Session =
             let layerIndex = nextIndex session
             let layerId = $"layer-{layerIndex}"
 
+            // Id is namespaced with layerId (unique per session) so two layers
+            // added with the same entered name never collide: everything keyed
+            // by Source.Id (colors, "current table" detection, and the PG-1
+            // property-value id namespace) would otherwise conflate them.
             let source = {
-                Id = command.Name
+                Id = $"{layerId}:{command.Name}"
                 Name = command.Name
             }
 
