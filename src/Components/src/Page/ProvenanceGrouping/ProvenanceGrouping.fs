@@ -561,8 +561,29 @@ type ProvenanceGrouping =
 
         // Single-step undo: the session as it was before the last published edit.
         // Layer switches deliberately do not overwrite this slot, so an edit stays
-        // undoable across navigation.
-        let undoSession = React.useRef (None: ProvenanceSession option)
+        // undoable across navigation. State (not a ref) so the Undo button's
+        // disabled state is render-pure; a companion ref mirrors it for handlers
+        // that need a synchronous read (every write site sets both together, so
+        // they never diverge within a render).
+        let undoSession, setUndoSession = React.useState (None: ProvenanceSession option)
+        let latestUndoSession = React.useRef undoSession
+
+        // The session this component itself last published (via publish or
+        // undo). Lets an effect below tell "the host echoed back what we
+        // published" apart from "the host swapped the session prop under us",
+        // so an external replacement invalidates a stale undo snapshot instead
+        // of leaving it able to resurrect data the host has already replaced.
+        let lastPublishedSession = React.useRef session
+
+        React.useEffect (
+            (fun () ->
+                if not (Object.ReferenceEquals(session, lastPublishedSession.current)) then
+                    latestUndoSession.current <- None
+                    setUndoSession None
+                    lastPublishedSession.current <- session
+            ),
+            [| box session |]
+        )
 
         // publish and the actions below read session/layer/UI state through the
         // latest refs so that memoized subtrees never fire an action against a
@@ -573,10 +594,12 @@ type ProvenanceGrouping =
                 LiveDrag.clear liveDragStore.current
 
                 if recordUndo then
-                    undoSession.current <- Some latestSession.current
+                    latestUndoSession.current <- Some latestSession.current
+                    setUndoSession (Some latestSession.current)
 
                 commitUiState (State.Publish.onSuccess next latestUiState.current)
 
+                lastPublishedSession.current <- next
                 latestOnChange.current { Session = next; Patches = patches }
             | Error error ->
                 LiveDrag.clear liveDragStore.current
@@ -587,9 +610,10 @@ type ProvenanceGrouping =
             React.useCallback ((fun (result: SessionResult) -> publishResult true result), [||])
 
         let undoLast () =
-            match undoSession.current with
+            match latestUndoSession.current with
             | Some previous ->
-                undoSession.current <- None
+                latestUndoSession.current <- None
+                setUndoSession None
                 LiveDrag.clear liveDragStore.current
 
                 commitUiState {
@@ -597,6 +621,7 @@ type ProvenanceGrouping =
                         Detail = None
                 }
 
+                lastPublishedSession.current <- previous
                 latestOnChange.current { Session = previous; Patches = [] }
             | None -> ()
 
@@ -679,13 +704,15 @@ type ProvenanceGrouping =
                     match Session.removeConnections connection.ConnectionIds latestSession.current with
                     | Ok(next, patches) ->
                         LiveDrag.clear liveDragStore.current
-                        undoSession.current <- Some latestSession.current
+                        latestUndoSession.current <- Some latestSession.current
+                        setUndoSession (Some latestSession.current)
 
                         commitUiState {
                             State.Publish.onSuccess next latestUiState.current with
                                 Detail = None
                         }
 
+                        lastPublishedSession.current <- next
                         latestOnChange.current { Session = next; Patches = patches }
                     | Error error ->
                         LiveDrag.clear liveDragStore.current
@@ -1368,7 +1395,7 @@ type ProvenanceGrouping =
                                                 prop.className "swt:btn swt:btn-xs swt:btn-ghost"
                                                 prop.title "Undo last change"
                                                 prop.ariaLabel "Undo last change"
-                                                prop.disabled undoSession.current.IsNone
+                                                prop.disabled undoSession.IsNone
                                                 if debug then
                                                     prop.testId "provenance-undo"
                                                 prop.onClick (fun _ -> undoLast ())

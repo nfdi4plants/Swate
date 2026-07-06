@@ -2178,6 +2178,27 @@ export const UndoRetractsPatchPreview: Story = {
   },
 };
 
+export const ExternalSessionReplacementDisablesUndo: Story = {
+  render: () => <Harness fixture="typedSample" allowTermReplacement />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByTestId('provenance-undo')).toBeDisabled();
+
+    const connector = await waitFor(() => canvas.getAllByTestId('provenance-connection')[0]);
+    connector.focus();
+    await userEvent.keyboard('{Delete}');
+
+    await waitFor(() => expect(canvas.getByTestId('provenance-undo')).not.toBeDisabled());
+
+    // The host replaces the session prop directly (not through onChange) -
+    // the undo snapshot refers to a session the host has already discarded,
+    // so it must be invalidated rather than left able to resurrect it.
+    await userEvent.click(canvas.getByRole('button', { name: /Replace term metadata/i }));
+
+    await waitFor(() => expect(canvas.getByTestId('provenance-undo')).toBeDisabled());
+  },
+};
+
 export const IgnoresConnectionHandleDroppedOnCardBody: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
