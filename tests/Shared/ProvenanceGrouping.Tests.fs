@@ -2335,9 +2335,12 @@ let uiStateTests =
             Expect.equal manual.PendingMemberResolution None "Choosing manual should close the prompt."
 
             Expect.equal
-                manual.ExpandedGroup
-                (Some(ProvenanceSide.Input, pending.InputGroupId))
-                "Choosing manual should expand the input group."
+                manual.ExpandedGroups
+                (Set.ofList [
+                    ProvenanceSide.Input, pending.InputGroupId
+                    ProvenanceSide.Output, pending.OutputGroupId
+                ])
+                "Choosing manual should expand exactly the two pending groups."
 
             Expect.equal manual.Detail None "Choosing manual should clear the detail panel."
 
