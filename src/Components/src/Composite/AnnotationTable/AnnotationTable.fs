@@ -80,7 +80,6 @@ module AnnotationTableMemo =
                     oa,
                     (fun t -> setHeader (CompositeHeader.Parameter t)),
                     isStickyHeader = true,
-                    activateFirstTermSearchResultOnInput = false,
                     ?debug = debug
                 )
             | CompositeHeader.Characteristic oa ->
@@ -89,7 +88,6 @@ module AnnotationTableMemo =
                     oa,
                     (fun t -> setHeader (CompositeHeader.Characteristic t)),
                     isStickyHeader = true,
-                    activateFirstTermSearchResultOnInput = false,
                     ?debug = debug
                 )
             | CompositeHeader.Component oa ->
@@ -98,7 +96,6 @@ module AnnotationTableMemo =
                     oa,
                     (fun t -> setHeader (CompositeHeader.Component t)),
                     isStickyHeader = true,
-                    activateFirstTermSearchResultOnInput = false,
                     ?debug = debug
                 )
             | CompositeHeader.Factor oa ->
@@ -107,7 +104,6 @@ module AnnotationTableMemo =
                     oa,
                     (fun t -> setHeader (CompositeHeader.Factor t)),
                     isStickyHeader = true,
-                    activateFirstTermSearchResultOnInput = false,
                     ?debug = debug
                 )
             | CompositeHeader.Performer
@@ -281,7 +277,6 @@ module AnnotationTableMemo =
                     props.index,
                     props.cell,
                     props.setCell,
-                    activateFirstTermSearchResultOnInput = false,
                     ?debug = props.debug
                 )
             ),
