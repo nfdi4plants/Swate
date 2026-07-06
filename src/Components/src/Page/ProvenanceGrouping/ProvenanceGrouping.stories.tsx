@@ -11,7 +11,7 @@ import {
   Exports_createTypedSampleSession as createTypedSampleSession,
   Exports_createDataOutputOnlySession as createDataOutputOnlySession,
   Exports_createRetaggedTypedSampleSession as createRetaggedTypedSampleSession,
-  Exports_patchDetails as patchDetails,
+  Exports_patchLog as patchLog,
 } from './Types.fs.js';
 
 type Fixture = 'sample' | 'inputOnly' | 'outputOnly' | 'switchableProperty' | 'typedSample' | 'dataOutputOnly';
@@ -74,12 +74,16 @@ function HarnessState({
   allowEndpointReplacement: boolean;
 }) {
   const [session, setSession] = React.useState(() => createSessionForFixture(selected));
-  const [patches, setPatches] = React.useState<string[]>([]);
 
   React.useEffect(() => {
     setSession(createSessionForFixture(selected));
-    setPatches([]);
   }, [selected]);
+
+  // The session's own PatchLog is the authoritative writeback record - reading
+  // it directly (instead of accumulating each change's delta host-side) means
+  // undo retracts already-emitted patches for free, since undo restores a
+  // prior session snapshot complete with its own (shorter) PatchLog.
+  const patches = Array.from(patchLog(session));
 
   return (
     <div className="swt:flex swt:flex-col swt:gap-4 swt:min-h-screen swt:bg-base-200 swt:p-4">
@@ -99,10 +103,6 @@ function HarnessState({
         debug={debug}
         onChange={(change: any) => {
           setSession(change.Session);
-          setPatches((current) => [
-            ...current,
-            ...Array.from(patchDetails(change.Patches)),
-          ]);
         }}
       />
       <section className="swt:rounded-box swt:border swt:border-base-300 swt:bg-base-100 swt:p-4">
@@ -2101,6 +2101,44 @@ export const UndoRevertsLastChange: Story = {
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-undo')).toBeDisabled();
       expect(canvas.queryAllByTestId('provenance-connection')).toHaveLength(before);
+    });
+  },
+};
+
+export const UndoRetractsPatchPreview: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
+
+    const input = canvas.getByText('Input C').closest('article')!;
+    const output = canvas.getByText('Output E').closest('article')!;
+
+    await dragByPointer(
+      within(input).getByTestId('provenance-connection-handle-Input-GroupCard'),
+      within(output).getByTestId('provenance-connection-handle-Output-GroupCard'),
+    );
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedConnection');
+    });
+
+    for (
+      let attempt = 0;
+      attempt < 3 && !canvas.getByTestId('provenance-undo').hasAttribute('disabled');
+      attempt += 1
+    ) {
+      fireEvent.click(canvas.getByTestId('provenance-undo'));
+      await waitFor(() => expect(canvas.getByTestId('provenance-undo')).toBeDisabled(), {
+        timeout: 1000,
+      }).catch(() => undefined);
+    }
+
+    // The patch preview reads the session's own PatchLog, so undoing the
+    // connect (which restores the pre-edit session snapshot) must retract the
+    // patch from the preview too, not just from the model.
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
     });
   },
 };

@@ -9,6 +9,11 @@ open Swate.Components.Shared.ProvenanceGrouping.Fixtures
 
 type ProvenanceEditorChange = {
     Session: ProvenanceSession
+    /// The delta introduced by this one change - empty for navigation-only
+    /// changes such as undo or a layer switch. Do not accumulate this across
+    /// calls for writeback: `Session.PatchLog` is the authoritative, ordered
+    /// log of every patch emitted so far, and it survives undo for free
+    /// because undo restores a session snapshot.
     Patches: ProvenanceTablePatch list
 }
 
@@ -273,3 +278,9 @@ module Exports =
         StoryFixtures.createRetaggedTypedSampleSession ()
 
     let patchDetails patches = PatchPreview.patchDetails patches
+
+    /// The authoritative writeback log for a session - use this instead of
+    /// accumulating per-change `Patches` deltas host-side, so undo retracts
+    /// already-emitted patches instead of leaving them stranded.
+    let patchLog (session: ProvenanceSession) =
+        PatchPreview.patchDetails session.PatchLog

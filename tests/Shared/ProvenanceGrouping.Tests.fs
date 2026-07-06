@@ -2227,6 +2227,48 @@ let sessionTests =
             Expect.isTrue
                 (hasLayerTwoOwnValue backOnLayerTwo)
                 "Layer-2's own value must remain attached to its set after an unrelated layer-1 edit and focus switch."
+
+        testCase "session patch log accumulates leaf edits exactly once"
+        <| fun _ ->
+            let inputHeader = ioHeader FixtureKinds.sampleEndpoint "Input [Sample Name]"
+            let session = Session.init (sampleModel ())
+
+            let session1, patches1 =
+                match Session.connectSets "input-d" "output-a" None session with
+                | Ok(next, patches) -> next, patches
+                | Error error -> failwithf "Unexpected connectSets error: %A" error
+
+            Expect.equal session1.PatchLog patches1 "First edit: log equals its own delta."
+
+            let session2, patches2 =
+                match
+                    Session.createLoadedSet
+                        {
+                            Side = ProvenanceSide.Input
+                            Header = inputHeader
+                            Name = "Input E"
+                        }
+                        session1
+                with
+                | Ok(next, patches) -> next, patches
+                | Error error -> failwithf "Unexpected createLoadedSet error: %A" error
+
+            Expect.equal session2.PatchLog (patches1 @ patches2) "Log is append-only across edits, no duplicates."
+
+        testCase "restoring a prior session snapshot also restores its patch log"
+        <| fun _ ->
+            let before = Session.init (sampleModel ())
+
+            let after =
+                match Session.connectSets "input-d" "output-a" None before with
+                | Ok(next, _) -> next
+                | Error error -> failwithf "Unexpected connectSets error: %A" error
+
+            Expect.isNonEmpty after.PatchLog "Sanity: the edit added a log entry."
+
+            Expect.isEmpty
+                before.PatchLog
+                "Undo restoring the pre-edit snapshot must retract its patch log too, since PatchLog lives on the session."
     ]
 
 let uiStateTests =

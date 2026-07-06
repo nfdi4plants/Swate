@@ -58,6 +58,12 @@ type ProvenanceSession = {
     ActiveLayerId: ProvenanceLayerId
     ReferenceLinks: ProvenanceReferenceLink list
     DirtyPropertyValueIds: Set<ProvenancePropertyValueId>
+    /// Ordered log of every writeback patch produced since the session was
+    /// created. This - not the per-change delta returned alongside a
+    /// SessionResult - is the source of truth for the future "apply" button:
+    /// it lives on the session, so undo (which restores a session snapshot)
+    /// retracts already-emitted patches for free.
+    PatchLog: ProvenanceTablePatch list
 } with
     // Temporary adapter for component migration. Remove after downstream callers stop using pair terminology.
     member this.Pairs =
@@ -104,6 +110,7 @@ module Session =
             ActiveLayerId = layer.Id
             ReferenceLinks = []
             DirtyPropertyValueIds = Set.empty
+            PatchLog = []
         }
 
     let tryLayer layerId session =
@@ -249,6 +256,21 @@ module Session =
     }
 
     let private mapEditError = Result.mapError SessionError.EditFailed
+
+    /// Appends a leaf edit's emitted patches to the session's authoritative
+    /// PatchLog. Applied only at the six leaf edit functions - composites
+    /// (updatePropertyValues, removeConnections, copyPropertyValueToLoadedTarget,
+    /// EditorActions batch helpers) call those leaves and must not wrap again,
+    /// or patches would be logged twice.
+    let private withLoggedPatches (result: SessionResult) : SessionResult =
+        result
+        |> Result.map (fun (next, patches) ->
+            {
+                next with
+                    PatchLog = next.PatchLog @ patches
+            },
+            patches
+        )
 
     let private updateLayerModel layerId model session =
         match tryLayer layerId session with
@@ -484,6 +506,7 @@ module Session =
                 patches
             )
         )
+        |> withLoggedPatches
 
     let private validatePropertyValueUpdate propertyValueId value unit session =
         let layer = activeLayer session
@@ -529,6 +552,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) session : SessionResult =
         let layer = activeLayer session
@@ -539,6 +563,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let copyPropertyValueToLoadedTarget propertyValueId (target: ProvenancePropertyTarget) session : SessionResult =
         let layer = activeLayer session
@@ -565,6 +590,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let connectSets inputSetId outputSetId processName session : SessionResult =
         let layer = activeLayer session
@@ -575,6 +601,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let removeConnection connectionId session : SessionResult =
         let layer = activeLayer session
@@ -585,6 +612,7 @@ module Session =
             updateLayerModel layer.Id model session
             |> Result.map (fun next -> next, patches)
         )
+        |> withLoggedPatches
 
     let removeConnections connectionIds session : SessionResult =
         connectionIds
