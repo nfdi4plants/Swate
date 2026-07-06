@@ -2479,3 +2479,38 @@ export const DoesNotReuseSelectionForEqualGroupIdsInDifferentLayers: Story = {
     expect(layer3Output).not.toHaveClass('swt:border-primary');
   },
 };
+
+export const StrictModeSmoke: Story = {
+  // React.StrictMode double-invokes renders (and, in the relevant React
+  // versions, effects) in development - the closest browser-testable proxy
+  // for a render being committed twice or discarded. Render-phase writes to
+  // "latest" refs would show up here as duplicated patch lines from a single
+  // user action.
+  render: () => (
+    <React.StrictMode>
+      <Harness />
+    </React.StrictMode>
+  ),
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const source = await addRailValue(canvas, 'Output', 'Analysis', 'Imaging');
+    await groupByProperty(canvas, 'Output', 'Analysis');
+    const outputD = canvas.getByText('Output D').closest('article')!;
+
+    await dragByPointer(source, outputD);
+
+    await waitFor(() => {
+      const preview = canvas.getByTestId('provenance-patch-preview').textContent ?? '';
+      const addLines = preview.split('\n').filter((line) => line.startsWith('AddLoadedPropertyValue:'));
+      expect(addLines).toHaveLength(1);
+    });
+    expect(canvas.getByTestId('provenance-group-Output-output:Analysis=Imaging')).toBeInTheDocument();
+
+    await waitFor(() => expect(canvas.getByTestId('provenance-undo')).not.toBeDisabled());
+    await userEvent.click(canvas.getByTestId('provenance-undo'));
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
+    });
+  },
+};

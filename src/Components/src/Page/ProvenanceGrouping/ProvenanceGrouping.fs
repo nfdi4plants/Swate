@@ -46,7 +46,6 @@ type ProvenanceGrouping =
         // tapped, Escape is pressed, or the pointer goes down elsewhere.
         let armedHandle, setArmedHandle = React.useState<ConnectionHandleRef option> None
         let latestArmedHandle = React.useRef armedHandle
-        latestArmedHandle.current <- armedHandle
         let latestDragContext = React.useRef (None: DragContext option)
 
         React.useEffectOnce (fun () ->
@@ -112,17 +111,16 @@ type ProvenanceGrouping =
 
         // Event handlers below read these refs instead of closing over render values,
         // so their identities stay stable and memoized subtrees never act on stale
-        // sessions or UI state.
+        // sessions or UI state. Written in a useLayoutEffect further down (once
+        // dragContext exists) rather than here in the render body: a render can
+        // be discarded under concurrent rendering / StrictMode double-invoke, and
+        // a discarded render must not leave these refs pointing at values the
+        // user never actually saw committed.
         let latestUiState = React.useRef uiState
         let latestSession = React.useRef session
         let latestLayer = React.useRef layer
         let latestOnChange = React.useRef onChange
         let latestConnections = React.useRef connections
-        latestUiState.current <- uiState
-        latestSession.current <- session
-        latestLayer.current <- layer
-        latestOnChange.current <- onChange
-        latestConnections.current <- connections
 
         // Marks the cards connected to the hovered card with a data attribute, styled
         // by the cards' CSS; imperative on purpose so hovering never re-renders the
@@ -778,7 +776,19 @@ type ProvenanceGrouping =
             ConnectSetPairs = connectSetPairs
         }
 
-        latestDragContext.current <- Some dragContext
+        // Runs on every commit (no dep array), after the browser can deliver a
+        // user event but before it actually does - so a handler firing right
+        // after this commit always sees this render's values, and a render
+        // that gets thrown away without committing never writes these at all.
+        React.useLayoutEffect (fun () ->
+            latestUiState.current <- uiState
+            latestSession.current <- session
+            latestLayer.current <- layer
+            latestOnChange.current <- onChange
+            latestConnections.current <- connections
+            latestArmedHandle.current <- armedHandle
+            latestDragContext.current <- Some dragContext
+        )
 
         let railSideLabel side =
             match side with

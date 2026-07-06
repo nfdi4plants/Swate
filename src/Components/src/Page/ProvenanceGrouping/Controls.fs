@@ -1612,8 +1612,14 @@ type Controls =
         let searchDraft, setSearchDraft = React.useState filters.SearchText
         let latestSearchText = React.useRef filters.SearchText
         let latestOnSearch = React.useRef onSearch
-        latestSearchText.current <- filters.SearchText
-        latestOnSearch.current <- onSearch
+
+        // useLayoutEffect (not a render-phase write) so a discarded render
+        // under concurrent rendering / StrictMode never leaves these pointing
+        // at a filters/onSearch value that was never actually committed.
+        React.useLayoutEffect (fun () ->
+            latestSearchText.current <- filters.SearchText
+            latestOnSearch.current <- onSearch
+        )
 
         let debouncedSearchDraft = React.useDebounce (searchDraft, 300)
 

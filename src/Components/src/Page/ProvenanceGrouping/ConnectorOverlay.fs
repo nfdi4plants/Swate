@@ -131,7 +131,13 @@ type ConnectorOverlay =
             )
 
         let latestSpecs = React.useRef specs
-        latestSpecs.current <- specs
+
+        // useLayoutEffect (not a render-phase write) so a render that gets
+        // discarded under concurrent rendering / StrictMode never leaves this
+        // pointing at specs that were never actually committed. The sibling
+        // `React.useEffect(..., [| box specs |])` below runs after this, so
+        // ordering is unaffected.
+        React.useLayoutEffect ((fun () -> latestSpecs.current <- specs), [| box specs |])
 
         let setMeasuredPaths animate next =
             setMeasuredState (fun (current, currentAnimate) ->
