@@ -1117,6 +1117,18 @@ let editTests =
                     "Model should contain new connection."
             | other -> failwithf "Expected one AddLoadedConnection patch, got %A" other
 
+        testCase "connecting an already-connected pair is a no-op"
+        <| fun _ ->
+            let model = validModel ()
+
+            match connectSets "input-a" "output-a" None model with
+            | Ok(nextModel, []) ->
+                Expect.equal
+                    nextModel.Connections.Count
+                    model.Connections.Count
+                    "Re-connecting an already-connected pair must not create a duplicate connection."
+            | other -> failwithf "Expected a no-op duplicate connect, got %A" other
+
         testCase "removeConnection removes the loaded connection and its inherited values"
         <| fun _ ->
             let model = validModel ()

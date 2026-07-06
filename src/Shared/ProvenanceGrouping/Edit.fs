@@ -463,6 +463,18 @@ let connectSets inputSetId outputSetId processName (model: ProvenanceModel) : Ed
     match chooseInputSet model inputSetId, chooseOutputSet model outputSetId with
     | Error error, _ -> Error error
     | _, Error error -> Error error
+    | Ok _, Ok _ when
+        model.Connections
+        |> Map.exists (fun _ connection ->
+            connection.Source.Id = model.Source.Id
+            && connection.InputSetId = inputSetId
+            && connection.OutputSetId = outputSetId
+        )
+        ->
+        // Same shape as the createLoadedSet duplicate guard above: a no-op
+        // Ok keeps composite folds (connectSetPairs, all-to-all) working
+        // unchanged instead of needing to special-case an empty patch list.
+        Ok(model, [])
     | Ok _, Ok _ ->
         let connectionId = nextConnectionId model
 
