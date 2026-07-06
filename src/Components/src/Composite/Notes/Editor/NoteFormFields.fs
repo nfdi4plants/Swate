@@ -4,19 +4,16 @@ open System
 open ARCtrl
 open Feliz
 open Swate.Components
-open Swate.Components.Shared
-open Swate.Components.Composite.Notes.Types
 open Swate.Components.Composite.MarkdownText
 open Swate.Components.Composite.TermSearch
 open Swate.Components.Composite.TermSearch.Types
 open Swate.Components.Primitive.LayoutComponents
-open Swate.Components.Composite.MarkdownText.Types
 
 [<RequireQualifiedAccess>]
-module NoteFormFields =
+type NoteFormFields =
 
     [<ReactComponent>]
-    let Main (draft: NotesDraft, setDraft: NotesDraft -> unit) =
+    static member Main(draft: NotesDraft, setDraft: NotesDraft -> unit) =
         let dateInputValue =
             draft.DateCreated
             |> Option.map (fun dateValue -> dateValue.ToString("yyyy-MM-dd"))

@@ -15,6 +15,18 @@ const TERMSEARCH_DETAILSMODAL_TESTID = 'modal_termsearch_details_modal'
 
 const toTerms = (searchApi: any): Term[] => (searchApi ? Array.from(toMyTerm(searchApi)) : []);
 
+const mockInstrumentModelSearch = async (query: string): Promise<Term[]> =>
+  query.trim()
+    ? [
+      {
+        name: 'LECO instrument model',
+        id: 'MS:1001800',
+        description: 'Instrument model used by LECO.',
+        source: 'MS',
+      },
+    ]
+    : [];
+
 function renderTermSearch(args: any) {
   const [term, setTerm] = React.useState(undefined as Term | undefined);
 
@@ -85,6 +97,32 @@ export const ParentSearch: Story = {
       const expectedIcons = screen.getAllByTitle("Directed Search");
       expect(expectedIcons.length).toBeGreaterThan(0);
     }, { timeout: 5000 });
+  }
+}
+
+export const DoesNotSelectFirstResultOnEnter: Story = {
+  render: renderTermSearch,
+  parameters: {isolated: true},
+  args: {
+    onTermChange: fn(),
+    term: undefined,
+    disableDefaultSearch: true,
+    termSearchQueries: [["mock_search", mockInstrumentModelSearch]],
+  },
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const input = canvas.getByTestId(TERMSEARCH_INPUT_TESTID);
+    expect(input).toBeInTheDocument();
+
+    await userEvent.type(input, "leco instrument", {delay: 50});
+
+    await waitFor(() => {
+      expect(screen.getByText("LECO instrument model")).toBeVisible();
+    });
+
+    await userEvent.keyboard("{Enter}");
+
+    expect(input).toHaveValue("leco instrument");
   }
 }
 
