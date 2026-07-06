@@ -1213,6 +1213,41 @@ let editTests =
                     Expect.equal anchor.OutputNames [ "Output A" ] "Virtual anchor should capture target output names."
                 | ProvenancePropertyOrigin.Real _ -> failwith "Expected caller-created values to be virtual."
             | other -> failwithf "Expected one AddLoadedPropertyValue patch, got %A" other
+
+        testCase "updating a virtual property value emits an update patch"
+        <| fun _ ->
+            let model = validModel ()
+            let treatment = propertyHeader FixtureKinds.characteristicProperty "Treatment"
+
+            let command = {
+                Target = ProvenancePropertyTarget.InputSets [ "input-c" ]
+                CopiedFrom = None
+                Header = treatment
+                Value = ProvenanceValue.Text "Drought"
+                Unit = None
+            }
+
+            let withVirtualValue =
+                match createLoadedPropertyValue command model with
+                | Ok(nextModel, _) -> nextModel
+                | Error error -> failwithf "Unexpected createLoadedPropertyValue error: %A" error
+
+            let virtualId =
+                withVirtualValue.PropertyValues
+                |> Map.toList
+                |> List.pick (fun (id, value) -> if value.Header = treatment then Some id else None)
+
+            match updatePropertyValue virtualId (ProvenanceValue.Text "Edited") None withVirtualValue with
+            | Ok(_, [ ProvenanceTablePatch.UpdatePropertyValue(propertyValueId, _, oldValue, newValue, _) ]) ->
+                Expect.equal propertyValueId virtualId "Patch should identify the edited virtual occurrence."
+
+                Expect.equal
+                    oldValue
+                    (ProvenanceValue.Text "Drought")
+                    "Patch should carry the value from before the edit."
+
+                Expect.equal newValue (ProvenanceValue.Text "Edited") "Patch should carry the edited value."
+            | other -> failwithf "Expected exactly one UpdatePropertyValue patch for a virtual value, got %A" other
     ]
 
 let fixtureTests =

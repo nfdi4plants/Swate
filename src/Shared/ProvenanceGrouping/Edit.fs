@@ -319,44 +319,38 @@ let updatePropertyValue propertyValueId newValue newUnit (model: ProvenanceModel
     match model.PropertyValues.TryFind propertyValueId with
     | None -> Error(EditError.PropertyNotFound propertyValueId)
     | Some propertyValue ->
-        match propertyValue.Origin with
-        | ProvenancePropertyOrigin.Real anchor ->
-            let nextPropertyValue: ProvenancePropertyValue = {
-                propertyValue with
-                    Value = newValue
-                    Unit = newUnit
-            }
+        // Virtual (editor-created) values used to emit no patch here, on the
+        // assumption the writeback log only needed the AddLoadedPropertyValue
+        // that created them. But a later drop can overwrite that value before
+        // any writeback happens, and the log would then still say "add X"
+        // while the model says Y - silent data loss for editor-created values.
+        // Real and Virtual anchors carry the same Source/Header/InputNames/
+        // OutputNames writeback context, so both can emit the same patch shape.
+        let anchor = anchorOfOrigin propertyValue.Origin
 
-            let nextModel = {
-                model with
-                    PropertyValues = model.PropertyValues |> Map.add propertyValueId nextPropertyValue
-            }
+        let nextPropertyValue: ProvenancePropertyValue = {
+            propertyValue with
+                Value = newValue
+                Unit = newUnit
+        }
 
-            Ok(
-                nextModel,
-                [
-                    ProvenanceTablePatch.UpdatePropertyValue(
-                        propertyValueId,
-                        anchor,
-                        propertyValue.Value,
-                        newValue,
-                        newUnit
-                    )
-                ]
-            )
-        | ProvenancePropertyOrigin.Virtual _anchor ->
-            let nextPropertyValue: ProvenancePropertyValue = {
-                propertyValue with
-                    Value = newValue
-                    Unit = newUnit
-            }
+        let nextModel = {
+            model with
+                PropertyValues = model.PropertyValues |> Map.add propertyValueId nextPropertyValue
+        }
 
-            let nextModel = {
-                model with
-                    PropertyValues = model.PropertyValues |> Map.add propertyValueId nextPropertyValue
-            }
-
-            Ok(nextModel, [])
+        Ok(
+            nextModel,
+            [
+                ProvenanceTablePatch.UpdatePropertyValue(
+                    propertyValueId,
+                    anchor,
+                    propertyValue.Value,
+                    newValue,
+                    newUnit
+                )
+            ]
+        )
 
 let createLoadedPropertyValue (command: CreateLoadedPropertyValueCommand) (model: ProvenanceModel) : EditResult =
     match targetSets model command.Target with

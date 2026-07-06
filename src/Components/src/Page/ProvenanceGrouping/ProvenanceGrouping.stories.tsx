@@ -1197,6 +1197,35 @@ export const PaletteValuesLookTentativeUntilAssigned: Story = {
   },
 };
 
+export const OverwritingAPaletteCreatedValueEmitsAnUpdatePatch: Story = {
+  render: () => <Harness />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+    const outputD = canvas.getByText('Output D').closest('article')!;
+
+    const first = await addRailValue(canvas, 'Output', 'Analysis', 'Imaging');
+    await dragByPointer(first, outputD);
+
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
+    });
+
+    const second = await addRailValue(canvas, 'Output', 'Analysis', 'Sequencing');
+    await dragByPointer(second, outputD);
+
+    await waitFor(() => expect(canvas.getByTestId('provenance-overwrite-warning')).toBeInTheDocument());
+    await userEvent.click(canvas.getByTestId('provenance-confirm-overwrite'));
+
+    // The value being overwritten is Virtual (palette-created), not Real. Before
+    // the PG-3 fix, editing a Virtual value emitted no patch, so the writeback
+    // log would still say "add Imaging" while the model actually held
+    // "Sequencing" - silent data loss for editor-created values.
+    await waitFor(() => {
+      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('UpdatePropertyValue:Text:none');
+    });
+  },
+};
+
 export const ConnectionDetailsShowEntityPairsWithoutPropertyCreation: Story = {
   render: () => <Harness />,
   play: async ({ canvasElement }) => {
