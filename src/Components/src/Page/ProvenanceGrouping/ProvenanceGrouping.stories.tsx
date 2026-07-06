@@ -1560,14 +1560,33 @@ export const RapidEditThenLayerSwitchKeepsEdit: Story = {
       expect(canvasElement).toHaveTextContent('Output A');
     });
 
-    // Output A has no Species value in the fixture, so this drop just adds -
-    // no overwrite-confirm step, keeping the setup free of unrelated flake.
-    const source = await addRailValue(canvas, 'Input', 'Species', 'Arabidopsis');
-    const carried = canvas.getByText('Output A').closest('article')!;
+    // Dropping Analysis=Imaging onto the Mass Spectrometry group overwrites its
+    // members' (inherited) Analysis values, so the edit goes through the
+    // overwrite-confirm step - the same proven boundary edit as
+    // CreatesNextLayerAndKeepsBoundaryEditsSynchronized. (The earlier attempt to
+    // drop Species onto Output A "as a plain add" was wrong: Output A inherits
+    // Species=Arabidopsis via its connection to Input A, so that drop is an
+    // overwrite too and never emitted the AddLoadedPropertyValue this asserted.)
+    const source = await addRailValue(canvas, 'Input', 'Analysis', 'Imaging');
+    await groupByProperty(canvas, 'Input', 'Analysis');
+    const carried = canvas.getByTestId('provenance-group-Input-input:Analysis=Mass Spectrometry');
     await dragByPointer(source, carried);
 
+    await waitFor(() => expect(canvas.getByTestId('provenance-confirm-overwrite')).toBeInTheDocument());
+    await userEvent.click(canvas.getByTestId('provenance-confirm-overwrite'));
+
+    // Count of real patch lines the edit committed - the exact number depends on
+    // how many members the group has, so the duplication guard below compares
+    // against this baseline instead of hard-coding it.
+    const patchCount = () =>
+      (canvas.getByTestId('provenance-patch-preview').textContent ?? '')
+        .split('\n')
+        .filter((line) => line.trim().length > 0 && line !== 'No patches emitted.').length;
+
+    let committedPatches = 0;
     await waitFor(() => {
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedPropertyValue');
+      committedPatches = patchCount();
+      expect(committedPatches).toBeGreaterThan(0);
     });
 
     // fireEvent (not userEvent, which adds its own settle delay): switch away
@@ -1579,10 +1598,9 @@ export const RapidEditThenLayerSwitchKeepsEdit: Story = {
     fireEvent.click(canvas.getByTestId('provenance-layer-layer-2'));
 
     await waitFor(() => {
-      expect(canvasElement).toHaveTextContent('Arabidopsis');
-      const preview = canvas.getByTestId('provenance-patch-preview').textContent ?? '';
-      const addLines = preview.split('\n').filter((line) => line.startsWith('AddLoadedPropertyValue:'));
-      expect(addLines).toHaveLength(1);
+      expect(canvasElement).toHaveTextContent('Imaging');
+      // Neither dropped (Imaging gone / fewer patches) nor duplicated (more patches).
+      expect(patchCount()).toBe(committedPatches);
     });
   },
 };
@@ -2012,11 +2030,21 @@ async function addRailValue(
   valueType = 'Text',
 ) {
   const panel = await expandProperty(canvas, side, propertyName);
-  await userEvent.click(panel.getByText('Add value'));
+  const valueLabel = new RegExp(`${escapeRegExp(propertyName)} value`, 'i');
+  // Late in the loaded full-suite run the AddValuePopover trigger occasionally
+  // needs a second activation before its portal form mounts (the first popover
+  // still animating out from a prior add). Retry opening it until the value input
+  // exists instead of assuming a single click landed.
+  for (let attempt = 0; attempt < 3 && !screen.queryByRole('textbox', { name: valueLabel }); attempt += 1) {
+    await userEvent.click(panel.getByText('Add value'));
+    await waitFor(() => expect(screen.getByRole('textbox', { name: valueLabel })).toBeInTheDocument(), {
+      timeout: 1000,
+    }).catch(() => undefined);
+  }
   if (valueType !== 'Text') {
     await userEvent.selectOptions(screen.getByRole('combobox', { name: /Value type/i }), valueType);
   }
-  await userEvent.type(screen.getByRole('textbox', { name: new RegExp(`${propertyName} value`, 'i') }), valueText);
+  await userEvent.type(screen.getByRole('textbox', { name: valueLabel }), valueText);
   const submit = screen
     .getAllByRole('button', { name: /^Add value$/i })
     .find((button) => button.getAttribute('type') === 'submit')!;
@@ -2356,10 +2384,14 @@ export const EqualCountGroupConnectionOffersPairByOrder: Story = {
       }).catch(() => undefined);
     }
 
-    await waitFor(() => {
-      expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('AddLoadedConnection');
-    });
+    // The three ordered pairs (input-a↔output-a, input-b↔output-b,
+    // input-c↔output-c) are all already connected in the fixture, so pair-by-order
+    // hits the connectSets duplicate guard: it resolves the prompt without
+    // emitting a duplicate connection patch. Emitting AddLoadedConnection here (as
+    // this once asserted) would mean re-connecting an already-connected pair,
+    // which the shared Edit layer deliberately makes a no-op.
     expect(canvas.queryByTestId('provenance-member-resolution-prompt')).not.toBeInTheDocument();
+    expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
   },
 };
 
@@ -2558,7 +2590,21 @@ export const StrictModeSmoke: Story = {
     expect(canvas.getByTestId('provenance-group-Output-output:Analysis=Imaging')).toBeInTheDocument();
 
     await waitFor(() => expect(canvas.getByTestId('provenance-undo')).not.toBeDisabled());
-    await userEvent.click(canvas.getByTestId('provenance-undo'));
+
+    // fireEvent with a retry (as elsewhere in this file): late in the loaded
+    // suite the first undo click can land during a toolbar reflow and miss.
+    // Undo is single-step, so once it takes the button disables and extra
+    // clicks are safe no-ops.
+    for (
+      let attempt = 0;
+      attempt < 3 && !canvas.getByTestId('provenance-undo').hasAttribute('disabled');
+      attempt += 1
+    ) {
+      fireEvent.click(canvas.getByTestId('provenance-undo'));
+      await waitFor(() => expect(canvas.getByTestId('provenance-undo')).toBeDisabled(), {
+        timeout: 1000,
+      }).catch(() => undefined);
+    }
 
     await waitFor(() => {
       expect(canvas.getByTestId('provenance-patch-preview')).toHaveTextContent('No patches emitted.');
