@@ -110,7 +110,10 @@ type CreateFileSystemItemRequest = {
     kind: FileSystemItemKind
 }
 
-type PickExternalFilePathsRequest = { filterExtensions: string[] option }
+type PickExternalFilePathsRequest = {
+    filterExtensions: string[] option
+    allowMultiple: bool option
+}
 
 type CopyExternalFileRequest = {
     sourceAbsolutePath: string

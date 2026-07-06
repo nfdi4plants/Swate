@@ -41,7 +41,6 @@ type IArcVaultsApi = {
 
     pickArcPaths: unit -> JS.Promise<Result<string[], exn>>
     pickDirectory: unit -> JS.Promise<Result<string, exn>>
-    pickExternalFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>
     getFileTree: unit -> JS.Promise<Result<System.Collections.Generic.Dictionary<string, FileEntry>, exn>>
     pathExists: string -> JS.Promise<Result<bool, exn>>
     openFile: string -> JS.Promise<Result<FileContentDTO, exn>>
@@ -130,6 +129,11 @@ type IAuthApi = {
     rotatePersonalAccessToken: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     setActiveAccount: string -> Fable.Core.JS.Promise<Result<AuthStateDto, exn>>
     removeAccount: string -> Fable.Core.JS.Promise<Result<unit, exn>>
+}
+
+/// Two Way Bridge: Renderer <-> Main
+type IFilePickerApi = {
+    pickExternalFilePaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>
 }
 
 /// One Way Bridge: Main -> Renderer

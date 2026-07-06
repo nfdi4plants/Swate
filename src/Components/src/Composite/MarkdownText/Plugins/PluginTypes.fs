@@ -18,10 +18,13 @@ type MarkdownPromptFile = {
 }
 
 // AcceptTypes uses the same comma-separated format as an HTML file input accept attribute.
-type MarkdownFilePickerOptions = { AcceptTypes: string option }
+type MarkdownFilePickerOptions = {
+    AcceptTypes: string option
+    AllowMultiple: bool option
+}
 
 // Host/runtime extension point for dialog picking and markdown path resolution.
-// When provided, file selection uses the adapter, while built-in drag/drop input remains available.
+// When provided, file selection and drop handling are delegated to the adapter.
 type MarkdownFilePickerAdapter = {
     PickFiles: MarkdownFilePickerOptions -> JS.Promise<MarkdownPromptFile list>
     ResolveMarkdownPath: MarkdownPromptFile -> JS.Promise<string>

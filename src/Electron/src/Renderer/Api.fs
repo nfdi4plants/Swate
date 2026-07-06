@@ -14,3 +14,6 @@ let ipcArcVaultApi =
     Remoting.createIpc () |> Remoting.buildProxySender<IArcVaultsApi>
 
 let ipcAuthApi = Remoting.createIpc () |> Remoting.buildProxySender<IAuthApi>
+
+let ipcFilePickerApi =
+    Remoting.createIpc () |> Remoting.buildProxySender<IFilePickerApi>

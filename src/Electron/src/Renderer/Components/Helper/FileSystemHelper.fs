@@ -2,7 +2,6 @@ module Renderer.Components.Helper.FileSystemHelper
 
 open System
 open System.Collections.Generic
-open Browser.Types
 open Fable.Core
 open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Components.Shared
@@ -121,13 +120,6 @@ let private assetMarkdownPath assetFolderName (fileName: string) =
     else
         $"{assetFolder}/{imageFileName}"
 
-let private tryGetAbsolutePathForBrowserFile (file: File) = promise {
-    try
-        return Renderer.Types.PreloadBindings.getPathForFile file |> tryNormalizeNonEmptyPath
-    with _ ->
-        return None
-}
-
 let private tryGetStoredAbsolutePath (absolutePathsById: Dictionary<string, string>) (sourceId: string option) =
     match sourceId with
     | Some sourceId when not (String.IsNullOrWhiteSpace sourceId) ->
@@ -135,20 +127,6 @@ let private tryGetStoredAbsolutePath (absolutePathsById: Dictionary<string, stri
         | true, absolutePath -> tryNormalizeNonEmptyPath absolutePath
         | _ -> None
     | _ -> None
-
-let private tryResolvePromptFileAbsolutePath
-    (absolutePathsById: Dictionary<string, string>)
-    (tryResolveBrowserFileAbsolutePath: File -> JS.Promise<string option>)
-    (file: MarkdownPromptFile)
-    =
-    promise {
-        match tryGetStoredAbsolutePath absolutePathsById file.SourceId with
-        | Some absolutePath -> return Some absolutePath
-        | None ->
-            match file.BrowserFile with
-            | Some browserFile -> return! tryResolveBrowserFileAbsolutePath browserFile
-            | None -> return None
-    }
 
 let private externalAssetLink assetFolderName (file: MarkdownPromptFile) sourceAbsolutePath = {
     sourceAbsolutePath = sourceAbsolutePath
@@ -161,11 +139,10 @@ let private copyRequestForAsset parentPath asset = {
     overwrite = true
 }
 
-let internal createAssetFilePickerAdapterWithAbsolutePathResolverAsync
-    (pickPaths: string[] option -> JS.Promise<Result<string[], exn>>)
+let internal createAssetFilePickerAdapterWithPathPicker
+    (pickPaths: PickExternalFilePathsRequest -> JS.Promise<Result<string[], exn>>)
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
-    (tryResolveBrowserFileAbsolutePath: File -> JS.Promise<string option>)
     =
     let absolutePathsById = Dictionary<string, string>()
 
@@ -186,14 +163,19 @@ let internal createAssetFilePickerAdapterWithAbsolutePathResolverAsync
     {
         PickFiles =
             (fun options -> promise {
-                match! pickPaths (fileExtensionsFromAcceptTypes options.AcceptTypes) with
+                match!
+                    pickPaths {
+                        filterExtensions = fileExtensionsFromAcceptTypes options.AcceptTypes
+                        allowMultiple = options.AllowMultiple
+                    }
+                with
                 | Ok paths -> return paths |> Array.map toPromptFile |> Array.toList
                 | Error error when error.Message = "Cancelled" -> return []
                 | Error error -> return raise error
             })
         ResolveMarkdownPath =
             (fun file -> promise {
-                match! tryResolvePromptFileAbsolutePath absolutePathsById tryResolveBrowserFileAbsolutePath file with
+                match tryGetStoredAbsolutePath absolutePathsById file.SourceId with
                 | Some sourceAbsolutePath ->
                     let asset = externalAssetLink assetFolderName file sourceAbsolutePath
                     addAsset asset
@@ -207,11 +189,7 @@ let createAssetFilePickerAdapter
     (assetFolderName: string)
     (addAsset: ExternalAssetLink -> unit)
     =
-    createAssetFilePickerAdapterWithAbsolutePathResolverAsync
-        (fun filterExtensions -> pickExternalFilePaths { filterExtensions = filterExtensions })
-        assetFolderName
-        addAsset
-        tryGetAbsolutePathForBrowserFile
+    createAssetFilePickerAdapterWithPathPicker pickExternalFilePaths assetFolderName addAsset
 
 let writeFileWithOptionalExternalAssetLinks
     (writeFile: FileContentDTO -> JS.Promise<Result<unit, exn>>)

@@ -214,15 +214,17 @@ type TextInputWithMarkdown =
                 |> List.choose (fun (index, file) -> if index = indexToRemove then None else Some file)
             )
 
+        let promptFilePickerOptions () = {
+            AcceptTypes = PluginTextInputHelpers.activePromptAcceptTypes activePrompt
+            AllowMultiple = Some(PluginTextInputHelpers.activePromptAllowsMultipleFiles activePrompt)
+        }
+
         let triggerPromptFileSelection () =
             promise {
                 match filePickerAdapter with
                 | Some adapter ->
                     // Preferred substitution point for runtime-specific file pickers.
-                    let! files =
-                        adapter.PickFiles {
-                            AcceptTypes = PluginTextInputHelpers.activePromptAcceptTypes activePrompt
-                        }
+                    let! files = adapter.PickFiles(promptFilePickerOptions ())
 
                     applyPickedPromptFiles files
                 | None ->
@@ -249,23 +251,38 @@ type TextInputWithMarkdown =
                 e.stopPropagation ()
                 setPromptFileDropActive false
 
-                // Built-in browser File objects are passed to the active file adapter, when present.
-                let files =
-                    if isNull e.dataTransfer || isNull e.dataTransfer.files then
-                        []
+                match filePickerAdapter with
+                | Some adapter ->
+                    promise {
+                        let! files = adapter.PickFiles(promptFilePickerOptions ())
+
+                        if List.isEmpty files then
+                            setPromptError (Some "No files were selected.")
+                        else
+                            applyPickedPromptFiles files
+                    }
+                    |> Promise.catch (fun err ->
+                        if isMountedRef.current then
+                            setPromptError (Some $"File selection failed: {string err}")
+                    )
+                    |> Promise.start
+                | None ->
+                    let files =
+                        if isNull e.dataTransfer || isNull e.dataTransfer.files then
+                            []
+                        else
+                            [
+                                for i in 0 .. int e.dataTransfer.files.length - 1 do
+                                    let file = e.dataTransfer.files.item i
+
+                                    if not (isNull file) then
+                                        yield PluginTextInputHelpers.toPromptFile file
+                            ]
+
+                    if List.isEmpty files then
+                        setPromptError (Some "No files were dropped.")
                     else
-                        [
-                            for i in 0 .. int e.dataTransfer.files.length - 1 do
-                                let file = e.dataTransfer.files.item i
-
-                                if not (isNull file) then
-                                    yield PluginTextInputHelpers.toPromptFile file
-                        ]
-
-                if List.isEmpty files then
-                    setPromptError (Some "No files were dropped.")
-                else
-                    applyPickedPromptFiles files
+                        applyPickedPromptFiles files
 
         let openPromptDialog (prompt: MarkdownPromptPlugin) =
             let startIndex, endIndex = getSelectionOrEnd ()

@@ -1,7 +1,6 @@
 module ElectronRenderer.FileSystemHelperTests
 
 open System
-open Browser.Types
 open Renderer.Components.Helper.FileSystemHelper
 open Swate.Components.Composite.MarkdownText.Plugins
 open Swate.Electron.Shared.FileIOHelper
@@ -15,17 +14,11 @@ let private expectSourceId (file: MarkdownPromptFile) =
         sourceId
     | None -> failwith $"Expected '{file.Name}' to have a source id."
 
-let private noBrowserFileAbsolutePath (_: File) = promise { return None }
-
-let private createAssetAdapter pickPaths resolveBrowserFileAbsolutePath =
+let private createAssetAdapter pickPaths =
     let pendingAssets = ResizeArray<ExternalAssetLink>()
 
     let adapter =
-        createAssetFilePickerAdapterWithAbsolutePathResolverAsync
-            pickPaths
-            "assets"
-            (fun asset -> pendingAssets.Add asset)
-            resolveBrowserFileAbsolutePath
+        createAssetFilePickerAdapterWithPathPicker pickPaths "assets" (fun asset -> pendingAssets.Add asset)
 
     adapter, pendingAssets
 
@@ -206,21 +199,26 @@ Vitest.describe (
             "createAssetFilePickerAdapter resolves selected images and tracks copy source",
             fun () -> promise {
                 let mutable requestedExtensions: string[] option = None
+                let mutable requestedAllowMultiple: bool option = None
 
                 let adapter, pendingAssets =
-                    createAssetAdapter
-                        (fun extensions ->
-                            requestedExtensions <- extensions
-                            promise { return Ok [| "C:/outside/diagram.png" |] }
-                        )
-                        noBrowserFileAbsolutePath
+                    createAssetAdapter (fun request ->
+                        requestedExtensions <- request.filterExtensions
+                        requestedAllowMultiple <- request.allowMultiple
+                        promise { return Ok [| "C:/outside/diagram.png" |] }
+                    )
 
-                let! pickedFiles = adapter.PickFiles { AcceptTypes = Some "image/*" }
+                let! pickedFiles =
+                    adapter.PickFiles {
+                        AcceptTypes = Some "image/*"
+                        AllowMultiple = Some false
+                    }
 
                 match requestedExtensions with
                 | Some extensions -> Vitest.expect(extensions).toEqual (imageFileExtensions)
                 | None -> failwith "Expected image extensions to be passed to the absolute path picker."
 
+                Vitest.expect(requestedAllowMultiple).toEqual (Some false)
                 Vitest.expect(pickedFiles.Length).toBe (1)
                 Vitest.expect(pickedFiles.[0].Name).toBe ("diagram.png")
                 Vitest.expect(pickedFiles.[0].MimeType).toEqual (Some "image/*")
@@ -238,11 +236,16 @@ Vitest.describe (
             "createAssetFilePickerAdapter resolves multiple selected images independently",
             fun () -> promise {
                 let adapter, pendingAssets =
-                    createAssetAdapter
-                        (fun _ -> promise { return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |] })
-                        noBrowserFileAbsolutePath
+                    createAssetAdapter (fun _ -> promise {
+                        return Ok [| "C:/outside/diagram-a.png"; "D:/camera/diagram-b.jpg" |]
+                    })
 
-                let! pickedFiles = adapter.PickFiles { AcceptTypes = Some "image/*" }
+                let! pickedFiles =
+                    adapter.PickFiles {
+                        AcceptTypes = Some "image/*"
+                        AllowMultiple = Some true
+                    }
+
                 Vitest.expect(pickedFiles.Length).toBe (2)
                 Vitest.expect(pickedFiles.[0].Name).toBe ("diagram-a.png")
                 Vitest.expect(pickedFiles.[1].Name).toBe ("diagram-b.jpg")
@@ -264,25 +267,24 @@ Vitest.describe (
         )
 
         Vitest.test (
-            "createAssetFilePickerAdapter resolves dropped browser files through the absolute path resolver",
+            "createAssetFilePickerAdapter rejects browser files that were not selected through the main picker",
             fun () -> promise {
                 let adapter, pendingAssets =
-                    createAssetAdapter
-                        (fun _ -> promise { return Ok [||] })
-                        (fun _ -> promise { return Some "C:/dropped/dropped-image.png" })
+                    createAssetAdapter (fun _ -> promise { return Ok [||] })
 
                 let promptFile: MarkdownPromptFile = {
                     Name = "dropped-image.png"
                     MimeType = Some "image/png"
                     SourceId = None
-                    BrowserFile = Some(unbox<File> (obj ()))
+                    BrowserFile = Some(unbox (obj ()))
                 }
 
-                let! markdownPath = adapter.ResolveMarkdownPath promptFile
-
-                Vitest.expect(markdownPath).toBe ("assets/dropped-image.png")
-                Vitest.expect(pendingAssets.Count).toBe (1)
-                expectAsset pendingAssets.[0] "C:/dropped/dropped-image.png" "assets/dropped-image.png"
+                try
+                    let! _ = adapter.ResolveMarkdownPath promptFile
+                    failwith "Expected markdown path resolution to fail."
+                with error ->
+                    Vitest.expect(error.Message).toBe ("Could not resolve the selected image source path.")
+                    Vitest.expect(pendingAssets.Count).toBe (0)
             }
         )
 
@@ -290,7 +292,7 @@ Vitest.describe (
             "createAssetFilePickerAdapter rejects files without a source",
             fun () -> promise {
                 let adapter, pendingAssets =
-                    createAssetAdapter (fun _ -> promise { return Ok [||] }) noBrowserFileAbsolutePath
+                    createAssetAdapter (fun _ -> promise { return Ok [||] })
 
                 let promptFile: MarkdownPromptFile = {
                     Name = "dropped-image.png"

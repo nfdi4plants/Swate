@@ -19,6 +19,7 @@ app
         Remoting.createIpc () |> Remoting.fromValue IPC.IGitLabApi.api
         Remoting.createIpc () |> Remoting.fromIpcMainEvent IPC.ArcVaultsApi.api
         Remoting.createIpc () |> Remoting.fromValue Main.IPC.AuthApi.api
+        Remoting.createIpc () |> Remoting.fromIpcMainEvent Main.IPC.FilePickerApi.api
 
         app.onActivate (fun _ ->
             if BrowserWindow.getAllWindows().Length = 0 then
