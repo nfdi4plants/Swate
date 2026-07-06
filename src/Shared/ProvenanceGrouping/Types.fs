@@ -3,6 +3,14 @@ module Swate.Components.Shared.ProvenanceGrouping.Types
 /// Name of a study, assay, or run table as known by the caller.
 type ProvenanceTableName = string
 
+type ProvenanceSourceId = string
+type ProvenanceSourceName = string
+
+type ProvenanceSourceRef = {
+    Id: ProvenanceSourceId
+    Name: ProvenanceSourceName
+}
+
 /// Optional process name from the source model.
 /// This is display/logical metadata, not a unique process ID.
 type ProvenanceProcessName = string
@@ -91,8 +99,8 @@ type ProvenancePropertyHeader = {
 /// Source metadata needed to update an existing property value in its source model.
 /// This is a writeback anchor, not a graph edge and not an ARCtrl object reference.
 type ProvenanceWritebackAnchor = {
-    /// Source table containing the property value occurrence.
-    TableName: ProvenanceTableName
+    /// Source containing the property value occurrence.
+    Source: ProvenanceSourceRef
     /// Optional source process ID when the adapter needs a unique process identity.
     ProcessId: ProvenanceProcessId option
     /// Optional source process name when the adapter can provide a logical/display name.
@@ -105,6 +113,11 @@ type ProvenanceWritebackAnchor = {
     OutputNames: string list
 }
 
+[<RequireQualifiedAccess>]
+type ProvenancePropertyOrigin =
+    | Real of ProvenanceWritebackAnchor
+    | Virtual of ProvenanceWritebackAnchor
+
 /// One concrete editable key/value in the normalized model.
 /// Distinct values must remain distinct; exact duplicate source occurrences may collapse when they are not meaningfully distinguishable in the source-agnostic core model.
 type ProvenancePropertyValue = {
@@ -116,10 +129,8 @@ type ProvenancePropertyValue = {
     Value: ProvenanceValue
     /// Optional unit term.
     Unit: ProvenanceTerm option
-    /// Optional writeback anchor.
-    /// Loaded values may omit this when the target can be derived from loaded set membership.
-    /// Collapsed previous-context values must keep this when they should be editable.
-    Source: ProvenanceWritebackAnchor option
+    /// Required origin and writeback anchor metadata.
+    Origin: ProvenancePropertyOrigin
 }
 
 /// One actual loaded input or output endpoint.
@@ -127,8 +138,8 @@ type ProvenancePropertyValue = {
 type ProvenanceSet = {
     /// Swate-local stable endpoint ID used by connections and display groups.
     Id: ProvenanceSetId
-    /// Loaded table this endpoint belongs to.
-    TableName: ProvenanceTableName
+    /// Source this endpoint belongs to.
+    Source: ProvenanceSourceRef
     /// Loaded input/output header this endpoint came from.
     Header: ProvenanceIOHeader
     /// Actual loaded input/output name from the table cell or source adapter.
@@ -182,8 +193,8 @@ module ProvenanceSet =
 type ProvenanceConnection = {
     /// Swate-local stable connection ID.
     Id: ProvenanceConnectionId
-    /// Loaded table containing this editable connection.
-    TableName: ProvenanceTableName
+    /// Source containing this editable connection.
+    Source: ProvenanceSourceRef
     /// Optional process ID associated with this connection.
     ProcessId: ProvenanceProcessId option
     /// Optional process name associated with this connection.
@@ -197,8 +208,8 @@ type ProvenanceConnection = {
 /// Complete provenance projection for one loaded table session.
 /// The model stores loaded endpoints, their property value pointers, and loaded connections.
 type ProvenanceModel = {
-    /// The table currently opened and editable in the viewer.
-    LoadedTableName: ProvenanceTableName
+    /// The source currently opened and editable in the viewer.
+    Source: ProvenanceSourceRef
     /// Shared property value occurrence store.
     PropertyValues: Map<ProvenancePropertyValueId, ProvenancePropertyValue>
     /// First-class loaded input endpoints, keyed by `ProvenanceSet.Id`.
@@ -222,7 +233,7 @@ module ProvenanceModel =
                 match
                     model.InputSets.TryFind connection.InputSetId, model.OutputSets.TryFind connection.OutputSetId
                 with
-                | Some inputSet, Some _ when connection.TableName = model.LoadedTableName ->
+                | Some inputSet, Some _ when connection.Source.Id = model.Source.Id ->
                     let propertyValueIds = ProvenanceSet.effectivePropertyValueIds inputSet
 
                     if propertyValueIds.IsEmpty then

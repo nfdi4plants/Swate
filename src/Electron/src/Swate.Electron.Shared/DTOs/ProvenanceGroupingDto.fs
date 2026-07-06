@@ -44,8 +44,13 @@ type ProvenanceValueDto = {
     Term: ProvenanceTermDto option
 }
 
+type ProvenanceSourceRefDto = {
+    Id: ProvenanceSourceId
+    Name: ProvenanceSourceName
+}
+
 type ProvenanceWritebackAnchorDto = {
-    TableName: ProvenanceTableName
+    Source: ProvenanceSourceRefDto
     ProcessId: ProvenanceProcessId option
     ProcessName: ProvenanceProcessName option
     Header: ProvenancePropertyHeaderDto
@@ -53,17 +58,22 @@ type ProvenanceWritebackAnchorDto = {
     OutputNames: string[]
 }
 
+type ProvenancePropertyOriginDto = {
+    IsReal: bool
+    Anchor: ProvenanceWritebackAnchorDto
+}
+
 type ProvenancePropertyValueDto = {
     Id: ProvenancePropertyValueId
     Header: ProvenancePropertyHeaderDto
     Value: ProvenanceValueDto
     Unit: ProvenanceTermDto option
-    Source: ProvenanceWritebackAnchorDto option
+    Origin: ProvenancePropertyOriginDto
 }
 
 type ProvenanceSetDto = {
     Id: ProvenanceSetId
-    TableName: ProvenanceTableName
+    Source: ProvenanceSourceRefDto
     Header: ProvenanceIOHeaderDto
     Name: string
     PropertyValueIds: ProvenancePropertyValueId[]
@@ -72,7 +82,7 @@ type ProvenanceSetDto = {
 
 type ProvenanceConnectionDto = {
     Id: ProvenanceConnectionId
-    TableName: ProvenanceTableName
+    Source: ProvenanceSourceRefDto
     ProcessId: ProvenanceProcessId option
     ProcessName: ProvenanceProcessName option
     InputSetId: ProvenanceSetId
@@ -80,7 +90,7 @@ type ProvenanceConnectionDto = {
 }
 
 type ProvenanceModelDto = {
-    LoadedTableName: ProvenanceTableName
+    Source: ProvenanceSourceRefDto
     PropertyValues: ProvenanceMapEntryDto<ProvenancePropertyValueDto>[]
     InputSets: ProvenanceMapEntryDto<ProvenanceSetDto>[]
     OutputSets: ProvenanceMapEntryDto<ProvenanceSetDto>[]
@@ -192,10 +202,16 @@ module ProvenanceValueDto =
         | "Text"
         | _ -> value.Text |> Option.defaultValue "" |> ProvenanceValue.Text
 
+module ProvenanceSourceRefDto =
+
+    let ofModel (source: ProvenanceSourceRef) = { Id = source.Id; Name = source.Name }
+
+    let toModel (source: ProvenanceSourceRefDto) : ProvenanceSourceRef = { Id = source.Id; Name = source.Name }
+
 module ProvenanceWritebackAnchorDto =
 
     let ofModel (source: ProvenanceWritebackAnchor) = {
-        TableName = source.TableName
+        Source = ProvenanceSourceRefDto.ofModel source.Source
         ProcessId = source.ProcessId
         ProcessName = source.ProcessName
         Header = ProvenancePropertyHeaderDto.ofModel source.Header
@@ -204,13 +220,34 @@ module ProvenanceWritebackAnchorDto =
     }
 
     let toModel (source: ProvenanceWritebackAnchorDto) : ProvenanceWritebackAnchor = {
-        TableName = source.TableName
+        Source = ProvenanceSourceRefDto.toModel source.Source
         ProcessId = source.ProcessId
         ProcessName = source.ProcessName
         Header = ProvenancePropertyHeaderDto.toModel source.Header
         InputNames = source.InputNames |> Array.toList
         OutputNames = source.OutputNames |> Array.toList
     }
+
+module ProvenancePropertyOriginDto =
+
+    let ofModel =
+        function
+        | ProvenancePropertyOrigin.Real anchor -> {
+            IsReal = true
+            Anchor = ProvenanceWritebackAnchorDto.ofModel anchor
+          }
+        | ProvenancePropertyOrigin.Virtual anchor -> {
+            IsReal = false
+            Anchor = ProvenanceWritebackAnchorDto.ofModel anchor
+          }
+
+    let toModel origin =
+        let anchor = ProvenanceWritebackAnchorDto.toModel origin.Anchor
+
+        if origin.IsReal then
+            ProvenancePropertyOrigin.Real anchor
+        else
+            ProvenancePropertyOrigin.Virtual anchor
 
 module ProvenancePropertyValueDto =
 
@@ -219,7 +256,7 @@ module ProvenancePropertyValueDto =
         Header = ProvenancePropertyHeaderDto.ofModel propertyValue.Header
         Value = ProvenanceValueDto.ofModel propertyValue.Value
         Unit = propertyValue.Unit |> Option.map ProvenanceTermDto.ofModel
-        Source = propertyValue.Source |> Option.map ProvenanceWritebackAnchorDto.ofModel
+        Origin = ProvenancePropertyOriginDto.ofModel propertyValue.Origin
     }
 
     let toModel (propertyValue: ProvenancePropertyValueDto) : ProvenancePropertyValue = {
@@ -227,14 +264,14 @@ module ProvenancePropertyValueDto =
         Header = ProvenancePropertyHeaderDto.toModel propertyValue.Header
         Value = ProvenanceValueDto.toModel propertyValue.Value
         Unit = propertyValue.Unit |> Option.map ProvenanceTermDto.toModel
-        Source = propertyValue.Source |> Option.map ProvenanceWritebackAnchorDto.toModel
+        Origin = ProvenancePropertyOriginDto.toModel propertyValue.Origin
     }
 
 module ProvenanceSetDto =
 
     let ofModel (set: ProvenanceSet) = {
         Id = set.Id
-        TableName = set.TableName
+        Source = ProvenanceSourceRefDto.ofModel set.Source
         Header = ProvenanceIOHeaderDto.ofModel set.Header
         Name = set.Name
         PropertyValueIds = set.PropertyValueIds |> List.toArray
@@ -243,7 +280,7 @@ module ProvenanceSetDto =
 
     let toModel (set: ProvenanceSetDto) : ProvenanceSet = {
         Id = set.Id
-        TableName = set.TableName
+        Source = ProvenanceSourceRefDto.toModel set.Source
         Header = ProvenanceIOHeaderDto.toModel set.Header
         Name = set.Name
         PropertyValueIds = set.PropertyValueIds |> Array.toList
@@ -254,7 +291,7 @@ module ProvenanceConnectionDto =
 
     let ofModel (connection: ProvenanceConnection) = {
         Id = connection.Id
-        TableName = connection.TableName
+        Source = ProvenanceSourceRefDto.ofModel connection.Source
         ProcessId = connection.ProcessId
         ProcessName = connection.ProcessName
         InputSetId = connection.InputSetId
@@ -263,7 +300,7 @@ module ProvenanceConnectionDto =
 
     let toModel (connection: ProvenanceConnectionDto) : ProvenanceConnection = {
         Id = connection.Id
-        TableName = connection.TableName
+        Source = ProvenanceSourceRefDto.toModel connection.Source
         ProcessId = connection.ProcessId
         ProcessName = connection.ProcessName
         InputSetId = connection.InputSetId
@@ -273,7 +310,7 @@ module ProvenanceConnectionDto =
 module ProvenanceModelDto =
 
     let ofModel (model: ProvenanceModel) = {
-        LoadedTableName = model.LoadedTableName
+        Source = ProvenanceSourceRefDto.ofModel model.Source
         PropertyValues = model.PropertyValues |> MapDto.ofMap ProvenancePropertyValueDto.ofModel
         InputSets = model.InputSets |> MapDto.ofMap ProvenanceSetDto.ofModel
         OutputSets = model.OutputSets |> MapDto.ofMap ProvenanceSetDto.ofModel
@@ -281,7 +318,7 @@ module ProvenanceModelDto =
     }
 
     let toModel (model: ProvenanceModelDto) : ProvenanceModel = {
-        LoadedTableName = model.LoadedTableName
+        Source = ProvenanceSourceRefDto.toModel model.Source
         PropertyValues = model.PropertyValues |> MapDto.toMap ProvenancePropertyValueDto.toModel
         InputSets = model.InputSets |> MapDto.toMap ProvenanceSetDto.toModel
         OutputSets = model.OutputSets |> MapDto.toMap ProvenanceSetDto.toModel

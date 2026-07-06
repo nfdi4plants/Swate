@@ -11,712 +11,6 @@ open Swate.Components.Primitive.ContextMenu
 open Swate.Components.Primitive.ContextMenu.Types
 open Swate.Components.Page.ProvenanceGrouping.Types
 
-type private MeasuredConnector = {
-    Key: string
-    Path: string
-    TestId: string
-    ClassName: string
-    StrokeWidth: float
-    StrokeDasharray: string option
-    InteractiveConnection: DisplayConnection option
-    AriaLabel: string option
-    Color: string option
-}
-
-type ConnectorOverlayState = {
-    ExpandedGroup: (ProvenanceSide * string) option
-    SelectedConnectionId: string option
-    ExpandedProperties: Set<ProvenanceLayerId * ProvenanceSide * GroupingKey>
-}
-
-module ConnectorOverlayState =
-
-    let fromUiState (uiState: UiState) =
-        let selectedConnectionId =
-            match uiState.Detail with
-            | Some(ProvenanceDetail.Connection connectionId) -> Some connectionId
-            | _ -> None
-
-        {
-            ExpandedGroup = uiState.ExpandedGroup
-            SelectedConnectionId = selectedConnectionId
-            ExpandedProperties = uiState.ExpandedProperties
-        }
-
-    let isGroupExpanded side groupId state =
-        state.ExpandedGroup = Some(side, groupId)
-
-    let isPropertyExpanded layerId side header state =
-        state.ExpandedProperties.Contains(layerId, side, { Header = header })
-
-type private ConnectorMeasureContext = {
-    Container: HTMLElement
-    Origin: ClientRect
-    Nodes: Map<string, HTMLElement>
-}
-
-module private ConnectorDom =
-
-    [<Emit("Array.from($0.querySelectorAll($1))")>]
-    let querySelectorAll (_container: HTMLElement) (_selector: string) : HTMLElement[] = jsNative
-
-    let connectionNodes (container: HTMLElement) =
-        querySelectorAll container "[data-provenance-connection-node]"
-        |> Array.choose (fun node ->
-            let id = node.getAttribute "data-provenance-connection-node"
-            if isNull id then None else Some(id, node)
-        )
-        |> Map.ofArray
-
-/// Measures connection handles and builds SVG connector paths between them.
-module private ConnectorMeasure =
-
-    let createContext container = {
-        Container = container
-        Origin = container.getBoundingClientRect ()
-        Nodes = ConnectorDom.connectionNodes container
-    }
-
-    let private tryHandle (context: ConnectorMeasureContext) handle =
-        context.Nodes |> Map.tryFind (DragDrop.connectionHandleNodeId handle)
-
-    let private center (context: ConnectorMeasureContext) (node: HTMLElement) =
-        let origin = context.Origin
-        let rect = node.getBoundingClientRect ()
-
-        {
-            X = rect.left - origin.left + float context.Container.scrollLeft + rect.width / 2.
-            Y = rect.top - origin.top + float context.Container.scrollTop + rect.height / 2.
-        }
-
-    let pathBetweenPoints start finish =
-        let deltaX = finish.X - start.X
-        let direction = if deltaX >= 0. then 1. else -1.
-        // The bend scales with the horizontal span, so connectors between nearby
-        // endpoints stay short stubs instead of looping past their targets.
-        let bend = max 8. (abs deltaX / 2.)
-        let firstControlX = start.X + direction * bend
-        let secondControlX = finish.X - direction * bend
-        Some $"M {start.X} {start.Y} C {firstControlX} {start.Y}, {secondControlX} {finish.Y}, {finish.X} {finish.Y}"
-
-    let pathBetweenHandles context source target =
-        match tryHandle context source, tryHandle context target with
-        | Some sourceNode, Some targetNode -> pathBetweenPoints (center context sourceNode) (center context targetNode)
-        | _ -> None
-
-    /// Rail connectors shorter than this are skipped entirely so dense layouts do not
-    /// fill the rail gutters with overlapping stubs.
-    let minimumConnectorDistance = 24.
-
-    let private distanceBetween start finish =
-        let deltaX = finish.X - start.X
-        let deltaY = finish.Y - start.Y
-        sqrt (deltaX * deltaX + deltaY * deltaY)
-
-    let pathBetweenDistantHandles context source target =
-        match tryHandle context source, tryHandle context target with
-        | Some sourceNode, Some targetNode ->
-            let start = center context sourceNode
-            let finish = center context targetNode
-
-            if distanceBetween start finish < minimumConnectorDistance then
-                None
-            else
-                pathBetweenPoints start finish
-        | _ -> None
-
-/// Builds handle references used by overlay measurements.
-module private ConnectorHandles =
-
-    let group side groupId : ConnectionHandleRef = {
-        Kind = ConnectionHandleKind.GroupCard
-        Side = side
-        Id = groupId
-        ParentGroupId = None
-    }
-
-    let member' side groupId setId : ConnectionHandleRef = {
-        Kind = ConnectionHandleKind.GroupMember
-        Side = side
-        Id = setId
-        ParentGroupId = Some groupId
-    }
-
-    let propertyHeader side header : ConnectionHandleRef = {
-        Kind = ConnectionHandleKind.PropertyHeader
-        Side = side
-        Id = DragDrop.propertyHeaderIdentity header
-        ParentGroupId = None
-    }
-
-    let propertyValue side propertyValueId : ConnectionHandleRef = {
-        Kind = ConnectionHandleKind.PropertyValue
-        Side = side
-        Id = propertyValueId
-        ParentGroupId = None
-    }
-
-    /// Measurement-only anchor on the property-facing card edge; rail connectors end here
-    /// instead of at the draggable group handle on the opposite edge.
-    let propertyAnchor side groupId : ConnectionHandleRef = {
-        Kind = ConnectionHandleKind.GroupPropertyAnchor
-        Side = side
-        Id = groupId
-        ParentGroupId = None
-    }
-
-/// Projects model/UI state into concrete connector path definitions.
-module private ConnectorPaths =
-
-    let private measured key testId className strokeWidth strokeDasharray interactiveConnection ariaLabel color path = {
-        Key = key
-        Path = path
-        TestId = testId
-        ClassName = className
-        StrokeWidth = strokeWidth
-        StrokeDasharray = strokeDasharray
-        InteractiveConnection = interactiveConnection
-        AriaLabel = ariaLabel
-        Color = color
-    }
-
-    let private groupById (inputGroups: DisplayGroup list) (outputGroups: DisplayGroup list) side groupId =
-        let groups =
-            match side with
-            | ProvenanceSide.Input -> inputGroups
-            | ProvenanceSide.Output -> outputGroups
-
-        groups |> List.tryFind (fun group -> group.Id = groupId)
-
-    let private isGroupedCard (inputGroups: DisplayGroup list) (outputGroups: DisplayGroup list) side groupId =
-        groupById inputGroups outputGroups side groupId
-        |> Option.exists (fun group -> group.GroupingValues |> List.isEmpty |> not)
-
-    let private isConnectedToExpanded
-        (inputGroups: DisplayGroup list)
-        (outputGroups: DisplayGroup list)
-        connections
-        side
-        groupId
-        overlayState
-        =
-        isGroupedCard inputGroups outputGroups side groupId
-        && (connections
-            |> List.exists (fun connection ->
-                match side with
-                | ProvenanceSide.Input ->
-                    connection.SourceGroupId = groupId
-                    && ConnectorOverlayState.isGroupExpanded
-                        ProvenanceSide.Output
-                        connection.TargetGroupId
-                        overlayState
-                | ProvenanceSide.Output ->
-                    connection.TargetGroupId = groupId
-                    && ConnectorOverlayState.isGroupExpanded ProvenanceSide.Input connection.SourceGroupId overlayState
-            ))
-
-    let private isGroupExpanded
-        (inputGroups: DisplayGroup list)
-        (outputGroups: DisplayGroup list)
-        connections
-        side
-        groupId
-        overlayState
-        =
-        ConnectorOverlayState.isGroupExpanded side groupId overlayState
-        || isConnectedToExpanded inputGroups outputGroups connections side groupId overlayState
-
-    let groupConnections
-        context
-        (inputGroups: DisplayGroup list)
-        (outputGroups: DisplayGroup list)
-        connections
-        overlayState
-        =
-        connections
-        // Expanded endpoints swap the aggregate group connector for the
-        // member-level connectors, so the group line disappears instead of
-        // doubling up underneath them.
-        |> List.filter (fun connection ->
-            not (
-                isGroupExpanded
-                    inputGroups
-                    outputGroups
-                    connections
-                    ProvenanceSide.Input
-                    connection.SourceGroupId
-                    overlayState
-            )
-            && not (
-                isGroupExpanded
-                    inputGroups
-                    outputGroups
-                    connections
-                    ProvenanceSide.Output
-                    connection.TargetGroupId
-                    overlayState
-            )
-        )
-        |> List.choose (fun connection ->
-            ConnectorMeasure.pathBetweenHandles
-                context
-                (ConnectorHandles.group ProvenanceSide.Input connection.SourceGroupId)
-                (ConnectorHandles.group ProvenanceSide.Output connection.TargetGroupId)
-            |> Option.map (
-                measured
-                    $"connection:{connection.Id}"
-                    "provenance-connection"
-                    "swt:text-primary"
-                    2.25
-                    None
-                    (Some connection)
-                    (Some $"Select connection {connection.Id}")
-                    None
-            )
-        )
-
-    let memberConnections
-        context
-        (model: ProvenanceModel)
-        (inputGroups: DisplayGroup list)
-        (outputGroups: DisplayGroup list)
-        connections
-        overlayState
-        =
-        connections
-        |> List.collect (fun displayConnection ->
-            let inputExpanded =
-                isGroupExpanded
-                    inputGroups
-                    outputGroups
-                    connections
-                    ProvenanceSide.Input
-                    displayConnection.SourceGroupId
-                    overlayState
-
-            let outputExpanded =
-                isGroupExpanded
-                    inputGroups
-                    outputGroups
-                    connections
-                    ProvenanceSide.Output
-                    displayConnection.TargetGroupId
-                    overlayState
-
-            if not inputExpanded && not outputExpanded then
-                []
-            else
-                displayConnection.ConnectionIds
-                |> List.choose (fun connectionId ->
-                    model.Connections.TryFind connectionId
-                    |> Option.bind (fun connection ->
-                        let source =
-                            if inputExpanded then
-                                ConnectorHandles.member'
-                                    ProvenanceSide.Input
-                                    displayConnection.SourceGroupId
-                                    connection.InputSetId
-                            else
-                                ConnectorHandles.group ProvenanceSide.Input displayConnection.SourceGroupId
-
-                        let target =
-                            if outputExpanded then
-                                ConnectorHandles.member'
-                                    ProvenanceSide.Output
-                                    displayConnection.TargetGroupId
-                                    connection.OutputSetId
-                            else
-                                ConnectorHandles.group ProvenanceSide.Output displayConnection.TargetGroupId
-
-                        let singleConnection = {
-                            displayConnection with
-                                ConnectionIds = [ connectionId ]
-                        }
-
-                        ConnectorMeasure.pathBetweenHandles context source target
-                        |> Option.map (
-                            measured
-                                $"member:{displayConnection.Id}:{connectionId}"
-                                "provenance-member-connection"
-                                "swt:text-primary/70 swt:pointer-events-none"
-                                2.0
-                                None
-                                (Some singleConnection)
-                                (Some $"Select connection {displayConnection.Id}")
-                                None
-                        )
-                    )
-                )
-        )
-
-    let private memberHasMatchingValue (model: ProvenanceModel) predicate (member': DisplayMember) =
-        member'.PropertyValueIds
-        |> List.exists (fun propertyValueId -> model.PropertyValues.TryFind propertyValueId |> Option.exists predicate)
-
-    let private groupsMatching model predicate groups =
-        groups
-        |> List.filter (fun (group: DisplayGroup) ->
-            group.Members |> List.exists (memberHasMatchingValue model predicate)
-        )
-
-    /// Dashed rail connectors derived from model data only: collapsed properties
-    /// draw one line per same-side group containing any value for that property.
-    let private railConnectionsForSide
-        context
-        layerId
-        (model: ProvenanceModel)
-        side
-        groups
-        (railProjection: PropertyRails.RailProjection)
-        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
-        overlayState
-        =
-        railProjection.Headers
-        |> List.filter (fun header -> not (ConnectorOverlayState.isPropertyExpanded layerId side header overlayState))
-        |> List.collect (fun header ->
-            let color =
-                railProjection.ColorByHeader
-                |> Map.tryFind header
-                |> Option.bind id
-                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
-
-            groupsMatching model (fun propertyValue -> propertyValue.Header = header) groups
-            |> List.choose (fun group ->
-                ConnectorMeasure.pathBetweenDistantHandles
-                    context
-                    (ConnectorHandles.propertyHeader side header)
-                    (ConnectorHandles.propertyAnchor side group.Id)
-                |> Option.map (
-                    measured
-                        $"property:{side}:{DragDrop.propertyHeaderIdentity header}:{group.Id}"
-                        "provenance-property-connection"
-                        "swt:text-secondary swt:pointer-events-none"
-                        1.75
-                        (Some "4 4")
-                        None
-                        None
-                        color
-                )
-            )
-        )
-
-    let private propertyValueMatches header value unit' (propertyValue: ProvenancePropertyValue) =
-        propertyValue.Header = header
-        && propertyValue.Value = value
-        && propertyValue.Unit = unit'
-
-    let private valueRailConnectionsForSide
-        context
-        layerId
-        (model: ProvenanceModel)
-        side
-        groups
-        (railProjection: PropertyRails.RailProjection)
-        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
-        overlayState
-        =
-        railProjection.Headers
-        |> List.filter (fun header -> ConnectorOverlayState.isPropertyExpanded layerId side header overlayState)
-        |> List.collect (fun header ->
-            let color =
-                railProjection.ColorByHeader
-                |> Map.tryFind header
-                |> Option.bind id
-                |> Option.orElseWith (fun () -> colorByHeader |> Map.tryFind header |> Option.bind id)
-
-            railProjection.ValuesByHeader
-            |> Map.tryFind header
-            |> Option.defaultValue []
-            |> List.collect (fun propertyValue ->
-                groupsMatching model (propertyValueMatches header propertyValue.Value propertyValue.Unit) groups
-                |> List.choose (fun group ->
-                    ConnectorMeasure.pathBetweenDistantHandles
-                        context
-                        (ConnectorHandles.propertyValue side propertyValue.Id)
-                        (ConnectorHandles.propertyAnchor side group.Id)
-                    |> Option.map (
-                        measured
-                            $"value:{side}:{DragDrop.propertyHeaderIdentity header}:{Formatting.formatValue propertyValue.Value propertyValue.Unit}:{group.Id}"
-                            "provenance-value-connection"
-                            "swt:text-accent swt:pointer-events-none"
-                            2.0
-                            (Some "4 4")
-                            None
-                            None
-                            color
-                    )
-                )
-            )
-        )
-
-    let railConnections
-        context
-        layerId
-        model
-        inputGroups
-        outputGroups
-        inputRailProjection
-        outputRailProjection
-        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
-        overlayState
-        showPropertyHeaderConnectors
-        =
-        [
-            if showPropertyHeaderConnectors then
-                yield!
-                    railConnectionsForSide
-                        context
-                        layerId
-                        model
-                        ProvenanceSide.Input
-                        inputGroups
-                        inputRailProjection
-                        colorByHeader
-                        overlayState
-
-                yield!
-                    railConnectionsForSide
-                        context
-                        layerId
-                        model
-                        ProvenanceSide.Output
-                        outputGroups
-                        outputRailProjection
-                        colorByHeader
-                        overlayState
-            yield!
-                valueRailConnectionsForSide
-                    context
-                    layerId
-                    model
-                    ProvenanceSide.Input
-                    inputGroups
-                    inputRailProjection
-                    colorByHeader
-                    overlayState
-            yield!
-                valueRailConnectionsForSide
-                    context
-                    layerId
-                    model
-                    ProvenanceSide.Output
-                    outputGroups
-                    outputRailProjection
-                    colorByHeader
-                    overlayState
-        ]
-
-    let liveConnection liveConnectionDrag =
-        liveConnectionDrag
-        |> Option.bind (fun live ->
-            ConnectorMeasure.pathBetweenPoints live.Start live.Current
-            |> Option.map (
-                measured
-                    "live"
-                    "provenance-live-connection"
-                    "swt:text-primary swt:pointer-events-none swt:opacity-80"
-                    2.25
-                    (Some "6 4")
-                    None
-                    None
-                    None
-            )
-        )
-
-    let all
-        context
-        layerId
-        model
-        inputGroups
-        outputGroups
-        connections
-        inputRailProjection
-        outputRailProjection
-        (colorByHeader: Map<ProvenancePropertyHeader, string option>)
-        overlayState
-        showPropertyHeaderConnectors
-        =
-        [
-            yield!
-                railConnections
-                    context
-                    layerId
-                    model
-                    inputGroups
-                    outputGroups
-                    inputRailProjection
-                    outputRailProjection
-                    colorByHeader
-                    overlayState
-                    showPropertyHeaderConnectors
-            yield! groupConnections context inputGroups outputGroups connections overlayState
-            yield! memberConnections context model inputGroups outputGroups connections overlayState
-        ]
-
-module private ConnectorSvg =
-
-    let debugAttributes debug measured = [
-        if debug then
-            svg.custom ("data-testid", measured.TestId)
-            svg.custom ("data-provenance-connection-key", measured.Key)
-    ]
-
-    let strokeElements measured strokeWidth strokeOpacity debug =
-        let strokeColor = measured.Color |> Option.defaultValue "currentColor"
-        let debugAttributes = debugAttributes debug measured
-
-        [
-            // A surface-colored halo keeps crossing connectors readable.
-            Svg.path [
-                svg.d measured.Path
-                svg.fill "none"
-                svg.stroke "currentColor"
-                svg.strokeWidth (strokeWidth + 2.5)
-                svg.strokeLineCap "round"
-                svg.className "swt:text-base-200"
-                match measured.StrokeDasharray with
-                | Some dash -> svg.custom ("strokeDasharray", dash)
-                | None -> ()
-            ]
-            Svg.path [
-                svg.d measured.Path
-                svg.fill "none"
-                svg.stroke strokeColor
-                svg.strokeWidth strokeWidth
-                svg.strokeLineCap "round"
-                svg.custom ("strokeOpacity", strokeOpacity)
-                svg.className measured.ClassName
-                match measured.StrokeDasharray with
-                | Some dash -> svg.custom ("strokeDasharray", dash)
-                | None -> ()
-                match measured.Color with
-                | Some color -> svg.custom ("data-provenance-color", color)
-                | None -> ()
-                if measured.InteractiveConnection.IsNone then
-                    yield! debugAttributes
-            ]
-        ]
-
-module private ConnectorContextMenu =
-
-    let connectionKeyAttribute = "data-provenance-interactive-connection-key"
-
-    let private tryTargetElement (event: Browser.Types.Event) : Browser.Types.Element option =
-        let targetObj: obj = box event.target
-
-        if isNullOrUndefined targetObj || isNullOrUndefined targetObj?closest then
-            None
-        else
-            Some(unbox<Browser.Types.Element> targetObj)
-
-    let private interactiveConnectionKey (event: Browser.Types.MouseEvent) =
-        event
-        |> tryTargetElement
-        |> Option.bind (fun target ->
-            let node: Browser.Types.Element = !!target?closest($"[{connectionKeyAttribute}]")
-
-            if isNull node then
-                None
-            else
-                Some(node.getAttribute connectionKeyAttribute)
-        )
-        |> Option.bind (fun key -> if isNull key then None else Some key)
-
-    let spawnData paths event =
-        interactiveConnectionKey event
-        |> Option.bind (fun key ->
-            paths
-            |> List.tryFind (fun path -> path.Key = key)
-            |> Option.bind (fun path -> path.InteractiveConnection)
-        )
-        |> Option.map box
-
-    let items remove (data: obj) =
-        let connection = data |> unbox<DisplayConnection>
-
-        [
-            ContextMenuItem(
-                text = Html.span "Delete",
-                icon =
-                    Html.i [
-                        prop.className "swt:iconify swt:fluent--delete-20-regular swt:size-4"
-                    ],
-                onClick =
-                    (fun event ->
-                        event.buttonEvent.stopPropagation ()
-                        remove connection
-                    )
-            )
-        ]
-
-/// Thin ResizeObserver bindings used to remeasure connector paths after layout changes.
-module private ConnectorObserver =
-
-    [<Emit("new ResizeObserver(() => $0())")>]
-    let create (callback: unit -> unit) : obj = jsNative
-
-    [<Emit("$0.observe($1)")>]
-    let observeNode (observer: obj) (target: HTMLElement) : unit = jsNative
-
-    [<Emit("$0.querySelectorAll($1).forEach(node => $2.observe(node))")>]
-    let observeMatching (container: HTMLElement) (selector: string) (observer: obj) : unit = jsNative
-
-    [<Emit("$0.disconnect()")>]
-    let disconnect (observer: obj) : unit = jsNative
-
-module private AnimationFrame =
-
-    [<Emit("requestAnimationFrame($0)")>]
-    let request (_callback: unit -> unit) : float = jsNative
-
-    [<Emit("cancelAnimationFrame($0)")>]
-    let cancel (_handle: float) : unit = jsNative
-
-module private ConnectorPositionObserver =
-
-    let private rounded (value: float) = System.Math.Round(value, 2)
-
-    let private signature (container: HTMLElement) =
-        let origin = container.getBoundingClientRect ()
-
-        ConnectorDom.querySelectorAll container "[data-provenance-connection-node]"
-        |> Array.choose (fun node ->
-            let id = node.getAttribute "data-provenance-connection-node"
-
-            if isNull id then
-                None
-            else
-                let rect = node.getBoundingClientRect ()
-
-                let centerX = rect.left - origin.left + float container.scrollLeft + rect.width / 2.
-
-                let centerY = rect.top - origin.top + float container.scrollTop + rect.height / 2.
-
-                Some $"{id}:{rounded centerX}:{rounded centerY}:{rounded rect.width}:{rounded rect.height}"
-        )
-        |> Array.sort
-        |> String.concat "|"
-
-    let watch (container: HTMLElement) (onChange: unit -> unit) =
-        let lastSignature = ref (signature container)
-        let frame = ref None
-
-        let rec tick () =
-            let nextSignature = signature container
-
-            if nextSignature <> lastSignature.Value then
-                lastSignature.Value <- nextSignature
-                onChange ()
-
-            frame.Value <- Some(AnimationFrame.request tick)
-
-        frame.Value <- Some(AnimationFrame.request tick)
-
-        fun () ->
-            match frame.Value with
-            | Some handle -> AnimationFrame.cancel handle
-            | None -> ()
-
 [<Erase; Mangle(false)>]
 type ConnectorOverlay =
 
@@ -739,7 +33,14 @@ type ConnectorOverlay =
             Svg.svg [
                 svg.className "swt:absolute swt:inset-0 swt:pointer-events-none swt:size-full"
                 svg.children [
-                    yield! ConnectorSvg.strokeElements measured measured.StrokeWidth 1.0 (defaultArg debug false)
+                    yield!
+                        ConnectorSvg.strokeElements
+                            measured
+                            measured.StrokeWidth
+                            1.0
+                            false
+                            false
+                            (defaultArg debug false)
                 ]
             ]
         | None -> Html.none
@@ -756,6 +57,7 @@ type ConnectorOverlay =
             inputRailProjection: PropertyRails.RailProjection,
             outputRailProjection: PropertyRails.RailProjection,
             overlayState: ConnectorOverlayState,
+            layoutSignature: string,
             showPropertyHeaderConnectors: bool,
             liveDragStore: LiveDrag.Store,
             onSelect: DisplayConnection -> unit,
@@ -763,36 +65,99 @@ type ConnectorOverlay =
             ?debug: bool,
             ?railColorByHeader: Map<ProvenancePropertyHeader, string option>
         ) =
-        let paths, setPaths = React.useStateWithUpdater ([]: MeasuredConnector list)
+        let measuredState, setMeasuredState =
+            React.useStateWithUpdater ((([]: MeasuredConnector list), false))
+
         let hoveredKey, setHoveredKey = React.useState<string option> None
         let pendingFrame = React.useRef (None: float option)
-        let debugEnabled = defaultArg debug false
-        let colorByHeader = defaultArg railColorByHeader Map.empty
 
-        let setMeasuredPaths next =
-            setPaths (fun current -> if current = next then current else next)
+        // Hovering a group card (published through the store) emphasizes the
+        // connectors attached to it; only this overlay re-renders on hover changes.
+        let hoverStore = React.useContext HoverHighlight.context
+        let _, bumpHover = React.useStateWithUpdater 0
+
+        React.useEffect (
+            (fun () ->
+                let unsubscribe =
+                    hoverStore
+                    |> HoverHighlight.subscribe (fun () -> bumpHover (fun version -> version + 1))
+
+                FsReact.createDisposable unsubscribe
+            ),
+            [| box hoverStore |]
+        )
+
+        let hoveredGroup = hoverStore.Current
+
+        // Discrete data/layout changes morph paths to their new shape; continuous
+        // sources (scroll, resize, drag-driven mutations) snap per frame instead.
+        let animateNextMeasure = React.useRef false
+        let debugEnabled = defaultArg debug false
+
+        let colorByHeader =
+            React.useMemo ((fun () -> defaultArg railColorByHeader Map.empty), [| box railColorByHeader |])
+
+        // The logical connector list is pure model/UI derivation; recomputing it on
+        // every observer-driven remeasure made scroll and resize expensive on large
+        // models, so it is memoized here and only the DOM rect reads happen per frame.
+        let specs =
+            React.useMemo (
+                (fun () ->
+                    ConnectorPaths.specs
+                        layerId
+                        model
+                        inputGroups
+                        outputGroups
+                        connections
+                        inputRailProjection
+                        outputRailProjection
+                        colorByHeader
+                        overlayState
+                        showPropertyHeaderConnectors
+                ),
+                [|
+                    box layerId
+                    box model
+                    box inputGroups
+                    box outputGroups
+                    box connections
+                    box inputRailProjection
+                    box outputRailProjection
+                    box colorByHeader
+                    box overlayState.ExpandedGroups
+                    box overlayState.ExpandedProperties
+                    box showPropertyHeaderConnectors
+                |]
+            )
+
+        let latestSpecs = React.useRef specs
+
+        // useLayoutEffect (not a render-phase write) so a render that gets
+        // discarded under concurrent rendering / StrictMode never leaves this
+        // pointing at specs that were never actually committed. The sibling
+        // `React.useEffect(..., [| box specs |])` below runs after this, so
+        // ordering is unaffected.
+        React.useLayoutEffect ((fun () -> latestSpecs.current <- specs), [| box specs |])
+
+        let setMeasuredPaths animate next =
+            setMeasuredState (fun (current, currentAnimate) ->
+                if current = next then
+                    (current, currentAnimate)
+                else
+                    (next, animate)
+            )
 
         let measureNow () =
             pendingFrame.current <- None
+            let animate = animateNextMeasure.current
+            animateNextMeasure.current <- false
 
             match containerRef.current with
-            | None -> setMeasuredPaths []
+            | None -> setMeasuredPaths false []
             | Some container ->
                 let context = ConnectorMeasure.createContext container
 
-                ConnectorPaths.all
-                    context
-                    layerId
-                    model
-                    inputGroups
-                    outputGroups
-                    connections
-                    inputRailProjection
-                    outputRailProjection
-                    colorByHeader
-                    overlayState
-                    showPropertyHeaderConnectors
-                |> setMeasuredPaths
+                ConnectorPaths.measure context latestSpecs.current |> setMeasuredPaths animate
 
         let scheduleMeasure () =
             match pendingFrame.current with
@@ -806,50 +171,97 @@ type ConnectorOverlay =
                 pendingFrame.current <- None
             | None -> ()
 
-        React.useEffect (
-            (fun () ->
-                measureNow ()
+        // Layout plumbing is bound once per mount: the surface element identity is
+        // stable across renders, and node churn inside it is picked up by the
+        // mutation observer rather than by re-binding the observers.
+        React.useEffectOnce (fun () ->
+            match containerRef.current with
+            | None -> FsReact.createDisposable cancelPendingFrame
+            | Some container ->
+                let onLayout = fun (_: Event) -> scheduleMeasure ()
+                container.addEventListener ("scroll", onLayout)
+                Browser.Dom.window.addEventListener ("resize", onLayout)
 
-                match containerRef.current with
-                | None -> FsReact.createDisposable cancelPendingFrame
-                | Some container ->
-                    let onLayout = fun (_: Event) -> scheduleMeasure ()
-                    container.addEventListener ("scroll", onLayout)
-                    Browser.Dom.window.addEventListener ("resize", onLayout)
-                    let observer = ConnectorObserver.create scheduleMeasure
-                    let stopPositionObserver = ConnectorPositionObserver.watch container scheduleMeasure
+                let observer = ConnectorObserver.create scheduleMeasure
+
+                let observeCurrentNodes () =
                     ConnectorObserver.observeNode observer container
-                    // Resize nodes are the content-sized boxes (property headers, value
-                    // chips); their handles move when the box grows, without the handle
-                    // itself changing size, so the boxes must be observed directly.
+
                     ConnectorObserver.observeMatching
                         container
                         "[data-provenance-group-node],[data-provenance-connection-node],[data-provenance-resize-node]"
                         observer
 
-                    FsReact.createDisposable (fun () ->
-                        container.removeEventListener ("scroll", onLayout)
-                        Browser.Dom.window.removeEventListener ("resize", onLayout)
-                        ConnectorObserver.disconnect observer
-                        stopPositionObserver ()
-                        cancelPendingFrame ()
-                    )
+                let mutationFrame = ref (None: float option)
+
+                let cancelMutationFrame () =
+                    match mutationFrame.Value with
+                    | Some handle ->
+                        AnimationFrame.cancel handle
+                        mutationFrame.Value <- None
+                    | None -> ()
+
+                let scheduleMutationMeasure () =
+                    match mutationFrame.Value with
+                    | Some _ -> ()
+                    | None ->
+                        mutationFrame.Value <-
+                            Some(
+                                AnimationFrame.request (fun () ->
+                                    mutationFrame.Value <- None
+                                    observeCurrentNodes ()
+                                    // Measure in the same frame instead of scheduling
+                                    // another one; live panel resizes flow through this
+                                    // path and should trail the layout by one frame at
+                                    // most.
+                                    measureNow ()
+                                )
+                            )
+
+                let mutationObserver =
+                    ConnectorMutationObserver.create (fun () -> scheduleMutationMeasure ())
+
+                observeCurrentNodes ()
+                ConnectorMutationObserver.observe mutationObserver container
+
+                FsReact.createDisposable (fun () ->
+                    container.removeEventListener ("scroll", onLayout)
+                    Browser.Dom.window.removeEventListener ("resize", onLayout)
+                    ConnectorObserver.disconnect observer
+                    ConnectorMutationObserver.disconnect mutationObserver
+                    cancelMutationFrame ()
+                    cancelPendingFrame ()
+                )
+        )
+
+        // Spec changes measure synchronously so connectors track data edits within
+        // the same committed frame, exactly like the previous effect did.
+        React.useEffect (
+            (fun () ->
+                animateNextMeasure.current <- true
+                measureNow ()
             ),
-            [|
-                box layerId
-                box model
-                box inputGroups
-                box outputGroups
-                box connections
-                box inputRailProjection
-                box outputRailProjection
-                box overlayState.ExpandedGroup
-                box overlayState.ExpandedProperties
-                box showPropertyHeaderConnectors
-            |]
+            [| box specs |]
+        )
+
+        React.useEffect (
+            (fun () ->
+                animateNextMeasure.current <- true
+                scheduleMeasure ()
+            ),
+            [| box layoutSignature |]
         )
 
         let selectedConnectionId = overlayState.SelectedConnectionId
+        let paths, measuredWithAnimation = measuredState
+        let animatePaths = measuredWithAnimation && not (Motion.prefersReduced ())
+
+        // Keys seen in the previous committed render; connectors not in this set are
+        // freshly created and get their entrance animation.
+        let renderedKeys = React.useRef (Set.empty: Set<string>)
+        let previousKeys = renderedKeys.current
+
+        React.useEffect (fun () -> renderedKeys.current <- paths |> List.map (fun m -> m.Key) |> Set.ofList)
 
         React.Fragment [
             Svg.svg [
@@ -877,7 +289,14 @@ type ConnectorOverlay =
                             | Some connection, Some selectedId -> connection.Id = selectedId
                             | _ -> false
 
-                        let isEmphasized = isSelected || hoveredKey = Some measured.Key
+                        let isHoverRelated =
+                            match measured.InteractiveConnection, hoveredGroup with
+                            | Some connection, Some target ->
+                                (target.Side = ProvenanceSide.Input && connection.SourceGroupId = target.GroupId)
+                                || (target.Side = ProvenanceSide.Output && connection.TargetGroupId = target.GroupId)
+                            | _ -> false
+
+                        let isEmphasized = isSelected || hoveredKey = Some measured.Key || isHoverRelated
 
                         let strokeWidth =
                             if isEmphasized then
@@ -898,13 +317,57 @@ type ConnectorOverlay =
                         Svg.g [
                             svg.key measured.Key
                             svg.children [
-                                yield! ConnectorSvg.strokeElements measured strokeWidth strokeOpacity debugEnabled
+                                yield!
+                                    ConnectorSvg.strokeElements
+                                        measured
+                                        strokeWidth
+                                        strokeOpacity
+                                        animatePaths
+                                        (not (previousKeys.Contains measured.Key))
+                                        debugEnabled
+                                // A collapsed group connector summarizes several underlying
+                                // connections; the midpoint badge makes that multiplicity
+                                // visible without expanding the groups.
+                                match measured.InteractiveConnection, measured.Midpoint with
+                                | Some connection, Some midpoint when connection.ConnectionIds.Length > 1 ->
+                                    let countText = string connection.ConnectionIds.Length
+                                    let radius = if countText.Length > 2 then 12. else 9.
+
+                                    Svg.g [
+                                        svg.className "swt:pointer-events-none"
+                                        svg.custom ("opacity", strokeOpacity)
+                                        if debugEnabled then
+                                            svg.custom ("data-testid", "provenance-connection-count")
+                                            svg.custom ("data-provenance-connection-key", measured.Key)
+                                        svg.children [
+                                            Svg.circle [
+                                                svg.cx midpoint.X
+                                                svg.cy midpoint.Y
+                                                svg.r radius
+                                                svg.custom ("fill", "var(--color-base-100)")
+                                                svg.custom ("stroke", "var(--color-primary)")
+                                                svg.custom ("strokeWidth", 1.5)
+                                            ]
+                                            Svg.text [
+                                                svg.x midpoint.X
+                                                svg.y midpoint.Y
+                                                svg.custom ("textAnchor", "middle")
+                                                svg.custom ("dominantBaseline", "central")
+                                                svg.custom ("fill", "var(--color-primary)")
+                                                svg.custom ("fontSize", 10)
+                                                svg.custom ("fontWeight", 600)
+                                                svg.text countText
+                                            ]
+                                        ]
+                                    ]
+                                | _ -> ()
                                 // A wide transparent stroke is the actual pointer/keyboard target,
                                 // so selecting a thin curve no longer needs pixel accuracy.
                                 match measured.InteractiveConnection with
                                 | Some connection ->
                                     Svg.path [
                                         svg.d measured.Path
+                                        svg.custom ("style", ConnectorSvg.pathStyle measured.Path animatePaths)
                                         svg.fill "none"
                                         svg.stroke "transparent"
                                         svg.strokeWidth 14
