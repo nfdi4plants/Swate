@@ -273,12 +273,7 @@ module AnnotationTableMemo =
                         setCell: CompositeCell -> unit
                         debug: bool option
                     |}) ->
-                TableCell.CompositeCellActiveCell(
-                    props.index,
-                    props.cell,
-                    props.setCell,
-                    ?debug = props.debug
-                )
+                TableCell.CompositeCellActiveCell(props.index, props.cell, props.setCell, ?debug = props.debug)
             ),
             areEqual =
                 (fun props nextProps ->
