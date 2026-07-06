@@ -103,6 +103,12 @@ type Story = StoryObj<typeof meta>;
 
 export const Default: Story = {
   render: () => <PreviewHarness createInitialDraft={createEmptyDraft} />,
+  play: async ({ canvasElement }) => {
+    const canvas = within(canvasElement);
+
+    await expect(canvas.getByTestId('notes-add-existing-button')).toBeDisabled();
+    await expect(canvas.getByTestId('notes-create-new-button')).toBeDisabled();
+  },
 };
 
 export const ExistingTargetSubmit: Story = {

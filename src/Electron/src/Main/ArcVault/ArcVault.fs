@@ -564,6 +564,27 @@ type ArcVaults() =
             this.BroadcastRecentARCs()
             printfn $"[Swate] Removed vault '{id}'"
 
+    member private this.HasUnsavedRendererNoteChanges(vault: ArcVault) =
+        Remoting.createIpc ()
+        |> Remoting.withWindow vault.window
+        |> Remoting.buildProxySender<IRendererUnsavedChangesApi>
+        |> fun client -> client.hasUnsavedNoteChanges ()
+
+    member private this.ApproveClose(vault: ArcVault) =
+        vault.isCloseApproved <- true
+        vault.window.close ()
+        CloseRequestResolution.Handled
+
+    member private this.ResolveWhenRendererHasNoUnsavedNotes(windowId: int, vault: ArcVault, approveClose) = promise {
+        let! hasUnsavedNoteChanges = this.HasUnsavedRendererNoteChanges vault
+
+        if hasUnsavedNoteChanges then
+            swatelogfn windowId "Close request blocked by unsaved note changes."
+            return Ok CloseRequestResolution.BlockedByUnsavedNote
+        else
+            return! approveClose ()
+    }
+
     member this.ResolveCloseRequest(windowId: int, decision: SaveBeforeQuitDecision) = promise {
         match this.TryGetVault(windowId) with
         | None ->
@@ -576,29 +597,36 @@ type ArcVaults() =
             match decision with
             | SaveBeforeQuitDecision.CancelClose ->
                 swatelogfn windowId "Close request cancelled by user."
-                return Ok()
+                return Ok CloseRequestResolution.Handled
             | SaveBeforeQuitDecision.CloseWithoutSaving ->
-                swatelogfn windowId "Close request approved by user. Closing without saving."
-                vault.RefreshHasUnsavedArcChangesFlag()
-                vault.isCloseApproved <- true
-                vault.window.close ()
-                return Ok()
+                return!
+                    this.ResolveWhenRendererHasNoUnsavedNotes(
+                        windowId,
+                        vault,
+                        fun () -> promise {
+                            swatelogfn windowId "Close request approved by user. Closing without saving."
+                            vault.RefreshHasUnsavedArcChangesFlag()
+                            return Ok(this.ApproveClose vault)
+                        }
+                    )
             | SaveBeforeQuitDecision.SaveAndClose ->
-                swatelogfn windowId "Close request approved by user. Closing after main save."
+                return!
+                    this.ResolveWhenRendererHasNoUnsavedNotes(
+                        windowId,
+                        vault,
+                        fun () -> promise {
+                            swatelogfn windowId "Close request approved by user. Closing after main save."
 
-                if vault.hasUnsavedArcChanges then
-                    let! persistResult = vault.WriteArc()
+                            if vault.hasUnsavedArcChanges then
+                                let! persistResult = vault.WriteArc()
 
-                    match persistResult with
-                    | Error saveError -> return Error saveError
-                    | Ok() ->
-                        vault.isCloseApproved <- true
-                        vault.window.close ()
-                        return Ok()
-                else
-                    vault.isCloseApproved <- true
-                    vault.window.close ()
-                    return Ok()
+                                match persistResult with
+                                | Error saveError -> return Error saveError
+                                | Ok() -> return Ok(this.ApproveClose vault)
+                            else
+                                return Ok(this.ApproveClose vault)
+                        }
+                    )
     }
 
     member this.OnCloseWindow(window: BrowserWindow, vault: ArcVault, id: int) =
@@ -618,7 +646,7 @@ type ArcVaults() =
 
                         saveBeforeQuitClient.requestSaveBeforeQuit ()
                 else
-                    swatelogfn id "Closing window directly because no unsaved ARC changes are present."
+                    swatelogfn id "Closing window directly because no unsaved changes are present."
         )
 
         window.onClosed (fun () ->

@@ -14,9 +14,6 @@ module Validation =
         else
             Some trimmed
 
-    let isRequiredDataValid (draft: NotesDraft) =
-        not (String.IsNullOrWhiteSpace draft.Title) && draft.DateCreated.IsSome
-
     let tryParseDateCreated (dateText: string) =
         let trimmed = dateText.Trim()
 
@@ -58,3 +55,6 @@ module Validation =
         |> sanitizeProtocolNameCandidate
         |> fun value -> Regex.Replace(value, @"\s+", "_").Trim([| '_'; '-' |])
         |> toOptionalString
+
+    let isRequiredDataValid (draft: NotesDraft) =
+        sanitizeProtocolName draft.Title |> Option.isSome

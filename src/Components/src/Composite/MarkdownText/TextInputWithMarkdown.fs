@@ -75,7 +75,8 @@ type TextInputWithMarkdown =
             ?mode: PreviewMode,
             ?previewClassName: string,
             ?plugins: MarkdownToolbarPlugin list,
-            ?filePickerAdapter: MarkdownFilePickerAdapter
+            ?filePickerAdapter: MarkdownFilePickerAdapter,
+            ?onImmediateChange: string -> unit
         ) =
         let disabled = defaultArg disabled false
         let isJoin = defaultArg isJoin false
@@ -156,6 +157,11 @@ type TextInputWithMarkdown =
             [| box activePrompt; box tempValue |]
         )
 
+        let setChangedText (text: string) =
+            setTempValue text
+            onImmediateChange |> Option.iter (fun notify -> notify text)
+            startedChange.current <- true
+
         let tryGetTextarea () =
             textareaRef.current
             |> Option.map (fun element -> element :?> HTMLTextAreaElement)
@@ -172,15 +178,10 @@ type TextInputWithMarkdown =
 
         let syncTextFromTextarea () =
             match tryGetTextarea () with
-            | Some textarea when textarea.value <> tempValue ->
-                setTempValue textarea.value
-                startedChange.current <- true
+            | Some textarea when textarea.value <> tempValue -> setChangedText textarea.value
             | _ -> ()
 
-        let handleTextChange =
-            fun (text: string) ->
-                setTempValue text
-                startedChange.current <- true
+        let handleTextChange = setChangedText
 
         let getSelectionOrEnd () =
             match tryGetTextarea () with
@@ -282,8 +283,7 @@ type TextInputWithMarkdown =
             | Some prompt ->
                 let applyPromptResult (nextValue: string) ((nextSelectionStart, nextSelectionEnd): int * int) =
                     if isMountedRef.current then
-                        setTempValue nextValue
-                        startedChange.current <- true
+                        setChangedText nextValue
                         promptSelectionRef.current <- Some(nextSelectionStart, nextSelectionEnd)
                         setActivePrompt None
                         setPromptInput ""

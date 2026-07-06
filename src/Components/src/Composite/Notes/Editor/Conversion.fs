@@ -183,3 +183,69 @@ let formatMarkdown (draft: NotesDraft) =
         $"{header}\n"
     else
         $"{header}\n\n{body}\n"
+
+[<AbstractClass; Sealed>]
+type PayloadRequirements =
+
+    static member tryCreate(title: string, ?dateCreated: DateTime) =
+        Validation.sanitizeProtocolName title
+        |> Option.map (fun protocolName -> (dateCreated |> Option.defaultValue DateTime.Today).Date, protocolName)
+
+    static member tryResolve(draft: NotesDraft) =
+        PayloadRequirements.tryCreate (draft.Title, ?dateCreated = draft.DateCreated)
+
+    static member private createPayloadWithDate
+        (target: NotesTarget, relativePath: string, dateCreated: DateTime, draft: NotesDraft)
+        =
+        let draftWithEffectiveDate = {
+            draft with
+                DateCreated = Some dateCreated
+        }
+
+        {
+            Intent = {
+                RelativePath = relativePath
+                Content = formatMarkdown draftWithEffectiveDate
+                Target = target
+            }
+            Title = draft.Title.Trim()
+            DateCreated = dateCreated
+            Tags = draft.Tags |> Seq.toList
+        }
+
+    static member private tryCreatePayload
+        (
+            target: NotesTarget,
+            resolveRelativePath: DateTime -> string -> string option,
+            unsafePathMessage: string,
+            dateCreated: DateTime,
+            protocolName: string,
+            draft: NotesDraft
+        ) =
+        let dateCreated = dateCreated.Date
+
+        match resolveRelativePath dateCreated protocolName with
+        | None -> Error unsafePathMessage
+        | Some relativePath -> Ok(PayloadRequirements.createPayloadWithDate (target, relativePath, dateCreated, draft))
+
+    static member tryCreateExistingTargetPayload
+        (targetRef: ExistingTargetRef, dateCreated: DateTime, protocolName: string, draft: NotesDraft)
+        =
+        PayloadRequirements.tryCreatePayload (
+            NotesTarget.ExistingTarget targetRef,
+            (fun _ protocolName -> mkExistingTargetRelativePath targetRef protocolName),
+            "Could not resolve a safe target path.",
+            dateCreated,
+            protocolName,
+            draft
+        )
+
+    static member tryCreateNewRootNotePayload(dateCreated: DateTime, protocolName: string, draft: NotesDraft) =
+        PayloadRequirements.tryCreatePayload (
+            NotesTarget.NewRootNote,
+            (fun dateCreated protocolName -> mkNewRootNoteRelativePath dateCreated protocolName),
+            "Could not resolve a safe note path.",
+            dateCreated,
+            protocolName,
+            draft
+        )

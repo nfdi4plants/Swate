@@ -20,6 +20,7 @@ type Notes =
             setSelectedTarget: ExistingTargetRef option -> unit,
             availableTargets: ResizeArray<ExistingTargetRef>,
             isSubmitting: bool,
+            canSubmitDraft: bool,
             error: string option,
             submit: unit -> unit
         ) =
@@ -33,6 +34,9 @@ type Notes =
         let setClose isOpen =
             if not isOpen then
                 close ()
+
+        let createInExistingDisabled =
+            isSubmitting || selectedTarget.IsNone || not canSubmitDraft
 
         let footer =
             Html.div [
@@ -48,11 +52,14 @@ type Notes =
                         prop.testId "notes-create-existing-button"
                         prop.className [
                             "swt:btn swt:btn-primary"
-                            if isSubmitting || selectedTarget.IsNone then
+                            if createInExistingDisabled then
                                 "swt:btn-disabled"
                         ]
-                        prop.disabled (isSubmitting || selectedTarget.IsNone)
-                        prop.onClick (fun _ -> submit ())
+                        prop.disabled createInExistingDisabled
+                        prop.onClick (fun _ ->
+                            if not createInExistingDisabled then
+                                submit ()
+                        )
                         prop.text createInExistingText
                     ]
                 ]
@@ -88,23 +95,14 @@ type Notes =
         let setError (value: string option) =
             setUiState (State.setError value uiState)
 
-        let createPayload (target: NotesTarget) (relativePath: string) =
-            match draft.DateCreated with
-            | None -> setError (Some "Date Created is required.")
-            | Some dateCreated ->
-                let content = NoteConversion.formatMarkdown draft
+        let submitRequirements = NoteConversion.PayloadRequirements.tryResolve (draft)
+        let canSubmitDraft = submitRequirements.IsSome
 
-                let payload = {
-                    Intent = {
-                        RelativePath = relativePath
-                        Content = content
-                        Target = target
-                    }
-                    Title = draft.Title.Trim()
-                    DateCreated = dateCreated
-                    Tags = draft.Tags |> Seq.toList
-                }
-
+        let submitPayload onSuccess =
+            function
+            | Error message -> setError (Some message)
+            | Ok payload ->
+                onSuccess ()
                 onSubmit payload
 
         let setExistingTargetSelector isOpen =
@@ -115,51 +113,40 @@ type Notes =
             }
 
         let openExistingTargetSelector () =
-            let selectedTarget =
-                draft.SelectedExistingTarget
-                |> Option.bind (fun targetRef -> availableExistingTargets |> Seq.tryFind ((=) targetRef))
-                |> Option.orElseWith (fun () -> availableExistingTargets |> Seq.tryHead)
+            match submitRequirements with
+            | None -> ()
+            | Some _ ->
+                let selectedTarget =
+                    draft.SelectedExistingTarget
+                    |> Option.bind (fun targetRef -> availableExistingTargets |> Seq.tryFind ((=) targetRef))
+                    |> Option.orElseWith (fun () -> availableExistingTargets |> Seq.tryHead)
 
-            if draft.SelectedExistingTarget <> selectedTarget then
-                setDraft {
-                    draft with
-                        SelectedExistingTarget = selectedTarget
-                }
+                if draft.SelectedExistingTarget <> selectedTarget then
+                    setDraft {
+                        draft with
+                            SelectedExistingTarget = selectedTarget
+                    }
 
-            setExistingTargetSelector true
+                setExistingTargetSelector true
 
         let submitToExisting () =
-            if Validation.isRequiredDataValid draft |> not then
-                setError (Some "Please enter a Title and a Date Created value before submitting.")
-            else
-                match draft.SelectedExistingTarget with
-                | None -> setError (Some "Select a Study or Assay target first.")
-                | Some targetRef ->
-                    match draft.DateCreated with
-                    | None -> setError (Some "Date Created is required.")
-                    | Some dateCreated ->
-                        match NoteConversion.resolveProtocolName draft with
-                        | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
-                        | Some protocolName ->
-                            match NoteConversion.mkExistingTargetRelativePath targetRef protocolName with
-                            | None -> setError (Some "Could not resolve a safe target path.")
-                            | Some relativePath ->
-                                setExistingTargetSelector false
-                                createPayload (NotesTarget.ExistingTarget targetRef) relativePath
+            match draft.SelectedExistingTarget, submitRequirements with
+            | Some targetRef, Some(dateCreated, protocolName) ->
+                NoteConversion.PayloadRequirements.tryCreateExistingTargetPayload (
+                    targetRef,
+                    dateCreated,
+                    protocolName,
+                    draft
+                )
+                |> submitPayload (fun () -> setExistingTargetSelector false)
+            | _ -> ()
 
         let submitNewRootNote () =
-            if Validation.isRequiredDataValid draft |> not then
-                setError (Some "Please enter a Title and a Date Created value before submitting.")
-            else
-                match draft.DateCreated with
-                | None -> setError (Some "Date Created is required.")
-                | Some dateCreated ->
-                    match NoteConversion.resolveProtocolName draft with
-                    | None -> setError (Some "Title is invalid for protocol naming. Choose a different title.")
-                    | Some protocolName ->
-                        match NoteConversion.mkNewRootNoteRelativePath dateCreated protocolName with
-                        | None -> setError (Some "Could not resolve a safe note path.")
-                        | Some relativePath -> createPayload NotesTarget.NewRootNote relativePath
+            match submitRequirements with
+            | None -> ()
+            | Some(dateCreated, protocolName) ->
+                NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload (dateCreated, protocolName, draft)
+                |> submitPayload ignore
 
         Html.div [
             prop.className "swt:p-8 swt:flex swt:justify-center swt:overflow-y-auto"
@@ -173,7 +160,13 @@ type Notes =
                             prop.text "Notes"
                         ]
                         NoteFormFields.Main(draft, setDraft, filePickerAdapter)
-                        Actions.Main(uiState.IsSubmitting, openExistingTargetSelector, submitNewRootNote, uiState.Error)
+                        Actions.Main(
+                            uiState.IsSubmitting,
+                            canSubmitDraft,
+                            openExistingTargetSelector,
+                            submitNewRootNote,
+                            uiState.Error
+                        )
                         Notes.ExistingTargetModal(
                             uiState.ShowExistingTargetSelector,
                             (fun () -> setExistingTargetSelector false),
@@ -186,6 +179,7 @@ type Notes =
                             ),
                             availableExistingTargets,
                             uiState.IsSubmitting,
+                            canSubmitDraft,
                             uiState.Error,
                             submitToExisting
                         )

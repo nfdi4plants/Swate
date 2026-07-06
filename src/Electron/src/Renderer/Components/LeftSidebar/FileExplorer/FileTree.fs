@@ -79,6 +79,10 @@ type FileTree =
         let appStateCtx = Renderer.Context.AppStateContext.useAppStateCtx ()
         let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
         let gitStateCtx = Renderer.Context.GitStateContext.useGitStateCtx ()
+
+        let unsavedChangesCtx =
+            Renderer.Context.UnsavedChangesContext.useUnsavedChangesCtx ()
+
         let errorModal = useErrorModalCtx ()
 
         let arcScopeId =
@@ -175,27 +179,28 @@ type FileTree =
                 pageStateCtx.setState (Some(Renderer.Types.PageState.ErrorPage fullErrorMessage))
         }
 
-        let openPreview (item: FileItem) =
-            promise {
-                match item.Path with
-                | None ->
-                    errorModal.enqueue (
-                        ErrorModalRequest.create ($"File '{item.Name}' has no path.", title = "Preview failed")
-                    )
-                | Some path when item.IsDirectory ->
-                    let selectedPath = PathHelpers.normalizePath path
-                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
-                    pageStateCtx.setState None
-                | Some path ->
-                    let selectedPath = PathHelpers.normalizePath path
-                    fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+        let openNoteViewWithoutUnsavedGuard (item: FileItem) = promise {
+            match item.Path with
+            | None ->
+                errorModal.enqueue (
+                    ErrorModalRequest.create ($"File '{item.Name}' has no path.", title = "Preview failed")
+                )
+            | Some path when item.IsDirectory ->
+                let selectedPath = PathHelpers.normalizePath path
+                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
+                pageStateCtx.setState None
+            | Some path ->
+                let selectedPath = PathHelpers.normalizePath path
+                fileStateCtx.setSelection (ArcSelection.forTreePath (Some selectedPath))
 
-                    if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
-                        pageStateCtx.setState None
-                    else
-                        do! openSelectedPreview item.Name selectedPath
-            }
-            |> Promise.start
+                if Swate.Components.Page.FileExplorer.Helper.needsLfsDownload item then
+                    pageStateCtx.setState None
+                else
+                    do! openSelectedPreview item.Name selectedPath
+        }
+
+        let openPreview (item: FileItem) =
+            unsavedChangesCtx.RequestAction(fun () -> openNoteViewWithoutUnsavedGuard item)
 
         let reloadSelectedPreviewAfterFileTreeUpdate () =
             if

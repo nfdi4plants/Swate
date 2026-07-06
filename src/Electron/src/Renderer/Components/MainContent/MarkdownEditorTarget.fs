@@ -1,17 +1,17 @@
 module Renderer.Components.MainContent.MarkdownEditorTargetView
 
 open Feliz
+open Renderer.Context.UnsavedChangesContext
 open Swate.Components.Composite.MarkdownText
 open Swate.Components.Composite.MarkdownText.Types
 open Swate.Components.Composite.Notes.Editor
 open Swate.Components.Shared
-open Swate.Electron.Shared.FileIOHelper
-open Swate.Electron.Shared.FileIOTypes
 open Renderer.Components.Helper.FileSystemHelper
 
 [<ReactComponent(true)>]
 let MarkdownEditorTarget (content: string) =
     let fileStateCtx = Renderer.Context.FileStateContext.useFileStateCtx ()
+
     let markdown, setMarkdown = React.useState content
     let lastSavedContent, setLastSavedContent = React.useState content
     let isSaving, setIsSaving = React.useState false
@@ -44,37 +44,44 @@ let MarkdownEditorTarget (content: string) =
             [||]
         )
 
-    let writeMarkdown path =
-        let request = FileContentDTO.create FileContentType.Markdown markdown path
-
-        writeFileWithOptionalExternalAssetLinks
-            Api.ipcArcVaultApi.writeFile
-            Api.ipcArcVaultApi.createFileSystemItem
-            Api.ipcArcVaultApi.copyExternalFilesToArc
-            NoteConversion.tryGetNoteFolderRelativePath
-            NoteConversion.noteAssetsFolderName
-            request
-            pendingImageAssetsRef.current
-
-    let saveMarkdown () =
+    let saveMarkdownAsync () =
         match selectedPath with
-        | None -> setSaveError (Some "No markdown file is selected.")
-        | Some relativePath ->
-            promise {
-                setIsSaving true
-                setSaveError None
+        | None ->
+            let message = "No markdown file is selected."
+            setSaveError (Some message)
+            promise { return Error(exn message) }
+        | Some relativePath -> promise {
+            setIsSaving true
+            setSaveError None
 
-                let! writeResult = writeMarkdown relativePath
+            try
+                let currentMarkdown = markdown
+                let currentAssets = pendingImageAssetsRef.current
+
+                let! writeResult =
+                    Renderer.Components.MainContent.Helper.writeMarkdownNote relativePath currentMarkdown currentAssets
 
                 match writeResult with
                 | Ok() ->
-                    setLastSavedContent markdown
+                    setLastSavedContent currentMarkdown
                     pendingImageAssetsRef.current <- []
-                | Error exn -> setSaveError (Some $"Failed to save markdown file: {exn.Message}")
-
+                    return Ok()
+                | Error error ->
+                    let message = $"Failed to save markdown file: {error.Message}"
+                    setSaveError (Some message)
+                    return Error(exn message)
+            finally
                 setIsSaving false
-            }
-            |> Promise.start
+          }
+
+    let saveMarkdown () =
+        promise {
+            let! _ = saveMarkdownAsync ()
+            return ()
+        }
+        |> Promise.start
+
+    useUnsavedChangesGuard (UnsavedChangesGuard.note selectedPath saveMarkdownAsync (fun () -> hasUnsavedChanges))
 
     let saveStatusText =
         match saveError with

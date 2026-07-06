@@ -148,4 +148,99 @@ Body
                     .expect(NoteConversion.mkNewRootNoteRelativePath (DateTime(2026, 6, 15)) "Sampling_protocol")
                     .toEqual (Some "notes/2026-06-15/Sampling_protocol/Sampling_protocol.md")
         )
+
+        Vitest.test (
+            "PayloadRequirements.tryResolve defaults missing dates and requires a protocol-safe title",
+            fun () ->
+                let validDraft = {
+                    NotesDraft.init with
+                        Title = " Sampling protocol "
+                        DateCreated = Some(DateTime(2026, 6, 15))
+                }
+
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve (validDraft)).IsSome).toBe (true)
+
+                let missingDateDraft = { validDraft with DateCreated = None }
+
+                let beforeResolve = DateTime.Today
+
+                let missingDate, missingDateProtocolName =
+                    NoteConversion.PayloadRequirements.tryResolve (missingDateDraft)
+                    |> expectSome "Expected missing date to default."
+
+                let afterResolve = DateTime.Today
+
+                match
+                    NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload (
+                        missingDate,
+                        missingDateProtocolName,
+                        missingDateDraft
+                    )
+                with
+                | Error message -> failwith $"Expected payload, got error: {message}"
+                | Ok payload ->
+                    Vitest.expect(payload.DateCreated = beforeResolve || payload.DateCreated = afterResolve).toBe (true)
+
+                    Vitest
+                        .expect(payload.Intent.RelativePath)
+                        .toBe (
+                            $"notes/{NoteConversion.formatDateFolder payload.DateCreated}/Sampling_protocol/Sampling_protocol.md"
+                        )
+
+                    let frontmatter, _ =
+                        NoteConversion.tryDecodeMarkdownFrontmatter payload.Intent.Content
+                        |> expectSome "Expected YAML frontmatter to decode."
+
+                    Vitest.expect(frontmatter.Date).toEqual (payload.DateCreated)
+
+                let missingTitleDraft = { validDraft with Title = "   " }
+
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve (missingTitleDraft)).IsNone).toBe (true)
+
+                let unsafeTitleDraft = { validDraft with Title = "!!!" }
+
+                Vitest.expect((NoteConversion.PayloadRequirements.tryResolve (unsafeTitleDraft)).IsNone).toBe (true)
+        )
+
+        Vitest.test (
+            "tryCreateNewRootNotePayload creates the same root note intent as the wizard",
+            fun () ->
+                let draft = {
+                    NotesDraft.init with
+                        Title = " Sampling protocol "
+                        DateCreated = Some(DateTime(2026, 6, 15))
+                        MainText = "Body"
+                }
+
+                let dateCreated, protocolName =
+                    NoteConversion.PayloadRequirements.tryResolve (draft)
+                    |> expectSome "Expected payload requirements to resolve."
+
+                match
+                    NoteConversion.PayloadRequirements.tryCreateNewRootNotePayload (dateCreated, protocolName, draft)
+                with
+                | Error message -> failwith $"Expected payload, got error: {message}"
+                | Ok payload ->
+                    Vitest.expect(payload.Title).toBe ("Sampling protocol")
+
+                    Vitest
+                        .expect(payload.Intent.RelativePath)
+                        .toBe ("notes/2026-06-15/Sampling_protocol/Sampling_protocol.md")
+
+                    Vitest.expect(payload.Intent.Target).toEqual (NotesTarget.NewRootNote)
+                    Vitest.expect(payload.Intent.Content.Contains("Body")).toBe (true)
+        )
+
+        Vitest.test (
+            "hasUnsavedDraft detects user-entered note draft content",
+            fun () ->
+                Vitest.expect(State.hasUnsavedDraft NotesDraft.init).toBe (false)
+
+                let editedDraft = {
+                    NotesDraft.init with
+                        MainText = "draft body"
+                }
+
+                Vitest.expect(State.hasUnsavedDraft editedDraft).toBe (true)
+        )
 )

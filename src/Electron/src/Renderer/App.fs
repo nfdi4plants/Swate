@@ -3,8 +3,8 @@ module Renderer.App
 open Elmish
 open Feliz
 open Feliz.UseElmish
-open Renderer.Components
 open Renderer.Types
+open Renderer.Components
 open Swate.Components
 open Swate.Components.Composite.Layout
 open Swate.Components.Primitive.ErrorModal
@@ -156,7 +156,20 @@ let private LeftActionButtons (leftSidebarTarget: LeftSidebarPage) setLeftSideba
 let Main () =
     let model, dispatch = React.useElmish (init, update, subscribe, [||])
 
-    let setPageState (pageState: PageState option) = dispatch (PageStateChanged pageState)
+    let unsavedChanges =
+        Renderer.Components.UnsavedChangesController.useUnsavedChangesController ()
+
+    let pageProvidesUnsavedChangesGuard =
+        match model.PageState with
+        | Some(PageState.MarkdownPage _)
+        | Some PageState.NotesDraftPage -> true
+        | _ -> false
+
+    if not pageProvidesUnsavedChangesGuard then
+        unsavedChanges.Controller.SetActiveGuard None
+
+    let setPageState (pageState: PageState option) =
+        unsavedChanges.Controller.RequestAction(fun () -> promise { dispatch (PageStateChanged pageState) })
 
     let pageCtx: StateContext<PageState option> =
         React.useMemo (
@@ -205,29 +218,33 @@ let Main () =
                     (fun () -> Api.ipcArcVaultApi.getFileTree ()),
                     Renderer.Context.PageStateContext.PageStateCtx.Provider(
                         pageCtx,
-                        ErrorModalProvider.ErrorModalProvider(
-                            Renderer.Context.AuthStateContext.Provider(
-                                Renderer.Context.GitStateContext.GitStateCtxProvider(
-                                    Swate
-                                        .Components
-                                        .Composite
-                                        .AnnotationTable
-                                        .AnnotationTableContextProvider
-                                        .AnnotationTableContextProvider(
-                                            Layout.Main(
-                                                children =
-                                                    React.Fragment [|
-                                                        children
-                                                        CloseWindowController.CloseWindowController.Subscription()
-                                                    |],
-                                                navbar = Renderer.Components.Navbar.Main(),
-                                                ?leftSidebar = leftSidebar,
-                                                ?leftActions = leftActions
+                        Renderer.Context.UnsavedChangesContext.UnsavedChangesCtx.Provider(
+                            unsavedChanges.Controller,
+                            ErrorModalProvider.ErrorModalProvider(
+                                Renderer.Context.AuthStateContext.Provider(
+                                    Renderer.Context.GitStateContext.GitStateCtxProvider(
+                                        Swate
+                                            .Components
+                                            .Composite
+                                            .AnnotationTable
+                                            .AnnotationTableContextProvider
+                                            .AnnotationTableContextProvider(
+                                                Layout.Main(
+                                                    children =
+                                                        React.Fragment [|
+                                                            children
+                                                            CloseWindowController.CloseWindowController.Subscription()
+                                                            unsavedChanges.Modal
+                                                        |],
+                                                    navbar = Renderer.Components.Navbar.Main(),
+                                                    ?leftSidebar = leftSidebar,
+                                                    ?leftActions = leftActions
+                                                )
                                             )
-                                        )
-                                )
-                            ),
-                            ?scopeId = currentArcScopeId
+                                    )
+                                ),
+                                ?scopeId = currentArcScopeId
+                            )
                         )
                     )
                 )
