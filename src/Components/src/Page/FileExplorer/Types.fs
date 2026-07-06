@@ -106,6 +106,7 @@ type DirectoryInteractionMode =
     | OpenOnDoubleClickCloseOnSingleClick
     | ToggleOnSingleClickSelectOnDoubleClick
 
+/// The type of destination and source for a note assignment
 type AssignableNoteRef = {
     SourceFolderPath: string
     NoteFolderName: string
